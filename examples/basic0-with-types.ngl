@@ -1,0 +1,40 @@
+ngless version 0.0
+
+# This is a comment
+input :: List ReadSet
+input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq',stim2.fq'])
+
+contanminants :: List DNASequence
+contanminants = seq(['ATTACGGATAAATGGACA','AGGGAGAGGGGGAGAGAT'])
+contanminants += standard_contaminants(['illumina-PCR_10'])
+
+
+input :: List ReadSet
+input = remove_redundancies(input, max_copies=2)
+
+read :: Read&
+for read in input:
+    if read in contanminants:
+        discard
+    read = read[5:]
+    read = substrim(read, min_quality=26)
+    if len(read) < 31:
+        discard
+
+mapped :: List MapSet
+mapped = reference_map(input,
+                reference='hg19')
+
+annotated :: List AnnotatedSet
+annotated = annotate(mapped,
+                features=[:gene])
+
+write(mapcount(annotated, count=:gene),
+        ofile='gene_counts.csv',
+        format=:csv)
+write(mapcount(annotated, count=:chromosome),
+        ofile='chromossome.csv',
+        format=:csv)
+
+cover :: Count
+cover = coverage(mapped, |an| -> (an.map_start to an.map_end))
