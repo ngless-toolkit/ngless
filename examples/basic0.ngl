@@ -15,7 +15,7 @@ mapped = reference_map(input,
                 reference='hg19')
 annotated = annotate(mapped,
                 features=[:gene])
-write(mapcount(annotated),
+write(mapcount(annotated, count=:gene),
         ofile='gene_counts.csv',
         format=:csv)
 write(mapcount(annotated, count=:chromosome),
