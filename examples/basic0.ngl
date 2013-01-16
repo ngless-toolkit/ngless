@@ -2,7 +2,7 @@ ngless version 0.0
 input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq',stim2.fq'])
 contanminants = seq(['ATTACGGATAAATGGACA','AGGGAGAGGGGGAGAGAT'])
 contanminants += standard_contaminants(['illumina-PCR_10'])
-input = remove_redundancies(input, max_copies=2)
+input = unique(input, max_copies=2)
 for read in input:
     if read in contanminants:
         discard

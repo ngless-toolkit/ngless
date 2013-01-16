@@ -10,7 +10,7 @@ contanminants += standard_contaminants(['illumina-PCR_10'])
 
 
 input :: List ReadSet
-input = remove_redundancies(input, max_copies=2)
+input = unique(input, max_copies=2)
 
 read :: Read&
 for read in input:
