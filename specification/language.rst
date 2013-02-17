@@ -21,6 +21,11 @@ escapes apply (\\n for newline, ...).
 A symbol is denoted as a token preceded by ``:`` (e.g., ``:symbol`` or
 ``:gene``).
 
+Integers are specified as decimals ``[0-9]+`` or as hexadecimals
+``0x[0-9a-fA-F]+``.
+
+Booleans are denoted as ``true`` or ``false``.
+
 Language
 --------
 
