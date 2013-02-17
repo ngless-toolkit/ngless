@@ -47,6 +47,24 @@ Assignment is performed with ``=`` operator::
 
 A variable that is all upper-case is a constant and can only be assigned once.
 
+Types
+-----
+
+NGless supports the following basic types:
+
+- string
+- integer
+- bool
+- symbol
+- filename
+- shortread
+- shortreadset
+- mappedread
+- mappedreadset
+
+In addition, it supports the composite type ``List of X`` where ``X`` is a
+basic type.
+
 Functions
 ---------
 
@@ -69,38 +87,4 @@ A function of type ``A -> * -> B`` can be automatically used as ``[A] -> * ->
 [B]``::
 
     in1,in2 = fastq(["in1.fq", "in2.fq"])
-
-Builtin Functions
------------------
-
-``fastq:: Str -> ReadSet``
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Reads a FastQ file and computes all QC statistics.
-
-``unique:: ReadSet -> ReadSet``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Given a set of reads, returns another which only retains a set number of copies
-of each read (if there are any duplicates).
-
-Takes a ``max_copies`` parameter.
-
-``map:: ReadSet -> MappedSet``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Maps to a reference.
-
-``write:: * -> ()`` and ``print:: * -> ()``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Writes to a file (or, for ``print`` to standard output). Otherwise, these are
-identical functions.
-
-Example::
-
-    write(counts,
-            file="file.csv",
-            format=:csv)
-
 
