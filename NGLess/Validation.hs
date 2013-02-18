@@ -7,8 +7,19 @@ module Validation
 
 import Language
 
+import Data.Maybe
 import Data.Either
 import qualified Data.ByteString as S
 
 validate :: Expression -> Either S.ByteString Expression
-validate = Right
+validate expr = case errors of
+        [] -> Right expr
+        _ -> Left (S.concat errors)
+    where
+        errors = catMaybes (map ($expr) checks)
+        checks = [validate_types]
+
+
+validate_types :: Expression -> Maybe S.ByteString
+validate_types = const Nothing
+

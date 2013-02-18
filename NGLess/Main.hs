@@ -32,6 +32,6 @@ nglessargs = NGLessArgs
 main = do
     NGLessArgs fname <- cmdArgs nglessargs
     ngltext <- S.readFile fname
-    case parsengless (S8.pack fname) ngltext of
+    case parsengless (S8.pack fname) ngltext >>= validate of
         Left err -> S8.putStrLn err
         Right expr -> interpret expr
