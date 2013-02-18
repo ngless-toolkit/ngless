@@ -3,6 +3,10 @@
  -}
 module Language
     ( Expression(..)
+    , Variable(..)
+    , UOp(..)
+    , BOp(..)
+    , FuncName(..)
     ) where
 
 {- This module defines the internal representation the language -}

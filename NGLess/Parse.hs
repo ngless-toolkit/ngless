@@ -1,6 +1,7 @@
 {- Copyright 2013 NGLess Authors
  - License: GPL, version 3 or later
  -}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Parse
     ( parsengless
@@ -9,7 +10,7 @@ module Parse
 import Language
 
 import Data.Maybe
-import Control.Applicative
+import Control.Applicative hiding ((<|>), many)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import Text.Parsec.ByteString
@@ -26,8 +27,39 @@ parsengless _inputname input = case  parse nglparser "input" input of
 
 nglparser :: Parser Expression
 nglparser = many1 expression >>= return . Sequence
-expression = symbol
-symbol = (char ':')  *> (liftA ConstSymbol $ nglstring) <* (char ':')
-nglstring = liftA S8.pack $ many1 (oneOf asciiLetters)
+expression = (try symbol) <|>
+            (try nglstr) <|>
+            (try funccall)
+
+
+symbol = (char ':')  *> (liftA ConstSymbol $ ngltoken) <* (char ':')
+nglstr = (char '"') *> (liftA (ConstStr . S8.pack) $ many (noneOf "\"")) <* (char '"')
+
+ngltoken :: Parser S.ByteString
+ngltoken = liftA S8.pack $ many1 (oneOf asciiLetters)
+
+funccall :: Parser Expression
+funccall = do
+    fname <- ngltoken
+    _ <- char '('
+    arg <- expression
+    _ <- char ','
+    kwargs <- many (kwarg <* (char ','))
+    _ <- char ')'
+    case functionOf fname of
+        Right f -> return (FunctionCall f [arg] kwargs Nothing)
+        Left err -> error (show err)
+
+
+functionOf :: S.ByteString -> Either S.ByteString FuncName
+functionOf "fastq" = Right Ffastq
+functionOf _ = Left "Function not found"
+
+kwarg = do
+    name <- ngltoken
+    char '='
+    val <- expression
+    return (Variable name,val)
+
 
 asciiLetters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
