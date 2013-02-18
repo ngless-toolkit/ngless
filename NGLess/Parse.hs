@@ -27,4 +27,7 @@ parsengless _inputname input = case  parse nglparser "input" input of
 nglparser :: Parser Expression
 nglparser = many1 expression >>= return . Sequence
 expression = symbol
-symbol = string "abcdef" >>= return . ConstSymbol . S8.pack
+symbol = (char ':')  *> (liftA ConstSymbol $ nglstring) <* (char ':')
+nglstring = liftA S8.pack $ many1 (oneOf asciiLetters)
+
+asciiLetters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
