@@ -1,10 +1,12 @@
 {- Copyright 2013 NGLess Authors
  - License: GPL, version 3 or later
  -}
+{-# LANGUAGE DeriveDataTypeable #-}
 module Main
     ( main
     ) where
 
+import Interpret
 import Language
 import Validation
 import Parse
@@ -12,6 +14,7 @@ import Parse
 import System.Console.CmdArgs
 import Data.Either
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Char8 as S8
 
 version = "0.0.0"
 data NGLessArgs = NGLessArgs {
@@ -26,10 +29,9 @@ nglessargs = NGLessArgs
         details ["ngless implement the NGLess language"]
     where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013"]
 
-
 main = do
     NGLessArgs fname <- cmdArgs nglessargs
-    input <- readFile fname
-    case parse input >> validate of
-        Left err -> putStrLn err
+    ngltext <- S.readFile fname
+    case parsengless (S8.pack fname) ngltext of
+        Left err -> S8.putStrLn err
         Right expr -> interpret expr
