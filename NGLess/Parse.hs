@@ -53,6 +53,11 @@ funccall = do
 
 functionOf :: S.ByteString -> Either S.ByteString FuncName
 functionOf "fastq" = Right Ffastq
+functionOf "substrim" = Right Fsubstrim
+functionOf "map" = Right Fmap
+functionOf "count" = Right Fcount
+functionOf "write" = Fwrite
+functionOf "print" = Fprint
 functionOf _ = Left "Function not found"
 
 kwarg = pure (,) <*> (Variable <$> ngltoken <* char '=') <*> expression
