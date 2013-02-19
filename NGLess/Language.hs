@@ -15,7 +15,7 @@ import qualified Data.ByteString as S
 
 newtype Variable = Variable S.ByteString
     deriving (Eq, Show)
-data FuncName = Ffastq | Fsubstream | Fmap | Fcount | Fwrite | Fprint
+data FuncName = Ffastq | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
     deriving (Eq, Show)
 
 data UOp = UOpLen
