@@ -55,11 +55,6 @@ functionOf :: S.ByteString -> Either S.ByteString FuncName
 functionOf "fastq" = Right Ffastq
 functionOf _ = Left "Function not found"
 
-kwarg = do
-    name <- ngltoken
-    char '='
-    val <- expression
-    return (Variable name,val)
-
+kwarg = pure (,) <*> (Variable <$> ngltoken <* char '=') <*> expression
 
 asciiLetters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
