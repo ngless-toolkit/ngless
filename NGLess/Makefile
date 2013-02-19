@@ -14,6 +14,9 @@ ngless: Main.hs $(SOURCES)
 nglesstest: Tests.hs $(SOURCES)
 	ghc $(GHCOPTS) --make -O $^ -o $@
 
+tests: nglesstest
+	./nglesstest
+
 clean:
 	rm -rf .objs
 	rm -f ngless nglesstest
