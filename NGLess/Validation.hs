@@ -19,7 +19,15 @@ validate expr = case errors of
         errors = catMaybes (map ($expr) checks)
         checks = [validate_types]
 
-
+{- Each checking function has the type
+ -
+ - Expression -> Maybe S.ByteString
+ -
+ - If it finds an error, it returns a Just error; otherwise, Nothing.
+ -
+ - The validate function just runs all checks and either concatenates all the
+ - error messages or passes the expression unharmed on the Right side.
+ -}
 validate_types :: Expression -> Maybe S.ByteString
 validate_types = const Nothing
 
