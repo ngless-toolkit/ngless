@@ -45,10 +45,9 @@ ngltoken = comment
 
 _eol = ((char '\r' *> char '\n') <|> char '\n') *> pure TNewLine
 
-
 try_string s = try (string s)
 
-symbol = (char ':')  *> (TExpr . ConstSymbol . T.pack <$> variableStr) <* (char ':')
+symbol = (char '{')  *> (TExpr . ConstSymbol . T.pack <$> variableStr) <* (char '}')
 tstring = tstring' '\'' <|> tstring' '"'
     where tstring' term = char term *> (TExpr . ConstStr <$> strtext term) <* char term
 strtext term = T.pack <$> many (escapedchar <|> noneOf [term])
@@ -76,20 +75,24 @@ word = try $ do
     let k' = pure (T.pack k)
     case k of
         "true" -> pure (TExpr $ ConstBool True)
+        "True" -> pure (TExpr $ ConstBool True)
         "false" -> pure (TExpr $ ConstBool False)
+        "False" -> pure (TExpr $ ConstBool False)
         _
             | k `elem` reservedwords -> TReserved <$> k'
             | otherwise -> TWord <$> k'
 
 reservedwords = 
         ["if"
+        ,"else"
         ,"ngless"
         ,"len"
         ,"discard"
+        ,"continue"
         ]
 
 variableStr = (:) <$> (char '_' <|> letter) <*> many alphaNum
-operator = TOperator <$> oneOf "=,+-*():"
+operator = TOperator <$> oneOf "=,+-*():[]≠<>"
 indent = TIndent . length <$> many1 (char ' ')
 taberror = tab *> fail "Tabs are not used in NGLess. Please use spaces."
 

@@ -25,9 +25,14 @@ parsengless inputname input =
         tokenize inputname input >>= parsetoks inputname
 
 parsetoks :: String -> [Token] -> Either T.Text Expression
-parsetoks inputname toks = case parse nglparser inputname toks of
+parsetoks inputname toks = case parse nglparser inputname (cleanupindents toks) of
             Right val -> Right val
             Left err -> Left (T.pack . show $ err)
+
+cleanupindents (TNewLine:TIndent i:ts) = (TNewLine:TIndent i:cleanupindents ts)
+cleanupindents (TIndent _:ts) = cleanupindents ts
+cleanupindents (t:ts) = (t:cleanupindents ts)
+cleanupindents [] = []
 
 type Parser = GenParser Token ()
 
@@ -35,7 +40,9 @@ nglparser = Sequence <$> (many1 expression <* eof)
 expression :: Parser Expression
 expression = expression' <* (many eol)
     where
-        expression' = assignment <|> rawexpr <|> funccall
+        expression' = pexpression <|> assignment <|> rawexpr <|> funccall <|> conditional
+
+pexpression = operator '(' *> expression <* operator ')'
 
 tokf ::  (Token -> Maybe a) -> Parser a
 tokf f = tokenPrim show updatePos f
@@ -55,6 +62,15 @@ operator op = tokf $ \t -> case t of
 word = tokf $ \t -> case t of
     TWord w -> Just w
     _ -> Nothing
+
+reserved r = tokf $ \t -> case t of
+    TReserved r' | r == r' -> Just r
+    _ -> Nothing
+
+indentation = tokf $ \t -> case t of
+    TIndent i -> Just i
+    _ -> Nothing
+
 eol = tokf $ \t -> case t of { TNewLine -> Just (); _ -> Nothing }
 
 funccall = FunctionCall <$>
@@ -82,3 +98,20 @@ assignment = try assignment'
             Assignment <$> (Variable <$> word) <*> (space *> operator '=' *> space *> expression)
 
 space = optional . tokf $ \t -> case t of { TComment _ -> Just (); TNewLine -> Just (); TIndent _ -> Just (); _ -> Nothing; }
+
+conditional = Condition <$> (reserved "if" *> expression <* operator ':') <*> block <*> mayelse
+mayelse = elseblock <|> (pure $ Sequence [])
+elseblock = (reserved "else" *> operator ':' *> block)
+block = do
+        eol
+        level <- indentation
+        first <- expression <* many eol
+        rest <- block' level
+        return $ Sequence (first:rest)
+    where
+        block' level = many (try $ do
+                            level' <- indentation
+                            if level /= level'
+                                then fail "indentation changed"
+                                else expression <* many eol)
+

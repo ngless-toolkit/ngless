@@ -23,7 +23,7 @@ main = $(defaultMainGenerator)
 
 
 -- Test Parsing Module
-case_parse_symbol = parsengless "test" ":symbol:" @?= Right (Sequence [ConstSymbol "symbol"])
+case_parse_symbol = parsengless "test" "{symbol}" @?= Right (Sequence [ConstSymbol "symbol"])
 case_parse_fastq = parsengless "test" fastqcalls @?= Right fastqcall
     where
         fastqcalls = "fastq(\"input.fq\")"
@@ -48,6 +48,21 @@ case_parse_bool = parsengless "test" bools @?= Right bool
     where
         bools = "a = true"
         bool  = Sequence [Assignment (Variable "a") (ConstBool True)]
+
+case_parse_if_else = parsengless "test" blocks @?= Right block
+    where
+        blocks = "if true:\n 0\n 1\nelse:\n 2\n"
+        block  = Sequence [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [ConstNum 2])]
+
+case_parse_if = parsengless "test" blocks @?= Right block
+    where
+        blocks = "if true:\n 0\n 1\n"
+        block  = Sequence [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [])]
+
+case_parse_if_end = parsengless "test" blocks @?= Right block
+    where
+        blocks = "if true:\n 0\n 1\n2\n"
+        block  = Sequence [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence []),ConstNum 2]
 
 case_parse_tok_cr = TNewLine @=? (case parse (_eol <* eof) "test" "\r\n" of { Right t -> t; Left _ -> error "Parse failed"; })
 
