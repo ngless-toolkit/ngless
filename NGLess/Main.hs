@@ -36,7 +36,7 @@ main = do
     --Note that the input for ngless is always UTF-8.
     --Always. This means that we cannot use T.readFile
     --which is locale aware
-    engltext <- T.decodeUtf8' <$> S.readFile fname
+    engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of
         Left err -> putStrLn (show err)
         Right ngltext -> case parsengless (T.pack fname) ngltext >>= validate of
