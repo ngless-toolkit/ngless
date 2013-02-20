@@ -31,7 +31,7 @@ parsetoks inputname toks = case parse nglparser inputname toks of
 
 type Parser = GenParser Token ()
 
-nglparser = Sequence <$> (many1 expression)
+nglparser = Sequence <$> (many1 expression <* eof)
 expression :: Parser Expression
 expression = assignment <|> rawexpr <|> funccall
 
