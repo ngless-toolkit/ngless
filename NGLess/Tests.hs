@@ -36,3 +36,12 @@ case_parse_sequence = parsengless "test" seqs @?= Right seqr
         seqr = Sequence [a,a]
         a    = Assignment (Variable "reads") (ConstStr "something")
 
+case_parse_num = parsengless "test" nums @?= Right num
+    where
+        nums = "a = 0x10"
+        num  = Sequence [Assignment (Variable "a") (ConstNum 16)]
+
+case_parse_bool = parsengless "test" bools @?= Right bool
+    where
+        bools = "a = true"
+        bool  = Sequence [Assignment (Variable "a") (ConstBool True)]

@@ -35,6 +35,7 @@ tokenizer = many ngltoken <* eof
 ngltoken = comment
         <|> symbol
         <|> tstring
+        <|> number
         <|> word
         <|> operator
         <|> indent
@@ -71,9 +72,13 @@ skipmultilinecomment = (try_string "*/" *> pure 0)
 word = try $ do
     k <- variableStr
     let k' = pure (T.pack k)
-    if k `elem` reservedwords
-        then TReserved <$> k'
-        else TWord <$> k'
+    case k of
+        "true" -> pure (TExpr $ ConstBool True)
+        "false" -> pure (TExpr $ ConstBool False)
+        _
+            | k `elem` reservedwords -> TReserved <$> k'
+            | otherwise -> TWord <$> k'
+
 reservedwords = 
         ["if"
         ,"ngless"
@@ -85,3 +90,8 @@ variableStr = (:) <$> (char '_' <|> letter) <*> many alphaNum
 operator = TOperator <$> oneOf "=,+-*():"
 indent = TIndent . length <$> many1 (char ' ')
 taberror = tab *> fail "Tabs are not used in NGLess. Please use spaces."
+
+number = TExpr . ConstNum <$> (try hex <|> dec)
+    where
+        hex = (read . ("0x"++)) <$> (string "0x" *> many1 hexDigit)
+        dec = read <$> many1 digit
