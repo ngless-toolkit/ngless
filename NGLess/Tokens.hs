@@ -19,6 +19,7 @@ import Language
 
 data Token =
         TExpr Expression
+        | TBop BOp
         | TWord T.Text
         | TReserved T.Text
         | TOperator Char
@@ -38,6 +39,7 @@ ngltoken = comment
         <|> tstring
         <|> number
         <|> word
+        <|> boperator
         <|> operator
         <|> indent
         <|> taberror
@@ -92,7 +94,20 @@ reservedwords =
         ]
 
 variableStr = (:) <$> (char '_' <|> letter) <*> many alphaNum
-operator = TOperator <$> oneOf "=,+-*():[]≠<>"
+operator = TOperator <$> oneOf "=,+-*():[]<>"
+boperator = choice [
+                try ((string long) *> pure (TBop short))
+                    | (long,short) <-
+                    [ ("!=", BOpNEQ)
+                    , ("==", BOpEQ)
+                    , ("<=", BOpLTE)
+                    , ("<", BOpLT)
+                    , (">=", BOpGTE)
+                    , (">", BOpGT)
+
+                    , ("+", BOpAdd)
+                    , ("*", BOpMul)
+                    ]]
 indent = TIndent . length <$> many1 (char ' ')
 taberror = tab *> fail "Tabs are not used in NGLess. Please use spaces."
 

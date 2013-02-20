@@ -20,7 +20,7 @@ data FuncName = Ffastq | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
 
 data UOp = UOpLen
     deriving (Eq, Show)
-data BOp = BOpAdd | BOpMul
+data BOp = BOpAdd | BOpMul | BOpGT | BOpGTE | BOpLT | BOpLTE | BOpEQ | BOpNEQ
     deriving (Eq, Show)
 
 data Index = Index (Maybe Integer) (Maybe Integer)
