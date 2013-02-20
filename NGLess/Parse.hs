@@ -31,6 +31,7 @@ parsetoks inputname toks = case parse nglparser inputname (cleanupindents toks) 
 
 cleanupindents (TNewLine:TIndent i:ts) = (TNewLine:TIndent i:cleanupindents ts)
 cleanupindents (TIndent _:ts) = cleanupindents ts
+cleanupindents (TComment 0:ts) = cleanupindents ts -- same line comments do not matter
 cleanupindents (t:ts) = (t:cleanupindents ts)
 cleanupindents [] = []
 
