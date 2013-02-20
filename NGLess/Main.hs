@@ -12,7 +12,6 @@ import Parse
 
 import Control.Applicative
 import System.Console.CmdArgs
-import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as S
