@@ -10,10 +10,13 @@ import Test.HUnit
 import Test.QuickCheck
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
-import Data.Either
+import Control.Applicative
+import Text.Parsec (parse)
+import Text.Parsec.Combinator (eof)
 
 import Language
 import Parse
+import Tokens
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -45,3 +48,6 @@ case_parse_bool = parsengless "test" bools @?= Right bool
     where
         bools = "a = true"
         bool  = Sequence [Assignment (Variable "a") (ConstBool True)]
+
+case_parse_tok_cr = TNewLine @=? (case parse (_eol <* eof) "test" "\r\n" of { Right t -> t; Left _ -> error "Parse failed"; })
+

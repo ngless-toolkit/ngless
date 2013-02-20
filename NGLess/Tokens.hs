@@ -6,10 +6,11 @@
 module Tokens
     ( Token(..)
     , tokenize
+    , _eol
     ) where
 
 import qualified Data.Text as T
-import Control.Applicative hiding ((<|>), many)
+import Control.Applicative hiding ((<|>), many, optional)
 import Control.Monad (void)
 import Text.Parsec.Text ()
 import Text.Parsec.Combinator
@@ -40,9 +41,10 @@ ngltoken = comment
         <|> operator
         <|> indent
         <|> taberror
-        <|> eol
+        <|> _eol
 
-eol = char '\n' *> return TNewLine
+_eol = ((char '\r' *> char '\n') <|> char '\n') *> pure TNewLine
+
 
 try_string s = try (string s)
 
@@ -62,7 +64,7 @@ strtext term = T.pack <$> many (escapedchar <|> noneOf [term])
 comment = singlelinecomment <|> multilinecomment
 singlelinecomment = commentstart *> skiptoeol
     where commentstart = (void $ char '#') <|> (void . try $ string "//")
-skiptoeol = eol  <|> (anyChar *> skiptoeol)
+skiptoeol = _eol  <|> (anyChar *> skiptoeol)
 multilinecomment = (try_string "/*") *> (TComment <$> skipmultilinecomment)
 skipmultilinecomment = (try_string "*/" *> pure 0)
             <|> (char '\n' *> ((+1) <$> skipmultilinecomment))
