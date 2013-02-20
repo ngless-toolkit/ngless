@@ -21,6 +21,6 @@ main = $(defaultMainGenerator)
 case_parse_symbol = parsengless "test" ":symbol:" @?= Right (Sequence [ConstSymbol "symbol"])
 case_parse_fastq = parsengless "test" fastqcalls @?= Right fastqcall
     where
-        fastqcalls = "fastq(\"input.fq\",)"
+        fastqcalls = "fastq(\"input.fq\")"
         fastqcall  = Sequence [FunctionCall Ffastq [ConstStr "input.fq"] [] Nothing]
 

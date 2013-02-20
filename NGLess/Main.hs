@@ -39,6 +39,6 @@ main = do
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of
         Left err -> putStrLn (show err)
-        Right ngltext -> case parsengless (T.pack fname) ngltext >>= validate of
+        Right ngltext -> case parsengless fname ngltext >>= validate of
             Left err -> T.putStrLn err
             Right expr -> interpret expr

@@ -6,6 +6,7 @@ SOURCES :=  \
 	Interpret.hs \
 	Language.hs \
 	Parse.hs \
+	Tokens.hs \
 	Validation.hs
 
 ngless: Main.hs $(SOURCES)

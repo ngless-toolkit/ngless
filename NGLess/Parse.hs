@@ -8,57 +8,68 @@ module Parse
     ) where
 
 import Language
+import Tokens
 
-import Data.Maybe
 import Control.Applicative hiding ((<|>), many)
+import Control.Monad.Identity ()
 import qualified Data.Text as T
-import Text.Parsec.Text
+import Text.ParserCombinators.Parsec.Prim hiding (Parser)
 import Text.Parsec.Combinator
-import Text.Parsec
+import Text.Parsec (incSourceLine)
 
 -- main function of this module
 -- Because the scripts are expected to be small, we can expect to load them
 -- whole into memory (with a strict Text) before parsing
-parsengless :: T.Text -> T.Text -> Either T.Text Expression
-parsengless _inputname input = case  parse nglparser "input" input of
+parsengless :: String -> T.Text -> Either T.Text Expression
+parsengless inputname input =
+        tokenize inputname input >>= parsetoks inputname
+
+parsetoks :: String -> [Token] -> Either T.Text Expression
+parsetoks inputname toks = case parse nglparser inputname toks of
             Right val -> Right val
             Left err -> Left (T.pack . show $ err)
 
-nglparser :: Parser Expression
-nglparser = many1 expression >>= return . Sequence
-expression = (try symbol) <|>
-            (try nglstr) <|>
-            (try funccall)
+type Parser = GenParser Token ()
 
+nglparser = Sequence <$> (many1 expression)
+expression :: Parser Expression
+expression = rawexpr <|> funccall
+tokf ::  (Token -> Maybe a) -> Parser a
+tokf f = tokenPrim show updatePos f
+    where
+        updatePos s TNewLine _ = incSourceLine s 1
+        updatePos s (TComment t) _ = incSourceLine s t
+        updatePos s _ _ = s
 
-symbol = (char ':')  *> (liftA ConstSymbol $ ngltoken) <* (char ':')
-nglstr = (char '"') *> (liftA (ConstStr . T.pack) $ many (noneOf "\"")) <* (char '"')
+rawexpr = tokf $ \t -> case t of
+    TExpr e -> Just e
+    _ -> Nothing
 
-ngltoken :: Parser T.Text
-ngltoken = T.pack <$> many1 (oneOf asciiLetters)
+operator op = tokf $ \t -> case t of
+    TOperator op' | op == op' -> Just t
+    _ -> Nothing
 
-funccall :: Parser Expression
-funccall = do
-    fname <- ngltoken
-    _ <- char '('
-    arg <- expression
-    _ <- char ','
-    kwargs <- many (kwarg <* (char ','))
-    _ <- char ')'
-    case functionOf fname of
-        Right f -> return (FunctionCall f [arg] kwargs Nothing)
-        Left err -> error (show err)
+word = tokf $ \t -> case t of
+    TWord w -> Just w
+    _ -> Nothing
 
+funccall = FunctionCall <$>
+                (try funcname <* operator '(')
+                <*> ((:[]) <$> expression)
+                <*> (kwargs <* operator ')')
+                <*> pure Nothing
 
-functionOf :: T.Text -> Either T.Text FuncName
-functionOf "fastq" = Right Ffastq
-functionOf "substrim" = Right Fsubstrim
-functionOf "map" = Right Fmap
-functionOf "count" = Right Fcount
-functionOf "write" = Right Fwrite
-functionOf "print" = Right Fprint
-functionOf _ = Left "Function not found"
+funcname = do
+    fname <- word
+    case fname of
+        "fastq" -> pure Ffastq
+        "substrim" -> pure Fsubstrim
+        "map" -> pure Fmap
+        "count" -> pure Fcount
+        "write" -> pure Fwrite
+        "print" -> pure Fprint
+        _ -> fail "Function not found"
 
-kwarg = pure (,) <*> (Variable <$> ngltoken <* char '=') <*> expression
+kwargs = many (operator ',' *> kwarg)
+kwarg = pure (,) <*> (Variable <$> word <* operator '=') <*> expression
 
-asciiLetters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
