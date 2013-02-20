@@ -81,6 +81,6 @@ reservedwords =
         ]
 
 variableStr = (:) <$> (char '_' <|> letter) <*> many alphaNum
-operator = TOperator <$> oneOf ",+-*():"
+operator = TOperator <$> oneOf "=,+-*():"
 indent = TIndent . length <$> many1 (char ' ')
 taberror = tab *> fail "Tabs are not used in NGLess. Please use spaces."

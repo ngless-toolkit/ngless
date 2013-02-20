@@ -10,7 +10,7 @@ module Parse
 import Language
 import Tokens
 
-import Control.Applicative hiding ((<|>), many)
+import Control.Applicative hiding ((<|>), many, optional)
 import Control.Monad.Identity ()
 import qualified Data.Text as T
 import Text.ParserCombinators.Parsec.Prim hiding (Parser)
@@ -33,7 +33,8 @@ type Parser = GenParser Token ()
 
 nglparser = Sequence <$> (many1 expression)
 expression :: Parser Expression
-expression = rawexpr <|> funccall
+expression = assignment <|> rawexpr <|> funccall
+
 tokf ::  (Token -> Maybe a) -> Parser a
 tokf f = tokenPrim show updatePos f
     where
@@ -71,5 +72,10 @@ funcname = do
         _ -> fail "Function not found"
 
 kwargs = many (operator ',' *> kwarg)
-kwarg = pure (,) <*> (Variable <$> word <* operator '=') <*> expression
+kwarg = (,) <$> (Variable <$> word <* operator '=') <*> expression
 
+assignment = try assignment'
+    where assignment' =
+            Assignment <$> (Variable <$> word) <*> (space *> operator '=' *> space *> expression)
+
+space = optional . tokf $ \t -> case t of { TComment _ -> Just (); TNewLine -> Just (); TIndent _ -> Just (); _ -> Nothing; }

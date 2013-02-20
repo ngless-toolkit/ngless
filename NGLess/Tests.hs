@@ -24,3 +24,6 @@ case_parse_fastq = parsengless "test" fastqcalls @?= Right fastqcall
         fastqcalls = "fastq(\"input.fq\")"
         fastqcall  = Sequence [FunctionCall Ffastq [ConstStr "input.fq"] [] Nothing]
 
+case_parse_assignment =  parsengless "test" "reads = \"something\"" @?=
+        Right (Sequence [Assignment (Variable "reads") (ConstStr "something")])
+
