@@ -8,6 +8,7 @@ module Main
 
 import Interpret
 import Validation
+import Tokens
 import Parse
 
 import Control.Applicative
@@ -17,12 +18,14 @@ import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as S
 
 version = "0.0.0"
-data NGLessArgs = NGLessArgs {
-        input :: String
+data NGLessArgs = NGLessArgs
+    { debug_mode :: String
+    , input :: String
     } deriving (Eq, Show, Data, Typeable)
 
 nglessargs = NGLessArgs
-        { input = "-" &= argPos 0 &= opt "-"
+        { debug_mode = "ngless"
+        , input = "-" &= argPos 0 &= opt "-"
         } &=
         verbosity &=
         summary sumtext &=
@@ -30,14 +33,22 @@ nglessargs = NGLessArgs
     where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013"]
 
 
+function "ngless" fname text = case parsengless fname text >>= validate of
+            Left err -> T.putStrLn err
+            Right expr -> interpret expr
+
+function "tokens" fname text = case tokenize fname text of
+            Left err -> T.putStrLn err
+            Right toks -> putStrLn $ show toks
+
+function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
+
 main = do
-    NGLessArgs fname <- cmdArgs nglessargs
+    NGLessArgs dmode fname <- cmdArgs nglessargs
     --Note that the input for ngless is always UTF-8.
     --Always. This means that we cannot use T.readFile
     --which is locale aware
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of
         Left err -> putStrLn (show err)
-        Right ngltext -> case parsengless fname ngltext >>= validate of
-            Left err -> T.putStrLn err
-            Right expr -> interpret expr
+        Right ngltext -> function dmode fname ngltext
