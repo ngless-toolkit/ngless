@@ -46,8 +46,9 @@ eol = char '\n' *> return TNewLine
 try_string s = try (string s)
 
 symbol = (char ':')  *> (TExpr . ConstSymbol . T.pack <$> variableStr) <* (char ':')
-tstring = char '"' *> (TExpr . ConstStr <$> strtext) <* char '"'
-strtext = T.pack <$> many (escapedchar <|> noneOf "\"")
+tstring = tstring' '\'' <|> tstring' '"'
+    where tstring' term = char term *> (TExpr . ConstStr <$> strtext term) <* char term
+strtext term = T.pack <$> many (escapedchar <|> noneOf [term])
     where
         escapedchar = char '\\' *> escapedchar'
         escapedchar' = do
