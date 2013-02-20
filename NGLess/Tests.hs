@@ -18,6 +18,8 @@ import Parse
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
 
+
+-- Test Parsing Module
 case_parse_symbol = parsengless "test" ":symbol:" @?= Right (Sequence [ConstSymbol "symbol"])
 case_parse_fastq = parsengless "test" fastqcalls @?= Right fastqcall
     where
@@ -26,4 +28,11 @@ case_parse_fastq = parsengless "test" fastqcalls @?= Right fastqcall
 
 case_parse_assignment =  parsengless "test" "reads = \"something\"" @?=
         Right (Sequence [Assignment (Variable "reads") (ConstStr "something")])
+
+
+case_parse_sequence = parsengless "test" seqs @?= Right seqr
+    where
+        seqs = "reads = 'something'\nreads = 'something'"
+        seqr = Sequence [a,a]
+        a    = Assignment (Variable "reads") (ConstStr "something")
 

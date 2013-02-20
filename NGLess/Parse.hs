@@ -33,7 +33,9 @@ type Parser = GenParser Token ()
 
 nglparser = Sequence <$> (many1 expression <* eof)
 expression :: Parser Expression
-expression = assignment <|> rawexpr <|> funccall
+expression = expression' <* (many eol)
+    where
+        expression' = assignment <|> rawexpr <|> funccall
 
 tokf ::  (Token -> Maybe a) -> Parser a
 tokf f = tokenPrim show updatePos f
@@ -53,6 +55,7 @@ operator op = tokf $ \t -> case t of
 word = tokf $ \t -> case t of
     TWord w -> Just w
     _ -> Nothing
+eol = tokf $ \t -> case t of { TNewLine -> Just (); _ -> Nothing }
 
 funccall = FunctionCall <$>
                 (try funcname <* operator '(')
