@@ -11,9 +11,9 @@ module Language
 
 {- This module defines the internal representation the language -}
 import Data.Maybe
-import qualified Data.ByteString as S
+import qualified Data.Text as T
 
-newtype Variable = Variable S.ByteString
+newtype Variable = Variable T.Text
     deriving (Eq, Show)
 data FuncName = Ffastq | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
     deriving (Eq, Show)
@@ -47,19 +47,19 @@ data NGLessType = NGLType NGLessBaseType | NGLList NGLessBaseType
     deriving (Eq, Show)
 
 data NGLessObject =
-        NGOString S.ByteString
+        NGOString T.Text
         | NGOBool Bool
         | NGOInteger Integer
-        | NGOSymbol S.ByteString
-        | NGOFilename S.ByteString
-        | NGOShortRead S.ByteString S.ByteString
+        | NGOSymbol T.Text
+        | NGOFilename T.Text
+        | NGOShortRead T.Text T.Text
 
 data Expression = 
         Lookup Variable -- ^ This is just the variable
-        | ConstStr S.ByteString -- ^ Constant string
+        | ConstStr T.Text -- ^ Constant string
         | ConstNum Integer -- ^ integer
         | ConstBool Bool -- ^ true/false
-        | ConstSymbol S.ByteString -- ^ a symbol
+        | ConstSymbol T.Text -- ^ a symbol
         | Continue -- ^ continue
         | Discard -- ^ discard
         | UnaryOp UOp Expression  -- ^ op ( expr )

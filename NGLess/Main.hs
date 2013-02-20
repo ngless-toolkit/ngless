@@ -7,14 +7,15 @@ module Main
     ) where
 
 import Interpret
-import Language
 import Validation
 import Parse
 
+import Control.Applicative
 import System.Console.CmdArgs
-import Data.Either
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
+import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Char8 as S8
 
 version = "0.0.0"
 data NGLessArgs = NGLessArgs {
@@ -29,9 +30,15 @@ nglessargs = NGLessArgs
         details ["ngless implement the NGLess language"]
     where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013"]
 
+
 main = do
     NGLessArgs fname <- cmdArgs nglessargs
-    ngltext <- S.readFile fname
-    case parsengless (S8.pack fname) ngltext >>= validate of
-        Left err -> S8.putStrLn err
-        Right expr -> interpret expr
+    --Note that the input for ngless is always UTF-8.
+    --Always. This means that we cannot use T.readFile
+    --which is locale aware
+    engltext <- T.decodeUtf8' <$> S.readFile fname
+    case engltext of
+        Left err -> putStrLn (show err)
+        Right ngltext -> case parsengless (T.pack fname) ngltext >>= validate of
+            Left err -> T.putStrLn err
+            Right expr -> interpret expr

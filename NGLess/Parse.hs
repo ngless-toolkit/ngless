@@ -11,19 +11,18 @@ import Language
 
 import Data.Maybe
 import Control.Applicative hiding ((<|>), many)
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Char8 as S8
-import Text.Parsec.ByteString
+import qualified Data.Text as T
+import Text.Parsec.Text
 import Text.Parsec.Combinator
 import Text.Parsec
 
 -- main function of this module
 -- Because the scripts are expected to be small, we can expect to load them
--- whole into memory (with a strict ByteString) before parsing
-parsengless :: S.ByteString -> S.ByteString -> Either S.ByteString Expression
+-- whole into memory (with a strict Text) before parsing
+parsengless :: T.Text -> T.Text -> Either T.Text Expression
 parsengless _inputname input = case  parse nglparser "input" input of
             Right val -> Right val
-            Left err -> Left (S8.pack . show $ err)
+            Left err -> Left (T.pack . show $ err)
 
 nglparser :: Parser Expression
 nglparser = many1 expression >>= return . Sequence
@@ -33,10 +32,10 @@ expression = (try symbol) <|>
 
 
 symbol = (char ':')  *> (liftA ConstSymbol $ ngltoken) <* (char ':')
-nglstr = (char '"') *> (liftA (ConstStr . S8.pack) $ many (noneOf "\"")) <* (char '"')
+nglstr = (char '"') *> (liftA (ConstStr . T.pack) $ many (noneOf "\"")) <* (char '"')
 
-ngltoken :: Parser S.ByteString
-ngltoken = liftA S8.pack $ many1 (oneOf asciiLetters)
+ngltoken :: Parser T.Text
+ngltoken = T.pack <$> many1 (oneOf asciiLetters)
 
 funccall :: Parser Expression
 funccall = do
@@ -51,13 +50,13 @@ funccall = do
         Left err -> error (show err)
 
 
-functionOf :: S.ByteString -> Either S.ByteString FuncName
+functionOf :: T.Text -> Either T.Text FuncName
 functionOf "fastq" = Right Ffastq
 functionOf "substrim" = Right Fsubstrim
 functionOf "map" = Right Fmap
 functionOf "count" = Right Fcount
-functionOf "write" = Fwrite
-functionOf "print" = Fprint
+functionOf "write" = Right Fwrite
+functionOf "print" = Right Fprint
 functionOf _ = Left "Function not found"
 
 kwarg = pure (,) <*> (Variable <$> ngltoken <* char '=') <*> expression

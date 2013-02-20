@@ -10,8 +10,6 @@ import Test.HUnit
 import Test.QuickCheck
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
-import System.IO.Unsafe
-import qualified Data.ByteString.Char8 as S8
 import Data.Either
 
 import Language
