@@ -52,6 +52,7 @@ expression = expression' <* (many eol)
 
 base_expression = pexpression
                     <|> rawexpr
+                    <|> (Lookup <$> variable)
 
 pexpression = operator '(' *> expression <* operator ')'
 
@@ -87,16 +88,21 @@ binop = tokf $ \t -> case t of { TBop b -> Just b; _ -> Nothing }
 funccall = FunctionCall <$>
                 (try funcname <* operator '(')
                 <*> ((:[]) <$> expression)
-                <*> (kwargs <* operator ')')
-                <*> pure Nothing
+                <*> (kwargs <* operator ')' <* space)
+                <*> funcblock
+
+funcblock = (Just <$> (Block <$> (reserved "using" *> space *> operator '|' *> variableList <* operator '|' <* operator ':') <*> block))
+    <|> pure Nothing
 
 funcname = do
     fname <- word
     case fname of
         "fastq" -> pure Ffastq
         "substrim" -> pure Fsubstrim
+        "process_reads" -> pure Fprocess_reads
         "map" -> pure Fmap
         "count" -> pure Fcount
+        "unique" -> pure Funique
         "write" -> pure Fwrite
         "print" -> pure Fprint
         _ -> fail "Function not found"
@@ -132,5 +138,7 @@ block = do
                             if level /= level'
                                 then fail "indentation changed"
                                 else expression <* many eol)
+variableList = sepBy1 variable (operator ',' *> space)
+variable = Variable <$> word
 
 ngless_version = NGLessVersion <$> (reserved "ngless" *> space *> integer) <*> (operator '.' *> integer)

@@ -98,6 +98,7 @@ reservedwords =
         ,"len"
         ,"discard"
         ,"continue"
+        ,"using"
         ]
 
 variableStr = (:) <$> (char '_' <|> letter) <*> many (char '_' <|> alphaNum)

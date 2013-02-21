@@ -6,6 +6,7 @@ module Language
     , Variable(..)
     , UOp(..)
     , BOp(..)
+    , Block(..)
     , FuncName(..)
     ) where
 
@@ -15,7 +16,7 @@ import qualified Data.Text as T
 
 newtype Variable = Variable T.Text
     deriving (Eq, Show)
-data FuncName = Ffastq | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
+data FuncName = Ffastq | Funique | Fprocess_reads | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
     deriving (Eq, Show)
 
 data UOp = UOpLen
@@ -28,7 +29,7 @@ data Index = Index (Maybe Integer) (Maybe Integer)
 
 data Block = Block
                 [Variable] -- ^ input arguments
-                [Expression] -- ^ block body
+                Expression -- ^ block body
     deriving (Eq, Show)
 
 data NGLessBaseType =
