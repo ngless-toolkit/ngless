@@ -56,6 +56,7 @@ expression = expression' <* (many eol)
 
 base_expression = pexpression
                     <|> rawexpr
+                    <|> uoperator
                     <|> (Lookup <$> variable)
 
 pexpression = operator '(' *> expression <* operator ')'
@@ -89,6 +90,7 @@ indentation = tokf $ \t -> case t of
 eol = tokf $ \t -> case t of { TNewLine -> Just (); _ -> Nothing }
 binop = tokf $ \t -> case t of { TBop b -> Just b; _ -> Nothing }
 
+uoperator = UnaryOp UOpLen <$> (reserved "len" *> operator '(' *> expression <* operator ')')
 funccall = FunctionCall <$>
                 (try funcname <* operator '(')
                 <*> ((:[]) <$> expression)
