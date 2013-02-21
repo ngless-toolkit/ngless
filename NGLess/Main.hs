@@ -44,7 +44,7 @@ function "ngless" fname text = case parsengless fname text >>= validate of
 
 function "tokens" fname text = case tokenize fname text of
             Left err -> T.putStrLn err
-            Right toks -> putStrLn $ show toks
+            Right toks -> putStrLn . show . map snd $ toks
 
 function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 

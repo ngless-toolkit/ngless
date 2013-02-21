@@ -3,6 +3,7 @@
  -}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | This module handles tokenization
 module Tokens
     ( Token(..)
     , tokenize
@@ -17,23 +18,30 @@ import Text.Parsec.Combinator
 import Text.Parsec
 import Language
 
+-- | Token datatype
 data Token =
-        TExpr Expression
-        | TBop BOp
-        | TWord T.Text
-        | TReserved T.Text
-        | TOperator Char
-        | TNewLine
-        | TComment Int
-        | TIndent Int
+        TExpr Expression -- ^ These are Const* type of expressions
+        | TBop BOp -- ^ Binary operators
+        | TReserved T.Text -- ^ Reserved keywords
+        | TWord T.Text -- ^ Any other word (function name, variable, &c)
+        | TOperator Char -- ^ A single character operator (',', '[', ...)
+        | TNewLine -- ^ A new line
+        | TIndent Int -- ^ A sequence of spaces
     deriving (Eq, Show)
 
-tokenize :: String -> T.Text -> Either T.Text [Token]
+-- | tokenize is the main function of this module
+-- It returns tokens with position information (the position in the original
+-- file)
+tokenize :: String -> T.Text -> Either T.Text [(SourcePos,Token)]
 tokenize inname input = case parse tokenizer inname input of
         Right val -> Right val
         Left err -> Left (T.pack . show $ err)
 
-tokenizer = many ngltoken <* eof
+tokenizer = many ngltoken' <* eof
+ngltoken' = (,) <$> getPosition <*> ngltoken
+
+-- | 'ngltoken' parse a token as a series of possibilities.
+-- All of these are written so that they never fail after consuming input
 ngltoken = comment
         <|> symbol
         <|> tstring
@@ -66,9 +74,8 @@ comment = singlelinecomment <|> multilinecomment
 singlelinecomment = commentstart *> skiptoeol
     where commentstart = (void $ char '#') <|> (void . try $ string "//")
 skiptoeol = _eol  <|> (anyChar *> skiptoeol)
-multilinecomment = (try_string "/*") *> (TComment <$> skipmultilinecomment)
-skipmultilinecomment = (try_string "*/" *> pure 0)
-            <|> (char '\n' *> ((+1) <$> skipmultilinecomment))
+multilinecomment = (try_string "/*") *> skipmultilinecomment
+skipmultilinecomment = (try_string "*/" *> pure (TIndent 0))
             <|> (anyChar *> skipmultilinecomment)
             <|> (eof *> fail "Unexpected End Of File inside a comment")
 
@@ -96,7 +103,7 @@ reservedwords =
 variableStr = (:) <$> (char '_' <|> letter) <*> many alphaNum
 operator = TOperator <$> oneOf "=,+-*():[]<>"
 boperator = choice [
-                try ((string long) *> pure (TBop short))
+                (try_string long *> pure (TBop short))
                     | (long,short) <-
                     [ ("!=", BOpNEQ)
                     , ("==", BOpEQ)

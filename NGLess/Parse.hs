@@ -15,7 +15,7 @@ import Control.Monad.Identity ()
 import qualified Data.Text as T
 import Text.ParserCombinators.Parsec.Prim hiding (Parser)
 import Text.Parsec.Combinator
-import Text.Parsec (incSourceLine)
+import Text.Parsec (SourcePos)
 
 -- main function of this module
 -- Because the scripts are expected to be small, we can expect to load them
@@ -24,18 +24,19 @@ parsengless :: String -> T.Text -> Either T.Text Expression
 parsengless inputname input =
         tokenize inputname input >>= parsetoks inputname
 
-parsetoks :: String -> [Token] -> Either T.Text Expression
+parsetoks :: String -> [(SourcePos,Token)] -> Either T.Text Expression
 parsetoks inputname toks = case parse nglparser inputname (cleanupindents toks) of
             Right val -> Right val
             Left err -> Left (T.pack . show $ err)
 
-cleanupindents (TNewLine:TIndent i:ts) = (TNewLine:TIndent i:cleanupindents ts)
-cleanupindents (TIndent _:ts) = cleanupindents ts
-cleanupindents (TComment 0:ts) = cleanupindents ts -- same line comments do not matter
+cleanupindents ::[(SourcePos,Token)] -> [(SourcePos, Token)]
+cleanupindents ((p0,TNewLine):(p1,TIndent i):ts) = ((p0,TNewLine):(p1,TIndent i):cleanupindents ts)
+cleanupindents ((_,TIndent _):ts) = cleanupindents ts
 cleanupindents (t:ts) = (t:cleanupindents ts)
 cleanupindents [] = []
 
-type Parser = GenParser Token ()
+type Parser = GenParser (SourcePos,Token) ()
+
 
 nglparser = Sequence <$> (many1 expression <* eof)
 expression :: Parser Expression
@@ -46,11 +47,7 @@ expression = expression' <* (many eol)
 pexpression = operator '(' *> expression <* operator ')'
 
 tokf ::  (Token -> Maybe a) -> Parser a
-tokf f = tokenPrim show updatePos f
-    where
-        updatePos s TNewLine _ = incSourceLine s 1
-        updatePos s (TComment t) _ = incSourceLine s t
-        updatePos s _ _ = s
+tokf f = token (show .snd) fst (f . snd)
 
 rawexpr = tokf $ \t -> case t of
     TExpr e -> Just e
@@ -98,7 +95,7 @@ assignment = try assignment'
     where assignment' =
             Assignment <$> (Variable <$> word) <*> (space *> operator '=' *> space *> expression)
 
-space = optional . tokf $ \t -> case t of { TComment _ -> Just (); TNewLine -> Just (); TIndent _ -> Just (); _ -> Nothing; }
+space = optional . tokf $ \t -> case t of { TNewLine -> Just (); TIndent _ -> Just (); _ -> Nothing; }
 
 conditional = Condition <$> (reserved "if" *> expression <* operator ':') <*> block <*> mayelse
 mayelse = elseblock <|> (pure $ Sequence [])
