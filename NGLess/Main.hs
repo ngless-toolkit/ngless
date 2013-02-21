@@ -13,6 +13,7 @@ import Parse
 
 import Control.Applicative
 import System.Console.CmdArgs
+import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as S
@@ -33,6 +34,10 @@ nglessargs = NGLessArgs
     where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013"]
 
 
+-- | function implements the debug-mode argument.
+-- The only purpose is to aid in debugging by printing intermediate
+-- representations.
+function :: String -> String -> T.Text -> IO ()
 function "ngless" fname text = case parsengless fname text >>= validate of
             Left err -> T.putStrLn err
             Right expr -> interpret expr
