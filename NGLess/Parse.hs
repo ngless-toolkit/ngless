@@ -42,7 +42,15 @@ nglparser = Sequence <$> (many1 expression <* eof)
 expression :: Parser Expression
 expression = expression' <* (many eol)
     where
-        expression' = pexpression <|> assignment <|> rawexpr <|> funccall <|> conditional
+        expression' =
+                    conditional
+                    <|> assignment
+                    <|> binoperator
+                    <|> funccall
+                    <|> base_expression
+
+base_expression = pexpression
+                    <|> rawexpr
 
 pexpression = operator '(' *> expression <* operator ')'
 
@@ -70,6 +78,7 @@ indentation = tokf $ \t -> case t of
     _ -> Nothing
 
 eol = tokf $ \t -> case t of { TNewLine -> Just (); _ -> Nothing }
+binop = tokf $ \t -> case t of { TBop b -> Just b; _ -> Nothing }
 
 funccall = FunctionCall <$>
                 (try funcname <* operator '(')
@@ -94,6 +103,13 @@ kwarg = (,) <$> (Variable <$> word <* operator '=') <*> expression
 assignment = try assignment'
     where assignment' =
             Assignment <$> (Variable <$> word) <*> (space *> operator '=' *> space *> expression)
+
+binoperator = try $ do
+    a <- base_expression
+    bop <- space *> binop <* space
+    b <- expression
+    return $ BinaryOp bop a b
+
 
 space = optional . tokf $ \t -> case t of { TNewLine -> Just (); TIndent _ -> Just (); _ -> Nothing; }
 
