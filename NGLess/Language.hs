@@ -6,12 +6,12 @@ module Language
     , Variable(..)
     , UOp(..)
     , BOp(..)
+    , Index(..)
     , Block(..)
     , FuncName(..)
     ) where
 
 {- This module defines the internal representation the language -}
-import Data.Maybe
 import qualified Data.Text as T
 
 newtype Variable = Variable T.Text

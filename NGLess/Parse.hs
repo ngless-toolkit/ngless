@@ -5,6 +5,7 @@
 
 module Parse
     ( parsengless
+    , _indexexpr
     ) where
 
 import Language
@@ -47,6 +48,7 @@ expression = expression' <* (many eol)
                     <|> ngless_version
                     <|> assignment
                     <|> binoperator
+                    <|> _indexexpr
                     <|> funccall
                     <|> base_expression
 
@@ -120,6 +122,10 @@ binoperator = try $ do
     b <- expression
     return $ BinaryOp bop a b
 
+_indexexpr = try (IndexExpression <$> base_expression <*> indexing)
+    where
+        indexing = Index <$> (operator '[' *> may_int <* operator ':') <*> (may_int <* operator ']')
+        may_int = (Just <$> integer) <|> (pure Nothing)
 
 space = optional . tokf $ \t -> case t of { TNewLine -> Just (); TIndent _ -> Just (); _ -> Nothing; }
 

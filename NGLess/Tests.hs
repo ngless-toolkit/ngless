@@ -13,6 +13,9 @@ import Test.Framework.Providers.QuickCheck2
 import Control.Applicative
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
+import Text.ParserCombinators.Parsec.Prim (GenParser)
+import qualified Data.Text as T
+import Text.Parsec (SourcePos)
 
 import Language
 import Parse
@@ -23,6 +26,11 @@ main = $(defaultMainGenerator)
 
 
 -- Test Parsing Module
+parseText :: GenParser (SourcePos,Token) () a -> T.Text -> a
+parseText p t = fromRight . parse p "test" . fromRight . tokenize "test" $ t
+fromRight (Right r) = r
+fromRight (Left _) = undefined
+
 case_parse_symbol = parsengless "test" "{symbol}" @?= Right (Sequence [ConstSymbol "symbol"])
 case_parse_fastq = parsengless "test" fastqcalls @?= Right fastqcall
     where
@@ -69,9 +77,16 @@ case_parse_ngless = parsengless "test" ngs @?= Right ng
         ngs = "ngless 0.0\n"
         ng  = Sequence [NGLessVersion 0 0]
 
-case_parse_tok_cr = TNewLine @=? (case parse (_eol <* eof) "test" "\r\n" of { Right t -> t; Left _ -> error "Parse failed"; })
+case_parse_indexexpr_11 = parseText _indexexpr "read[1:1]" @?= IndexExpression (Lookup (Variable "read")) (Index (Just 1) (Just 1))
+case_parse_indexexpr_10 = parseText _indexexpr "read[1:]"  @?= IndexExpression (Lookup (Variable "read")) (Index (Just 1) Nothing)
+case_parse_indexexpr_01 = parseText _indexexpr "read[:1]"  @?= IndexExpression (Lookup (Variable "read")) (Index Nothing (Just 1))
+case_parse_indexexpr_00 = parseText _indexexpr "read[:]"   @?= IndexExpression (Lookup (Variable "read")) (Index Nothing Nothing)
 
+
+-- Test Tokens module
 tokenize' fn t = map snd <$> (tokenize fn t)
+
+case_tok_cr = TNewLine @=? (case parse (_eol <* eof) "test" "\r\n" of { Right t -> t; Left _ -> error "Parse failed"; })
 case_tok_single_line_comment = tokenize' "test" with_comment @?= Right expected
     where
         with_comment = "a=0# comment\nb=1\n"
