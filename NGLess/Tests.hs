@@ -72,12 +72,16 @@ case_parse_ngless = parsengless "test" ngs @?= Right ng
 case_parse_tok_cr = TNewLine @=? (case parse (_eol <* eof) "test" "\r\n" of { Right t -> t; Left _ -> error "Parse failed"; })
 
 tokenize' fn t = map snd <$> (tokenize fn t)
-case_parse_tok_single_line_comment = tokenize' "test" with_comment @?= Right expected
+case_tok_single_line_comment = tokenize' "test" with_comment @?= Right expected
     where
         with_comment = "a=0# comment\nb=1\n"
         expected = [TWord "a",TOperator '=',TExpr (ConstNum 0),TNewLine,TWord "b",TOperator '=',TExpr (ConstNum 1),TNewLine]
 
-case_parse_tok_multi_line_comment = tokenize' "test" with_comment @?= Right expected
+case_tok_multi_line_comment = tokenize' "test" with_comment @?= Right expected
     where
         with_comment = "a=0/* This\n\nwith\nlines*/\nb=1\n"
         expected = [TWord "a",TOperator '=',TExpr (ConstNum 0),TIndent 0,TNewLine,TWord "b",TOperator '=',TExpr (ConstNum 1),TNewLine]
+
+case_tok_word_ = tokenize' "test" "word_with_underscore" @?= Right expected
+    where
+        expected = [TWord "word_with_underscore"]

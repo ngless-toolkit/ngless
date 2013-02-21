@@ -100,8 +100,8 @@ reservedwords =
         ,"continue"
         ]
 
-variableStr = (:) <$> (char '_' <|> letter) <*> many alphaNum
-operator = TOperator <$> oneOf "=,+-*():[]<>."
+variableStr = (:) <$> (char '_' <|> letter) <*> many (char '_' <|> alphaNum)
+operator = TOperator <$> oneOf "=,+-*():[]<>.|"
 boperator = choice [
                 (try_string long *> pure (TBop short))
                     | (long,short) <-
