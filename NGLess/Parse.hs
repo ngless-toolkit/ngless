@@ -44,6 +44,7 @@ expression = expression' <* (many eol)
     where
         expression' =
                     conditional
+                    <|> ngless_version
                     <|> assignment
                     <|> binoperator
                     <|> funccall
@@ -59,6 +60,9 @@ tokf f = token (show .snd) fst (f . snd)
 
 rawexpr = tokf $ \t -> case t of
     TExpr e -> Just e
+    _ -> Nothing
+integer = tokf $ \t -> case t of
+    TExpr (ConstNum n) -> Just n
     _ -> Nothing
 
 operator op = tokf $ \t -> case t of
@@ -129,3 +133,4 @@ block = do
                                 then fail "indentation changed"
                                 else expression <* many eol)
 
+ngless_version = NGLessVersion <$> (reserved "ngless" *> space *> integer) <*> (operator '.' *> integer)

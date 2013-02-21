@@ -64,6 +64,11 @@ case_parse_if_end = parsengless "test" blocks @?= Right block
         blocks = "if true:\n 0\n 1\n2\n"
         block  = Sequence [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence []),ConstNum 2]
 
+case_parse_ngless = parsengless "test" ngs @?= Right ng
+    where
+        ngs = "ngless 0.0\n"
+        ng  = Sequence [NGLessVersion 0 0]
+
 case_parse_tok_cr = TNewLine @=? (case parse (_eol <* eof) "test" "\r\n" of { Right t -> t; Left _ -> error "Parse failed"; })
 
 tokenize' fn t = map snd <$> (tokenize fn t)

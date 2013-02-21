@@ -101,7 +101,7 @@ reservedwords =
         ]
 
 variableStr = (:) <$> (char '_' <|> letter) <*> many alphaNum
-operator = TOperator <$> oneOf "=,+-*():[]<>"
+operator = TOperator <$> oneOf "=,+-*():[]<>."
 boperator = choice [
                 (try_string long *> pure (TBop short))
                     | (long,short) <-
