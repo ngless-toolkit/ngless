@@ -77,11 +77,12 @@ case_parse_ngless = parsengless "test" ngs @?= Right ng
         ngs = "ngless 0.0\n"
         ng  = Sequence [NGLessVersion 0 0]
 
-case_parse_indexexpr_11 = parseText _indexexpr "read[1:1]" @?= IndexExpression (Lookup (Variable "read")) (Index (Just 1) (Just 1))
-case_parse_indexexpr_10 = parseText _indexexpr "read[1:]"  @?= IndexExpression (Lookup (Variable "read")) (Index (Just 1) Nothing)
-case_parse_indexexpr_01 = parseText _indexexpr "read[:1]"  @?= IndexExpression (Lookup (Variable "read")) (Index Nothing (Just 1))
+case_parse_indexexpr_11 = parseText _indexexpr "read[1:1]" @?= IndexExpression (Lookup (Variable "read")) (Index j1 j1)
+case_parse_indexexpr_10 = parseText _indexexpr "read[1:]"  @?= IndexExpression (Lookup (Variable "read")) (Index j1 Nothing)
+case_parse_indexexpr_01 = parseText _indexexpr "read[:1]"  @?= IndexExpression (Lookup (Variable "read")) (Index Nothing j1)
 case_parse_indexexpr_00 = parseText _indexexpr "read[:]"   @?= IndexExpression (Lookup (Variable "read")) (Index Nothing Nothing)
 
+j1 = Just (ConstNum 1)
 
 -- Test Tokens module
 tokenize' fn t = map snd <$> (tokenize fn t)

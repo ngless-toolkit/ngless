@@ -19,12 +19,12 @@ newtype Variable = Variable T.Text
 data FuncName = Ffastq | Funique | Fprocess_reads | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
     deriving (Eq, Show)
 
-data UOp = UOpLen
+data UOp = UOpLen | UOpMinus
     deriving (Eq, Show)
 data BOp = BOpAdd | BOpMul | BOpGT | BOpGTE | BOpLT | BOpLTE | BOpEQ | BOpNEQ
     deriving (Eq, Show)
 
-data Index = Index (Maybe Integer) (Maybe Integer)
+data Index = Index (Maybe Expression) (Maybe Expression)
     deriving (Eq, Show)
 
 data Block = Block

@@ -90,7 +90,10 @@ indentation = tokf $ \t -> case t of
 eol = tokf $ \t -> case t of { TNewLine -> Just (); _ -> Nothing }
 binop = tokf $ \t -> case t of { TBop b -> Just b; _ -> Nothing }
 
-uoperator = UnaryOp UOpLen <$> (reserved "len" *> operator '(' *> expression <* operator ')')
+uoperator = lenop <|> unary_minus
+    where
+        lenop = UnaryOp UOpLen <$> (reserved "len" *> operator '(' *> expression <* operator ')')
+        unary_minus = UnaryOp UOpMinus <$> (operator '-' *> base_expression)
 funccall = FunctionCall <$>
                 (try funcname <* operator '(')
                 <*> ((:[]) <$> expression)
@@ -129,7 +132,7 @@ binoperator = try $ do
 _indexexpr = try (IndexExpression <$> base_expression <*> indexing)
     where
         indexing = Index <$> (operator '[' *> may_int <* operator ':') <*> (may_int <* operator ']')
-        may_int = (Just <$> integer) <|> (pure Nothing)
+        may_int = (Just <$> expression) <|> (pure Nothing)
 
 space = optional . tokf $ \t -> case t of { TNewLine -> Just (); TIndent _ -> Just (); _ -> Nothing; }
 
