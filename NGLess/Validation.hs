@@ -20,6 +20,7 @@ validate expr = case errors of
         checks =
             [validate_types
             ,validate_ngless_at_beginning
+            ,validate_version
             ]
 
 {- Each checking function has the type
@@ -39,4 +40,8 @@ validate_ngless_at_beginning (Sequence (_:es)) =
                 then Just "ngless declaration must be the first declaration"
                 else Nothing
 validate_ngless_at_beginning _ = Nothing
+
+validate_version (Sequence ((NGLessVersion major minor):_))
+    | major /= 0 || minor /= 0 = Just (T.concat ["Version ", T.pack (show  major), ".", T.pack (show minor), " is not supported (nly version 0.0 is available)."])
+validate_version _ = Nothing
 
