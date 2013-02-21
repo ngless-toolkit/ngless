@@ -46,6 +46,8 @@ expression = expression' <* (many eol)
         expression' =
                     conditional
                     <|> ngless_version
+                    <|> (reserved "discard" *> pure Discard)
+                    <|> (reserved "continue" *> pure Continue)
                     <|> assignment
                     <|> binoperator
                     <|> _indexexpr
