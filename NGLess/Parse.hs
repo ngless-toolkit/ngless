@@ -6,6 +6,7 @@
 module Parse
     ( parsengless
     , _indexexpr
+    , _listexpr
     ) where
 
 import Language
@@ -49,9 +50,12 @@ expression = expression' <* (many eol)
                     <|> (reserved "discard" *> pure Discard)
                     <|> (reserved "continue" *> pure Continue)
                     <|> assignment
-                    <|> binoperator
-                    <|> _indexexpr
                     <|> funccall
+                    <|> innerexpression
+
+innerexpression = binoperator
+                    <|> _listexpr
+                    <|> _indexexpr
                     <|> base_expression
 
 base_expression = pexpression
@@ -133,6 +137,10 @@ _indexexpr = try (IndexExpression <$> base_expression <*> indexing)
     where
         indexing = Index <$> (operator '[' *> may_int <* operator ':') <*> (may_int <* operator ']')
         may_int = (Just <$> expression) <|> (pure Nothing)
+
+_listexpr = try listexpr
+    where
+        listexpr = (operator '[') *> (NGList <$> (innerexpression `sepEndBy` (operator ',' *> space))) <* (operator ']')
 
 space = optional . tokf $ \t -> case t of { TNewLine -> Just (); TIndent _ -> Just (); _ -> Nothing; }
 

@@ -70,6 +70,7 @@ data Expression =
         | Assignment Variable Expression -- ^ var = expr
         | FunctionCall FuncName [Expression] [(Variable, Expression)] (Maybe Block)
         | Sequence [Expression]
+        | NGList [Expression]
         | NGLessVersion Integer Integer
     deriving (Eq, Show)
 
