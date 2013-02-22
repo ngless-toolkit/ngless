@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell, OverloadedStrings, TupleSections #-}
 -- Unit tests are their own programme.
 
 module Main where
@@ -16,6 +16,7 @@ import Text.Parsec.Combinator (eof)
 import Text.ParserCombinators.Parsec.Prim (GenParser)
 import qualified Data.Text as T
 import Text.Parsec (SourcePos)
+import Text.Parsec.Pos (newPos)
 
 import Language
 import Parse
@@ -84,7 +85,26 @@ case_parse_indexexpr_10 = parseText _indexexpr "read[1:]"  @?= IndexExpression (
 case_parse_indexexpr_01 = parseText _indexexpr "read[:1]"  @?= IndexExpression (Lookup (Variable "read")) (Index Nothing j1)
 case_parse_indexexpr_00 = parseText _indexexpr "read[:]"   @?= IndexExpression (Lookup (Variable "read")) (Index Nothing Nothing)
 
+case_parse_cleanupindents_0 = tokcleanupindents [TIndent 1] @?= []
+case_parse_cleanupindents_1 = tokcleanupindents [TNewLine] @?= [TNewLine]
+case_parse_cleanupindents_2 = tokcleanupindents [TIndent 1,TNewLine] @?= [TNewLine]
+case_parse_cleanupindents_3 = tokcleanupindents [TOperator '(',TNewLine,TIndent 2,TOperator ')'] @?= [TOperator '(',TOperator ')']
+
+case_parse_cleanupindents_4 = tokcleanupindents toks @?= toks'
+    where
+        toks  = [TWord "write",TOperator '(',TWord "A",TOperator ',',TNewLine,TIndent 16,TNewLine,TIndent 16,TWord "format",TOperator '=',TExpr (ConstSymbol "csv"),TOperator ')',TNewLine]
+        toks' = [TWord "write",TOperator '(',TWord "A",TOperator ','                                        ,TWord "format",TOperator '=',TExpr (ConstSymbol "csv"),TOperator ')',TNewLine]
+case_parse_cleanupindents_4' = tokcleanupindents toks @?= toks'
+    where
+        toks  = [TOperator '(',TOperator ',',TNewLine,TIndent 16,TNewLine,TIndent 16,TOperator ')',TNewLine]
+        toks' = [TOperator '(',TOperator ','                                        ,TOperator ')',TNewLine]
+case_parse_cleanupindents_4'' = tokcleanupindents toks @?= toks'
+    where
+        toks  = [TOperator '(',TNewLine,TIndent 16,TNewLine,TIndent 16,TOperator ')',TNewLine]
+        toks' = [TOperator '('                                        ,TOperator ')',TNewLine]
+
 j1 = Just (ConstNum 1)
+tokcleanupindents = map snd . _cleanupindents . map (newPos "test" 0 0,)
 
 -- Test Tokens module
 tokenize' fn t = map snd <$> (tokenize fn t)

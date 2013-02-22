@@ -5,6 +5,7 @@
 
 module Parse
     ( parsengless
+    , _cleanupindents
     , _indexexpr
     , _listexpr
     ) where
@@ -27,15 +28,30 @@ parsengless inputname input =
         tokenize inputname input >>= parsetoks inputname
 
 parsetoks :: String -> [(SourcePos,Token)] -> Either T.Text Expression
-parsetoks inputname toks = case parse nglparser inputname (cleanupindents toks) of
+parsetoks inputname toks = case parse nglparser inputname (_cleanupindents toks) of
             Right val -> Right val
             Left err -> Left (T.pack . show $ err)
 
-cleanupindents ::[(SourcePos,Token)] -> [(SourcePos, Token)]
-cleanupindents ((p0,TNewLine):(p1,TIndent i):ts) = ((p0,TNewLine):(p1,TIndent i):cleanupindents ts)
-cleanupindents ((_,TIndent _):ts) = cleanupindents ts
-cleanupindents (t:ts) = (t:cleanupindents ts)
-cleanupindents [] = []
+_cleanupindents ::[(SourcePos,Token)] -> [(SourcePos, Token)]
+_cleanupindents = _cleanupindents' []
+    where
+        _cleanupindents' _ [] = []
+        _cleanupindents' cs (t@(_,TOperator o):ts)
+                | isOpen o = (t:(_cleanupindents' (closeOf o:cs) ts))
+        _cleanupindents' (c:cs) (t@(_,TOperator c'):ts)
+                | c' == c = (t:(_cleanupindents' cs ts))
+        _cleanupindents' cs@(_:_) ((_,TNewLine):ts) = _cleanupindents' cs ts
+        _cleanupindents' cs@(_:_) ((_,TIndent _):ts) = _cleanupindents' cs ts
+        _cleanupindents' [] (t0@(_,TNewLine):t1@(_,TIndent _):ts) = (t0:t1:_cleanupindents' [] ts)
+        _cleanupindents' [] ((_,TIndent _):ts) = _cleanupindents' [] ts
+        _cleanupindents' cs (t:ts) = (t:_cleanupindents' cs ts)
+
+        isOpen '(' = True
+        isOpen '[' = True
+        isOpen _ = False
+        closeOf '[' = ']'
+        closeOf '(' = ')'
+        closeOf _ = error "we should not close anything but [ & ("
 
 type Parser = GenParser (SourcePos,Token) ()
 
