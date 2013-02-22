@@ -16,7 +16,7 @@ import qualified Data.Text as T
 
 newtype Variable = Variable T.Text
     deriving (Eq, Show)
-data FuncName = Ffastq | Funique | Fprocess_reads | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
+data FuncName = Ffastq | Funique | Fpreprocess | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
     deriving (Eq, Show)
 
 data UOp = UOpLen | UOpMinus

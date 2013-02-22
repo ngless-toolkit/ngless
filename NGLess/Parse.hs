@@ -108,7 +108,7 @@ funcname = do
     case fname of
         "fastq" -> pure Ffastq
         "substrim" -> pure Fsubstrim
-        "process_reads" -> pure Fprocess_reads
+        "preprocess" -> pure Fpreprocess
         "map" -> pure Fmap
         "count" -> pure Fcount
         "unique" -> pure Funique
