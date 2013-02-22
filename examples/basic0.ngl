@@ -1,9 +1,9 @@
-ngless version 0.0
+ngless 0.0
 input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq',stim2.fq'])
 contanminants = seq(['ATTACGGATAAATGGACA','AGGGAGAGGGGGAGAGAT'])
 contanminants += standard_contaminants(['illumina-PCR_10'])
 input = unique(input, max_copies=2)
-for read in input:
+preprocess(input) using |read|:
     if read in contanminants:
         discard
     read = read[5:]
@@ -14,11 +14,12 @@ for read in input:
 mapped = reference_map(input,
                 reference='hg19')
 annotated = annotate(mapped,
-                features=[:gene])
-write(mapcount(annotated, count=:gene),
+                features=[{gene}])
+write(mapcount(annotated, count={gene}),
         ofile='gene_counts.csv',
-        format=:csv)
-write(mapcount(annotated, count=:chromosome),
+        format={csv})
+write(mapcount(annotated, count={chromosome}),
         ofile='chromossome.csv',
-        format=:csv)
-cover = coverage(mapped, |an| -> (an.map_start to an.map_end))
+        format={csv})
+cover = coverage(mapped) using |an|:
+    tag(an.map_start to an.map_end)
