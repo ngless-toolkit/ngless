@@ -117,10 +117,10 @@ uoperator = lenop <|> unary_minus
 funccall = FunctionCall <$>
                 (try funcname <* operator '(')
                 <*> ((:[]) <$> expression)
-                <*> (kwargs <* operator ')' <* space)
+                <*> (kwargs <* operator ')')
                 <*> funcblock
 
-funcblock = (Just <$> (Block <$> (reserved "using" *> space *> operator '|' *> variableList <* operator '|' <* operator ':') <*> block))
+funcblock = (Just <$> (Block <$> (reserved "using" *> operator '|' *> variableList <* operator '|' <* operator ':') <*> block))
     <|> pure Nothing
 
 funcname = do
@@ -141,11 +141,11 @@ kwarg = (,) <$> (Variable <$> word <* operator '=') <*> expression
 
 assignment = try assignment'
     where assignment' =
-            Assignment <$> (Variable <$> word) <*> (space *> operator '=' *> space *> expression)
+            Assignment <$> (Variable <$> word) <*> (operator '=' *> expression)
 
 binoperator = try $ do
     a <- base_expression
-    bop <- space *> binop <* space
+    bop <- binop
     b <- expression
     return $ BinaryOp bop a b
 
@@ -156,9 +156,7 @@ _indexexpr = try (IndexExpression <$> base_expression <*> indexing)
 
 _listexpr = try listexpr
     where
-        listexpr = (operator '[') *> (NGList <$> (innerexpression `sepEndBy` (operator ',' *> space))) <* (operator ']')
-
-space = optional . tokf $ \t -> case t of { TNewLine -> Just (); TIndent _ -> Just (); _ -> Nothing; }
+        listexpr = (operator '[') *> (NGList <$> (innerexpression `sepEndBy` (operator ','))) <* (operator ']')
 
 conditional = Condition <$> (reserved "if" *> expression <* operator ':') <*> block <*> mayelse
 mayelse = elseblock <|> (pure $ Sequence [])
@@ -175,7 +173,7 @@ block = do
                             if level /= level'
                                 then fail "indentation changed"
                                 else expression <* many eol)
-variableList = sepBy1 variable (operator ',' *> space)
+variableList = sepBy1 variable (operator ',')
 variable = Variable <$> word
 
-ngless_version = NGLessVersion <$> (reserved "ngless" *> space *> integer) <*> (operator '.' *> integer)
+ngless_version = NGLessVersion <$> (reserved "ngless" *> integer) <*> (operator '.' *> integer)
