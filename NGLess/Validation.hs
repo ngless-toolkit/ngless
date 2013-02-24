@@ -11,7 +11,7 @@ import Language
 import Data.Maybe
 import qualified Data.Text as T
 
-validate :: Expression -> Either T.Text Expression
+validate :: Script -> Either T.Text Script
 validate expr = case errors of
         [] -> Right expr
         _ -> Left (T.concat errors)
@@ -19,29 +19,22 @@ validate expr = case errors of
         errors = catMaybes (map ($expr) checks)
         checks =
             [validate_types
-            ,validate_ngless_at_beginning
             ,validate_version
             ]
 
 {- Each checking function has the type
  -
- - Expression -> Maybe T.Text
+ - Script -> Maybe T.Text
  -
  - If it finds an error, it returns a Just error; otherwise, Nothing.
  -
  - The validate function just runs all checks and either concatenates all the
- - error messages or passes the expression unharmed on the Right side.
+ - error messages or passes the script unharmed on the Right side.
  -}
-validate_types :: Expression -> Maybe T.Text
+validate_types :: Script -> Maybe T.Text
 validate_types = const Nothing
 
-validate_ngless_at_beginning (Sequence (_:es)) =
-            if any (\e -> case e of { NGLessVersion _ _ -> True; _ -> False }) es
-                then Just "ngless declaration must be the first declaration"
-                else Nothing
-validate_ngless_at_beginning _ = Nothing
-
-validate_version (Sequence ((NGLessVersion major minor):_))
+validate_version (Script (major,minor) _)
     | major /= 0 || minor /= 0 = Just (T.concat ["Version ", T.pack (show  major), ".", T.pack (show minor), " is not supported (nly version 0.0 is available)."])
 validate_version _ = Nothing
 

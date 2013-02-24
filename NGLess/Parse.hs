@@ -5,6 +5,7 @@
 
 module Parse
     ( parsengless
+    , _nglbody
     , _cleanupindents
     , _indexexpr
     , _listexpr
@@ -23,11 +24,11 @@ import Text.Parsec (SourcePos)
 -- main function of this module
 -- Because the scripts are expected to be small, we can expect to load them
 -- whole into memory (with a strict Text) before parsing
-parsengless :: String -> T.Text -> Either T.Text Expression
+parsengless :: String -> T.Text -> Either T.Text Script
 parsengless inputname input =
         tokenize inputname input >>= parsetoks inputname
 
-parsetoks :: String -> [(SourcePos,Token)] -> Either T.Text Expression
+parsetoks :: String -> [(SourcePos,Token)] -> Either T.Text Script
 parsetoks inputname toks = case parse nglparser inputname (_cleanupindents toks) of
             Right val -> Right val
             Left err -> Left (T.pack . show $ err)
@@ -55,14 +56,14 @@ _cleanupindents = _cleanupindents' []
 
 type Parser = GenParser (SourcePos,Token) ()
 
+nglparser = Script <$> ngless_version <*> (many eol *> _nglbody)
+_nglbody = (eof *> pure (Sequence [])) <|> Sequence <$> (many1 expression <* eof)
 
-nglparser = Sequence <$> (many1 expression <* eof)
 expression :: Parser Expression
 expression = expression' <* (many eol)
     where
         expression' =
                     conditional
-                    <|> ngless_version
                     <|> (reserved "discard" *> pure Discard)
                     <|> (reserved "continue" *> pure Continue)
                     <|> assignment
@@ -176,4 +177,5 @@ block = do
 variableList = sepBy1 variable (operator ',')
 variable = Variable <$> word
 
-ngless_version = NGLessVersion <$> (reserved "ngless" *> integer) <*> (operator '.' *> integer)
+ngless_version = (,) <$> (reserved "ngless" *> integer) <*> (operator '.' *> integer <* eol)
+

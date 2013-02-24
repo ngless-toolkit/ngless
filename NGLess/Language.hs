@@ -9,6 +9,7 @@ module Language
     , Index(..)
     , Block(..)
     , FuncName(..)
+    , Script(..)
     ) where
 
 {- This module defines the internal representation the language -}
@@ -61,6 +62,7 @@ data Expression =
         | ConstNum Integer -- ^ integer
         | ConstBool Bool -- ^ true/false
         | ConstSymbol T.Text -- ^ a symbol
+        | NGList [Expression] -- ^ a list
         | Continue -- ^ continue
         | Discard -- ^ discard
         | UnaryOp UOp Expression  -- ^ op ( expr )
@@ -70,7 +72,12 @@ data Expression =
         | Assignment Variable Expression -- ^ var = expr
         | FunctionCall FuncName [Expression] [(Variable, Expression)] (Maybe Block)
         | Sequence [Expression]
-        | NGList [Expression]
-        | NGLessVersion Integer Integer
     deriving (Eq, Show)
+
+-- | Script is a version declaration followed by an Expression
+-- (almost surely a 'Sequence')
+data Script = Script
+        { nglVersion :: (Integer, Integer)
+        , nglBody :: Expression
+        } deriving (Eq,Show)
 

@@ -8,6 +8,7 @@ module Main
 
 import Interpret
 import Validation
+import Language
 import Tokens
 import Parse
 
@@ -40,7 +41,7 @@ nglessargs = NGLessArgs
 function :: String -> String -> T.Text -> IO ()
 function "ngless" fname text = case parsengless fname text >>= validate of
             Left err -> T.putStrLn err
-            Right expr -> interpret expr
+            Right expr -> interpret . nglBody $ expr
 
 function "tokens" fname text = case tokenize fname text of
             Left err -> T.putStrLn err

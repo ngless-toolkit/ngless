@@ -28,47 +28,48 @@ main = $(defaultMainGenerator)
 
 -- Test Parsing Module
 parseText :: GenParser (SourcePos,Token) () a -> T.Text -> a
-parseText p t = fromRight . parse p "test" . fromRight . tokenize "test" $ t
+parseText p t = fromRight . parse p "test" . _cleanupindents . fromRight . tokenize "test" $ t
 fromRight (Right r) = r
-fromRight (Left _) = undefined
+fromRight (Left e) = error (concat ["Unexpected Left: ",show e])
+parseBody = parseText _nglbody
 
-case_parse_symbol = parsengless "test" "{symbol}" @?= Right (Sequence [ConstSymbol "symbol"])
-case_parse_fastq = parsengless "test" fastqcalls @?= Right fastqcall
+case_parse_symbol = parseBody "{symbol}" @?= (Sequence [ConstSymbol "symbol"])
+case_parse_fastq = parseBody fastqcalls @?= fastqcall
     where
         fastqcalls = "fastq(\"input.fq\")"
         fastqcall  = Sequence [FunctionCall Ffastq [ConstStr "input.fq"] [] Nothing]
 
-case_parse_assignment =  parsengless "test" "reads = \"something\"" @?=
-        Right (Sequence [Assignment (Variable "reads") (ConstStr "something")])
+case_parse_assignment =  parseBody "reads = \"something\"" @?=
+        (Sequence [Assignment (Variable "reads") (ConstStr "something")])
 
 
-case_parse_sequence = parsengless "test" seqs @?= Right seqr
+case_parse_sequence = parseBody seqs @?= seqr
     where
         seqs = "reads = 'something'\nreads = 'something'"
         seqr = Sequence [a,a]
         a    = Assignment (Variable "reads") (ConstStr "something")
 
-case_parse_num = parsengless "test" nums @?= Right num
+case_parse_num = parseBody nums @?= num
     where
         nums = "a = 0x10"
         num  = Sequence [Assignment (Variable "a") (ConstNum 16)]
 
-case_parse_bool = parsengless "test" bools @?= Right bool
+case_parse_bool = parseBody bools @?= bool
     where
         bools = "a = true"
         bool  = Sequence [Assignment (Variable "a") (ConstBool True)]
 
-case_parse_if_else = parsengless "test" blocks @?= Right block
+case_parse_if_else = parseBody blocks @?= block
     where
         blocks = "if true:\n 0\n 1\nelse:\n 2\n"
         block  = Sequence [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [ConstNum 2])]
 
-case_parse_if = parsengless "test" blocks @?= Right block
+case_parse_if = parseBody blocks @?= block
     where
         blocks = "if true:\n 0\n 1\n"
         block  = Sequence [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [])]
 
-case_parse_if_end = parsengless "test" blocks @?= Right block
+case_parse_if_end = parseBody blocks @?= block
     where
         blocks = "if true:\n 0\n 1\n2\n"
         block  = Sequence [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence []),ConstNum 2]
@@ -76,7 +77,7 @@ case_parse_if_end = parsengless "test" blocks @?= Right block
 case_parse_ngless = parsengless "test" ngs @?= Right ng
     where
         ngs = "ngless 0.0\n"
-        ng  = Sequence [NGLessVersion 0 0]
+        ng  = Script (0,0) (Sequence [])
 
 case_parse_list = parseText _listexpr "[a,b]" @?= NGList [Lookup (Variable "a"), Lookup (Variable "b")]
 
