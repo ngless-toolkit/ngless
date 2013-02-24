@@ -88,9 +88,7 @@ tokf f = token (show .snd) fst (f . snd)
 rawexpr = tokf $ \t -> case t of
     TExpr e -> Just e
     _ -> Nothing
-integer = tokf $ \t -> case t of
-    TExpr (ConstNum n) -> Just n
-    _ -> Nothing
+integer = (tokf $ \t -> case t of { TExpr (ConstNum n) -> Just n; _ -> Nothing }) <?> "integer"
 
 operator op = tokf $ \t -> case t of
     TOperator op' | op == op' -> Just t
@@ -108,8 +106,8 @@ indentation = tokf $ \t -> case t of
     TIndent i -> Just i
     _ -> Nothing
 
-eol = tokf $ \t -> case t of { TNewLine -> Just (); _ -> Nothing }
-binop = tokf $ \t -> case t of { TBop b -> Just b; _ -> Nothing }
+eol = (tokf $ \t -> case t of { TNewLine -> Just (); _ -> Nothing }) <?> "end of line"
+binop = (tokf $ \t -> case t of { TBop b -> Just b; _ -> Nothing }) <?> "binary operator"
 
 uoperator = lenop <|> unary_minus
     where
@@ -124,21 +122,24 @@ funccall = FunctionCall <$>
 funcblock = (Just <$> (Block <$> (reserved "using" *> operator '|' *> variableList <* operator '|' <* operator ':') <*> block))
     <|> pure Nothing
 
-funcname = do
-    fname <- word
-    case fname of
-        "fastq" -> pure Ffastq
-        "substrim" -> pure Fsubstrim
-        "preprocess" -> pure Fpreprocess
-        "map" -> pure Fmap
-        "count" -> pure Fcount
-        "unique" -> pure Funique
-        "write" -> pure Fwrite
-        "print" -> pure Fprint
-        _ -> fail "Function not found"
+funcname = funcname' <?> "function name"
+    where
+        funcname' = do
+            fname <- word
+            case fname of
+                "fastq" -> pure Ffastq
+                "substrim" -> pure Fsubstrim
+                "preprocess" -> pure Fpreprocess
+                "map" -> pure Fmap
+                "count" -> pure Fcount
+                "unique" -> pure Funique
+                "write" -> pure Fwrite
+                "print" -> pure Fprint
+                _ -> fail "Function not found"
 
-kwargs = many (operator ',' *> kwarg)
-kwarg = (,) <$> (Variable <$> word <* operator '=') <*> expression
+kwargs = many (operator ',' *> kwarg) <?> "keyword argument list"
+kwarg = kwarg' <?> "keyword argument"
+    where kwarg' = (,) <$> (Variable <$> word <* operator '=') <*> expression
 
 assignment = try assignment'
     where assignment' =
@@ -174,8 +175,9 @@ block = do
                             if level /= level'
                                 then fail "indentation changed"
                                 else expression <* many eol)
-variableList = sepBy1 variable (operator ',')
-variable = Variable <$> word
+variableList = sepBy1 variable (operator ',') <?> "variable list"
+variable = Variable <$> word <?> "variable"
 
-ngless_version = (,) <$> (reserved "ngless" *> integer) <*> (operator '.' *> integer <* eol)
+ngless_version = ngless_version' <?> "ngless version declararion"
+    where ngless_version' = (,) <$> (reserved "ngless" *> integer) <*> (operator '.' *> integer <* eol)
 

@@ -107,6 +107,8 @@ case_parse_cleanupindents_4'' = tokcleanupindents toks @?= toks'
 j1 = Just (ConstNum 1)
 tokcleanupindents = map snd . _cleanupindents . map (newPos "test" 0 0,)
 
+case_parse_kwargs = parseBody "unique(reads,maxCopies=2)\n" @?= Sequence [FunctionCall Funique [Lookup (Variable "reads")] [(Variable "maxCopies", ConstNum 2)] Nothing]
+
 -- Test Tokens module
 tokenize' fn t = map snd <$> (tokenize fn t)
 
