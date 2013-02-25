@@ -118,6 +118,11 @@ case_tok_single_line_comment = tokenize' "test" with_comment @?= Right expected
         with_comment = "a=0# comment\nb=1\n"
         expected = [TWord "a",TOperator '=',TExpr (ConstNum 0),TNewLine,TWord "b",TOperator '=',TExpr (ConstNum 1),TNewLine]
 
+case_tok_single_line_comment_cstyle = tokenize' "test" with_comment @?= Right expected
+    where
+        with_comment = "a=0// comment\nb=1\n"
+        expected = [TWord "a",TOperator '=',TExpr (ConstNum 0),TNewLine,TWord "b",TOperator '=',TExpr (ConstNum 1),TNewLine]
+
 case_tok_multi_line_comment = tokenize' "test" with_comment @?= Right expected
     where
         with_comment = "a=0/* This\n\nwith\nlines*/\nb=1\n"
