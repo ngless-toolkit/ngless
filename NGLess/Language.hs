@@ -17,20 +17,28 @@ import qualified Data.Text as T
 
 newtype Variable = Variable T.Text
     deriving (Eq, Show)
+
+-- | functions are hard coded here
 data FuncName = Ffastq | Funique | Fpreprocess | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
     deriving (Eq, Show)
 
+-- | unary operators
 data UOp = UOpLen | UOpMinus
     deriving (Eq, Show)
+
+-- | binary operators
 data BOp = BOpAdd | BOpMul | BOpGT | BOpGTE | BOpLT | BOpLTE | BOpEQ | BOpNEQ
     deriving (Eq, Show)
 
 data Index = Index (Maybe Expression) (Maybe Expression)
     deriving (Eq, Show)
 
+-- | a block is
+--  f(a) using |inputvariables|:
+--      expression
 data Block = Block
                 [Variable] -- ^ input arguments
-                Expression -- ^ block body
+                Expression -- ^ block body, will likely be Sequence
     deriving (Eq, Show)
 
 data NGLessBaseType =
@@ -45,6 +53,7 @@ data NGLessBaseType =
         | NGLMappedReadSet
     deriving (Eq, Show)
 
+-- | A type is either a base type or a list thereof
 data NGLessType = NGLType NGLessBaseType | NGLList NGLessBaseType
     deriving (Eq, Show)
 
@@ -56,9 +65,10 @@ data NGLessObject =
         | NGOFilename T.Text
         | NGOShortRead T.Text T.Text
 
+-- | 'Expression' is the main type for holding the AST.
 data Expression = 
-        Lookup Variable -- ^ This is just the variable
-        | ConstStr T.Text -- ^ Constant string
+        Lookup Variable -- ^ This looks up the variable name
+        | ConstStr T.Text -- ^ constant string
         | ConstNum Integer -- ^ integer
         | ConstBool Bool -- ^ true/false
         | ConstSymbol T.Text -- ^ a symbol
