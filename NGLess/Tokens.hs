@@ -32,7 +32,9 @@ data Token =
 -- | tokenize is the main function of this module
 -- It returns tokens with position information (the position in the original
 -- file)
-tokenize :: String -> T.Text -> Either T.Text [(SourcePos,Token)]
+tokenize :: String -- ^ input filename (for error messages)
+        -> T.Text -- ^ input text
+        -> Either T.Text [(SourcePos,Token)] -- ^ either error message or tokens
 tokenize inname input = case parse tokenizer inname input of
         Right val -> Right val
         Left err -> Left (T.pack . show $ err)

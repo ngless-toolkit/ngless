@@ -21,10 +21,13 @@ import Text.ParserCombinators.Parsec.Prim hiding (Parser)
 import Text.Parsec.Combinator
 import Text.Parsec (SourcePos)
 
--- main function of this module
+-- | main function of this module
+--
 -- Because the scripts are expected to be small, we can expect to load them
--- whole into memory (with a strict Text) before parsing
-parsengless :: String -> T.Text -> Either T.Text Script
+-- whole into memory (with a strict 'Text') before parsing
+parsengless :: String -- ^ input filename (for error messages)
+            -> T.Text -- ^ input data
+            -> Either T.Text Script -- ^ either error message or parsed 'Script'
 parsengless inputname input =
         tokenize inputname input >>= parsetoks inputname
 
@@ -33,6 +36,8 @@ parsetoks inputname toks = case parse nglparser inputname (_cleanupindents toks)
             Right val -> Right val
             Left err -> Left (T.pack . show $ err)
 
+-- | '_cleanupindents' removes spaces that do not follow new lines as well as
+-- any spaces that are between brackets (round or square).
 _cleanupindents ::[(SourcePos,Token)] -> [(SourcePos, Token)]
 _cleanupindents = _cleanupindents' []
     where
@@ -90,22 +95,15 @@ rawexpr = tokf $ \t -> case t of
     _ -> Nothing
 integer = (tokf $ \t -> case t of { TExpr (ConstNum n) -> Just n; _ -> Nothing }) <?> "integer"
 
-operator op = tokf $ \t -> case t of
-    TOperator op' | op == op' -> Just t
-    _ -> Nothing
+operator op = (tokf $ \t -> case t of { TOperator op' | op == op' -> Just t; _ -> Nothing }) <?> (concat ["operator ", [op]])
 
 word = tokf $ \t -> case t of
     TWord w -> Just w
     _ -> Nothing
 
-reserved r = tokf $ \t -> case t of
-    TReserved r' | r == r' -> Just r
-    _ -> Nothing
+reserved r = (tokf $ \t -> case t of { TReserved r' | r == r' -> Just r; _ -> Nothing }) <?> (concat [T.unpack r, " (reserved word)"])
 
-indentation = tokf $ \t -> case t of
-    TIndent i -> Just i
-    _ -> Nothing
-
+indentation = (tokf $ \t -> case t of { TIndent i -> Just i; _ -> Nothing }) <?> "indentation"
 eol = (tokf $ \t -> case t of { TNewLine -> Just (); _ -> Nothing }) <?> "end of line"
 binop = (tokf $ \t -> case t of { TBop b -> Just b; _ -> Nothing }) <?> "binary operator"
 

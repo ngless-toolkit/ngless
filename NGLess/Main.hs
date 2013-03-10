@@ -1,7 +1,7 @@
 {- Copyright 2013 NGLess Authors
  - License: GPL, version 3 or later
  -}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, OverloadedStrings #-}
 module Main
     ( main
     ) where
@@ -27,7 +27,7 @@ data NGLessArgs = NGLessArgs
 
 nglessargs = NGLessArgs
         { debug_mode = "ngless"
-        , input = "-" &= argPos 0 &= opt "-"
+        , input = "-" &= argPos 0 &= opt ("-" :: String)
         } &=
         verbosity &=
         summary sumtext &=
@@ -43,6 +43,10 @@ function "ngless" fname text = case parsengless fname text >>= validate of
             Left err -> T.putStrLn err
             Right expr -> interpret . nglBody $ expr
 
+function "ast" fname text = case parsengless fname text >>= validate of
+            Left err -> T.putStrLn (T.concat ["Error in parsing: ", err])
+            Right expr -> putStrLn . show . nglBody $ expr
+
 function "tokens" fname text = case tokenize fname text of
             Left err -> T.putStrLn err
             Right toks -> putStrLn . show . map snd $ toks
@@ -53,7 +57,9 @@ main = do
     NGLessArgs dmode fname <- cmdArgs nglessargs
     --Note that the input for ngless is always UTF-8.
     --Always. This means that we cannot use T.readFile
-    --which is locale aware
+    --which is locale aware.
+    --We also assume that the text file is quite small and, therefore, loading
+    --it in to memory is not resource intensive.
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of
         Left err -> putStrLn (show err)

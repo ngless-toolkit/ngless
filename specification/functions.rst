@@ -5,14 +5,17 @@ Functions
 fastq
 -----
 
-``fastq:: Str -> ReadSet``
+::
+
+    fastq:: Str -> ReadSet
+    inputdata = fastq('input.fq')
 
 Argument type: ``String``
 
 Keyword arguments:
-- ``type``: symbol, one of ``:auto:`` (default) or ``:solexa:``    
-- ``compression``: symbol, one of ``:auto:`` (default), ``:none:``, ``:gzip:``,
-  or ``:bzip2:``
+- ``type``: symbol, one of ``{auto}`` (default) or ``{solexa}``
+- ``compression``: symbol, one of ``{auto}`` (default), ``{none}``, ``{gzip}``,
+or ``{bzip2}``
 
 Block: ``None``
 
@@ -52,5 +55,5 @@ Example::
 
     write(counts,
             file="file.csv",
-            format=:csv)
+            format={csv})
 

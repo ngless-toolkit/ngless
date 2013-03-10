@@ -18,8 +18,8 @@ Both LF and CRLF are accepted as line endings (Unix-style LF is preferred).
 Strings are denoted with single or double quotes and standard backslashed
 escapes apply (\\n for newline, ...).
 
-A symbol is denoted as a token preceded by ``:`` (e.g., ``:symbol`` or
-``:gene``).
+A symbol is denoted as a token surrounded by curly braces (e.g., ``{symbol}``
+or ``{gene}``).
 
 Integers are specified as decimals ``[0-9]+`` or as hexadecimals
 ``0x[0-9a-fA-F]+``.
@@ -31,7 +31,7 @@ Language
 
 The first line of an NGLess file should be a version declaration::
 
-    ngless 0
+    ngless 0.0
 
 This also serves as a *magic constant* for other tools
 
@@ -50,7 +50,8 @@ Assignment is performed with ``=`` operator::
 
     variable = value
 
-A variable that is all upper-case is a constant and can only be assigned once.
+A variable that is all upper-case is a constant and can only be assigned to
+once.
 
 Types
 -----
@@ -68,7 +69,7 @@ NGless supports the following basic types:
 - mappedreadset
 
 In addition, it supports the composite type ``List of X`` where ``X`` is a
-basic type.
+basic type. Lists are built with square brackes (e.g., ``[1,2,3]``)
 
 Functions
 ---------
@@ -78,12 +79,19 @@ Functions are called with parentheses::
     result = f(arg, arg1=2)
 
 Functions have a single positional parameter, all other *must be given by
-name*. The exception are constructs which take a block: they take a single
-positional parameter and a block.
+name*::
+
+    unique(reads, maxCopies=2)
+
+The exception are constructs which take a block: they take a single positional
+parameter and a block. The block is passed using the ``using`` keyword::
+
+    preprocess(reads) using |read|:
+        block
+        ...
 
 In the first version, there is no possibility of defining new functions. Only
 the builtin functions are available.
-
 
 Auto-comprehension
 ------------------
@@ -93,3 +101,4 @@ A function of type ``A -> * -> B`` can be automatically used as ``[A] -> * ->
 
     in1,in2 = fastq(["in1.fq", "in2.fq"])
 
+This allows for a pipeline which runs in parallel over many input filenames.
