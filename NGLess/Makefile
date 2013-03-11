@@ -7,7 +7,8 @@ SOURCES :=  \
 	Language.hs \
 	Parse.hs \
 	Tokens.hs \
-	Validation.hs
+	NumberOfChars.hs \
+	Validation.hs 
 
 ngless: Main.hs $(SOURCES)
 	ghc $(GHCOPTS) --make -O2 $^ -o $@

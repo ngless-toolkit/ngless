@@ -21,6 +21,7 @@ import Text.Parsec.Pos (newPos)
 import Language
 import Parse
 import Tokens
+import NumberOfChars
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -131,3 +132,6 @@ case_tok_multi_line_comment = tokenize' "test" with_comment @?= Right expected
 case_tok_word_ = tokenize' "test" "word_with_underscore" @?= Right expected
     where
         expected = [TWord "word_with_underscore"]
+
+
+
