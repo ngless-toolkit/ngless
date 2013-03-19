@@ -134,16 +134,10 @@ case_tok_word_ = tokenize' "test" "word_with_underscore" @?= Right expected
         expected = [TWord "word_with_underscore"]
 
 
-case_count_bps_empty = countBps "[>name\n\nsomeData\nsomeMoreData]" @?= expected
-    where
-	expected = (0, 0, 0, 0)
+-- Test CountChars
 
-case_count_bps_normal = countBps "[>name\nAAAGGGTTTCCC\nsomeData\nsomeMoreData]" @?= expected
-    where
-	expected = (3, 3, 3, 3)
-
-case_count_bps_onlyAs = countBps "[>name\nAAAAAAAAAA\nsomeData\nsomeMoreData]" @?= expected
-    where
-	expected = (10, 0, 0, 0)
+case_count_bps_empty = countBps "[>name\n\nsomeData\nsomeMoreData]" @?= (0,0,0,0)
+case_count_bps_normal = countBps "[>name\nAAAGGGTTTCCC\nsomeData\nsomeMoreData]" @?= (3,3,3,3)
+case_count_bps_onlyAs = countBps "[>name\nAAAAAAAAAA\nsomeData\nsomeMoreData]" @?= (10,0,0,0)
 
 

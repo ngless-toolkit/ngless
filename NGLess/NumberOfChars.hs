@@ -1,7 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 module NumberOfChars
-    ( 
-	countBps
+    ( countBps
     ) where
 
 addChar (!bpA, !bpC, !bpG, !bpT) 'A' = (bpA + 1, bpC, bpG, bpT)
@@ -13,10 +12,9 @@ addChar (!bpA, !bpC, !bpG, !bpT) _ = (bpA, bpC, bpG, bpT)
 countChars !c (x:xs) = countChars (addChar c x) xs
 countChars !c [] = c 
 
+countBps :: String -> (Integer,Integer,Integer,Integer)
 countBps fileContent = countBps' (0,0,0,0) (lines fileContent)
-	where
-		countBps' c (id:sequence:optional:quality:xs) = 	
-			countBps' (countChars c sequence) xs
-
-		countBps' c [] = c
-	
+    where
+        countBps' c (_id:bps:_optional:_quality:xs) = countBps' (countChars c bps) xs
+        countBps' c [] = c
+        countBps' _ _ = error "FastQ file does not have a number of lines that is a multiple of 4"
