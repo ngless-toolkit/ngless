@@ -30,7 +30,10 @@ data UOp = UOpLen | UOpMinus
 data BOp = BOpAdd | BOpMul | BOpGT | BOpGTE | BOpLT | BOpLTE | BOpEQ | BOpNEQ
     deriving (Eq, Show)
 
-data Index = Index (Maybe Expression) (Maybe Expression)
+-- | index expression encodes what is inside an index variable
+-- either [a] (IndexOne) or [a:b] (IndexTwo)
+data Index = IndexOne Expression
+            | IndexTwo (Maybe Expression) (Maybe Expression)
     deriving (Eq, Show)
 
 -- | a block is
@@ -66,7 +69,7 @@ data NGLessObject =
         | NGOShortRead T.Text T.Text
 
 -- | 'Expression' is the main type for holding the AST.
-data Expression = 
+data Expression =
         Lookup Variable -- ^ This looks up the variable name
         | ConstStr T.Text -- ^ constant string
         | ConstNum Integer -- ^ integer

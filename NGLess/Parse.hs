@@ -151,7 +151,8 @@ binoperator = try $ do
 
 _indexexpr = try (IndexExpression <$> base_expression <*> indexing)
     where
-        indexing = Index <$> (operator '[' *> may_int <* operator ':') <*> (may_int <* operator ']')
+        indexing = try (IndexTwo <$> (operator '[' *> may_int <* operator ':') <*> (may_int <* operator ']'))
+                    <|> (IndexOne <$> (operator '[' *> expression <* operator ']'))
         may_int = (Just <$> expression) <|> (pure Nothing)
 
 _listexpr = try listexpr
