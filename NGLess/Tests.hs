@@ -38,7 +38,7 @@ case_parse_symbol = parseBody "{symbol}" @?= (Sequence [ConstSymbol "symbol"])
 case_parse_fastq = parseBody fastqcalls @?= fastqcall
     where
         fastqcalls = "fastq(\"input.fq\")"
-        fastqcall  = Sequence [FunctionCall Ffastq [ConstStr "input.fq"] [] Nothing]
+        fastqcall  = Sequence [FunctionCall Ffastq (ConstStr "input.fq") [] Nothing]
 
 case_parse_assignment =  parseBody "reads = \"something\"" @?=
         (Sequence [Assignment (Variable "reads") (ConstStr "something")])
@@ -112,7 +112,7 @@ case_parse_cleanupindents_4'' = tokcleanupindents toks @?= toks'
 j1 = Just (ConstNum 1)
 tokcleanupindents = map snd . _cleanupindents . map (newPos "test" 0 0,)
 
-case_parse_kwargs = parseBody "unique(reads,maxCopies=2)\n" @?= Sequence [FunctionCall Funique [Lookup (Variable "reads")] [(Variable "maxCopies", ConstNum 2)] Nothing]
+case_parse_kwargs = parseBody "unique(reads,maxCopies=2)\n" @?= Sequence [FunctionCall Funique (Lookup (Variable "reads")) [(Variable "maxCopies", ConstNum 2)] Nothing]
 
 -- Test Tokens module
 tokenize' fn t = map snd <$> (tokenize fn t)

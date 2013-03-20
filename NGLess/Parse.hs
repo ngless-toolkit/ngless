@@ -113,7 +113,7 @@ uoperator = lenop <|> unary_minus
         unary_minus = UnaryOp UOpMinus <$> (operator '-' *> base_expression)
 funccall = FunctionCall <$>
                 (try funcname <* operator '(')
-                <*> ((:[]) <$> expression)
+                <*> expression
                 <*> (kwargs <* operator ')')
                 <*> funcblock
 

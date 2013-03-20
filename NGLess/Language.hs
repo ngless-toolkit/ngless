@@ -83,7 +83,7 @@ data Expression =
         | Condition Expression Expression Expression -- ^ if condition: true-expr else: false-expr
         | IndexExpression Expression Index -- ^ expr [ index ]
         | Assignment Variable Expression -- ^ var = expr
-        | FunctionCall FuncName [Expression] [(Variable, Expression)] (Maybe Block)
+        | FunctionCall FuncName Expression [(Variable, Expression)] (Maybe Block)
         | Sequence [Expression]
     deriving (Eq, Show)
 

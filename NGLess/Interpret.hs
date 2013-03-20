@@ -15,7 +15,7 @@ interpret (Assignment var func) = variableAssignment var >> interpretFunctions f
 interpret e = error (concat ["interpret: cannot handle ", show e])
 
 variableAssignment (Variable varName) = print varName
-interpretFunctions (FunctionCall functionType [ConstStr fname] _exprs _block) =
+interpretFunctions (FunctionCall functionType (ConstStr fname) _exprs _block) =
     case functionType of
         Ffastq -> readFastQ (T.unpack fname)
         _ -> print functionType -- all the other functionCalls
