@@ -33,48 +33,48 @@ parseText :: GenParser (SourcePos,Token) () a -> T.Text -> a
 parseText p t = fromRight . parse p "test" . _cleanupindents . fromRight . tokenize "test" $ t
 fromRight (Right r) = r
 fromRight (Left e) = error (concat ["Unexpected Left: ",show e])
-parseBody = Sequence . map snd . parseText _nglbody
+parseBody = map snd . parseText _nglbody
 
-case_parse_symbol = parseBody "{symbol}" @?= (Sequence [ConstSymbol "symbol"])
+case_parse_symbol = parseBody "{symbol}" @?= [ConstSymbol "symbol"]
 case_parse_fastq = parseBody fastqcalls @?= fastqcall
     where
         fastqcalls = "fastq(\"input.fq\")"
-        fastqcall  = Sequence [FunctionCall Ffastq (ConstStr "input.fq") [] Nothing]
+        fastqcall  = [FunctionCall Ffastq (ConstStr "input.fq") [] Nothing]
 
 case_parse_assignment =  parseBody "reads = \"something\"" @?=
-        (Sequence [Assignment (Variable "reads") (ConstStr "something")])
+        [Assignment (Variable "reads") (ConstStr "something")]
 
 
 case_parse_sequence = parseBody seqs @?= seqr
     where
         seqs = "reads = 'something'\nreads = 'something'"
-        seqr = Sequence [a,a]
+        seqr = [a,a]
         a    = Assignment (Variable "reads") (ConstStr "something")
 
 case_parse_num = parseBody nums @?= num
     where
         nums = "a = 0x10"
-        num  = Sequence [Assignment (Variable "a") (ConstNum 16)]
+        num  = [Assignment (Variable "a") (ConstNum 16)]
 
 case_parse_bool = parseBody bools @?= bool
     where
         bools = "a = true"
-        bool  = Sequence [Assignment (Variable "a") (ConstBool True)]
+        bool  = [Assignment (Variable "a") (ConstBool True)]
 
 case_parse_if_else = parseBody blocks @?= block
     where
         blocks = "if true:\n 0\n 1\nelse:\n 2\n"
-        block  = Sequence [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [ConstNum 2])]
+        block  = [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [ConstNum 2])]
 
 case_parse_if = parseBody blocks @?= block
     where
         blocks = "if true:\n 0\n 1\n"
-        block  = Sequence [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [])]
+        block  = [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [])]
 
 case_parse_if_end = parseBody blocks @?= block
     where
         blocks = "if true:\n 0\n 1\n2\n"
-        block  = Sequence [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence []),ConstNum 2]
+        block  = [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence []),ConstNum 2]
 
 case_parse_ngless = parsengless "test" ngs @?= Right ng
     where
@@ -113,7 +113,7 @@ case_parse_cleanupindents_4'' = tokcleanupindents toks @?= toks'
 j1 = Just (ConstNum 1)
 tokcleanupindents = map snd . _cleanupindents . map (newPos "test" 0 0,)
 
-case_parse_kwargs = parseBody "unique(reads,maxCopies=2)\n" @?= Sequence [FunctionCall Funique (Lookup (Variable "reads")) [(Variable "maxCopies", ConstNum 2)] Nothing]
+case_parse_kwargs = parseBody "unique(reads,maxCopies=2)\n" @?= [FunctionCall Funique (Lookup (Variable "reads")) [(Variable "maxCopies", ConstNum 2)] Nothing]
 
 -- Test Tokens module
 tokenize' fn t = map snd <$> (tokenize fn t)
