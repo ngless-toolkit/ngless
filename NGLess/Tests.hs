@@ -34,6 +34,7 @@ parseText p t = fromRight . parse p "test" . _cleanupindents . fromRight . token
 fromRight (Right r) = r
 fromRight (Left e) = error (concat ["Unexpected Left: ",show e])
 parseBody = map snd . parseText _nglbody
+parsetest = parsengless "test"
 
 case_parse_symbol = parseBody "{symbol}" @?= [ConstSymbol "symbol"]
 case_parse_fastq = parseBody fastqcalls @?= fastqcall
@@ -155,4 +156,15 @@ isOk (Right _) = return ()
 
 case_bad_type_fastq = isError $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
 case_good_type_fastq = isOk $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
+
+case_type_complete = isOk $ (parsetest complete) >>= checktypes
+
+complete = "ngless 0.0\n\
+    \reads = fastq('input1.fq')\n\
+    \reads = unique(reads,maxCopies=2)\n\
+    \preprocess(reads) using |read|:\n\
+    \    read = read[5:]\n\
+    \    read = substrim(read,minQuality=24)\n\
+    \    if len(read) < 30:\n\
+    \        discard\n"
 

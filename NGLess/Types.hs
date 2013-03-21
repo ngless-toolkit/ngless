@@ -42,9 +42,11 @@ inferM :: Expression -> TypeMSt ()
 inferM (Sequence es) = inferM `mapM_` es
 inferM (Assignment (Variable v) expr) = do
     ltype <- envLookup v
-    rtype <- nglTypeOf expr
-    check_assignment ltype rtype
-    envInsert v (fromJust ltype)
+    mrtype <- nglTypeOf expr
+    check_assignment ltype mrtype
+    case mrtype of
+        Nothing -> errorInLine "Cannot infer type for right-hand of assignment"
+        Just rtype -> envInsert v rtype
 inferM e = void (nglTypeOf e)
 
 envLookup :: T.Text -> TypeMSt (Maybe NGLType)
