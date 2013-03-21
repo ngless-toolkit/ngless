@@ -13,6 +13,7 @@ import Data.Maybe
 import Control.Monad.State
 import Control.Monad.Error
 import Control.Applicative
+import Data.String
 
 import Language
 
@@ -25,6 +26,13 @@ instance Error T.Text where
 -- | checktypes will either return an error message or pass through the script
 checktypes :: Script -> Either T.Text Script
 checktypes script@(Script _ exprs) = evalState (runErrorT (inferScriptM exprs >> return script)) (0,Map.empty)
+
+
+errorInLineC = errorInLine . T.concat . map fromString
+
+errorInLine e = do
+    line <- fst `fmap` get
+    throwError (T.concat ["Line ", T.pack (show line),": ", e])
 
 inferScriptM :: [(Int,Expression)] -> TypeMSt ()
 inferScriptM [] = return ()
@@ -46,7 +54,7 @@ envInsert :: T.Text -> NGLType -> TypeMSt ()
 envInsert v t = modify (\(lno,m) -> (lno, Map.insert v t m))
 
 check_assignment :: Maybe NGLType -> Maybe NGLType -> TypeMSt ()
-check_assignment _ (Just NGLVoid) = throwError "Assigning void value to variable"
+check_assignment _ (Just NGLVoid) = errorInLine "Assigning void value to variable"
 check_assignment Nothing _ = return ()
 check_assignment a b = guard (a == b)
 
@@ -80,7 +88,7 @@ checkinteger (ConstNum _) = return (Just NGLInteger)
 checkinteger expr = do
     t <- nglTypeOf expr
     if t /= Just NGLInteger
-        then throwError "Expected integer"
+        then errorInLine "Expected integer"
         else return t
 
 checkindex expr index = checkindex' index *> checklist expr
@@ -95,14 +103,14 @@ checklist (ListExpression es) = do
     types <- nglTypeOf `mapM` es
     let (t:ts) = catMaybes types
     when (not $ all (==t) ts)
-        (throwError "List of mixed type")
+        (errorInLine "List of mixed type")
     return (Just t)
 checklist (Lookup (Variable v)) = do
     vtype <- envLookup v
     case vtype of
         Just (NGList btype) -> return (Just btype)
-        _ -> throwError "List expected"
-checklist _ = throwError "List expected"
+        _ -> errorInLine "List expected"
+checklist _ = errorInLine "List expected"
 
 checkfunccall :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
 checkfunccall f arg = do
@@ -112,6 +120,7 @@ checkfunccall f arg = do
         case targ of
             Just (NGList t) -> checkfunctype etype t *> return (Just (NGList rtype))
             Just t -> checkfunctype etype t *> return (Just rtype)
-            Nothing -> throwError "Could not infer type of argument"
+            Nothing -> errorInLine "Could not infer type of argument"
     where
-        checkfunctype t t' = when (t /= t') (throwError "Bad type in function call")
+        checkfunctype t t' = when (t /= t') (errorInLineC
+                                    ["Bad type in function call (function '", show f,"' expects ", show t, " got ", show t', ")."])
