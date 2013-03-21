@@ -9,8 +9,7 @@ module Language
     , Index(..)
     , Block(..)
     , FuncName(..)
-    , NGLessType(..)
-    , NGLessBaseType(..)
+    , NGLType(..)
     , Script(..)
     , function_return_type
     , function_arg_type
@@ -27,7 +26,7 @@ newtype Variable = Variable T.Text
 data FuncName = Ffastq | Funique | Fpreprocess | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
     deriving (Eq, Show, Ord)
 
-function_argtype_return_type :: [(FuncName, (NGLessBaseType, NGLessBaseType))]
+function_argtype_return_type :: [(FuncName, (NGLType, NGLType))]
 function_argtype_return_type =
     [(Ffastq,       (NGLReadSet,         NGLFilename))
     ,(Funique,      (NGLReadSet,         NGLReadSet))
@@ -64,7 +63,7 @@ data Block = Block
                 Expression -- ^ block body, will likely be Sequence
     deriving (Eq, Show)
 
-data NGLessBaseType =
+data NGLType =
         NGLString
         | NGLInteger
         | NGLBool
@@ -76,10 +75,7 @@ data NGLessBaseType =
         | NGLMappedReadSet
         | NGLCounts
         | NGLVoid
-    deriving (Eq, Show)
-
--- | A type is either a base type or a list thereof
-data NGLessType = NGLType NGLessBaseType | NGLList NGLessBaseType
+        | NGList NGLType
     deriving (Eq, Show)
 
 data NGLessObject =
@@ -97,7 +93,7 @@ data Expression =
         | ConstNum Integer -- ^ integer
         | ConstBool Bool -- ^ true/false
         | ConstSymbol T.Text -- ^ a symbol
-        | NGList [Expression] -- ^ a list
+        | ListExpression [Expression] -- ^ a list
         | Continue -- ^ continue
         | Discard -- ^ discard
         | UnaryOp UOp Expression  -- ^ op ( expr )

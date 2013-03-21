@@ -157,7 +157,7 @@ _indexexpr = try (IndexExpression <$> base_expression <*> indexing)
 
 _listexpr = try listexpr
     where
-        listexpr = (operator '[') *> (NGList <$> (innerexpression `sepEndBy` (operator ','))) <* (operator ']')
+        listexpr = (operator '[') *> (ListExpression <$> (innerexpression `sepEndBy` (operator ','))) <* (operator ']')
 
 conditional = Condition <$> (reserved "if" *> expression <* operator ':') <*> block <*> mayelse
 mayelse = elseblock <|> (pure $ Sequence [])

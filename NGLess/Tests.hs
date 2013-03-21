@@ -80,7 +80,7 @@ case_parse_ngless = parsengless "test" ngs @?= Right ng
         ngs = "ngless 0.0\n"
         ng  = Script (0,0) (Sequence [])
 
-case_parse_list = parseText _listexpr "[a,b]" @?= NGList [Lookup (Variable "a"), Lookup (Variable "b")]
+case_parse_list = parseText _listexpr "[a,b]" @?= ListExpression [Lookup (Variable "a"), Lookup (Variable "b")]
 
 case_parse_indexexpr_11 = parseText _indexexpr "read[1:1]" @?= IndexExpression (Lookup (Variable "read")) (IndexTwo j1 j1)
 case_parse_indexexpr_10 = parseText _indexexpr "read[1:]"  @?= IndexExpression (Lookup (Variable "read")) (IndexTwo j1 Nothing)
