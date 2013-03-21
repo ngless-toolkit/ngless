@@ -10,9 +10,13 @@ import NumberOfChars
 import qualified Data.Text as T
 
 
-interpret (Sequence es) = handleSequence es
-interpret (Assignment var func) = variableAssignment var >> interpretFunctions func
-interpret e = error (concat ["interpret: cannot handle ", show e])
+interpret :: [(Int,Expression)] -> IO ()
+interpret [] = return ()
+interpret ((_,e):es) = interpret' e >> interpret es
+
+interpret' (Sequence es) = handleSequence es
+interpret' (Assignment var func) = variableAssignment var >> interpretFunctions func
+interpret' e = error (concat ["interpret: cannot handle ", show e])
 
 variableAssignment (Variable varName) = print varName
 interpretFunctions (FunctionCall functionType (ConstStr fname) _exprs _block) =
@@ -29,6 +33,6 @@ readFastQ fname =
      print (countBps x)
 
 handleSequence :: [Expression] -> IO ()
-handleSequence (e:es) = interpret e >> handleSequence es
+handleSequence (e:es) = interpret' e >> handleSequence es
 handleSequence [] = return ()
 

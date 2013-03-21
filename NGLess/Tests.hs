@@ -33,7 +33,7 @@ parseText :: GenParser (SourcePos,Token) () a -> T.Text -> a
 parseText p t = fromRight . parse p "test" . _cleanupindents . fromRight . tokenize "test" $ t
 fromRight (Right r) = r
 fromRight (Left e) = error (concat ["Unexpected Left: ",show e])
-parseBody = parseText _nglbody
+parseBody = Sequence . map snd . parseText _nglbody
 
 case_parse_symbol = parseBody "{symbol}" @?= (Sequence [ConstSymbol "symbol"])
 case_parse_fastq = parseBody fastqcalls @?= fastqcall
@@ -79,7 +79,7 @@ case_parse_if_end = parseBody blocks @?= block
 case_parse_ngless = parsengless "test" ngs @?= Right ng
     where
         ngs = "ngless 0.0\n"
-        ng  = Script (0,0) (Sequence [])
+        ng  = Script (0,0) []
 
 case_parse_list = parseText _listexpr "[a,b]" @?= ListExpression [Lookup (Variable "a"), Lookup (Variable "b")]
 
@@ -153,6 +153,6 @@ isError (Left _) = return ()
 isOk (Left _) = assertFailure "Type error on good code"
 isOk (Right _) = return ()
 
-case_bad_type = isError $ checktypes (Script (0,0) (Sequence [FunctionCall Ffastq (ConstNum 3) [] Nothing]))
-case_good_type = isError $ checktypes (Script (0,0) (Sequence [FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing]))
+case_bad_type = isError $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
+case_good_type = isError $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
 

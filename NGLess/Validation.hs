@@ -40,7 +40,7 @@ validate_version (Script (major,minor) _)
 validate_version _ = Nothing
 
 -- | check whether function result of function calls are used
-validate_pure_function (Script _ (Sequence es)) = check_toplevel validate_pure_function' es
+validate_pure_function (Script _ es) = check_toplevel validate_pure_function' es
     where
         validate_pure_function' (FunctionCall f _ _ _)
             | f `elem` pureFunctions = Just (T.concat ["Result of call function ", T.pack . show $ f, " should be assigned to something."])
@@ -51,10 +51,9 @@ validate_pure_function (Script _ (Sequence es)) = check_toplevel validate_pure_f
                     , Fmap
                     , Fcount
                     ]
-validate_pure_function _ = Nothing
 
 check_toplevel _ [] = Nothing
-check_toplevel f (e:es) = case f e of
+check_toplevel f ((_,e):es) = case f e of
         Nothing -> check_toplevel f es
         Just m -> Just m
 

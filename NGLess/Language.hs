@@ -105,10 +105,9 @@ data Expression =
         | Sequence [Expression]
     deriving (Eq, Show)
 
--- | Script is a version declaration followed by an Expression
--- (almost surely a 'Sequence')
+-- | Script is a version declaration followed by a series of expressions
 data Script = Script
         { nglVersion :: (Integer, Integer)
-        , nglBody :: Expression
+        , nglBody :: [(Int,Expression)] -- ^ (line number, expression)
         } deriving (Eq,Show)
 

@@ -19,7 +19,7 @@ import Control.Monad.Identity ()
 import qualified Data.Text as T
 import Text.ParserCombinators.Parsec.Prim hiding (Parser)
 import Text.Parsec.Combinator
-import Text.Parsec (SourcePos)
+import Text.Parsec.Pos
 
 -- | main function of this module
 --
@@ -62,7 +62,9 @@ _cleanupindents = _cleanupindents' []
 type Parser = GenParser (SourcePos,Token) ()
 
 nglparser = Script <$> ngless_version <*> (many eol *> _nglbody)
-_nglbody = (eof *> pure (Sequence [])) <|> Sequence <$> (many1 expression <* eof)
+_nglbody = (eof *> pure []) <|> (many1 lno_expression <* eof)
+lno_expression = (,) <$> linenr <*> expression
+linenr = sourceLine `fmap` getPosition
 
 expression :: Parser Expression
 expression = expression' <* (many eol)

@@ -18,13 +18,17 @@ import Language
 
 
 type TypeMap = Map.Map T.Text NGLType
-type TypeMSt b = ErrorT T.Text (State TypeMap) b
+type TypeMSt b = ErrorT T.Text (State (Int,TypeMap)) b
 instance Error T.Text where
     strMsg = T.pack
 
 -- | checktypes will either return an error message or pass through the script
 checktypes :: Script -> Either T.Text Script
-checktypes script@(Script _ expr) = evalState (runErrorT (inferM expr >> return script)) Map.empty
+checktypes script@(Script _ exprs) = evalState (runErrorT (inferScriptM exprs >> return script)) (0,Map.empty)
+
+inferScriptM :: [(Int,Expression)] -> TypeMSt ()
+inferScriptM [] = return ()
+inferScriptM ((lno,e):es) = modify (\(_,m) -> (lno,m)) >> inferM e >> inferScriptM es
 
 inferM :: Expression -> TypeMSt ()
 inferM (Sequence es) = inferM `mapM_` es
@@ -36,10 +40,10 @@ inferM (Assignment (Variable v) expr) = do
 inferM e = void (nglTypeOf e)
 
 envLookup :: T.Text -> TypeMSt (Maybe NGLType)
-envLookup v = Map.lookup v <$> get
+envLookup v = Map.lookup v . snd <$> get
 
 envInsert :: T.Text -> NGLType -> TypeMSt ()
-envInsert v t = modify (Map.insert v t)
+envInsert v t = modify (\(lno,m) -> (lno, Map.insert v t m))
 
 check_assignment :: Maybe NGLType -> Maybe NGLType -> TypeMSt ()
 check_assignment _ (Just NGLVoid) = throwError "Assigning void value to variable"
