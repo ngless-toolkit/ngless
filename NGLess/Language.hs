@@ -9,18 +9,38 @@ module Language
     , Index(..)
     , Block(..)
     , FuncName(..)
+    , NGLessType(..)
+    , NGLessBaseType(..)
     , Script(..)
+    , function_return_type
+    , function_arg_type
     ) where
 
 {- This module defines the internal representation the language -}
 import qualified Data.Text as T
+import Control.Applicative
 
 newtype Variable = Variable T.Text
     deriving (Eq, Show)
 
 -- | functions are hard coded here
 data FuncName = Ffastq | Funique | Fpreprocess | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
-    deriving (Eq, Show)
+    deriving (Eq, Show, Ord)
+
+function_argtype_return_type :: [(FuncName, (NGLessBaseType, NGLessBaseType))]
+function_argtype_return_type =
+    [(Ffastq,       (NGLReadSet,         NGLFilename))
+    ,(Funique,      (NGLReadSet,         NGLReadSet))
+    ,(Fpreprocess,  (NGLReadSet,         NGLVoid))
+    ,(Fsubstrim,    (NGLRead,            NGLRead))
+    ,(Fmap,         (NGLReadSet,         NGLMappedReadSet))
+    ,(Fcount,       (NGLMappedReadSet,   NGLCounts))
+    ,(Fwrite,       (NGLVoid,            NGLVoid))
+    ,(Fprint,       (NGLVoid,            NGLVoid))
+    ]
+
+function_return_type f = pure fst <$> (f `lookup` function_argtype_return_type)
+function_arg_type f = pure snd <$> (f `lookup` function_argtype_return_type)
 
 -- | unary operators
 data UOp = UOpLen | UOpMinus
@@ -50,10 +70,12 @@ data NGLessBaseType =
         | NGLBool
         | NGLSymbol
         | NGLFilename
-        | NGLShortRead
-        | NGLShortReadSet
+        | NGLRead
+        | NGLReadSet
         | NGLMappedRead
         | NGLMappedReadSet
+        | NGLCounts
+        | NGLVoid
     deriving (Eq, Show)
 
 -- | A type is either a base type or a list thereof
