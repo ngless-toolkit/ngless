@@ -26,7 +26,7 @@ data FuncName = Ffastq | Funique | Fpreprocess | Fsubstrim | Fmap | Fcount | Fwr
     deriving (Eq, Show, Ord)
 
 function_argtype_return_type :: FuncName -> (NGLType, NGLType)
-function_argtype_return_type Ffastq =       (NGLReadSet,         NGLFilename)
+function_argtype_return_type Ffastq =       (NGLReadSet,         NGLString)
 function_argtype_return_type Funique =      (NGLReadSet,         NGLReadSet)
 function_argtype_return_type Fpreprocess =  (NGLReadSet,         NGLVoid)
 function_argtype_return_type Fsubstrim =    (NGLRead,            NGLRead)
