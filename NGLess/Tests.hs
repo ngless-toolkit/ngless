@@ -153,6 +153,6 @@ isError (Left _) = return ()
 isOk (Left _) = assertFailure "Type error on good code"
 isOk (Right _) = return ()
 
-case_bad_type = isError $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
-case_good_type = isError $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
+case_bad_type_fastq = isError $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
+case_good_type_fastq = isOk $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
 
