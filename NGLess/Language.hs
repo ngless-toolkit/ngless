@@ -17,7 +17,6 @@ module Language
 
 {- This module defines the internal representation the language -}
 import qualified Data.Text as T
-import Control.Applicative
 
 newtype Variable = Variable T.Text
     deriving (Eq, Show)
@@ -26,20 +25,21 @@ newtype Variable = Variable T.Text
 data FuncName = Ffastq | Funique | Fpreprocess | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
     deriving (Eq, Show, Ord)
 
-function_argtype_return_type :: [(FuncName, (NGLType, NGLType))]
-function_argtype_return_type =
-    [(Ffastq,       (NGLReadSet,         NGLFilename))
-    ,(Funique,      (NGLReadSet,         NGLReadSet))
-    ,(Fpreprocess,  (NGLReadSet,         NGLVoid))
-    ,(Fsubstrim,    (NGLRead,            NGLRead))
-    ,(Fmap,         (NGLReadSet,         NGLMappedReadSet))
-    ,(Fcount,       (NGLMappedReadSet,   NGLCounts))
-    ,(Fwrite,       (NGLVoid,            NGLVoid))
-    ,(Fprint,       (NGLVoid,            NGLVoid))
-    ]
+function_argtype_return_type :: FuncName -> (NGLType, NGLType)
+function_argtype_return_type Ffastq =       (NGLReadSet,         NGLFilename)
+function_argtype_return_type Funique =      (NGLReadSet,         NGLReadSet)
+function_argtype_return_type Fpreprocess =  (NGLReadSet,         NGLVoid)
+function_argtype_return_type Fsubstrim =    (NGLRead,            NGLRead)
+function_argtype_return_type Fmap =         (NGLReadSet,         NGLMappedReadSet)
+function_argtype_return_type Fcount =       (NGLMappedReadSet,   NGLCounts)
+function_argtype_return_type Fwrite =       (NGLVoid,            NGLVoid)
+function_argtype_return_type Fprint =       (NGLVoid,            NGLVoid)
 
-function_return_type f = pure fst <$> (f `lookup` function_argtype_return_type)
-function_arg_type f = pure snd <$> (f `lookup` function_argtype_return_type)
+function_return_type :: FuncName -> NGLType
+function_return_type = fst . function_argtype_return_type
+
+function_arg_type :: FuncName -> NGLType
+function_arg_type = snd . function_argtype_return_type
 
 -- | unary operators
 data UOp = UOpLen | UOpMinus
