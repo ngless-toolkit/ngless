@@ -21,6 +21,7 @@ import Text.Parsec.Pos (newPos)
 import Language
 import Parse
 import Tokens
+import Types
 import NumberOfChars
 
 -- The main test driver is automatically generated
@@ -144,4 +145,14 @@ case_count_bps_empty = countBps "[>name\n\nsomeData\nsomeMoreData]" @?= (0,0,0,0
 case_count_bps_normal = countBps "[>name\nAAAGGGTTTCCC\nsomeData\nsomeMoreData]" @?= (3,3,3,3)
 case_count_bps_onlyAs = countBps "[>name\nAAAAAAAAAA\nsomeData\nsomeMoreData]" @?= (10,0,0,0)
 
+-- Test Types
+
+isError (Right _) = assertFailure "error not caught"
+isError (Left _) = return ()
+
+isOk (Left _) = assertFailure "Type error on good code"
+isOk (Right _) = return ()
+
+case_bad_type = isError $ checktypes (Script (0,0) (Sequence [FunctionCall Ffastq (ConstNum 3) [] Nothing]))
+case_good_type = isError $ checktypes (Script (0,0) (Sequence [FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing]))
 

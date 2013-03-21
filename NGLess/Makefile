@@ -7,6 +7,7 @@ SOURCES :=  \
 	Language.hs \
 	Parse.hs \
 	Tokens.hs \
+	Types.hs \
 	NumberOfChars.hs \
 	Validation.hs 
 

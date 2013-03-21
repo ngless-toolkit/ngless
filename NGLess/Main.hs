@@ -10,6 +10,7 @@ import Interpret
 import Validation
 import Language
 import Tokens
+import Types
 import Parse
 
 import Control.Applicative
@@ -39,7 +40,7 @@ nglessargs = NGLessArgs
 -- The only purpose is to aid in debugging by printing intermediate
 -- representations.
 function :: String -> String -> T.Text -> IO ()
-function "ngless" fname text = case parsengless fname text >>= validate of
+function "ngless" fname text = case parsengless fname text >>= validate >>= checktypes of
             Left err -> T.putStrLn err
             Right expr -> interpret . nglBody $ expr
 
