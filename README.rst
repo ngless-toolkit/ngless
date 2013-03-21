@@ -10,7 +10,8 @@ Dependencies
 
 You need the following packages::
 
+    cabal install cmdargs
+    cabal install test-framework-th
     cabal install test-framework-quickcheck2
     cabal install test-framework-hunit
-
 
