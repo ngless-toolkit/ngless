@@ -47,6 +47,7 @@ inferM (Assignment (Variable v) expr) = do
     case mrtype of
         Nothing -> errorInLine "Cannot infer type for right-hand of assignment"
         Just rtype -> envInsert v rtype
+inferM (Condition c te fe) = checkbool c >> inferM te >> inferM fe
 inferM e = void (nglTypeOf e)
 
 envLookup :: T.Text -> TypeMSt (Maybe NGLType)
@@ -85,6 +86,9 @@ checkuop UOpLen e = checklist e *> return (Just NGLInteger)
 checkuop UOpMinus e = checkinteger e
 
 checkbop _ a b = checkinteger a *> checkinteger b
+
+checkbool (ConstBool _) = return (Just NGLBool)
+checkbool _ = errorInLine "Expected boolean"
 
 checkinteger (ConstNum _) = return (Just NGLInteger)
 checkinteger expr = do
