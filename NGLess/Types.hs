@@ -28,8 +28,10 @@ checktypes :: Script -> Either T.Text Script
 checktypes script@(Script _ exprs) = evalState (runErrorT (inferScriptM exprs >> return script)) (0,Map.empty)
 
 
+errorInLineC :: [String] -> TypeMSt ()
 errorInLineC = errorInLine . T.concat . map fromString
 
+errorInLine :: T.Text -> TypeMSt a
 errorInLine e = do
     line <- fst `fmap` get
     throwError (T.concat ["Line ", T.pack (show line),": ", e])
