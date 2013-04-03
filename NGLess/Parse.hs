@@ -64,7 +64,7 @@ type Parser = GenParser (SourcePos,Token) ()
 nglparser = Script <$> ngless_version <*> (many eol *> _nglbody)
 _nglbody = (eof *> pure []) <|> (many1 lno_expression <* eof)
 lno_expression = (,) <$> linenr <*> expression
-linenr = sourceLine `fmap` getPosition
+    where linenr = sourceLine `fmap` getPosition
 
 expression :: Parser Expression
 expression = expression' <* (many eol)

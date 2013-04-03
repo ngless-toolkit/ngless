@@ -14,6 +14,7 @@ interpret :: [(Int,Expression)] -> IO ()
 interpret [] = return ()
 interpret ((_,e):es) = interpret' e >> interpret es
 
+interpret' :: Expression -> IO ()
 interpret' (Sequence es) = handleSequence es
 interpret' (Assignment var func) = variableAssignment var >> interpretFunctions func
 interpret' e = error (concat ["interpret: cannot handle ", show e])
@@ -27,8 +28,8 @@ interpretFunctions _ = error "interpretFunctions does not handle non-FunctionCal
 
 
 -- functions to handle interpretation
-readFastQ fname =
-    do
+readFastQ :: FilePath -> IO ()
+readFastQ fname = do
      x <- readFile fname
      print (countBps x)
 
