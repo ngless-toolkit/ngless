@@ -38,3 +38,16 @@ You need the following packages::
     cabal install test-framework-quickcheck2
     cabal install test-framework-hunit
 
+
+If you are developing on Ubuntu, you can also install the packages globally
+(the following only applies after Ubuntu 13.04; before that install
+``haskell-platform`` and perform the ``cabal`` commands above)::
+
+    sudo apt-get install \
+        libghc-parsec3-dev \
+        libghc-test-framework-dev \
+        libghc-test-framework-th-dev \
+        libghc-test-framework-quickcheck2-dev
+        libghc-text-dev \
+        libghc-test-framework-hunit-dev \
+        libghc-cmdargs-dev
