@@ -8,6 +8,7 @@ module Interpret
 import Language
 import NumberOfChars
 import Data.Text
+import PrintFastqBasicStats
 
 
 interpret (Sequence es) = handleSequence es
@@ -23,7 +24,13 @@ interpretFunctions (FunctionCall functionType [ConstStr fname] exprs block ) =
 readFastQ fname =
 	do
 	 x <- readFile fname
-	 print (countBps x)
+	 printFileName fname
+	 printGCPercent (countBps x)
+	 printEncoding (lowestChar x)
+	 printNumberSequences x
+	 printSequenceSize x
+	 
+
 
 handleSequence :: [Expression] -> IO ()
 handleSequence (e:es) = interpret e >> handleSequence es
