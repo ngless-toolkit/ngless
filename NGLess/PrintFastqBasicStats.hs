@@ -5,11 +5,15 @@ module PrintFastqBasicStats
         printGCPercent,
         printNumberSequences,
         printSequenceSize,
-        printEncoding
+        printEncoding,
+        calculateEncoding,
+        Encoding(..)
     ) where
 
 import Data.Char
 import NumberOfChars
+
+data Encoding = Encoding {name :: String, offset :: Int}
 
 printFileName fname = putStrLn("File Name is: " ++ fname)
 
@@ -29,13 +33,13 @@ illumina_1_encoding_offset = 59
 illumina_1_3_encoding_offset = 64
 
 printEncoding :: Char -> IO ()
-printEncoding lc = putStrLn( "Encoding: " ++ (calculateEncoding $ ord lc)  )
+printEncoding lc = putStrLn( "Encoding: " ++ (name (calculateEncoding $ ord lc))  )
 
-calculateEncoding :: Int -> String
+calculateEncoding :: Int -> Encoding
 calculateEncoding lc
-        | lc < sanger_encoding_offset  = "No known encodings with chars < 33 (Yours was "++ (show lc) ++ ")"
-        | lc < illumina_1_encoding_offset =  "Sanger / Illumina 1.9"
-        | lc < illumina_1_3_encoding_offset = "Illumina <1.3"
-        | lc == (illumina_1_3_encoding_offset+1) = "Illumina 1.3"
-        | lc <=  126 = "Illumina 1.5"
-        | otherwise = "No known encodings with chars > 126 (Yours was "++ (show lc) ++")"
+        | lc < sanger_encoding_offset  = error ("No known encodings with chars < 33 (Yours was "++ (show lc) ++ ")")
+        | lc < illumina_1_encoding_offset =  Encoding "Sanger / Illumina 1.9" sanger_encoding_offset
+        | lc < illumina_1_3_encoding_offset = Encoding "Illumina <1.3" illumina_1_encoding_offset
+        | lc == (illumina_1_3_encoding_offset+1) = Encoding "Illumina 1.3" illumina_1_3_encoding_offset
+        | lc <=  126 = Encoding "Illumina 1.5" illumina_1_3_encoding_offset
+        | otherwise = error ("No known encodings with chars > 126 (Yours was "++ (show lc) ++")")

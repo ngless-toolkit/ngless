@@ -9,7 +9,8 @@ SOURCES :=  \
 	Tokens.hs \
 	NumberOfChars.hs \
 	Validation.hs \
-	PrintFastqBasicStats.hs
+	PrintFastqBasicStats.hs \
+	PerBaseQualityScores.hs
 
 ngless: Main.hs $(SOURCES)
 	ghc $(GHCOPTS) --make -O2 $^ -o $@

@@ -10,6 +10,8 @@ import qualified Data.ByteString.Lazy.Char8 as B
 import Language
 import NumberOfChars
 import Data.Text
+import Data.Char
+import PerBaseQualityScores
 import PrintFastqBasicStats
 
 
@@ -32,7 +34,8 @@ readFastQ fname = do
     printEncoding (lc fileData)
     printNumberSequences (nSeq fileData)
     printSequenceSize (seqSize fileData)
-    print (qualCounts fileData)
+--  print (qualCounts fileData)
+    print $ calculateMean (qualCounts fileData) (ord (lc fileData))
 
 
 
