@@ -66,7 +66,7 @@ data NGLessObject =
         | NGOShortRead T.Text T.Text
 
 -- | 'Expression' is the main type for holding the AST.
-data Expression = 
+data Expression =
         Lookup Variable -- ^ This looks up the variable name
         | ConstStr T.Text -- ^ constant string
         | ConstNum Integer -- ^ integer
