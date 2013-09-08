@@ -11,9 +11,15 @@ module PrintFastqBasicStats
     ) where
 
 import Data.Char
-import NumberOfChars
+import FastQFileData
 
 data Encoding = Encoding {name :: String, offset :: Int}
+
+-- Constants
+sanger_encoding_offset = 33
+illumina_1_encoding_offset = 59
+illumina_1_3_encoding_offset = 64
+--
 
 printFileName fname = putStrLn("File Name is: " ++ fname)
 
@@ -27,14 +33,10 @@ printGCPercent (bpA,bpC,bpG,bpT) =
 printNumberSequences nSeq = putStrLn ("Number of Sequences: " ++ (show nSeq) )
 printSequenceSize seqSize = putStrLn("Sequence length: " ++ (show seqSize))
 
-
-sanger_encoding_offset = 33
-illumina_1_encoding_offset = 59
-illumina_1_3_encoding_offset = 64
-
 printEncoding :: Char -> IO ()
 printEncoding lc = putStrLn( "Encoding: " ++ (name (calculateEncoding $ ord lc))  )
 
+--calculateEncoding :: Calculates the encoding by receiving the lowest quality character.
 calculateEncoding :: Int -> Encoding
 calculateEncoding lc
         | lc < sanger_encoding_offset  = error ("No known encodings with chars < 33 (Yours was "++ (show lc) ++ ")")

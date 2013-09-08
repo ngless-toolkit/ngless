@@ -8,7 +8,7 @@ module Interpret
 import qualified Data.ByteString.Lazy.Char8 as B
 
 import Language
-import NumberOfChars
+import FastQFileData
 import Data.Text
 import Data.Char
 import PerBaseQualityScores
@@ -35,7 +35,7 @@ readFastQ fname = do
     printNumberSequences (nSeq fileData)
     printSequenceSize (seqSize fileData)
 --  print (qualCounts fileData)
-    print $ calculateMean (qualCounts fileData) (ord (lc fileData))
+    print $ calculateStatistics (qualCounts fileData) (ord (lc fileData))
 
 
 

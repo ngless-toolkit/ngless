@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-module NumberOfChars
+module FastQFileData
     (
         Result(..),  iterateFile
     ) where
@@ -13,10 +13,12 @@ data Result =  Result {bpCounts :: !(Int, Int, Int, Int) , lc :: !Char, qualCoun
 maxBPPossible = 126
 ---
 
+-- mapAddFunction :: To increase the old_value value by 1 of a given key.
 mapAddFunction _ new_value old_value = old_value + new_value
 
+-- addEachCount :: Update Map counts with a new quality.
 addEachCount :: Char -> Map Char Int -> Map Char Int
-addEachCount qual count = insertWithKey mapAddFunction qual 1 count
+addEachCount qual counts = insertWithKey mapAddFunction qual 1 counts
 
 addToCount counts qual = addToCount' counts qual []
         where
@@ -36,6 +38,7 @@ countChars c [] = c
 seqMinMax :: (Int,Int) -> Int -> (Int,Int)
 seqMinMax !(!minSeq, !maxSeq) !length =  ((min length minSeq),(max length maxSeq))
 
+--updateResults :: Used to fill in the structure "Result" with the FastQ file info.
 updateResults :: Result -> String -> String -> Result
 updateResults fileData seq qual = Result (countChars (bpCounts fileData) seq)
                                          (Prelude.foldr min (lc fileData) qual)
@@ -43,6 +46,7 @@ updateResults fileData seq qual = Result (countChars (bpCounts fileData) seq)
                                          ((nSeq fileData) + 1)
                                          (seqMinMax (seqSize fileData) (length seq))
 
+--iterateFile :: Used to iterate the file in a strict manner.
 iterateFile :: B.ByteString -> Result
 iterateFile contents = iterateFile' initial (B.lines contents)
         where

@@ -7,7 +7,7 @@ SOURCES :=  \
 	Language.hs \
 	Parse.hs \
 	Tokens.hs \
-	NumberOfChars.hs \
+	FastQFileData.hs \
 	Validation.hs \
 	PrintFastqBasicStats.hs \
 	PerBaseQualityScores.hs
