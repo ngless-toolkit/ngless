@@ -12,6 +12,7 @@ SOURCES :=  \
 	PrintFastqBasicStats.hs \
 	PerBaseQualityScores.hs
 
+
 ngless: Main.hs $(SOURCES)
 	ghc $(GHCOPTS) --make -O2 $^ -o $@
 

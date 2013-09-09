@@ -19,7 +19,7 @@ import Control.Monad.Identity ()
 import qualified Data.Text as T
 import Text.ParserCombinators.Parsec.Prim hiding (Parser)
 import Text.Parsec.Combinator
-import Text.Parsec (SourcePos)
+import Text.Parsec.Pos
 
 -- | main function of this module
 --
@@ -62,7 +62,9 @@ _cleanupindents = _cleanupindents' []
 type Parser = GenParser (SourcePos,Token) ()
 
 nglparser = Script <$> ngless_version <*> (many eol *> _nglbody)
-_nglbody = (eof *> pure (Sequence [])) <|> Sequence <$> (many1 expression <* eof)
+_nglbody = (eof *> pure []) <|> (many1 lno_expression <* eof)
+lno_expression = (,) <$> linenr <*> expression
+    where linenr = sourceLine `fmap` getPosition
 
 expression :: Parser Expression
 expression = expression' <* (many eol)
@@ -113,7 +115,7 @@ uoperator = lenop <|> unary_minus
         unary_minus = UnaryOp UOpMinus <$> (operator '-' *> base_expression)
 funccall = FunctionCall <$>
                 (try funcname <* operator '(')
-                <*> ((:[]) <$> expression)
+                <*> expression
                 <*> (kwargs <* operator ')')
                 <*> funcblock
 
@@ -151,12 +153,13 @@ binoperator = try $ do
 
 _indexexpr = try (IndexExpression <$> base_expression <*> indexing)
     where
-        indexing = Index <$> (operator '[' *> may_int <* operator ':') <*> (may_int <* operator ']')
+        indexing = try (IndexTwo <$> (operator '[' *> may_int <* operator ':') <*> (may_int <* operator ']'))
+                    <|> (IndexOne <$> (operator '[' *> expression <* operator ']'))
         may_int = (Just <$> expression) <|> (pure Nothing)
 
 _listexpr = try listexpr
     where
-        listexpr = (operator '[') *> (NGList <$> (innerexpression `sepEndBy` (operator ','))) <* (operator ']')
+        listexpr = (operator '[') *> (ListExpression <$> (innerexpression `sepEndBy` (operator ','))) <* (operator ']')
 
 conditional = Condition <$> (reserved "if" *> expression <* operator ':') <*> block <*> mayelse
 mayelse = elseblock <|> (pure $ Sequence [])

@@ -10,19 +10,28 @@ import qualified Codec.Compression.GZip as GZip
 
 import Language
 import FastQFileData
-import Data.Text
+import Data.Text as T
 import Data.Char
 import PerBaseQualityScores
 import PrintFastqBasicStats
 
 
-interpret (Sequence es) = handleSequence es
-interpret (Assignment var func) = variableAssignment var >> interpretFunctions func
+interpret :: [(Int,Expression)] -> IO ()
+interpret [] = return ()
+interpret ((_,e):es) = interpret' e >> interpret es
+
+interpret' :: Expression -> IO ()
+interpret' (Sequence es) = handleSequence es
+interpret' (Assignment var func) = variableAssignment var >> interpretFunctions func
+interpret' e = error (Prelude.concat ["interpret: cannot handle ", show e])
+
 variableAssignment (Variable varName) = print varName
-interpretFunctions (FunctionCall functionType [ConstStr fname] exprs block ) =
+interpretFunctions (FunctionCall functionType (ConstStr fname) _exprs _block) =
     case functionType of
-        Ffastq -> readFastQ (unpack fname)
+        Ffastq -> readFastQ (T.unpack fname)
         _ -> print functionType -- all the other functionCalls
+interpretFunctions _ = error "interpretFunctions does not handle non-FunctionCall expressions"
+
 
 unzipIfPossible fname = 
 			case isInfixOf (pack ".tar.gz") (pack fname) of
@@ -30,6 +39,8 @@ unzipIfPossible fname =
 				False -> B.readFile fname
 				
 -- functions to handle interpretation
+
+readFastQ :: FilePath -> IO ()
 readFastQ fname = do
     contents <- B.readFile fname
     let fileData = iterateFile contents
@@ -43,8 +54,7 @@ readFastQ fname = do
     print $ calculateStatistics (qualCounts fileData) (ord (lc fileData))
 
 
-
 handleSequence :: [Expression] -> IO ()
-handleSequence (e:es) = interpret e >> handleSequence es
+handleSequence (e:es) = interpret' e >> handleSequence es
 handleSequence [] = return ()
 

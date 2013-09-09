@@ -9,7 +9,10 @@ module Language
     , Index(..)
     , Block(..)
     , FuncName(..)
+    , NGLType(..)
     , Script(..)
+    , function_return_type
+    , function_arg_type
     ) where
 
 {- This module defines the internal representation the language -}
@@ -20,7 +23,23 @@ newtype Variable = Variable T.Text
 
 -- | functions are hard coded here
 data FuncName = Ffastq | Funique | Fpreprocess | Fsubstrim | Fmap | Fcount | Fwrite | Fprint
-    deriving (Eq, Show)
+    deriving (Eq, Show, Ord)
+
+function_argtype_return_type :: FuncName -> (NGLType, NGLType)
+function_argtype_return_type Ffastq =       (NGLReadSet,         NGLString)
+function_argtype_return_type Funique =      (NGLReadSet,         NGLReadSet)
+function_argtype_return_type Fpreprocess =  (NGLVoid,           NGLReadSet)
+function_argtype_return_type Fsubstrim =    (NGLRead,            NGLRead)
+function_argtype_return_type Fmap =         (NGLReadSet,         NGLMappedReadSet)
+function_argtype_return_type Fcount =       (NGLMappedReadSet,   NGLCounts)
+function_argtype_return_type Fwrite =       (NGLVoid,            NGLVoid)
+function_argtype_return_type Fprint =       (NGLVoid,            NGLVoid)
+
+function_return_type :: FuncName -> NGLType
+function_return_type = fst . function_argtype_return_type
+
+function_arg_type :: FuncName -> NGLType
+function_arg_type = snd . function_argtype_return_type
 
 -- | unary operators
 data UOp = UOpLen | UOpMinus
@@ -30,7 +49,10 @@ data UOp = UOpLen | UOpMinus
 data BOp = BOpAdd | BOpMul | BOpGT | BOpGTE | BOpLT | BOpLTE | BOpEQ | BOpNEQ
     deriving (Eq, Show)
 
-data Index = Index (Maybe Expression) (Maybe Expression)
+-- | index expression encodes what is inside an index variable
+-- either [a] (IndexOne) or [a:b] (IndexTwo)
+data Index = IndexOne Expression
+            | IndexTwo (Maybe Expression) (Maybe Expression)
     deriving (Eq, Show)
 
 -- | a block is
@@ -41,20 +63,19 @@ data Block = Block
                 Expression -- ^ block body, will likely be Sequence
     deriving (Eq, Show)
 
-data NGLessBaseType =
+data NGLType =
         NGLString
         | NGLInteger
         | NGLBool
         | NGLSymbol
         | NGLFilename
-        | NGLShortRead
-        | NGLShortReadSet
+        | NGLRead
+        | NGLReadSet
         | NGLMappedRead
         | NGLMappedReadSet
-    deriving (Eq, Show)
-
--- | A type is either a base type or a list thereof
-data NGLessType = NGLType NGLessBaseType | NGLList NGLessBaseType
+        | NGLCounts
+        | NGLVoid
+        | NGList NGLType
     deriving (Eq, Show)
 
 data NGLessObject =
@@ -72,7 +93,7 @@ data Expression =
         | ConstNum Integer -- ^ integer
         | ConstBool Bool -- ^ true/false
         | ConstSymbol T.Text -- ^ a symbol
-        | NGList [Expression] -- ^ a list
+        | ListExpression [Expression] -- ^ a list
         | Continue -- ^ continue
         | Discard -- ^ discard
         | UnaryOp UOp Expression  -- ^ op ( expr )
@@ -80,14 +101,13 @@ data Expression =
         | Condition Expression Expression Expression -- ^ if condition: true-expr else: false-expr
         | IndexExpression Expression Index -- ^ expr [ index ]
         | Assignment Variable Expression -- ^ var = expr
-        | FunctionCall FuncName [Expression] [(Variable, Expression)] (Maybe Block)
+        | FunctionCall FuncName Expression [(Variable, Expression)] (Maybe Block)
         | Sequence [Expression]
     deriving (Eq, Show)
 
--- | Script is a version declaration followed by an Expression
--- (almost surely a 'Sequence')
+-- | Script is a version declaration followed by a series of expressions
 data Script = Script
         { nglVersion :: (Integer, Integer)
-        , nglBody :: Expression
+        , nglBody :: [(Int,Expression)] -- ^ (line number, expression)
         } deriving (Eq,Show)
 
