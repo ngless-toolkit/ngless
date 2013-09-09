@@ -33,16 +33,16 @@ interpretFunctions (FunctionCall functionType (ConstStr fname) _exprs _block) =
 interpretFunctions _ = error "interpretFunctions does not handle non-FunctionCall expressions"
 
 
-unzipIfPossible fname = 
-			case isInfixOf (pack ".tar.gz") (pack fname) of
+uncompress fname = 
+			case isInfixOf (pack ".gz") (pack fname) of
 				True -> fmap GZip.decompress (B.readFile fname)
-				False -> B.readFile fname
+				False -> B.readFile fname -- not compressed
 				
 -- functions to handle interpretation
 
 readFastQ :: FilePath -> IO ()
 readFastQ fname = do
-    contents <- B.readFile fname
+    contents <- uncompress fname
     let fileData = iterateFile contents
     printFileName fname
     print (lc fileData)
