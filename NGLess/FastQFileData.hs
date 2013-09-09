@@ -4,10 +4,15 @@ module FastQFileData
         Result(..),  iterateFile
     ) where
 
+import Control.DeepSeq
 import Data.Map as Map
 import qualified Data.ByteString.Lazy.Char8 as B
 
-data Result =  Result {bpCounts :: !(Int, Int, Int, Int) , lc :: !Char, qualCounts :: ![Map Char Int], nSeq :: !Int, seqSize :: !(Int,Int)} deriving(Show)
+
+data Result =  Result {bpCounts :: (Int, Int, Int, Int) , lc :: Char, qualCounts ::  [Map Char Int], nSeq :: Int, seqSize :: (Int,Int)} deriving(Show)
+
+instance NFData Result where
+    rnf (Result (!_,!_,!_,!_) !_ cs !_ (!_,!_)) = rnf cs
 
 --- Constants
 maxBPPossible = 126
@@ -25,18 +30,18 @@ addToCount counts qual = addToCount' counts qual []
             addToCount' (counts:xs) (q:ys) qualResults = addToCount' xs ys ((addEachCount q counts) : qualResults)
             addToCount' _ [] qualResults = reverse qualResults
 
-addChar !(!bpA, !bpC, !bpG, !bpT) 'A' = (bpA + 1, bpC, bpG, bpT)
-addChar !(!bpA, !bpC, !bpG, !bpT) 'C' = (bpA, bpC + 1, bpG, bpT)
-addChar !(!bpA, !bpC, !bpG, !bpT) 'G' = (bpA, bpC, bpG + 1, bpT)
-addChar !(!bpA, !bpC, !bpG, !bpT) 'T' = (bpA, bpC, bpG, bpT + 1)
-addChar !(!bpA, !bpC, !bpG, !bpT) _ = (bpA, bpC, bpG, bpT)
+addChar (bpA, bpC, bpG, bpT) 'A' = (bpA + 1, bpC, bpG, bpT)
+addChar (bpA, bpC, bpG, bpT) 'C' = (bpA, bpC + 1, bpG, bpT)
+addChar (bpA, bpC, bpG, bpT) 'G' = (bpA, bpC, bpG + 1, bpT)
+addChar (bpA, bpC, bpG, bpT) 'T' = (bpA, bpC, bpG, bpT + 1)
+addChar (bpA, bpC, bpG, bpT) _ = (bpA, bpC, bpG, bpT)
 
 countChars c (x:xs) = countChars (addChar c x) xs
 countChars c [] = c
 
 
 seqMinMax :: (Int,Int) -> Int -> (Int,Int)
-seqMinMax !(!minSeq, !maxSeq) !length =  ((min length minSeq),(max length maxSeq))
+seqMinMax (minSeq, maxSeq) length =  ((min length minSeq),(max length maxSeq))
 
 --updateResults :: Used to fill in the structure "Result" with the FastQ file info.
 updateResults :: Result -> String -> String -> Result
@@ -51,7 +56,7 @@ iterateFile :: B.ByteString -> Result
 iterateFile contents = iterateFile' initial (B.lines contents)
         where
                 initial = Result (0,0,0,0) '~' (replicate maxBPPossible (fromList [] :: Map Char Int)) 0 (maxBound :: Int, minBound :: Int)
-                iterateFile' !r (_:seq:_:quals:xs) =
+                iterateFile' r (_:seq:_:quals:xs) = r `deepseq`
                         iterateFile' (updateResults r (B.unpack seq) (B.unpack quals)) xs
-                iterateFile' !r [] = r
+                iterateFile' !r [] = r `deepseq` r
 

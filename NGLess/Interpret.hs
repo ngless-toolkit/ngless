@@ -6,6 +6,7 @@ module Interpret
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as B
+import qualified Codec.Compression.GZip as GZip
 
 import Language
 import FastQFileData
@@ -23,7 +24,11 @@ interpretFunctions (FunctionCall functionType [ConstStr fname] exprs block ) =
         Ffastq -> readFastQ (unpack fname)
         _ -> print functionType -- all the other functionCalls
 
-
+unzipIfPossible fname = 
+			case isInfixOf (pack ".tar.gz") (pack fname) of
+				True -> fmap GZip.decompress (B.readFile fname)
+				False -> B.readFile fname
+				
 -- functions to handle interpretation
 readFastQ fname = do
     contents <- B.readFile fname

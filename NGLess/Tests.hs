@@ -21,7 +21,6 @@ import Text.Parsec.Pos (newPos)
 import Language
 import Parse
 import Tokens
-import NumberOfChars
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
