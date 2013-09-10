@@ -1,11 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
 module PrintFastqBasicStats
     (
-        printFileName,
-        printGCPercent,
-        printNumberSequences,
-        printSequenceSize,
-        printEncoding,
+        printHtmlBasicStats,
+        printHtmlEndScripts,
         calculateEncoding,
         Encoding(..)
     ) where
@@ -21,20 +18,35 @@ illumina_1_encoding_offset = 59
 illumina_1_3_encoding_offset = 64
 --
 
-printFileName fname = putStrLn("File Name is: " ++ fname)
+printHtml fname = appendFile fname
 
-printGCPercent :: (Int,Int,Int,Int) -> IO ()
-printGCPercent (bpA,bpC,bpG,bpT) =
+printHtmlEndScripts destFile = printHtml destFile "\n<script src=\"d3.v3/d3.v3.js\"></script><script src=\"perbaseQualScoresData.js\"></script><script src=\"perBaseQualityScores.js\"></script></body></html>"
+
+printHtmlBasicStats destDir fileData fname = do
+							 let fileDest = (destDir ++ "/index.html")
+							 printHtml fileDest ("<table border=\"1\">") 
+							 printFileName fname fileDest 					  
+							 printGCPercent (bpCounts fileData) fileDest
+							 printEncoding (lc fileData) fileDest
+							 printNumberSequences (nSeq fileData) fileDest
+							 printSequenceSize (seqSize fileData) fileDest 
+							 printHtml fileDest ("</table>")
+
+
+printFileName fname fileDest = printHtml fileDest ("<tr><td> File Name is: </td> <td>" ++ fname ++ "</td></tr>")
+
+printGCPercent :: (Int,Int,Int,Int) -> String -> IO ()
+printGCPercent (bpA,bpC,bpG,bpT) fileDest =
     do
         let gcCount = fromIntegral (bpC + bpG)
             allBpCount = fromIntegral (bpA + bpC + bpG + bpT)
-        putStrLn ("%GC " ++ (show ((gcCount / allBpCount) * 100)))
+        printHtml fileDest ("<tr><td> %GC: </td> <td>" ++ (show ((gcCount / allBpCount) * 100)) ++ "</td></tr>" )
 
-printNumberSequences nSeq = putStrLn ("Number of Sequences: " ++ (show nSeq) )
-printSequenceSize seqSize = putStrLn("Sequence length: " ++ (show seqSize))
+printNumberSequences nSeq fileDest =  printHtml fileDest ("<tr><td> Number of Sequences: </td> <td>" ++ (show nSeq) ++ "</td></tr>")
+printSequenceSize seqSize fileDest =  printHtml fileDest ("<tr><td> Sequence length:  </td> <td>" ++ (show seqSize) ++ "</td></tr>")
 
-printEncoding :: Char -> IO ()
-printEncoding lc = putStrLn( "Encoding: " ++ (name (calculateEncoding $ ord lc))  )
+printEncoding :: Char -> String -> IO ()
+printEncoding lc fileDest =  printHtml fileDest ( "<tr><td> Encoding is: </td> <td> " ++ (name (calculateEncoding $ ord lc)) ++ "</td></tr>"  )
 
 --calculateEncoding :: Calculates the encoding by receiving the lowest quality character.
 calculateEncoding :: Int -> Encoding

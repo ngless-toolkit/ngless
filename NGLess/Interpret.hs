@@ -14,6 +14,7 @@ import Data.Text as T
 import Data.Char
 import PerBaseQualityScores
 import PrintFastqBasicStats
+import System.Directory 
 
 
 interpret :: [(Int,Expression)] -> IO ()
@@ -37,21 +38,22 @@ uncompress fname =
 			case isInfixOf (pack ".gz") (pack fname) of
 				True -> fmap GZip.decompress (B.readFile fname)
 				False -> B.readFile fname -- not compressed
-				
+
+		
 -- functions to handle interpretation
 
 readFastQ :: FilePath -> IO ()
 readFastQ fname = do
-    contents <- uncompress fname
-    let fileData = iterateFile contents
-    printFileName fname
-    print (lc fileData)
-    printGCPercent (bpCounts fileData)
-    printEncoding (lc fileData)
-    printNumberSequences (nSeq fileData)
-    printSequenceSize (seqSize fileData)
---  print (qualCounts fileData)
-    print $ calculateStatistics (qualCounts fileData) (ord (lc fileData))
+		 contents <- uncompress fname
+		 let fileData = iterateFile contents
+		 let destDir = (fname ++ "_ngless")
+		 createDirectory destDir
+		 eachFileToCp <- (getDirectoryContents "Html/")
+--		 foreach eachFileToCp (copyFile ("Html/" ++ x ) (destDir ++ "/" + x)) 
+		 copyFile "Html/index.html" (destDir ++ "/index.html")
+		 printHtmlBasicStats destDir fileData fname
+		 print $ calculateStatistics (qualCounts fileData) (ord (lc fileData))
+		 printHtmlEndScripts (destDir ++ "/index.html")
 
 
 handleSequence :: [Expression] -> IO ()
