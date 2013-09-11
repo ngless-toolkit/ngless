@@ -14,7 +14,8 @@ import Data.Text as T
 import Data.Char
 import PerBaseQualityScores
 import PrintFastqBasicStats
-import System.Directory 
+import System.Directory
+import Control.Monad
 
 
 interpret :: [(Int,Expression)] -> IO ()
@@ -34,27 +35,33 @@ interpretFunctions (FunctionCall functionType (ConstStr fname) _exprs _block) =
 interpretFunctions _ = error "interpretFunctions does not handle non-FunctionCall expressions"
 
 
-uncompress fname = 
-			case isInfixOf (pack ".gz") (pack fname) of
-				True -> fmap GZip.decompress (B.readFile fname)
-				False -> B.readFile fname -- not compressed
 
-		
 -- functions to handle interpretation
+
+-- Uncompression of a given fastQ file if it's compressed in a .gz format.
+unCompress fname =
+    if isInfixOf (pack ".gz") (pack fname)
+        then fmap GZip.decompress (B.readFile fname)
+        else B.readFile fname -- not compressed
+
+
+-- Removes the destiny directory if it already exists from previous executions.
+createDir destDir = do
+    doesDirExist <- doesDirectoryExist destDir
+    when (doesDirExist) $ removeDirectoryRecursive destDir
+    createDirectory destDir
 
 readFastQ :: FilePath -> IO ()
 readFastQ fname = do
-		 contents <- uncompress fname
-		 let fileData = iterateFile contents
-		 let destDir = (fname ++ "_ngless")
-		 createDirectory destDir
-		 eachFileToCp <- (getDirectoryContents "Html/")
---		 foreach eachFileToCp (copyFile ("Html/" ++ x ) (destDir ++ "/" + x)) 
-		 copyFile "Html/index.html" (destDir ++ "/index.html")
-		 printHtmlBasicStats destDir fileData fname
-		 print $ calculateStatistics (qualCounts fileData) (ord (lc fileData))
-		 printHtmlEndScripts (destDir ++ "/index.html")
-
+        contents <- unCompress fname
+        let fileData = iterateFile contents
+            destDir = (fname ++ "_ngless")
+        createDir destDir
+        copyFile "Html/index.html" (destDir ++ "/index.html")
+        copyFile "Html/perBaseQualScores.css" (destDir ++ "/perBaseQualScores.css")
+        printHtmlBasicStats destDir fileData fname
+        printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir
+        printHtmlEndScripts (destDir ++ "/index.html")
 
 handleSequence :: [Expression] -> IO ()
 handleSequence (e:es) = interpret' e >> handleSequence es
