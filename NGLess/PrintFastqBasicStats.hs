@@ -43,7 +43,7 @@ printHtmlEndScripts destFile = do
 
 printHtmlBasicStats destDir fileData fname = do
          let fileDest = (destDir ++ "/index.html")
-         appendHtml fileDest ("<table border=\"1\">")
+         appendHtml fileDest ("<table class=\"table\" border=\"1\">")
          printFileName fname fileDest
          printGCPercent (bpCounts fileData) fileDest
          printEncoding (lc fileData) fileDest

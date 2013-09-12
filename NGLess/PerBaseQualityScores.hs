@@ -10,6 +10,8 @@ import PrintFastqBasicStats
 
 --constants
 percentile50 = 0.5 :: Double
+lowerQuartile = 0.25 :: Double
+upperQuartile = 0.75 :: Double
 --
 
 --accUntilLim :: given lim, each position of the array is added until lim. Is returned the elem of the array in that position.
@@ -19,9 +21,14 @@ accUntilLim array lim = accUntilLim' array 0 0
           accUntilLim' (x:xs) acc offset = (if (acc + x) >= lim then offset else accUntilLim' xs (acc + x) (1 + offset))
 
 -- TODO: lQ, uQ, tenthPerc, ninetiethPerc
-concatData :: (Double, Int) -> String -> Int -> String
-concatData (mean, median) content bp =
-    content ++ "{\"bp\" :" ++ show bp ++ ", \"mean\" :" ++ show mean ++ ", \"median\" :" ++ show median ++ "},\n"
+concatData :: (Double, Int, Int, Int) -> String -> Int -> String
+concatData (mean, median, lq, uq) content bp =
+    content ++ "{ \"bp\" :" ++ show bp ++
+    				", \"mean\" :" ++ show mean ++
+    				", \"median\" :" ++ show median ++
+    				", \"Lower Quartile\" :" ++ show lq ++    				
+    				", \"Upper Quartile\" :" ++ show uq ++
+    				 "},\n"
 
 createDataString stats = createDataString' stats "data = [\n " 0
     where createDataString' [] content _ = (content ++ "]\n")
@@ -47,13 +54,17 @@ calcPerc keySet elemSet elemTotal perc = keySet !! (accUntilLim elemSet val')
 
 
 --statistics :: Calculates the Quality Statistics of a given FastQ.
-statistics :: Fractional a => Map Char Int -> Int -> (a, Int)
-statistics bpQualCount encScheme = (calcMean keySet'' elemSet' elemTotal' , (subtract encScheme) $ calcPerc keySet' elemSet' elemTotal' percentile50)
+statistics :: Fractional a => Map Char Int -> Int -> (a, Int, Int, Int)
+statistics bpQualCount encScheme = (calcMean keySet'' elemSet' elemTotal' , 
+															(subtract encScheme) $ calcPerc' percentile50,
+															(subtract encScheme) $ calcPerc' lowerQuartile,
+															(subtract encScheme) $ calcPerc' upperQuartile)
     where keySet = keys bpQualCount
           keySet' = Prelude.map (ord) keySet
           keySet'' = Prelude.map (subtract encScheme) keySet'
           elemSet' = elems bpQualCount
           elemTotal' = foldl1 (+) elemSet'
+          calcPerc' = calcPerc keySet' elemSet' elemTotal'
 
 
 
