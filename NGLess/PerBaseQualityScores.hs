@@ -1,7 +1,9 @@
 module PerBaseQualityScores
     (
         calculateStatistics,
-        printHtmlStatisticsData
+        printHtmlStatisticsData,
+        calcMean,
+        calcPerc
     ) where
 
 import Data.Map
@@ -43,6 +45,7 @@ calculateStatistics qCounts minChar = calculateStatistics' qCounts []
           calculateStatistics' qcounts bpStatsResult = calculateStatistics' (init qcounts)
                                                                             (statistics (last qcounts) encScheme' : bpStatsResult)
 
+calcMean _ _ 0 = error "The total number of quality elements in the fastQ needs to be higher than 0"
 calcMean keySet elemSet elemTotal = fromIntegral bpSum' / fromIntegral elemTotal
     where eachBpValue = zipWith (*) keySet elemSet
           bpSum' = foldl1 (+) eachBpValue

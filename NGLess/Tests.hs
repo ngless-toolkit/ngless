@@ -5,11 +5,12 @@ module Main where
 
 -- Import basic functionality and our own modules
 
+import qualified Data.Map as M
 import Test.Framework.TH
 import Test.HUnit
-import Test.QuickCheck
+import Test.QuickCheck()
 import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2
+import Test.Framework.Providers.QuickCheck2()
 import Control.Applicative
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
@@ -22,6 +23,9 @@ import Language
 import Parse
 import Tokens
 import Types
+import PrintFastqBasicStats
+import FastQFileData
+import PerBaseQualityScores
 
 
 -- The main test driver is automatically generated
@@ -142,10 +146,33 @@ case_tok_word_ = tokenize' "test" "word_with_underscore" @?= Right expected
 
 
 -- Test CountChars
+case_count_bps_empty = countChars ((0,0,0,0) :: (Int,Int,Int,Int)) "\n" @?= (0,0,0,0)
+case_count_bps_normal = countChars ((1,1,1,1) :: (Int,Int,Int,Int)) "AAAGGGTTTCCC\n" @?= (4,4,4,4)
+case_count_bps_only_As = countChars ((0,0,0,0) :: (Int,Int,Int,Int)) "AAAAAAAAAA\n" @?= (10,0,0,0)
 
---case_count_bps_empty = countBps "[>name\n\nsomeData\nsomeMoreData]" @?= (0,0,0,0)
---case_count_bps_normal = countBps "[>name\nAAAGGGTTTCCC\nsomeData\nsomeMoreData]" @?= (3,3,3,3)
---case_count_bps_onlyAs = countBps "[>name\nAAAAAAAAAA\nsomeData\nsomeMoreData]" @?= (10,0,0,0)
+-- Test Encoding
+case_calculateEncoding_sanger = calculateEncoding 55 @?= Encoding "Sanger / Illumina 1.9" sanger_encoding_offset
+case_calculateEncoding_illumina_1 = calculateEncoding 60 @?= Encoding "Illumina <1.3" illumina_1_encoding_offset
+case_calculateEncoding_illumina_1_5 = calculateEncoding 100 @?= Encoding "Illumina 1.5" illumina_1_3_encoding_offset
+
+-- Test the insertion of Quality Counts
+case_add_Qual_Count_without_bp = addToCount [] "!!!" @?= replicate 3 (M.fromList [('!',1)])
+case_add_Qual_Count_with_existing_bp = addToCount (replicate 3 (M.fromList [('!',1)])) "!!!" @?= replicate 3 (M.fromList [('!',2)])
+
+--Test the calculation of the Mean
+case_calc_simple_mean = calcMean ([1,2] :: [Integer]) [1,2] (2 :: Integer) @?= (2.5 :: Double) -- 5/2
+--TODO: compare returned errors to the Mean and Percentile
+--case_calc_mean_error = calcMean ([] :: [Integer]) [] (0 :: Integer) @?= error "The total number of quality elements in the fastQ needs to be higher than 0"
+
+--Test the calculation of the Percentile
+case_calc_median = calcPerc ([2,5,10] :: [Integer]) [1,5,1] (7 :: Integer) (0.5 :: Double) @?= (5 :: Integer)
+case_calc_Low_Quart = calcPerc ([2,5,10] :: [Integer]) [1,1,1] (3 :: Integer) (0.25 :: Double) @?= (2 :: Integer)
+case_calc_Upper_Quart = calcPerc ([2,5,10] :: [Integer]) [1,1,1] (3 :: Integer) (0.75 :: Double) @?= (10 :: Integer)
+
+--Calculate Sequence min and max Size
+case_seq_size_first_invocation = seqMinMax (maxBound :: Int, minBound :: Int) 10 @?= (10,10)
+case_seq_size_max_update = seqMinMax (5,6) 10 @?= (5,10)
+case_seq_size_min_update = seqMinMax (5,6) 2 @?= (2,6)
 
 -- Test Types
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 module FastQFileData
     (
-        Result(..),  iterateFile
+        Result(..),  iterateFile, addToCount, countChars, seqMinMax
     ) where
 
 import Control.DeepSeq

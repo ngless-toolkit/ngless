@@ -5,6 +5,9 @@ module PrintFastqBasicStats
         printHtmlEndScripts,
         calculateEncoding,
         dataFileName,
+        sanger_encoding_offset,
+        illumina_1_encoding_offset,
+        illumina_1_3_encoding_offset,
         Encoding(..)
     ) where
 
@@ -12,7 +15,7 @@ import Data.Char
 import FastQFileData
 import System.Directory
 
-data Encoding = Encoding {name :: String, offset :: Int}
+data Encoding = Encoding {name :: String, offset :: Int} deriving(Show,Eq)
 
 -- Constants
 sanger_encoding_offset = 33
