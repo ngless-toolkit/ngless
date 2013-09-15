@@ -27,8 +27,10 @@ addEachCount qual counts = insertWithKey mapAddFunction qual 1 counts
 
 addToCount counts qual = addToCount' counts qual []
         where
-            addToCount' (counts:xs) (q:ys) qualResults = addToCount' xs ys ((addEachCount q counts) : qualResults)
+            addToCount' (eachCount:xs) (q:ys) qualResults = addToCount' xs ys ((addEachCount q eachCount) : qualResults)
+            addToCount' [] (q:ys) qualResults = addToCount' [] ys ((addEachCount q (fromList [])) : qualResults)
             addToCount' _ [] qualResults = reverse qualResults
+
 
 addChar (bpA, bpC, bpG, bpT) 'A' = (bpA + 1, bpC, bpG, bpT)
 addChar (bpA, bpC, bpG, bpT) 'C' = (bpA, bpC + 1, bpG, bpT)
@@ -41,22 +43,22 @@ countChars c [] = c
 
 
 seqMinMax :: (Int,Int) -> Int -> (Int,Int)
-seqMinMax (minSeq, maxSeq) length =  ((min length minSeq),(max length maxSeq))
+seqMinMax (minSeq, maxSeq) length' =  ((min length' minSeq),(max length' maxSeq))
 
 --updateResults :: Used to fill in the structure "Result" with the FastQ file info.
 updateResults :: Result -> String -> String -> Result
-updateResults fileData seq qual = Result (countChars (bpCounts fileData) seq)
+updateResults fileData seq' qual = Result (countChars (bpCounts fileData) seq')
                                          (Prelude.foldr min (lc fileData) qual)
                                          (addToCount (qualCounts fileData) qual)
                                          ((nSeq fileData) + 1)
-                                         (seqMinMax (seqSize fileData) (length seq))
+                                         (seqMinMax (seqSize fileData) (length seq'))
 
 --iterateFile :: Used to iterate the file in a strict manner.
 iterateFile :: B.ByteString -> Result
 iterateFile contents = iterateFile' initial (B.lines contents)
         where
                 initial = Result (0,0,0,0) '~' (replicate maxBPPossible (fromList [] :: Map Char Int)) 0 (maxBound :: Int, minBound :: Int)
-                iterateFile' r (_:seq:_:quals:xs) = r `deepseq`
-                        iterateFile' (updateResults r (B.unpack seq) (B.unpack quals)) xs
+                iterateFile' r (_:seq':_:quals:xs) = r `deepseq`
+                        iterateFile' (updateResults r (B.unpack seq') (B.unpack quals)) xs
                 iterateFile' !r [] = r `deepseq` r
-
+                iterateFile' _ _  = error "There is an error with the the size of the fastQ file"

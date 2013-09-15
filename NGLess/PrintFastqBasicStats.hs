@@ -59,20 +59,20 @@ printGCPercent (bpA,bpC,bpG,bpT) fileDest =
     do
         let gcCount = fromIntegral (bpC + bpG)
             allBpCount = fromIntegral (bpA + bpC + bpG + bpT)
-        appendHtml fileDest (htmlGC ++ (show ((gcCount / allBpCount) * 100)) ++ htmlRowEnding )
+        appendHtml fileDest (htmlGC ++ (show (((gcCount / allBpCount) * 100) :: Double)) ++ htmlRowEnding )
 
-printNumberSequences nSeq fileDest =  appendHtml fileDest (htmlNumOfSeqs ++ (show nSeq) ++ htmlRowEnding)
-printSequenceSize seqSize fileDest =  appendHtml fileDest (htmlSeqLen ++ (show seqSize) ++ htmlRowEnding)
+printNumberSequences numSeq fileDest =  appendHtml fileDest (htmlNumOfSeqs ++ (show numSeq) ++ htmlRowEnding)
+printSequenceSize sqSize fileDest =  appendHtml fileDest (htmlSeqLen ++ (show sqSize) ++ htmlRowEnding)
 
 printEncoding :: Char -> String -> IO ()
-printEncoding lc fileDest =  appendHtml fileDest ( htmlEncoding ++ (name (calculateEncoding $ ord lc)) ++ htmlRowEnding  )
+printEncoding lowC fileDest =  appendHtml fileDest ( htmlEncoding ++ (name (calculateEncoding $ ord lowC)) ++ htmlRowEnding  )
 
 --calculateEncoding :: Calculates the encoding by receiving the lowest quality character.
 calculateEncoding :: Int -> Encoding
-calculateEncoding lc
-        | lc < sanger_encoding_offset  = error ("No known encodings with chars < 33 (Yours was "++ (show lc) ++ ")")
-        | lc < illumina_1_encoding_offset =  Encoding "Sanger / Illumina 1.9" sanger_encoding_offset
-        | lc < illumina_1_3_encoding_offset = Encoding "Illumina <1.3" illumina_1_encoding_offset
-        | lc == (illumina_1_3_encoding_offset+1) = Encoding "Illumina 1.3" illumina_1_3_encoding_offset
-        | lc <=  126 = Encoding "Illumina 1.5" illumina_1_3_encoding_offset
-        | otherwise = error ("No known encodings with chars > 126 (Yours was "++ (show lc) ++")")
+calculateEncoding lowC
+        | lowC < sanger_encoding_offset  = error ("No known encodings with chars < 33 (Yours was "++ (show lowC) ++ ")")
+        | lowC < illumina_1_encoding_offset =  Encoding "Sanger / Illumina 1.9" sanger_encoding_offset
+        | lowC < illumina_1_3_encoding_offset = Encoding "Illumina <1.3" illumina_1_encoding_offset
+        | lowC == (illumina_1_3_encoding_offset+1) = Encoding "Illumina 1.3" illumina_1_3_encoding_offset
+        | lowC <=  126 = Encoding "Illumina 1.5" illumina_1_3_encoding_offset
+        | otherwise = error ("No known encodings with chars > 126 (Yours was "++ (show lowC) ++")")

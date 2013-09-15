@@ -18,17 +18,17 @@ upperQuartile = 0.75 :: Double
 accUntilLim :: [Int] -> Int -> Int
 accUntilLim array lim = accUntilLim' array 0 0
     where accUntilLim' [] acc _ = error ("ERROR: The accumulator has value" ++ show acc ++ " and is never higher than " ++ show lim )
-          accUntilLim' (x:xs) acc offset = (if (acc + x) >= lim then offset else accUntilLim' xs (acc + x) (1 + offset))
+          accUntilLim' (x:xs) acc offset' = (if (acc + x) >= lim then offset' else accUntilLim' xs (acc + x) (1 + offset'))
 
 -- TODO: lQ, uQ, tenthPerc, ninetiethPerc
 concatData :: (Double, Int, Int, Int) -> String -> Int -> String
 concatData (mean, median, lq, uq) content bp =
     content ++ "{ \"bp\" :" ++ show bp ++
-    				", \"mean\" :" ++ show mean ++
-    				", \"median\" :" ++ show median ++
-    				", \"Lower Quartile\" :" ++ show lq ++    				
-    				", \"Upper Quartile\" :" ++ show uq ++
-    				 "},\n"
+    ", \"mean\" :" ++ show mean ++
+    ", \"median\" :" ++ show median ++
+    ", \"Lower Quartile\" :" ++ show lq ++
+    ", \"Upper Quartile\" :" ++ show uq ++
+     "},\n"
 
 createDataString stats = createDataString' stats "data = [\n " 0
     where createDataString' [] content _ = (content ++ "]\n")
@@ -55,16 +55,16 @@ calcPerc keySet elemSet elemTotal perc = keySet !! (accUntilLim elemSet val')
 
 --statistics :: Calculates the Quality Statistics of a given FastQ.
 statistics :: Fractional a => Map Char Int -> Int -> (a, Int, Int, Int)
-statistics bpQualCount encScheme = (calcMean keySet'' elemSet' elemTotal' , 
-															(subtract encScheme) $ calcPerc' percentile50,
-															(subtract encScheme) $ calcPerc' lowerQuartile,
-															(subtract encScheme) $ calcPerc' upperQuartile)
-    where keySet = keys bpQualCount
-          keySet' = Prelude.map (ord) keySet
-          keySet'' = Prelude.map (subtract encScheme) keySet'
-          elemSet' = elems bpQualCount
-          elemTotal' = foldl1 (+) elemSet'
-          calcPerc' = calcPerc keySet' elemSet' elemTotal'
+statistics bpQualCount encScheme = (calcMean keySet'' elemSet' elemTotal' ,
+                                   (subtract encScheme) $ calcPerc' percentile50,
+                                   (subtract encScheme) $ calcPerc' lowerQuartile,
+                                   (subtract encScheme) $ calcPerc' upperQuartile)
+        where keySet = keys bpQualCount
+              keySet' = Prelude.map (ord) keySet
+              keySet'' = Prelude.map (subtract encScheme) keySet'
+              elemSet' = elems bpQualCount
+              elemTotal' = foldl1 (+) elemSet'
+              calcPerc' = calcPerc keySet' elemSet' elemTotal'
 
 
 
