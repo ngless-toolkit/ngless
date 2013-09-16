@@ -32,6 +32,10 @@ addToCount counts qual = addToCount' counts qual []
             addToCount' _ [] qualResults = reverse qualResults
 
 
+addChar cs 'a' = addChar cs 'A'
+addChar cs 't' = addChar cs 'T'
+addChar cs 'c' = addChar cs 'C'
+addChar cs 'g' = addChar cs 'G'
 addChar (bpA, bpC, bpG, bpT) 'A' = (bpA + 1, bpC, bpG, bpT)
 addChar (bpA, bpC, bpG, bpT) 'C' = (bpA, bpC + 1, bpG, bpT)
 addChar (bpA, bpC, bpG, bpT) 'G' = (bpA, bpC, bpG + 1, bpT)
@@ -61,4 +65,4 @@ iterateFile contents = iterateFile' initial (B.lines contents)
                 iterateFile' r (_:seq':_:quals:xs) = r `deepseq`
                         iterateFile' (updateResults r (B.unpack seq') (B.unpack quals)) xs
                 iterateFile' !r [] = r `deepseq` r
-                iterateFile' _ _  = error "There is an error with the the size of the fastQ file"
+                iterateFile' _ _  = error "Number of lines is not multiple of 4!"

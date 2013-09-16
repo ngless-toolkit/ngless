@@ -149,6 +149,7 @@ case_tok_word_ = tokenize' "test" "word_with_underscore" @?= Right expected
 case_count_bps_empty = countChars ((0,0,0,0) :: (Int,Int,Int,Int)) "\n" @?= (0,0,0,0)
 case_count_bps_normal = countChars ((1,1,1,1) :: (Int,Int,Int,Int)) "AAAGGGTTTCCC\n" @?= (4,4,4,4)
 case_count_bps_only_As = countChars ((0,0,0,0) :: (Int,Int,Int,Int)) "AAAAAAAAAA\n" @?= (10,0,0,0)
+case_count_bps_mixed_case = countChars ((0,0,0,0) :: (Int,Int,Int,Int)) "AaAaAaaaAA\n" @?= (10,0,0,0)
 
 -- Test Encoding
 case_calculateEncoding_sanger = calculateEncoding 55 @?= Encoding "Sanger / Illumina 1.9" sanger_encoding_offset
