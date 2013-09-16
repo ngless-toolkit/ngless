@@ -24,6 +24,18 @@ Returns: ``ReadSet``
 This function reads one (or more) FastQ files and performs quality control.
 
 
+preprocess
+----------
+
+``preprocess:: ReadSet -> Block -> ReadSet``
+
+This function executes the block for each read in the input. Unless the read is
+discarded, it is transfered (after transformations) to the output.
+
+This function performs quality control on its output.
+
+
+
 unique
 ------
 
@@ -39,7 +51,26 @@ map
 
 ``map:: ReadSet -> MappedSet``
 
-Maps to a reference.
+Parameters
+~~~~~~~~~~
+
+reference
+    A string. It could be a path to a fasta file or a reference known to
+    ngless.
+
+Maps to a reference. In the future, this function should also take parameters
+to specify the mapping parameters.
+
+annotate
+--------
+
+``annotate :: MappedSet -> CountMap``
+
+Parameters
+~~~~~~~~~~
+
+features
+    A set of symbols.
 
 write & print
 -------------
