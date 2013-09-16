@@ -21,6 +21,7 @@ data Encoding = Encoding {name :: String, offset :: Int} deriving(Show,Eq)
 sanger_encoding_offset = 33
 illumina_1_encoding_offset = 59
 illumina_1_3_encoding_offset = 64
+
 dataFileName = "perbaseQualScoresData.js"
 bpQualStatsFileName = "/Html/perBaseQualityScores.js"
 htmlFileName = "<tr><td> File Name is: </td> <td>"
@@ -29,20 +30,22 @@ htmlSeqLen = "<tr><td> Sequence length:  </td> <td>"
 htmlEncoding = "<tr><td> Encoding is: </td> <td> "
 htmlGC = "<tr><td> %GC: </td> <td>"
 htmlRowEnding =  "</td></tr>\n"
-htmlScriptTag = "\"></script>\n<script src=\""
 --
 
-appendHtml fname = appendFile fname
+appendHtml = appendFile
 
 -- TODO: Understand why cannot make an assignement inside a where or let.
 printHtmlEndScripts destFile = do
         curDir <- getCurrentDirectory
         let dataPath' = dataFileName -- Each Dir has its own data
             bpStatisticsPlot' = curDir ++ bpQualStatsFileName
+            scriptTag path = concat ["<script src=\"", path, "\"></script>\n"]
 
         appendHtml destFile ("\n" ++
-            "<script src=\"http://d3js.org/d3.v3.min.js\" charset=\"utf-8\"></script>" ++
-            "<script src=\"" ++ dataPath' ++ htmlScriptTag ++ bpStatisticsPlot' ++ "\"></script></body></html>")
+            scriptTag "http://d3js.org/d3.v3.min.js" ++
+            scriptTag dataPath' ++
+            scriptTag bpStatisticsPlot' ++
+            "</body></html>")
 
 printHtmlBasicStats destDir fileData fname = do
          let fileDest = (destDir ++ "/index.html")
