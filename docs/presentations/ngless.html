@@ -1,0 +1,213 @@
+<html>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<script src="https://rawgithub.com/markdalgleish/fathom/master/fathom.min.js" type="text/javascript"></script>
+<link href="https://raw.github.com/markdalgleish/fathom/master/fathom.sample.css" rel="stylesheet"/>
+<style>
+body {
+    font-family: sans-serif;
+    font-size: 24px;
+}
+h1 {
+    font-size: 72px;
+    color: #966;
+    padding-bottom: 1.3em;
+    padding-top: 4em;
+    text-align: right;
+
+}
+h2 {
+    font-size: 48px;
+    color: #930;
+    padding-bottom: 1.3em;
+    text-align: right;
+}
+
+pre {
+    font-family: monospace;
+    padding-left: 1em;
+    padding-top: .4em;
+    padding-bottom: .8em;
+    margin-bottom: .8em;
+    color: #333;
+    border-left: solid 2px #940;
+}
+em {
+    color: #930;
+}
+
+ul {
+    list-style-type: square;
+    padding-left: 1em; 
+}
+ol {
+    list-style-type: lower-roman;
+    padding-left: 1em; 
+}
+li {
+    width: 80%;
+    padding-left: 1em; 
+    padding-bottom: 1em; 
+    font-size: 24px;
+
+}
+</style>
+<body>
+<div id="presentation">
+  <div class="slide">
+    <h1>NGLESS<br />NGS With Less Work</h1>
+  </div>
+
+  <div class="slide">
+    <h2>Problem Setting</h2>
+    <ul>
+      <li>NGS (Next Generation Sequencing) has many applications.</li>
+      <li>It is impossible to define the <em>definitive processing</em> pipeline (context-dependent).</li>
+      <li>Computational analysis is the bottleneck for many labs.<br />
+        Not computation time, but setting up pipelines &amp; interpreting results.</li>
+    </ul>
+  </div>
+  <div class="slide">
+    <h2>Input Data</h2>
+    <pre>
+@SRR172902.1_USI-EAS376:1:1:1:1204/1
+CGGTCGTACTCGCGCTGGGCCNCGCCCAGCGCCAGCCGCGAGTNGATTTCTAACGCCTGC
++
+a\^Sa_T``Z`Y`S^SX\YaZDY^`_ZKU^Z`YLW\\Y\]TYKDTETYZ^VRW\BBBBBB
+@SRR172902.2_USI-EAS376:1:1:1:1811/1
+AGATATAAAACCTGAAAACTTNAATTTAGATATTTATTATGAANACGAAGACGTTGCTGT
++
+Xabbba\a\_bbaba^a`bb^DZ`bbbbbbabbbbabaabb[]D^bb^^babb`abbaa^
+</pre>    
+  </div>
+  <div class="slide">
+    <h2>Data Structure</h2>
+    <ol>
+        <li>Header line (may have structure).</li>
+        <li>Sequence line, typically short (35-350 bps).</li>
+        <li>Plus sign (separator).</li>
+        <li>Quality of each base, encoded as ASCII characters<br />
+            (<tt>a</tt> means that the machine is 99.97% confident.)
+    </ol>
+  </div>
+  <div class="slide">
+    <h2>Some Technical Complications:</h2>
+    <ul>
+        <li>Header may have structure.</li>
+        <li>Sequences may not all be of same size.</li>
+        <li>There are two sub-formats (ways of encoding qualities).</li>
+        <li>There is a more complex type of data called <em>paired-end</em>, which we will ignore in this presentation.</li>
+    </ul>
+  </div>
+  <div class="slide">
+    <h2>Mapping to a Reference is a Primitive</h2>
+    <ul>
+    <li>Mapping means <em>given a reference</em> and a <em>read</em>, finding
+the read in the reference.</li>
+    <li>For example, given the read
+<tt>GCACATCCAGGCTGGTCAGTGTGGCAACCAGATCGGTGCCAAGTTCT</tt>:
+    <li>We can
+computationally find it in the human genome (chromossome 6, in the TUBB
+[tubulin, beta 1] gene).</li>
+    <li>In many cases, it is not an exact match.</li>
+    </ul>
+  </div>
+  <div class="slide">
+    <h2>Typical Pipelines Share the Same Initial Steps</h2>
+    <ol>
+        <li>Pre-process &amp; filter (based on qualities).</li>
+        <li>Map to a reference.</li>
+        <li>Compute statistics of mapping.</li>
+        <li>Problem-specific analysis.</li>
+    </ol>
+    <p>For <em>version 1.0</em>, we wish to support the first 3 steps plus one
+    or two applications in the 4th step.</p>
+  </div>
+  <div class="slide">
+    <h2>Problems are Simple, but Scale is Large</h2>
+    <ol>
+        <li>A single run generates millions of reads.</li>
+        <li>Typical file is 1~10GiB (compressed!).</li>
+        <li>A genome can have giga basepairs.</li>
+        <li>In many problems, we have multiple genomes, many read files (hundreds, now growing to thousands).</li>
+    </ol>
+    <p>For <em>version 1.0</em>, we wish to support the first 3 steps plus one
+    or two applications in the 4th step.</p>
+  </div>
+
+  <div class="slide">
+    <h2>Example of NGLESS</h2>
+    <pre>
+ngless "0.0"
+input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
+input = unique(input, max_copies=2)
+preprocess(input) using |read|:
+    read = read[5:]
+    read = substrim(read, min_quality=26)
+    if len(read) &lt; 31:
+        discard
+mapped = map(input, reference='hg19')
+annotated = annotate(mapped, features=[{gene}])
+write(count(annotated, count={gene}),
+        ofile='gene_counts.csv',
+        format={csv})
+    </pre>
+  </div>
+
+  <div class="slide">
+    <h2>Basic Properties of the Language</h2>
+    <ul>
+        <li>Pythonesque syntax with Ruby-like blocks.</li>
+        <li>Statically and strictly typed.</li>
+        <li>Types are implicit, but limited language allows for type inferrence and checking.</li>
+    </ul>
+  </div>
+
+  <div class="slide">
+    <h2>The Language Design</h2>
+    <ol>
+        <li>Good practices should be automatic.</li>
+        <li>Types should allow for bug discovery.</li>
+    </ol>
+  </div>
+
+  <div class="slide">
+    <h2>Quality Control is Implicit</h2>
+    <ol>
+        <li>Loading the files triggers quality control.</li>
+        <li>After post processing, quality control is run again.</li>
+        <li>Mapping also generates quality statistics.</li>
+    </ol>
+  </div>
+
+  <div class="slide">
+    <h2>Types Are Domain Types</h2>
+    <ul>
+        <li>Reads, chromosomes, genes...</li>
+        <li>Allows for fast error detection &amp; good error messages.</li>
+    </ul>
+  </div>
+
+  <div class="slide">
+    <h2>Basic Domain Knowledge is Builtin</h2>
+    <ul>
+        <li>Human (and other model organisms) are built-in.</li>
+    <pre>
+mapped = map(input, reference='hg19')
+annotated = annotate(mapped, features=[{gene}])
+</pre>
+        <li>The user does not need to specify which annotation database to use
+        in the second line, <em>as the reads had been mapped to hg19</em>.</li>
+        <li>The language <em>knows which reference to map and to annotate with</em>.</li>
+        <li>Some types of common mistakes (mismatched reference files, &amp;c) are <em>impossible or hard to express</em>.</li>
+    </ul>
+  </div>
+
+  <div class="slide">
+    <h2>Status of Project</h2>
+    <ol>
+        <li>Draft language design is finished.</li>
+        <li>Interpreter for the language is being implemented.</li>
+    </ol>
+  </div>
+</div>
+<script>$('#presentation').fathom();</script>
