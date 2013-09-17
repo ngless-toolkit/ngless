@@ -129,9 +129,8 @@ computationally find it in the human genome (chromossome 6, in the TUBB
         <li>Typical file is 1~10GiB (compressed!).</li>
         <li>A genome can have giga basepairs.</li>
         <li>In many problems, we have multiple genomes, many read files (hundreds, now growing to thousands).</li>
+        <li>OTOH, most of the computations are <em>embarrassingly parallel</em>.</li>
     </ol>
-    <p>For <em>version 1.0</em>, we wish to support the first 3 steps plus one
-    or two applications in the 4th step.</p>
   </div>
 
   <div class="slide">
@@ -158,7 +157,17 @@ write(count(annotated, count={gene}),
     <ul>
         <li>Pythonesque syntax with Ruby-like blocks.</li>
         <li>Statically and strictly typed.</li>
-        <li>Types are implicit, but limited language allows for type inferrence and checking.</li>
+        <li>Types are implicit, but limited language allows for type inference and checking.</li>
+    </ul>
+  </div>
+
+  <div class="slide">
+    <h2>Target Market</h2>
+    <ul>
+        <li>Bioinformaticians working in a wetlab setting.</li>
+        <li>Every serious biological lab in the world now needs to hire at least one.</li>
+        <li>They know programming (at least basic programming), but are not method developers.</li>
+        <li>The tool can still be useful for more advanced users.</li>
     </ul>
   </div>
 
@@ -167,6 +176,7 @@ write(count(annotated, count={gene}),
     <ol>
         <li>Good practices should be automatic.</li>
         <li>Types should allow for bug discovery.</li>
+        <li>Scripts should be reproducible: use of version string.</li>
     </ol>
   </div>
 
@@ -176,6 +186,7 @@ write(count(annotated, count={gene}),
         <li>Loading the files triggers quality control.</li>
         <li>After post processing, quality control is run again.</li>
         <li>Mapping also generates quality statistics.</li>
+        <li><em>User is not allowed to skip quality control.</em></li>
     </ol>
   </div>
 
@@ -184,6 +195,20 @@ write(count(annotated, count={gene}),
     <ul>
         <li>Reads, chromosomes, genes...</li>
         <li>Allows for fast error detection &amp; good error messages.</li>
+        <li>Bad error messages can be a huge barrier to adoption.</li>
+        <li>Alternative solutions (workflow engines) work great, but fail badly.</li>
+    </ul>
+  </div>
+
+  <div class="slide">
+    <h2>Types in NGLESS</h2>
+    <ul>
+        <li>Read</li>
+        <li>ReadSet</li>
+        <li>MappedRead</li>
+        <li>MappedReadSet</li>
+        <li>CountMap</li>
+        <li>int, float, bool, symbol, str</li>
     </ul>
   </div>
 
@@ -199,6 +224,7 @@ annotated = annotate(mapped, features=[{gene}])
         in the second line, <em>as the reads had been mapped to hg19</em>.</li>
         <li>The language <em>knows which reference to map and to annotate with</em>.</li>
         <li>Some types of common mistakes (mismatched reference files, &amp;c) are <em>impossible or hard to express</em>.</li>
+        <li>Tool can ship with or auto-download the necessary data dependencies.</li>
     </ul>
   </div>
 
