@@ -16,6 +16,8 @@ import PerBaseQualityScores
 import PrintFastqBasicStats
 import System.Directory
 import Control.Monad
+import Data.Maybe
+import FPreProcess
 
 
 interpret :: [(Int,Expression)] -> IO ()
@@ -26,17 +28,30 @@ interpret' :: Expression -> IO ()
 interpret' (Sequence es) = handleSequence es
 interpret' (Assignment var func) = variableAssignment var >> interpretFunctions func
 interpret' e = error (Prelude.concat ["interpret: cannot handle ", show e])
+--interpret' (FunctionCall Fpreprocess var _ (Just block)) = do
+--    fileReads <- (B.readFile "../Ngless-Mine/test.fq" )
+--    writeFile "../Ngless-Mine/test_.fq" (fpreprocess fileReads block)
+
 
 variableAssignment (Variable varName) = print varName
 interpretFunctions (FunctionCall functionType (ConstStr fname) _exprs _block) =
     case functionType of
         Ffastq -> readFastQ (T.unpack fname)
-        _ -> print functionType -- all the other functionCalls
+--        _ -> print functionType -- all the other functionCalls
+
 interpretFunctions _ = error "interpretFunctions does not handle non-FunctionCall expressions"
 
 
-
 -- functions to handle interpretation
+
+--fpreprocess fileReads block = do
+--	let fileString = Prelude.map (B.unpack) (B.lines fileReads)
+--	mapMaybe (interpretPreprocessBlock block) fileString-- file should come from the 'var'
+       
+       
+--interpretPreprocessBlock :: Block -> String -> Maybe String
+--interpretPreprocessBlock (Block var expr) str = interpret expr
+
 
 -- Uncompression of a given fastQ file if it's compressed in a .gz format.
 unCompress fname =
