@@ -27,14 +27,18 @@ This function reads one (or more) FastQ files and performs quality control.
 preprocess
 ----------
 
-``preprocess:: ReadSet -> Block -> ReadSet``
+::
 
-This function executes the block for each read in the input. Unless the read is
-discarded, it is transfered (after transformations) to the output.
+    preprocess(inputs) using |read|:
+        ...
+
+``preprocess:: ReadSet -> ()``
+
+This function executes the given block for each read in the input. Unless the
+read is discarded, it is transfered (after transformations) to the output. The
+output is assigned to the same name as the inputs.
 
 This function performs quality control on its output.
-
-
 
 unique
 ------
@@ -44,7 +48,7 @@ unique
 Given a set of reads, returns another which only retains a set number of copies
 of each read (if there are any duplicates).
 
-Takes a ``max_copies`` parameter.
+Takes a ``max_copies`` parameter, which is an integer.
 
 map
 ---
