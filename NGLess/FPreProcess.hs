@@ -6,6 +6,8 @@ module FPreProcess
 --TODO: receive a read of type (id:seq:qual:_:xs) and use the quality to calculateSubStrim'
 --substrim :: String -> Int -> (Int,Int)
 
+
+-- Receives a Quality array and returns a pair with the index and size of the subsequence which has the most consecutive bps respecting the cutoff.
 calculateSubStrim qual cutoff = calculateSubStrim' qual 0 0 0 (0,0)
     where   calculateSubStrim' [] _ _ _ (index,size) = (index,size)
             calculateSubStrim' (q:xs) inc offset act_index (index, size) =

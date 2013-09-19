@@ -5,19 +5,11 @@ module Interpret
     ( interpret
     ) where
 
-import qualified Data.ByteString.Lazy.Char8 as B
-import qualified Codec.Compression.GZip as GZip
-
 import Language
-import FastQFileData
 import Data.Text as T
 import Data.Char
-import PerBaseQualityScores
-import PrintFastqBasicStats
-import System.Directory
-import Control.Monad
 import Data.Maybe
-import FPreProcess
+import ProcessFastQ
 
 
 interpret :: [(Int,Expression)] -> IO ()
@@ -27,20 +19,25 @@ interpret ((_,e):es) = interpret' e >> interpret es
 interpret' :: Expression -> IO ()
 interpret' (Sequence es) = handleSequence es
 interpret' (Assignment var func) = variableAssignment var >> interpretFunctions func
+interpret' func@(FunctionCall _ _ _ _ ) = interpretFunctions func 
 interpret' e = error (Prelude.concat ["interpret: cannot handle ", show e])
---interpret' (FunctionCall Fpreprocess var _ (Just block)) = do
---    fileReads <- (B.readFile "../Ngless-Mine/test.fq" )
---    writeFile "../Ngless-Mine/test_.fq" (fpreprocess fileReads block)
+--interpret' (FunctionCall Fpreprocess var _ (Just block)) = 
 
 
 variableAssignment (Variable varName) = print varName
-interpretFunctions (FunctionCall functionType (ConstStr fname) _exprs _block) =
-    case functionType of
-        Ffastq -> readFastQ (T.unpack fname)
---        _ -> print functionType -- all the other functionCalls
+
+-- Handling Function calls
+-- Structure -> FunctionCall FuncName Expression [(Variable, Expression)] (Maybe Block)
+
+interpretFunctions (FunctionCall Ffastq (ConstStr fname) _exprs _block) = readFastQ (T.unpack fname)
+interpretFunctions (FunctionCall Fpreprocess expr _exprs (Just _block)) = print _block
+--do
+--    fileReads <- (B.readFile "../Ngless-Mine/test.fq" )
+--    writeFile "../Ngless-Mine/test_.fq" (fpreprocess fileReads block)
 
 interpretFunctions _ = error "interpretFunctions does not handle non-FunctionCall expressions"
 
+-- >
 
 -- functions to handle interpretation
 
@@ -53,30 +50,6 @@ interpretFunctions _ = error "interpretFunctions does not handle non-FunctionCal
 --interpretPreprocessBlock (Block var expr) str = interpret expr
 
 
--- Uncompression of a given fastQ file if it's compressed in a .gz format.
-unCompress fname =
-    if isInfixOf (pack ".gz") (pack fname)
-        then fmap GZip.decompress (B.readFile fname)
-        else B.readFile fname -- not compressed
-
-
--- Removes the destiny directory if it already exists from previous executions.
-createDir destDir = do
-    doesDirExist <- doesDirectoryExist destDir
-    when (doesDirExist) $ removeDirectoryRecursive destDir
-    createDirectory destDir
-
-readFastQ :: FilePath -> IO ()
-readFastQ fname = do
-        contents <- unCompress fname
-        let fileData = iterateFile contents
-            destDir = (fname ++ "_ngless")
-        createDir destDir
-        copyFile "Html/index.html" (destDir ++ "/index.html")
-        copyFile "Html/perBaseQualScores.css" (destDir ++ "/perBaseQualScores.css")
-        printHtmlBasicStats destDir fileData fname
-        printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir
-        printHtmlEndScripts (destDir ++ "/index.html")
 
 handleSequence :: [Expression] -> IO ()
 handleSequence (e:es) = interpret' e >> handleSequence es
