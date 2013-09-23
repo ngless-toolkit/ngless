@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module FPreProcess
     (
         FPreProcess.Read(..), substrim
@@ -5,7 +6,7 @@ module FPreProcess
 
 import Data.Char
 
-data Read = Read {id :: String, seq :: String, qual::String} deriving (Show,Eq)
+data Read = Read {id :: String, seq :: String, qual::String} deriving (Show,Eq, Prelude.Read)
 
 removeBps :: String -> (Int,Int) -> String
 removeBps bps (index,size) = take size (drop index bps)
