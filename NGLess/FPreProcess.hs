@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 module FPreProcess
     (
-        FPreProcess.Read(..), substrim
+        FPreProcess.Read(..), substrim,calculateSubStrim
     ) where
 
 import Data.Char
@@ -9,7 +9,7 @@ import Data.Char
 data Read = Read {id :: String, seq :: String, qual::String} deriving (Show,Eq, Prelude.Read)
 
 removeBps :: String -> (Int,Int) -> String
-removeBps bps (index,size) = take size (drop index bps)
+removeBps bps (index,size) = take size . drop index $ bps
 
 --TODO: Discuss how to calculate the quality. This is not totally implemented!
 substrim :: Int -> FPreProcess.Read -> FPreProcess.Read

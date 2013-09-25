@@ -40,8 +40,9 @@ interpretFunctions (FunctionCall Fpreprocess expr _exprs (Just _block)) = do
 interpretFunctions _ = error "interpretFunctions does not handle non-FunctionCall expressions"
 
 -- handling PreProcess -- TODO: Refactor Code.
+
 handlePreProcessSequence :: [Expression] -> FPreProcess.Read -> Maybe FPreProcess.Read
-handlePreProcessSequence (e:es) eachRead = interpretPreProcessFunctions' e eachRead >>= (\x -> handlePreProcessSequence es x)
+handlePreProcessSequence (e:es) eachRead = interpretPreProcessFunctions' e eachRead >>= handlePreProcessSequence es
 handlePreProcessSequence [] eachRead = return (eachRead)
 
 interpretPreProcessFunctions' :: Expression -> FPreProcess.Read -> Maybe FPreProcess.Read
