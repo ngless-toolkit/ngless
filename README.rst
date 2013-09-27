@@ -50,4 +50,5 @@ If you are developing on Ubuntu, you can also install the packages globally
         libghc-test-framework-quickcheck2-dev
         libghc-text-dev \
         libghc-test-framework-hunit-dev \
-        libghc-cmdargs-dev
+        libghc-cmdargs-dev \
+        libghc-parallel-dev
