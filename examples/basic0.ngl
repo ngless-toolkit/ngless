@@ -23,3 +23,5 @@ write(count(annotated, count={chromosome}),
         format={csv})
 cover = coverage(mapped) using |an|:
     tag(an.map_start to an.map_end)
+    
+    
