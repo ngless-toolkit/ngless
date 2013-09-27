@@ -60,17 +60,23 @@ interpretPreProcessFunctions' e _ = error (Prelude.concat ["interpretPreProcessF
 
 
 interpretConditions :: Expression -> Expression -> Expression -> FPreProcess.Read -> Maybe FPreProcess.Read
-interpretConditions (BinaryOp opType lvalue rvalue) seq1 seq2 eachRead =
-  if  (interpretBinaryOperators opType lvalue rvalue) 
-      then interpretPreProcessFunctions' seq1 eachRead >>= interpretPreProcessFunctions' seq2
-      else Just eachRead
+interpretConditions (BinaryOp opType lvalue rvalue) seq1 seq2 eachRead = do
+  case interpretBinaryOperators opType lvalue rvalue of 
+    Left res -> if  (res) then interpretPreProcessFunctions' seq1 eachRead >>= interpretPreProcessFunctions' seq2 else Just eachRead
+    Right res -> Just eachRead 
+interpretConditions e _ _ _ = error (Prelude.concat ["interpretConditions: cannot handle ", show e])
 
-interpretBinaryOperators :: BOp -> Expression -> Expression -> Bool
-interpretBinaryOperators BOpLT lexpr rexpr = if (interpretUnaryOperators lexpr < interpretUnaryOperators rexpr) then True else False
-interpretBinaryOperators BOpGT lexpr rexpr = if (interpretUnaryOperators lexpr > interpretUnaryOperators rexpr) then True else False
-interpretBinaryOperators BOpLTE lexpr rexpr = if (interpretUnaryOperators lexpr <= interpretUnaryOperators rexpr) then True else False
-interpretBinaryOperators BOpGTE lexpr rexpr = if (interpretUnaryOperators lexpr >= interpretUnaryOperators rexpr) then True else False
-interpretBinaryOperators e _ _ = error (Prelude.concat ["interpretBinaryOperators: cannot handle ", show e])
+---- data BOp = BOpAdd | BOpMul | BOpGT | BOpGTE | BOpLT | BOpLTE | BOpEQ | BOpNEQ
+interpretBinaryOperators :: BOp -> Expression -> Expression -> Either Bool Integer
+interpretBinaryOperators BOpLT lexpr rexpr = Left $ interpretUnaryOperators lexpr < interpretUnaryOperators rexpr 
+interpretBinaryOperators BOpGT lexpr rexpr = Left $ interpretUnaryOperators lexpr > interpretUnaryOperators rexpr 
+interpretBinaryOperators BOpLTE lexpr rexpr = Left $ interpretUnaryOperators lexpr <= interpretUnaryOperators rexpr
+interpretBinaryOperators BOpGTE lexpr rexpr = Left $ interpretUnaryOperators lexpr >= interpretUnaryOperators rexpr
+interpretBinaryOperators BOpEQ lexpr rexpr = Left $ interpretUnaryOperators lexpr == interpretUnaryOperators rexpr
+interpretBinaryOperators BOpNEQ lexpr rexpr = Left $ interpretUnaryOperators lexpr /= interpretUnaryOperators rexpr
+interpretBinaryOperators BOpAdd lexpr rexpr = Right $ interpretUnaryOperators lexpr + interpretUnaryOperators rexpr
+interpretBinaryOperators BOpMul lexpr rexpr = Right $ interpretUnaryOperators lexpr * interpretUnaryOperators rexpr
+
 
 interpretUnaryOperators :: Expression -> Integer
 interpretUnaryOperators (UnaryOp UOpLen var) = 10 --TODO: length var, after lookup implemented 
