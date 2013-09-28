@@ -6,15 +6,18 @@ module Interpret
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as B
+import qualified Control.Monad.State as M
+import qualified Data.Map as Map
 
 import Control.Exception.Base
 import Control.Parallel.Strategies
-
 import Language
 import Data.Text as T
 import Data.Maybe
 import ProcessFastQ
 import FPreProcess
+
+type Vars = M.State (Map.Map String NGLType)
 
 
 interpret :: [(Int,Expression)] -> IO ()
@@ -80,7 +83,7 @@ interpretBinaryOperators BOpMul lexpr rexpr = Right $ interpretUnaryOperators le
 
 interpretUnaryOperators :: Expression -> Integer
 interpretUnaryOperators (UnaryOp UOpLen var) = 10 --TODO: length var, after lookup implemented 
-interpretUnaryOperators (ConstNum num) = num
+interpretUnaryOperators (ConstNum num) = num -- Constant
 interpretUnaryOperators e = error (Prelude.concat ["interpretUnaryOperators: cannot handle ", show e])
 
 
@@ -89,12 +92,12 @@ interpretUnaryOperators e = error (Prelude.concat ["interpretUnaryOperators: can
 -- handle read [5:10], read[:5], read[5:], read[:] 
 interpretIndexExpr :: Expression -> Index -> FPreProcess.Read -> Maybe FPreProcess.Read
 
---Case : array[x] -- TODO: Makes sense to have a read of 1 char
---interpretIndexExpr var (IndexOne expr) eachRead = 
---  let value' = (fromInteger $ interpretUnaryOperators expr)
---  in Just $ FPreProcess.Read  (FPreProcess.id eachRead)
---                              (FPreProcess.seq eachRead !! value')    
---                              (FPreProcess.qual eachRead !! value')     
+--Case : array[x] -- Makes sense to have a read of 1 char
+interpretIndexExpr var (IndexOne expr) eachRead = 
+  let value' = (fromInteger $ interpretUnaryOperators expr)
+  in Just $ FPreProcess.Read  (FPreProcess.id eachRead)
+                              ([FPreProcess.seq eachRead !! value'])    
+                              ([FPreProcess.qual eachRead !! value'])     
 
 -- Case : array[:x]
 interpretIndexExpr var (IndexTwo Nothing (Just end)) eachRead = 
