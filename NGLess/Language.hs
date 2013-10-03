@@ -11,6 +11,7 @@ module Language
     , FuncName(..)
     , NGLType(..)
     , Script(..)
+    , NGLessObject(..)
     , function_return_type
     , function_arg_type
     ) where
@@ -85,6 +86,7 @@ data NGLessObject =
         | NGOSymbol T.Text
         | NGOFilename T.Text
         | NGOShortRead T.Text T.Text
+        | NGOVoid
 
 -- | 'Expression' is the main type for holding the AST.
 data Expression =
