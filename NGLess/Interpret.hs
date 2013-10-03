@@ -92,21 +92,21 @@ interpretIndexExpr :: Expression -> Index -> FPreProcess.Read -> Maybe FPreProce
 --Case : array[x] -- TODO: Makes sense to have a read of 1 char
 --interpretIndexExpr var (IndexOne expr) eachRead = 
 --  let value' = (fromInteger $ interpretUnaryOperators expr)
---  in Just $ FPreProcess.Read  (FPreProcess.id eachRead)
+--  in Just $ FPreProcess.Read  (FPreProcess.readId eachRead)
 --                              (FPreProcess.seq eachRead !! value')    
 --                              (FPreProcess.qual eachRead !! value')     
 
 -- Case : array[:x]
 interpretIndexExpr var (IndexTwo Nothing (Just end)) eachRead = 
   let value' = (fromInteger $ interpretUnaryOperators end)
-  in Just $ FPreProcess.Read  (FPreProcess.id eachRead)
+  in Just $ FPreProcess.Read  (FPreProcess.readId eachRead)
                               (Prelude.take value' $ FPreProcess.seq eachRead)    
                               (Prelude.take value' $ FPreProcess.qual eachRead)
 
 -- Case : array[x:]
 interpretIndexExpr var (IndexTwo (Just start) Nothing) eachRead =   
   let value' = (fromInteger $ interpretUnaryOperators start)
-  in Just $ FPreProcess.Read  (FPreProcess.id eachRead)
+  in Just $ FPreProcess.Read  (FPreProcess.readId eachRead)
                               (Prelude.drop value' $ FPreProcess.seq eachRead)    
                               (Prelude.drop value' $ FPreProcess.qual eachRead)
 -- Case : array[y:x]
@@ -114,7 +114,7 @@ interpretIndexExpr var (IndexTwo (Just start) (Just end)) eachRead =
   let startIndex' = (fromInteger $ interpretUnaryOperators start)
       endIndex' = (fromInteger $ interpretUnaryOperators end)
       calcIndex' = (endIndex' - startIndex') -- since the start position is removed.
-  in Just $ FPreProcess.Read  (FPreProcess.id eachRead)
+  in Just $ FPreProcess.Read  (FPreProcess.readId eachRead)
                               (Prelude.take calcIndex' . Prelude.drop startIndex' $ FPreProcess.seq eachRead)    
                               (Prelude.take calcIndex' . Prelude.drop startIndex' $ FPreProcess.qual eachRead)  
 interpretIndexExpr e _ _ = error (Prelude.concat ["interpretIndexExpr: cannot handle ", show e])
@@ -138,7 +138,7 @@ handleSequence [] = return ()
 
 createReadSet :: B.ByteString -> [FPreProcess.Read]
 createReadSet fileReads = createReadSet' (Prelude.map (B.unpack) (B.lines fileReads)) []
-    where createReadSet' (readId:readSeq:_:readQual:xs) res =  createReadSet' xs ((FPreProcess.Read readId readSeq readQual) : res)
+    where createReadSet' (rid:readSeq:_:readQual:xs) res =  createReadSet' xs ((FPreProcess.Read rid readSeq readQual) : res)
           createReadSet' [] res = res
           createReadSet' _ _ = error "Number of lines is not multiple of 4!"
 
