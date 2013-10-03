@@ -6,7 +6,7 @@ module FPreProcess
 
 import Data.Char
 
-data Read = Read {id :: String, seq :: String, qual::String} deriving (Show,Eq, Prelude.Read)
+data Read = Read {readId :: String, seq :: String, qual::String} deriving (Show,Eq, Prelude.Read)
 
 removeBps :: String -> (Int,Int) -> String
 removeBps bps (index,size) = take size . drop index $ bps
@@ -15,7 +15,7 @@ removeBps bps (index,size) = take size . drop index $ bps
 substrim :: Int -> FPreProcess.Read -> FPreProcess.Read
 substrim cutoff eachRead = do
     let res = calculateSubStrim (map ord (qual eachRead)) cutoff
-    FPreProcess.Read (FPreProcess.id eachRead) (removeBps (FPreProcess.seq eachRead) res) (removeBps (qual eachRead) res)
+    FPreProcess.Read (FPreProcess.readId eachRead) (removeBps (FPreProcess.seq eachRead) res) (removeBps (qual eachRead) res)
 
 -- Receives a Quality array and returns a pair with the index and size of the subsequence which has the most consecutive bps respecting the cutoff.
 calculateSubStrim :: [Int] -> Int -> (Int,Int)

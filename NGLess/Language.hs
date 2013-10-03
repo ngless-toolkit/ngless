@@ -11,12 +11,14 @@ module Language
     , FuncName(..)
     , NGLType(..)
     , Script(..)
+    , NGLessObject(..)
     , function_return_type
     , function_arg_type
     ) where
 
 {- This module defines the internal representation the language -}
 import qualified Data.Text as T
+import qualified Data.ByteString.Char8 as B
 
 newtype Variable = Variable T.Text
     deriving (Eq, Show)
@@ -84,7 +86,10 @@ data NGLessObject =
         | NGOInteger Integer
         | NGOSymbol T.Text
         | NGOFilename T.Text
-        | NGOShortRead T.Text T.Text
+        | NGOShortRead T.Text B.ByteString B.ByteString
+        | NGOReadSet B.ByteString
+        | NGOVoid
+    deriving (Eq, Show)
 
 -- | 'Expression' is the main type for holding the AST.
 data Expression =
