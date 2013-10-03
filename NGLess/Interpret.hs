@@ -5,14 +5,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Interpret
     ( interpret
+    , interpretBlock
     ) where
 
-import Control.Monad.Identity
-import Control.Monad.State
 import Control.Monad.Error
+import Control.Monad.Identity
+import Control.Monad.Reader
+import Control.Monad.State
 
 import qualified Data.Map as Map
-import Data.Text as T
+import qualified Data.Text as T
 import Data.Maybe
 import Data.String
 
@@ -31,19 +33,30 @@ instance IsString NGError where
 
 type NGLEnv_t = Map.Map T.Text NGLessObject
 
-type InterpretationEnvT m a =
+type InterpretationEnvT m =
             ErrorT
                 NGError
                 (StateT (Int,NGLEnv_t) m)
-                a
-type InterpretationEnvIO a = InterpretationEnvT IO a
-type InterpretationEnv a = InterpretationEnvT Identity a
+type InterpretationEnvIO = InterpretationEnvT IO
+type InterpretationEnv = InterpretationEnvT Identity
+type InterpretationROEnv =
+            ErrorT
+                NGError
+                (Reader NGLEnv_t)
+
+data BlockStatus = BlockOk | BlockDiscarded | BlockContinued
+    deriving (Eq,Show)
+data BlockResult = BlockResult
+                { blockStatus :: BlockStatus
+                , blockValues :: [(T.Text, NGLessObject)]
+                }
 
 setlno :: Int -> InterpretationEnvIO ()
 setlno !n = modify $ \(_,e) -> (n,e)
 
-lookupVariable :: T.Text -> InterpretationEnv (Maybe NGLessObject)
-lookupVariable !k = gets $ \(_,e) -> Map.lookup k e
+lookupVariable :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
+lookupVariable !k =
+    Map.lookup k `fmap` ask
 
 setVariableValue :: T.Text -> NGLessObject -> InterpretationEnvIO ()
 setVariableValue !k !v = modify $ \(n,e) -> (n, Map.insert k v e)
@@ -56,6 +69,17 @@ runInEnv action = do
     case mv of
         Left e -> throwError e
         Right v -> return v
+
+runInROEnv :: InterpretationROEnv a -> InterpretationEnv a
+runInROEnv action = do
+    (_,env) <- gets id
+    let Identity mv = runReaderT (runErrorT action) env
+    case mv of
+        Left e -> throwError e
+        Right v -> return v
+
+runInROEnvIO :: InterpretationROEnv a -> InterpretationEnvIO a
+runInROEnvIO = runInEnv . runInROEnv
 
 interpret :: [(Int,Expression)] -> IO ()
 interpret es = do
@@ -75,7 +99,7 @@ interpretTop (Assignment (Variable var) val) = do
     return ()
 interpretTop func@(FunctionCall _ _ _ _ ) = void $ topFunction func
 interpretTop (Condition c ifTrue ifFalse) = do
-    c' <- runInEnv (interpretExpr c)
+    c' <- runInROEnvIO (interpretExpr c)
     if evalBool c'
         then interpretTop ifTrue
         else interpretTop ifFalse
@@ -84,9 +108,9 @@ interpretTop _ = throwError "Top level statement is NOP"
 
 interpretTopValue :: Expression -> InterpretationEnvIO NGLessObject
 interpretTopValue f@(FunctionCall {}) = topFunction f
-interpretTopValue e = runInEnv (interpretExpr e)
+interpretTopValue e = runInROEnvIO (interpretExpr e)
 
-interpretExpr :: Expression -> InterpretationEnv NGLessObject
+interpretExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretExpr (Lookup (Variable v)) = do
     r <- lookupVariable v
     case r of
@@ -110,23 +134,22 @@ interpretExpr (IndexExpression expr ie) = do
     return r
 interpretExpr _ = throwError "Not an expression"
 
-interpretIndex :: Index -> InterpretationEnv [Maybe NGLessObject]
+interpretIndex :: Index -> InterpretationROEnv [Maybe NGLessObject]
 interpretIndex (IndexTwo a b) = forM [a,b] maybeInterpretExpr
 interpretIndex (IndexOne a) = forM [Just a] maybeInterpretExpr
 
-maybeInterpretExpr :: (Maybe Expression) -> InterpretationEnv (Maybe NGLessObject)
+maybeInterpretExpr :: (Maybe Expression) -> InterpretationROEnv (Maybe NGLessObject)
 maybeInterpretExpr Nothing = return Nothing
 maybeInterpretExpr (Just e) = interpretExpr e >>= return . Just
 
 topFunction :: Expression -> InterpretationEnvIO NGLessObject
 topFunction (FunctionCall Ffastq (ConstStr fname) _exprs _block) = liftIO (readFastQ (T.unpack fname)) >> return NGOVoid
 topFunction (FunctionCall Fpreprocess expr args (Just block)) = do
-    expr' <- runInEnv $ interpretExpr expr
-    args' <- runInEnv $ evaluateArguments args
+    expr' <- runInROEnvIO $ interpretExpr expr
+    args' <- runInROEnvIO $ evaluateArguments args
     executePreprocess expr' args' block
     return NGOVoid
 topFunction _ = throwError ("Unable to handle these functions")
-
 executePreprocess _ _ _ = return ()
 
 evaluateArguments [] = return []
@@ -134,6 +157,34 @@ evaluateArguments ((v,e):args) = do
     e' <- interpretExpr e
     args' <- evaluateArguments args
     return ((v,e'):args')
+
+interpretBlock :: [(T.Text, NGLessObject)] -> [Expression] -> InterpretationROEnv BlockResult
+interpretBlock vs [] = return (BlockResult BlockOk vs)
+interpretBlock vs (e:es) = do
+    r <- interpretBlock1 vs e
+    case blockStatus r of
+        BlockOk -> interpretBlock (blockValues r) es
+        _ -> return r
+
+interpretBlock1 :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv BlockResult
+interpretBlock1 vs (Assignment (Variable n) val) = do
+    val' <- interpretBlockExpr vs val
+    if not (n `elem` (map fst vs))
+        then error "only assignments to block variable are possible"
+        else do
+            let vs' = map (\p@(a,_) -> (if a == n then (a,val') else p)) vs
+            return $ BlockResult BlockOk vs'
+interpretBlock1 vs Discard = return (BlockResult BlockDiscarded vs)
+interpretBlock1 vs Continue = return (BlockResult BlockContinued vs)
+interpretBlock1 vs (Condition c ifT ifF) = do
+    v' <- interpretBlockExpr vs c
+    if evalBool v'
+        then interpretBlock1 vs ifT
+        else interpretBlock1 vs ifF
+interpretBlock1 _ _ = error "should not have gotten here"
+
+interpretBlockExpr :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv NGLessObject
+interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpretExpr val)
 
 evalMinus (NGOInteger n) = NGOInteger (-n)
 evalMinus _ = error "invalid minus operation"
