@@ -59,13 +59,19 @@ type InterpretationEnvT m =
             ErrorT
                 NGError
                 (StateT (Int,NGLEnv_t) m)
+-- Monad 1: IO + read-write environment
 type InterpretationEnvIO = InterpretationEnvT IO
+-- Monad 2: read-write environment
 type InterpretationEnv = InterpretationEnvT Identity
+-- Monad 3: read-only environment
 type InterpretationROEnv =
             ErrorT
                 NGError
                 (Reader NGLEnv_t)
 
+{- The result of a block is a status indicating why the block finished
+ - and the value of all block variables.
+ -}
 data BlockStatus = BlockOk | BlockDiscarded | BlockContinued
     deriving (Eq,Show)
 data BlockResult = BlockResult
