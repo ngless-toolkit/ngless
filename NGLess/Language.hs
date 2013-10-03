@@ -89,6 +89,7 @@ data NGLessObject =
         | NGOShortRead T.Text B.ByteString B.ByteString
         | NGOReadSet B.ByteString
         | NGOVoid
+    deriving (Eq, Show)
 
 -- | 'Expression' is the main type for holding the AST.
 data Expression =

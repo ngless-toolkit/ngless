@@ -22,6 +22,27 @@ import ProcessFastQ
 import FPreProcess
 import Language
 
+{- Interpretation is done inside 3 Monads
+ -  1. InterpretationEnvIO
+ -      This is the IO Monad with a variable environment
+ -  2. InterpretationEnv
+ -      This is the read-write variable environment
+ -  3. InterpretationROEnv
+ -      This is a read-only variable environment.
+ - 
+ - Monad (1) is a superset of (2) which is a superset of (3). runInEnv and
+ - friends switch between the monads.
+ -
+ -
+ - For blocks, we have a special system where block-variables are read-write,
+ - but others are read-only.
+ -
+ - Functions inside the interpret monads are named interpret*, helper
+ - non-monadic functions which perform computations are named eval*.
+ -
+ -}
+
+-- For now just a string, but should become more descriptive later
 data NGError = NGError !T.Text
         deriving (Show, Eq)
 
@@ -31,6 +52,7 @@ instance Error NGError where
 instance IsString NGError where
     fromString = NGError . T.pack
 
+-- A variable map
 type NGLEnv_t = Map.Map T.Text NGLessObject
 
 type InterpretationEnvT m =
@@ -49,8 +71,9 @@ data BlockStatus = BlockOk | BlockDiscarded | BlockContinued
 data BlockResult = BlockResult
                 { blockStatus :: BlockStatus
                 , blockValues :: [(T.Text, NGLessObject)]
-                }
+                } deriving (Eq,Show)
 
+-- Set line number
 setlno :: Int -> InterpretationEnvIO ()
 setlno !n = modify $ \(_,e) -> (n,e)
 
@@ -97,7 +120,7 @@ interpretTop (Assignment (Variable var) val) = do
     val' <- interpretTopValue val
     setVariableValue var val'
     return ()
-interpretTop func@(FunctionCall _ _ _ _ ) = void $ topFunction func
+interpretTop (FunctionCall f e args b) = void $ topFunction f e args b
 interpretTop (Condition c ifTrue ifFalse) = do
     c' <- runInROEnvIO (interpretExpr c)
     if evalBool c'
@@ -107,7 +130,7 @@ interpretTop (Sequence es) = forM_ es interpretTop
 interpretTop _ = throwError "Top level statement is NOP"
 
 interpretTopValue :: Expression -> InterpretationEnvIO NGLessObject
-interpretTopValue f@(FunctionCall {}) = topFunction f
+interpretTopValue (FunctionCall f e args b) = topFunction f e args b
 interpretTopValue e = runInROEnvIO (interpretExpr e)
 
 interpretExpr :: Expression -> InterpretationROEnv NGLessObject
@@ -142,14 +165,14 @@ maybeInterpretExpr :: (Maybe Expression) -> InterpretationROEnv (Maybe NGLessObj
 maybeInterpretExpr Nothing = return Nothing
 maybeInterpretExpr (Just e) = interpretExpr e >>= return . Just
 
-topFunction :: Expression -> InterpretationEnvIO NGLessObject
-topFunction (FunctionCall Ffastq (ConstStr fname) _exprs _block) = liftIO (readFastQ (T.unpack fname)) >> return NGOVoid
-topFunction (FunctionCall Fpreprocess expr args (Just block)) = do
+topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
+topFunction Ffastq (ConstStr fname) _args _block = liftIO (readFastQ (T.unpack fname)) >> return NGOVoid
+topFunction Fpreprocess expr args (Just block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
     executePreprocess expr' args' block
     return NGOVoid
-topFunction _ = throwError ("Unable to handle these functions")
+topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 executePreprocess _ _ _ = return ()
 
 evaluateArguments [] = return []
@@ -191,4 +214,4 @@ evalMinus _ = error "invalid minus operation"
 evalLen _ = error "not implemented yet"
 evalBinary _bop _ _ = error "not implemented yet"
 evalIndex _ _ = error "not implemented yet"
-evalBool _ = False
+evalBool _ = error "not implemented yet"
