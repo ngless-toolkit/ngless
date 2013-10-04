@@ -217,7 +217,41 @@ interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpr
 
 evalMinus (NGOInteger n) = NGOInteger (-n)
 evalMinus _ = error "invalid minus operation"
+
 evalLen _ = error "not implemented yet"
-evalBinary _bop _ _ = error "not implemented yet"
 evalIndex _ _ = error "not implemented yet"
-evalBool _ = error "not implemented yet"
+
+evalBool (NGOBool x) = x
+
+
+-- Binary Evaluation
+evalBinary :: BOp ->  NGLessObject -> NGLessObject -> NGLessObject
+evalBinary BOpLT lexpr rexpr = lt lexpr rexpr 
+evalBinary BOpGT lexpr rexpr  = gt lexpr rexpr 
+evalBinary BOpLTE lexpr rexpr = lte lexpr rexpr
+evalBinary BOpGTE lexpr rexpr = gte lexpr rexpr
+evalBinary BOpEQ lexpr rexpr =  NGOBool $ lexpr == rexpr
+evalBinary BOpNEQ lexpr rexpr =  NGOBool $ lexpr /= rexpr
+evalBinary BOpAdd lexpr rexpr =  add lexpr  rexpr
+evalBinary BOpMul lexpr rexpr =  mul lexpr rexpr 
+
+
+{- Allows for the addition of new types and operations easily if required.
+ -}
+
+class BOP a where  
+    mul,add, gte, gt, lte, lt :: a -> a -> NGLessObject 
+
+instance BOP NGLessObject where
+    gte (NGOInteger x) (NGOInteger y) = NGOBool $ x >= y
+    gte _ _ = error "BinaryOP gte: Arguments Should be of type NGOInteger" 
+    gt (NGOInteger x) (NGOInteger y) = NGOBool $ x > y
+    gt _ _ = error "BinaryOP lte: Arguments Should be of type NGOInteger"
+    lte (NGOInteger x) (NGOInteger y) = NGOBool $ x <= y
+    lte _ _ = error "BinaryOP lte: Arguments Should be of type NGOInteger"
+    lt (NGOInteger x) (NGOInteger y) = NGOBool $ x < y
+    lt _ _ = error "BinaryOP lt: Arguments Should be of type NGOInteger"
+    add (NGOInteger x) (NGOInteger y) = NGOInteger $ x + y
+    add _ _ = error "BinaryOP add: Arguments Should be of type NGOInteger" 
+    mul (NGOInteger x) (NGOInteger y) = NGOInteger $ x * y
+    mul _ _ = error "BinaryOP mul: Arguments Should be of type NGOInteger" 
