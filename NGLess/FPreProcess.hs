@@ -4,18 +4,23 @@ module FPreProcess
         FPreProcess.Read(..), substrim,calculateSubStrim
     ) where
 
+import qualified Data.ByteString.Char8 as B
+
 import Data.Char
+import Language
 
 data Read = Read {readId :: String, seq :: String, qual::String} deriving (Show,Eq, Prelude.Read)
 
-removeBps :: String -> (Int,Int) -> String
-removeBps bps (index,size) = take size . drop index $ bps
+removeBps :: B.ByteString -> (Int,Int) -> B.ByteString
+removeBps bps (index,size) = B.take size . B.drop index $ bps
 
 --TODO: Discuss how to calculate the quality. This is not totally implemented!
-substrim :: Int -> FPreProcess.Read -> FPreProcess.Read
-substrim cutoff eachRead = do
-    let res = calculateSubStrim (map ord (qual eachRead)) cutoff
-    FPreProcess.Read (FPreProcess.readId eachRead) (removeBps (FPreProcess.seq eachRead) res) (removeBps (qual eachRead) res)
+substrim :: Int -> NGLessObject -> NGLessObject
+substrim cutoff (NGOShortRead readId readSeq readQual) = do
+    let res = calculateSubStrim (map ord (B.unpack readSeq)) cutoff
+    NGOShortRead readId (removeBps readSeq res) (removeBps readQual res)
+
+substrim _ _ = error "substrim: must have type Int and NGOShortRead"
 
 -- Receives a Quality array and returns a pair with the index and size of the subsequence which has the most consecutive bps respecting the cutoff.
 calculateSubStrim :: [Int] -> Int -> (Int,Int)

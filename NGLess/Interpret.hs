@@ -8,15 +8,20 @@ module Interpret
     , interpretBlock
     ) where
 
+import Control.Exception.Base
+
 import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
 
+import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import Data.Maybe
 import Data.String
+
+import System.Directory
 
 import ProcessFastQ
 import FPreProcess
@@ -161,7 +166,15 @@ interpretExpr (IndexExpression expr ie) = do
     ie' <- interpretIndex ie
     let r = evalIndex expr' ie'
     return r
-interpretExpr _ = throwError "Not an expression"
+interpretExpr (FunctionCall Fsubstrim var args _) = do 
+    var' <- interpretExpr var
+    let r = substrim (getvalue args) var'
+    return r
+interpretExpr _ = throwError $ "Not an expression"
+
+getvalue :: [(Variable, Expression)] -> Int
+getvalue [((Variable v),(ConstNum value))] = assert (v == (T.pack "min_quality")) fromIntegral value
+getvalue _ = error "unexpected"
 
 interpretIndex :: Index -> InterpretationROEnv [Maybe NGLessObject]
 interpretIndex (IndexTwo a b) = forM [a,b] maybeInterpretExpr
@@ -172,17 +185,33 @@ maybeInterpretExpr Nothing = return Nothing
 maybeInterpretExpr (Just e) = interpretExpr e >>= return . Just
 
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
-topFunction Ffastq (ConstStr fname) _args _block = liftIO (readFastQ (T.unpack fname)) >> return NGOVoid
-topFunction Fpreprocess expr args (Just block) = do
+topFunction Ffastq (ConstStr fname) _args _block = liftIO (readFastQ (T.unpack fname))
+topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
-    executePreprocess expr' args' block
+    res' <- executePreprocess expr' args' _block varName
     return NGOVoid
 topFunction _ _ _ _ = throwError ("Unable to handle these functions")
-executePreprocess _ _ _ = return ()
+
+executePreprocess (NGOReadSet file) args (Block ([Variable var]) expr) varName = do
+    let newfp = (B.unpack file) ++ ".test"
+    readSet <- liftIO $ createReadSet file
+    _ <- liftIO $ removeFileIfExists newfp
+    res <- forM readSet $ \x -> do
+        executePreprocessEachRead' x args var expr newfp
+    setVariableValue varName $ NGOReadSet (B.pack newfp)
+    return res     
+executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
+  
+executePreprocessEachRead' er args var expr fp = do
+    eachRead' <- runInROEnvIO $ interpretBlock1 ((var, er) : args) expr
+    let newRead = lookup var (blockValues eachRead')
+    case newRead of
+      Just value -> liftIO (appendFile fp $ show value)  
+      Nothing -> return ()
 
 evaluateArguments [] = return []
-evaluateArguments ((v,e):args) = do
+evaluateArguments (((Variable v),e):args) = do
     e' <- interpretExpr e
     args' <- evaluateArguments args
     return ((v,e'):args')
@@ -190,7 +219,7 @@ evaluateArguments ((v,e):args) = do
 interpretBlock :: [(T.Text, NGLessObject)] -> [Expression] -> InterpretationROEnv BlockResult
 interpretBlock vs [] = return (BlockResult BlockOk vs)
 interpretBlock vs (e:es) = do
-    r <- interpretBlock1 vs e
+    r <- interpretBlock1 vs e 
     case blockStatus r of
         BlockOk -> interpretBlock (blockValues r) es
         _ -> return r
@@ -210,7 +239,8 @@ interpretBlock1 vs (Condition c ifT ifF) = do
     if evalBool v'
         then interpretBlock1 vs ifT
         else interpretBlock1 vs ifF
-interpretBlock1 _ _ = error "should not have gotten here"
+interpretBlock1 vs (Sequence expr) = interpretBlock vs expr -- interpret [expr]
+interpretBlock1 vs x = error ("should not have gotten here " ++ show vs ++ " " ++ show x)
 
 interpretBlockExpr :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv NGLessObject
 interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpretExpr val)
@@ -222,7 +252,10 @@ evalLen _ = error "not implemented yet"
 evalIndex _ _ = error "not implemented yet"
 
 evalBool (NGOBool x) = x
+evalBool _ = error "evalBool: Argument must have NGOBool type"
 
+evalString (NGOString v) = v
+evalString _ = error "evalString: Argument type must be NGOString"
 
 -- Binary Evaluation
 evalBinary :: BOp ->  NGLessObject -> NGLessObject -> NGLessObject

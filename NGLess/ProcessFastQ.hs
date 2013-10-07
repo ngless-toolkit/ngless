@@ -1,9 +1,12 @@
 module ProcessFastQ
     (
-		readFastQ
+		readFastQ,
+        createReadSet,
+        removeFileIfExists
     ) where
     
 import qualified Data.ByteString.Lazy.Char8 as GZipReader
+import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as B
 import qualified Codec.Compression.GZip as GZip    
 import Data.Text
@@ -29,6 +32,16 @@ createDir destDir = do
     when (doesDirExist) $ removeDirectoryRecursive destDir
     createDirectory destDir
 
+
+createReadSet :: B.ByteString -> IO [NGLessObject]
+createReadSet fileName = do
+    fileContents' <- (B.readFile (B.unpack fileName))
+    putStrLn ("FileName: " ++ B.unpack fileName)
+    createReadSet' (Prelude.map (B.unpack) (B.lines fileContents')) []
+    where createReadSet' (readId:readSeq:_:readQual:xs) res =  createReadSet' xs ((NGOShortRead (T.pack readId) (B.pack readSeq) (B.pack readQual)) : res)
+          createReadSet' [] res = return res
+          createReadSet' _ _ = error "Number of lines is not multiple of 4!"
+
 readFastQ :: FilePath -> IO NGLessObject
 readFastQ fname = do
         contents <- unCompress fname
@@ -41,3 +54,7 @@ readFastQ fname = do
         printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir
         printHtmlEndScripts (destDir ++ "/index.html")
         return $ NGOReadSet (B.pack fname)
+
+removeFileIfExists fp = do    
+    fexist' <- doesFileExist fp
+    when fexist' $ removeFile fp
