@@ -21,8 +21,6 @@ import qualified Data.Text as T
 import Data.Maybe
 import Data.String
 
-import System.Directory
-
 import ProcessFastQ
 import FPreProcess
 import Language
@@ -248,8 +246,21 @@ interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpr
 evalMinus (NGOInteger n) = NGOInteger (-n)
 evalMinus _ = error "invalid minus operation"
 
-evalLen _ = error "not implemented yet"
-evalIndex _ _ = error "not implemented yet"
+evalLen (NGOShortRead _ rSeq _) = NGOInteger . toInteger $ B.length rSeq
+evalLen _ = error "evalLen: Type Must be NGOShortRead"
+
+evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject 
+evalIndex sr index@[Just (NGOInteger a)] = evalIndex sr $ (Just $ NGOInteger (a + 1)) : index   
+evalIndex (NGOShortRead rId rSeq rQual) [Just (NGOInteger s), Nothing] = 
+    NGOShortRead rId (B.drop (fromIntegral s) rSeq) (B.drop (fromIntegral s) rQual)
+evalIndex (NGOShortRead rId rSeq rQual) [Nothing, Just (NGOInteger e)] = 
+    NGOShortRead rId (B.take (fromIntegral e) rSeq) (B.take (fromIntegral e) rQual)
+evalIndex (NGOShortRead rId rSeq rQual) [Just (NGOInteger s), Just (NGOInteger e)] = do
+    let e' = (fromIntegral e)
+        s' = (fromIntegral s)
+        e'' = e'- s' 
+    NGOShortRead rId (B.take e'' . B.drop s' $ rSeq) (B.take e'' . B.drop s' $ rQual)       
+evalIndex _ _ = error "evalIndex: invalid operation"
 
 evalBool (NGOBool x) = x
 evalBool _ = error "evalBool: Argument must have NGOBool type"
