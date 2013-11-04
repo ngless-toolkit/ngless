@@ -6,4 +6,39 @@
 </head>
 <body>
 	<h1 align = "center">Statistics of fastq file</h1>
-  
+	<table class="table" border="1">
+		<tr>
+			<td> File Name is: </td>
+			<td> <span id="fileName"></span> </td>
+		</tr>
+		
+		<tr>
+			<td> %GC: </td>
+			<td> <span id="GC"></span> </td>
+		</tr>
+		<tr>
+			<td> Encoding is: </td>
+			<td> <span id="Encoding"></span> </td>
+		</tr>
+		<tr>
+			<td> Number of Sequences: </td> 
+			<td> <span id="NumSeqs"></span> </td>
+		</tr>
+		<tr>
+			<td> Sequence length:  </td>
+			<td> <span id="SeqLength"></span> </td>
+		</tr>
+	</table>
+	<script src="http://d3js.org/d3.v3.min.js"></script>
+	<script src="perbaseQualScoresData.js"></script>
+	<script src="/home/paulo/ngless/NGLess/Html/perBaseQualityScores.js"></script>
+	<script src="basicStats.js"></script>
+	<script>
+		document.getElementById("fileName").innerHTML=basicInfo[0].fileName;	
+		document.getElementById("GC").innerHTML=basicInfo[0].GC;
+		document.getElementById("Encoding").innerHTML=basicInfo[0].Encoding;
+		document.getElementById("NumSeqs").innerHTML=basicInfo[0].NumSeqs;
+		document.getElementById("SeqLength").innerHTML=basicInfo[0].SeqLength;
+	</script
+</body>
+</html>  

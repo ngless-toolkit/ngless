@@ -19,6 +19,8 @@ import PrintFastqBasicStats
 import FastQFileData
 import Language
     
+
+
 -- Uncompression of a given fastQ file if it's compressed in a .gz format.
 unCompress fname =
     if isInfixOf (pack ".gz") (pack fname)
@@ -50,9 +52,8 @@ readFastQ fname = do
         createDir destDir
         copyFile "Html/index.html" (destDir ++ "/index.html")
         copyFile "Html/perBaseQualScores.css" (destDir ++ "/perBaseQualScores.css")
-        printHtmlBasicStats destDir fileData fname
-        printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir
-        printHtmlEndScripts (destDir ++ "/index.html")
+        createBasicStatsJson (destDir ++ "/basicStats.js") fileData fname -- generate JSON DATA file: basicStats.js
+        printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir -- " " " file: perBaseQualScoresData.js
         return $ NGOReadSet (B.pack fname)
 
 removeFileIfExists fp = do    

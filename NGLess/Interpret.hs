@@ -198,7 +198,8 @@ executePreprocess (NGOReadSet file) args (Block ([Variable var]) expr) varName =
     res <- forM readSet $ \x -> do
         executePreprocessEachRead' x args var expr newfp
     setVariableValue varName $ NGOReadSet (B.pack newfp)
-    return res     
+    return res
+         
 executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
   
 executePreprocessEachRead' er args var expr fp = do

@@ -10,6 +10,10 @@ import Data.Map
 import Data.Char
 import PrintFastqBasicStats
 
+-- JSON File Dest
+dataFileName = "perbaseQualScoresData.js"
+--
+
 --constants
 percentile50 = 0.5 :: Double
 lowerQuartile = 0.25 :: Double
