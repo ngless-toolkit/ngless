@@ -52,6 +52,7 @@ readFastQ fname = do
         createDir destDir
         copyFile "Html/index.html" (destDir ++ "/index.html")
         copyFile "Html/perBaseQualScores.css" (destDir ++ "/perBaseQualScores.css")
+        copyFile "Html/perBaseQualityScores.js" (destDir ++ "/perBaseQualityScores.js")
         createBasicStatsJson (destDir ++ "/basicStats.js") fileData fname -- generate JSON DATA file: basicStats.js
         printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir -- " " " file: perBaseQualScoresData.js
         return $ NGOReadSet (B.pack fname)
