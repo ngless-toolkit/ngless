@@ -34,10 +34,12 @@ Dependencies
 You need the following packages::
 
     cabal install cmdargs
+    cabal install happy
     cabal install test-framework-th
     cabal install test-framework-quickcheck2
     cabal install test-framework-hunit
 
+    
 
 If you are developing on Ubuntu, you can also install the packages globally
 (the following only applies after Ubuntu 13.04; before that install
