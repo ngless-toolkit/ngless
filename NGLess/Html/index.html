@@ -1,34 +1,46 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 <link rel="stylesheet" type="text/css" href="perBaseQualScores.css" media="screen" />
+
+<!-- Load of the Twitter Bootstrap -->
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css">
+<!-- Optional theme -->
+<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-theme.min.css">
+<!-- Latest compiled and minified JavaScript -->
+<script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js"></script>
+
 <head>
 	<title>FastQ Quality Statistics</title>
 </head>
 <body>
-	<h1 align = "center">Statistics of fastq file</h1>
-	<table class="table" border="1">
-		<tr>
-			<td> File Name is: </td>
-			<td> <span id="fileName"></span> </td>
-		</tr>
-		
-		<tr>
-			<td> %GC: </td>
-			<td> <span id="GC"></span> </td>
-		</tr>
-		<tr>
-			<td> Encoding is: </td>
-			<td> <span id="Encoding"></span> </td>
-		</tr>
-		<tr>
-			<td> Number of Sequences: </td> 
-			<td> <span id="NumSeqs"></span> </td>
-		</tr>
-		<tr>
-			<td> Sequence length:  </td>
-			<td> <span id="SeqLength"></span> </td>
-		</tr>
-	</table>
+	<h1 align = "center"> Statistics of fastq file </h1>
+	<div id="table" align="center">
+		<table class="table table-bordered table-hover">
+			<tr>
+				<td> File Name is: </td>
+				<td> <span id="fileName"></span> </td>
+			</tr>
+			
+			<tr>
+				<td> %GC: </td>
+				<td> <span id="GC"></span> </td>
+			</tr>
+			<tr>
+				<td> Encoding is: </td>
+				<td> <span id="Encoding"></span> </td>
+			</tr>
+			<tr>
+				<td> Number of Sequences: </td> 
+				<td> <span id="NumSeqs"></span> </td>
+			</tr>
+			<tr>
+				<td> Sequence length:  </td>
+				<td> <span id="SeqLength"></span> </td>
+			</tr>
+		</table>
+	</div>
+	<div id="graph"></div>
 	<script src="http://d3js.org/d3.v3.min.js"></script>
 	<script src="perbaseQualScoresData.js"></script>
 	<script src="perBaseQualityScores.js"></script>
@@ -39,6 +51,7 @@
 		document.getElementById("Encoding").innerHTML=basicInfo[0].Encoding;
 		document.getElementById("NumSeqs").innerHTML=basicInfo[0].NumSeqs;
 		document.getElementById("SeqLength").innerHTML=basicInfo[0].SeqLength;
-	</script
+	</script>
+	<p> </p>
 </body>
 </html>  
