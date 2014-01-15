@@ -11,7 +11,6 @@ module PrintFastqBasicStats
 
 import Data.Char
 import FastQFileData
-import System.Directory
 
 data Encoding = Encoding {name :: String, offset :: Int} deriving(Show,Eq)
 

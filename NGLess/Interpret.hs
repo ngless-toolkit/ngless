@@ -192,8 +192,8 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
 topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
-    let newfp = (B.unpack file) ++ ".test"
-    readSet <- liftIO $ createReadSet file
+    newfp <- liftIO $ getTempFilePath (B.unpack file)
+    readSet <- liftIO $ readReadSet file
     _ <- liftIO $ removeFileIfExists newfp
     res <- forM readSet $ \x -> do
         executePreprocessEachRead' x args var expr newfp
