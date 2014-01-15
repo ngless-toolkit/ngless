@@ -191,13 +191,13 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     return NGOVoid
 topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 
-executePreprocess (NGOReadSet file) args (Block ([Variable var]) expr) varName = do
+executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
     let newfp = (B.unpack file) ++ ".test"
     readSet <- liftIO $ createReadSet file
     _ <- liftIO $ removeFileIfExists newfp
     res <- forM readSet $ \x -> do
         executePreprocessEachRead' x args var expr newfp
-    setVariableValue varName $ NGOReadSet (B.pack newfp)
+    setVariableValue varName $ NGOReadSet (B.pack newfp) enc
     return res
          
 executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
@@ -253,14 +253,14 @@ evalLen _ = error "evalLen: Type Must be NGOShortRead"
 evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject 
 evalIndex sr index@[Just (NGOInteger a)] = evalIndex sr $ (Just $ NGOInteger (a + 1)) : index   
 evalIndex (NGOShortRead rId rSeq rQual) [Just (NGOInteger s), Nothing] = 
-    NGOShortRead rId (B.drop (fromIntegral s) rSeq) (B.drop (fromIntegral s) rQual)
+    NGOShortRead rId (B.drop (fromIntegral s) rSeq) (drop (fromIntegral s) rQual)
 evalIndex (NGOShortRead rId rSeq rQual) [Nothing, Just (NGOInteger e)] = 
-    NGOShortRead rId (B.take (fromIntegral e) rSeq) (B.take (fromIntegral e) rQual)
+    NGOShortRead rId (B.take (fromIntegral e) rSeq) (take (fromIntegral e) rQual)
 evalIndex (NGOShortRead rId rSeq rQual) [Just (NGOInteger s), Just (NGOInteger e)] = do
     let e' = (fromIntegral e)
         s' = (fromIntegral s)
         e'' = e'- s' 
-    NGOShortRead rId (B.take e'' . B.drop s' $ rSeq) (B.take e'' . B.drop s' $ rQual)       
+    NGOShortRead rId (B.take e'' . B.drop s' $ rSeq) (take e'' . drop s' $ rQual)       
 evalIndex _ _ = error "evalIndex: invalid operation"
 
 evalBool (NGOBool x) = x

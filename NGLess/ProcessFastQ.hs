@@ -40,7 +40,7 @@ createReadSet fileName = do
     fileContents' <- (B.readFile (B.unpack fileName))
     putStrLn ("FileName: " ++ B.unpack fileName)
     createReadSet' (Prelude.map (B.unpack) (B.lines fileContents')) []
-    where createReadSet' (readId:readSeq:_:readQual:xs) res =  createReadSet' xs ((NGOShortRead (T.pack readId) (B.pack readSeq) (B.pack readQual)) : res)
+    where createReadSet' (readId:readSeq:_:readQual:xs) res =  createReadSet' xs ((NGOShortRead (T.pack readId) (B.pack readSeq) readQual) : res)
           createReadSet' [] res = return res
           createReadSet' _ _ = error "Number of lines is not multiple of 4!"
 
@@ -55,7 +55,7 @@ readFastQ fname = do
         copyFile "Html/perBaseQualityScores.js" (destDir ++ "/perBaseQualityScores.js")
         createBasicStatsJson (destDir ++ "/basicStats.js") fileData fname -- generate JSON DATA file: basicStats.js
         printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir -- " " " file: perBaseQualScoresData.js
-        return $ NGOReadSet (B.pack fname)
+        return $ NGOReadSet (B.pack fname) (ord (lc fileData))
 
 removeFileIfExists fp = do    
     fexist' <- doesFileExist fp

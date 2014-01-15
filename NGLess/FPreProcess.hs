@@ -11,14 +11,15 @@ import Language
 
 data Read = Read {readId :: String, seq :: String, qual::String} deriving (Show,Eq, Prelude.Read)
 
-removeBps :: B.ByteString -> (Int,Int) -> B.ByteString
-removeBps bps (index,size) = B.take size . B.drop index $ bps
+removeBps :: [a] -> (Int,Int) -> [a]
+removeBps bps (index,size) = take size (drop index bps)
 
 --TODO: Discuss how to calculate the quality. This is not totally implemented!
 substrim :: Int -> NGLessObject -> NGLessObject
 substrim cutoff (NGOShortRead readId readSeq readQual) = do
-    let res = calculateSubStrim (map ord (B.unpack readSeq)) cutoff
-    NGOShortRead readId (removeBps readSeq res) (removeBps readQual res)
+    let readSeq' = B.unpack readSeq
+        res = calculateSubStrim (map ord readSeq') cutoff
+    NGOShortRead readId (B.pack (removeBps readSeq' res)) (removeBps readQual res)
 
 substrim _ _ = error "substrim: must have type Int and NGOShortRead"
 
@@ -32,5 +33,3 @@ calculateSubStrim qual cutoff = calculateSubStrim' qual 0 0 0 (0,0)
                                                                          then (act_index , (1 + size))
                                                                          else (index, size))
                     else calculateSubStrim' xs 0 (offset + 1) (offset + 1) (index,size))
-
-

@@ -1,6 +1,7 @@
 {- Copyright 2013 NGLess Authors
  - License: GPL, version 3 or later
  -}
+
 module Language
     ( Expression(..)
     , Variable(..)
@@ -86,8 +87,8 @@ data NGLessObject =
         | NGOInteger Integer
         | NGOSymbol T.Text
         | NGOFilename T.Text
-        | NGOShortRead T.Text B.ByteString B.ByteString
-        | NGOReadSet B.ByteString
+        | NGOShortRead T.Text B.ByteString [Char]
+        | NGOReadSet B.ByteString Int
         | NGOVoid
     deriving (Eq, Show)
 
