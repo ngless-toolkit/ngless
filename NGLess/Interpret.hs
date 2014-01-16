@@ -6,7 +6,8 @@
 module Interpret
     ( interpret,
      interpretBlock,
-     evalIndex
+     evalIndex,
+     evalLen
     ) where
 
 import Control.Exception.Base
