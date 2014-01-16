@@ -4,8 +4,9 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Interpret
-    ( interpret
-    , interpretBlock
+    ( interpret,
+     interpretBlock,
+     evalIndex
     ) where
 
 import Control.Exception.Base
@@ -210,6 +211,7 @@ executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
   
 executePreprocessEachRead' er args var expr fp = do
     eachRead' <- runInROEnvIO $ interpretBlock1 ((var, er) : args) expr
+    _ <- liftIO $ putStrLn (show expr)
     let newRead = lookup var (blockValues eachRead')
     case newRead of
       Just value -> liftIO (appendFile fp $ show value)  

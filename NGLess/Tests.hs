@@ -20,6 +20,7 @@ import Text.Parsec (SourcePos)
 import Text.Parsec.Pos (newPos)
 
 import Language
+import Interpret
 import Parse
 import Tokens
 import Types
@@ -181,7 +182,6 @@ case_substrim_normal_exec =  calculateSubStrim [10,11,12,123,122,111,10,11,0] 20
 case_substrim_empty_quals = calculateSubStrim [] 20 @?= (0,0)
 
 -- Test Types
-
 isError (Right _) = assertFailure "error not caught"
 isError (Left _) = return ()
 
@@ -193,6 +193,7 @@ case_good_type_fastq = isOk $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (
 
 case_type_complete = isOk $ (parsetest complete) >>= checktypes
 
+
 complete = "ngless 0.0\n\
     \reads = fastq('input1.fq')\n\
     \reads = unique(reads,maxCopies=2)\n\
@@ -201,4 +202,11 @@ complete = "ngless 0.0\n\
     \    read = substrim(read,minQuality=24)\n\
     \    if len(read) < 30:\n\
     \        discard\n"
+
+
+-- Type Validate pre process operations
+case_pre_process_indexation_1 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 5), Nothing] @?= (NGOShortRead "@IRIS" "CAA" "aaa")
+case_pre_process_indexation_2 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Nothing, Just (NGOInteger 3)] @?= (NGOShortRead "@IRIS" "AGT" "aa`")
+case_pre_process_indexation_3 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 2), Just (NGOInteger 5)] @?= (NGOShortRead "@IRIS" "TAC" "`aa")
+
 
