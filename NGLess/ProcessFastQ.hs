@@ -3,13 +3,16 @@ module ProcessFastQ
     readFastQ,
     readReadSet,
     removeFileIfExists,
-    getTempFilePath
+    getTempFilePath,
+    writeToFile
     ) where
     
 import qualified Data.ByteString.Lazy.Char8 as GZipReader
 import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as B
 import qualified Codec.Compression.GZip as GZip    
+
+import qualified Data.Map as Map
 import Data.Text
 import Data.Char
 
@@ -44,6 +47,20 @@ createDir destDir = do
     when (doesDirExist) $ removeDirectoryRecursive destDir
     createDirectory destDir
 
+
+
+getNGOString (Just (NGOString s)) = T.unpack s
+getNGOString _ = "Error: Type is different of String"
+
+writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO NGLessObject   
+writeToFile (NGOReadSet path enc) args = do
+    let map' = Map.fromList args
+        destFilePath = Map.lookup (T.pack "ofile") map'
+        newfp = getNGOString destFilePath
+    copyFile (B.unpack path) newfp
+    return $ NGOReadSet (B.pack newfp) enc
+
+writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
 readReadSet :: B.ByteString -> IO [NGLessObject]
 readReadSet fileName = do

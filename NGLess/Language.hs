@@ -31,11 +31,11 @@ data FuncName = Ffastq | Funique | Fpreprocess | Fsubstrim | Fmap | Fcount | Fwr
 function_argtype_return_type :: FuncName -> (NGLType, NGLType)
 function_argtype_return_type Ffastq =       (NGLReadSet,         NGLString)
 function_argtype_return_type Funique =      (NGLReadSet,         NGLReadSet)
-function_argtype_return_type Fpreprocess =  (NGLVoid,           NGLReadSet)
+function_argtype_return_type Fpreprocess =  (NGLVoid,            NGLReadSet)
 function_argtype_return_type Fsubstrim =    (NGLRead,            NGLRead)
 function_argtype_return_type Fmap =         (NGLReadSet,         NGLMappedReadSet)
 function_argtype_return_type Fcount =       (NGLMappedReadSet,   NGLCounts)
-function_argtype_return_type Fwrite =       (NGLVoid,            NGLVoid)
+function_argtype_return_type Fwrite =       (NGLVoid,            NGLReadSet)
 function_argtype_return_type Fprint =       (NGLVoid,            NGLVoid)
 
 function_return_type :: FuncName -> NGLType

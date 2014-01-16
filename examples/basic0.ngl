@@ -5,3 +5,4 @@ preprocess(input) using |read|:
     read = substrim(read, min_quality=26)
     if len(read) < 31:
         discard
+write(input, ofile='filtered.fq', format={csv})

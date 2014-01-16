@@ -18,7 +18,6 @@ import Control.Monad.State
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as Map
 import qualified Data.Text as T
-import Data.Maybe
 import Data.String
 
 import ProcessFastQ
@@ -187,9 +186,16 @@ topFunction Ffastq (ConstStr fname) _args _block = liftIO (readFastQ (T.unpack f
 topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
-    res' <- executePreprocess expr' args' _block varName
+    _ <- executePreprocess expr' args' _block varName
     return NGOVoid
+topFunction Fwrite expr args _ = do 
+    expr' <- runInROEnvIO $ interpretExpr expr
+    args' <- runInROEnvIO $ evaluateArguments args
+    _ <- liftIO (writeToFile expr' args')
+    return NGOVoid
+
 topFunction _ _ _ _ = throwError ("Unable to handle these functions")
+
 
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
     newfp <- liftIO $ getTempFilePath (B.unpack file)

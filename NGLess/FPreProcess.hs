@@ -16,16 +16,15 @@ removeBps bps (index,size) = take size (drop index bps)
 
 --TODO: Discuss how to calculate the quality. This is not totally implemented!
 substrim :: Int -> NGLessObject -> NGLessObject
-substrim cutoff (NGOShortRead readId readSeq readQual) = do
-    let readSeq' = B.unpack readSeq
-        res = calculateSubStrim (map ord readSeq') cutoff
-    NGOShortRead readId (B.pack (removeBps readSeq' res)) (removeBps readQual res)
+substrim cutoff (NGOShortRead rId rSeq rQual) = do
+    let res = calculateSubStrim (fmap ord rQual) cutoff
+    NGOShortRead rId (B.pack (removeBps (B.unpack rSeq) res)) (removeBps rQual res)
 
 substrim _ _ = error "substrim: must have type Int and NGOShortRead"
 
 -- Receives a Quality array and returns a pair with the index and size of the subsequence which has the most consecutive bps respecting the cutoff.
 calculateSubStrim :: [Int] -> Int -> (Int,Int)
-calculateSubStrim qual cutoff = calculateSubStrim' qual 0 0 0 (0,0)
+calculateSubStrim quality cutoff = calculateSubStrim' quality 0 0 0 (0,0)
     where   calculateSubStrim' [] _ _ _ (index,size) = (index,size)
             calculateSubStrim' (q:xs) inc offset act_index (index, size) =
                 (if q >= cutoff
