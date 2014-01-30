@@ -7,7 +7,8 @@ module Interpret
     ( interpret,
      interpretBlock,
      evalIndex,
-     evalLen
+     evalLen,
+     evalBinary
     ) where
 
 import Control.Exception.Base
@@ -201,21 +202,21 @@ topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
     newfp <- liftIO $ getTempFilePath (B.unpack file)
-    readSet <- liftIO $ readReadSet file
     _ <- liftIO $ removeFileIfExists newfp
-    res <- forM readSet $ \x -> do
+    readSet <- liftIO $ readReadSet file enc -- ReadSet Decodes Quality
+    res <- forM readSet $ \x -> do 
         executePreprocessEachRead' x args var expr newfp
     setVariableValue varName $ NGOReadSet (B.pack newfp) enc
     return res
          
 executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
   
+
 executePreprocessEachRead' er args var expr fp = do
     eachRead' <- runInROEnvIO $ interpretBlock1 ((var, er) : args) expr
-    _ <- liftIO $ putStrLn (show expr)
     let newRead = lookup var (blockValues eachRead')
     case newRead of
-      Just value -> liftIO (appendFile fp $ show value)  
+      Just value -> liftIO (appendGZIP fp value)  
       Nothing -> return ()
 
 evaluateArguments [] = return []
@@ -293,19 +294,16 @@ evalBinary BOpMul lexpr rexpr =  mul lexpr rexpr
 {- Allows for the addition of new types and operations easily if required.
  -}
 
-class BOP a where  
-    mul,add, gte, gt, lte, lt :: a -> a -> NGLessObject 
 
-instance BOP NGLessObject where
-    gte (NGOInteger x) (NGOInteger y) = NGOBool $ x >= y
-    gte _ _ = error "BinaryOP gte: Arguments Should be of type NGOInteger" 
-    gt (NGOInteger x) (NGOInteger y) = NGOBool $ x > y
-    gt _ _ = error "BinaryOP lte: Arguments Should be of type NGOInteger"
-    lte (NGOInteger x) (NGOInteger y) = NGOBool $ x <= y
-    lte _ _ = error "BinaryOP lte: Arguments Should be of type NGOInteger"
-    lt (NGOInteger x) (NGOInteger y) = NGOBool $ x < y
-    lt _ _ = error "BinaryOP lt: Arguments Should be of type NGOInteger"
-    add (NGOInteger x) (NGOInteger y) = NGOInteger $ x + y
-    add _ _ = error "BinaryOP add: Arguments Should be of type NGOInteger" 
-    mul (NGOInteger x) (NGOInteger y) = NGOInteger $ x * y
-    mul _ _ = error "BinaryOP mul: Arguments Should be of type NGOInteger" 
+gte (NGOInteger x) (NGOInteger y) = NGOBool $ x >= y
+gte _ _ = error "BinaryOP gte: Arguments Should be of type NGOInteger" 
+gt (NGOInteger x) (NGOInteger y) = NGOBool $ x > y
+gt _ _ = error "BinaryOP lte: Arguments Should be of type NGOInteger"
+lte (NGOInteger x) (NGOInteger y) = NGOBool $ x <= y
+lte _ _ = error "BinaryOP lte: Arguments Should be of type NGOInteger"
+lt (NGOInteger x) (NGOInteger y) = NGOBool $ x < y
+lt _ _ = error "BinaryOP lt: Arguments Should be of type NGOInteger"
+add (NGOInteger x) (NGOInteger y) = NGOInteger $ x + y
+add _ _ = error "BinaryOP add: Arguments Should be of type NGOInteger" 
+mul (NGOInteger x) (NGOInteger y) = NGOInteger $ x * y
+mul _ _ = error "BinaryOP mul: Arguments Should be of type NGOInteger" 

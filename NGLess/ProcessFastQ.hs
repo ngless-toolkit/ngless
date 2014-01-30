@@ -1,18 +1,25 @@
+{-# LANGUAGE BangPatterns #-}
+
 module ProcessFastQ
     (
     readFastQ,
     readReadSet,
     removeFileIfExists,
     getTempFilePath,
-    writeToFile
+    writeToFile,
+    showRead,
+    unCompress,
+    createRead,
+    appendGZIP,
+    writeGZIP
     ) where
-    
-import qualified Data.ByteString.Lazy.Char8 as GZipReader
+
+import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as B
 import qualified Codec.Compression.GZip as GZip    
-
 import qualified Data.Map as Map
+
 import Data.Text
 import Data.Char
 
@@ -31,22 +38,14 @@ import Language
 getTempFilePath :: FilePath -> IO FilePath
 getTempFilePath fp = do
     let oldFilePath = splitFileName fp
-    res <- openTempFile (fst oldFilePath) (snd oldFilePath)   
+    res <- openTempFile (fst oldFilePath) (snd oldFilePath ++ ".gz")   
     return (fst res)
 
 -- Uncompression of a given fastQ file if it's compressed in a .gz format.
 unCompress fname =
     if isInfixOf (pack ".gz") (pack fname)
-        then fmap GZip.decompress (GZipReader.readFile fname)
-        else GZipReader.readFile fname -- not compressed
-
-
--- Removes the destiny directory if it already exists from previous executions.
-createDir destDir = do
-    doesDirExist <- doesDirectoryExist destDir
-    when (doesDirExist) $ removeDirectoryRecursive destDir
-    createDirectory destDir
-
+        then fmap GZip.decompress (BL.readFile fname)
+        else BL.readFile fname -- not compressed
 
 
 getNGOString (Just (NGOString s)) = T.unpack s
@@ -62,14 +61,28 @@ writeToFile (NGOReadSet path enc) args = do
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
-readReadSet :: B.ByteString -> IO [NGLessObject]
-readReadSet fileName = do
-    fileContents' <- (B.readFile (B.unpack fileName))
+
+writeGZIP :: String -> NGLessObject -> IO ()
+writeGZIP fp newRead = BL.appendFile fp $ GZip.compress (BL.pack (showRead newRead)) 
+
+appendGZIP :: String -> NGLessObject -> IO ()
+appendGZIP fp newRead = BL.appendFile fp $ GZip.compress (BL.pack (showRead newRead))
+
+
+readReadSet :: B.ByteString -> Int -> IO [NGLessObject]
+readReadSet fileName enc = do
+    fileContents' <- unCompress (B.unpack fileName)
     putStrLn ("FileName: " ++ B.unpack fileName)
-    readReadSet' (Prelude.map (B.unpack) (B.lines fileContents')) []
-    where readReadSet' (readId:readSeq:_:readQual:xs) res =  readReadSet' xs ((NGOShortRead (T.pack readId) (B.pack readSeq) readQual) : res)
+    readReadSet' (fmap BL.unpack (BL.lines fileContents')) []
+    where readReadSet' (readId:readSeq:_:readQual:xs) !res = 
+                readReadSet' xs ((createRead readId readSeq (decodeQuality enc readQual)) : res)
           readReadSet' [] res = return res
           readReadSet' _ _ = error "Number of lines is not multiple of 4!"
+
+
+decodeQuality enc = fmap (chr . subtract enc . ord)
+
+createRead rId rSeq rQual = NGOShortRead (T.pack rId) (B.pack rSeq) rQual
 
 readFastQ :: FilePath -> IO NGLessObject
 readFastQ fname = do
@@ -87,6 +100,16 @@ readFastQ fname = do
         putStrLn $ "File: " ++ fname ++ " loaded"
         return $ NGOReadSet (B.pack fname) (ord (lc fileData))
 
+
+showRead (NGOShortRead a b c) = ((T.unpack a) ++ "\n" ++ "+??\n" ++ (B.unpack b) ++ "\n" ++ c ++ "\n")
+showRead _ = error "error: The argument must be a read."
+
 removeFileIfExists fp = do    
     fexist' <- doesFileExist fp
     when fexist' $ removeFile fp
+
+-- Removes the destiny directory if it already exists from previous executions.
+createDir destDir = do
+    doesDirExist <- doesDirectoryExist destDir
+    when (doesDirExist) $ removeDirectoryRecursive destDir
+    createDirectory destDir
