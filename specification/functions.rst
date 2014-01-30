@@ -50,6 +50,15 @@ of each read (if there are any duplicates).
 
 Takes a ``max_copies`` parameter, which is an integer.
 
+subtrim
+------
+
+``subtrim:: Read -> Read``
+
+Given a read, returns another which is the biggest sub-sequence with a min_quality.
+
+Takes a ``min_quality`` parameter, which is an integer.
+
 map
 ---
 
