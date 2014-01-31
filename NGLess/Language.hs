@@ -87,7 +87,7 @@ data NGLessObject =
         | NGOInteger Integer
         | NGOSymbol T.Text
         | NGOFilename T.Text
-        | NGOShortRead T.Text B.ByteString [Char]
+        | NGOShortRead T.Text B.ByteString B.ByteString
         | NGOReadSet B.ByteString Int
         | NGOVoid
     deriving (Eq, Show)

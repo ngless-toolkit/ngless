@@ -28,6 +28,8 @@ import System.IO
 import System.FilePath.Posix
 
 import Control.Monad
+import Control.Concurrent
+
 import PerBaseQualityScores
 import PrintFastqBasicStats
 import FastQFileData
@@ -68,21 +70,27 @@ writeGZIP fp newRead = BL.appendFile fp $ GZip.compress (BL.pack (showRead newRe
 appendGZIP :: String -> NGLessObject -> IO ()
 appendGZIP fp newRead = BL.appendFile fp $ GZip.compress (BL.pack (showRead newRead))
 
+readPossiblyCompressedFile ::  B.ByteString -> IO [BL.ByteString]
+readPossiblyCompressedFile fileName = do
+    res <- unCompress (B.unpack fileName)
+    return $ BL.lines res
 
-readReadSet :: B.ByteString -> Int -> IO [NGLessObject]
-readReadSet fileName enc = do
-    fileContents' <- unCompress (B.unpack fileName)
-    putStrLn ("FileName: " ++ B.unpack fileName)
-    readReadSet' (fmap BL.unpack (BL.lines fileContents')) []
-    where readReadSet' (readId:readSeq:_:readQual:xs) !res = 
-                readReadSet' xs ((createRead readId readSeq (decodeQuality enc readQual)) : res)
-          readReadSet' [] res = return res
-          readReadSet' _ _ = error "Number of lines is not multiple of 4!"
+readReadSet :: B.ByteString -> IO [NGLessObject]
+readReadSet = parseReadSet . readPossiblyCompressedFile 
+
+parseReadSet :: IO [BL.ByteString] -> IO [NGLessObject]
+parseReadSet fileLines = do
+    res <- fileLines
+    parseReadSet' res []
+    where parseReadSet' (readId:readSeq:_:readQual:xs) !res =
+             parseReadSet' xs (createRead (BL.unpack readId) (BL.unpack readSeq) (BL.unpack readQual) : res)
+          parseReadSet' [] !res = return res
+          parseReadSet' _ _ = error "Number of lines is not multiple of 4!"
 
 
 decodeQuality enc = fmap (chr . subtract enc . ord)
 
-createRead rId rSeq rQual = NGOShortRead (T.pack rId) (B.pack rSeq) rQual
+createRead !rId !rSeq !rQual = NGOShortRead (T.pack rId) (B.pack rSeq) (B.pack rQual)
 
 readFastQ :: FilePath -> IO NGLessObject
 readFastQ fname = do
@@ -101,7 +109,7 @@ readFastQ fname = do
         return $ NGOReadSet (B.pack fname) (ord (lc fileData))
 
 
-showRead (NGOShortRead a b c) = ((T.unpack a) ++ "\n" ++ "+??\n" ++ (B.unpack b) ++ "\n" ++ c ++ "\n")
+showRead (NGOShortRead a b c) = ((T.unpack a) ++ "\n" ++ "+??\n" ++ (B.unpack b) ++ "\n" ++ (B.unpack c) ++ "\n")
 showRead _ = error "error: The argument must be a read."
 
 removeFileIfExists fp = do    

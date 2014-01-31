@@ -17,8 +17,8 @@ removeBps bps (index,size) = take size (drop index bps)
 --TODO: Discuss how to calculate the quality. This is not totally implemented!
 substrim :: Int -> NGLessObject -> NGLessObject
 substrim cutoff (NGOShortRead rId rSeq rQual) = do
-    let res = calculateSubStrim (fmap ord rQual) cutoff
-    NGOShortRead rId (B.pack (removeBps (B.unpack rSeq) res)) (removeBps rQual res)
+    let res = calculateSubStrim (fmap ord (B.unpack rQual)) cutoff
+    NGOShortRead rId (B.pack (removeBps (B.unpack rSeq) res)) (B.pack (removeBps (B.unpack rQual) res))
 
 substrim _ _ = error "substrim: must have type Int and NGOShortRead"
 
