@@ -205,6 +205,7 @@ executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varNa
     _ <- liftIO $ removeFileIfExists newfp
     _ <- liftIO $ putStrLn "excute pre-process"
     readSet <- liftIO $ readReadSet file --enc  ReadSet Decodes Quality
+    _ <- liftIO $ putStrLn "readSet readed"
     res <- forM readSet $ \x -> do 
         executePreprocessEachRead' x args var expr newfp
     setVariableValue varName $ NGOReadSet (B.pack newfp) enc

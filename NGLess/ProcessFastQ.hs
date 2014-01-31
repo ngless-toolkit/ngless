@@ -28,7 +28,6 @@ import System.IO
 import System.FilePath.Posix
 
 import Control.Monad
-import Control.Concurrent
 
 import PerBaseQualityScores
 import PrintFastqBasicStats
@@ -70,27 +69,27 @@ writeGZIP fp newRead = BL.appendFile fp $ GZip.compress (BL.pack (showRead newRe
 appendGZIP :: String -> NGLessObject -> IO ()
 appendGZIP fp newRead = BL.appendFile fp $ GZip.compress (BL.pack (showRead newRead))
 
-readPossiblyCompressedFile ::  B.ByteString -> IO [BL.ByteString]
-readPossiblyCompressedFile fileName = do
-    res <- unCompress (B.unpack fileName)
-    return $ BL.lines res
+readPossiblyCompressedFile ::  B.ByteString -> IO BL.ByteString
+readPossiblyCompressedFile fileName = unCompress (B.unpack fileName)
 
 readReadSet :: B.ByteString -> IO [NGLessObject]
 readReadSet = parseReadSet . readPossiblyCompressedFile 
 
-parseReadSet :: IO [BL.ByteString] -> IO [NGLessObject]
-parseReadSet fileLines = do
-    res <- fileLines
-    parseReadSet' res []
-    where parseReadSet' (readId:readSeq:_:readQual:xs) !res =
-             parseReadSet' xs (createRead (BL.unpack readId) (BL.unpack readSeq) (BL.unpack readQual) : res)
-          parseReadSet' [] !res = return res
-          parseReadSet' _ _ = error "Number of lines is not multiple of 4!"
+parseReadSet :: IO BL.ByteString -> IO [NGLessObject]
+parse = parse' . (fmap BL.unpack) . BL.lines
+        where
+            parse' [] = []
+            parse' xs = (createRead (Prelude.take 4 xs) : parse' (Prelude.drop 4 xs))
+parseReadSet = fmap parse
+
+createRead :: [String] -> NGLessObject
+createRead r = case (Prelude.length r) of
+    4 -> NGOShortRead (T.pack $ r !! 0) (B.pack $ r !! 1) (B.pack $ r !! 3)
+    _ -> error "Number of lines is not multiple of 4!"
 
 
 decodeQuality enc = fmap (chr . subtract enc . ord)
 
-createRead !rId !rSeq !rQual = NGOShortRead (T.pack rId) (B.pack rSeq) (B.pack rQual)
 
 readFastQ :: FilePath -> IO NGLessObject
 readFastQ fname = do
