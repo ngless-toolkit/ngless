@@ -203,23 +203,22 @@ topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
     newfp <- liftIO $ getTempFilePath (B.unpack file)
     _ <- liftIO $ removeFileIfExists newfp
-    _ <- liftIO $ putStrLn "excute pre-process"
     readSet <- liftIO $ readReadSet file --enc  ReadSet Decodes Quality
-    _ <- liftIO $ putStrLn "readSet readed"
     res <- forM readSet $ \x -> do 
-        executePreprocessEachRead' x args var expr newfp
+        executePreprocessEachRead' x args var expr
+    _ <- liftIO $ writeReadSet newfp res
     setVariableValue varName $ NGOReadSet (B.pack newfp) enc
     return res
          
 executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
   
 
-executePreprocessEachRead' er args var expr fp = do
+executePreprocessEachRead' er args var expr = do
     eachRead' <- runInROEnvIO $ interpretBlock1 ((var, er) : args) expr
     let newRead = lookup var (blockValues eachRead')
     case newRead of
-      Just value -> liftIO (appendGZIP fp value)  
-      Nothing -> return ()
+        Just value -> return value
+        _ -> throwError "A read should have been returned."
 
 evaluateArguments [] = return []
 evaluateArguments (((Variable v),e):args) = do
