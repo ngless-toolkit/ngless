@@ -64,11 +64,12 @@ writeToFile (NGOReadSet path enc) args = do
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
 
+
 writeReadSet :: String -> [NGLessObject] -> IO()
 writeReadSet fp rs = writeGZIP fp $ parseNGOReadSet rs
 
 parseNGOReadSet :: [NGLessObject] -> BL.ByteString
-parseNGOReadSet rs = BL.unlines $ fmap (showRead) rs
+parseNGOReadSet = BL.unlines . (fmap showRead)
 
 writeGZIP :: String -> BL.ByteString -> IO ()
 writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents 
@@ -112,7 +113,7 @@ readFastQ fname = do
         return $ NGOReadSet (B.pack fname) (ord (lc fileData))
 
 showRead :: NGLessObject -> BL.ByteString
-showRead (NGOShortRead a b c) = BL.pack $ ((T.unpack a) ++ "\n" ++ "+??\n" ++ (B.unpack b) ++ "\n" ++ (B.unpack c) ++ "\n")
+showRead (NGOShortRead a b c) =  BL.pack ((T.unpack a) ++ "\n" ++ "+??\n" ++ (B.unpack b) ++ "\n" ++ (B.unpack c) ++ "\n")
 showRead _ = error "error: The argument must be a read."
 
 removeFileIfExists fp = do    
