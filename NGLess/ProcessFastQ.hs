@@ -65,8 +65,12 @@ writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
 
 
-writeReadSet :: String -> [NGLessObject] -> IO()
-writeReadSet fp rs = writeGZIP fp $ parseNGOReadSet rs
+writeReadSet :: B.ByteString -> [NGLessObject] -> IO FilePath
+writeReadSet fn rs = do
+    newfp <- getTempFilePath (B.unpack fn)
+    removeFileIfExists newfp
+    writeGZIP newfp $ parseNGOReadSet rs
+    return newfp
 
 parseNGOReadSet :: [NGLessObject] -> BL.ByteString
 parseNGOReadSet = BL.unlines . (fmap showRead)

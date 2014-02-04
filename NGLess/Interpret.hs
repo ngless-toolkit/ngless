@@ -201,10 +201,9 @@ topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO ()
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
-    newfp <- liftIO $ getTempFilePath (B.unpack file)
     readSet <- liftIO $ readReadSet file --enc  ReadSet Decodes Quality
     res <- runInROEnvIO $ executePreprocess' readSet args var expr
-    _ <- liftIO $ writeReadSet newfp res
+    newfp <- liftIO $ writeReadSet file res
     setVariableValue varName $ NGOReadSet (B.pack newfp) enc
          
 executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
