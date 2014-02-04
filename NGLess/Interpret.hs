@@ -1,4 +1,4 @@
-{- Copyright 2013 NGLess Authors
+{- Copyright 2013-2014 NGLess Authors
  - License: GPL, version 3 or later
  -}
 {-# LANGUAGE BangPatterns #-}
@@ -112,6 +112,11 @@ runInROEnv action = do
         Left e -> throwError e
         Right v -> return v
 
+runInterpret :: InterpretationROEnv a -> NGLEnv_t -> a
+runInterpret action env = case runReaderT (runErrorT action) env of
+        Identity (Left _) -> error "Error in interpretation"
+        Identity (Right v) -> v
+
 runInROEnvIO :: InterpretationROEnv a -> InterpretationEnvIO a
 runInROEnvIO = runInEnv . runInROEnv
 
@@ -199,27 +204,26 @@ topFunction Fwrite expr args _ = do
 
 topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 
+
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO ()
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
-    readSet <- liftIO $ readReadSet file --enc  ReadSet Decodes Quality
-    res <- runInROEnvIO $ executePreprocess' readSet args var expr
-    newfp <- liftIO $ writeReadSet file res
-    setVariableValue varName $ NGOReadSet (B.pack newfp) enc
+            fcontents <- liftIO $ readPossiblyCompressedFile file
+            let rs = parseReadSet fcontents
+            env <- gets snd
+            let rs' = map (\r -> runInterpret (interpretPBlock1 r) env) rs
+            newfp <- liftIO $ writeReadSet file rs'
+            setVariableValue varName $ NGOReadSet (B.pack newfp) enc
+            return ()
+    where
+        interpretPBlock1 :: NGLessObject -> InterpretationROEnv NGLessObject
+        interpretPBlock1 r = do
+            r' <- interpretBlock1 ((var, r) : args) expr
+            let newRead = lookup var (blockValues r')
+            case newRead of
+                Just value -> return value
+                _ -> throwError "A read should have been returned."
          
 executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
-
-executePreprocess' :: [NGLessObject] -> [(T.Text, NGLessObject)] -> T.Text -> Expression -> InterpretationROEnv [NGLessObject]
-executePreprocess' rs args var expr = forM rs $ \x -> do 
-                        executePreprocessEachRead' x args var expr
-
-
-executePreprocessEachRead' :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> Expression -> InterpretationROEnv NGLessObject
-executePreprocessEachRead' er args var expr = do
-    eachRead' <- interpretBlock1 ((var, er) : args) expr
-    let newRead = lookup var (blockValues eachRead')
-    case newRead of
-        Just value -> return value
-        _ -> throwError "A read should have been returned."
 
 evaluateArguments [] = return []
 evaluateArguments (((Variable v),e):args) = do
@@ -308,4 +312,4 @@ lt _ _ = error "BinaryOP lt: Arguments Should be of type NGOInteger"
 add (NGOInteger x) (NGOInteger y) = NGOInteger $ x + y
 add _ _ = error "BinaryOP add: Arguments Should be of type NGOInteger" 
 mul (NGOInteger x) (NGOInteger y) = NGOInteger $ x * y
-mul _ _ = error "BinaryOP mul: Arguments Should be of type NGOInteger" 
+mul _ _ = error "BinaryOP mul: Arguments Should be of type NGOInteger"

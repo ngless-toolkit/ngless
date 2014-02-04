@@ -2,7 +2,9 @@
 
 module ProcessFastQ
     (
+    parseReadSet,
     readFastQ,
+    readPossiblyCompressedFile,
     readReadSet,
     removeFileIfExists,
     getTempFilePath,
@@ -62,17 +64,15 @@ writeToFile (NGOReadSet path enc) args = do
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
-
-
 writeReadSet :: B.ByteString -> [NGLessObject] -> IO FilePath
 writeReadSet fn rs = do
     newfp <- getTempFilePath (B.unpack fn)
     removeFileIfExists newfp
-    writeGZIP newfp $ parseNGOReadSet rs
+    writeGZIP newfp $ asFastQ rs
     return newfp
 
-parseNGOReadSet :: [NGLessObject] -> BL.ByteString
-parseNGOReadSet = BL.unlines . (fmap showRead)
+asFastQ :: [NGLessObject] -> BL.ByteString
+asFastQ = BL.unlines . (fmap showRead)
 
 writeGZIP :: String -> BL.ByteString -> IO ()
 writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents 
