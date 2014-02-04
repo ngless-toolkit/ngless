@@ -199,22 +199,24 @@ topFunction Fwrite expr args _ = do
 
 topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 
-
+executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO ()
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
     newfp <- liftIO $ getTempFilePath (B.unpack file)
-    _ <- liftIO $ removeFileIfExists newfp
     readSet <- liftIO $ readReadSet file --enc  ReadSet Decodes Quality
-    res <- forM readSet $ \x -> do 
-        executePreprocessEachRead' x args var expr
+    res <- runInROEnvIO $ executePreprocess' readSet args var expr
     _ <- liftIO $ writeReadSet newfp res
     setVariableValue varName $ NGOReadSet (B.pack newfp) enc
-    return res
          
 executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
-  
 
+executePreprocess' :: [NGLessObject] -> [(T.Text, NGLessObject)] -> T.Text -> Expression -> InterpretationROEnv [NGLessObject]
+executePreprocess' rs args var expr = forM rs $ \x -> do 
+                        executePreprocessEachRead' x args var expr
+
+
+executePreprocessEachRead' :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> Expression -> InterpretationROEnv NGLessObject
 executePreprocessEachRead' er args var expr = do
-    eachRead' <- runInROEnvIO $ interpretBlock1 ((var, er) : args) expr
+    eachRead' <- interpretBlock1 ((var, er) : args) expr
     let newRead = lookup var (blockValues eachRead')
     case newRead of
         Just value -> return value
