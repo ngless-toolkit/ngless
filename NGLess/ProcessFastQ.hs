@@ -19,7 +19,7 @@ import qualified Data.ByteString.Char8 as B
 import qualified Codec.Compression.GZip as GZip    
 import qualified Data.Map as Map
 
-import Data.Text
+import qualified Data.Text as T
 import Data.Char
 
 import System.Directory
@@ -44,7 +44,7 @@ getTempFilePath fp = do
 
 -- Uncompression of a given fastQ file if it's compressed in a .gz format.
 unCompress fname =
-    if isInfixOf (pack ".gz") (pack fname)
+    if T.isInfixOf (T.pack ".gz") (T.pack fname)
         then fmap GZip.decompress (BL.readFile fname)
         else BL.readFile fname -- not compressed
 
