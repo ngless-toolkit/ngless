@@ -10,6 +10,7 @@ SOURCES :=  \
 	FastQFileData.hs \
 	Validation.hs \
 	PrintFastqBasicStats.hs \
+	ProcessFastQ.hs \
 	PerBaseQualityScores.hs
 
 
