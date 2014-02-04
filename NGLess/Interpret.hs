@@ -207,8 +207,7 @@ topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO ()
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
-            fcontents <- liftIO $ readPossiblyCompressedFile file
-            let rs = parseReadSet fcontents
+            rs <- liftIO $ readReadSet enc file
             env <- gets snd
             let rs' = map (\r -> runInterpret (interpretPBlock1 r) env) rs
             newfp <- liftIO $ writeReadSet file rs'

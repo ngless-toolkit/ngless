@@ -5,9 +5,9 @@ module ProcessFastQ
     parseReadSet,
     readFastQ,
     readPossiblyCompressedFile,
-    readReadSet,
     removeFileIfExists,
     getTempFilePath,
+    readReadSet,
     writeToFile,
     showRead,
     unCompress,
@@ -80,20 +80,20 @@ writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents
 readPossiblyCompressedFile ::  B.ByteString -> IO BL.ByteString
 readPossiblyCompressedFile fileName = unCompress (B.unpack fileName)
 
-readReadSet :: B.ByteString -> IO [NGLessObject]
-readReadSet fn = parseReadSet `fmap` (readPossiblyCompressedFile fn)
+readReadSet :: Int -> B.ByteString -> IO [NGLessObject]
+readReadSet enc fn = (parseReadSet enc) `fmap` (readPossiblyCompressedFile fn)
 
-parseReadSet :: BL.ByteString -> [NGLessObject]
-parseReadSet = parse' . (fmap BL.unpack) . BL.lines
+parseReadSet :: Int -> BL.ByteString -> [NGLessObject]
+parseReadSet enc contents = parse' . (fmap BL.unpack) . BL.lines $ contents
         where
             parse' [] = []
             parse' xs = (createRead (Prelude.take 4 xs) : parse' (Prelude.drop 4 xs))
             createRead :: [String] -> NGLessObject
             createRead r = case (Prelude.length r) of
-                4 -> NGOShortRead (T.pack $ r !! 0) (B.pack $ r !! 1) (B.pack $ r !! 3)
+                4 -> NGOShortRead (T.pack $ r !! 0) (B.pack $ r !! 1) (B.pack $ decodeQual enc (r !! 3))
                 _ -> error "Number of lines is not multiple of 4!"
 
-decodeQuality enc = fmap (chr . subtract enc . ord)
+decodeQual enc = fmap (chr . subtract enc . ord)
 
 
 readFastQ :: FilePath -> IO NGLessObject
