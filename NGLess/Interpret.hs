@@ -232,8 +232,8 @@ executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varNa
                 _ -> do
                     let newRead = lookup var (blockValues r')
                     case newRead of
-                        Just value -> case evalLen value of 
-                            (NGOInteger 0) -> return Nothing
+                        Just value -> case evalInteger $ evalLen value of 
+                            0 -> return Nothing
                             _ -> return newRead
                         _ -> throwError "A read should have been returned."
              
@@ -298,8 +298,11 @@ evalIndex _ _ = error "evalIndex: invalid operation"
 evalBool (NGOBool x) = x
 evalBool _ = error "evalBool: Argument must have NGOBool type"
 
-evalString (NGOString v) = v
+evalString (NGOString x) = x
 evalString _ = error "evalString: Argument type must be NGOString"
+
+evalInteger (NGOInteger x) = x
+evalInteger _ = error "evalString: Argument type must be NGOString"
 
 -- Binary Evaluation
 evalBinary :: BOp ->  NGLessObject -> NGLessObject -> NGLessObject

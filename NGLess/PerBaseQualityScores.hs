@@ -43,11 +43,8 @@ createDataString stats = createDataString' stats "data = [\n " 0
 printHtmlStatisticsData qCounts minChar destDir = writeFile (destDir ++ "/" ++ dataFileName) (createDataString statisticsData')
         where statisticsData' = calculateStatistics qCounts minChar
 
-calculateStatistics qCounts minChar = calculateStatistics' qCounts []
+calculateStatistics qCounts minChar = Prelude.map (statistics encScheme') qCounts
     where encScheme' = offset (calculateEncoding minChar)
-          calculateStatistics' [] bpStatsResult = bpStatsResult
-          calculateStatistics' qcounts bpStatsResult = calculateStatistics' (init qcounts)
-                                                                            (statistics (last qcounts) encScheme' : bpStatsResult)
 
 calcMean _ _ 0 = error "The total number of quality elements in the fastQ needs to be higher than 0"
 calcMean keySet elemSet elemTotal = fromIntegral bpSum' / fromIntegral elemTotal
@@ -61,8 +58,8 @@ calcPerc keySet elemSet elemTotal perc = keySet !! (accUntilLim elemSet val')
 
 
 --statistics :: Calculates the Quality Statistics of a given FastQ.
-statistics :: Fractional a => Map Char Int -> Int -> (a, Int, Int, Int)
-statistics bpQualCount encScheme = (calcMean keySet'' elemSet' elemTotal' ,
+statistics :: Fractional a => Int -> Map Char Int -> (a, Int, Int, Int)
+statistics encScheme bpQualCount = (calcMean keySet'' elemSet' elemTotal' ,
                                    (subtract encScheme) $ calcPerc' percentile50,
                                    (subtract encScheme) $ calcPerc' lowerQuartile,
                                    (subtract encScheme) $ calcPerc' upperQuartile)
