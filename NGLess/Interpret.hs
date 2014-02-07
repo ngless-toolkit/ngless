@@ -195,6 +195,10 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
     _ <- executePreprocess expr' args' _block varName
+    r <- runInROEnvIO $ lookupVariable varName
+    case r of
+        Nothing -> throwError "Variable lookup error"
+        Just r' -> executeQualityProcess r'  
     return NGOVoid
 topFunction Fwrite expr args _ = do 
     expr' <- runInROEnvIO $ interpretExpr expr
@@ -204,13 +208,17 @@ topFunction Fwrite expr args _ = do
 
 topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 
+executeQualityProcess :: NGLessObject -> InterpretationEnvIO ()
+executeQualityProcess (NGOReadSet fname _) = do
+         _ <- liftIO(readFastQ (B.unpack fname)) 
+         return () 
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO ()
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
             rs <- liftIO $ readReadSet enc file
             env <- gets snd
             let rs' = map (\r -> runInterpret (interpretPBlock1 r) env) rs
-            newfp <- liftIO $ writeReadSet file rs'
+            newfp <- liftIO $ writeReadSet file rs' enc
             setVariableValue varName $ NGOReadSet (B.pack newfp) enc
             return ()
     where

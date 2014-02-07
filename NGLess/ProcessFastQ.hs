@@ -64,15 +64,15 @@ writeToFile (NGOReadSet path enc) args = do
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
-writeReadSet :: B.ByteString -> [NGLessObject] -> IO FilePath
-writeReadSet fn rs = do
+writeReadSet :: B.ByteString -> [NGLessObject] -> Int -> IO FilePath
+writeReadSet fn rs enc = do
     newfp <- getTempFilePath (B.unpack fn)
     removeFileIfExists newfp
-    writeGZIP newfp $ asFastQ rs
+    writeGZIP newfp $ asFastQ rs enc
     return newfp
 
-asFastQ :: [NGLessObject] -> BL.ByteString
-asFastQ = BL.unlines . (fmap showRead)
+asFastQ :: [NGLessObject] -> Int -> BL.ByteString
+asFastQ rs enc = BL.unlines . (fmap (showRead enc)) $ rs 
 
 writeGZIP :: String -> BL.ByteString -> IO ()
 writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents 
@@ -93,8 +93,8 @@ parseReadSet enc contents = parse' . (fmap BL.unpack) . BL.lines $ contents
                 4 -> NGOShortRead (T.pack $ r !! 0) (B.pack $ r !! 1) (B.pack $ decodeQual enc (r !! 3))
                 _ -> error "Number of lines is not multiple of 4!"
 
-decodeQual enc = fmap (chr . subtract enc . ord)
-
+decodeQual enc = fmap (chr . (flip (-) enc) . ord)
+encodeQual enc = fmap (chr . (flip (+) enc) . ord)
 
 readFastQ :: FilePath -> IO NGLessObject
 readFastQ fname = do
@@ -112,9 +112,9 @@ readFastQ fname = do
         putStrLn $ "File: " ++ fname ++ " loaded"
         return $ NGOReadSet (B.pack fname) (ord (lc fileData))
 
-showRead :: NGLessObject -> BL.ByteString
-showRead (NGOShortRead a b c) =  BL.pack ((T.unpack a) ++ "\n" ++ "+??\n" ++ (B.unpack b) ++ "\n" ++ (B.unpack c) ++ "\n")
-showRead _ = error "error: The argument must be a read."
+showRead :: Int -> NGLessObject -> BL.ByteString
+showRead enc (NGOShortRead a b c) =  BL.pack ((T.unpack a) ++ "\n" ++ "+\n" ++ (B.unpack b) ++ "\n" ++ (encodeQual enc (B.unpack c)))
+showRead _ _ = error "error: The argument must be a read."
 
 removeFileIfExists fp = do    
     fexist' <- doesFileExist fp
