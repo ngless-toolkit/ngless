@@ -22,6 +22,7 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import Data.String
+import Data.Maybe
 
 import ProcessFastQ
 import FPreProcess
@@ -212,25 +213,30 @@ executeQualityProcess :: NGLessObject -> InterpretationEnvIO ()
 executeQualityProcess (NGOReadSet fname _) = do
          _ <- liftIO(readFastQ (B.unpack fname)) 
          return () 
+executeQualityProcess _ = throwError("Should be passed a DataSet")
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO ()
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
             rs <- liftIO $ readReadSet enc file
             env <- gets snd
-            let rs' = map (\r -> runInterpret (interpretPBlock1 r) env) rs
+            let rs' = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env) rs
             newfp <- liftIO $ writeReadSet file rs' enc
             setVariableValue varName $ NGOReadSet (B.pack newfp) enc
             return ()
     where
-        interpretPBlock1 :: NGLessObject -> InterpretationROEnv NGLessObject
+        interpretPBlock1 :: NGLessObject -> InterpretationROEnv (Maybe NGLessObject)
         interpretPBlock1 r = do
             r' <- interpretBlock1 ((var, r) : args) expr
             let newRead = lookup var (blockValues r')
             case newRead of
-                Just value -> return value
+                Just value -> case evalLen value of 
+                    (NGOInteger 0) -> return Nothing
+                    _ -> return newRead
                 _ -> throwError "A read should have been returned."
          
 executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
+
+
 
 evaluateArguments [] = return []
 evaluateArguments (((Variable v),e):args) = do

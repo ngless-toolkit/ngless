@@ -21,7 +21,6 @@ import qualified Data.ByteString.Char8 as B
 import qualified Codec.Compression.GZip as GZip    
 import qualified Data.Map as Map
 
-import qualified Data.Text as T
 import Data.Char
 
 import System.Directory
@@ -113,7 +112,7 @@ readFastQ fname = do
         return $ NGOReadSet (B.pack fname) (ord (lc fileData))
 
 showRead :: Int -> NGLessObject -> BL.ByteString
-showRead enc (NGOShortRead a b c) =  BL.pack ((T.unpack a) ++ "\n" ++ "+\n" ++ (B.unpack b) ++ "\n" ++ (encodeQual enc (B.unpack c)))
+showRead enc (NGOShortRead a b c) =  BL.pack ((T.unpack a) ++ "\n" ++ (B.unpack b) ++ "\n+\n" ++ (encodeQual enc (B.unpack c)))
 showRead _ _ = error "error: The argument must be a read."
 
 removeFileIfExists fp = do    
