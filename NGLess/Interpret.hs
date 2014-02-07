@@ -227,13 +227,16 @@ executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varNa
         interpretPBlock1 :: NGLessObject -> InterpretationROEnv (Maybe NGLessObject)
         interpretPBlock1 r = do
             r' <- interpretBlock1 ((var, r) : args) expr
-            let newRead = lookup var (blockValues r')
-            case newRead of
-                Just value -> case evalLen value of 
-                    (NGOInteger 0) -> return Nothing
-                    _ -> return newRead
-                _ -> throwError "A read should have been returned."
-         
+            case blockStatus r' of
+                BlockDiscarded -> return Nothing
+                _ -> do
+                    let newRead = lookup var (blockValues r')
+                    case newRead of
+                        Just value -> case evalLen value of 
+                            (NGOInteger 0) -> return Nothing
+                            _ -> return newRead
+                        _ -> throwError "A read should have been returned."
+             
 executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
 
 
@@ -306,13 +309,11 @@ evalBinary BOpLTE lexpr rexpr = lte lexpr rexpr
 evalBinary BOpGTE lexpr rexpr = gte lexpr rexpr
 evalBinary BOpEQ lexpr rexpr =  NGOBool $ lexpr == rexpr
 evalBinary BOpNEQ lexpr rexpr =  NGOBool $ lexpr /= rexpr
-evalBinary BOpAdd lexpr rexpr =  add lexpr  rexpr
+evalBinary BOpAdd lexpr rexpr =  add lexpr rexpr
 evalBinary BOpMul lexpr rexpr =  mul lexpr rexpr 
 
 
-{- Allows for the addition of new types and operations easily if required.
- -}
-
+{- Allows for the addition of new types and operations easily if required. -}
 
 gte (NGOInteger x) (NGOInteger y) = NGOBool $ x >= y
 gte _ _ = error "BinaryOP gte: Arguments Should be of type NGOInteger" 
