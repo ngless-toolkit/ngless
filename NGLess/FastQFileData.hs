@@ -14,9 +14,6 @@ data Result =  Result {bpCounts :: (Int, Int, Int, Int) , lc :: Char, qualCounts
 instance NFData Result where
     rnf (Result (!_,!_,!_,!_) !_ cs !_ (!_,!_)) = rnf cs
 
---- Constants
-maxBPPossible = 126
----
 
 -- mapAddFunction :: To increase the old_value value by 1 of a given key.
 mapAddFunction _ new_value old_value = old_value + new_value
@@ -25,11 +22,12 @@ mapAddFunction _ new_value old_value = old_value + new_value
 addEachCount :: Char -> Map Char Int -> Map Char Int
 addEachCount qual counts = insertWithKey mapAddFunction qual 1 counts
 
-addToCount counts qual = addToCount' counts qual []
+addToCount counts qual = addToCount' counts qual
         where
-            addToCount' (eachCount:xs) (q:ys) qualResults = addToCount' xs ys ((addEachCount q eachCount) : qualResults)
-            addToCount' [] (q:ys) qualResults = addToCount' [] ys ((addEachCount q (fromList [])) : qualResults)
-            addToCount' _ [] qualResults = reverse qualResults
+            addToCount' (c:xs) (q:ys) = (addEachCount q c) : addToCount' xs ys
+            addToCount' [] (q:ys) = (addEachCount q (fromList [])) : addToCount' [] ys 
+            addToCount' (c:xs) [] = c : addToCount' xs []
+            addToCount' [] [] = []
 
 
 addChar cs 'a' = addChar cs 'A'
@@ -61,7 +59,7 @@ updateResults fileData seq' qual = Result (countChars (bpCounts fileData) seq')
 iterateFile :: B.ByteString -> Result
 iterateFile contents = iterateFile' initial (B.lines contents)
         where
-                initial = Result (0,0,0,0) '~' (replicate maxBPPossible (fromList [] :: Map Char Int)) 0 (maxBound :: Int, minBound :: Int)
+                initial = Result (0,0,0,0) '~' [] 0 (maxBound :: Int, minBound :: Int)
                 iterateFile' r (_:seq':_:quals:xs) = r `deepseq`
                         iterateFile' (updateResults r (B.unpack seq') (B.unpack quals)) xs
                 iterateFile' !r [] = r `deepseq` r

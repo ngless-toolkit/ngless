@@ -106,7 +106,7 @@ readFastQ fname = do
         copyFile "Html/perBaseQualityScores.js" (destDir ++ "/perBaseQualityScores.js")
         putStrLn $ "Generation of statistics for " ++ fname
         createBasicStatsJson (destDir ++ "/basicStats.js") fileData fname -- generate JSON DATA file: basicStats.js
-        putStrLn $ "Simple Statistics for: " ++ fname ++ " completed"
+        putStrLn $ "Simple Statistics for: " ++ fname ++ " completed "  ++ (show $ length (qualCounts fileData)) ++ " Base pairs."
         printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir -- " " " file: perBaseQualScoresData.js
         putStrLn $ "File: " ++ fname ++ " loaded"
         return $ NGOReadSet (B.pack fname) (ord (lc fileData))
