@@ -12,7 +12,8 @@ module ProcessFastQ
     showRead,
     unCompress,
     writeGZIP,
-    writeReadSet
+    writeReadSet,
+    createDir,
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL

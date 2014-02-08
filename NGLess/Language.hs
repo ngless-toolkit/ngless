@@ -92,9 +92,10 @@ data NGLessObject =
         | NGOVoid
     deriving (Eq, Show)
 
+{-
 instance Ord NGLessObject where
     (NGOShortRead _ s1 _) `compare` (NGOShortRead _ s2 _) = s1 `compare` s2
-
+-}
 -- | 'Expression' is the main type for holding the AST.
 data Expression =
         Lookup Variable -- ^ This looks up the variable name
