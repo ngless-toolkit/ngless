@@ -27,6 +27,7 @@ import Data.Maybe
 import ProcessFastQ
 import FPreProcess
 import Language
+import Unique
 
 {- Interpretation is done inside 3 Monads
  -  1. InterpretationEnvIO
@@ -192,6 +193,11 @@ maybeInterpretExpr (Just e) = interpretExpr e >>= return . Just
 
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
 topFunction Ffastq (ConstStr fname) _args _block = liftIO (readFastQ (T.unpack fname))
+topFunction Funique expr@(Lookup (Variable varName)) args _block = do
+    expr' <- runInROEnvIO $ interpretExpr expr
+    args' <- runInROEnvIO $ evaluateArguments args
+    _ <- executeUnique expr' args' varName
+    return NGOVoid
 topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
@@ -209,26 +215,44 @@ topFunction Fwrite expr args _ = do
 
 topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 
+executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> InterpretationEnvIO ()
+executeUnique (NGOReadSet file enc) args varName = do
+        let map' = Map.fromList args
+            numMaxOccur = Map.lookup (T.pack "max_copies") map'
+        case numMaxOccur of
+            Just value' -> do
+                let numMaxOccur' = fromIntegral (evalInteger $ value')
+                uniqueCalculations' numMaxOccur'
+            _ -> uniqueCalculations' 2 --default
+    where 
+        uniqueCalculations' numMaxOccur' = do
+            newfp <- liftIO $ unique enc file numMaxOccur' 
+            setVariableValue varName $ NGOReadSet (B.pack newfp) enc
+            return ()
+
+executeUnique _ _ _ = error "executeUnique: Should not have happened"
+
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO ()
 executeQualityProcess (NGOReadSet fname _) = do
-         _ <- liftIO(readFastQ (B.unpack fname)) 
-         return () 
+        _ <- liftIO(readFastQ (B.unpack fname)) 
+        return ()
+
 executeQualityProcess _ = throwError("Should be passed a DataSet")
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO ()
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
-            rs <- liftIO $ readReadSet enc file
-            env <- gets snd
-            let rs' = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env) rs
-            newfp <- liftIO $ writeReadSet file rs' enc
-            setVariableValue varName $ NGOReadSet (B.pack newfp) enc
-            return ()
+        rs <- liftIO $ readReadSet enc file
+        env <- gets snd
+        let rs' = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env) rs
+        newfp <- liftIO $ writeReadSet file rs' enc
+        setVariableValue varName $ NGOReadSet (B.pack newfp) enc
+        return ()
     where
         interpretPBlock1 :: NGLessObject -> InterpretationROEnv (Maybe NGLessObject)
         interpretPBlock1 r = do
             r' <- interpretBlock1 ((var, r) : args) expr
             case blockStatus r' of
-                BlockDiscarded -> return Nothing
+                BlockDiscarded -> return Nothing -- Discard Read.
                 _ -> do
                     let newRead = lookup var (blockValues r')
                     case newRead of
@@ -238,8 +262,6 @@ executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varNa
                         _ -> throwError "A read should have been returned."
              
 executePreprocess _ _ _ _ = error "executePreprocess: Should not have happened"
-
-
 
 evaluateArguments [] = return []
 evaluateArguments (((Variable v),e):args) = do
