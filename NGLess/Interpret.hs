@@ -23,11 +23,11 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 import Data.String
 import Data.Maybe
+import Data.List
 
 import ProcessFastQ
 import FPreProcess
 import Language
-import Unique
 
 {- Interpretation is done inside 3 Monads
  -  1. InterpretationEnvIO
@@ -225,10 +225,17 @@ executeUnique (NGOReadSet file enc) args varName = do
                 uniqueCalculations' numMaxOccur'
             _ -> uniqueCalculations' 2 --default
     where 
+        uniqueCalculations' :: Int -> InterpretationEnvIO ()
         uniqueCalculations' numMaxOccur' = do
-            newfp <- liftIO $ unique enc file numMaxOccur' 
+            rs <- liftIO $ readReadSet enc file
+            rs' <- runInROEnvIO $ removeDuplicates numMaxOccur' rs
+            newfp <- liftIO $ writeReadSet file rs' enc 
             setVariableValue varName $ NGOReadSet (B.pack newfp) enc
             return ()
+        removeDuplicates :: Int -> [NGLessObject] -> InterpretationROEnv [NGLessObject]
+        removeDuplicates numMax rs = return ( 
+            foldl1' (++) $ Prelude.map (\l -> (if (length l) <= numMax then l else (take numMax l))) . group . sort $ rs)
+
 
 executeUnique _ _ _ = error "executeUnique: Should not have happened"
 

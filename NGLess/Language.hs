@@ -90,7 +90,10 @@ data NGLessObject =
         | NGOShortRead T.Text B.ByteString B.ByteString
         | NGOReadSet B.ByteString Int
         | NGOVoid
-    deriving (Eq, Ord, Show) 
+    deriving (Eq, Show)
+
+instance Ord NGLessObject where
+    (NGOShortRead _ s1 _) `compare` (NGOShortRead _ s2 _) = s1 `compare` s2
 
 -- | 'Expression' is the main type for holding the AST.
 data Expression =
