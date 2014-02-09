@@ -216,22 +216,24 @@ topFunction _ _ _ _ = throwError ("Unable to handle these functions")
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> InterpretationEnvIO NGLessObject
 executeUnique (NGOReadSet file enc) args varName = do
+        _ <- liftIO $ putStrLn "start executeUnique..."
+        rs <- liftIO $ readReadSet enc file
+        _ <- liftIO $ putStrLn "Set readed..."
+        dirP <- liftIO $ writeToNFiles (B.unpack file) enc rs
         let map' = Map.fromList args
             numMaxOccur = Map.lookup (T.pack "max_copies") map'
         case numMaxOccur of
             Just value' -> do
                 let numMaxOccur' = fromIntegral (evalInteger $ value')
-                uniqueCalculations' numMaxOccur'
-            _ -> uniqueCalculations' 2 --default
+                uniqueCalculations' numMaxOccur' dirP
+            _ -> uniqueCalculations' 2 dirP--default
     where 
-        uniqueCalculations' :: Int -> InterpretationEnvIO NGLessObject
-        uniqueCalculations' numMaxOccur' = do
-            rs <- liftIO $ readReadSet enc file
-            dirP <- liftIO $ writeToNFiles (B.unpack file) enc rs
+        uniqueCalculations' :: Int -> String -> InterpretationEnvIO NGLessObject
+        uniqueCalculations' numMaxOccur' dirP = do
             rs' <- liftIO $ readFromNFiles dirP enc numMaxOccur'
             newfp <- liftIO $ writeReadSet file rs' enc
             _<-liftIO $ putStrLn ("unique saved to variable (" ++ (T.unpack varName) ++ "):  " ++ newfp)   
-            return $ NGOReadSet (B.pack newfp) enc
+            return $ NGOReadSet (B.pack newfp) enc  
             
 
 executeUnique _ _ _ = error "executeUnique: Should not have happened"
@@ -243,7 +245,7 @@ executeQualityProcess (NGOReadSet fname _) = liftIO(readFastQ (B.unpack fname))
 executeQualityProcess _ = throwError("Should be passed a DataSet")
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
-executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varName = do
+executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) _ = do
         rs <- liftIO $ readReadSet enc file
         env <- gets snd
         let rs' = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env) rs
@@ -264,7 +266,6 @@ executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) varNa
                         _ -> throwError "A read should have been returned."
              
 executePreprocess _ _ _ _ = throwError ("executePreprocess: This should have not happened.")
-    --error $ (show a) ++ " " ++ (show b)++ (show c) ++ (show d)
 
 evaluateArguments [] = return []
 evaluateArguments (((Variable v),e):args) = do
