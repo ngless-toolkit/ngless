@@ -40,6 +40,7 @@ You need the following packages::
     cabal install test-framework-hunit
     cabal install zlib
     cabal install parsec
+    cabal install pureMD5
 
     
 
