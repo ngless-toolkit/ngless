@@ -11,7 +11,8 @@ SOURCES :=  \
 	Validation.hs \
 	PrintFastqBasicStats.hs \
 	ProcessFastQ.hs \
-	PerBaseQualityScores.hs
+	PerBaseQualityScores.hs \
+	Unique.hs
 
 
 ngless: Main.hs $(SOURCES)

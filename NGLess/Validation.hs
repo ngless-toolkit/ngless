@@ -2,6 +2,7 @@
  - License: GPL, version 3 or later
  -}
 {-# LANGUAGE OverloadedStrings #-}
+
 module Validation
     ( validate
     ) where

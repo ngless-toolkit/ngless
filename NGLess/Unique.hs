@@ -17,6 +17,8 @@ import Data.Digest.Pure.MD5
 import Data.List
 
 import Control.Monad
+import Control.DeepSeq
+
 
 import System.Directory
 import System.IO
@@ -41,13 +43,21 @@ writeToNFiles fname enc rs = do
     return dirPath
 
 
-         
+readFile' :: String -> IO BL.ByteString
+readFile' path = do
+     h <- openFile path ReadMode
+     s <- BL.hGetContents h
+     s `deepseq` hClose h
+     return s
 
+readFromNFiles' :: Int -> String -> IO [NGLessObject]
+readFromNFiles' enc fp = do 
+    cont <- readFile' fp
+    return $ parseReadSet enc cont
+    
+        
 readFromNFiles :: String -> Int -> Int -> IO [NGLessObject]
 readFromNFiles fp enc nMax = do
-    files <- getDirectoryContents fp
-    let files' = map ((++) fp) $ filter (isSuffixOf "txt") files   
-    res <- mapM (\path -> withFile path ReadMode $ \hnd -> do
-                    c <- BL.hGetContents hnd
-                    return (take nMax $ parseReadSet enc c)) files'
-    return $ foldl1 (++) res
+    files <- getDirectoryContents fp   
+    res <- mapM (readFromNFiles' enc) $ filter (isSuffixOf "txt") files
+    return $ foldl1' ((++) . take nMax) res
