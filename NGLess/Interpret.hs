@@ -8,7 +8,8 @@ module Interpret
      interpretBlock,
      evalIndex,
      evalLen,
-     evalBinary
+     evalBinary,
+     evalMinus
     ) where
 
 import Control.Exception.Base
