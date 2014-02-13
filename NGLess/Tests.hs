@@ -204,12 +204,19 @@ complete = "ngless 0.0\n\
     \        discard\n"
 
 case_indent_comment = isOk "ParseFailed" $ parsetest indent_comment
+case_indent_space = isOk "ParseFailed" $ parsetest indent_space
 
 indent_comment = "ngless 0.0\n\
     \reads = fastq('input1.fq')\n\
     \preprocess(reads) using |read|:\n\
     \    read = read[5:]\n\
     \    # comment \n"
+
+indent_space  = "ngless 0.0\n\
+    \reads = fastq('input1.fq')\n\
+    \preprocess(reads) using |read|:\n\
+    \    read = read[5:]\n\
+    \    \n"
 
 
 -- Type Validate pre process operations
