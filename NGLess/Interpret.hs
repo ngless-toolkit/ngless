@@ -9,7 +9,7 @@ module Interpret
      evalIndex,
      evalLen,
      evalBinary,
-     evalMinus
+     evalMinus,
     ) where
 
 import Control.Exception.Base

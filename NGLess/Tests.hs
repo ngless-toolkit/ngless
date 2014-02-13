@@ -220,6 +220,7 @@ indent_space  = "ngless 0.0\n\
 
 
 -- Type Validate pre process operations
+
 case_pre_process_indexation_1 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 5), Nothing] @?= (NGOShortRead "@IRIS" "CAA" "aaa")
 case_pre_process_indexation_2 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Nothing, Just (NGOInteger 3)] @?= (NGOShortRead "@IRIS" "AGT" "aa`")
 case_pre_process_indexation_3 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 2), Just (NGOInteger 5)] @?= (NGOShortRead "@IRIS" "TAC" "`aa")
@@ -258,3 +259,4 @@ case_bop_mul_3 = evalBinary BOpMul (NGOInteger 10) (NGOInteger 10) @?= (NGOInteg
 
 case_uop_minus_1 = evalMinus (NGOInteger 10) @?= (NGOInteger (-10))
 case_uop_minus_2 = evalMinus (NGOInteger (-10)) @?= (NGOInteger 10)
+
