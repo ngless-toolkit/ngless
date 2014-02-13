@@ -185,24 +185,32 @@ case_substrim_empty_quals = calculateSubStrim [] 20 @?= (0,0)
 isError (Right _) = assertFailure "error not caught"
 isError (Left _) = return ()
 
-isOk (Left _) = assertFailure "Type error on good code"
-isOk (Right _) = return ()
+isOk m (Left _) = assertFailure m
+isOk _ (Right _) = return ()
+isOkTypes = isOk "Type error on good code"
 
 case_bad_type_fastq = isError $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
-case_good_type_fastq = isOk $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
+case_good_type_fastq = isOkTypes $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
 
-case_type_complete = isOk $ (parsetest complete) >>= checktypes
-
+case_type_complete = isOkTypes $ (parsetest complete) >>= checktypes
 
 complete = "ngless 0.0\n\
     \reads = fastq('input1.fq')\n\
     \reads = unique(reads,maxCopies=2)\n\
     \preprocess(reads) using |read|:\n\
     \    read = read[5:]\n\
-    \    read = substrim(read,minQuality=24)\n\
+    \    read = substrim(read, minQuality=24)\n\
     \    if len(read) < 30:\n\
     \        discard\n"
- 
+
+case_indent_comment = isOk "ParseFailed" $ parsetest indent_comment
+
+indent_comment = "ngless 0.0\n\
+    \reads = fastq('input1.fq')\n\
+    \preprocess(reads) using |read|:\n\
+    \    read = read[5:]\n\
+    \    # comment \n"
+
 
 -- Type Validate pre process operations
 case_pre_process_indexation_1 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 5), Nothing] @?= (NGOShortRead "@IRIS" "CAA" "aaa")
