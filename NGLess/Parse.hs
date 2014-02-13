@@ -48,6 +48,7 @@ _cleanupindents = _cleanupindents' []
                 | c' == c = (t:(_cleanupindents' cs ts))
         _cleanupindents' cs@(_:_) ((_,TNewLine):ts) = _cleanupindents' cs ts
         _cleanupindents' cs@(_:_) ((_,TIndent _):ts) = _cleanupindents' cs ts
+        _cleanupindents' [] ((_,TNewLine):(_,TIndent _):(_,TNewLine):ts) = _cleanupindents' [] ts
         _cleanupindents' [] (t0@(_,TNewLine):t1@(_,TIndent _):ts) = (t0:t1:_cleanupindents' [] ts)
         _cleanupindents' [] ((_,TIndent _):ts) = _cleanupindents' [] ts
         _cleanupindents' cs (t:ts) = (t:_cleanupindents' cs ts)

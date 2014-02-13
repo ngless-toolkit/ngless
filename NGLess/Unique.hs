@@ -26,8 +26,7 @@ import System.IO
 
 hashfunc path r enc = do 
     let r' = showRead enc r
-        d' =  md5 r'
-        i' = show d'
+        i' = show $ md5 r'
     _ <- BL.appendFile (path ++ i' ++ ".txt") r'
     return i' 
 
