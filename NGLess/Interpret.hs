@@ -163,8 +163,7 @@ interpretExpr (ConstStr t) = return (NGOString t)
 interpretExpr (ConstBool b) = return (NGOBool b)
 interpretExpr (ConstSymbol s) = return (NGOSymbol s)
 interpretExpr (ConstNum n) = return (NGOInteger n)
-interpretExpr (UnaryOp UOpMinus v) = interpretExpr v >>= return . evalMinus
-interpretExpr (UnaryOp UOpLen ell) = interpretExpr ell >>= return . evalLen
+interpretExpr (UnaryOp op v) = interpretExpr v >>= return . evalUOP op
 interpretExpr (BinaryOp bop v1 v2) = do
     v1' <- interpretExpr v1
     v2' <- interpretExpr v2
@@ -303,11 +302,16 @@ interpretBlock1 vs x = error ("should not have gotten here " ++ show vs ++ " " +
 interpretBlockExpr :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv NGLessObject
 interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpretExpr val)
 
-evalMinus (NGOInteger n) = NGOInteger (-n)
-evalMinus _ = error "invalid minus operation"
+evalUOP :: UOp -> NGLessObject -> NGLessObject
+evalUOP UOpMinus x@(NGOInteger _) = evalMinus x
+evalUOP UOpLen sr@(NGOShortRead _ _ _) = evalLen sr
+evalUOP _ _ = error "invalid unary operation. "
 
 evalLen (NGOShortRead _ rSeq _) = NGOInteger . toInteger $ B.length rSeq
-evalLen _ = error "evalLen: Type Must be NGOShortRead"
+evalLen err = error ("Length must receive a Read. Received a " ++ (show err))
+
+evalMinus (NGOInteger n) = NGOInteger (-n)
+evalMinus err = error ("Minus operator must receive a integer. Received a" ++ (show err))
 
 evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject 
 evalIndex sr index@[Just (NGOInteger a)] = evalIndex sr $ (Just $ NGOInteger (a + 1)) : index   
@@ -323,13 +327,13 @@ evalIndex (NGOShortRead rId rSeq rQual) [Just (NGOInteger s), Just (NGOInteger e
 evalIndex _ _ = error "evalIndex: invalid operation"
 
 evalBool (NGOBool x) = x
-evalBool _ = error "evalBool: Argument must have NGOBool type"
+evalBool _ = error "evalBool: Argument type must be NGOBool"
 
 evalString (NGOString x) = x
 evalString _ = error "evalString: Argument type must be NGOString"
 
 evalInteger (NGOInteger x) = x
-evalInteger _ = error "evalString: Argument type must be NGOString"
+evalInteger _ = error "evalString: Argument type must be NGOInteger"
 
 -- Binary Evaluation
 evalBinary :: BOp ->  NGLessObject -> NGLessObject -> NGLessObject
