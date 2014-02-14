@@ -298,7 +298,7 @@ interpretBlock1 vs (Condition c ifT ifF) = do
         then interpretBlock1 vs ifT
         else interpretBlock1 vs ifF
 interpretBlock1 vs (Sequence expr) = interpretBlock vs expr -- interpret [expr]
-interpretBlock1 vs x = error ("should not have gotten here " ++ show vs ++ " " ++ show x)
+interpretBlock1 vs x = error ("interpretBlock1: This should not have happened " ++ show vs ++ " " ++ show x)
 
 interpretBlockExpr :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv NGLessObject
 interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpretExpr val)
