@@ -14,6 +14,7 @@ module ProcessFastQ
     writeGZIP,
     writeReadSet,
     createDir,
+    getTFilePath
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -64,10 +65,15 @@ writeToFile (NGOReadSet path enc) args = do
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
-writeReadSet :: B.ByteString -> [NGLessObject] -> Int -> IO FilePath
-writeReadSet fn rs enc = do
+getTFilePath :: B.ByteString -> IO FilePath
+getTFilePath fn = do
     newfp <- getTempFilePath (B.unpack fn)
     removeFileIfExists newfp
+    return newfp    
+
+writeReadSet :: B.ByteString -> [NGLessObject] -> Int -> IO FilePath
+writeReadSet fn rs enc = do
+    newfp <- getTFilePath fn
     writeGZIP newfp $ asFastQ rs enc
     return newfp
 

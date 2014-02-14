@@ -12,6 +12,7 @@ import Language
 import ProcessFastQ
 
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.ByteString.Char8 as B
 
 import Data.Digest.Pure.MD5
 import Data.List
@@ -49,14 +50,17 @@ readFile' path = do
      s `deepseq` hClose h
      return s
 
-readFromNFiles' :: Int -> String -> IO [NGLessObject]
-readFromNFiles' enc fp = do 
+readFromNFiles' :: FilePath -> Int -> Int -> String -> IO ()
+readFromNFiles' newfp enc nMax fp = do 
     cont <- readFile' fp
-    return $ parseReadSet enc cont
+    res' <- mapM_ (BL.appendFile newfp . showRead enc) (take nMax $ parseReadSet enc cont)
+    return res'
     
         
-readFromNFiles :: String -> Int -> Int -> IO [NGLessObject]
-readFromNFiles fp enc nMax = do
-    files <- getDirectoryContents fp   
-    res <- mapM (readFromNFiles' enc) $ filter (isSuffixOf "txt") files
-    return $ foldl1' ((++) . take nMax) res
+readFromNFiles :: B.ByteString -> String -> Int -> Int -> IO FilePath
+readFromNFiles file fp enc nMax = do
+    files <- getDirectoryContents fp
+    newfp <- getTFilePath file
+    forM_ (filter (isSuffixOf "txt") files) $ \x -> do
+        readFromNFiles' newfp enc nMax x
+    return newfp

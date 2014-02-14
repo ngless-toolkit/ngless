@@ -194,11 +194,13 @@ maybeInterpretExpr (Just e) = interpretExpr e >>= return . Just
 
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
 topFunction Ffastq (ConstStr fname) _args _block = liftIO (readFastQ (T.unpack fname))
+
 topFunction Funique expr@(Lookup (Variable varName)) args _block = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
     res' <- executeUnique expr' args' varName
     return res'
+
 topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
@@ -209,16 +211,14 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
 topFunction Fwrite expr args _ = do 
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
-    _ <- liftIO (writeToFile expr' args')
-    return NGOVoid
+    res' <- liftIO (writeToFile expr' args')
+    return res'
 
-topFunction _ _ _ _ = throwError ("Unable to handle these functions")
+topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> InterpretationEnvIO NGLessObject
 executeUnique (NGOReadSet file enc) args varName = do
-        _ <- liftIO $ putStrLn "start executeUnique..."
         rs <- liftIO $ readReadSet enc file
-        _ <- liftIO $ putStrLn "Set readed..."
         dirP <- liftIO $ writeToNFiles (B.unpack file) enc rs
         let map' = Map.fromList args
             numMaxOccur = Map.lookup (T.pack "max_copies") map'
@@ -230,8 +230,7 @@ executeUnique (NGOReadSet file enc) args varName = do
     where 
         uniqueCalculations' :: Int -> String -> InterpretationEnvIO NGLessObject
         uniqueCalculations' numMaxOccur' dirP = do
-            rs' <- liftIO $ readFromNFiles dirP enc numMaxOccur'
-            newfp <- liftIO $ writeReadSet file rs' enc
+            newfp <- liftIO $ readFromNFiles file dirP enc numMaxOccur'
             _<-liftIO $ putStrLn ("unique saved to variable (" ++ (T.unpack varName) ++ "):  " ++ newfp)   
             return $ NGOReadSet (B.pack newfp) enc  
             
