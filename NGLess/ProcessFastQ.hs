@@ -55,13 +55,13 @@ unCompress fname =
 getNGOString (Just (NGOString s)) = T.unpack s
 getNGOString _ = "Error: Type is different of String"
 
-writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO NGLessObject   
+writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO (B.ByteString, NGLessObject)   
 writeToFile (NGOReadSet path enc) args = do
     let map' = Map.fromList args
         destFilePath = Map.lookup (T.pack "ofile") map'
         newfp = getNGOString destFilePath
     copyFile (B.unpack path) newfp
-    return $ NGOReadSet (B.pack newfp) enc
+    return $ (path, NGOReadSet (B.pack newfp) enc)
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 

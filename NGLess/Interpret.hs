@@ -206,13 +206,15 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     args' <- runInROEnvIO $ evaluateArguments args
     res' <- executePreprocess expr' args' _block varName
     res'' <- executeQualityProcess res' 
+    setVariableValue varName res''
     return res''
 
 topFunction Fwrite expr args _ = do 
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
     res' <- liftIO (writeToFile expr' args')
-    return res'
+    setVariableValue (T.pack (B.unpack $ fst res')) (snd res')
+    return (snd res')
 
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
 
