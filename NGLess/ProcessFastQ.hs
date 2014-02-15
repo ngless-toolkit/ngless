@@ -5,16 +5,12 @@ module ProcessFastQ
     parseReadSet,
     readFastQ,
     readPossiblyCompressedFile,
-    removeFileIfExists,
-    getTempFilePath,
     readReadSet,
     writeToFile,
     showRead,
     unCompress,
     writeGZIP,
-    writeReadSet,
-    createDir,
-    getTFilePath
+    writeReadSet
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -25,25 +21,12 @@ import qualified Data.Map as Map
 
 import Data.Char
 
-import System.Directory
-import System.IO
-import System.FilePath.Posix
-
-import Control.Monad
-
+import FileManagement
 import PerBaseQualityScores
 import PrintFastqBasicStats
 import FastQFileData
 import Language
     
-
-
-
-getTempFilePath :: FilePath -> IO FilePath
-getTempFilePath fp = do
-    let oldFilePath = splitFileName fp
-    res <- openTempFile (fst oldFilePath) (snd oldFilePath ++ ".gz")   
-    return (fst res)
 
 -- Uncompression of a given fastQ file if it's compressed in a .gz format.
 unCompress fname =
@@ -65,16 +48,10 @@ writeToFile (NGOReadSet path enc) args = do
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
-getTFilePath :: B.ByteString -> IO FilePath
-getTFilePath fn = do
-    newfp <- getTempFilePath (B.unpack fn)
-    removeFileIfExists newfp
-    return newfp    
-
 writeReadSet :: B.ByteString -> [NGLessObject] -> Int -> IO FilePath
 writeReadSet fn rs enc = do
-    newfp <- getTFilePath fn
-    writeGZIP newfp $ asFastQ rs enc
+    newfp <- getTFilePath (B.unpack fn)
+    writeGZIP (newfp ++ ".gz") $ asFastQ rs enc
     return newfp
 
 asFastQ :: [NGLessObject] -> Int -> BL.ByteString
@@ -107,10 +84,7 @@ readFastQ fname = do
         contents <- unCompress fname
         let fileData = iterateFile contents
             destDir = (fname ++ "_ngless")
-        createDir destDir 
-        copyFile "Html/index.html" (destDir ++ "/index.html")
-        copyFile "Html/perBaseQualScores.css" (destDir ++ "/perBaseQualScores.css")
-        copyFile "Html/perBaseQualityScores.js" (destDir ++ "/perBaseQualityScores.js")
+        setupRequiredFiles destDir
         putStrLn $ "Generation of statistics for " ++ fname
         createBasicStatsJson (destDir ++ "/basicStats.js") fileData fname -- generate JSON DATA file: basicStats.js
         putStrLn $ "Simple Statistics for: " ++ fname ++ " completed "  ++ (show $ length (qualCounts fileData)) ++ " Base pairs."
@@ -121,13 +95,3 @@ readFastQ fname = do
 showRead :: Int -> NGLessObject -> BL.ByteString
 showRead enc (NGOShortRead a b c) =  BL.pack ((T.unpack a) ++ "\n" ++ (B.unpack b) ++ "\n+\n" ++ (encodeQual enc (B.unpack c)))
 showRead _ _ = error "error: The argument must be a read."
-
-removeFileIfExists fp = do    
-    fexist' <- doesFileExist fp
-    when fexist' $ removeFile fp
-
--- Removes the destiny directory if it already exists from previous executions.
-createDir destDir = do
-    doesDirExist <- doesDirectoryExist destDir
-    when (doesDirExist) $ removeDirectoryRecursive destDir
-    createDirectory destDir

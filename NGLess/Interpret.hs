@@ -219,21 +219,21 @@ topFunction Fwrite expr args _ = do
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> InterpretationEnvIO NGLessObject
-executeUnique (NGOReadSet file enc) args varName = do
+executeUnique (NGOReadSet file enc) args _ = do
         rs <- liftIO $ readReadSet enc file
-        dirP <- liftIO $ writeToNFiles (B.unpack file) enc rs
+        dirName <- liftIO $ writeToNFiles (B.unpack file) enc rs
         let map' = Map.fromList args
             numMaxOccur = Map.lookup (T.pack "max_copies") map'
         case numMaxOccur of
             Just value' -> do
                 let numMaxOccur' = fromIntegral (evalInteger $ value')
-                uniqueCalculations' numMaxOccur' dirP
-            _ -> uniqueCalculations' 2 dirP--default
+                uniqueCalculations' numMaxOccur' dirName
+            _ -> uniqueCalculations' 2 dirName--default
     where 
-        uniqueCalculations' :: Int -> String -> InterpretationEnvIO NGLessObject
-        uniqueCalculations' numMaxOccur' dirP = do
-            newfp <- liftIO $ readFromNFiles file dirP enc numMaxOccur'
-            _<-liftIO $ putStrLn ("unique saved to variable (" ++ (T.unpack varName) ++ "):  " ++ newfp)   
+        uniqueCalculations' :: Int -> FilePath -> InterpretationEnvIO NGLessObject
+        uniqueCalculations' numMaxOccur' dirName = do
+            rs' <- liftIO $ readNFiles enc numMaxOccur' dirName
+            newfp <- liftIO $ writeReadSet file rs' enc
             return $ NGOReadSet (B.pack newfp) enc  
             
 
