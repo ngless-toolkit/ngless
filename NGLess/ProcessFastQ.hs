@@ -50,8 +50,8 @@ writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
 writeReadSet :: B.ByteString -> [NGLessObject] -> Int -> IO FilePath
 writeReadSet fn rs enc = do
-    newfp <- getTFilePath (B.unpack fn)
-    writeGZIP (newfp ++ ".gz") $ asFastQ rs enc
+    newfp <- getTFilePathComp (B.unpack fn)
+    writeGZIP newfp $ asFastQ rs enc
     return newfp
 
 asFastQ :: [NGLessObject] -> Int -> BL.ByteString

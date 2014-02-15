@@ -2,12 +2,12 @@ module FileManagement
     ( 
         removeFileIfExists,
         createDir,
-        getTFilePath,
         getTempFilePath,
         setupRequiredFiles,
         copyFile,
         getFilesInDir,
-        generateTempFilePath
+        generateTempFilePath,
+        getTFilePathComp
     ) where
 
 import System.FilePath.Posix
@@ -36,20 +36,24 @@ setupRequiredFiles destDir = do
 generateTempFilePath :: FilePath -> FilePath -> IO FilePath
 generateTempFilePath fd fn = do
     res <- openTempFile fd (snd $ splitFileName fn)   
+    hClose (snd res)   
     return (fst res)
 
 getTempFilePath :: FilePath -> IO FilePath
 getTempFilePath fp = do
     let oldFilePath = splitFileName fp
-    res <- openTempFile (fst oldFilePath) (snd oldFilePath)   
+    res <- openTempFile (fst oldFilePath) (snd oldFilePath)
+    hClose (snd res)   
     return (fst res)
 
 
-getTFilePath :: FilePath -> IO FilePath
-getTFilePath fn = do
-    newfp <- getTempFilePath fn
-    removeFileIfExists newfp
-    return newfp    
+getTFilePathComp :: FilePath -> IO FilePath
+getTFilePathComp fp = do
+    let oldFilePath = splitFileName fp
+    res <- openTempFile (fst oldFilePath) ((snd oldFilePath) ++ ".gz")
+    hClose (snd res)   
+    return (fst res)
+
 
 removeFileIfExists fp = do    
     fexist' <- doesFileExist fp

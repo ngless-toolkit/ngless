@@ -3,13 +3,13 @@
 module Unique
     ( 
         writeToNFiles,
-        readNFiles
+        readNFiles,
+        readUniqueFile
     ) where
 
 import qualified Data.ByteString.Char8 as B
 
 import Data.Map as Map
-import Data.List
 
 import Control.Monad
 
@@ -36,19 +36,23 @@ writeToNFiles fname enc rs = do
     createDir dirPath
     _ <- putStrLn ("Start to write N Files to: " ++ dirPath)
     forM_ (generateBlocks maxBlockSize rs) $ \x -> do
-        newfp <- generateTempFilePath dirPath fname
-        writeReadSet (B.pack newfp) x enc
+        x' <- writeReadSet (B.pack dirPath) x enc
+        putStrLn x'
     _ <- putStrLn ("Wrote N Files to: " ++ dirPath)
     return dirPath
 
+reduceReads k a b = take k (a ++ b)
+
 readNFiles :: Int -> Int -> FilePath -> IO [NGLessObject]
-readNFiles enc numMaxOccur file = do
-    files' <- getFilesInDir file
-    res <- mapM (\x -> readUniqueFile numMaxOccur enc (B.pack x)) files'
-    return $ foldl1 (++) (elems $ unions res)
+readNFiles enc k d = do
+    files' <- getFilesInDir d
+    res <- mapM (\x -> readUniqueFile k enc (B.pack x)) files'
+    return $ foldl1 (++) (elems $ unionsWith (reduceReads k) res)
 
 readUniqueFile :: Int -> Int -> B.ByteString -> IO UnrepeatedRead
-readUniqueFile k enc fname = (getk k . parseReadSet enc) `fmap` (readPossiblyCompressedFile fname)
+readUniqueFile k enc fname = do
+    _ <- putStrLn $ "Unique -> Read: " ++ (B.unpack fname)
+    (getk k . parseReadSet enc) `fmap` (readPossiblyCompressedFile fname)
 
 getk :: Int -> [NGLessObject] -> UnrepeatedRead
 getk k rs = putk k rs empty
