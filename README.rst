@@ -40,8 +40,7 @@ You need the following packages::
     cabal install test-framework-hunit
     cabal install zlib
     cabal install parsec
-    cabal install pureMD5
-
+    cabal install hashable
     
 
 If you are developing on Ubuntu, you can also install the packages globally
