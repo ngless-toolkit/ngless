@@ -10,7 +10,8 @@ module ProcessFastQ
     showRead,
     unCompress,
     writeGZIP,
-    writeReadSet
+    writeReadSet,
+    appendFile'
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -34,6 +35,7 @@ unCompress fname =
         then fmap GZip.decompress (BL.readFile fname)
         else BL.readFile fname -- not compressed
 
+appendFile' = BL.appendFile
 
 getNGOString (Just (NGOString s)) = T.unpack s
 getNGOString _ = "Error: Type is different of String"
