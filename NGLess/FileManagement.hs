@@ -6,7 +6,6 @@ module FileManagement
         setupRequiredFiles,
         copyFile,
         getFilesInDir,
-        generateTempFilePath,
         getTFilePathComp
     ) where
 
@@ -15,6 +14,8 @@ import System.Directory
 import System.IO
 
 import Control.Monad
+
+import System.Posix.Internals (c_getpid)
 
 
 isDot :: FilePath -> Bool
@@ -27,33 +28,29 @@ getFilesInDir p = do
 
 setupRequiredFiles :: FilePath -> IO ()
 setupRequiredFiles destDir = do
-    createDir destDir 
+    void $ createDir destDir 
     copyFile "Html/index.html" (destDir ++ "/index.html")
     copyFile "Html/perBaseQualScores.css" (destDir ++ "/perBaseQualScores.css")
     copyFile "Html/perBaseQualityScores.js" (destDir ++ "/perBaseQualityScores.js")
 
 
-generateTempFilePath :: FilePath -> FilePath -> IO FilePath
-generateTempFilePath fd fn = do
-    res <- openTempFile fd (snd $ splitFileName fn)   
+generateTempFilePath :: FilePath -> String -> IO FilePath
+generateTempFilePath fd template = do
+    res <- openTempFile fd template   
     hClose (snd res)   
     return (fst res)
 
 getTempFilePath :: FilePath -> IO FilePath
 getTempFilePath fp = do
-    let oldFilePath = splitFileName fp
-    res <- openTempFile (fst oldFilePath) (snd oldFilePath)
-    hClose (snd res)   
-    return (fst res)
-
+    let oldFilePath = splitFileName . fst . splitExtensions $ fp
+    generateTempFilePath (fst oldFilePath) (snd oldFilePath)
+    
 
 getTFilePathComp :: FilePath -> IO FilePath
 getTFilePathComp fp = do
-    let oldFilePath = splitFileName fp
-    res <- openTempFile (fst oldFilePath) ((snd oldFilePath) ++ ".gz")
-    hClose (snd res)   
-    return (fst res)
-
+    let oldFilePath = splitFileName . fst . splitExtensions $ fp
+    generateTempFilePath (fst oldFilePath) ((snd oldFilePath) ++ ".gz")
+    
 
 removeFileIfExists fp = do    
     fexist' <- doesFileExist fp
@@ -62,6 +59,22 @@ removeFileIfExists fp = do
 -- Removes the destiny directory if it already exists from previous executions.
 
 createDir destDir = do
-    doesDirExist <- doesDirectoryExist destDir
-    when (doesDirExist) $ removeDirectoryRecursive destDir
-    createDirectory destDir
+    tdir <- getTemporaryDirectory
+    let template = snd . splitFileName . fst . splitExtensions $ destDir
+    putStrLn template 
+    createTempDirectory tdir template
+
+
+createTempDirectory :: FilePath -> String -> IO FilePath
+createTempDirectory dir template = do
+  pid <- c_getpid
+  fp <- findTempName pid
+  createDirectory fp
+  return fp
+  where
+    findTempName x = do
+      let dirpath = dir </> template ++ show x
+      r <- doesDirectoryExist dirpath
+      case r of
+        False  -> return dirpath
+        True -> findTempName (x+1)

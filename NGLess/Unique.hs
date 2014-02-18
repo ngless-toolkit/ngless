@@ -49,13 +49,12 @@ readFileN' = show . readFileN
 
 writeToNFiles :: FilePath -> Int -> [NGLessObject] -> IO FilePath
 writeToNFiles fname enc rs = do
-    let dirPath = fname ++ "_temp/"
-    createDir dirPath
-    _ <- putStrLn ("Start to write N Files to: " ++ dirPath)
+    dest <- createDir fname    
+    _ <- putStrLn ("Start to write N Files to: " ++ dest)
     forM_ rs $ \x -> do
-        appendFile' (dirPath ++ (readFileN' x)) (BL.append (showRead enc x) "\n")
-    _ <- putStrLn ("Wrote N Files to: " ++ dirPath)
-    return dirPath
+        appendFile' (dest ++ (readFileN' x)) (BL.append (showRead enc x) "\n")
+    _ <- putStrLn ("Wrote N Files to: " ++ dest)
+    return dest
 
 
 readNFiles :: Int -> Int -> FilePath -> IO [NGLessObject]
