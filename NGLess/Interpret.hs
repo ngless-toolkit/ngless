@@ -234,8 +234,7 @@ executeUnique (NGOReadSet file enc) args _ = do
         uniqueCalculations' numMaxOccur' dirName = do
             rs' <- liftIO $ readNFiles enc numMaxOccur' dirName
             newfp <- liftIO $ writeReadSet file rs' enc
-            return $ NGOReadSet (B.pack newfp) enc  
-            
+            return $ NGOReadSet (B.pack newfp) enc 
 
 executeUnique _ _ _ = error "executeUnique: Should not have happened"
 
