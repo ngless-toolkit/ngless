@@ -6,7 +6,8 @@ module FileManagement
         setupRequiredFiles,
         copyFile,
         getFilesInDir,
-        getTFilePathComp
+        getTFilePathComp,
+        getTemporaryDirectory
     ) where
 
 import System.FilePath.Posix
@@ -24,14 +25,15 @@ isDot f = f `notElem` [".", ".."]
 getFilesInDir :: FilePath -> IO [FilePath]
 getFilesInDir p = do
  files <- getDirectoryContents p
- return $ map ((++) p) (filter (isDot) files)
+ return $ map ((</>) p) (filter (isDot) files)
 
-setupRequiredFiles :: FilePath -> IO ()
+setupRequiredFiles :: FilePath -> IO FilePath
 setupRequiredFiles destDir = do
-    void $ createDir destDir 
-    copyFile "Html/index.html" (destDir ++ "/index.html")
-    copyFile "Html/perBaseQualScores.css" (destDir ++ "/perBaseQualScores.css")
-    copyFile "Html/perBaseQualityScores.js" (destDir ++ "/perBaseQualityScores.js")
+    destDir' <- createDir destDir 
+    copyFile "Html/index.html" (destDir' ++ "/index.html")
+    copyFile "Html/perBaseQualScores.css" (destDir' ++ "/perBaseQualScores.css")
+    copyFile "Html/perBaseQualityScores.js" (destDir' ++ "/perBaseQualityScores.js")
+    return destDir'
 
 
 generateTempFilePath :: FilePath -> String -> IO FilePath
@@ -61,7 +63,6 @@ removeFileIfExists fp = do
 createDir destDir = do
     tdir <- getTemporaryDirectory
     let template = snd . splitFileName . fst . splitExtensions $ destDir
-    putStrLn template 
     createTempDirectory tdir template
 
 
@@ -70,6 +71,7 @@ createTempDirectory dir template = do
   pid <- c_getpid
   fp <- findTempName pid
   createDirectory fp
+  putStrLn fp 
   return fp
   where
     findTempName x = do

@@ -22,6 +22,8 @@ import qualified Data.Map as Map
 
 import Data.Char
 
+import System.FilePath.Posix
+
 import FileManagement
 import PerBaseQualityScores
 import PrintFastqBasicStats
@@ -52,7 +54,8 @@ writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
 writeReadSet :: B.ByteString -> [NGLessObject] -> Int -> IO FilePath
 writeReadSet fn rs enc = do
-    newfp <- getTFilePathComp (B.unpack fn)
+    temp <- getTemporaryDirectory 
+    newfp <- getTFilePathComp (temp </> (snd . splitFileName $ (B.unpack fn)))
     writeGZIP newfp $ asFastQ rs enc
     return newfp
 
@@ -85,11 +88,10 @@ readFastQ :: FilePath -> IO NGLessObject
 readFastQ fname = do
         contents <- unCompress fname
         let fileData = iterateFile contents
-            destDir = (fname ++ "_ngless")
-        setupRequiredFiles destDir
-        putStrLn $ "Generation of statistics for " ++ fname
+        destDir <- setupRequiredFiles fname
+        putStrLn $ "Generation of statistics for " ++ destDir
         createBasicStatsJson (destDir ++ "/basicStats.js") fileData fname -- generate JSON DATA file: basicStats.js
-        putStrLn $ "Simple Statistics for: " ++ fname ++ " completed "  ++ (show $ length (qualCounts fileData)) ++ " Base pairs."
+        putStrLn $ "Simple Statistics for: " ++ destDir ++ " completed "  ++ (show $ length (qualCounts fileData)) ++ " Base pairs."
         printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir -- " " " file: perBaseQualScoresData.js
         putStrLn $ "File: " ++ fname ++ " loaded"
         return $ NGOReadSet (B.pack fname) (ord (lc fileData))

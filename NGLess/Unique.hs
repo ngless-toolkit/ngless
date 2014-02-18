@@ -21,6 +21,8 @@ import Language
 import ProcessFastQ
 import FileManagement
 
+import System.FilePath.Posix
+
 type UnrepeatedRead = Map B.ByteString [NGLessObject]
 
 {- Should be a heuristic based on File size -}
@@ -52,7 +54,7 @@ writeToNFiles fname enc rs = do
     dest <- createDir fname    
     _ <- putStrLn ("Start to write N Files to: " ++ dest)
     forM_ rs $ \x -> do
-        appendFile' (dest ++ (readFileN' x)) (BL.append (showRead enc x) "\n")
+        appendFile' (dest </> (readFileN' x)) (BL.append (showRead enc x) "\n")
     _ <- putStrLn ("Wrote N Files to: " ++ dest)
     return dest
 
