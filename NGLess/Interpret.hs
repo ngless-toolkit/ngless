@@ -229,7 +229,7 @@ executeQualityProcess (NGOList e) = do
     res <- mapM (executeQualityProcess) e
     return (NGOList res)
 executeQualityProcess (NGOString fname) = executeQualityProcess' (T.unpack fname)
-executeQualityProcess (NGOReadSet fname _) = executeQualityProcess' (B.unpack fname)
+executeQualityProcess (NGOReadSet fname _) = executeQualityProcess' (B.unpack fname) 
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
 
 executeQualityProcess' fname = liftIO $ readFastQ fname
@@ -266,6 +266,7 @@ executePreprocess (NGOList e) args _block v = do
     return $ NGOList res
 
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) _ = do
+        _ <- liftIO $ (putStrLn $ "executePreprocess on " ++ (B.unpack file)) 
         rs <- liftIO $ readReadSet enc file
         env <- gets snd
         let rs' = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env) rs

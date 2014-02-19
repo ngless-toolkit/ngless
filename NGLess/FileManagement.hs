@@ -11,7 +11,6 @@ module FileManagement
         getFileSize
     ) where
 
-import System.Posix (getFileStatus, fileSize)
 import System.FilePath.Posix
 import System.Directory
 import System.IO
@@ -82,4 +81,4 @@ createTempDirectory dir template = do
         False  -> return dirpath
         True -> findTempName (x+1)
 
-getFileSize path = getFileStatus path >>= \s -> return $ fileSize s
+getFileSize path = withFile path ReadMode hFileSize

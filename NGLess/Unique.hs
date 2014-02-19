@@ -25,15 +25,25 @@ import System.FilePath.Posix
 
 type UnrepeatedRead = Map B.ByteString [NGLessObject]
 
-{- Should be a heuristic based on File size -}
-numFiles :: Int
-numFiles = 6
+maxFileSize :: Num a => a
+maxFileSize = 30000000 -- 50MB
 
-readFileN :: NGLessObject -> Int
-readFileN (NGOShortRead _ r _) = mod (hash r) numFiles
-readFileN err = error ("readFileN should receive a NGOShortRead, but received a " ++ (show err))
+calcSize :: Integer -> Integer
+calcSize s = ceiling $ ((fromInteger s) / maxFileSize :: Double) 
+
+numFiles :: FilePath -> IO Integer
+numFiles path = do
+    size' <- getFileSize path
+    return $ calcSize size'
+
+readFileN :: Int -> NGLessObject -> Int
+readFileN k (NGOShortRead _ r _) = 
+    mod (hash r) k 
+
+readFileN _ err = error ("readFileN should receive a NGOShortRead, but received a " ++ (show err))
 
 -- TODO: Reduce memory use
+{-
 changeNthElement :: Int -> (a -> a) -> [a] -> [a]
 changeNthElement idx transform list =  case splitAt idx list of
                     (front, element:back) -> front ++ transform element : back
@@ -45,16 +55,18 @@ slice (x:xs) = do
     let xs' = slice xs
         pos = (readFileN x)
     changeNthElement pos ((:) x) xs'
---
+--}
 
-readFileN' = show . readFileN
+readFileN' :: Int -> NGLessObject -> FilePath
+readFileN' k r = show $ (readFileN k r)
 
 writeToNFiles :: FilePath -> Int -> [NGLessObject] -> IO FilePath
 writeToNFiles fname enc rs = do
-    dest <- createDir fname    
-    _ <- putStrLn ("Start to write N Files to: " ++ dest)
+    dest <- createDir fname
+    numFiles' <- numFiles fname    
+    _ <- putStrLn ("Start to write" ++ (show numFiles') ++ "Files to: " ++ dest)
     forM_ rs $ \x -> do
-        appendFile' (dest </> (readFileN' x)) (BL.append (showRead enc x) "\n")
+        appendFile' (dest </> (readFileN' (fromIntegral numFiles') x)) (BL.append (showRead enc x) "\n")
     _ <- putStrLn ("Wrote N Files to: " ++ dest)
     return dest
 
