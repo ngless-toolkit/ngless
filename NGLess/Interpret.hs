@@ -193,6 +193,9 @@ maybeInterpretExpr Nothing = return Nothing
 maybeInterpretExpr (Just e) = interpretExpr e >>= return . Just
 
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
+topFunction Ffastq (ListExpression e) _args _block = do
+    res <- mapM (\x -> topFunction Ffastq x _args _block) e
+    return (NGOList res)
 topFunction Ffastq (ConstStr fname) _args _block = liftIO (readFastQ (T.unpack fname))
 
 topFunction Funique expr@(Lookup (Variable varName)) args _block = do

@@ -92,6 +92,7 @@ data NGLessObject =
         | NGOShortRead T.Text B.ByteString B.ByteString
         | NGOReadSet B.ByteString Int
         | NGOVoid
+        | NGOList [NGLessObject]
     deriving (Eq, Show, Ord)
 
 
@@ -104,10 +105,6 @@ readQual (NGOShortRead _ _ x) = x
 readQual x = error ("Expected a NGOShortRead, but the type was " ++ (show x))
 
 
-{-
-instance Ord NGLessObject where
-    (NGOShortRead _ s1 _) `compare` (NGOShortRead _ s2 _) = s1 `compare` s2
--}
 -- | 'Expression' is the main type for holding the AST.
 
 data Expression =
