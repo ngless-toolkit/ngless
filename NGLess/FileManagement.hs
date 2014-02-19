@@ -7,9 +7,11 @@ module FileManagement
         copyFile,
         getFilesInDir,
         getTFilePathComp,
-        getTemporaryDirectory
+        getTemporaryDirectory,
+        getFileSize
     ) where
 
+import System.Posix (getFileStatus, fileSize)
 import System.FilePath.Posix
 import System.Directory
 import System.IO
@@ -80,3 +82,5 @@ createTempDirectory dir template = do
       case r of
         False  -> return dirpath
         True -> findTempName (x+1)
+
+getFileSize path = getFileStatus path >>= \s -> return $ fileSize s

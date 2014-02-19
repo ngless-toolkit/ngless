@@ -221,7 +221,12 @@ topFunction Fwrite expr args _ = do
 
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
 
+
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> InterpretationEnvIO NGLessObject
+executeUnique (NGOList e) args v = do
+     res <- mapM (\x -> executeUnique x args v) e
+     return $ NGOList res
+
 executeUnique (NGOReadSet file enc) args _ = do
         rs <- liftIO $ readReadSet enc file
         dirName <- liftIO $ writeToNFiles (B.unpack file) enc rs
