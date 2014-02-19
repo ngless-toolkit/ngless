@@ -73,7 +73,6 @@ createTempDirectory dir template = do
   pid <- c_getpid
   fp <- findTempName pid
   createDirectory fp
-  putStrLn fp 
   return fp
   where
     findTempName x = do

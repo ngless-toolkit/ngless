@@ -178,6 +178,10 @@ interpretExpr (FunctionCall Fsubstrim var args _) = do
     var' <- interpretExpr var
     let r = substrim (getvalue args) var'
     return r
+interpretExpr (ListExpression e) = do
+    res <- mapM (interpretExpr) e
+    return (NGOList $ res)
+
 interpretExpr _ = throwError $ "Not an expression"
 
 getvalue :: [(Variable, Expression)] -> Int
@@ -193,10 +197,9 @@ maybeInterpretExpr Nothing = return Nothing
 maybeInterpretExpr (Just e) = interpretExpr e >>= return . Just
 
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
-topFunction Ffastq (ListExpression e) _args _block = do
-    res <- mapM (\x -> topFunction Ffastq x _args _block) e
-    return (NGOList res)
-topFunction Ffastq (ConstStr fname) _args _block = liftIO (readFastQ (T.unpack fname))
+topFunction Ffastq expr _args _block = do
+    expr' <- runInROEnvIO $ interpretExpr expr
+    executeQualityProcess expr'
 
 topFunction Funique expr@(Lookup (Variable varName)) args _block = do
     expr' <- runInROEnvIO $ interpretExpr expr
@@ -221,6 +224,15 @@ topFunction Fwrite expr args _ = do
 
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
 
+executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
+executeQualityProcess (NGOList e) = do
+    res <- mapM (executeQualityProcess) e
+    return (NGOList res)
+executeQualityProcess (NGOString fname) = executeQualityProcess' (T.unpack fname)
+executeQualityProcess (NGOReadSet fname _) = executeQualityProcess' (B.unpack fname)
+executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
+
+executeQualityProcess' fname = liftIO $ readFastQ fname
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> InterpretationEnvIO NGLessObject
 executeUnique (NGOList e) args v = do
@@ -247,12 +259,12 @@ executeUnique (NGOReadSet file enc) args _ = do
 executeUnique _ _ _ = error "executeUnique: Should not have happened"
 
 
-executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
-executeQualityProcess (NGOReadSet fname _) = liftIO(readFastQ (B.unpack fname)) 
-        
-executeQualityProcess _ = throwError("Should be passed a DataSet")
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
+executePreprocess (NGOList e) args _block v = do
+    res <- mapM (\x -> executePreprocess x args _block v) e
+    return $ NGOList res
+
 executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) _ = do
         rs <- liftIO $ readReadSet enc file
         env <- gets snd
@@ -273,7 +285,7 @@ executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) _ = d
                             _ -> return newRead
                         _ -> throwError "A read should have been returned."
              
-executePreprocess _ _ _ _ = throwError ("executePreprocess: This should have not happened.")
+executePreprocess a _ _ _ = error ("executePreprocess: This should have not happened." ++ (show a))
 
 evaluateArguments [] = return []
 evaluateArguments (((Variable v),e):args) = do
