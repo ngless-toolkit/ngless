@@ -3,12 +3,12 @@ module FileManagement
         removeFileIfExists,
         createDir,
         getTempFilePath,
-        setupRequiredFiles,
         copyFile,
         getFilesInDir,
         getTFilePathComp,
         getTemporaryDirectory,
-        getFileSize
+        getFileSize,
+        setupRequiredFiles
     ) where
 
 import System.FilePath.Posix
@@ -19,6 +19,8 @@ import Control.Monad
 
 import System.Posix.Internals (c_getpid)
 
+defaultDir :: String
+defaultDir = "ngless.outputs/"
 
 isDot :: FilePath -> Bool
 isDot f = f `notElem` [".", ".."]
@@ -28,14 +30,14 @@ getFilesInDir p = do
  files <- getDirectoryContents p
  return $ map ((</>) p) (filter (isDot) files)
 
+
 setupRequiredFiles :: FilePath -> IO FilePath
 setupRequiredFiles destDir = do
-    destDir' <- createDir destDir 
+    destDir' <- createOutputDir destDir 
     copyFile "Html/index.html" (destDir' ++ "/index.html")
     copyFile "Html/perBaseQualScores.css" (destDir' ++ "/perBaseQualScores.css")
     copyFile "Html/perBaseQualityScores.js" (destDir' ++ "/perBaseQualityScores.js")
     return destDir'
-
 
 generateTempFilePath :: FilePath -> String -> IO FilePath
 generateTempFilePath fd template = do
@@ -65,6 +67,17 @@ createDir destDir = do
     tdir <- getTemporaryDirectory
     let template = snd . splitFileName . fst . splitExtensions $ destDir
     createTempDirectory tdir template
+
+createOutputDir destDir = do
+    tdir <- getTemporaryDirectory
+    let template = snd . splitFileName . fst . splitExtensions $ destDir
+        tdir' = tdir </> defaultDir
+    _ <- createDirIfExists tdir'
+    createTempDirectory tdir' template
+
+createDirIfExists tdir =  do
+  exists <- doesDirectoryExist tdir
+  when (not exists) $ createDirectory tdir 
 
 
 createTempDirectory :: FilePath -> String -> IO FilePath

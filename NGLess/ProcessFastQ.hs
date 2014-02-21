@@ -96,6 +96,7 @@ readFastQ fname = do
         putStrLn $ "File: " ++ fname ++ " loaded"
         return $ NGOReadSet (B.pack fname) (ord (lc fileData))
 
+
 showRead :: Int -> NGLessObject -> BL.ByteString
 showRead enc (NGOShortRead a b c) =  BL.pack ((T.unpack a) ++ "\n" ++ (B.unpack b) ++ "\n+\n" ++ (encodeQual enc (B.unpack c)))
 showRead _ _ = error "error: The argument must be a read."

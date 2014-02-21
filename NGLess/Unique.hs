@@ -26,7 +26,7 @@ import System.FilePath.Posix
 type UnrepeatedRead = Map B.ByteString [NGLessObject]
 
 maxFileSize :: Num a => a
-maxFileSize = 30000000 -- 50MB
+maxFileSize = 30000000 -- 30MB
 
 calcSize :: Integer -> Integer
 calcSize s = ceiling $ ((fromInteger s) / maxFileSize :: Double) 
