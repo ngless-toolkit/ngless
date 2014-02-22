@@ -19,8 +19,10 @@ import Control.Monad
 
 import System.Posix.Internals (c_getpid)
 
-defaultDir :: String
-defaultDir = "ngless.outputs/"
+defaultDir :: IO String
+defaultDir = do 
+  tdir <- getTemporaryDirectory
+  return $ tdir </> "ngless.outputs/"
 
 isDot :: FilePath -> Bool
 isDot f = f `notElem` [".", ".."]
@@ -69,9 +71,8 @@ createDir destDir = do
     createTempDirectory tdir template
 
 createOutputDir destDir = do
-    tdir <- getTemporaryDirectory
     let template = snd . splitFileName . fst . splitExtensions $ destDir
-        tdir' = tdir </> defaultDir
+    tdir' <- defaultDir
     _ <- createDirIfExists tdir'
     createTempDirectory tdir' template
 
