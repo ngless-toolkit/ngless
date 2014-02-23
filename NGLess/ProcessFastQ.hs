@@ -22,6 +22,8 @@ import qualified Data.Map as Map
 
 import Data.Char
 
+import Control.Monad
+
 import System.FilePath.Posix
 
 import FileManagement
@@ -39,20 +41,32 @@ unCompress fname =
 
 appendFile' = BL.appendFile
 
-getNGOString (Just (NGOString s)) = T.unpack s
+getNGOString (Just (NGOString s)) = s
 getNGOString _ = error "Error: Type is different of String"
 
-writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO NGLessObject   
-writeToFile (NGOReadSet path enc) args = do
-    let map' = Map.fromList args
-        destFilePath = Map.lookup (T.pack "ofile") map'
-        newfp = getNGOString destFilePath
+
+
+elFromMap el args = Map.lookup (T.pack el) (Map.fromList args)
+
+--        newfp = getNGOString destFilePath
+writeToUncFile (NGOReadSet path enc) newfp = do
+    let newfp' = T.unpack newfp
     contents' <- readPossiblyCompressedFile path
-    write newfp $ contents' 
-    return $ NGOReadSet (B.pack newfp) enc
+    write newfp' $ contents' 
+    return $ NGOReadSet (B.pack newfp') enc
+
+writeToUncFile err _ = error ("writeToUncFile: Should have received a NGOReadSet, but the type was: " ++ (show err))
+
+writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO NGLessObject   
+writeToFile el@(NGOReadSet _ _) args = do
+    let newfp = getNGOString ( elFromMap "ofile" args )
+    writeToUncFile el newfp
 
 writeToFile (NGOList el) args = do
-    res <- mapM (\x -> writeToFile x args) el
+    let templateFP = getNGOString ( elFromMap "ofile" args )
+        indexFPs = map (T.pack . show) [1..(length el)]
+        newFPS' = map (\x -> T.replace (T.pack "{index}") x templateFP) indexFPs
+    res <- zipWithM (\x y -> writeToUncFile x y) el newFPS'
     return (NGOList res)
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
@@ -72,7 +86,6 @@ writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents
 
 write :: String -> BL.ByteString -> IO ()
 write fp contents = BL.writeFile fp contents 
-
 
 readPossiblyCompressedFile ::  B.ByteString -> IO BL.ByteString
 readPossiblyCompressedFile fileName = unCompress (B.unpack fileName)
