@@ -33,9 +33,9 @@ getFilesInDir p = do
  return $ map ((</>) p) (filter (isDot) files)
 
 
-setupRequiredFiles :: FilePath -> IO FilePath
-setupRequiredFiles destDir = do
-    destDir' <- createOutputDir destDir 
+setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
+setupRequiredFiles destDir info = do
+    destDir' <- createOutputDir destDir info
     copyFile "Html/index.html" (destDir' ++ "/index.html")
     copyFile "Html/perBaseQualScores.css" (destDir' ++ "/perBaseQualScores.css")
     copyFile "Html/perBaseQualityScores.js" (destDir' ++ "/perBaseQualityScores.js")
@@ -49,13 +49,13 @@ generateTempFilePath fd template = do
 
 getTempFilePath :: FilePath -> IO FilePath
 getTempFilePath fp = do
-    let oldFilePath = splitFileName . fst . splitExtensions $ fp
+    let oldFilePath = splitFileName . fst . break ((==) '$') . fst . splitExtensions $ fp
     generateTempFilePath (fst oldFilePath) (snd oldFilePath)
     
 
 getTFilePathComp :: FilePath -> IO FilePath
 getTFilePathComp fp = do
-    let oldFilePath = splitFileName . fst . splitExtensions $ fp
+    let oldFilePath = splitFileName . fst . break ((==) '$') . fst . splitExtensions $ fp
     generateTempFilePath (fst oldFilePath) ((snd oldFilePath) ++ ".gz")
     
 
@@ -68,13 +68,18 @@ removeFileIfExists fp = do
 createDir destDir = do
     tdir <- getTemporaryDirectory
     let template = snd . splitFileName . fst . splitExtensions $ destDir
-    createTempDirectory tdir template
+    fp <- createTempDirectory tdir template
+    createDirectory fp
+    return fp
 
-createOutputDir destDir = do
+createOutputDir destDir info = do
     let template = snd . splitFileName . fst . splitExtensions $ destDir
     tdir' <- defaultDir
     _ <- createDirIfExists tdir'
-    createTempDirectory tdir' template
+    fp <- createTempDirectory tdir' template
+    let fp' = (fp ++ "$" ++ info)
+    createDirectory fp'
+    return fp'
 
 createDirIfExists tdir =  do
   exists <- doesDirectoryExist tdir
@@ -85,11 +90,10 @@ createTempDirectory :: FilePath -> String -> IO FilePath
 createTempDirectory dir template = do
   pid <- c_getpid
   fp <- findTempName pid
-  createDirectory fp
   return fp
   where
     findTempName x = do
-      let dirpath = dir </> template ++ show x
+      let dirpath = dir </> template ++ "." ++ show x
       r <- doesDirectoryExist dirpath
       case r of
         False  -> return dirpath

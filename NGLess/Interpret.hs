@@ -228,11 +228,11 @@ executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = do
     res <- mapM (executeQualityProcess) e
     return (NGOList res)
-executeQualityProcess (NGOString fname) = executeQualityProcess' (T.unpack fname)
-executeQualityProcess (NGOReadSet fname _) = executeQualityProcess' (B.unpack fname) 
+executeQualityProcess (NGOString fname) = executeQualityProcess' (T.unpack fname) "beforeQC"
+executeQualityProcess (NGOReadSet fname _) = executeQualityProcess' (B.unpack fname) "afterQC"
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
 
-executeQualityProcess' fname = liftIO $ readFastQ fname
+executeQualityProcess' fname info = liftIO $ readFastQ fname info
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> InterpretationEnvIO NGLessObject
 executeUnique (NGOList e) args v = do

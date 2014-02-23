@@ -106,11 +106,11 @@ parseReadSet enc contents = parse' . (fmap BL.unpack) . BL.lines $ contents
 decodeQual enc = fmap (chr . (flip (-) enc) . ord)
 encodeQual enc = fmap (chr . (flip (+) enc) . ord)
 
-readFastQ :: FilePath -> IO NGLessObject
-readFastQ fname = do
+readFastQ :: FilePath -> FilePath -> IO NGLessObject
+readFastQ fname info = do
         contents <- unCompress fname
         let fileData = iterateFile contents
-        destDir <- setupRequiredFiles fname
+        destDir <- setupRequiredFiles fname info
         putStrLn $ "Generation of statistics for " ++ destDir
         createBasicStatsJson (destDir ++ "/basicStats.js") fileData fname -- generate JSON DATA file: basicStats.js
         putStrLn $ "Simple Statistics for: " ++ destDir ++ " completed "  ++ (show $ length (qualCounts fileData)) ++ " Base pairs."
