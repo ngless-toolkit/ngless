@@ -40,15 +40,20 @@ unCompress fname =
 appendFile' = BL.appendFile
 
 getNGOString (Just (NGOString s)) = T.unpack s
-getNGOString _ = "Error: Type is different of String"
+getNGOString _ = error "Error: Type is different of String"
 
-writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO (B.ByteString, NGLessObject)   
+writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO NGLessObject   
 writeToFile (NGOReadSet path enc) args = do
     let map' = Map.fromList args
         destFilePath = Map.lookup (T.pack "ofile") map'
         newfp = getNGOString destFilePath
-    copyFile (B.unpack path) newfp
-    return $ (path, NGOReadSet (B.pack newfp) enc)
+    contents' <- readPossiblyCompressedFile path
+    write newfp $ contents' 
+    return $ NGOReadSet (B.pack newfp) enc
+
+writeToFile (NGOList el) args = do
+    res <- mapM (\x -> writeToFile x args) el
+    return (NGOList res)
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
@@ -64,6 +69,10 @@ asFastQ rs enc = BL.unlines . (fmap (showRead enc)) $ rs
 
 writeGZIP :: String -> BL.ByteString -> IO ()
 writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents 
+
+write :: String -> BL.ByteString -> IO ()
+write fp contents = BL.writeFile fp contents 
+
 
 readPossiblyCompressedFile ::  B.ByteString -> IO BL.ByteString
 readPossiblyCompressedFile fileName = unCompress (B.unpack fileName)
