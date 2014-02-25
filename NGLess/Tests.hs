@@ -8,9 +8,8 @@ module Main where
 import qualified Data.Map as M
 import Test.Framework.TH
 import Test.HUnit
-import Test.QuickCheck
 import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2()
+import Test.Framework.Providers.QuickCheck2
 import Control.Applicative
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
@@ -176,8 +175,19 @@ case_seq_size_first_invocation = seqMinMax (maxBound :: Int, minBound :: Int) 10
 case_seq_size_max_update = seqMinMax (5,6) 10 @?= (5,10)
 case_seq_size_min_update = seqMinMax (5,6) 2 @?= (2,6)
 
---Propertie 1: For every s, the size must be allways smaller than the input
-case_substrim_maxsize = quickCheck (\s -> snd(calculateSubStrim s 20) <= length(s))
+--Property 1: For every s, the size must be allways smaller than the input
+prop_substrim_maxsize s = st >= 0 && e <= length s
+    where (st,e) = calculateSubStrim s 20
+
+-- Property 2: substrim should be idempotent
+prop_substrim_idempotent s = st == 0 && e == length s1
+    where
+        s1 = removeBps s (calculateSubStrim s 20)
+        (st,e) = calculateSubStrim s1 20
+                        
+                       
+
+
 case_substrim_normal_exec =  calculateSubStrim [10,11,12,123,122,111,10,11,0] 20 @?= (3,3)
 case_substrim_empty_quals = calculateSubStrim [] 20 @?= (0,0)
 
