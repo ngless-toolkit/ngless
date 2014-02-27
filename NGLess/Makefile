@@ -12,6 +12,7 @@ SOURCES :=  \
 	PrintFastqBasicStats.hs \
 	ProcessFastQ.hs \
 	PerBaseQualityScores.hs \
+	FPreProcess.hs \
 	Unique.hs
 
 
