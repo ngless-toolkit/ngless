@@ -1,7 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 module FPreProcess
-    ( FPreProcess.Read(..)
-    , substrim
+    ( substrim
     , calculateSubStrim
     , removeBps
     ) where
@@ -11,7 +10,6 @@ import qualified Data.ByteString.Char8 as B
 import Data.Char
 import Language
 
-data Read = Read {readId :: String, seq :: String, qual::String} deriving (Show,Eq, Prelude.Read)
 
 removeBps :: [a] -> (Int,Int) -> [a]
 removeBps bps (index,size) = take size (drop index bps)
