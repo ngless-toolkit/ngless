@@ -39,14 +39,10 @@ writeToNFiles fname enc rs = do
     numFiles' <- numFiles fname
     let k = fromIntegral numFiles'
     fhs <- openKFileHandles k dest    
-
-   
     _ <- putStrLn ("Start to write" ++ (show numFiles') ++ "Files to: " ++ dest)
-
     forM_ rs $ \x -> do
         let pos = readFileN' k x
         appendFile' (fhs !! pos) (showRead enc x)
-
     _ <- putStrLn ("Wrote N Files to: " ++ dest)
     _ <- closekFileHandles fhs
     return dest
