@@ -8,7 +8,10 @@ module FileManagement
         getTFilePathComp,
         getTemporaryDirectory,
         getFileSize,
-        setupRequiredFiles
+        setupRequiredFiles,
+        openKFileHandles,
+        closekFileHandles,
+        numFiles
     ) where
 
 import System.FilePath.Posix
@@ -18,6 +21,26 @@ import System.IO
 import Control.Monad
 
 import System.Posix.Internals (c_getpid)
+
+
+maxFileSize :: Num a => a
+maxFileSize = 100000000 -- 100MB
+
+calcSize :: Integer -> Integer
+calcSize s = ceiling $ ((fromInteger s) / maxFileSize :: Double) 
+
+numFiles :: FilePath -> IO Integer
+numFiles path = do
+    size' <- getFileSize path
+    return $ calcSize size'
+
+openKFileHandles :: Int -> FilePath -> IO [Handle]
+openKFileHandles k dest = do
+    forM [0..k] $ \x -> do
+        openFile (dest </> (show x)) AppendMode
+
+closekFileHandles :: [Handle] -> IO ()
+closekFileHandles fhs = mapM_ (hClose) fhs
 
 defaultDir :: IO String
 defaultDir = do 

@@ -39,11 +39,10 @@ unCompress fname =
         then fmap GZip.decompress (BL.readFile fname)
         else BL.readFile fname -- not compressed
 
-appendFile' = BL.appendFile
+appendFile' = BL.hPutStrLn
 
 getNGOString (Just (NGOString s)) = s
 getNGOString _ = error "Error: Type is different of String"
-
 
 
 elFromMap el args = Map.lookup (T.pack el) (Map.fromList args)
