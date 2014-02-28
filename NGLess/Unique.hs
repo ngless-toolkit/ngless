@@ -67,7 +67,8 @@ putk _ [] e = e
 putk k (r:rs) e = putk k rs (put1k k r e)
 
 put1k :: Int -> NGLessObject -> UnrepeatedRead -> UnrepeatedRead
-put1k k r e = case Map.lookup (readSeq r) e of
-    Just rs | length rs == k -> e
-    Just rs -> Map.insert (readSeq r) (r:rs) e 
-    Nothing -> Map.insert (readSeq r) [r] e 
+put1k k r e = Map.alter insertk (readSeq r) e
+    where
+        insertk Nothing = Just [r]
+        insertk (Just rs) | length rs == k = Just rs
+        insertk (Just rs) = Just (r:rs)
