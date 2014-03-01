@@ -14,9 +14,13 @@ import Control.Applicative
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
 import Text.ParserCombinators.Parsec.Prim (GenParser)
-import qualified Data.Text as T
 import Text.Parsec (SourcePos)
 import Text.Parsec.Pos (newPos)
+
+
+import qualified Data.Text as T
+import qualified Data.ByteString.Char8 as B
+
 
 import Language
 import Interpret
@@ -30,7 +34,6 @@ import FPreProcess
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
-
 
 -- Test Parsing Module
 parseText :: GenParser (SourcePos,Token) () a -> T.Text -> a
@@ -175,21 +178,23 @@ case_seq_size_first_invocation = seqMinMax (maxBound :: Int, minBound :: Int) 10
 case_seq_size_max_update = seqMinMax (5,6) 10 @?= (5,10)
 case_seq_size_min_update = seqMinMax (5,6) 2 @?= (2,6)
 
+
+--- SETUP to reduce imports.
+-- test array: "\n\v\f{zo\n\v\NUL" -> [10,11,12,123,122,111,10,11,0]
+-- test cutoff: chr 20 -> '\DC4'
+
 --Property 1: For every s, the size must be allways smaller than the input
-prop_substrim_maxsize s = st >= 0 && e <= length s
-    where (st,e) = calculateSubStrim s 20
+prop_substrim_maxsize s = st >= 0 && e <= B.length (B.pack s)
+    where (st,e) = calculateSubStrim (B.pack s) '\DC4'
 
 -- Property 2: substrim should be idempotent
-prop_substrim_idempotent s = st == 0 && e == length s1
+prop_substrim_idempotent s = st == 0 && e == B.length s1
     where
-        s1 = removeBps s (calculateSubStrim s 20)
-        (st,e) = calculateSubStrim s1 20
+        s1 = removeBps (B.pack s) (calculateSubStrim (B.pack s) '\DC4')
+        (st,e) = calculateSubStrim s1 '\DC4'
                         
-                       
-
-
-case_substrim_normal_exec =  calculateSubStrim [10,11,12,123,122,111,10,11,0] 20 @?= (3,3)
-case_substrim_empty_quals = calculateSubStrim [] 20 @?= (0,0)
+case_substrim_normal_exec =  calculateSubStrim "\n\v\f{zo\n\v\NUL" '\DC4' @?= (3,3)
+case_substrim_empty_quals = calculateSubStrim "" '\DC4' @?= (0,0)
 
 -- Test Types
 isError (Right _) = assertFailure "error not caught"
