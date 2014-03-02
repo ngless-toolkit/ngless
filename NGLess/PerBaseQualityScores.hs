@@ -55,21 +55,21 @@ calculateStatistics qCounts minChar = Prelude.map (statistics encScheme') qCount
 --statistics :: Calculates the Quality Statistics of a given FastQ.
 statistics :: Fractional a => Int -> Map Char Int -> (a, Int, Int, Int)
 statistics encScheme bpQualCount = (calcMean bpQualCount encScheme elemTotal' ,
-                                   (subtract encScheme) $ calcPerc' percentile50,
-                                   (subtract encScheme) $ calcPerc' lowerQuartile,
-                                   (subtract encScheme) $ calcPerc' upperQuartile)
-        where keySet = keys bpQualCount
-              elemTotal' = Map.fold (+) 0 bpQualCount
-              keySet' = Prelude.map (ord) keySet
+                                   (calcPerc' percentile50) - encScheme,
+                                   (calcPerc' lowerQuartile) - encScheme,
+                                   (calcPerc' upperQuartile) - encScheme)
+        where keySet' = keys bpQualCount
               elemSet' = elems bpQualCount
-              calcPerc' = calcPerc keySet' elemSet' elemTotal'
+              elemTotal' = Map.fold (+) 0 bpQualCount
+              calcPerc' x = ord $ calcPerc keySet' elemSet' elemTotal' x
 
 -- calcMean :: Used to calculate the mean
 calcMean _ _ 0 = error "The total number of quality elements in the fastQ needs to be higher than 0"
 calcMean bpQualCount encScheme elemTotal = fromIntegral bpSum' / fromIntegral elemTotal
     where bpSum' = foldWithKey (\k a b -> (((ord k) - encScheme) * a) + b) 0 bpQualCount
 
---calcPerc :: Given a specific percentil,  calculates it's results. 
+--calcPerc :: Given a specific percentil,  calculates it's results.
+
 calcPerc keySet elemSet elemTotal perc = keySet !! (accUntilLim elemSet val')
     where val' = (ceiling (fromIntegral elemTotal * perc) :: Int) 
 

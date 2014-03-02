@@ -13,8 +13,8 @@ import Control.Monad.ST
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 
-import qualified Data.Vector as V
-import qualified Data.Vector.Generic.Mutable as VM
+import qualified Data.Vector.Unboxed as V
+import qualified Data.Vector.Unboxed.Mutable as VM
 
 import Data.Map
 import Data.Char
@@ -75,5 +75,5 @@ iterateFile contents = iterateFile' initial (BL.lines contents)
                 initial = Result (0,0,0,0) '~' [] 0 (maxBound :: Int, minBound :: Int)
                 iterateFile' r (_:seq':_:quals:xs) = r `deepseq`
                         iterateFile' (updateResults r seq' quals) xs
-                iterateFile' !r [] = r `deepseq` r
+                iterateFile' r [] = r
                 iterateFile' _ _  = error "Number of lines is not multiple of 4!"

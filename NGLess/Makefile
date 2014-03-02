@@ -1,6 +1,6 @@
 all: ngless nglesstest
 .PHONY: all clean
-GHCOPTS := -odir .objs -hidir .objs -Wall -fwarn-tabs -fno-warn-missing-signatures 
+GHCOPTS := -odir .objs -hidir .objs -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded
 
 SOURCES :=  \
 	Interpret.hs \
