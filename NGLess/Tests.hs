@@ -17,10 +17,8 @@ import Text.ParserCombinators.Parsec.Prim (GenParser)
 import Text.Parsec (SourcePos)
 import Text.Parsec.Pos (newPos)
 
-
 import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as B
-
 
 import Language
 import Interpret
@@ -164,7 +162,7 @@ case_add_Qual_Count_without_bp = addToCount [] "!!!" @?= replicate 3 (M.fromList
 case_add_Qual_Count_with_existing_bp = addToCount (replicate 3 (M.fromList [('!',1)])) "!!!" @?= replicate 3 (M.fromList [('!',2)])
 
 --Test the calculation of the Mean
-case_calc_simple_mean = calcMean ([1,2] :: [Integer]) [1,2] (2 :: Integer) @?= (2.5 :: Double) -- 5/2
+case_calc_simple_mean = calcMean (M.fromList[('b',1),('d',3)]) 50 (4 :: Integer) @?= (49.5 :: Double) -- 198/50
 --TODO: compare returned errors to the Mean and Percentile
 --case_calc_mean_error = calcMean ([] :: [Integer]) [] (0 :: Integer) @?= error "The total number of quality elements in the fastQ needs to be higher than 0"
 

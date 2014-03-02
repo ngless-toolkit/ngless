@@ -14,7 +14,7 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 
 import qualified Data.Vector as V
-import qualified Data.Vector.Mutable as VM
+import qualified Data.Vector.Generic.Mutable as VM
 
 import Data.Map
 import Data.Char
@@ -39,7 +39,7 @@ addToCount counts qual = addToCount' counts qual
 
 wc :: BL.ByteString -> V.Vector Int
 wc st = runST $ do
-    counts <- VM.new 256 -- number max of chars
+    counts <- VM.unsafeNew 256 -- number max of chars
     forM_ [0..255] $ \i -> do
         VM.unsafeWrite counts i 0
     forM_ (BL.toChunks st) $ \c -> do
