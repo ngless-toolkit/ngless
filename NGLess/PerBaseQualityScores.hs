@@ -6,12 +6,15 @@ module PerBaseQualityScores
         calcPerc
     ) where
 
-import Data.Map as Map
-import Data.Char
+import qualified Data.Vector.Unboxed as V
 
 import System.FilePath.Posix
 
 import PrintFastqBasicStats
+
+import Control.Monad.ST
+import Data.STRef
+import Control.Monad
 
 -- JSON File Dest
 dataFileName = "perbaseQualScoresData.js"
@@ -25,13 +28,13 @@ upperQuartile = 0.75 :: Double
 
 -- accUntilLim :: given lim, each position of the array is added until lim. 
 -- Is returned the elem of the array in that position.
-accUntilLim :: [Int] -> Int -> Int
-accUntilLim array lim = accUntilLim' array 0 0
-    where  accUntilLim' (x:xs) acc offset' = if (acc + x) >= lim 
-                                                  then offset' 
-                                                  else accUntilLim' xs (acc + x) (1 + offset')
-           accUntilLim' [] acc _ = error ("ERROR: The accumulator has value" ++ show acc ++ " and is never higher than " ++ show lim )
-         
+accUntilLim :: V.Vector Int -> Int -> Int
+accUntilLim bps lim = do 
+    let i = V.findIndex (> lim) $ V.postscanl (+) 0 bps
+    case i of
+      Just v -> v
+      Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ (show i))
+
 -- TODO: lQ, uQ, tenthPerc, ninetiethPerc
 concatData :: (Double, Int, Int, Int) -> String -> Int -> String
 concatData (mean, median, lq, uq) content bp =
@@ -53,23 +56,30 @@ calculateStatistics qCounts minChar = Prelude.map (statistics encScheme') qCount
     where encScheme' = offset (calculateEncoding minChar)
 
 --statistics :: Calculates the Quality Statistics of a given FastQ.
-statistics :: Fractional a => Int -> Map Char Int -> (a, Int, Int, Int)
-statistics encScheme bpQualCount = (calcMean bpQualCount encScheme elemTotal' ,
+statistics :: Fractional a => Int -> V.Vector Int -> (a, Int, Int, Int)
+statistics encScheme bps = (calcMean bpSum' elemTotal' ,
                                    (calcPerc' percentile50) - encScheme,
                                    (calcPerc' lowerQuartile) - encScheme,
                                    (calcPerc' upperQuartile) - encScheme)
-        where keySet' = keys bpQualCount
-              elemSet' = elems bpQualCount
-              elemTotal' = Map.fold (+) 0 bpQualCount
-              calcPerc' x = ord $ calcPerc keySet' elemSet' elemTotal' x
+        where bpSum' = calcBPSum bps encScheme
+              elemTotal' = V.sum bps
+              calcPerc' x = calcPerc bps elemTotal' x
+
+-- Calculates [('a',1), ('b',2)] = 0 + 'a' * 1 + 'b' * 2 . 
+-- 'a' and 'b' minus encoding.
+calcBPSum qc es = runST $ do
+              n <- newSTRef 0
+              let s = V.length qc
+              forM_ [0..s - 1] $ \i -> do
+                  modifySTRef n ((+) $ (i - es) * (V.unsafeIndex qc i))
+              readSTRef n
 
 -- calcMean :: Used to calculate the mean
-calcMean _ _ 0 = error "The total number of quality elements in the fastQ needs to be higher than 0"
-calcMean bpQualCount encScheme elemTotal = fromIntegral bpSum' / fromIntegral elemTotal
-    where bpSum' = foldWithKey (\k a b -> (((ord k) - encScheme) * a) + b) 0 bpQualCount
+calcMean _ 0 = error "The total number of quality elements in the fastQ needs to be higher than 0"
+calcMean bpSum elemTotal = fromIntegral bpSum / fromIntegral elemTotal
+
 
 --calcPerc :: Given a specific percentil,  calculates it's results.
-
-calcPerc keySet elemSet elemTotal perc = keySet !! (accUntilLim elemSet val')
+calcPerc bps elemTotal perc = accUntilLim bps val'
     where val' = (ceiling (fromIntegral elemTotal * perc) :: Int) 
 
