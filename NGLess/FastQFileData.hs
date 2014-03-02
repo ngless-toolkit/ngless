@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module FastQFileData
     (
         Result(..),  iterateFile, addToCount, countChars, seqMinMax
@@ -30,27 +32,13 @@ mapAddFunction _ new_value old_value = old_value + new_value
 addEachCount :: Map Char Int -> Char -> Map Char Int
 addEachCount counts qual = insertWithKey mapAddFunction qual 1 counts
 
-{--
+ 
 addToCount :: [Map Char Int] -> BL.ByteString -> [Map Char Int]
-addToCount counts qual = runST $ do
-    let sQual = BL.toStrict qual
-        sSize = B.length sQual
-        cLength = length counts
-    res <- VM.new sSize
-    forM_ [0..sSize - 1] $ \i -> do
-        if i >= cLength
-            then VM.write res i $ addEachCount (fromList []) (B.index sQual i)
-            else VM.write res i $ addEachCount (counts !! i) (B.index sQual i)
-    res' <- V.unsafeFreeze res
-    return $ V.toList res'
---}
-  
-addToCount :: [Map Char Int] -> String -> [Map Char Int]
 addToCount counts qual = addToCount' counts qual
         where
-            addToCount' (c:xs) (q:ys) = (addEachCount c q) : addToCount' xs ys
-            addToCount' [] (q:ys) = (addEachCount (fromList []) q) : addToCount' [] ys 
-            addToCount' c [] = c
+            addToCount' c "" = c -- c size > q bps
+            addToCount' [] q = addEachCount (fromList []) ( BL.head q ) : addToCount' [] (BL.tail q)  -- c size < q bps
+            addToCount' (c:xs) q = addEachCount c (BL.head q) : addToCount' xs (BL.tail q) -- normal case 1 to 1
 
 wc :: BL.ByteString -> V.Vector Int
 wc st = runST $ do
@@ -79,7 +67,7 @@ seqMinMax (minSeq, maxSeq) length' = ((min length' minSeq),(max length' maxSeq))
 updateResults :: Result -> BL.ByteString -> BL.ByteString -> Result
 updateResults fileData seq' qual = Result (countChars (bpCounts fileData) seq')
                                          (BL.foldr min (lc fileData) qual)
-                                         (addToCount (qualCounts fileData) (BL.unpack qual))
+                                         (addToCount (qualCounts fileData) qual)
                                          ((nSeq fileData) + 1)
                                          (seqMinMax (seqSize fileData) (fromIntegral (BL.length seq')))
 
