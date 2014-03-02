@@ -25,12 +25,9 @@ instance NFData Result where
     rnf (Result (!_,!_,!_,!_) !_ cs !_ (!_,!_)) = rnf cs
 
 
--- mapAddFunction :: To increase the old_value value by 1 of a given key.
-mapAddFunction _ new_value old_value = old_value + new_value
-
 -- addEachCount :: Update Map counts with a new quality.
 addEachCount :: Map Char Int -> Char -> Map Char Int
-addEachCount counts qual = insertWithKey mapAddFunction qual 1 counts
+addEachCount counts qual = insertWith (+) qual 1 counts
 
  
 addToCount :: [Map Char Int] -> BL.ByteString -> [Map Char Int]
