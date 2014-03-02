@@ -56,12 +56,12 @@ wc :: BL.ByteString -> V.Vector Int
 wc st = runST $ do
     counts <- VM.new 256 -- number max of chars
     forM_ [0..255] $ \i -> do
-        VM.write counts i 0
+        VM.unsafeWrite counts i 0
     forM_ (BL.toChunks st) $ \c -> do
         forM_ [0..B.length c - 1] $ \i -> do
             let w = ord . toUpper $ B.index c i
-            cur <- VM.read counts w
-            VM.write counts w (1 + cur)
+            cur <- VM.unsafeRead counts w
+            VM.unsafeWrite counts w (1 + cur)
     res <- V.unsafeFreeze counts
     return res
 
