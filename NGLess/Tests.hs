@@ -5,7 +5,7 @@ module Main where
 
 -- Import basic functionality and our own modules
 
-import qualified Data.Map as M
+
 import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
@@ -17,8 +17,8 @@ import Text.ParserCombinators.Parsec.Prim (GenParser)
 import Text.Parsec (SourcePos)
 import Text.Parsec.Pos (newPos)
 
-import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as B
+import qualified Data.Text as T
 
 import Language
 import Interpret
@@ -157,19 +157,33 @@ case_calculateEncoding_sanger = calculateEncoding 55 @?= Encoding "Sanger / Illu
 case_calculateEncoding_illumina_1 = calculateEncoding 60 @?= Encoding "Illumina <1.3" illumina_1_encoding_offset
 case_calculateEncoding_illumina_1_5 = calculateEncoding 100 @?= Encoding "Illumina 1.5" illumina_1_3_encoding_offset
 
+-- Auxiliary functions
+initVec' = addEachCount initVec '!'
+initVec'' = do
+    let i1 = iterate (\x -> addEachCount x '\STX') initVec !! 1
+        i2 = iterate (\x -> addEachCount x '\ENQ') i1 !! 1
+    iterate (\x -> addEachCount x '\n'  ) i2 !! 1
+
 -- Test the insertion of Quality Counts
-case_add_Qual_Count_without_bp = addToCount [] "!!!" @?= replicate 3 (M.fromList [('!',1)])
-case_add_Qual_Count_with_existing_bp = addToCount (replicate 3 (M.fromList [('!',1)])) "!!!" @?= replicate 3 (M.fromList [('!',2)])
+case_add_Qual_Count_without_bp = addToCount [] "!!!" @?= replicate 3 initVec'
+case_add_Qual_Count_with_existing_bp = addToCount (replicate 3 initVec') "!!!" @?= replicate 3 (addEachCount initVec' '!')
+case_add_Qual_Count_without_existing_bp = addToCount (replicate 3 initVec') "" @?= (replicate 3 initVec') 
 
 --Test the calculation of the Mean
-case_calc_simple_mean = calcMean (M.fromList[('b',1),('d',3)]) 50 (4 :: Integer) @?= (49.5 :: Double) -- 198/50
---TODO: compare returned errors to the Mean and Percentile
---case_calc_mean_error = calcMean ([] :: [Integer]) [] (0 :: Integer) @?= error "The total number of quality elements in the fastQ needs to be higher than 0"
+case_calc_simple_mean = calcMean (500 :: Int) (10 :: Int) @?= (50 :: Double) 
 
 --Test the calculation of the Percentile
-case_calc_median = calcPerc ([2,5,10] :: [Integer]) [1,5,1] (7 :: Integer) (0.5 :: Double) @?= (5 :: Integer)
-case_calc_Low_Quart = calcPerc ([2,5,10] :: [Integer]) [1,1,1] (3 :: Integer) (0.25 :: Double) @?= (2 :: Integer)
-case_calc_Upper_Quart = calcPerc ([2,5,10] :: [Integer]) [1,1,1] (3 :: Integer) (0.75 :: Double) @?= (10 :: Integer)
+--    2 -> 1
+--    5 -> 5
+--    10-> 1
+case_calc_median = calcPerc  (iterate (\x -> addEachCount x '\ENQ') initVec'' !! 4) (7 :: Integer) (0.5 :: Double) @?= (5 :: Int)
+
+--Test the calculation of the Percentile
+--    2 -> 1
+--    5 -> 1
+--    10-> 1
+case_calc_Low_Quart = calcPerc initVec''  (3 :: Integer) (0.25 :: Double) @?= (2 :: Int)
+case_calc_Upper_Quart = calcPerc initVec'' (3 :: Integer) (0.75 :: Double) @?= (10 :: Int)
 
 --Calculate Sequence min and max Size
 case_seq_size_first_invocation = seqMinMax (maxBound :: Int, minBound :: Int) 10 @?= (10,10)

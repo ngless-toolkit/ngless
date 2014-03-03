@@ -3,7 +3,7 @@
 
 module FastQFileData
     (
-        Result(..),  iterateFile, addToCount, countChars, seqMinMax
+        Result(..), initVec, iterateFile, addToCount, countChars, seqMinMax, addEachCount
     ) where
 
 import Control.DeepSeq
@@ -16,7 +16,6 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Unboxed.Mutable as VM
 
-import Data.Map
 import Data.Char
 
 data Result =  Result {bpCounts :: (Int, Int, Int, Int) , lc :: Char, qualCounts ::  [V.Vector Int], nSeq :: Int, seqSize :: (Int,Int)} deriving(Show)
@@ -24,7 +23,9 @@ data Result =  Result {bpCounts :: (Int, Int, Int, Int) , lc :: Char, qualCounts
 instance NFData Result where
     rnf (Result (!_,!_,!_,!_) !_ cs !_ (!_,!_)) = rnf cs
 
-
+{-
+    Auxiliary functions to work with Mutable Vectors.
+-}
 
 initVec :: V.Vector Int
 initVec = runST $ do
@@ -46,6 +47,8 @@ wc st = runST $ do
             VM.unsafeWrite counts w (1 + cur)
     res <- V.unsafeFreeze counts
     return res
+
+
 
 -- addEachCount :: Update Map counts with a new quality.
 addEachCount :: V.Vector Int -> Char -> V.Vector Int

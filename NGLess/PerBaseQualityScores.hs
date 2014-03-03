@@ -30,7 +30,7 @@ upperQuartile = 0.75 :: Double
 -- Is returned the elem of the array in that position.
 accUntilLim :: V.Vector Int -> Int -> Int
 accUntilLim bps lim = do 
-    let i = V.findIndex (> lim) $ V.postscanl (+) 0 bps
+    let i = V.findIndex (>= lim) $ V.postscanl (+) 0 bps
     case i of
       Just v -> v
       Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ (show i))
