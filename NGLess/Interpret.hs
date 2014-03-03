@@ -219,7 +219,6 @@ topFunction Fwrite expr args _ = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
     res' <- liftIO (writeToFile expr' args')
---    setVariableValue (T.pack (B.unpack $ fst res')) (snd res')
     return res'
 
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"

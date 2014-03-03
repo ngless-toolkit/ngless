@@ -71,7 +71,7 @@ countChars :: (Int,Int,Int,Int) -> BL.ByteString -> (Int,Int,Int,Int)
 countChars (a,b,c,d) s = do 
     let res = wc s
     (a + getCount res 'A', b + getCount res 'C', c + getCount res 'G', d + getCount res 'T') 
-    where getCount res pos = (res V.! (ord pos)) 
+    where getCount res pos = (V.unsafeIndex res (ord pos)) 
 
 
 seqMinMax :: (Int,Int) -> Int -> (Int,Int)
