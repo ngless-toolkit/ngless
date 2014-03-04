@@ -17,15 +17,16 @@ module ProcessFastQ
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
-import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as B
+
 import qualified Codec.Compression.GZip as GZip    
 import qualified Data.Map as Map
-
 import Data.Char
 
-import Control.Monad
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 
+import Control.Monad
 import System.FilePath.Posix
 
 import FileManagement
@@ -95,17 +96,17 @@ readReadSet :: Int -> B.ByteString -> IO [NGLessObject]
 readReadSet enc fn = (parseReadSet enc) `fmap` (readPossiblyCompressedFile fn)
 
 parseReadSet :: Int -> BL.ByteString -> [NGLessObject]
-parseReadSet enc contents = parse' . BL.lines $ contents
+parseReadSet enc contents = parse' . map BL.toStrict . BL.lines $ contents
         where
             parse' [] = []
             parse' xs = (createRead (Prelude.take 4 xs) : parse' (Prelude.drop 4 xs))
-            createRead :: [BL.ByteString] -> NGLessObject
+            createRead :: [B.ByteString] -> NGLessObject
             createRead r = case (Prelude.length r) of
-                4 -> NGOShortRead (T.pack $ BL.unpack $ r !! 0) (BL.toStrict $ r !! 1) (BL.toStrict $ decodeQual enc (r !! 3))
+                4 -> NGOShortRead (TE.decodeUtf8 $ r !! 0) (r !! 1) (decodeQual enc (r !! 3))
                 _ -> error "Number of lines is not multiple of 4!"
 
 -- Change to only apply this function when Pre-Processing
-decodeQual enc = BL.map (chr . (flip (-) enc) . ord)
+decodeQual enc = B.map (chr . (flip (-) enc) . ord)
 encodeQual enc = B.map (chr . (flip (+) enc) . ord)
 
 readFastQ :: FilePath -> FilePath -> IO NGLessObject
@@ -122,5 +123,5 @@ readFastQ fname info = do
 
 --remove encodeQual when not Pre-Processing.
 showRead :: Int -> NGLessObject -> BL.ByteString
-showRead enc (NGOShortRead a b c) = BL.fromChunks [(B.pack (T.unpack a)), "\n", b, "\n+\n", (encodeQual enc c)]
+showRead enc (NGOShortRead a b c) = BL.fromChunks [TE.encodeUtf8 a, "\n", b, "\n+\n", (encodeQual enc c)]
 showRead _ _ = error "error: The argument must be a read."
