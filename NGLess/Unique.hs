@@ -20,7 +20,7 @@ import Language
 import ProcessFastQ
 import FileManagement
 
-type UnrepeatedRead = Map B.ByteString [NGLessObject]
+type UnrepeatedRead = Map B.ByteString (Int, NGLessObject)
 
 
 readFileN :: Int -> NGLessObject -> Int
@@ -60,7 +60,10 @@ readUniqueFile k enc fname = do
     (getk k . parseReadSet enc) `fmap` (readPossiblyCompressedFile fname)
 
 getk :: Int -> [NGLessObject] -> [NGLessObject]
-getk k rs = concat . elems $ putk k rs empty
+getk k rs = Map.fold (\(i,r) b -> addkEl i r b) [] (putk k rs empty)
+    where
+        addkEl 0 _ b = b
+        addkEl i r b = r : addkEl (i - 1) r b 
 
 putk :: Int -> [NGLessObject] -> UnrepeatedRead -> UnrepeatedRead
 putk _ [] e = e
@@ -69,6 +72,6 @@ putk k (r:rs) e = putk k rs (put1k k r e)
 put1k :: Int -> NGLessObject -> UnrepeatedRead -> UnrepeatedRead
 put1k k r e = Map.alter insertk (readSeq r) e
     where
-        insertk Nothing = Just [r]
-        insertk (Just rs) | length rs == k = Just rs
-        insertk (Just rs) = Just (r:rs)
+        insertk Nothing = Just (1, r)
+        insertk (Just b@(a,_)) | a == k = Just b
+        insertk (Just (a,b)) = Just (a + 1, b)

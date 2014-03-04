@@ -24,7 +24,7 @@ import System.Posix.Internals (c_getpid)
 
 
 maxFileSize :: Num a => a
-maxFileSize = 100000000 -- 100MB
+maxFileSize = 300000000 -- 100MB
 
 calcSize :: Integer -> Integer
 calcSize s = ceiling $ ((fromInteger s) / maxFileSize :: Double) 
@@ -36,7 +36,7 @@ numFiles path = do
 
 openKFileHandles :: Int -> FilePath -> IO [Handle]
 openKFileHandles k dest = do
-    forM [0..k] $ \x -> do
+    forM [0..k - 1] $ \x -> do
         openFile (dest </> (show x)) AppendMode
 
 closekFileHandles :: [Handle] -> IO ()
