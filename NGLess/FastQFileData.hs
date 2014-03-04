@@ -10,6 +10,8 @@ import Control.DeepSeq
 import Control.Monad    
 import Control.Monad.ST
 
+import Control.Monad.Par
+
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 
