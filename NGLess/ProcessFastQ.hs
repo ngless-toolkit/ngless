@@ -112,7 +112,7 @@ encodeQual enc = B.map (chr . (flip (+) enc) . ord)
 readFastQ :: FilePath -> FilePath -> IO NGLessObject
 readFastQ fname info = do
         contents <- unCompress fname
-        let fileData = iterateFile contents
+        let fileData = computeStats contents
         destDir <- setupRequiredFiles fname info
         putStrLn $ "Generation of statistics for " ++ destDir
         createBasicStatsJson (destDir ++ "/basicStats.js") fileData fname -- generate JSON DATA file: basicStats.js

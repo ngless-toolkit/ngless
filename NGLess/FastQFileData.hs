@@ -2,12 +2,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module FastQFileData
-    (
-        Result(..), initVec, iterateFile, addToCount, countChars, seqMinMax, addEachCount
+    ( Result(..)
+    , computeStats
     ) where
 
-import Control.DeepSeq
-import Control.Monad    
+import Control.Monad
 import Control.Monad.ST
 
 import Control.Monad.Par
@@ -18,81 +17,71 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Unboxed.Mutable as VM
 
+import Data.STRef
 import Data.Char
 
 data Result =  Result {bpCounts :: (Int, Int, Int, Int) , lc :: Char, qualCounts ::  [V.Vector Int], nSeq :: Int, seqSize :: (Int,Int)} deriving(Show)
 
-instance NFData Result where
-    rnf (Result (!_,!_,!_,!_) !_ cs !_ (!_,!_)) = rnf cs
+-- strict tuple
+data P3 = P3 !Int !Int !Int
 
-{-
-    Auxiliary functions to work with Mutable Vectors.
--}
-
-initVec :: V.Vector Int
-initVec = runST $ do
-    counts <- VM.unsafeNew 256 -- number max of chars
-    forM_ [0..255] $ \i -> do
-        VM.unsafeWrite counts i 0
-    res <- V.unsafeFreeze counts
-    return res        
-
-wc :: BL.ByteString -> V.Vector Int
-wc st = runST $ do
-    counts <- VM.unsafeNew 256 -- number max of chars
-    forM_ [0..255] $ \i -> do
-        VM.unsafeWrite counts i 0
-    forM_ (BL.toChunks st) $ \c -> do
-        forM_ [0..B.length c - 1] $ \i -> do
-            let w = ord . toUpper $ B.index c i -- 'a' -> 'A', etc.
-            cur <- VM.unsafeRead counts w
-            VM.unsafeWrite counts w (1 + cur)
-    res <- V.unsafeFreeze counts
-    return res
+computeStats :: BL.ByteString -> Result
+computeStats = computeStats' . fastqParse
+fastqParse :: BL.ByteString -> [(B.ByteString, B.ByteString)]
+fastqParse = fastqParse' . BL.lines
+    where
+        fastqParse' [] = []
+        fastqParse' (_:s:_:q:ls) = ((toStrict s, toStrict q):fastqParse' ls)
+        fastqParse' _ = error "Malformed file (nr of lines not a multiple of 4)"
+        toStrict = B.concat . BL.toChunks
 
 
+computeStats' seqs = runST $ do
+    charCounts <- zeroVec 256
+    qualCountsT <- newSTRef []
+    P3 n minSeq maxSeq <- foldM (update charCounts qualCountsT) (P3 0 (maxBound :: Int) (minBound :: Int)) seqs
+    qualCountsT' <- readSTRef qualCountsT >>= mapM V.freeze
+    aCount <- getV charCounts 'a'
+    cCount <- getV charCounts 'c'
+    gCount <- getV charCounts 'g'
+    tCount <- getV charCounts 't'
+    lcT <- getLC charCounts
+    return (Result (aCount, cCount, gCount, tCount) lcT qualCountsT' n (minSeq, maxSeq))
 
--- addEachCount :: Update Map counts with a new quality.
-addEachCount :: V.Vector Int -> Char -> V.Vector Int
-addEachCount counts qual = do
-    let i = ord qual
-        r = V.unsafeIndex counts i
-    V.modify (\v -> VM.write v i (r + 1)) counts 
+update charCounts qualCountsT (P3 n minSeq maxSeq) (bps,qs) = do
+    forM_ [0 .. B.length bps - 1] $ \i -> do
+        let bi = ord (B.index bps i)
+        incVec charCounts bi
+    let len = B.length bps
+    replicateM_ (len - maxSeq) $ do
+        nv <- zeroVec 256
+        modifySTRef' qualCountsT (++[nv])
+    qualCountsT' <- readSTRef qualCountsT
+    forM_ (zip [0 .. B.length qs - 1] qualCountsT') $ \(i,qv) -> do
+        let qi = ord (B.index qs i)
+        incVec qv qi
+    return $! P3 (n + 1) (min minSeq len) (max maxSeq len)
 
- 
-addToCount :: [V.Vector Int] -> BL.ByteString -> [V.Vector Int]
-addToCount counts qual = addToCount' counts qual
-        where
-            addToCount' c "" = c -- c size > q bps
-            addToCount' [] q = addEachCount (initVec) ( BL.head q ) : addToCount' [] (BL.tail q)  -- c size < q bps
-            addToCount' (c:xs) q = addEachCount c (BL.head q) : addToCount' xs (BL.tail q) -- normal case 1 to 1
-    
+incVec v i = do
+    cur <- VM.unsafeRead v i
+    VM.unsafeWrite v i (cur + 1)
 
+zeroVec n = do
+    vec <- VM.unsafeNew n
+    VM.set vec 0
+    return vec
 
-countChars :: (Int,Int,Int,Int) -> BL.ByteString -> (Int,Int,Int,Int)
-countChars (a,b,c,d) s = do 
-    let res = wc s
-    (a + getCount res 'A', b + getCount res 'C', c + getCount res 'G', d + getCount res 'T') 
-    where getCount res pos = (V.unsafeIndex res (ord pos)) 
+getV c p = do
+    lower <- VM.read c (ord p)
+    upper <- VM.read c (ord . toUpper $ p)
+    return (lower + upper)
 
-
-seqMinMax :: (Int,Int) -> Int -> (Int,Int)
-seqMinMax (minSeq, maxSeq) length' = ((min length' minSeq),(max length' maxSeq))
-
---updateResults :: Used to fill in the structure "Result" with the FastQ file info.
-updateResults :: Result -> BL.ByteString -> BL.ByteString -> Result
-updateResults fileData seq' qual = Result (countChars (bpCounts fileData) seq')
-                                         (BL.foldr min (lc fileData) qual)
-                                         (addToCount (qualCounts fileData) qual)
-                                         ((nSeq fileData) + 1)
-                                         (seqMinMax (seqSize fileData) (fromIntegral (BL.length seq')))
-
---iterateFile :: Used to iterate the file in a strict manner.
-iterateFile :: BL.ByteString -> Result
-iterateFile contents = iterateFile' initial (BL.lines contents)
-        where
-                initial = Result (0,0,0,0) '~' [] 0 (maxBound :: Int, minBound :: Int)
-                iterateFile' r (_:seq':_:quals:xs) = r `deepseq`
-                        iterateFile' (updateResults r seq' quals) xs
-                iterateFile' r [] = r
-                iterateFile' _ _  = error "Number of lines is not multiple of 4!"
+getLC c = getLC' 0
+    where
+        n = VM.length c
+        getLC' i | n == i = return (chr n)
+        getLC' i = do
+            ci <- VM.read c i
+            if ci > 0
+                then return (chr i)
+                else getLC' (i + 1)
