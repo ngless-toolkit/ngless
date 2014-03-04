@@ -22,8 +22,6 @@ import qualified Data.ByteString.Char8 as B
 import qualified Codec.Compression.GZip as GZip    
 import qualified Data.Map as Map
 
-import qualified ByteStringConversions as BSOP
-
 import Data.Char
 
 import Control.Monad
@@ -103,7 +101,7 @@ parseReadSet enc contents = parse' . BL.lines $ contents
             parse' xs = (createRead (Prelude.take 4 xs) : parse' (Prelude.drop 4 xs))
             createRead :: [BL.ByteString] -> NGLessObject
             createRead r = case (Prelude.length r) of
-                4 -> NGOShortRead (T.pack $ BL.unpack $ r !! 0) (BSOP.toStrict $ r !! 1) (BSOP.toStrict $ decodeQual enc (r !! 3))
+                4 -> NGOShortRead (T.pack $ BL.unpack $ r !! 0) (BL.toStrict $ r !! 1) (BL.toStrict $ decodeQual enc (r !! 3))
                 _ -> error "Number of lines is not multiple of 4!"
 
 -- Change to only apply this function when Pre-Processing
