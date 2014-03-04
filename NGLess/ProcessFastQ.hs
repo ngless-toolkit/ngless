@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 
 module ProcessFastQ
     (
@@ -19,6 +21,8 @@ import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as B
 import qualified Codec.Compression.GZip as GZip    
 import qualified Data.Map as Map
+
+import qualified ByteStringConversions as BSOP
 
 import Data.Char
 
@@ -93,17 +97,18 @@ readReadSet :: Int -> B.ByteString -> IO [NGLessObject]
 readReadSet enc fn = (parseReadSet enc) `fmap` (readPossiblyCompressedFile fn)
 
 parseReadSet :: Int -> BL.ByteString -> [NGLessObject]
-parseReadSet enc contents = parse' . (fmap BL.unpack) . BL.lines $ contents
+parseReadSet enc contents = parse' . BL.lines $ contents
         where
             parse' [] = []
             parse' xs = (createRead (Prelude.take 4 xs) : parse' (Prelude.drop 4 xs))
-            createRead :: [String] -> NGLessObject
+            createRead :: [BL.ByteString] -> NGLessObject
             createRead r = case (Prelude.length r) of
-                4 -> NGOShortRead (T.pack $ r !! 0) (B.pack $ r !! 1) (B.pack $ decodeQual enc (r !! 3))
+                4 -> NGOShortRead (T.pack $ BL.unpack $ r !! 0) (BSOP.toStrict $ r !! 1) (BSOP.toStrict $ decodeQual enc (r !! 3))
                 _ -> error "Number of lines is not multiple of 4!"
 
-decodeQual enc = fmap (chr . (flip (-) enc) . ord)
-encodeQual enc = fmap (chr . (flip (+) enc) . ord)
+-- Change to only apply this function when Pre-Processing
+decodeQual enc = BL.map (chr . (flip (-) enc) . ord)
+encodeQual enc = B.map (chr . (flip (+) enc) . ord)
 
 readFastQ :: FilePath -> FilePath -> IO NGLessObject
 readFastQ fname info = do
@@ -117,7 +122,7 @@ readFastQ fname info = do
         putStrLn $ "File: " ++ fname ++ " loaded"
         return $ NGOReadSet (B.pack fname) (ord (lc fileData))
 
-
+--remove encodeQual when not Pre-Processing.
 showRead :: Int -> NGLessObject -> BL.ByteString
-showRead enc (NGOShortRead a b c) =  BL.pack ((T.unpack a) ++ "\n" ++ (B.unpack b) ++ "\n+\n" ++ (encodeQual enc (B.unpack c)))
+showRead enc (NGOShortRead a b c) = BL.fromChunks [(B.pack (T.unpack a)), "\n", b, "\n+\n", (encodeQual enc c)]
 showRead _ _ = error "error: The argument must be a read."
