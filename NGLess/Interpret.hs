@@ -30,6 +30,7 @@ import Unique
 import ProcessFastQ
 import FPreProcess
 import Language
+import InvokeExternalProgs
 
 {- Interpretation is done inside 3 Monads
  -  1. InterpretationEnvIO
@@ -221,6 +222,11 @@ topFunction Fwrite expr args _ = do
     res' <- liftIO (writeToFile expr' args')
     return res'
 
+topFunction Fmap expr args _ = do
+    expr' <- runInROEnvIO $ interpretExpr expr
+    args' <- runInROEnvIO $ evaluateArguments args
+    res' <- executeMap expr' args'
+    return res'
 
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
 
@@ -233,6 +239,16 @@ executeQualityProcess (NGOReadSet fname _) = executeQualityProcess' (B.unpack fn
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
 
 executeQualityProcess' fname info = liftIO $ readFastQ fname info
+
+executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
+executeMap (NGOReadSet file enc) args = do
+            let map' = Map.fromList args
+                refPath = Map.lookup (T.pack "reference") map'
+            case refPath of 
+                Just refPath' -> do
+                    res <- liftIO $ indexReference (evalString refPath')
+                    return $ NGOVoid
+                Nothing -> return NGOVoid
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> InterpretationEnvIO NGLessObject
 executeUnique (NGOList e) args v = do
