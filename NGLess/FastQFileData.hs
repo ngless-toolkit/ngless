@@ -27,6 +27,7 @@ data P3 = P3 !Int !Int !Int
 
 computeStats :: BL.ByteString -> Result
 computeStats = computeStats' . fastqParse
+
 fastqParse :: BL.ByteString -> [(B.ByteString, B.ByteString)]
 fastqParse = fastqParse' . BL.lines
     where

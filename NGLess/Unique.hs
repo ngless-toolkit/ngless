@@ -13,14 +13,14 @@ import qualified Data.ByteString.Char8 as B
 import Data.Map as Map
 
 import Control.Monad
+import Control.Monad.ST
 
+import Data.STRef
 import Data.Hashable
 
 import Language
 import ProcessFastQ
 import FileManagement
-
-type UnrepeatedRead = Map B.ByteString (Int, [NGLessObject])
 
 
 readFileN :: Int -> NGLessObject -> Int
@@ -59,16 +59,24 @@ readUniqueFile k enc fname = do
     _ <- putStrLn $ "Unique -> Read: " ++ (B.unpack fname)
     (getk k . parseReadSet enc) `fmap` (readPossiblyCompressedFile fname)
 
-getk :: Int -> [NGLessObject] -> [NGLessObject]
-getk k rs = Map.fold (\(_,r) b -> r ++ b) [] (putk k rs empty)
+--getk :: Int -> [NGLessObject] -> [NGLessObject]
+getk k rs = runST $ do
+    dups_ref <- newSTRef Map.empty
+    putk k rs dups_ref
+    res <- readSTRef dups_ref
+    return $ concat . Prelude.map snd . elems $ res
 
-putk :: Int -> [NGLessObject] -> UnrepeatedRead -> UnrepeatedRead
-putk _ [] e = e
-putk k (r:rs) e = putk k rs (put1k k r e)
+--putk :: Int -> [NGLessObject] -> UnrepeatedRead
+putk k rs dups_ref = do
+    mapM_ (\x -> put1k k x dups_ref) rs
 
-put1k :: Int -> NGLessObject -> UnrepeatedRead -> UnrepeatedRead
-put1k k r e = Map.alter insertk (readSeq r) e
-    where
-        insertk Nothing = Just (1, [r])
-        insertk (Just b@(a,_)) | a == k = Just b
-        insertk (Just (a,b)) = Just (a + 1, r : b)
+--put1k :: Int -> NGLessObject -> UnrepeatedRead -> UnrepeatedRead
+put1k k r dups_ref = do
+    mdups  <- readSTRef dups_ref
+    let index = readSeq r
+    case Map.lookup index mdups of
+            Nothing -> writeSTRef dups_ref (Map.insert index (1,[r]) mdups)
+            Just (a,b) -> case a == k of
+                        True  -> return ()
+                        False -> writeSTRef dups_ref (Map.insert index ((a + 1), r : b) mdups)
+
