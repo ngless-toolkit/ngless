@@ -1,6 +1,6 @@
 ngless 0.0
 input = fastq('../Ngless-Mine/sample.fq')
-input = unique(input, max_copies=2)
+#input = unique(input, max_copies=2)
 preprocess(input) using |read|:
     read = read[5:25]
     read = substrim(read, min_quality=26)

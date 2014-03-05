@@ -40,7 +40,7 @@ fastqParse = fastqParse' . BL.lines
 computeStats' seqs = runST $ do
     charCounts <- zeroVec 256
     qualCountsT <- newSTRef []
-    P3 n minSeq maxSeq <- foldM (update charCounts qualCountsT) (P3 0 (maxBound :: Int) (minBound :: Int)) seqs
+    P3 n minSeq maxSeq <- foldM (update charCounts qualCountsT) (P3 0 (maxBound :: Int) 0) seqs
     qualCountsT' <- readSTRef qualCountsT >>= mapM V.freeze
     aCount <- getV charCounts 'a'
     cCount <- getV charCounts 'c'
