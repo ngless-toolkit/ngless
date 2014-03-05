@@ -8,11 +8,6 @@ module FPreProcess
     ) where
 
 import qualified Data.ByteString.Char8 as B
-import qualified Data.Vector as V
-import qualified Data.Vector.Mutable as VM
-
-import Control.Monad.ST
-import Control.Monad
 
 import Data.Char
 import Language
@@ -41,14 +36,3 @@ calcSubStrim' cutoff ((i,s),(n_i,n_s)) q = do
                             then (n_i, n_s + 1) -- new max
                             else (i,s) -- same max
 
-
-
--- Function to convert B.ByteString into a Vector of Ints. NOT being used for now.
-bsToVector :: B.ByteString -> V.Vector Int
-bsToVector s = runST $ do
-    elems <- VM.unsafeNew (B.length s)
-    forM_ [0..B.length s - 1] $ \i -> do
-        let w = ord $ B.index s i
-        VM.write elems i w
-    res <- V.unsafeFreeze elems
-    return res

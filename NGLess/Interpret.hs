@@ -221,6 +221,7 @@ topFunction Fwrite expr args _ = do
     res' <- liftIO (writeToFile expr' args')
     return res'
 
+
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
