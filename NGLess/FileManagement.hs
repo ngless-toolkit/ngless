@@ -11,7 +11,8 @@ module FileManagement
         setupRequiredFiles,
         openKFileHandles,
         closekFileHandles,
-        numFiles
+        numFiles,
+        doesDirContainFormats
     ) where
 
 import System.FilePath.Posix
@@ -123,3 +124,11 @@ createTempDirectory dir template = do
         True -> findTempName (x+1)
 
 getFileSize path = withFile path ReadMode hFileSize
+
+doesDirContainFormats :: String -> [String] -> IO Bool
+doesDirContainFormats _ [] = return True
+doesDirContainFormats path (x:xs) = do 
+    x' <- doesFileExist (path ++ x)
+    case x' of 
+        True -> doesDirContainFormats path xs
+        False -> return False
