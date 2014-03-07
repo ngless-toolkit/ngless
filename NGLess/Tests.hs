@@ -207,6 +207,15 @@ indent_space  = "ngless 0.0\n\
     \    read = read[5:]\n\
     \    \n"
 
+case_indent_empty_line = isOkTypes $ parsetest indent_empty_line >>= checktypes
+    where indent_empty_line  = "ngless 0.0\n\
+            \reads = fastq('input1.fq')\n\
+            \preprocess(reads) using |read|:\n\
+            \    read = read[5:]\n\
+            \    \n\
+            \    if len(read) < 24:\n\
+            \        discard\n"
+
 
 -- Type Validate pre process operations
 
