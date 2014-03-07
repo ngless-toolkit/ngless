@@ -14,6 +14,7 @@ import System.Process
 import System.Exit
 
 import System.IO
+import Control.Exception
 
 import FileManagement
 
@@ -23,17 +24,24 @@ mapAlg = "bwa"
 
 indexReference refPath = readProcess (dirPath </> mapAlg) ["index", (T.unpack refPath)] ""
 
+
 mapToReference refIndex readSet = do
-    (_, Just hout, _, jHandle) <-
-        createProcess (proc (dirPath </> mapAlg) ["aln","-t",(show numCapabilities), (T.unpack refIndex), readSet])
-           { std_out = CreatePipe
-           , std_err = CreatePipe 
-           }
+	newfp <- getTempFilePath readSet
+	putStrLn $ "write .sam file to: " ++ (show newfp)
+	jHandle <- mapToReference' newfp refIndex readSet
+	exitCode <- waitForProcess jHandle
+	case exitCode of
+		ExitSuccess -> return ()
+		ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
 
-    newfp <- getTempFilePath readSet
-    hGetLine hout >>= writeFile newfp
 
-    exitCode <- waitForProcess jHandle
-    case exitCode of
-      ExitSuccess -> return ()
-      ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
+-- Process to execute BWA and write to h .sam file
+mapToReference' newfp refIndex readSet = 
+		let ls h = runProcess (dirPath </> mapAlg)    -- Executable location
+	                          ["mem","-t",(show numCapabilities), (T.unpack refIndex), readSet] -- Parameters
+	                          Nothing      -- Working directory: current dir
+	                          Nothing      -- Standard environment
+	                          Nothing      -- STDIN
+	                          (Just h)     -- Connect STDOUT to the Handle opened above
+	                          Nothing      -- STDERR
+	    in bracket (openFile newfp WriteMode) hClose ls
