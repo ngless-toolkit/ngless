@@ -38,7 +38,7 @@ indexReference refPath = do
         False -> do
             _ <- readProcess (dirPath </> mapAlg) ["index", refPath'] ""
             return ()
-        True -> return () -- already contain index
+        True -> return () -- already contain reference index
 
 mapToReference refIndex readSet = do
     newfp <- getTempFilePath readSet
@@ -50,7 +50,7 @@ mapToReference refIndex readSet = do
         ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
 
 
--- Process to execute BWA and write to h .sam file
+-- Process to execute BWA and write to <handle h> .sam file
 mapToReference' newfp refIndex readSet = 
     let ls h = runProcess (dirPath </> mapAlg)    -- Executable location
                 ["mem","-t",(show numCapabilities), (T.unpack refIndex), readSet] -- Parameters
