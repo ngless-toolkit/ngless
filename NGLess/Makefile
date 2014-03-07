@@ -35,8 +35,8 @@ clean:
 	rm -f ngless nglesstest
 
 setup:
-	echo $(basename $(BWA_URL))
-	if [ ! -d $(BWA) ]; then \
+	@echo Configuring BWA...
+	@if [ ! -d $(BWA) ]; then \
 		wget $(BWA_URL);\
 		tar xvfj $(BWA_DIR) ;\
 		rm $(BWA_DIR);\
