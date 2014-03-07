@@ -1,6 +1,11 @@
-all: ngless nglesstest
+all: setup ngless nglesstest
 .PHONY: all clean
 GHCOPTS := -odir .objs -hidir .objs -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded
+
+# Bwa name and location
+BWA = ../bwa-0.7.7
+BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
+BWA_DIR = bwa-0.7.7.tar.bz2
 
 SOURCES :=  \
 	Interpret.hs \
@@ -28,3 +33,15 @@ tests: nglesstest
 clean:
 	rm -rf .objs
 	rm -f ngless nglesstest
+
+setup:
+	echo $(basename $(BWA_URL))
+	if [ ! -d $(BWA) ]; then \
+		wget $(BWA_URL);\
+		tar xvfj $(BWA_DIR) ;\
+		rm $(BWA_DIR);\
+		cd bwa-*;\
+		make;\
+		cd ..;\
+		mv bwa-* ../ ;\
+	fi
