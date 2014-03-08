@@ -12,7 +12,8 @@ module FileManagement
         openKFileHandles,
         closekFileHandles,
         numFiles,
-        doesDirContainFormats
+        doesDirContainFormats,
+        printNglessLn
     ) where
 
 import System.FilePath.Posix
@@ -22,6 +23,8 @@ import System.IO
 import Control.Monad
 
 import System.Posix.Internals (c_getpid)
+
+import System.Console.CmdArgs.Verbosity
 
 
 maxFileSize :: Num a => a
@@ -132,3 +135,6 @@ doesDirContainFormats path (x:xs) = do
     case x' of 
         True -> doesDirContainFormats path xs
         False -> return False
+
+printNglessLn :: String -> IO ()
+printNglessLn x = whenLoud $ putStrLn x 

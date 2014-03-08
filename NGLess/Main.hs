@@ -15,6 +15,7 @@ import Parse
 
 import Control.Applicative
 import System.Console.CmdArgs
+
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
@@ -61,6 +62,7 @@ main = do
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
+    getVerbosity >>= \verb -> putStrLn $ "verbosity: " ++ (show verb)
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of
         Left err -> putStrLn (show err)

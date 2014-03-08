@@ -114,11 +114,11 @@ readFastQ fname info = do
         contents <- unCompress fname
         let fileData = computeStats contents
         destDir <- setupRequiredFiles fname info
-        putStrLn $ "Generation of statistics for " ++ destDir
+        printNglessLn $ "Generation of statistics for " ++ destDir
         createBasicStatsJson (destDir ++ "/basicStats.js") fileData fname -- generate JSON DATA file: basicStats.js
-        putStrLn $ "Simple Statistics for: " ++ destDir ++ " completed "  ++ (show $ length (qualCounts fileData)) ++ " Base pairs."
+        printNglessLn $ "Simple Statistics for: " ++ destDir ++ " completed "  ++ (show $ length (qualCounts fileData)) ++ " Base pairs."
         printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir -- " " " file: perBaseQualScoresData.js
-        putStrLn $ "File: " ++ fname ++ " loaded"
+        printNglessLn $ "File: " ++ fname ++ " loaded"
         return $ NGOReadSet (B.pack fname) (ord (lc fileData))
 
 --remove encodeQual when not Pre-Processing.
