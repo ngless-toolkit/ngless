@@ -31,6 +31,7 @@ import ProcessFastQ
 import FPreProcess
 import Language
 import InvokeExternalProgs
+import FileManagement
 
 {- Interpretation is done inside 3 Monads
  -  1. InterpretationEnvIO

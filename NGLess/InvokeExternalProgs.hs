@@ -14,7 +14,6 @@ import System.Process
 import System.Exit
 
 import System.IO
-import Control.Exception
 
 import FileManagement
 
@@ -42,21 +41,30 @@ indexReference refPath = do
 
 mapToReference refIndex readSet = do
     newfp <- getTempFilePath readSet
-    putStrLn $ "write .sam file to: " ++ (show newfp)
+    printNglessLn $ "write .sam file to: " ++ (show newfp)
     jHandle <- mapToReference' newfp refIndex readSet
     exitCode <- waitForProcess jHandle
     case exitCode of
-        ExitSuccess -> return ()
-        ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
+       ExitSuccess -> return ()
+       ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
 
 
 -- Process to execute BWA and write to <handle h> .sam file
-mapToReference' newfp refIndex readSet = 
-    let ls h = runProcess (dirPath </> mapAlg)    -- Executable location
-                ["mem","-t",(show numCapabilities), (T.unpack refIndex), readSet] -- Parameters
-                Nothing      -- Working directory: current dir
-                Nothing      -- Standard environment
-                Nothing      -- STDIN
-                (Just h)     -- Connect STDOUT to the Handle opened above
-                Nothing      -- STDERR
-    in bracket (openFile newfp WriteMode) hClose ls
+mapToReference' newfp refIndex readSet = do 
+    (_, Just hout, Just herr, jHandle) <-
+        createProcess (
+            proc 
+                (dirPath </> mapAlg)
+                ["mem","-t",(show numCapabilities),(T.unpack refIndex), readSet]
+            ) { std_out = CreatePipe,
+                std_err = CreatePipe }
+    writeToFile hout newfp
+    hGetContents herr >>= printNglessLn
+    return jHandle
+
+
+writeToFile :: Handle -> FilePath -> IO ()
+writeToFile handle path = do
+    contents <- hGetContents handle
+    writeFile path contents
+    hClose handle
