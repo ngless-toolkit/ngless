@@ -35,9 +35,15 @@ indexReference refPath = do
     res <- doesDirContainFormats refPath' indexRequiredFormats
     case res of
         False -> do
-            _ <- readProcess (dirPath </> mapAlg) ["index", refPath'] ""
-            return ()
+            (exitCode, hout, herr) <-
+                readProcessWithExitCode (dirPath </> mapAlg) ["index", refPath'] []  
+            printNglessLn herr 
+            case exitCode of
+                ExitSuccess -> return ()
+                ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
         True -> return () -- already contain reference index
+
+
 
 mapToReference refIndex readSet = do
     newfp <- getTempFilePath readSet
