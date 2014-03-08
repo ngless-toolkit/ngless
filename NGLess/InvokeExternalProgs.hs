@@ -35,13 +35,14 @@ indexReference refPath = do
     res <- doesDirContainFormats refPath' indexRequiredFormats
     case res of
         False -> do
-            (exitCode, hout, herr) <-
+            (exitCode, _, herr) <-
                 readProcessWithExitCode (dirPath </> mapAlg) ["index", refPath'] []  
             printNglessLn herr 
             case exitCode of
                 ExitSuccess -> return ()
-                ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
-        True -> return () -- already contain reference index
+                ExitFailure _err -> error (herr)
+        True -> printNglessLn $ "index for " ++ refPath' ++ " as been sucessfully generated."
+            -- already contain reference index
 
 
 
