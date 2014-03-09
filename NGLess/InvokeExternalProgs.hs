@@ -15,6 +15,7 @@ import System.Exit
 
 import System.IO
 
+import Language
 import FileManagement
 
 -- Constants
@@ -52,7 +53,7 @@ mapToReference refIndex readSet = do
     jHandle <- mapToReference' newfp refIndex readSet
     exitCode <- waitForProcess jHandle
     case exitCode of
-       ExitSuccess -> return ()
+       ExitSuccess -> return (NGOMappedReadSet (T.pack newfp))
        ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
 
 

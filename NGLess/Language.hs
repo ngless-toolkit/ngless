@@ -91,6 +91,7 @@ data NGLessObject =
         | NGOFilename T.Text
         | NGOShortRead T.Text B.ByteString B.ByteString
         | NGOReadSet B.ByteString Int
+        | NGOMappedReadSet T.Text
         | NGOVoid
         | NGOList [NGLessObject]
     deriving (Eq, Show, Ord)

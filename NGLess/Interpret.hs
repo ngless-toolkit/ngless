@@ -242,15 +242,19 @@ executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]"
 executeQualityProcess' fname info = liftIO $ readFastQ fname info
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
+executeMap (NGOList e) args = do
+    res <- mapM (\x -> executeMap x args) e
+    return (NGOList res)
+
 executeMap (NGOReadSet file _enc) args = do
             let map' = Map.fromList args
                 refPath = Map.lookup (T.pack "reference") map'
             case refPath of 
                 Just refPath' -> do
-                    genIndex <- liftIO $ indexReference (evalString refPath')
+                    _ <- liftIO $ indexReference (evalString refPath')
                     execMap' <- liftIO $ mapToReference (evalString refPath') (B.unpack file)
-                    return $ NGOVoid
-                Nothing -> return NGOVoid
+                    return $ execMap'
+                Nothing -> error ("a reference must be suplied")
 executeMap _ _ = error ("Not implemented yet")
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> InterpretationEnvIO NGLessObject
