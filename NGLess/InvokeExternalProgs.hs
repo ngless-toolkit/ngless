@@ -49,11 +49,12 @@ indexReference refPath = do
 
 mapToReference refIndex readSet = do
     newfp <- getTempFilePath readSet
-    printNglessLn $ "write .sam file to: " ++ (show newfp)
+    let newfp' = newfp ++ ".sam"
+    printNglessLn $ "write .sam file to: " ++ (show newfp')
     jHandle <- mapToReference' newfp refIndex readSet
     exitCode <- waitForProcess jHandle
     case exitCode of
-       ExitSuccess -> return (NGOMappedReadSet (T.pack newfp))
+       ExitSuccess -> return (NGOMappedReadSet (T.pack newfp'))
        ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
 
 

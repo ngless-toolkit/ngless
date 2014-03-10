@@ -2,6 +2,12 @@
 <meta charset="utf-8">
 <link rel="stylesheet" type="text/css" href="perBaseQualScores.css" media="screen" />
 
+
+<script src="http://code.jquery.com/jquery-latest.min.js"></script>
+
+<!-- Load angular JS from google -->
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0-beta.1/angular.min.js"></script>
+
 <!-- Load of the Twitter Bootstrap -->
 <!-- Latest compiled and minified CSS -->
 <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css">
@@ -15,42 +21,54 @@
 </head>
 <body>
 	<h1 align = "center"> Statistics of fastq file </h1>
+	<div ng-app="myApp">
+	<div ng-controller="BasicInfoCtrl">
 	<div id="table" align="center">
 		<table class="table table-bordered table-hover">
 			<tr>
 				<td> File Name is: </td>
-				<td> <span id="fileName"></span> </td>
+				<td> {{basic.fileName}} </td>
 			</tr>
 			
 			<tr>
 				<td> %GC: </td>
-				<td> <span id="GC"></span> </td>
+				<td> {{basic.GC}} </td>
 			</tr>
 			<tr>
 				<td> Encoding is: </td>
-				<td> <span id="Encoding"></span> </td>
+				<td>{{basic.Encoding}}</td>
 			</tr>
 			<tr>
 				<td> Number of Sequences: </td> 
-				<td> <span id="NumSeqs"></span> </td>
+				<td> {{basic.NumSeqs}} </td>
 			</tr>
 			<tr>
 				<td> Sequence length:  </td>
-				<td> <span id="SeqLength"></span> </td>
+				<td> {{basic.SeqLength}} </td>
 			</tr>
 		</table>
 	</div>
+	</div>
+	</div>
+
 	<div id="graph"></div>
 	<script src="http://d3js.org/d3.v3.min.js"></script>
 	<script src="perbaseQualScoresData.js"></script>
 	<script src="perBaseQualityScores.js"></script>
-	<script src="basicStats.js"></script>
+	<script src="basicStats.js"> </script>
 	<script>
-		document.getElementById("fileName").innerHTML=basicInfo[0].fileName;	
-		document.getElementById("GC").innerHTML=basicInfo[0].GC;
-		document.getElementById("Encoding").innerHTML=basicInfo[0].Encoding;
-		document.getElementById("NumSeqs").innerHTML=basicInfo[0].NumSeqs;
-		document.getElementById("SeqLength").innerHTML=basicInfo[0].SeqLength;
+
+		var app = angular.module('myApp', []);
+
+		app.factory('BasicInfo', function() {
+			return basicInfo;
+		});
+
+		function BasicInfoCtrl($scope,BasicInfo){
+			console.log(BasicInfo[0]);
+			$scope.basic = BasicInfo[0];
+		}
+
 	</script>
 	<p> </p>
 </body>
