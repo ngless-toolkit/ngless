@@ -41,7 +41,7 @@ You need the following packages::
     cabal install zlib
     cabal install parsec
     cabal install hashable
-    
+    cabal install aeson
 
 If you are developing on Ubuntu, you can also install the packages globally
 (the following only applies after Ubuntu 13.04; before that install
