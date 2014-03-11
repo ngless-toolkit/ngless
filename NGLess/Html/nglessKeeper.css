@@ -1,0 +1,14 @@
+body {
+  padding-top: 30px;
+}
+
+.starter-template {
+  padding: 80px 15px;
+  text-align: center;
+}
+
+.frameFastQ {
+	height: 900px;
+	width: 100%; 
+	display: block
+}

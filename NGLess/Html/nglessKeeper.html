@@ -1,0 +1,91 @@
+<!-- Load angular JS from google -->
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0-beta.1/angular.min.js"></script>
+<!-- Load angular JS from google -->
+<script src="http://code.angularjs.org/1.3.0-beta.1/angular-sanitize.js"></script>
+<!-- Bootstrap core CSS -->
+<link href="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" rel="stylesheet">    
+<!-- Custom styles for this template -->
+<link href="nglessKeeper.css" rel="stylesheet">
+
+<title>Ngless</title>
+
+<body>
+
+  <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" >NGLess</a>
+      </div>
+      <div class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li class="active"><a href="#">Home</a></li>
+          <li><a href="#beforeqc">Before QC</a></li>
+          <li><a href="#afterqc">After QC</a></li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </div>
+
+  <div  ng-app="myApp" ng-controller="FilesProcessedCtrl" class="container">
+
+    <div class="starter-template">
+      <h1>Welcome to NGLess keeper</h1>
+      <p class="lead">Here can be seen everything that NGLess has produced in past executions. </p>
+    </div>
+
+    <div class="panel-group" id="accordion" ng-repeat="f in filesprocessed">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h4 class="panel-title">
+                <a data-toggle="collapse" data-parent="#accordion" href="#collapse{{$index}}">Statistics for {{f.name}}</a>
+            </h4>
+        </div>
+
+        <div id="collapse{{$index}}" class="panel-collapse collapse">
+            <div class="panel-body">
+              <p> Before Quality Control</p>
+              <iframe class="frameFastQ" seamless ng-src="{{trustSrc(f.name + '$beforeQC/index.html')}}"></iframe>
+              <p> After Quality Control</p>
+              <iframe class="frameFastQ" seamless ng-src="{{trustSrc(f.name + '$afterQC/index.html')}}" ></iframe>
+           </div>
+        </div>
+    </div>
+    </div>
+
+  </div><!-- /.container -->
+
+
+  <!-- Bootstrap core JavaScript
+  ================================================== -->
+  <!-- Placed at the end of the document so the pages load faster -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+  <script src="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+  <script src="filesProcessed.js"></script>
+
+  <!-- Angular Script to load different URLs -->
+  <script>
+
+    var app = angular.module('myApp', ['ngSanitize']);
+
+    app.factory('FilesProcessed', function() {
+      return filesProcessed;
+    });
+
+    function FilesProcessedCtrl($scope, $sce, FilesProcessed){
+      $scope.filesprocessed = FilesProcessed;
+
+      $scope.trustSrc = function(src) {
+        console.log(src)
+        return $sce.trustAsResourceUrl(src);
+      }
+    }
+
+  </script>
+
+</body>
