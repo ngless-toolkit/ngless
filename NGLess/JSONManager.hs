@@ -32,6 +32,20 @@ instance FromJSON BasicInfo where
 
 
 basicInfoToJson :: String -> Double -> String -> Int -> (Int,Int) -> BL.ByteString
-basicInfoToJson fname gc enc numSeq seqL = do
-    let bi = BasicInfo fname gc enc numSeq seqL
-    encode bi
+basicInfoToJson fname gc enc numSeq seqL = encode $ BasicInfo fname gc enc numSeq seqL
+
+
+data FilesProcessed = FilesProcessed String String deriving (Show)
+
+instance ToJSON FilesProcessed where
+   toJSON (FilesProcessed a b) = object ["name" .= a,
+                                        "time" .= b]
+
+instance FromJSON FilesProcessed where
+    parseJSON (Object v) = FilesProcessed <$>
+                            v .: "name" <*>
+                            v .: "time"
+    parseJSON _          = mzero
+
+filesProcessedToJson :: String -> String -> BL.ByteString
+filesProcessedToJson name time = encode $ FilesProcessed name time

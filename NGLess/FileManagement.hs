@@ -13,7 +13,9 @@ module FileManagement
         closekFileHandles,
         numFiles,
         doesDirContainFormats,
-        printNglessLn
+        printNglessLn,
+        createOutputDir,
+        setupHtmlViewer
     ) where
 
 import System.FilePath.Posix
@@ -61,8 +63,9 @@ getFilesInDir p = do
 
 
 setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
-setupRequiredFiles destDir info = do
-    destDir' <- createOutputDir destDir info
+setupRequiredFiles info dirTemplate = do
+    let destDir' = dirTemplate ++ "$" ++ info
+    createDirectory destDir'
     copyFile "Html/index.html" (destDir' ++ "/index.html")
     copyFile "Html/perBaseQualScores.css" (destDir' ++ "/perBaseQualScores.css")
     copyFile "Html/perBaseQualityScores.js" (destDir' ++ "/perBaseQualityScores.js")
@@ -99,14 +102,12 @@ createDir destDir = do
     createDirectory fp
     return fp
 
-createOutputDir destDir info = do
+createOutputDir destDir = do
     let template = snd . splitFileName . fst . splitExtensions $ destDir
     tdir' <- defaultDir
-    _ <- createDirIfExists tdir'
-    fp <- createTempDirectory tdir' template
-    let fp' = (fp ++ "$" ++ info)
-    createDirectory fp'
-    return fp'
+    _ <- createDirIfExists tdir' -- this is the dir where everything will be kept
+    createTempDirectory tdir' template >>= return
+    
 
 createDirIfExists tdir =  do
   exists <- doesDirectoryExist tdir
@@ -138,3 +139,12 @@ doesDirContainFormats path (x:xs) = do
 
 printNglessLn :: String -> IO ()
 printNglessLn x = whenLoud $ putStrLn x 
+
+setupHtmlViewer :: IO ()
+setupHtmlViewer = do
+    dir <- defaultDir
+    doesExist <- doesFileExist (dir </> "nglessKeeper.html")
+    case doesExist of 
+        True   -> return ()
+        False  -> do copyFile "Html/nglessKeeper.html" (dir </> "nglessKeeper.html")
+                     copyFile "Html/nglessKeeper.css"  (dir </> "nglessKeeper.css")

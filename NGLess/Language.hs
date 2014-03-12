@@ -90,7 +90,7 @@ data NGLessObject =
         | NGOSymbol T.Text
         | NGOFilename T.Text
         | NGOShortRead T.Text B.ByteString B.ByteString
-        | NGOReadSet B.ByteString Int
+        | NGOReadSet B.ByteString Int B.ByteString
         | NGOMappedReadSet T.Text
         | NGOVoid
         | NGOList [NGLessObject]

@@ -50,17 +50,16 @@ getNGOString _ = error "Error: Type is different of String"
 
 elFromMap el args = Map.lookup (T.pack el) (Map.fromList args)
 
---        newfp = getNGOString destFilePath
-writeToUncFile (NGOReadSet path enc) newfp = do
+writeToUncFile (NGOReadSet path enc tmplate) newfp = do
     let newfp' = T.unpack newfp
     contents' <- readPossiblyCompressedFile path
     write newfp' $ contents' 
-    return $ NGOReadSet (B.pack newfp') enc
+    return $ NGOReadSet (B.pack newfp') enc tmplate
 
 writeToUncFile err _ = error ("writeToUncFile: Should have received a NGOReadSet, but the type was: " ++ (show err))
 
 writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO NGLessObject   
-writeToFile el@(NGOReadSet _ _) args = do
+writeToFile el@(NGOReadSet _ _ _) args = do
     let newfp = getNGOString ( elFromMap "ofile" args )
     writeToUncFile el newfp
 
@@ -109,17 +108,17 @@ parseReadSet enc contents = parse' . map BL.toStrict . BL.lines $ contents
 decodeQual enc = B.map (chr . (flip (-) enc) . ord)
 encodeQual enc = B.map (chr . (flip (+) enc) . ord)
 
-readFastQ :: FilePath -> FilePath -> IO NGLessObject
-readFastQ fname info = do
+readFastQ :: FilePath -> FilePath -> FilePath -> IO NGLessObject
+readFastQ fname info dirTemplate = do
         contents <- unCompress fname
         let fileData = computeStats contents
-        destDir <- setupRequiredFiles fname info
+        destDir <- setupRequiredFiles info dirTemplate 
         printNglessLn $ "Generation of statistics for " ++ destDir
         createBasicStatsJson (destDir ++ "/basicStats.js") fileData fname -- generate JSON DATA file: basicStats.js
         printNglessLn $ "Simple Statistics for: " ++ destDir ++ " completed "  ++ (show $ length (qualCounts fileData)) ++ " Base pairs."
         printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir -- " " " file: perBaseQualScoresData.js
         printNglessLn $ "File: " ++ fname ++ " loaded"
-        return $ NGOReadSet (B.pack fname) (ord (lc fileData))
+        return $ NGOReadSet (B.pack fname) (ord (lc fileData)) (B.pack dirTemplate)
 
 --remove encodeQual when not Pre-Processing.
 showRead :: Int -> NGLessObject -> BL.ByteString

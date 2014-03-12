@@ -1,3 +1,6 @@
+<!DOCTYPE html>
+<html lang="en">
+
 <!-- Load angular JS from google -->
 <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0-beta.1/angular.min.js"></script>
 <!-- Load angular JS from google -->
@@ -27,6 +30,7 @@
           <li class="active"><a href="#">Home</a></li>
           <li><a href="#beforeqc">Before QC</a></li>
           <li><a href="#afterqc">After QC</a></li>
+          <li><a href="#visualize">Visualize</a></li>
         </ul>
       </div><!--/.nav-collapse -->
     </div>
@@ -34,7 +38,7 @@
 
   <div  ng-app="myApp" ng-controller="FilesProcessedCtrl" class="container">
 
-    <div class="starter-template">
+    <div class="textTitle">
       <h1>Welcome to NGLess keeper</h1>
       <p class="lead">Here can be seen everything that NGLess has produced in past executions. </p>
     </div>
@@ -42,16 +46,17 @@
     <div class="panel-group" id="accordion" ng-repeat="f in filesprocessed">
     <div class="panel panel-default">
         <div class="panel-heading">
-            <h4 class="panel-title">
-                <a data-toggle="collapse" data-parent="#accordion" href="#collapse{{$index}}">Statistics for {{f.name}}</a>
+            <h4 class="panel-title" data-toggle="collapse" data-parent="#accordion" href="#collapse{{$index}}">
+                <p class="titletext"><strong>Statistics for {{f.name}}</strong></p>
+                <p class="timetext">{{f.time}}</p>
             </h4>
         </div>
 
         <div id="collapse{{$index}}" class="panel-collapse collapse">
             <div class="panel-body">
-              <p> Before Quality Control</p>
+              <p class="lead"> Before Quality Control</p>
               <iframe class="frameFastQ" seamless ng-src="{{trustSrc(f.name + '$beforeQC/index.html')}}"></iframe>
-              <p> After Quality Control</p>
+              <p class="lead"> After Quality Control</p>
               <iframe class="frameFastQ" seamless ng-src="{{trustSrc(f.name + '$afterQC/index.html')}}" ></iframe>
            </div>
         </div>
@@ -89,3 +94,4 @@
   </script>
 
 </body>
+</html>

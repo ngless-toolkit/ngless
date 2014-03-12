@@ -30,10 +30,10 @@ illumina_1_3_encoding_offset = 64
 createBasicStatsJson filePath fileData fname = do
         let res = basicInfoToJson fname gc' enc' (nSeq fileData) (seqSize fileData) 
             resJS = BL.concat["var basicInfo = [", res, "];"]
-        BL.writeFile filePath (resJS)
+        BL.writeFile filePath resJS
         where 
-            gc' = (getGCPercent (bpCounts fileData))
-            enc' = (getEncoding (lc fileData))
+            gc' = getGCPercent $ bpCounts fileData
+            enc' = getEncoding $ lc fileData
 
 getGCPercent :: (Int,Int,Int,Int) -> Double
 getGCPercent (bpA,bpC,bpG,bpT) =

@@ -2,7 +2,7 @@ body {
   padding-top: 30px;
 }
 
-.starter-template {
+.textTitle {
   padding: 80px 15px;
   text-align: center;
 }
@@ -10,5 +10,13 @@ body {
 .frameFastQ {
 	height: 900px;
 	width: 100%; 
-	display: block
+	display: block;
+}
+
+.timetext {
+	text-align:right ;
+}
+
+.titletext {
+	text-align: left;
 }

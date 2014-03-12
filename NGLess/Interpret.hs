@@ -128,6 +128,7 @@ runInROEnvIO = runInEnv . runInROEnv
 
 interpret :: [(Int,Expression)] -> IO ()
 interpret es = do
+    _ <- setupHtmlViewer 
     r <- evalStateT (runErrorT (interpretIO es)) (0, Map.empty)
     case r of
         Right _ -> return ()
@@ -235,18 +236,21 @@ executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = do
     res <- mapM (executeQualityProcess) e
     return (NGOList res)
-executeQualityProcess (NGOString fname) = executeQualityProcess' (T.unpack fname) "beforeQC"
-executeQualityProcess (NGOReadSet fname _) = executeQualityProcess' (B.unpack fname) "afterQC"
+executeQualityProcess (NGOString fname) = do
+    let fname' = T.unpack fname
+    newTemplate <- liftIO $ createOutputDir fname'
+    executeQualityProcess' fname' "beforeQC" newTemplate -- new template only calculated once.
+executeQualityProcess (NGOReadSet fname _ nt) = executeQualityProcess' (B.unpack fname) "afterQC" (B.unpack nt)
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
 
-executeQualityProcess' fname info = liftIO $ readFastQ fname info
+executeQualityProcess' fname info nt = liftIO $ readFastQ fname info nt
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeMap (NGOList e) args = do
     res <- mapM (\x -> executeMap x args) e
     return (NGOList res)
 
-executeMap (NGOReadSet file _enc) args = do
+executeMap (NGOReadSet file _enc _) args = do
             let map' = Map.fromList args
                 refPath = Map.lookup (T.pack "reference") map'
             case refPath of 
@@ -262,7 +266,7 @@ executeUnique (NGOList e) args v = do
      res <- mapM (\x -> executeUnique x args v) e
      return $ NGOList res
 
-executeUnique (NGOReadSet file enc) args _ = do
+executeUnique (NGOReadSet file enc template) args _ = do
         rs <- liftIO $ readReadSet enc file
         dirName <- liftIO $ writeToNFiles (B.unpack file) enc rs
         let map' = Map.fromList args
@@ -277,7 +281,7 @@ executeUnique (NGOReadSet file enc) args _ = do
         uniqueCalculations' numMaxOccur' dirName = do
             rs' <- liftIO $ readNFiles enc numMaxOccur' dirName
             newfp <- liftIO $ writeReadSet file rs' enc
-            return $ NGOReadSet (B.pack newfp) enc 
+            return $ NGOReadSet (B.pack newfp) enc template
 
 executeUnique _ _ _ = error "executeUnique: Should not have happened"
 
@@ -288,13 +292,13 @@ executePreprocess (NGOList e) args _block v = do
     res <- mapM (\x -> executePreprocess x args _block v) e
     return $ NGOList res
 
-executePreprocess (NGOReadSet file enc) args (Block ([Variable var]) expr) _ = do
+executePreprocess (NGOReadSet file enc template) args (Block ([Variable var]) expr) _ = do
         _ <- liftIO $ (printNglessLn $ "executePreprocess on " ++ (B.unpack file)) 
         rs <- liftIO $ readReadSet enc file
         env <- gets snd
         let rs' = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env) rs
         newfp <- liftIO $ writeReadSet file rs' enc
-        return $ NGOReadSet (B.pack newfp) enc
+        return $ NGOReadSet (B.pack newfp) enc template
     where
         interpretPBlock1 :: NGLessObject -> InterpretationROEnv (Maybe NGLessObject)
         interpretPBlock1 r = do
