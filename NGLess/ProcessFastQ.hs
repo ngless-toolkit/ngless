@@ -31,10 +31,9 @@ import System.FilePath.Posix
 
 import FileManagement
 import PerBaseQualityScores
-import PrintFastqBasicStats
 import FastQFileData
 import Language
-    
+import JSONManager    
 
 -- Uncompression of a given fastQ file if it's compressed in a .gz format.
 unCompress fname =

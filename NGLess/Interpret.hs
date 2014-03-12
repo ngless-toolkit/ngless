@@ -32,6 +32,7 @@ import FPreProcess
 import Language
 import InvokeExternalProgs
 import FileManagement
+import JSONManager
 
 {- Interpretation is done inside 3 Monads
  -  1. InterpretationEnvIO
@@ -239,7 +240,10 @@ executeQualityProcess (NGOList e) = do
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     newTemplate <- liftIO $ createOutputDir fname'
-    executeQualityProcess' fname' "beforeQC" newTemplate -- new template only calculated once.
+    ngObj <- executeQualityProcess' fname' "beforeQC" newTemplate -- new template only calculated once.
+    _ <- liftIO $ insertFilesProcessedJson newTemplate
+    return ngObj
+    
 executeQualityProcess (NGOReadSet fname _ nt) = executeQualityProcess' (B.unpack fname) "afterQC" (B.unpack nt)
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
 

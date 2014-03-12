@@ -6,6 +6,7 @@ module Main
     ( main
     ) where
 
+import FileManagement
 import Interpret
 import Validation
 import Language
@@ -62,6 +63,7 @@ main = do
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
+    _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
     getVerbosity >>= \verb -> putStrLn $ "verbosity: " ++ (show verb)
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of

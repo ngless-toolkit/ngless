@@ -15,7 +15,10 @@ module FileManagement
         doesDirContainFormats,
         printNglessLn,
         createOutputDir,
-        setupHtmlViewer
+        setupHtmlViewer,
+        defaultDir,
+        doesFileExist,
+        createDirIfExists
     ) where
 
 import System.FilePath.Posix
@@ -105,7 +108,6 @@ createDir destDir = do
 createOutputDir destDir = do
     let template = snd . splitFileName . fst . splitExtensions $ destDir
     tdir' <- defaultDir
-    _ <- createDirIfExists tdir' -- this is the dir where everything will be kept
     createTempDirectory tdir' template >>= return
     
 

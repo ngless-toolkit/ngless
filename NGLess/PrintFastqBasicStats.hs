@@ -4,20 +4,15 @@
 module PrintFastqBasicStats
     (
         calculateEncoding,
-        createBasicStatsJson,
         sanger_encoding_offset,
         illumina_1_encoding_offset,
         illumina_1_3_encoding_offset,
+        getGCPercent,
+        getEncoding,
         Encoding(..)
     ) where
 
-import qualified Data.ByteString.Lazy.Char8 as BL
-
 import Data.Char
-
-import FastQFileData
-import JSONManager
-
 
 data Encoding = Encoding {name :: String, offset :: Int} deriving(Show,Eq)
 
@@ -27,13 +22,6 @@ illumina_1_encoding_offset = 59
 illumina_1_3_encoding_offset = 64
 
 
-createBasicStatsJson filePath fileData fname = do
-        let res = basicInfoToJson fname gc' enc' (nSeq fileData) (seqSize fileData) 
-            resJS = BL.concat["var basicInfo = [", res, "];"]
-        BL.writeFile filePath resJS
-        where 
-            gc' = getGCPercent $ bpCounts fileData
-            enc' = getEncoding $ lc fileData
 
 getGCPercent :: (Int,Int,Int,Int) -> Double
 getGCPercent (bpA,bpC,bpG,bpT) =
