@@ -47,7 +47,7 @@
     <div class="panel panel-default">
         <div class="panel-heading">
             <h4 class="panel-title" data-toggle="collapse" data-parent="#accordion" href="#collapse{{$index}}">
-                <p class="titletext"><strong>Statistics for {{f.name}}</strong></p>
+                <p class="titletext"><strong>Statistics for {{getFileName(f.name)}}</strong></p>
                 <p class="timetext">{{f.time}}</p>
             </h4>
         </div>
@@ -85,8 +85,13 @@
     function FilesProcessedCtrl($scope, $sce, FilesProcessed){
       $scope.filesprocessed = FilesProcessed;
 
+      $scope.getFileName = function(path){
+         console.log(path);
+         var pos = path.split("/").length;
+         return path.split("/")[pos - 1];
+      }
       $scope.trustSrc = function(src) {
-        console.log(src)
+        console.log(src);
         return $sce.trustAsResourceUrl(src);
       }
     }

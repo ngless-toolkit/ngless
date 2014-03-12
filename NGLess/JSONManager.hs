@@ -96,4 +96,4 @@ updateFilesProcessedJson jsonData jsonPath = do
     _ <- printNglessLn (show res)   
     case res of
         Just a -> createFilesProcessedJson (encode (jsonData : a)) jsonPath
-        Nothing -> error ("there was an error")
+        Nothing -> error ("updateFilesProcessedJson: there was an error with the json file")
