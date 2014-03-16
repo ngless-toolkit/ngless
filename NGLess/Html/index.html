@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 <link rel="stylesheet" type="text/css" href="perBaseQualScores.css" media="screen" />
+<link href="lib/nv.d3.css" rel="stylesheet" type="text/css">
 
 
 <script src="http://code.jquery.com/jquery-latest.min.js"></script>
@@ -15,6 +16,7 @@
 <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-theme.min.css">
 <!-- Latest compiled and minified JavaScript -->
 <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js"></script>
+
 
 <head>
 	<title>FastQ Quality Statistics</title>
@@ -51,11 +53,71 @@
 	</div>
 	</div>
 
-	<div id="graph"></div>
-	<script src="http://d3js.org/d3.v3.min.js"></script>
-	<script src="perbaseQualScoresData.js"></script>
-	<script src="perBaseQualityScores.js"></script>
+	<div id="offsetDiv">
+  		<div id="test1" class='with-3d-shadow with-transitions'>
+    		<svg></svg>
+  		</div>
+	</div>
+
+<!--	<script src="http://d3js.org/d3.v3.min.js"></script> -->
+	<script src="perbaseQualScoresData.js"></script> 
+<!--	<script src="perBaseQualityScores.js"></script> -->
 	<script src="basicStats.js"> </script>
+	<script src="lib/d3.v3.js"></script>
+	<script src="lib/nv.d3.js"></script>
+	<script >
+	var chart;
+	nv.addGraph(function() {
+	  chart = nv.models.scatterChart()
+	                .showDistX(true)
+	                .showDistY(true)
+	                .useVoronoi(true)
+	                .color(d3.scale.category10().range())
+	                .transitionDuration(300)
+	                ;
+
+	  chart.xAxis.tickFormat(d3.format('.02f'));
+	  chart.yAxis.tickFormat(d3.format('.02f'));
+	  chart.tooltipContent(function(key) {
+	      return '<h2>' + key + '</h2>';
+	  });
+
+	  d3.select('#test1 svg')
+	      .datum(convertData(data))
+	      .call(chart);
+
+	  nv.utils.windowResize(chart.update);
+
+	  chart.dispatch.on('stateChange', function(e) { ('New State:', JSON.stringify(e)); });
+
+	  return chart;
+	});
+
+	function convertData (data) {
+	  var newData = [],
+	      shapes = ['triangle-up', 'triangle-down'],
+	      tag = ['mean', 'median', 'Lower Quartile', 'Upper Quartile'];
+
+	  for (i = 0; i < tag.length; i++) {
+	    newData.push({
+	      key: tag[i],
+	      values: []
+	    });
+
+	    for (j = 0; j < data.length; j++) {
+	        newData[i].values.push({
+	          x: data[j].bp, 
+	          y: data[j][tag[i]], 
+	          size: Math.random(), 
+	          shape: shapes[i % 2]
+	      });
+	    }
+	  }
+	  console.log(newData);
+	  return newData;
+	}
+	</script>
+
 	<script>
 
 		var app = angular.module('myApp', []);
@@ -69,6 +131,6 @@
 		}
 
 	</script>
-	<p> </p>
+
 </body>
 </html>  

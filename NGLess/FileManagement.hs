@@ -72,6 +72,11 @@ setupRequiredFiles info dirTemplate = do
     copyFile "Html/index.html" (destDir' ++ "/index.html")
     copyFile "Html/perBaseQualScores.css" (destDir' ++ "/perBaseQualScores.css")
     copyFile "Html/perBaseQualityScores.js" (destDir' ++ "/perBaseQualityScores.js")
+    -- setup lib directory --
+    createDirectory $ destDir' </> "lib"
+    copyFile "Html/lib/d3.v3.js" (destDir' </> "lib/d3.v3.js")
+    copyFile "Html/lib/nv.d3.js" (destDir' </> "lib/nv.d3.js")
+    copyFile "Html/lib/nv.d3.css" (destDir' </> "lib/nv.d3.css")
     return destDir'
 
 generateTempFilePath :: FilePath -> String -> IO FilePath
