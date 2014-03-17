@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="perBaseQualScores.css" media="screen" />
+<link href="http://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.css" rel="stylesheet" type="text/css">
+
+
+<script src="http://code.jquery.com/jquery-latest.min.js"></script>
+
+<!-- Load angular JS from google -->
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0-beta.1/angular.min.js"></script>
+
+<!-- Load of the Twitter Bootstrap -->
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css">
+<!-- Optional theme -->
+<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-theme.min.css">
+<!-- Latest compiled and minified JavaScript -->
+<script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js"></script>
+
+
+<head>
+	<title>FastQ Quality Statistics</title>
+</head>
+<body>
+	<h1 align = "center"> Statistics of fastq file </h1>
+	<div ng-app="myApp">
+	<div ng-controller="BasicInfoCtrl">
+	<div id="table" align="center">
+		<table class="table table-bordered table-hover">
+			<tr>
+				<td> </td>
+				<td> Old Stats</td>
+				<td> New Stats </td>
+				<td> Summary </td>
+			</tr>
+			<tr>
+				<td> %GC: </td>
+				<td> <div id="oldGC"> </div></td>
+				<td> {{basic.GC}} </td>
+				<td><div id="calcGC"> </div></td>
+			</tr>
+			<tr>
+				<td> Encoding is: </td>
+				<td> <div id="oldEncoding"> </div></td>
+				<td>{{basic.Encoding}}</td>
+			</tr>
+			<tr>
+				<td> Number of Sequences: </td> 
+				<td> <div id="oldNumSeqs"> </div> </td>
+				<td> {{basic.NumSeqs}} </td>
+				<td><div id="calcNumSeqs"> </div></td>
+			</tr>
+			<tr>
+				<td> Sequence length:  </td>
+				<td> <div id="oldSeqLength"> </div> </td>
+				<td> {{basic.SeqLength}} </td>
+				<td><div id="calcSeqLength"> </div></td>
+			</tr>
+		</table>
+	</div>
+	
+
+	<div id="offsetDiv">
+  		<div id="test1" class='with-3d-shadow with-transitions'>
+    		<svg></svg>
+  		</div>
+	</div>
+
+<!-- Required to save current results -->
+	<script src="perbaseQualScoresData.js"></script>
+	<script src="basicStats.js"> </script>
+	<script>
+		var afterBasicInfo = basicInfo; 
+
+		function convertData (data) {
+		  var newData = [],
+		      shapes = ['triangle-up', 'triangle-down'],
+		      tag = ['mean', 'median', 'Lower Quartile', 'Upper Quartile'];
+
+		  for (i = 0; i < tag.length; i++) {
+		    newData.push({
+		      key: tag[i],
+		      values: []
+		    });
+
+		    for (j = 0; j < data.length; j++) {
+		        newData[i].values.push({
+		          x: data[j].bp, 
+		          y: data[j][tag[i]], 
+		          size: Math.random(), 
+		          shape: shapes[i % 2]
+		      });
+		    }
+		  }
+		  return newData;
+		}
+	</script>
+
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/d3/3.1.6/d3.min.js"> </script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.js"></script>
+
+	<script>
+		var chart;
+		nv.addGraph(function() {
+		  chart = nv.models.scatterChart()
+		                .showDistX(true)
+		                .showDistY(true)
+		                .useVoronoi(true)
+		                .color(d3.scale.category10().range())
+		                .transitionDuration(300)
+		                ;
+
+		  chart.xAxis.tickFormat(d3.format('.02f'));
+		  chart.yAxis.tickFormat(d3.format('.02f'));
+		  chart.tooltipContent(function(key) {
+		      return '<h2>' + key + '</h2>';
+		  });
+
+		  d3.select('#test1 svg')
+		      .datum(convertData(data))
+		      .call(chart);
+
+		  nv.utils.windowResize(chart.update);
+
+		  chart.dispatch.on('stateChange', function(e) { ('New State:', JSON.stringify(e)); });
+
+		  return chart;
+		});
+	
+	</script>
+
+	<script>
+			var fullPath = window.location.pathname;
+			var eachDir = fullPath.split('/');
+			var origDir = eachDir[eachDir.length - 2];
+
+			eachDir[eachDir.length - 2] = origDir.split('$')[0] + '$beforeQC';
+			eachDir[eachDir.length - 1] = 'basicStats.js';
+				
+			var head= document.getElementsByTagName('head')[0];
+	    	var script = document.createElement('script');
+	    		
+	    	script.type = 'text/javascript';
+	    	script.src = eachDir.join('/');
+	    		
+	    	head.appendChild(script);
+	    	script.onload = function () {
+	    		$("#oldGC").text(basicInfo[0].GC);
+	    		$("#calcGC").text(parseFloat(afterBasicInfo[0].GC) - parseFloat(basicInfo[0].GC));
+	    		
+	    		$("#oldEncoding").text(basicInfo[0].Encoding);
+	    		
+	    		$("#oldNumSeqs").text(basicInfo[0].NumSeqs); 
+	    	    $("#calcNumSeqs").text(parseFloat(afterBasicInfo[0].NumSeqs) - parseFloat(basicInfo[0].NumSeqs));
+	    		
+	    		$("#oldSeqLength").text(basicInfo[0].SeqLength);	    		
+	    	    $("#calcSeqLength").text(parseFloat(afterBasicInfo[0].SeqLength) - parseFloat(basicInfo[0].SeqLength));
+	    		console.log(basicInfo);
+	    	};
+	</script>
+
+	<script>
+
+		var app = angular.module('myApp', []);
+
+		app.factory('BasicInfo', function() {
+			return afterBasicInfo;
+		});
+
+		
+		function BasicInfoCtrl($scope,BasicInfo){
+			$scope.basic = BasicInfo[0];
+			$scope.calculatePath = function (){
+				var fullPath = window.location.pathname;
+				var eachDir = fullPath.split('/');
+				var origDir = eachDir[eachDir.length - 2];
+
+				eachDir[eachDir.length - 2] = origDir.split('$')[0] + '$beforeQC';
+				eachDir[eachDir.length - 1] = 'basicStats.js';
+				
+				return eachDir.join('/');
+			}
+		}
+
+	</script>
+
+	</div>
+	</div>
+</body>
+</html>  
