@@ -69,9 +69,12 @@ setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
 setupRequiredFiles info dirTemplate = do
     let destDir' = dirTemplate ++ "$" ++ info
     createDirectory destDir'
-    copyFile "Html/index.html" (destDir' ++ "/index.html")
     copyFile "Html/perBaseQualScores.css" (destDir' ++ "/perBaseQualScores.css")
     copyFile "Html/perBaseQualityScores.js" (destDir' ++ "/perBaseQualityScores.js")
+    case info of
+        "beforeQC" -> copyFile "Html/beforeQC.html" (destDir' ++ "/index.html")
+        "afterQC" -> copyFile "Html/afterQC.html" (destDir' ++ "/index.html")
+        err -> error ("Has to be either before or after QC. it is: " ++ (show err)) 
 
 -- setup lib directory --
 --    createDirectory $ destDir' </> "lib"

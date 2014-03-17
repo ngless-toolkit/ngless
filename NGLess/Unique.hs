@@ -39,11 +39,11 @@ writeToNFiles fname enc rs = do
     numFiles' <- numFiles fname
     let k = fromIntegral numFiles'
     fhs <- openKFileHandles k dest    
-    _ <- putStrLn ("Start to write" ++ (show numFiles') ++ "Files to: " ++ dest)
+    _ <- printNglessLn $ "Start to write" ++ (show numFiles') ++ "Files to: " ++ dest
     forM_ rs $ \x -> do
         let pos = readFileN' k x
         appendFile' (fhs !! pos) (showRead enc x)
-    _ <- putStrLn ("Wrote N Files to: " ++ dest)
+    _ <- printNglessLn $ "Wrote N Files to: " ++ dest  
     _ <- closekFileHandles fhs
     return dest
 
@@ -56,7 +56,7 @@ readNFiles enc k d = do
 
 readUniqueFile :: Int -> Int -> B.ByteString -> IO [NGLessObject]
 readUniqueFile k enc fname = do
-    _ <- putStrLn $ "Unique -> Read: " ++ (B.unpack fname)
+    _ <- printNglessLn $ "Unique -> Read: " ++ (B.unpack fname)
     (getk k . parseReadSet enc) `fmap` (readPossiblyCompressedFile fname)
 
 --getk :: Int -> [NGLessObject] -> [NGLessObject]
