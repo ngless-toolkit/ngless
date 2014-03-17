@@ -96,7 +96,7 @@ tokf f = token (show .snd) fst (f . snd)
 rawexpr = tokf $ \t -> case t of
     TExpr e -> Just e
     _ -> Nothing
-integer = (tokf $ \t -> case t of { TExpr (ConstNum n) -> Just n; _ -> Nothing }) <?> "integer"
+string = (tokf $ \t -> case t of { TExpr (ConstStr n) -> Just n; _ -> Nothing }) <?> "String"
 
 operator op = (tokf $ \t -> case t of { TOperator op' | op == op' -> Just t; _ -> Nothing }) <?> (concat ["operator ", [op]])
 
@@ -181,5 +181,5 @@ variableList = sepBy1 variable (operator ',') <?> "variable list"
 variable = Variable <$> word <?> "variable"
 
 ngless_version = ngless_version' <?> "ngless version declararion"
-    where ngless_version' = (,) <$> (reserved "ngless" *> integer) <*> (operator '.' *> integer <* eol)
+    where ngless_version' = reserved "ngless" *> string <* eol
 

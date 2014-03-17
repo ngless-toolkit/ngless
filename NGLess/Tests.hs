@@ -83,8 +83,8 @@ case_parse_if_end = parseBody blocks @?= block
 
 case_parse_ngless = parsengless "test" ngs @?= Right ng
     where
-        ngs = "ngless 0.0\n"
-        ng  = Script (0,0) []
+        ngs = "ngless '0.0'\n"
+        ng  = Script "0.0" []
 
 case_parse_list = parseText _listexpr "[a,b]" @?= ListExpression [Lookup (Variable "a"), Lookup (Variable "b")]
 
@@ -178,12 +178,12 @@ isOk m (Left _) = assertFailure m
 isOk _ (Right _) = return ()
 isOkTypes = isOk "Type error on good code"
 
-case_bad_type_fastq = isError $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
-case_good_type_fastq = isOkTypes $ checktypes (Script (0,0) [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
+case_bad_type_fastq = isError $ checktypes (Script "0.0" [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
+case_good_type_fastq = isOkTypes $ checktypes (Script "0.0" [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
 
 case_type_complete = isOkTypes $ (parsetest complete) >>= checktypes
 
-complete = "ngless 0.0\n\
+complete = "ngless '0.0'\n\
     \reads = fastq('input1.fq')\n\
     \reads = unique(reads,maxCopies=2)\n\
     \preprocess(reads) using |read|:\n\
@@ -195,20 +195,20 @@ complete = "ngless 0.0\n\
 case_indent_comment = isOk "ParseFailed" $ parsetest indent_comment
 case_indent_space = isOk "ParseFailed" $ parsetest indent_space
 
-indent_comment = "ngless 0.0\n\
+indent_comment = "ngless '0.0'\n\
     \reads = fastq('input1.fq')\n\
     \preprocess(reads) using |read|:\n\
     \    read = read[5:]\n\
     \    # comment \n"
 
-indent_space  = "ngless 0.0\n\
+indent_space  = "ngless '0.0'\n\
     \reads = fastq('input1.fq')\n\
     \preprocess(reads) using |read|:\n\
     \    read = read[5:]\n\
     \    \n"
 
 case_indent_empty_line = isOkTypes $ parsetest indent_empty_line >>= checktypes
-    where indent_empty_line  = "ngless 0.0\n\
+    where indent_empty_line  = "ngless '0.0'\n\
             \reads = fastq('input1.fq')\n\
             \preprocess(reads) using |read|:\n\
             \    read = read[5:]\n\

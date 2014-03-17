@@ -37,10 +37,8 @@ validate_types :: Script -> Maybe T.Text
 validate_types = const Nothing
 
 validate_version :: Script -> Maybe T.Text
-validate_version (Script (major,minor) _)
-    | major /= 0 || minor /= 0 = Just
-            (T.concat ["Version ", T.pack (show  major), ".", T.pack (show minor), " is not supported (only version 0.0 is available)."])
-validate_version _ = Nothing
+validate_version (Script "0.0" _ ) =  Nothing
+validate_version (Script version _) = Just (T.concat ["Version ", version, " is not supported (only version 0.0 is available)."])
 
 -- | check whether function result of function calls are used
 validate_pure_function (Script _ es) = check_toplevel validate_pure_function' es

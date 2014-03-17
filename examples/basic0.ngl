@@ -1,4 +1,4 @@
-ngless 0.0
+ngless "0.0"
 input = fastq('../Ngless-Mine/example.fastq')
 input = unique(input, max_copies=2)
 preprocess(input) using |read|:
