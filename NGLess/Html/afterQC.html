@@ -22,40 +22,43 @@
 	<title>FastQ Quality Statistics</title>
 </head>
 <body>
-	<h1 align = "center"> Statistics of fastq file </h1>
 	<div ng-app="myApp">
 	<div ng-controller="BasicInfoCtrl">
 	<div id="table" align="center">
 		<table class="table table-bordered table-hover">
-			<tr>
-				<td> </td>
-				<td> Old Stats</td>
-				<td> New Stats </td>
-				<td> Summary </td>
-			</tr>
-			<tr>
-				<td> %GC: </td>
-				<td> <div id="oldGC"> </div></td>
-				<td> {{basic.GC}} </td>
-				<td><div id="calcGC"> </div></td>
-			</tr>
-			<tr>
-				<td> Encoding is: </td>
-				<td> <div id="oldEncoding"> </div></td>
-				<td>{{basic.Encoding}}</td>
-			</tr>
-			<tr>
-				<td> Number of Sequences: </td> 
-				<td> <div id="oldNumSeqs"> </div> </td>
-				<td> {{basic.NumSeqs}} </td>
-				<td><div id="calcNumSeqs"> </div></td>
-			</tr>
-			<tr>
-				<td> Sequence length:  </td>
-				<td> <div id="oldSeqLength"> </div> </td>
-				<td> {{basic.SeqLength}} </td>
-				<td><div id="calcSeqLength"> </div></td>
-			</tr>
+			<thead>
+				<tr>
+					<th> </th>
+					<th> Old Stats</th>
+					<th> New Stats </th>
+					<th> Summary </th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td> %GC: </td>
+					<td> <div id="oldGC"> </div></td>
+					<td> {{basic.GC}} </td>
+					<td><div id="calcGC"> </div></td>
+				</tr>
+				<tr>
+					<td> Encoding is: </td>
+					<td> <div id="oldEncoding"> </div></td>
+					<td>{{basic.Encoding}}</td>
+				</tr>
+				<tr>
+					<td> Number of Sequences: </td> 
+					<td> <div id="oldNumSeqs"> </div> </td>
+					<td> {{basic.NumSeqs}} </td>
+					<td><div id="calcNumSeqs"> </div></td>
+				</tr>
+				<tr>
+					<td> Sequence length:  </td>
+					<td> <div id="oldSeqLength"> </div> </td>
+					<td> {{basic.SeqLength}} </td>
+					<td><div id="calcSeqLength"> </div></td>
+				</tr>
+			</tbody>
 		</table>
 	</div>
 	
@@ -110,7 +113,7 @@
 		                .transitionDuration(300)
 		                ;
 
-		  chart.xAxis.tickFormat(d3.format('.02f'));
+		  chart.xAxis.tickFormat(d3.format('1'));
 		  chart.yAxis.tickFormat(d3.format('.02f'));
 		  chart.tooltipContent(function(key) {
 		      return '<h2>' + key + '</h2>';
@@ -146,15 +149,17 @@
 	    	head.appendChild(script);
 	    	script.onload = function () {
 	    		$("#oldGC").text(basicInfo[0].GC);
-	    		$("#calcGC").text(parseFloat(afterBasicInfo[0].GC) - parseFloat(basicInfo[0].GC));
+	    		$("#calcGC").text(parseFloat(basicInfo[0].GC) - parseFloat(afterBasicInfo[0].GC));
 	    		
 	    		$("#oldEncoding").text(basicInfo[0].Encoding);
 	    		
 	    		$("#oldNumSeqs").text(basicInfo[0].NumSeqs); 
-	    	    $("#calcNumSeqs").text(parseFloat(afterBasicInfo[0].NumSeqs) - parseFloat(basicInfo[0].NumSeqs));
+	    	    $("#calcNumSeqs").text(parseInt(basicInfo[0].NumSeqs) - parseInt(afterBasicInfo[0].NumSeqs));
 	    		
 	    		$("#oldSeqLength").text(basicInfo[0].SeqLength);	    		
-	    	    $("#calcSeqLength").text(parseFloat(afterBasicInfo[0].SeqLength) - parseFloat(basicInfo[0].SeqLength));
+	    	    var minSeqLen =parseInt(basicInfo[0].SeqLength[0]) - parseInt(afterBasicInfo[0].SeqLength[0]);
+	    	    var maxSeqLen =parseInt(basicInfo[0].SeqLength[1]) - parseInt(afterBasicInfo[0].SeqLength[1]);
+	    	    $("#calcSeqLength").text("[" + minSeqLen + "," + maxSeqLen + "]");
 	    		console.log(basicInfo);
 	    	};
 	</script>

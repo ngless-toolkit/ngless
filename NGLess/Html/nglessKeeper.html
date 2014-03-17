@@ -88,7 +88,8 @@
       $scope.getFileName = function(path){
          console.log(path);
          var pos = path.split("/").length;
-         return path.split("/")[pos - 1];
+             fileName = path.split("/")[pos - 1];
+         return fileName.split('.')[0];    
       }
       $scope.trustSrc = function(src) {
         console.log(src);

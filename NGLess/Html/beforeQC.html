@@ -22,7 +22,6 @@
 	<title>FastQ Quality Statistics</title>
 </head>
 <body>
-	<h1 align = "center"> Statistics of fastq file </h1>
 	<div ng-app="myApp">
 	<div ng-controller="BasicInfoCtrl">
 	<div id="table" align="center">
@@ -76,7 +75,7 @@
 	                .transitionDuration(300)
 	                ;
 
-	  chart.xAxis.tickFormat(d3.format('.02f'));
+	  chart.xAxis.tickFormat(d3.format('1'));
 	  chart.yAxis.tickFormat(d3.format('.02f'));
 	  chart.tooltipContent(function(key) {
 	      return '<h2>' + key + '</h2>';
@@ -95,7 +94,7 @@
 
 	function convertData (data) {
 	  var newData = [],
-	      shapes = ['triangle-up', 'triangle-down'],
+	      shapes = ['triangle-up', 'triangle-down', 'circle', 'diamond'],
 	      tag = ['mean', 'median', 'Lower Quartile', 'Upper Quartile'];
 
 	  for (i = 0; i < tag.length; i++) {
@@ -109,7 +108,7 @@
 	          x: data[j].bp, 
 	          y: data[j][tag[i]], 
 	          size: Math.random(), 
-	          shape: shapes[i % 2]
+	          shape: shapes[i % 4]
 	      });
 	    }
 	  }
