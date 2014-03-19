@@ -1,4 +1,6 @@
 # Bwa name and location
+.PHONY: clean ngless
+
 BWA = bwa-0.7.7
 BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
 BWA_DIR = bwa-0.7.7.tar.bz2
@@ -7,7 +9,6 @@ all: install
 
 install: bwaconf 
 	cd NGLess && $(MAKE)
-	cd NGLess && cabal install
 
 bwaconf: 
 	@echo Configuring BWA...
@@ -19,6 +20,11 @@ bwaconf:
 		$(MAKE);\
 	fi
 
+ngless:
+	cd NGLess && $(MAKE) ngless
+
+nglesstest:
+	cd NGLess && $(MAKE) nglesstest
 
 clean:
 	rm -rf $(BWA)
