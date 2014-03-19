@@ -6,16 +6,8 @@ BWA_DIR = bwa-0.7.7.tar.bz2
 all: install
 
 install: bwaconf 
-	cabal install cmdargs
-	cabal install happy
-	cabal install test-framework-th
-	cabal install test-framework-quickcheck2
-	cabal install test-framework-hunit
-	cabal install zlib
-	cabal install parsec
-	cabal install hashable
-	cabal install aeson
 	cd NGLess && $(MAKE)
+	cd NGLess && cabal install
 
 bwaconf: 
 	@echo Configuring BWA...

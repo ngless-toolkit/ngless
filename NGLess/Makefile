@@ -1,4 +1,4 @@
-all: confhtmllibs ngless nglesstest
+all: reqdeps confhtmllibs ngless nglesstest
 .PHONY: all clean
 GHCOPTS := -odir .objs -hidir .objs -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded
 
@@ -39,6 +39,9 @@ nglesstest: Tests.hs $(SOURCES)
 tests: nglesstest
 	./nglesstest
 
+reqdeps: 
+	cabal install
+
 confhtmllibdir: 
 	@if [ ! -d $(HTML_DIR) ]; then \
 		mkdir $(HTML_DIR); \
@@ -50,4 +53,5 @@ confhtmllibs: confhtmllibdir
 
 clean:
 	rm -rf .objs
+	rm -rf deps
 	rm -f ngless nglesstest
