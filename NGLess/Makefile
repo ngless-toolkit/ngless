@@ -52,6 +52,5 @@ confhtmllibs: confhtmllibdir
 	@$(foreach url,$(URLS), wget -nc -O $(HTML_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
 
 clean:
-	rm -rf .objs
-	rm -rf deps
+	rm -rf .objs deps Html/htmllibs
 	rm -f ngless nglesstest
