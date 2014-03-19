@@ -1,5 +1,5 @@
 # Bwa name and location
-.PHONY: clean ngless
+.PHONY: clean ngless nglesstest
 
 BWA = bwa-0.7.7
 BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
@@ -25,6 +25,9 @@ ngless:
 
 nglesstest:
 	cd NGLess && $(MAKE) nglesstest
+
+tests:
+	cd NGLess && $(MAKE) tests
 
 clean:
 	rm -rf $(BWA)
