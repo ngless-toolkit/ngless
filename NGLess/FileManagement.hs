@@ -31,6 +31,11 @@ import System.Posix.Internals (c_getpid)
 
 import System.Console.CmdArgs.Verbosity
 
+htmlDefaultDirLibs :: String
+htmlDefaultDirLibs = "htmllibs"
+
+htmlDefaultDir :: String
+htmlDefaultDir = "Html"
 
 maxFileSize :: Num a => a
 maxFileSize = 300000000 -- 100MB
@@ -69,19 +74,12 @@ setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
 setupRequiredFiles info dirTemplate = do
     let destDir' = dirTemplate ++ "$" ++ info
     createDirectory destDir'
-    copyFile "Html/perBaseQualScores.css" (destDir' ++ "/perBaseQualScores.css")
-    copyFile "Html/perBaseQualityScores.js" (destDir' ++ "/perBaseQualityScores.js")
+    copyFile (htmlDefaultDir </> "perBaseQualScores.css") (destDir' </> "perBaseQualScores.css")
+    copyFile (htmlDefaultDir </> "perBaseQualityScores.js") (destDir' </> "perBaseQualityScores.js")
     case info of
-        "beforeQC" -> copyFile "Html/beforeQC.html" (destDir' ++ "/index.html")
-        "afterQC" -> copyFile "Html/afterQC.html" (destDir' ++ "/index.html")
-        err -> error ("Has to be either before or after QC. it is: " ++ (show err)) 
-
--- setup lib directory --
---    createDirectory $ destDir' </> "lib"
---    copyFile "Html/lib/d3.v3.js" (destDir' </> "lib/d3.v3.js")
---    copyFile "Html/lib/nv.d3.js" (destDir' </> "lib/nv.d3.js")
---    copyFile "Html/lib/nv.d3.css" (destDir' </> "lib/nv.d3.css")
-
+        "beforeQC" -> copyFile (htmlDefaultDir </> "beforeQC.html") (destDir' </> "index.html")
+        "afterQC" -> copyFile (htmlDefaultDir </> "afterQC.html") (destDir' </> "index.html")
+        err -> error ("Has to be either before or after QC. it is: " ++ (show err))
     return destDir'
 
 generateTempFilePath :: FilePath -> String -> IO FilePath
@@ -158,5 +156,18 @@ setupHtmlViewer = do
     doesExist <- doesFileExist (dir </> "nglessKeeper.html")
     case doesExist of 
         True   -> return ()
-        False  -> do copyFile "Html/nglessKeeper.html" (dir </> "nglessKeeper.html")
-                     copyFile "Html/nglessKeeper.css"  (dir </> "nglessKeeper.css")
+        False  -> do copyFile (htmlDefaultDir </> "nglessKeeper.html") (dir </> "nglessKeeper.html")
+                     copyFile (htmlDefaultDir </> "nglessKeeper.css")  (dir </> "nglessKeeper.css")
+                     copyDir  (htmlDefaultDir </> htmlDefaultDirLibs)  (dir </> htmlDefaultDirLibs)
+
+
+
+copyDir ::  FilePath -> FilePath -> IO ()
+copyDir src dst = do
+  createDirectory dst
+  content <- getDirectoryContents src
+  let xs = filter (`notElem` [".", ".."]) content
+  forM_ xs $ \name -> do
+    let srcPath = src </> name
+    let dstPath = dst </> name
+    copyFile srcPath dstPath

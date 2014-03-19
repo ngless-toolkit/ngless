@@ -16,9 +16,10 @@ URLS += http://netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js
 URLS += http://cdnjs.cloudflare.com/ajax/libs/d3/3.1.6/d3.min.js
 URLS += http://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.js
 URLS += http://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.css
+URLS += http://code.angularjs.org/1.3.0-beta.1/angular-sanitize.js
 #
 
-HTML_DIR = ../htmllibs
+HTML_DIR = Html/htmllibs
 
 SOURCES :=  \
 	Interpret.hs \
