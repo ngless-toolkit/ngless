@@ -7,8 +7,8 @@ version:             0.0.0
 -- description:         
 license:             GPL-3
 --license-file:        LICENSE
-author:              Paulo Monteiro
-maintainer:          paulomonteiro7.pm@gmail.com
+author:              Luis Pedro Coelho and Paulo Monteiro
+maintainer:          luis@luispedro.org
 -- copyright:           
 category:            Domain Specific Language
 build-type:          Simple
