@@ -7,9 +7,10 @@
 <script src="htmllibs/angular-sanitize.js"></script>
 <!-- Bootstrap core CSS -->
 <link href="htmllibs/bootstrap.min.css" rel="stylesheet"> 
-<link href="htmllibs/bootstrap-glyphicons.css" rel="stylesheet">   
+<link href="htmllibs/bootstrap-glyphicons.css" rel="stylesheet"> 
 <!-- Custom styles for this template -->
 <link href="nglessKeeper.css" rel="stylesheet">
+
 
 <title>Ngless</title>
 
@@ -53,8 +54,8 @@
           <ul id="leftlist" class="nav nav-pills nav-stacked sidenav">
              <li ng-repeat="f in filesprocessed" ng-class="{active: $index == 0}">
                 <a href="#file{{$index}}"> 
-                  <span style="float:right" class="glyphicon glyphicon-chevron-right"></span>
-                  File {{getFileName(f.name)}}
+                <span style="float:right" class="glyphicon glyphicon-chevron-right"></span>
+                File {{getFileName(f.name)}}
                 </a>
             </li>
           </ul>
@@ -91,8 +92,8 @@
   <script src="htmllibs/bootstrap.min.js"></script>
   <script src="filesProcessed.js"></script>
 
-  <!-- Angular Script to load different URLs -->
   <script>
+
 
     $(function() {
         $('#nav-wrapper').height($("#nav").height());

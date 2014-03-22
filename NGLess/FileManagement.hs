@@ -34,6 +34,9 @@ import System.Console.CmdArgs.Verbosity
 htmlDefaultDirLibs :: String
 htmlDefaultDirLibs = "htmllibs"
 
+htmlDefaultFonts :: String
+htmlDefaultFonts = "fonts"
+
 htmlDefaultDir :: String
 htmlDefaultDir = "Html"
 
@@ -162,7 +165,7 @@ setupHtmlViewer = do
                      copyFile (htmlDefaultDir </> "nglessKeepervisualize.html") (dir </> "nglessKeepervisualize.html")
                      copyFile (htmlDefaultDir </> "nglessKeeper.css")  (dir </> "nglessKeeper.css")
                      copyDir  (htmlDefaultDir </> htmlDefaultDirLibs)  (dir </> htmlDefaultDirLibs)
-
+                     copyDir  (htmlDefaultDir </> htmlDefaultFonts)  (dir </> htmlDefaultFonts)
 
 
 copyDir ::  FilePath -> FilePath -> IO ()

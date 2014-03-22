@@ -13,9 +13,12 @@ URLS += http://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.js
 URLS += http://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.css
 URLS += http://code.angularjs.org/1.3.0-beta.1/angular-sanitize.js
 URLS += http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css
+URLS += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.woff
+URLS += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.ttf
 GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
+HTML = Html
 HTML_DIR = Html/htmllibs
 
 SOURCES :=  \
@@ -52,6 +55,7 @@ confhtmllibdir:
 confhtmllibs: confhtmllibdir githublogo
 	@echo configuring html libraries... 
 	@$(foreach url,$(URLS), wget -nc -O $(HTML_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
+	mkdir $(HTML)/fonts; mv $(HTML_DIR)/glyphicons-halflings-* $(HTML)/fonts/;
 
 githublogo:
 	wget -nc -O $(HTML_DIR)/$(notdir $(GIT-LOGO)) $(GIT-LOGO); 
@@ -61,6 +65,7 @@ githublogo:
 	echo $(GIT-LOGO) configured;
 
 
+
 clean:
-	rm -rf .objs deps Html/htmllibs dist
+	rm -rf .objs deps Html/htmllibs Html/fonts dist
 	rm -f ngless nglesstest

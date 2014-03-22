@@ -56,7 +56,7 @@
           <ul id="leftlist" class="nav nav-pills nav-stacked sidenav">
              <li ng-repeat="f in filesprocessed" ng-class="{active: $index == 0}">
                 <a href="#file{{$index}}"> 
-                  <span style="float:right" class="glyphicon glyphicon-chevron-right"></span>
+                 <span style="float:right" class="glyphicon glyphicon-chevron-right"></span>
                   File {{getFileName(f.name)}}
                 </a>
             </li>
@@ -91,10 +91,10 @@
   <script src="htmllibs/bootstrap.min.js"></script>
   <script src="filesProcessed.js"></script>
 
-  <!-- Angular Script to load different URLs -->
   <script>
 
     $(function() {
+
         $('#nav-wrapper').height($("#nav").height());
         
         $('#nav').affix({
