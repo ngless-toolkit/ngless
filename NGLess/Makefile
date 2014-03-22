@@ -12,6 +12,8 @@ URLS += http://cdnjs.cloudflare.com/ajax/libs/d3/3.1.6/d3.min.js
 URLS += http://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.js
 URLS += http://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.css
 URLS += http://code.angularjs.org/1.3.0-beta.1/angular-sanitize.js
+URLS += http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css
+GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
 HTML_DIR = Html/htmllibs
@@ -47,9 +49,17 @@ confhtmllibdir:
 		mkdir $(HTML_DIR); \
 	fi
 
-confhtmllibs: confhtmllibdir
+confhtmllibs: confhtmllibdir githublogo
 	@echo configuring html libraries... 
 	@$(foreach url,$(URLS), wget -nc -O $(HTML_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
+
+githublogo:
+	wget -nc -O $(HTML_DIR)/$(notdir $(GIT-LOGO)) $(GIT-LOGO); 
+	unzip $(HTML_DIR)/$(notdir $(GIT-LOGO)) -d $(HTML_DIR);
+	cp $(HTML_DIR)/Octocat/Octocat.png $(HTML_DIR)/Octocat.png ;  
+	rm -rf $(HTML_DIR)/__MACOSX $(HTML_DIR)/Octocat $(HTML_DIR)/Octocats.zip ; 
+	echo $(GIT-LOGO) configured;
+
 
 clean:
 	rm -rf .objs deps Html/htmllibs dist

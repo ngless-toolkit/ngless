@@ -8,30 +8,31 @@
 <!-- Bootstrap core CSS -->
 <link href="htmllibs/bootstrap.min.css" rel="stylesheet">    
 <!-- Custom styles for this template -->
+<link href="nglessKeeper.css" rel="stylesheet">
+
 <link href="htmllibs/bootstrap-glyphicons.css" rel="stylesheet">   
 
-<link href="nglessKeeper.css" rel="stylesheet">
 
 <title>Ngless</title>
 
-<body>
+<body data-spy="scroll" data-target=".navbar-example">
 
   <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
-    <div class="container headTemplate">
+    <div class="container">
       <div class="navbar-header">
         <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
-          <span class="sr-only"></span>
+          <span class="sr-only">Toggle navigation</span>
           <span class="icon-bar"></span>
           <span class="icon-bar"></span>
           <span class="icon-bar"></span>
         </button>
         <a class="navbar-brand" >NGLess</a>
       </div>
-      <nav class="navbar-collapse">
+      <div class="collapse navbar-collapse">
         <ul class="nav navbar-nav">
-          <li class="active"><a href="#">Home</a></li>
+          <li><a href="nglessKeeper.html">Home</a></li>
           <li><a href="nglessKeeperbeforeQC.html">Before QC</a></li>
-          <li><a href="nglessKeeperafterQC.html">After QC</a></li>
+          <li class="active"><a href="nglessKeeperafterQC.html">After QC</a></li>
           <li><a href="nglessKeepervisualize.html">Visualize</a></li>
         </ul>
       </div><!--/.nav-collapse -->
@@ -41,46 +42,48 @@
 
   <div class="bs-docs-header" id="content">
       <div class="container">
-        <h1>Welcome to NGLess</h1>
-        <p>Here can be seen everything that NGLess has produced in past executions.</p>
+        <h1>After Quality Control</h1>
+        <p>Browse through out all your NGLess results</p>
       </div>
   </div>
 
-  <div class="section-body">
-    <h1>You can collapse or expand all items!</h1>
-    <p><a id="expandAll" class="btn btn-primary btn-lg disabled" role="button">expand</a>    <a id="colapseAll" class="btn btn-primary btn-lg" role="button">collapse</a></p>
-  </div>
-  
-  <div class="sec-collapse" ng-app="myApp" ng-controller="FilesProcessedCtrl">
-    <div class="container">
-    <div class="panel-group" id="accordion" ng-repeat="f in filesprocessed">
-    <div class="panel panel-default">
-        <div class="panel-heading" data-toggle="collapse" data-parent="#accordion" href="#collapse{{$index}}">
-            <h4 class="panel-title">
-                <p class="titletext"><strong>Statistics for {{getFileName(f.name)}}</strong></p>
-                <p class="timetext">{{f.time}}</p>
-            </h4>
+<div  ng-app="myApp" ng-controller="FilesProcessedCtrl" class="container">
+ 
+  <div class="container">
+    <div class="row">
+      <div id="nav-wrapper" class="col-md-3">
+       <div id="nav" class="navbar-example">
+          <ul id="leftlist" class="nav nav-pills nav-stacked sidenav">
+             <li ng-repeat="f in filesprocessed" ng-class="{active: $index == 0}">
+                <a href="#file{{$index}}"> 
+                  <span style="float:right" class="glyphicon glyphicon-chevron-right"></span>
+                  File {{getFileName(f.name)}}
+                </a>
+            </li>
+          </ul>
         </div>
+      </div>
 
-        <div id="collapse{{$index}}" class="panel-collapse collapse in">
-            <div class="panel-body">
-              <p class="lead"> Before Quality Control</p>
-              <iframe class="frameFastQ" seamless ng-src="{{trustSrc(f.name + '$beforeQC/index.html')}}"></iframe>
-              <p class="lead"> After Quality Control</p>
-              <iframe class="frameFastQ" seamless ng-src="{{trustSrc(f.name + '$afterQC/index.html')}}" ></iframe>
-           </div>
+      <div class="col-md-9">
+        <div ng-repeat="f in filesprocessed">
+          <section id="file{{$index}}">
+            <div class="page-header"> <h2>Statistics of {{getFileName(f.name)}}</h2></div>
+             <p > Here can be seen the resultant statistics of the applied NGLess script to the dataset <strong>{{getFileName(f.name)}}</strong>. </p>
+             <p class="titletext"> The file was processed at {{f.time}}. </p>
+             <iframe class="frameFastQ" seamless ng-src="{{trustSrc(f.name + '$afterQC/index.html')}}"></iframe>
+           </section>
+          </div>
         </div>
-    </div>
-    </div>
+      </div>
+    </div> <!-- /.container -->
   </div>
-  </div><!-- /.container -->
-
-
-  <div id="footer">
+    <div id="footer">
       <div class="container">
         <p>Happily designed by <a href="https://github.com/luispedro">Luis Pedro Coelho</a> and <a href="https://github.com/montoias">Paulo Monteiro</a>. <a href="https://github.com/luispedro/ngless"><img align="right" style="float:right; width:36px" src="htmllibs/Octocat.png"> </img> </a></p>
       </div>
     </div>
+
+
   <!-- Bootstrap core JavaScript
   ================================================== -->
   <!-- Placed at the end of the document so the pages load faster -->
@@ -90,27 +93,18 @@
 
   <!-- Angular Script to load different URLs -->
   <script>
-    $("#expandAll").click(function() {
-      $("#expandAll").addClass("disabled");
-      $("#colapseAll").removeClass("disabled");
-      var res = $('[id*="collapse"]')
-      for (var i=0;i<res.length;i++){
-          $("#" + res[i].id).addClass("collapse");
-          $("#" + res[i].id).addClass("in");
-      }
+
+    $(function() {
+        $('#nav-wrapper').height($("#nav").height());
+        
+        $('#nav').affix({
+            offset: { top: $('#nav').offset().top - 80}
+        });
     });
-
-    $("#colapseAll").click(function() {
-      $("#colapseAll").addClass("disabled");
-      $("#expandAll").removeClass("disabled");
-      var res = $('[id*="collapse"]')
-      for (var i=0;i<res.length;i++){
-          $("#" + res[i].id).addClass("collapse");        
-          $("#" + res[i].id).removeClass("in");
-      }
-
+    $("ul").on('click', 'li', function(e) {
+      $("li.active").removeClass( "active" );
+      $(this).addClass("active");
     });
-
     var app = angular.module('myApp', ['ngSanitize']);
 
     app.factory('FilesProcessed', function() {

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- Load angular JS from google -->
+<script src="htmllibs/angular.min.js"></script>
+<!-- Load angular JS from google -->
+<script src="htmllibs/angular-sanitize.js"></script>
+<!-- Bootstrap core CSS -->
+<link href="htmllibs/bootstrap.min.css" rel="stylesheet">    
+<!-- Custom styles for this template -->
+<link href="nglessKeeper.css" rel="stylesheet">
+<link href="htmllibs/bootstrap-glyphicons.css" rel="stylesheet">   
+
+
+<title>Ngless</title>
+
+<body>
+
+  <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" >NGLess</a>
+      </div>
+      <div class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li><a href="nglessKeeper.html">Home</a></li>
+          <li><a href="nglessKeeperbeforeQC.html">Before QC</a></li>
+          <li><a href="nglessKeeperafterQC.html">After QC</a></li>
+          <li class="active"><a href="nglessKeepervisualize.html">Visualize</a></li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </div>
+
+  <div  ng-app="myApp" ng-controller="FilesProcessedCtrl" class="container">
+
+    <div class="textTitle">
+      <h1>TODO</h1>
+    </div>
+
+
+  </div><!-- /.container -->
+
+    <div id="footer">
+      <div class="container">
+        <p>Happily designed by <a href="https://github.com/luispedro">Luis Pedro Coelho</a> and <a href="https://github.com/montoias">Paulo Monteiro</a>. <a href="https://github.com/luispedro/ngless"><img align="right" style="float:right; width:36px" src="htmllibs/Octocat/Octocat.png"> </img> </a></p>
+      </div>
+    </div>
+
+  <!-- Bootstrap core JavaScript
+  ================================================== -->
+  <!-- Placed at the end of the document so the pages load faster -->
+  <script src="htmllibs/jquery-latest.min.js"></script>
+  <script src="htmllibs/bootstrap.min.js"></script>
+  <script src="filesProcessed.js"></script>
+
+  <!-- Angular Script to load different URLs -->
+  <script>
+
+    var app = angular.module('myApp', ['ngSanitize']);
+
+    app.factory('FilesProcessed', function() {
+      return filesProcessed;
+    });
+
+    function FilesProcessedCtrl($scope, $sce, FilesProcessed){
+      $scope.filesprocessed = FilesProcessed;
+
+      $scope.getFileName = function(path){
+         console.log(path);
+         var pos = path.split("/").length;
+             fileName = path.split("/")[pos - 1];
+         return fileName.split('.')[0];    
+      }
+      $scope.trustSrc = function(src) {
+        console.log(src);
+        return $sce.trustAsResourceUrl(src);
+      }
+    }
+
+  </script>
+
+</body>
+</html>

@@ -20,3 +20,174 @@ body {
 .titletext {
 	text-align: left;
 }
+
+
+
+/* Sidenav for Docs
+-------------------------------------------------- */
+
+.sidenav {
+  width: 228px;
+  margin: 30px 0 0;
+  padding: 0;
+  background-color: #fff;
+  -webkit-border-radius: 6px;
+     -moz-border-radius: 6px;
+          border-radius: 6px;
+  -webkit-box-shadow: 0 1px 4px rgba(0,0,0,.065);
+     -moz-box-shadow: 0 1px 4px rgba(0,0,0,.065);
+          box-shadow: 0 1px 4px rgba(0,0,0,.065);
+}
+.sidenav > li > a {
+  display: block;
+  width: 190px \9;
+  margin: 0 0 -1px;
+  padding: 8px 14px;
+  border: 1px solid #e5e5e5;
+}
+.sidenav > li:first-child > a {
+  -webkit-border-radius: 6px 6px 0 0;
+     -moz-border-radius: 6px 6px 0 0;
+          border-radius: 6px 6px 0 0;
+}
+.sidenav > li:last-child > a {
+  -webkit-border-radius: 0 0 6px 6px;
+     -moz-border-radius: 0 0 6px 6px;
+          border-radius: 0 0 6px 6px;
+}
+.sidenav > .active > a {
+  position: relative;
+  z-index: 2;
+  padding: 9px 15px;
+  border: 0;
+  text-shadow: 0 1px 0 rgba(0,0,0,.15);
+  -webkit-box-shadow: inset 1px 0 0 rgba(0,0,0,.1), inset -1px 0 0 rgba(0,0,0,.1);
+     -moz-box-shadow: inset 1px 0 0 rgba(0,0,0,.1), inset -1px 0 0 rgba(0,0,0,.1);
+          box-shadow: inset 1px 0 0 rgba(0,0,0,.1), inset -1px 0 0 rgba(0,0,0,.1);
+}
+
+.bs-docs-masthead, .bs-docs-header {
+    position: relative;
+    padding: 30px 15px;
+    color: #cdbfe3;
+    text-align: center;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, .1);
+    background-color: #53B4FF;
+    background-image: -webkit-linear-gradient(top, #236DFF 0, #53B4FF 100%);
+    background-image: linear-gradient(to bottom, #236DFF 0, #53B4FF 100%);
+    background-repeat: repeat-x;
+}
+
+
+.bs-docs-header h1 {
+    color: #fff
+}
+
+@media (min-width:768px){
+  .bs-docs-header {
+        padding-top: 60px;
+        padding-bottom: 60px;
+        font-size: 24px;
+        text-align: left
+    }
+
+    .bs-docs-header h1 {
+        font-size: 60px;
+        line-height: 1
+    }
+}
+
+@media (min-width:992px){.bs-docs-header h1, .bs-docs-header p {
+        margin-right: 380px
+    }
+}
+
+#nav.affix {
+    position: fixed;
+    top: 70px;
+    width: 100%
+}
+
+.headTemplate {
+   color: #53B4FF;
+}
+
+
+html,body {
+  height: 100%;
+  /* The html and body elements cannot have any padding or margin. */
+}
+
+/* Wrapper for page content to push down footer */
+#wrap {
+  min-height: 100%;
+  height: auto !important;
+  height: 100%;
+  /* Negative indent footer by it's height */
+  margin: 0 auto -60px;
+}
+
+/* Set the fixed height of the footer here */
+#push,
+#footer {
+  height: 60px;
+}
+
+#footer {
+  background-color: #f5f5f5;
+}
+
+
+
+.section-body {
+    position: relative;
+    padding: 30px 15px;
+    color: #cdbfe3;
+    text-align: center;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, .1);
+    background-color: #fff;
+    background-image: -webkit-linear-gradient(top, #fff 0, #fff 100%);
+    background-image: linear-gradient(to bottom, #fff 0, #fff 100%);
+    background-repeat: repeat-x;
+}
+
+
+.section-body h1 {
+    color: #000000
+}
+
+@media (min-width:768px){
+  .section-body {
+        padding-top: 60px;
+        padding-bottom: 60px;
+        font-size: 14px;
+        text-align: center
+    }
+
+    .section-body h1 {
+        font-size: 20px;
+        line-height: 1
+    }
+}
+
+
+.sec-collapse{
+    text-shadow: 0 1px 0 rgba(0, 0, 0, .1);
+    background-color: #5CDBE5;
+    background-image: -webkit-linear-gradient(bottom, #fff 0, #5CDBE5 100%);
+    background-image: linear-gradient(to top, #fff 0, #5CDBE5 100%);
+    background-repeat: repeat-x;
+}
+
+@media (min-width:768px){
+  .sec-collapse {
+        padding-top: 20px;
+        padding-bottom: 60px;
+    }
+
+    .sec-collapse h1 {
+        font-size: 20px;
+        line-height: 1
+    }
+}
+

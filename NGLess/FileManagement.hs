@@ -157,6 +157,9 @@ setupHtmlViewer = do
     case doesExist of 
         True   -> return ()
         False  -> do copyFile (htmlDefaultDir </> "nglessKeeper.html") (dir </> "nglessKeeper.html")
+                     copyFile (htmlDefaultDir </> "nglessKeeperafterQC.html") (dir </> "nglessKeeperafterQC.html")
+                     copyFile (htmlDefaultDir </> "nglessKeeperbeforeQC.html") (dir </> "nglessKeeperbeforeQC.html")
+                     copyFile (htmlDefaultDir </> "nglessKeepervisualize.html") (dir </> "nglessKeepervisualize.html")
                      copyFile (htmlDefaultDir </> "nglessKeeper.css")  (dir </> "nglessKeeper.css")
                      copyDir  (htmlDefaultDir </> htmlDefaultDirLibs)  (dir </> htmlDefaultDirLibs)
 
