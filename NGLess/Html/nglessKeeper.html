@@ -56,10 +56,10 @@
     <div class="panel-group" id="accordion" ng-repeat="f in filesprocessed">
     <div class="panel panel-default">
         <div class="panel-heading" data-toggle="collapse" data-parent="#accordion" href="#collapse{{$index}}">
-            <h4 class="panel-title">
-                <p class="titletext"><strong>Statistics for {{getFileName(f.name)}}</strong></p>
-                <p class="timetext">{{f.time}}</p>
-            </h4>
+            <div class="panel-title">
+                  <a class="titletext"><strong>Statistics for {{getFileName(f.name)}}</strong></a>
+                  <a class="timetext">{{f.time}}</a>
+            </div>
         </div>
 
         <div id="collapse{{$index}}" class="panel-collapse collapse in">

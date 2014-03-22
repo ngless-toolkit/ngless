@@ -14,13 +14,23 @@ body {
 }
 
 .timetext {
-	text-align:right ;
+	float:right ;
 }
 
 .titletext {
-	text-align: left;
+	float: left;
 }
 
+div.panel-title {
+  padding-bottom: 30px;
+  padding-top: 10px;
+}
+
+.panel-default>.panel-heading {
+  color: #fff;
+  background-color: #E8A10C;
+  border-color: #ddd;
+}
 
 
 /* Sidenav for Docs
@@ -135,6 +145,7 @@ html,body {
 
 #footer {
   background-color: #f5f5f5;
+  padding-top: 20px;
 }
 
 
