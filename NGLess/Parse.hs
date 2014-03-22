@@ -181,5 +181,5 @@ variableList = sepBy1 variable (operator ',') <?> "variable list"
 variable = Variable <$> word <?> "variable"
 
 ngless_version = ngless_version' <?> "ngless version declararion"
-    where ngless_version' = reserved "ngless" *> string <* eol
+    where ngless_version' = reserved "ngless" *> (string <?> "ngless version string") <* eol
 
