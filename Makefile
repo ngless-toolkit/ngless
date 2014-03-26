@@ -1,7 +1,7 @@
 all: install
 .PHONY: clean ngless nglesstest
 
-BWA = bwa-0.7.7
+BWA = bwa-*
 BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
 BWA_DIR = bwa-0.7.7.tar.bz2
 
@@ -24,23 +24,11 @@ URLS += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflin
 GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
-install: bwaconf confhtmllibs
+install: nglessconf
 	cd NGLess && $(MAKE)
 
-confhtmllibs: confhtmllibdir githublogo
-	@echo configuring html libraries... 
-	@$(foreach url,$(URLS), wget -nc -O $(HTML_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
-	mkdir $(HTML)/fonts; mv $(HTML_DIR)/glyphicons-halflings-* $(HTML)/fonts/;
+nglessconf: bwaconf confhtmllibs
 
-bwaconf: 
-	@echo Configuring BWA...
-	@if [ ! -d $(BWA) ]; then \
-		wget $(BWA_URL);\
-		tar xvfj $(BWA_DIR) ;\
-		rm $(BWA_DIR);\
-		cd bwa-*;\
-		$(MAKE);\
-	fi
 
 ngless:
 	cd NGLess && $(MAKE) ngless
@@ -57,6 +45,23 @@ clean:
 
 
 ##### auxiliary functions to setup required files
+
+bwaconf: 
+	@echo Configuring BWA...
+	@if [ ! -d $(BWA) ]; then \
+		wget $(BWA_URL);\
+		tar xvfj $(BWA_DIR) ;\
+		rm $(BWA_DIR);\
+		cd bwa-*;\
+		$(MAKE);\
+	fi
+
+confhtmllibs: confhtmllibdir githublogo
+	@echo configuring html libraries... 
+	@$(foreach url,$(URLS), wget -nc -O $(HTML_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
+	mkdir $(HTML)/fonts; mv $(HTML_DIR)/glyphicons-halflings-* $(HTML)/fonts/;
+
+
 confhtmllibdir: 
 	@if [ ! -d $(HTML_DIR) ]; then \
 		mkdir $(HTML_DIR); \
