@@ -22,14 +22,19 @@ module FileManagement
     ) where
 
 import System.FilePath.Posix
+import System.Posix.Files (readSymbolicLink)
 import System.Directory
 import System.IO
+import System.Environment (getExecutablePath)
 
 import Control.Monad
 
 import System.Posix.Internals (c_getpid)
 
 import System.Console.CmdArgs.Verbosity
+
+
+-- relative paths 
 
 htmlDefaultDirLibs :: String
 htmlDefaultDirLibs = "htmllibs"
@@ -39,6 +44,8 @@ htmlDefaultFonts = "fonts"
 
 htmlDefaultDir :: String
 htmlDefaultDir = "Html"
+
+--- 
 
 maxFileSize :: Num a => a
 maxFileSize = 300000000 -- 100MB
@@ -72,9 +79,17 @@ getFilesInDir p = do
  files <- getDirectoryContents p
  return $ map ((</>) p) (filter (isDot) files)
 
+switchToNglessRoot :: FilePath -> IO ()
+switchToNglessRoot fp = do
+  nglessSymLinkPath <- getExecutablePath
+  nglessRootPath<- readSymbolicLink nglessSymLinkPath -- this retrieves the actual path from the symLink
+  setCurrentDirectory nglessRootPath
 
 setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
 setupRequiredFiles info dirTemplate = do
+    scriptEnvDir' <- getCurrentDirectory
+    switchToNglessRoot scriptEnvDir'
+    -- run under ngless root environment   
     let destDir' = dirTemplate ++ "$" ++ info
     createDirectory destDir'
     copyFile (htmlDefaultDir </> "perBaseQualScores.css") (destDir' </> "perBaseQualScores.css")
@@ -83,6 +98,8 @@ setupRequiredFiles info dirTemplate = do
         "beforeQC" -> copyFile (htmlDefaultDir </> "beforeQC.html") (destDir' </> "index.html")
         "afterQC" -> copyFile (htmlDefaultDir </> "afterQC.html") (destDir' </> "index.html")
         err -> error ("Has to be either before or after QC. it is: " ++ (show err))
+    -- run under script environment
+    setCurrentDirectory scriptEnvDir'
     return destDir'
 
 generateTempFilePath :: FilePath -> String -> IO FilePath
@@ -155,6 +172,9 @@ printNglessLn x = whenLoud $ putStrLn x
 
 setupHtmlViewer :: IO ()
 setupHtmlViewer = do
+    scriptEnvDir' <- getCurrentDirectory
+    switchToNglessRoot scriptEnvDir'
+    -- run under ngless root environment   
     dir <- defaultDir
     doesExist <- doesFileExist (dir </> "nglessKeeper.html")
     case doesExist of 
@@ -166,6 +186,8 @@ setupHtmlViewer = do
                      copyFile (htmlDefaultDir </> "nglessKeeper.css")  (dir </> "nglessKeeper.css")
                      copyDir  (htmlDefaultDir </> htmlDefaultDirLibs)  (dir </> htmlDefaultDirLibs)
                      copyDir  (htmlDefaultDir </> htmlDefaultFonts)  (dir </> htmlDefaultFonts)
+                     -- run under script environment
+                     setCurrentDirectory scriptEnvDir'
 
 
 copyDir ::  FilePath -> FilePath -> IO ()

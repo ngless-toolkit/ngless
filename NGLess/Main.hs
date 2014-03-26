@@ -68,7 +68,9 @@ main = do
     _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
     getVerbosity >>= \verb -> putStrLn $ "verbosity: " ++ (show verb)
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
-    _ <- setCurrentDirectory (takeDirectory fname) -- from now on all paths inside the script are relative to the script location
+    _ <- setCurrentDirectory (takeDirectory fname) 
+    -- from now on all paths inside the script are relative to the script location
+    -- Everytime is needed files from our root ngless we will change the current directory
     case engltext of
         Left err -> putStrLn (show err)
         Right ngltext -> function dmode fname ngltext

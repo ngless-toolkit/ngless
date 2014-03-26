@@ -45,7 +45,7 @@ tests: nglesstest
 	./nglesstest
 
 reqdeps: 
-	cabal install
+	cabal install --force-reinstalls
 
 confhtmllibdir: 
 	@if [ ! -d $(HTML_DIR) ]; then \
