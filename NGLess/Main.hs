@@ -16,6 +16,8 @@ import Parse
 
 import Control.Applicative
 import System.Console.CmdArgs
+import System.Directory
+import System.FilePath.Posix
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -66,6 +68,7 @@ main = do
     _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
     getVerbosity >>= \verb -> putStrLn $ "verbosity: " ++ (show verb)
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
+    _ <- setCurrentDirectory (takeDirectory fname) -- from now on all paths inside the script are relative to the script location
     case engltext of
         Left err -> putStrLn (show err)
         Right ngltext -> function dmode fname ngltext
