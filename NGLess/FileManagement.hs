@@ -78,7 +78,7 @@ getFilesInDir p = do
  files <- getDirectoryContents p
  return $ map ((</>) p) (filter (isDot) files)
 
-switchToNglessRoot :: FilePath -> IO ()
+switchToNglessRoot :: IO ()
 switchToNglessRoot = do
   nglessRootPath<- getExecutablePath -- this retrieves the actual path from the symLink
   setCurrentDirectory $ takeDirectory nglessRootPath
@@ -171,7 +171,7 @@ printNglessLn x = whenLoud $ putStrLn x
 setupHtmlViewer :: IO ()
 setupHtmlViewer = do
     scriptEnvDir' <- getCurrentDirectory
-    switchToNglessRoot scriptEnvDir'
+    switchToNglessRoot
     -- run under ngless root environment   
     dir <- defaultDir
     doesExist <- doesFileExist (dir </> "nglessKeeper.html")

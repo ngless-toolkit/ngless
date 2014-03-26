@@ -9,6 +9,7 @@ all: install
 
 install: bwaconf 
 	cd NGLess && $(MAKE)
+	cd NGLess && $(MAKE) createsymlink
 
 bwaconf: 
 	@echo Configuring BWA...
