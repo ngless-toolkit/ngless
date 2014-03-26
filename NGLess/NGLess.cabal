@@ -13,7 +13,7 @@ maintainer:          luis@luispedro.org
 category:            Domain Specific Language
 build-type:          Simple
 -- extra-source-files:  
-cabal-version:       >=1.10
+cabal-version:       >=1.18.0.3
 
 library
   -- main-is: Main.hs            
