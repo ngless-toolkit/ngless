@@ -79,14 +79,14 @@ getFilesInDir p = do
  return $ map ((</>) p) (filter (isDot) files)
 
 switchToNglessRoot :: FilePath -> IO ()
-switchToNglessRoot fp = do
+switchToNglessRoot = do
   nglessRootPath<- getExecutablePath -- this retrieves the actual path from the symLink
   setCurrentDirectory $ takeDirectory nglessRootPath
 
 setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
 setupRequiredFiles info dirTemplate = do
     scriptEnvDir' <- getCurrentDirectory
-    switchToNglessRoot scriptEnvDir'
+    switchToNglessRoot
     -- run under ngless root environment   
     let destDir' = dirTemplate ++ "$" ++ info
     createDirectory destDir'
