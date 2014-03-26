@@ -65,6 +65,9 @@ githublogo:
 	echo $(GIT-LOGO) configured;
 
 
+createsymlink: 
+	rm /usr/local/bin/ngless        
+	ln -s $(shell pwd)/ngless /usr/local/bin
 
 clean:
 	rm -rf .objs deps Html/htmllibs Html/fonts dist

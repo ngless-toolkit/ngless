@@ -22,7 +22,6 @@ module FileManagement
     ) where
 
 import System.FilePath.Posix
-import System.Posix.Files (readSymbolicLink)
 import System.Directory
 import System.IO
 import System.Environment (getExecutablePath)
@@ -81,9 +80,8 @@ getFilesInDir p = do
 
 switchToNglessRoot :: FilePath -> IO ()
 switchToNglessRoot fp = do
-  nglessSymLinkPath <- getExecutablePath
-  nglessRootPath<- readSymbolicLink nglessSymLinkPath -- this retrieves the actual path from the symLink
-  setCurrentDirectory nglessRootPath
+  nglessRootPath<- getExecutablePath -- this retrieves the actual path from the symLink
+  setCurrentDirectory $ takeDirectory nglessRootPath
 
 setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
 setupRequiredFiles info dirTemplate = do
