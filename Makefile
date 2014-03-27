@@ -27,7 +27,7 @@ GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 
 install: nglessconf
 	cabal update
-	cabal install cabal-install --global
+	sudo cabal install cabal-install --global
 	cd NGLess && $(MAKE)
 
 nglessconf: bwaconf confhtmllibs
@@ -62,7 +62,7 @@ bwaconf:
 confhtmllibs: confhtmllibdir githublogo
 	@echo configuring html libraries... 
 	@$(foreach url,$(URLS), wget -nc -O $(HTML_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
-	@if [ ! -d $(HTML)/fonts ]; then \
+	@if [ -d $(HTML)/fonts ]; then \
 		mkdir $(HTML)/fonts; mv $(HTML_DIR)/glyphicons-halflings-* $(HTML)/fonts/; \
 	fi
 
