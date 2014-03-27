@@ -1,4 +1,4 @@
-all: install
+all: nglessconf ngless nglesstest
 .PHONY: clean ngless nglesstest
 
 BWA = bwa-*
@@ -10,7 +10,7 @@ HTML_DIR = NGLess/Html/htmllibs
 
 
 # Required html Librarys
-URLS := http://code.jquery.com/jquery-latest.min.js
+URLS := http://code.jquery.com/jquery-latest.min.js 
 URLS += https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0-beta.1/angular.min.js
 URLS += http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css
 URLS += http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-theme.min.css
@@ -26,8 +26,8 @@ GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
 install: nglessconf
-	cabal install cabal-install --global
 	cabal update
+	cabal install cabal-install --global
 	cd NGLess && $(MAKE)
 
 nglessconf: bwaconf confhtmllibs
@@ -62,8 +62,9 @@ bwaconf:
 confhtmllibs: confhtmllibdir githublogo
 	@echo configuring html libraries... 
 	@$(foreach url,$(URLS), wget -nc -O $(HTML_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
-	mkdir $(HTML)/fonts; mv $(HTML_DIR)/glyphicons-halflings-* $(HTML)/fonts/;
-
+	@if [ ! -d $(HTML)/fonts ]; then \
+		mkdir $(HTML)/fonts; mv $(HTML_DIR)/glyphicons-halflings-* $(HTML)/fonts/; \
+	fi
 
 confhtmllibdir: 
 	@if [ ! -d $(HTML_DIR) ]; then \
@@ -71,9 +72,12 @@ confhtmllibdir:
 	fi
 
 githublogo:
-	wget -nc -O $(HTML_DIR)/$(notdir $(GIT-LOGO)) $(GIT-LOGO);
-	unzip $(HTML_DIR)/$(notdir $(GIT-LOGO)) -d $(HTML_DIR);
-	cp $(HTML_DIR)/Octocat/Octocat.png $(HTML_DIR)/Octocat.png ;  
-	rm -rf $(HTML_DIR)/__MACOSX $(HTML_DIR)/Octocat $(HTML_DIR)/Octocats.zip ; 
-	echo $(GIT-LOGO) configured;
+	@if [ -d $(HTML_DIR)/Octocat.png ]; then \
+		wget -nc -O $(HTML_DIR)/$(notdir $(GIT-LOGO)) $(GIT-LOGO); \
+		unzip $(HTML_DIR)/$(notdir $(GIT-LOGO)) -d $(HTML_DIR); \
+		cp $(HTML_DIR)/Octocat/Octocat.png $(HTML_DIR)/Octocat.png; \
+		rm -rf $(HTML_DIR)/__MACOSX $(HTML_DIR)/Octocat $(HTML_DIR)/Octocats.zip; \
+		echo $(GIT-LOGO) configured; \
+	fi
+
 #########
