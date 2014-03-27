@@ -27,8 +27,6 @@ GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
 install: nglessconf
-	cabal update
-	cabal install cabal-install --global
 	cd NGLess && $(MAKE)
 
 nglessconf: bwaconf confhtmllibs

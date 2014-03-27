@@ -2,6 +2,8 @@ all: reqdeps createsymlink nglesstest
 .PHONY: all clean
 GHCOPTS := -odir .objs -hidir .objs -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded
 
+CABAL_USER := ~/.cabal/bin/cabal
+
 SOURCES :=  \
 	Interpret.hs \
 	Language.hs \
@@ -25,8 +27,10 @@ nglesstest: Tests.hs $(SOURCES)
 tests: nglesstest
 	./nglesstest
 
-reqdeps: 
-	cabal install --force-reinstalls
+reqdeps:
+	cabal update
+	$(CABAL_USER) install cabal-install 
+	$(CABAL_USER) install --force-reinstalls
 
 createsymlink: ngless
 	echo linking to ngless at /usr/local/bin
