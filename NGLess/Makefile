@@ -29,7 +29,7 @@ tests: nglesstest
 
 reqdeps:
 	cabal update
-	$(CABAL_USER) install cabal-install 
+	cabal install cabal-install 
 	$(CABAL_USER) install --force-reinstalls
 
 createsymlink: ngless
