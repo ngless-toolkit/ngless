@@ -9,6 +9,7 @@ HTML = Html
 HTML_LIBS_DIR = Html/htmllibs
 HTML_FONTS_DIR = Html/fonts
 
+PREFIX=/usr/local 
 
 # Required html Librarys
 URLS := http://code.jquery.com/jquery-latest.min.js 
@@ -26,6 +27,9 @@ URLS_FONTS += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-h
 GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
+example:
+	@echo $(PREFIX)
+
 install: nglessconf
 	cd NGLess && $(MAKE)
 
@@ -42,7 +46,7 @@ tests:
 	cd NGLess && $(MAKE) tests
 
 clean:
-	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) 
+	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)* 
 	cd NGLess && $(MAKE) clean
 
 
@@ -81,5 +85,19 @@ githublogo:
 		rm -rf $(HTML_LIBS_DIR)/__MACOSX $(HTML_LIBS_DIR)/Octocat $(HTML_LIBS_DIR)/Octocats.zip; \
 		echo $(GIT-LOGO) configured; \
 	fi
+
+######
+
+#Generate self-contained executables
+64-MAC-PATH := 64-Mac
+
+64x-macos: nglessconf
+	mkdir $(64-MAC-PATH)
+	make ngless
+	cp NGLess/ngless $(64-MAC-PATH)
+	cp -r $(BWA) $(64-MAC-PATH)
+	cp -r $(HTML) $(64-MAC-PATH)
+	tar -zcvf $(64-MAC-PATH).tar.gz $(64-MAC-PATH)
+	rm -rf $(64-MAC-PATH)
 
 #########
