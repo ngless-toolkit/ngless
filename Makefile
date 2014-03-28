@@ -5,9 +5,9 @@ BWA = bwa-0.7.7
 BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
 BWA_DIR = bwa-0.7.7.tar.bz2
 
-HTML = NGLess/Html
-HTML_LIBS_DIR = NGLess/Html/htmllibs
-HTML_FONTS_DIR = NGLess/Html/fonts
+HTML = Html
+HTML_LIBS_DIR = Html/htmllibs
+HTML_FONTS_DIR = Html/fonts
 
 
 # Required html Librarys
@@ -42,7 +42,7 @@ tests:
 	cd NGLess && $(MAKE) tests
 
 clean:
-	rm -rf $(BWA)
+	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) 
 	cd NGLess && $(MAKE) clean
 
 
@@ -62,7 +62,6 @@ confhtmllibs: confhtmllibdir conffonts githublogo
 	@echo configuring html libraries... 
 	@$(foreach url,$(URLS), wget -nc -O $(HTML_LIBS_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
 	@$(foreach url,$(URLS_FONTS), wget -nc -O $(HTML_FONTS_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
-
 
 conffonts:
 	@if [ ! -d $(HTML)/fonts ]; then \

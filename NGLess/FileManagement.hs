@@ -42,7 +42,7 @@ htmlDefaultFonts :: String
 htmlDefaultFonts = "fonts"
 
 htmlDefaultDir :: String
-htmlDefaultDir = "Html"
+htmlDefaultDir = "../Html"
 
 --- 
 

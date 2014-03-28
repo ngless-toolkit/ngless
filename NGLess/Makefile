@@ -39,5 +39,5 @@ createsymlink: ngless
 	echo linking to ngless completed
 
 clean:
-	rm -rf .objs deps Html/htmllibs Html/fonts dist
+	rm -rf .objs deps dist
 	rm -f ngless nglesstest
