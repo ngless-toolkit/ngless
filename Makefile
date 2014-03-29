@@ -9,7 +9,6 @@ HTML = Html
 HTML_LIBS_DIR = Html/htmllibs
 HTML_FONTS_DIR = Html/fonts
 
-PREFIX=/usr/local 
 
 # Required html Librarys
 URLS := http://code.jquery.com/jquery-latest.min.js 
@@ -27,8 +26,6 @@ URLS_FONTS += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-h
 GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
-example:
-	@echo $(PREFIX)
 
 install: nglessconf
 	cd NGLess && $(MAKE)
