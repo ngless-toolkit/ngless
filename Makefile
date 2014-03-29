@@ -50,6 +50,14 @@ clean:
 	cabal sandbox delete
 
 
+variables:
+	@echo $(BWA)
+	@echo $(prefix)
+	@echo $(prefix)/$(deps)
+	@echo $(prefix)/$(opt)
+	@echo $(HTML_LIBS_DIR)
+	@echo $(HTML_FONTS_DIR)
+
 ##### auxiliary functions to setup required files
 
 bwaconf: 
