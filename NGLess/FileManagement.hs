@@ -42,7 +42,7 @@ htmlDefaultFonts :: String
 htmlDefaultFonts = "fonts"
 
 htmlDefaultDir :: String
-htmlDefaultDir = "../opt/ngless/Html"
+htmlDefaultDir = "../share/ngless/Html"
 
 --- getExecutablePath
 -- Returns for example: /usr/local/bin/ngless

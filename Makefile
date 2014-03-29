@@ -3,7 +3,8 @@ VERSION=1.0
 progname=ngless
 
 prefix=/usr/local
-deps=opt
+deps=$(prefix)/share/$(progname)
+exec=$(prefix)/bin
 
 SOURCES=NGLess/*
 
@@ -14,8 +15,8 @@ BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
 BWA_DIR = bwa-0.7.7.tar.bz2
 
 HTML = Html
-HTML_LIBS_DIR = Html/htmllibs
-HTML_FONTS_DIR = Html/fonts
+HTML_LIBS_DIR = $(HTML)/htmllibs
+HTML_FONTS_DIR = $(HTML)/fonts
 
 current_dir = $(shell pwd)
 
@@ -35,26 +36,27 @@ URLS_FONTS += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-h
 GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
-install: nglessconf
-	cabal sandbox init
-	cabal install --prefix=$(prefix) --force-reinstalls
-	mkdir -p $(prefix)/$(deps); cd $(prefix)/$(deps)/; ln -s $(current_dir) $(progname)
-
-compile:
+install: 
 	cabal install --prefix=$(prefix)
+	cp -r $(HTML) $(deps)
+	cp -r $(BWA) $(deps)
+
+compile: nglessconf
+	cabal sandbox init
+	cabal install --only-dependencies --force-reinstalls
 
 nglessconf: bwaconf confhtmllibs
 
 clean:
-	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs $(prefix)/$(deps)/$(progname)
+	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs $(deps) $(exec)/ngless*
 	cabal sandbox delete
 
 
 variables:
 	@echo $(BWA)
 	@echo $(prefix)
-	@echo $(prefix)/$(deps)
-	@echo $(prefix)/bin
+	@echo $(deps)
+	@echo $(exec)
 	@echo $(HTML_LIBS_DIR)
 	@echo $(HTML_FONTS_DIR)
 
@@ -62,6 +64,7 @@ variables:
 
 bwaconf: 
 	@echo Configuring BWA...
+	mkdir -p $(deps);
 	@if [ ! -d $(BWA) ]; then \
 		wget $(BWA_URL);\
 		tar xvfj $(BWA_DIR) ;\
@@ -71,19 +74,16 @@ bwaconf:
 	fi
 
 confhtmllibs: confhtmllibdir conffonts githublogo
-	@echo configuring html libraries... 
+	@echo configuring html libraries...
+	mkdir -p $(deps);
 	@$(foreach url,$(URLS), wget -nc -O $(HTML_LIBS_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
 	@$(foreach url,$(URLS_FONTS), wget -nc -O $(HTML_FONTS_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
 
 conffonts:
-	@if [ ! -d $(HTML)/fonts ]; then \
-		mkdir $(HTML)/fonts;\
-	fi
+	mkdir -p $(HTML_FONTS_DIR);
 
-confhtmllibdir: 
-	@if [ ! -d $(HTML_LIBS_DIR) ]; then \
-		mkdir $(HTML_LIBS_DIR); \
-	fi
+confhtmllibdir:
+	mkdir -p $(HTML_LIBS_DIR);
 
 githublogo:
 	@if [ ! -f $(HTML_LIBS_DIR)/Octocat.png ]; then \
