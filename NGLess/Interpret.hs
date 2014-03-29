@@ -127,10 +127,11 @@ runInterpret action env = case runReaderT (runErrorT action) env of
 runInROEnvIO :: InterpretationROEnv a -> InterpretationEnvIO a
 runInROEnvIO = runInEnv . runInROEnv
 
-interpret :: [(Int,Expression)] -> IO ()
-interpret es = do
+interpret :: T.Text -> [(Int,Expression)] -> IO ()
+interpret script es = do
+    let nglessScript = NGOString script 
     _ <- setupHtmlViewer 
-    r <- evalStateT (runErrorT (interpretIO es)) (0, Map.empty)
+    r <- evalStateT (runErrorT (interpretIO es)) (0, Map.insert ".script" nglessScript Map.empty)
     case r of
         Right _ -> return ()
         Left err -> putStrLn (show err)
@@ -239,10 +240,13 @@ executeQualityProcess (NGOList e) = do
     return (NGOList res)
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
-    newTemplate <- liftIO $ createOutputDir fname'
-    ngObj <- executeQualityProcess' fname' "beforeQC" newTemplate -- new template only calculated once.
-    _ <- liftIO $ insertFilesProcessedJson newTemplate
-    return ngObj
+    newTemplate <- liftIO $ createOutputDir fname' -- new template only calculated once.
+    r <- runInROEnvIO $ lookupVariable ".script"
+    case r of
+        Nothing -> throwError "Variable lookup error: .script"
+        Just r' -> do
+                 _ <- liftIO $ insertFilesProcessedJson newTemplate (evalString r')
+                 executeQualityProcess' fname' "beforeQC" newTemplate
     
 executeQualityProcess (NGOReadSet fname _ nt) = executeQualityProcess' (B.unpack fname) "afterQC" (B.unpack nt)
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")

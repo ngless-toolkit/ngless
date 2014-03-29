@@ -99,9 +99,9 @@ githublogo:
 64-MAC-PATH := 64-Mac
 
 64x-macos: nglessconf
-	mkdir $(64-MAC-PATH)
+	mkdir -p $(64-MAC-PATH)
 	cabal build
-	cp dist/build/$(progname)/$(progname) $(64-MAC-PATH)
+	cp dist/dist*/build/$(progname)/$(progname) $(64-MAC-PATH)
 	cp -r $(BWA) $(64-MAC-PATH)
 	cp -r $(HTML) $(64-MAC-PATH)
 	tar -zcvf $(64-MAC-PATH).tar.gz $(64-MAC-PATH)

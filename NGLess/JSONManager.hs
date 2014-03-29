@@ -8,6 +8,7 @@ module JSONManager
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.Text as T
 
 import Control.Applicative
 import Control.Monad
@@ -51,40 +52,42 @@ createBasicStatsJson filePath fileData fname = do
             gc' = getGCPercent $ bpCounts fileData
             enc' = getEncoding $ lc fileData
 
-data FilesProcessed = FilesProcessed String String deriving (Show)
+data FilesProcessed = FilesProcessed String String T.Text deriving (Show)
 
 instance ToJSON FilesProcessed where
-   toJSON (FilesProcessed a b) = object ["name" .= a,
-                                        "time" .= b]
+   toJSON (FilesProcessed a b c) = object [ "name" .= a,
+                                            "time" .= b,
+                                            "script" .=c ]
 
 instance FromJSON FilesProcessed where
     parseJSON (Object v) = FilesProcessed <$>
                             v .: "name" <*>
-                            v .: "time"
+                            v .: "time" <*>
+                            v .: "script"
     parseJSON _          = mzero
 
-createFilesProcessed :: String -> IO FilesProcessed
-createFilesProcessed template = do
+createFilesProcessed :: String -> T.Text -> IO FilesProcessed
+createFilesProcessed template script = do
     currentTime <- getClockTime
-    return $ FilesProcessed template (show currentTime) 
+    return $ FilesProcessed template (show currentTime) script
 
-filesProcessedToJson :: FilePath -> IO BL.ByteString
-filesProcessedToJson templateName = do
-    fp <- createFilesProcessed templateName 
+filesProcessedToJson :: FilePath -> T.Text -> IO BL.ByteString
+filesProcessedToJson templateName script = do
+    fp <- createFilesProcessed templateName script 
     return $ encode fp  
 
-insertFilesProcessedJson :: FilePath -> IO ()
-insertFilesProcessedJson template = do
+insertFilesProcessedJson :: FilePath -> T.Text -> IO ()
+insertFilesProcessedJson template script = do
         defaultDir' <- defaultDir
         let jsonPath = defaultDir' </> "filesProcessed.js"
         doesExist <- doesFileExist jsonPath
         putStrLn (show doesExist)
         case doesExist of
             True  -> do
-                jsonData <- createFilesProcessed template
+                jsonData <- createFilesProcessed template script
                 updateFilesProcessedJson jsonData jsonPath
             False -> do
-                jsonData <- filesProcessedToJson template
+                jsonData <- filesProcessedToJson template script
                 createFilesProcessedJson (BL.concat ["[",jsonData,"]"]) jsonPath
 
 createFilesProcessedJson jsonData jsonPath = BL.writeFile jsonPath $ BL.concat ["var filesProcessed = ", jsonData]

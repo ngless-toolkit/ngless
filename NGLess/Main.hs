@@ -46,7 +46,7 @@ nglessargs = NGLessArgs
 function :: String -> String -> T.Text -> IO ()
 function "ngless" fname text = case parsengless fname text >>= validate >>= checktypes of
             Left err -> T.putStrLn err
-            Right expr -> interpret . nglBody $ expr
+            Right expr -> (interpret text) . nglBody $ expr
 
 function "ast" fname text = case parsengless fname text >>= validate of
             Left err -> T.putStrLn (T.concat ["Error in parsing: ", err])
