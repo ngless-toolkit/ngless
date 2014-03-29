@@ -42,8 +42,12 @@ htmlDefaultFonts :: String
 htmlDefaultFonts = "fonts"
 
 htmlDefaultDir :: String
-htmlDefaultDir = "../Html"
+htmlDefaultDir = "../opt/ngless/Html"
 
+--- getExecutablePath
+-- Returns for example: /usr/local/bin/ngless
+-- Symbolic link to deps at /usr/local/opt/ngless
+-- from exec to deps is "../../opt/ngless/Html"
 --- 
 
 maxFileSize :: Num a => a

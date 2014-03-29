@@ -1,6 +1,10 @@
 VERSION=1.0
 
+progname=ngless
+
 prefix=/usr/local
+deps=opt
+
 SOURCES=NGLess/*
 
 all: compile nglessconf
@@ -13,6 +17,7 @@ HTML = Html
 HTML_LIBS_DIR = Html/htmllibs
 HTML_FONTS_DIR = Html/fonts
 
+current_dir = $(shell pwd)
 
 # Required html Librarys
 URLS := http://code.jquery.com/jquery-latest.min.js 
@@ -33,6 +38,7 @@ GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 install: nglessconf
 	cabal sandbox init
 	cabal install --prefix=$(prefix) --force-reinstalls
+	mkdir -p $(prefix)/$(deps); cd $(prefix)/$(deps)/; ln -s $(current_dir) $(progname)
 
 compile:
 	cabal install --prefix=$(prefix)
@@ -40,7 +46,7 @@ compile:
 nglessconf: bwaconf confhtmllibs
 
 clean:
-	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs
+	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs $(prefix)/$(deps)/$(progname)
 	cabal sandbox delete
 
 
@@ -88,7 +94,7 @@ githublogo:
 64x-macos: nglessconf
 	mkdir $(64-MAC-PATH)
 	make ngless
-	cp NGLess/ngless $(64-MAC-PATH)
+	cp NGLess/$(progname) $(64-MAC-PATH)
 	cp -r $(BWA) $(64-MAC-PATH)
 	cp -r $(HTML) $(64-MAC-PATH)
 	tar -zcvf $(64-MAC-PATH).tar.gz $(64-MAC-PATH)
