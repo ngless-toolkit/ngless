@@ -38,6 +38,7 @@ GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 
 install: 
 	cabal install --prefix=$(prefix)
+	mkdir -p $(deps);
 	cp -r $(HTML) $(deps)
 	cp -r $(BWA) $(deps)
 
@@ -64,7 +65,6 @@ variables:
 
 bwaconf: 
 	@echo Configuring BWA...
-	mkdir -p $(deps);
 	@if [ ! -d $(BWA) ]; then \
 		wget $(BWA_URL);\
 		tar xvfj $(BWA_DIR) ;\
@@ -75,7 +75,6 @@ bwaconf:
 
 confhtmllibs: confhtmllibdir conffonts githublogo
 	@echo configuring html libraries...
-	mkdir -p $(deps);
 	@$(foreach url,$(URLS), wget -nc -O $(HTML_LIBS_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
 	@$(foreach url,$(URLS_FONTS), wget -nc -O $(HTML_FONTS_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
 
