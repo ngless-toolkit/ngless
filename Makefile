@@ -9,6 +9,9 @@ HTML = Html
 HTML_LIBS_DIR = Html/htmllibs
 HTML_FONTS_DIR = Html/fonts
 
+GHCOPTS := -odir .objs -hidir .objs -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded
+
+CABAL_USER := ~/.cabal/bin/cabal
 
 # Required html Librarys
 URLS := http://code.jquery.com/jquery-latest.min.js 
@@ -26,26 +29,22 @@ URLS_FONTS += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-h
 GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
-
+reqdeps:
+	
 install: nglessconf
-	cd NGLess && $(MAKE)
+	cabal configure
+	cabal install
 
 nglessconf: bwaconf confhtmllibs
 
-
 ngless:
-	cd NGLess && $(MAKE) ngless
+	cabal install
 
 nglesstest:
-	cd NGLess && $(MAKE) nglesstest
-
-tests:
-	cd NGLess && $(MAKE) tests
+	cabal install
 
 clean:
-	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)* 
-	cd NGLess && $(MAKE) clean
-
+	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs
 
 ##### auxiliary functions to setup required files
 
