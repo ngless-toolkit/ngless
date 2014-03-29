@@ -1,5 +1,9 @@
-all: nglessconf ngless nglesstest
-.PHONY: clean ngless nglesstest
+VERSION=1.0
+
+PREFIX=/usr/local
+SOURCES=NGLess/*
+
+all: compile nglessconf
 
 BWA = bwa-0.7.7
 BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
@@ -9,9 +13,6 @@ HTML = Html
 HTML_LIBS_DIR = Html/htmllibs
 HTML_FONTS_DIR = Html/fonts
 
-GHCOPTS := -odir .objs -hidir .objs -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded
-
-CABAL_USER := ~/.cabal/bin/cabal
 
 # Required html Librarys
 URLS := http://code.jquery.com/jquery-latest.min.js 
@@ -29,22 +30,19 @@ URLS_FONTS += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-h
 GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
-reqdeps:
-	
-install: nglessconf
-	cabal configure
-	cabal install
+install:
+	cabal sandbox init
+	cabal install --prefix=$(PREFIX) --force-reinstalls
+
+compile:
+	cabal install --prefix=$(PREFIX)
 
 nglessconf: bwaconf confhtmllibs
 
-ngless:
-	cabal install
-
-nglesstest:
-	cabal install
-
 clean:
 	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs
+	cabal sandbox delete
+
 
 ##### auxiliary functions to setup required files
 
