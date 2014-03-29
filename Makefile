@@ -1,6 +1,6 @@
 VERSION=1.0
 
-PREFIX=/usr/local
+prefix=/usr/local
 SOURCES=NGLess/*
 
 all: compile nglessconf
@@ -30,12 +30,12 @@ URLS_FONTS += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-h
 GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
-install:
+install: nglessconf
 	cabal sandbox init
-	cabal install --prefix=$(PREFIX) --force-reinstalls
+	cabal install --prefix=$(prefix) --force-reinstalls
 
 compile:
-	cabal install --prefix=$(PREFIX)
+	cabal install --prefix=$(prefix)
 
 nglessconf: bwaconf confhtmllibs
 

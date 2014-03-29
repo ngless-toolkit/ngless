@@ -184,8 +184,8 @@ setupHtmlViewer = do
                      copyFile (htmlDefaultDir </> "nglessKeeper.css")  (dir </> "nglessKeeper.css")
                      copyDir  (htmlDefaultDir </> htmlDefaultDirLibs)  (dir </> htmlDefaultDirLibs)
                      copyDir  (htmlDefaultDir </> htmlDefaultFonts)  (dir </> htmlDefaultFonts)
-                     -- run under script environment
-                     setCurrentDirectory scriptEnvDir'
+    -- run under script environment
+    setCurrentDirectory scriptEnvDir'
 
 
 copyDir ::  FilePath -> FilePath -> IO ()
