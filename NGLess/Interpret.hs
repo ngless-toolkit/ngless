@@ -226,10 +226,11 @@ topFunction Fwrite expr args _ = do
     res' <- liftIO (writeToFile expr' args')
     return res'
 
-topFunction Fmap expr args _ = do
+topFunction Fmap expr@(Lookup (Variable varName)) args _ = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
     res' <- executeMap expr' args'
+    setVariableValue varName res'
     return res'
 
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"

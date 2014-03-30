@@ -98,9 +98,6 @@ setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
 setupRequiredFiles info dirTemplate = do
     scriptEnvDir' <- getCurrentDirectory
     switchToNglessRoot
-    scriptEnvDir'' <- getCurrentDirectory
-
-    _<-putStrLn $ scriptEnvDir'' </> htmlDefaultDir
     -- run under ngless root environment   
     let destDir' = dirTemplate ++ "$" ++ info
     createDirectory destDir'

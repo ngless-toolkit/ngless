@@ -7,4 +7,4 @@ preprocess(input) using |read|:
     if len(read) < 20:
         discard
 mapped = map(input,reference='../samples/chr1.fa')
-write(input, ofile='../samples/filtered.fq', format={csv})
+write(input, ofile='../samples/filtered.sam', format={csv})

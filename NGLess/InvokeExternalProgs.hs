@@ -58,7 +58,7 @@ mapToReference refIndex readSet = do
     newfp <- getTempFilePath readSet
     let newfp' = newfp ++ ".sam"
     printNglessLn $ "write .sam file to: " ++ (show newfp')
-    jHandle <- mapToReference' newfp refIndex readSet
+    jHandle <- mapToReference' newfp' refIndex readSet
     exitCode <- waitForProcess jHandle
     case exitCode of
        ExitSuccess -> return (NGOMappedReadSet (T.pack newfp'))
