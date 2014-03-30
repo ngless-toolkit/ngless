@@ -6,5 +6,5 @@ preprocess(input) using |read|:
     read = substrim(read, min_quality=26)
     if len(read) < 20:
         discard
-#mapped = map(input,reference='../Ngless-Mine/dmel-all.fasta')
-#write(input, ofile='../Ngless-Mine/filtered.fq', format={csv})
+mapped = map(input,reference='../samples/chr1.fa')
+write(input, ofile='../samples/filtered.fq', format={csv})

@@ -52,6 +52,8 @@ clean:
 	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs $(deps) $(exec)/ngless*
 	cabal sandbox delete
 
+clean-local-rep:
+	rm -rf $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(BWA)
 
 variables:
 	@echo $(BWA)
@@ -99,11 +101,11 @@ githublogo:
 64-MAC-PATH := 64-Mac
 
 64x-macos: nglessconf
-	mkdir -p $(64-MAC-PATH)
+	mkdir -p $(64-MAC-PATH)/share $(64-MAC-PATH)/bin
 	cabal build
-	cp dist/dist*/build/$(progname)/$(progname) $(64-MAC-PATH)
-	cp -r $(BWA) $(64-MAC-PATH)
-	cp -r $(HTML) $(64-MAC-PATH)
+	cp dist/dist*/build/$(progname)/$(progname) $(64-MAC-PATH)/bin
+	cp -r $(BWA) $(64-MAC-PATH)/share
+	cp -r $(HTML) $(64-MAC-PATH)/share
 	tar -zcvf $(64-MAC-PATH).tar.gz $(64-MAC-PATH)
 	rm -rf $(64-MAC-PATH)
 

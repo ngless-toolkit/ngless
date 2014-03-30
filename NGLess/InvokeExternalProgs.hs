@@ -20,8 +20,8 @@ import FileManagement
 
 -- Constants
 
-dirPath :: String
-dirPath = "../bwa-0.7.7/" --setup puts the bwa directory on project root.
+bwaDirPath :: String
+bwaDirPath = "../share/ngless/bwa-0.7.7" --setup puts the bwa directory on project root.
 
 mapAlg :: String
 mapAlg = "bwa"
@@ -31,14 +31,21 @@ indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
 
 ----
 
+getBWAPath :: IO String
+getBWAPath = do
+    rootDir <- getNglessRoot
+    return $ rootDir </> bwaDirPath
+
 indexReference refPath = do
     let refPath' = (T.unpack refPath)
     res <- doesDirContainFormats refPath' indexRequiredFormats
     case res of
         False -> do
-            (exitCode, _, herr) <-
-                readProcessWithExitCode (dirPath </> mapAlg) ["index", refPath'] []  
-            printNglessLn herr 
+            bwaPath <- getBWAPath
+            (exitCode, hout, herr) <-
+                readProcessWithExitCode (bwaPath </> mapAlg) ["index", refPath'] []  
+            printNglessLn herr
+            printNglessLn hout
             case exitCode of
                 ExitSuccess -> return ()
                 ExitFailure _err -> error (herr)
@@ -59,11 +66,12 @@ mapToReference refIndex readSet = do
 
 
 -- Process to execute BWA and write to <handle h> .sam file
-mapToReference' newfp refIndex readSet = do 
+mapToReference' newfp refIndex readSet = do
+    bwaPath <- getBWAPath
     (_, Just hout, Just herr, jHandle) <-
         createProcess (
             proc 
-                (dirPath </> mapAlg)
+                (bwaPath </> mapAlg)
                 ["mem","-t",(show numCapabilities),(T.unpack refIndex), readSet]
             ) { std_out = CreatePipe,
                 std_err = CreatePipe }

@@ -18,7 +18,8 @@ module FileManagement
         setupHtmlViewer,
         defaultDir,
         doesFileExist,
-        createDirIfExists
+        createDirIfExists,
+        getNglessRoot
     ) where
 
 import System.FilePath.Posix
@@ -87,10 +88,19 @@ switchToNglessRoot = do
   nglessRootPath<- getExecutablePath -- this retrieves the actual path from the symLink
   setCurrentDirectory $ takeDirectory nglessRootPath
 
+getNglessRoot :: IO FilePath
+getNglessRoot = do
+  nglessRootPath<- getExecutablePath -- this retrieves the actual path from the symLink
+  return $ takeDirectory nglessRootPath
+
+
 setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
 setupRequiredFiles info dirTemplate = do
     scriptEnvDir' <- getCurrentDirectory
     switchToNglessRoot
+    scriptEnvDir'' <- getCurrentDirectory
+
+    _<-putStrLn $ scriptEnvDir'' </> htmlDefaultDir
     -- run under ngless root environment   
     let destDir' = dirTemplate ++ "$" ++ info
     createDirectory destDir'
