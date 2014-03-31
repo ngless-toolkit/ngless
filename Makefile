@@ -45,19 +45,20 @@ install:
 	mkdir -p $(deps);
 	cp -r $(HTML) $(deps)
 	cp -r $(BWA) $(deps)
+	cp -r $(SAM) $(deps)
 
 compile: nglessconf
 	cabal sandbox init
 	cabal install --only-dependencies --force-reinstalls
 
-nglessconf: bwaconf confhtmllibs
+nglessconf: bwaconf samconf confhtmllibs
 
 clean:
 	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs $(deps) $(exec)/ngless*
 	cabal sandbox delete
 
 clean-local-rep:
-	rm -rf $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(BWA)
+	rm -rf $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(BWA) $(SAM)
 
 variables:
 	@echo $(BWA)
