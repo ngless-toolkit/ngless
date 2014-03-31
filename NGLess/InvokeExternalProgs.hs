@@ -2,7 +2,8 @@
 module InvokeExternalProgs
     ( 
     indexReference,
-    mapToReference
+    mapToReference,
+    convertSamToBam'
     ) where
 
 import GHC.Conc -- Returns number of cores available
@@ -20,6 +21,12 @@ import FileManagement
 
 -- Constants
 
+samDirPath :: String
+samDirPath = "../share/ngless/bwa-0.7.7" --setup puts the samtools directory on project root.
+
+samAlg :: String
+samAlg = "samtools"
+
 bwaDirPath :: String
 bwaDirPath = "../share/ngless/bwa-0.7.7" --setup puts the bwa directory on project root.
 
@@ -35,6 +42,12 @@ getBWAPath :: IO String
 getBWAPath = do
     rootDir <- getNglessRoot
     return $ rootDir </> bwaDirPath
+
+getSAMPath :: IO String
+getSAMPath = do
+    rootDir <- getNglessRoot
+    return $ rootDir </> samDirPath
+
 
 indexReference refPath = do
     let refPath' = (T.unpack refPath)
@@ -78,6 +91,22 @@ mapToReference' newfp refIndex readSet = do
     writeToFile hout newfp
     hGetContents herr >>= printNglessLn
     return jHandle
+
+
+--samtools view -bS test.sam > test.bam--
+convertSamToBam' samFP newfp = do
+    samPath <- getSAMPath
+    (_, Just hout, Just herr, jHandle) <-
+        createProcess (
+            proc 
+                (samPath </> samAlg)
+                ["view", "-bS",samFP]
+            ) { std_out = CreatePipe,
+                std_err = CreatePipe }
+    writeToFile hout newfp
+    hGetContents herr >>= printNglessLn
+    return jHandle
+
 
 
 writeToFile :: Handle -> FilePath -> IO ()

@@ -14,6 +14,10 @@ BWA = bwa-0.7.7
 BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
 BWA_DIR = bwa-0.7.7.tar.bz2
 
+SAM = samtools-0.1.19
+SAM_URL = http://sourceforge.net/projects/samtools/files/samtools/0.1.19/samtools-0.1.19.tar.bz2
+SAM_DIR = samtools-0.1.19.tar.bz2
+
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
 HTML_FONTS_DIR = $(HTML)/fonts
@@ -74,6 +78,17 @@ bwaconf:
 		cd $(BWA);\
 		$(MAKE);\
 	fi
+
+samconf: 
+	@echo Configuring BWA...
+	@if [ ! -d $(SAM) ]; then \
+		wget $(SAM_URL);\
+		tar xvfj $(SAM_DIR) ;\
+		rm $(SAM_DIR);\
+		cd $(SAM);\
+		$(MAKE);\
+	fi
+	@echo BWA completed...
 
 confhtmllibs: confhtmllibdir conffonts githublogo
 	@echo configuring html libraries...
