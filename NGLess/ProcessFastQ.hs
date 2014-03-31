@@ -29,6 +29,7 @@ import qualified Data.Text.Encoding as TE
 import Control.Monad
 import System.FilePath.Posix
 
+import SamBamOperations
 import FileManagement
 import PerBaseQualityScores
 import FastQFileData
@@ -42,6 +43,7 @@ unCompress fname =
         else BL.readFile fname -- not compressed
 
 appendFile' = BL.hPutStrLn
+
 
 getNGOString (Just (NGOString s)) = s
 getNGOString _ = error "Error: Type is different of String"
@@ -75,9 +77,15 @@ writeToFile el@(NGOReadSet _ _ _) args = do
     let newfp = getNGOString ( elFromMap "ofile" args )
     writeToUncFile el newfp
 
-writeToFile el@(NGOMappedReadSet _) args = do
-    let newfp = getNGOString ( elFromMap "ofile" args )
-    writeToUncFile el newfp
+writeToFile el@(NGOMappedReadSet fp) args = do
+    let map' = Map.fromList args
+        newfp = getNGOString ( Map.lookup (T.pack "ofile") map') --
+        format = Map.lookup (T.pack "format") map'
+    case format of
+        Nothing -> writeToUncFile el newfp
+        Just x -> case x of 
+            (NGOString "bam") -> samToBam (T.unpack fp) (T.unpack newfp) --newfp will contain the bam
+            _     -> writeToUncFile el newfp 
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 

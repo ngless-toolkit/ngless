@@ -4,15 +4,14 @@
 
 module SamBamOperations
     (
-	samToBam
+ samToBam
     ) where
 
-
+import Language
 import InvokeExternalProgs
 
-samToBam :: FilePath -> IO ()
-samToBam fp = convertSamToBam' fp
-
+samToBam :: FilePath -> FilePath -> IO NGLessObject
+samToBam = convertSamToBam'
 
 {-
 

@@ -93,8 +93,15 @@ mapToReference' newfp refIndex readSet = do
     return jHandle
 
 
+convertSamToBam' samfp newfp = do
+    jHandle <- convSamToBam' samfp newfp
+    exitCode <- waitForProcess jHandle
+    case exitCode of
+       ExitSuccess -> return (NGOMappedReadSet (T.pack newfp))
+       ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
+
 --samtools view -bS test.sam > test.bam--
-convertSamToBam' samFP newfp = do
+convSamToBam' samFP newfp = do
     samPath <- getSAMPath
     (_, Just hout, Just herr, jHandle) <-
         createProcess (
