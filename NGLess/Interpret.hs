@@ -34,6 +34,7 @@ import InvokeExternalProgs
 import FileManagement
 import JSONManager
 import SamBamOperations
+import WriteInterpretOperation
 
 {- Interpretation is done inside 3 Monads
  -  1. InterpretationEnvIO
