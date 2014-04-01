@@ -22,7 +22,7 @@ import FileManagement
 -- Constants
 
 samDirPath :: String
-samDirPath = "../share/ngless/bwa-0.7.7" --setup puts the samtools directory on project root.
+samDirPath = "../share/ngless/samtools-0.1.19" --setup puts the samtools directory on project root.
 
 samAlg :: String
 samAlg = "samtools"
@@ -94,23 +94,25 @@ mapToReference' newfp refIndex readSet = do
 
 
 convertSamToBam' samfp newfp = do
+    printNglessLn $ "Start to convert Bam to Sam. from " ++ samfp ++ "to -> " ++ newfp
     jHandle <- convSamToBam' samfp newfp
     exitCode <- waitForProcess jHandle
     case exitCode of
        ExitSuccess -> return (NGOMappedReadSet (T.pack newfp))
-       ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
+       ExitFailure err -> error ("Failure on converting sam to bam" ++ (show err))
 
 --samtools view -bS test.sam > test.bam--
 convSamToBam' samFP newfp = do
     samPath <- getSAMPath
-    (_, Just hout, Just herr, jHandle) <-
-        createProcess (
-            proc 
-                (samPath </> samAlg)
-                ["view", "-bS",samFP]
-            ) { std_out = CreatePipe,
-                std_err = CreatePipe }
+    (_, Just hout, Just herr, jHandle) <- createProcess (
+        proc 
+            (samPath </> samAlg) 
+            ["view", "-bS" ,samFP ]
+        ){ std_out = CreatePipe,
+           std_err = CreatePipe }
+
     writeToFile hout newfp
+--    hGetContents hout >>= printNglessLn
     hGetContents herr >>= printNglessLn
     return jHandle
 
@@ -118,6 +120,7 @@ convSamToBam' samFP newfp = do
 
 writeToFile :: Handle -> FilePath -> IO ()
 writeToFile handle path = do
+    hSetBinaryMode handle True
     contents <- hGetContents handle
     writeFile path contents
     hClose handle

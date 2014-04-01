@@ -84,7 +84,7 @@ writeToFile el@(NGOMappedReadSet fp) args = do
     case format of
         Nothing -> writeToUncFile el newfp
         Just x -> case x of 
-            (NGOString "bam") -> samToBam (T.unpack fp) (T.unpack newfp) --newfp will contain the bam
+            (NGOSymbol "bam") -> samToBam (T.unpack fp) (T.unpack newfp) --newfp will contain the bam
             _     -> writeToUncFile el newfp 
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
