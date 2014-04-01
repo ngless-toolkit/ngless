@@ -19,8 +19,20 @@ module FileManagement
         defaultDir,
         doesFileExist,
         createDirIfExists,
-        getNglessRoot
+        getNglessRoot,
+        readPossiblyCompressedFile,
+        unCompress,
+        writeGZIP,
+        appendFile',
+        write
     ) where
+
+import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.ByteString.Char8 as B
+
+import qualified Codec.Compression.GZip as GZip    
+
+import qualified Data.Text as T
 
 import System.FilePath.Posix
 import System.Directory
@@ -32,6 +44,8 @@ import Control.Monad
 import System.Posix.Internals (c_getpid)
 
 import System.Console.CmdArgs.Verbosity
+
+
 
 
 -- relative paths 
@@ -208,3 +222,22 @@ copyDir src dst = do
     let srcPath = src </> name
     let dstPath = dst </> name
     copyFile srcPath dstPath
+
+
+readPossiblyCompressedFile ::  B.ByteString -> IO BL.ByteString
+readPossiblyCompressedFile fileName = unCompress (B.unpack fileName)
+
+
+writeGZIP :: String -> BL.ByteString -> IO ()
+writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents 
+
+write :: String -> BL.ByteString -> IO ()
+write fp contents = BL.writeFile fp contents 
+
+unCompress fname =
+    if T.isInfixOf (T.pack ".gz") (T.pack fname)
+        then fmap GZip.decompress (BL.readFile fname)
+        else BL.readFile fname -- not compressed
+
+
+appendFile' = BL.hPutStrLn

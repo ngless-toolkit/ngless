@@ -4,9 +4,10 @@
 
 module SamBamOperations
     (
-	 SamLine(..),
-	 samToBam,
-	 isAligned
+ SamLine(..),
+ isAligned,
+ readAlignments,
+ getSamStats
     ) where
 
 
@@ -14,11 +15,14 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as L8
 
+import qualified Data.Text as T
+
 import Data.Bits (testBit)
 import Control.DeepSeq
 
+import FileManagement
 import Language
-import InvokeExternalProgs
+
 
 data SamLine = SamLine
             { samQName :: S.ByteString
@@ -43,9 +47,11 @@ isAligned :: SamLine -> Bool
 isAligned = not . (`testBit` 2) . samFlag
 
 
-samToBam :: FilePath -> FilePath -> IO NGLessObject
-samToBam = convertSamToBam'
+getSamStats (NGOMappedReadSet fname) = do
+    contents <- unCompress (T.unpack fname)
+    return (length $ map isAligned $ readAlignments contents)
 
+getSamStats err = error $ "Type must be NGOMappedReadSet, but is: " ++ (show err)
 
 readAlignments :: L.ByteString -> [SamLine]
 readAlignments = readAlignments' . L8.lines

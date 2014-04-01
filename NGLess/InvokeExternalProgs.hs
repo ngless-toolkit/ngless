@@ -3,7 +3,7 @@ module InvokeExternalProgs
     ( 
     indexReference,
     mapToReference,
-    convertSamToBam'
+    convertSamToBam
     ) where
 
 import GHC.Conc -- Returns number of cores available
@@ -93,7 +93,7 @@ mapToReference' newfp refIndex readSet = do
     return jHandle
 
 
-convertSamToBam' samfp newfp = do
+convertSamToBam samfp newfp = do
     printNglessLn $ "Start to convert Bam to Sam. from " ++ samfp ++ "to -> " ++ newfp
     jHandle <- convSamToBam' samfp newfp
     exitCode <- waitForProcess jHandle
@@ -101,7 +101,6 @@ convertSamToBam' samfp newfp = do
        ExitSuccess -> return (NGOMappedReadSet (T.pack newfp))
        ExitFailure err -> error ("Failure on converting sam to bam" ++ (show err))
 
---samtools view -bS test.sam > test.bam--
 convSamToBam' samFP newfp = do
     samPath <- getSAMPath
     (_, Just hout, Just herr, jHandle) <- createProcess (
@@ -112,7 +111,6 @@ convSamToBam' samFP newfp = do
            std_err = CreatePipe }
 
     writeToFile hout newfp
---    hGetContents hout >>= printNglessLn
     hGetContents herr >>= printNglessLn
     return jHandle
 

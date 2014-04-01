@@ -33,6 +33,7 @@ import Language
 import InvokeExternalProgs
 import FileManagement
 import JSONManager
+import SamBamOperations
 
 {- Interpretation is done inside 3 Monads
  -  1. InterpretationEnvIO
@@ -266,6 +267,7 @@ executeMap (NGOReadSet file _enc _) args = do
                 Just refPath' -> do
                     _ <- liftIO $ indexReference (evalString refPath')
                     execMap' <- liftIO $ mapToReference (evalString refPath') (B.unpack file)
+                    _ <- liftIO $ getSamStats execMap'
                     return $ execMap'
                 Nothing -> error ("a reference must be suplied")
 executeMap _ _ = error ("Not implemented yet")

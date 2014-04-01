@@ -6,20 +6,15 @@ module ProcessFastQ
     (
     parseReadSet,
     readFastQ,
-    readPossiblyCompressedFile,
     readReadSet,
     writeToFile,
     showRead,
-    unCompress,
-    writeGZIP,
-    writeReadSet,
-    appendFile'
+    writeReadSet
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 
-import qualified Codec.Compression.GZip as GZip    
 import qualified Data.Map as Map
 import Data.Char
 
@@ -29,21 +24,14 @@ import qualified Data.Text.Encoding as TE
 import Control.Monad
 import System.FilePath.Posix
 
-import SamBamOperations
 import FileManagement
 import PerBaseQualityScores
 import FastQFileData
 import Language
-import JSONManager    
+import JSONManager
+import InvokeExternalProgs    
 
 -- Uncompression of a given fastQ file if it's compressed in a .gz format.
-unCompress fname =
-    if T.isInfixOf (T.pack ".gz") (T.pack fname)
-        then fmap GZip.decompress (BL.readFile fname)
-        else BL.readFile fname -- not compressed
-
-appendFile' = BL.hPutStrLn
-
 
 getNGOString (Just (NGOString s)) = s
 getNGOString _ = error "Error: Type is different of String"
@@ -84,7 +72,7 @@ writeToFile el@(NGOMappedReadSet fp) args = do
     case format of
         Nothing -> writeToUncFile el newfp
         Just x -> case x of 
-            (NGOSymbol "bam") -> samToBam (T.unpack fp) (T.unpack newfp) --newfp will contain the bam
+            (NGOSymbol "bam") -> convertSamToBam (T.unpack fp) (T.unpack newfp) --newfp will contain the bam
             _     -> writeToUncFile el newfp 
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
@@ -99,14 +87,7 @@ writeReadSet fn rs enc = do
 asFastQ :: [NGLessObject] -> Int -> BL.ByteString
 asFastQ rs enc = BL.unlines . (fmap (showRead enc)) $ rs 
 
-writeGZIP :: String -> BL.ByteString -> IO ()
-writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents 
 
-write :: String -> BL.ByteString -> IO ()
-write fp contents = BL.writeFile fp contents 
-
-readPossiblyCompressedFile ::  B.ByteString -> IO BL.ByteString
-readPossiblyCompressedFile fileName = unCompress (B.unpack fileName)
 
 readReadSet :: Int -> B.ByteString -> IO [NGLessObject]
 readReadSet enc fn = (parseReadSet enc) `fmap` (readPossiblyCompressedFile fn)
