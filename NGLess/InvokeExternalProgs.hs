@@ -8,7 +8,8 @@ module InvokeExternalProgs
 
 import GHC.Conc -- Returns number of cores available
 
-import Data.Text as T
+import qualified Data.Text as T
+import qualified Data.ByteString.Char8 as B
 
 import System.FilePath.Posix
 import System.Process
@@ -109,16 +110,13 @@ convSamToBam' samFP newfp = do
             ["view", "-bS" ,samFP ]
         ){ std_out = CreatePipe,
            std_err = CreatePipe }
-
-    writeToFile hout newfp
-    hGetContents herr >>= printNglessLn
+    writeToFile hout newfp 
+ --   hGetContents herr >>= printNglessLn
     return jHandle
-
 
 
 writeToFile :: Handle -> FilePath -> IO ()
 writeToFile handle path = do
-    hSetBinaryMode handle True
-    contents <- hGetContents handle
-    writeFile path contents
+    contents <- B.hGetContents handle
+    B.writeFile path contents
     hClose handle

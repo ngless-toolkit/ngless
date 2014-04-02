@@ -261,9 +261,7 @@ executeMap (NGOList e) args = do
     return (NGOList res)
 
 executeMap (NGOReadSet file _enc _) args = do
-            let map' = Map.fromList args
-                refPath = Map.lookup (T.pack "reference") map'
-            case refPath of 
+            case Map.lookup (T.pack "reference") (Map.fromList args) of 
                 Just refPath' -> liftIO $ interpretMapOp (evalString refPath') file
                 Nothing -> error ("a reference must be suplied")
 executeMap _ _ = error ("Not implemented yet")
