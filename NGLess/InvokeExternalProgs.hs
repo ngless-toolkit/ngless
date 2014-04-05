@@ -111,7 +111,7 @@ convSamToBam' samFP newfp = do
         ){ std_out = CreatePipe,
            std_err = CreatePipe }
     writeToFile hout newfp 
- --   hGetContents herr >>= printNglessLn
+    hGetContents herr >>= printNglessLn
     return jHandle
 
 

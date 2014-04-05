@@ -5,10 +5,17 @@
 module SamBamOperations
     (
  SamLine(..),
+ SamResult(..),
  isAligned,
- readAlignments
+ readAlignments,
+ samStats
     ) where
 
+import Control.Monad
+import Control.Monad.ST
+
+import qualified Data.Vector.Unboxed as V
+import qualified Data.Vector.Unboxed.Mutable as VM
 
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
@@ -37,9 +44,26 @@ instance NFData SamLine where
     rnf (SamLine qn f r p m c rn pn tl s qual) = qn `seq` f `seq` r `seq` p `seq` m `seq` c `seq` rn `seq` pn `seq` tl `seq` s `seq` qual `seq` ()
 
 
+data SamResult = Total | Aligned | Unique deriving (Enum)
+
 isAligned :: SamLine -> Bool
 isAligned = not . (`testBit` 2) . samFlag
 
+isUnique :: SamLine -> Bool
+isUnique =  (> 0) . samMapq
+
+samStats = computeStats . readAlignments
+
+computeStats sams = runST $ do
+    initVec <- zeroVec 3
+    forM_ sams $ \x -> do
+        update initVec x
+    V.freeze initVec
+
+update result samLine = do
+    incV True result (fromEnum Total)
+    incV (isAligned samLine) result (fromEnum Aligned)
+    incV (isUnique samLine) result (fromEnum Unique) 
 
 readAlignments :: L.ByteString -> [SamLine]
 readAlignments = readAlignments' . L8.lines
@@ -73,3 +97,15 @@ readSamLine line = case L8.split '\t' line of
 
 strict :: L.ByteString -> S.ByteString
 strict = S.concat . L.toChunks
+
+zeroVec n = do
+    vec <- VM.unsafeNew n
+    VM.set vec (0 :: Int)
+    return vec
+
+incV False _ _ = return ()
+incV True v i = do
+    cur <- VM.unsafeRead v i
+    VM.unsafeWrite v i (cur + 1)
+    return ()
+  
