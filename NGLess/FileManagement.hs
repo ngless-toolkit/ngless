@@ -24,7 +24,8 @@ module FileManagement
         unCompress,
         writeGZIP,
         appendFile',
-        write
+        write,
+        switchToNglessRoot
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
