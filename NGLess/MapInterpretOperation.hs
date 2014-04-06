@@ -48,12 +48,14 @@ isDefaultGenome :: T.Text -> Bool
 isDefaultGenome name = name `elem` (map fst defaultGenomes)
 
 interpretMapOp ref ds = do
-    case isDefaultGenome ref of
-        False  -> indexReference ref
-        True   -> configGenome (T.unpack ref)
-    execMap' <- mapToReference ref (B.unpack ds)
+    ref' <- indexReference' ref
+    execMap' <- mapToReference (T.pack ref') (B.unpack ds)
     getSamStats execMap'
     return execMap'
+    where 
+        indexReference' r = case isDefaultGenome r of
+                                False  -> indexReference r
+                                True   -> configGenome (T.unpack r)
 
 
 getSamStats (NGOMappedReadSet fname) = do
@@ -81,21 +83,24 @@ calcDiv a b =
 showFloat' num = showFFloat (Just numDecimalPlaces) num ""
 
 
-configGenome :: FilePath -> IO ()
+configGenome :: FilePath -> IO FilePath
 configGenome ref = do
     scriptEnvDir' <- getCurrentDirectory
     switchToNglessRoot
     -- run under ngless root environment
     let genomePath = defGenomeDir </> ref
+        genomeDSPath = genomePath </> ref ++ ".fa"
     _ <- createDirectoryIfMissing True genomePath
-    res <- doesDirContainFormats genomePath  [".fa"] -- should check for fasta or fa
-    case res of 
-        True -> indexReference $ T.pack (genomePath </> ref ++ ".fa")
+    res <- doesFileExist genomeDSPath -- should check for fasta or fa
+    _ <- case res of 
+        True -> indexReference $ T.pack genomeDSPath
         False -> do
             let url = fromJust $ Map.lookup (T.pack ref) (Map.fromList defaultGenomes)
-            downloadReference url (genomePath </> ref ++ ".fa")
+            downloadReference url genomeDSPath
+            indexReference $ T.pack genomeDSPath
     -- run under script environment
     setCurrentDirectory scriptEnvDir'
+    return genomeDSPath
 
 
 downloadReference url destPath = runResourceT $ do
@@ -105,7 +110,7 @@ downloadReference url destPath = runResourceT $ do
     let genSize = B.unpack $ fromJust $ Map.lookup "Content-Length" (Map.fromList $ responseHeaders res)
     responseBody res $$+- printProgress (read genSize :: Int) =$ sinkFile destPath
     liftIO $ putProgress "Genome download completed!"
-    
+
 printProgress :: Int -> Conduit B.ByteString (ResourceT IO) B.ByteString
 printProgress genSize = loop 0
   where

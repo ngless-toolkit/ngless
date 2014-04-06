@@ -65,6 +65,7 @@ indexReference refPath = do
                 ExitFailure _err -> error (herr)
         True -> printNglessLn $ "index for " ++ refPath' ++ " as been sucessfully generated."
             -- already contain reference index
+    return refPath'
 
 
 
