@@ -36,8 +36,35 @@ import FileManagement
 defGenomeDir :: FilePath
 defGenomeDir = "../share/ngless/genomes"
 
+genomesRep :: FilePath
+genomesRep = "UCSC"
+
+ucscUrl :: FilePath
+ucscUrl = "ftp://igenome:G3nom3s4u@ussd-ftp.illumina.com"
+
+getUcscUrl :: FilePath -> FilePath
+getUcscUrl genome = do
+    let genomeMap = Map.fromList defaultGenomes
+        i = Map.lookupIndex (T.pack genome) genomeMap
+    case i of
+        Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
+        Just index -> do
+            let (abbrev, descrip) =  Map.elemAt index genomeMap 
+            ucscUrl </> descrip </> genomesRep </> (T.unpack abbrev) </> descrip ++ "_" ++ genomesRep ++ "_" ++ (T.unpack abbrev) ++ ".tar.gz"
+
 defaultGenomes :: [(T.Text, FilePath)]
-defaultGenomes = [("hg19", "http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/chromFa.tar.gz")]
+defaultGenomes = [
+                    ("hg19", "Homo_sapiens"),
+                    ("mm10", "Mus_musculus"),
+                    ("rn4",  "Rattus_norvegicus"),
+                    ("bosTau4",  "Bos_taurus"),   
+                    ("canFam2","Canis_familiaris"),
+                    ("dm3","Drosophila_melanogaster"),
+                    ("TAIR10","Arabidopsis_thaliana"),
+                    ("ce10","Caenorhabditis_elegans"),
+                    ("sacCer3","Saccharomyces_cerevisiae")
+                 ]
+
 
 numDecimalPlaces :: Int
 numDecimalPlaces = 2
