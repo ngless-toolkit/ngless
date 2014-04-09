@@ -21,6 +21,7 @@ import Data.Conduit.Binary (sinkFile)
 
 import Network.HTTP.Conduit
 
+import Control.Monad
 import Control.Monad.Error (liftIO)
 
 import ProgressBar
@@ -40,7 +41,7 @@ genomesRep :: FilePath
 genomesRep = "UCSC"
 
 ucscUrl :: FilePath
-ucscUrl = "ftp://igenome:G3nom3s4u@ussd-ftp.illumina.com"
+ucscUrl = "http://kdbio.inesc-id.pt/~prrm/genomes"
 
 getUcscUrl :: FilePath -> FilePath
 getUcscUrl genome = do
@@ -49,8 +50,24 @@ getUcscUrl genome = do
     case i of
         Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
         Just index -> do
-            let (abbrev, descrip) =  Map.elemAt index genomeMap 
-            ucscUrl </> descrip </> genomesRep </> (T.unpack abbrev) </> descrip ++ "_" ++ genomesRep ++ "_" ++ (T.unpack abbrev) ++ ".tar.gz"
+            let res =  Map.elemAt index genomeMap 
+            ucscUrl </>  (getGenomeDirName res) ++ ".tar.gz"
+
+getGenomeDirName :: (T.Text, FilePath) -> FilePath
+getGenomeDirName (a,d) = d ++ "_" ++ genomesRep ++ "_" ++ (T.unpack a)
+
+getGenomeRootPath :: (T.Text, FilePath) -> FilePath
+getGenomeRootPath (a,d) = d </> genomesRep </> (T.unpack a)
+
+getGenomePath :: FilePath -> FilePath
+getGenomePath gen = do
+    case Map.lookupIndex (T.pack gen) mapGens of
+        Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
+        Just index -> do
+            let res =  Map.elemAt index mapGens 
+            getGenomeDirName res </> getGenomeRootPath res </> "Sequence/BWAIndex/genome.fa"
+    where
+        mapGens = Map.fromList defaultGenomes
 
 defaultGenomes :: [(T.Text, FilePath)]
 defaultGenomes = [
@@ -114,26 +131,31 @@ configGenome :: FilePath -> IO FilePath
 configGenome ref = do
     scriptEnvDir' <- getCurrentDirectory
     switchToNglessRoot
-    -- run under ngless root environment
-    let genomePath = defGenomeDir </> ref
-        genomeDSPath = genomePath </> ref ++ ".fa"
-    _ <- createDirectoryIfMissing True genomePath
-    res <- doesFileExist genomeDSPath -- should check for fasta or fa
-    _ <- case res of 
-        True -> indexReference $ T.pack genomeDSPath
-        False -> do
-            let url = fromJust $ Map.lookup (T.pack ref) (Map.fromList defaultGenomes)
-            downloadReference url genomeDSPath
-            indexReference $ T.pack genomeDSPath
-    -- run under script environment
+
+    createDirectoryIfMissing True defGenomeDir
+    
+    let genomePath = defGenomeDir </> getGenomePath ref
+    res <- doesFileExist genomePath -- should check for fasta or fa
+    when (not res) $ do 
+        let url = getUcscUrl ref
+        downloadReference url (defGenomeDir </> dirName ++ ".tar.gz") 
+
     setCurrentDirectory scriptEnvDir'
-    return genomeDSPath
+    return genomePath
+    where 
+        mapGens = Map.fromList defaultGenomes
+        dirName = case Map.lookupIndex (T.pack ref) mapGens of
+            Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
+            Just index -> do
+                let res =  Map.elemAt index mapGens
+                (getGenomeDirName res) ++ ".tar.gz"
 
 
 downloadReference url destPath = runResourceT $ do
     manager <- liftIO $ newManager conduitManagerSettings
     req <- liftIO $ parseUrl url
     res <- http req manager
+    liftIO (putStrLn $ show (responseHeaders res))
     let genSize = B.unpack $ fromJust $ Map.lookup "Content-Length" (Map.fromList $ responseHeaders res)
     responseBody res $$+- printProgress (read genSize :: Int) =$ sinkFile destPath
     liftIO $ putProgress "Genome download completed!"
