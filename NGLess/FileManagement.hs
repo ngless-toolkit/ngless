@@ -25,7 +25,8 @@ module FileManagement
         writeGZIP,
         appendFile',
         write,
-        switchToNglessRoot
+        switchToNglessRoot,
+        switchToDir
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -102,6 +103,10 @@ switchToNglessRoot :: IO ()
 switchToNglessRoot = do
   nglessRootPath<- getExecutablePath -- this retrieves the actual path from the symLink
   setCurrentDirectory $ takeDirectory nglessRootPath
+
+switchToDir :: FilePath -> IO ()
+switchToDir = setCurrentDirectory 
+
 
 getNglessRoot :: IO FilePath
 getNglessRoot = do

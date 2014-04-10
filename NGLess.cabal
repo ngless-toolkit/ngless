@@ -44,7 +44,7 @@ executable ngless
     hashable, 
     conduit, 
     http-conduit,
-    zlib-conduit
+    tar  
   hs-source-dirs: NGLess/     
   default-language:    Haskell2010
 
@@ -76,6 +76,7 @@ executable nglesstest
     test-framework-quickcheck2, 
     hashable, 
     conduit, 
-    http-conduit    
+    http-conduit,
+    tar    
   hs-source-dirs: NGLess/   
   default-language:    Haskell2010

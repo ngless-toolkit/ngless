@@ -6,7 +6,11 @@ module MapInterpretOperation
     interpretMapOp
     ) where
 
+import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Compression.GZip as GZip
+
 import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Lazy as LB
 import qualified Data.Text as T
 
 import qualified Data.Vector.Unboxed as V
@@ -18,6 +22,7 @@ import System.FilePath.Posix
 import Data.Maybe
 import Data.Conduit
 import Data.Conduit.Binary (sinkFile)
+
 
 import Network.HTTP.Conduit
 
@@ -138,7 +143,9 @@ configGenome ref = do
     res <- doesFileExist genomePath -- should check for fasta or fa
     when (not res) $ do 
         let url = getUcscUrl ref
-        downloadReference url (defGenomeDir </> dirName ++ ".tar.gz") 
+        downloadReference url (defGenomeDir </> tarName)
+        switchToDir defGenomeDir 
+        Tar.unpack dirName . Tar.read . GZip.decompress =<< LB.readFile tarName
 
     setCurrentDirectory scriptEnvDir'
     return genomePath
@@ -148,7 +155,8 @@ configGenome ref = do
             Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
             Just index -> do
                 let res =  Map.elemAt index mapGens
-                (getGenomeDirName res) ++ ".tar.gz"
+                getGenomeDirName res
+        tarName = dirName ++ ".tar.gz"
 
 
 downloadReference url destPath = runResourceT $ do
