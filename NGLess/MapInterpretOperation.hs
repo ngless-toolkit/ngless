@@ -6,6 +6,8 @@ module MapInterpretOperation
     interpretMapOp
     ) where
 
+import qualified UnpackIlluminaGenomes as MTar
+
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 
@@ -35,6 +37,7 @@ import InvokeExternalProgs
 import SamBamOperations
 import Language
 import FileManagement
+
 
 
 -- Constants 
@@ -144,8 +147,8 @@ configGenome ref = do
     when (not res) $ do 
         let url = getUcscUrl ref
         downloadReference url (defGenomeDir </> tarName)
-        switchToDir defGenomeDir 
-        Tar.unpack dirName . Tar.read . GZip.decompress =<< LB.readFile tarName
+        switchToDir defGenomeDir
+        MTar.unpack dirName . Tar.read . GZip.decompress =<< LB.readFile tarName
 
     setCurrentDirectory scriptEnvDir'
     return genomePath
