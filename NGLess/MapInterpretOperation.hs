@@ -21,7 +21,6 @@ import qualified Data.Map as Map
 import System.Directory
 import System.FilePath.Posix
 
-import Data.Maybe
 import Data.Conduit
 import Data.Conduit.Binary (sinkFile)
 
@@ -37,59 +36,11 @@ import InvokeExternalProgs
 import SamBamOperations
 import Language
 import FileManagement
+import UnpackIlluminaGenomes
 
 
 
 -- Constants 
-
-defGenomeDir :: FilePath
-defGenomeDir = "../share/ngless/genomes"
-
-genomesRep :: FilePath
-genomesRep = "UCSC"
-
-ucscUrl :: FilePath
-ucscUrl = "http://kdbio.inesc-id.pt/~prrm/genomes"
-
-getUcscUrl :: FilePath -> FilePath
-getUcscUrl genome = do
-    let genomeMap = Map.fromList defaultGenomes
-        i = Map.lookupIndex (T.pack genome) genomeMap
-    case i of
-        Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-        Just index -> do
-            let res =  Map.elemAt index genomeMap 
-            ucscUrl </>  (getGenomeDirName res) ++ ".tar.gz"
-
-getGenomeDirName :: (T.Text, FilePath) -> FilePath
-getGenomeDirName (a,d) = d ++ "_" ++ genomesRep ++ "_" ++ (T.unpack a)
-
-getGenomeRootPath :: (T.Text, FilePath) -> FilePath
-getGenomeRootPath (a,d) = d </> genomesRep </> (T.unpack a)
-
-getGenomePath :: FilePath -> FilePath
-getGenomePath gen = do
-    case Map.lookupIndex (T.pack gen) mapGens of
-        Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-        Just index -> do
-            let res =  Map.elemAt index mapGens 
-            getGenomeDirName res </> getGenomeRootPath res </> "Sequence/BWAIndex/genome.fa"
-    where
-        mapGens = Map.fromList defaultGenomes
-
-defaultGenomes :: [(T.Text, FilePath)]
-defaultGenomes = [
-                    ("hg19", "Homo_sapiens"),
-                    ("mm10", "Mus_musculus"),
-                    ("rn4",  "Rattus_norvegicus"),
-                    ("bosTau4",  "Bos_taurus"),   
-                    ("canFam2","Canis_familiaris"),
-                    ("dm3","Drosophila_melanogaster"),
-                    ("TAIR10","Arabidopsis_thaliana"),
-                    ("ce10","Caenorhabditis_elegans"),
-                    ("sacCer3","Saccharomyces_cerevisiae")
-                 ]
-
 
 numDecimalPlaces :: Int
 numDecimalPlaces = 2
@@ -116,10 +67,10 @@ getSamStats (NGOMappedReadSet fname) = do
         total' = getV res' (fromEnum Total)
         aligned' = getV res' (fromEnum Aligned)
         unique' = getV res' (fromEnum Unique)
-    printNglessLn $ "Total reads: " ++ (show total')
-    printNglessLn $ "Total reads aligned: " ++ (show aligned') ++ "[" ++ (showFloat' $ calcDiv aligned' total') ++ "%]"
-    printNglessLn $ "Total reads Unique map: " ++ (show unique') ++ "[" ++ (showFloat' $ calcDiv unique' aligned') ++ "%]"
-    printNglessLn $ "Total reads Non-Unique map: " ++ (show $ aligned' - unique') ++ "[" ++ (showFloat' $ 100 - (calcDiv unique' aligned')) ++ "%]"
+    putStrLn $ "Total reads: " ++ (show total')
+    putStrLn $ "Total reads aligned: " ++ (show aligned') ++ "[" ++ (showFloat' $ calcDiv aligned' total') ++ "%]"
+    putStrLn $ "Total reads Unique map: " ++ (show unique') ++ "[" ++ (showFloat' $ calcDiv unique' aligned') ++ "%]"
+    putStrLn $ "Total reads Non-Unique map: " ++ (show $ aligned' - unique') ++ "[" ++ (showFloat' $ 100 - (calcDiv unique' aligned')) ++ "%]"
 
 
 getSamStats err = error $ "Type must be NGOMappedReadSet, but is: " ++ (show err)
@@ -141,8 +92,8 @@ configGenome ref = do
     switchToNglessRoot
 
     createDirectoryIfMissing True defGenomeDir
-    
-    let genomePath = defGenomeDir </> getGenomePath ref
+    nglessPath <- getCurrentDirectory 
+    let genomePath = nglessPath </> defGenomeDir </> getGenomePath ref
     res <- doesFileExist genomePath -- should check for fasta or fa
     when (not res) $ do 
         let url = getUcscUrl ref
@@ -159,17 +110,18 @@ configGenome ref = do
             Just index -> do
                 let res =  Map.elemAt index mapGens
                 getGenomeDirName res
-        tarName = dirName ++ ".tar.gz"
+        tarName = dirName <.> "tar.gz"
 
 
 downloadReference url destPath = runResourceT $ do
     manager <- liftIO $ newManager conduitManagerSettings
     req <- liftIO $ parseUrl url
     res <- http req manager
-    liftIO (putStrLn $ show (responseHeaders res))
-    let genSize = B.unpack $ fromJust $ Map.lookup "Content-Length" (Map.fromList $ responseHeaders res)
-    responseBody res $$+- printProgress (read genSize :: Int) =$ sinkFile destPath
-    liftIO $ putProgress "Genome download completed!"
+    case Map.lookup "Content-Length" (Map.fromList $ responseHeaders res) of
+        Nothing -> error ("Error on http request")
+        Just genSize -> do
+            responseBody res $$+- printProgress (read (B.unpack genSize) :: Int) =$ sinkFile destPath
+            liftIO $ putStrLn " Genome download completed! "
 
 printProgress :: Int -> Conduit B.ByteString (ResourceT IO) B.ByteString
 printProgress genSize = loop 0
