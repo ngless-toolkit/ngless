@@ -121,6 +121,7 @@ githublogo:
 	cabal build
 	cp dist/dist*/build/$(progname)/$(progname) $(64-MAC-PATH)/bin
 	cp -r $(BWA) $(64-MAC-PATH)/share
+	cp -r $(SAM) $(64-MAC-PATH)/share
 	cp -r $(HTML) $(64-MAC-PATH)/share
 	tar -zcvf $(64-MAC-PATH).tar.gz $(64-MAC-PATH)
 	rm -rf $(64-MAC-PATH)
