@@ -44,7 +44,8 @@ executable ngless
     hashable, 
     conduit, 
     http-conduit,
-    tar  
+    tar,
+    fingertree  
   hs-source-dirs: NGLess/     
   default-language:    Haskell2010
 
@@ -77,6 +78,7 @@ executable nglesstest
     hashable, 
     conduit, 
     http-conduit,
-    tar    
+    tar,
+    fingertree    
   hs-source-dirs: NGLess/   
   default-language:    Haskell2010

@@ -298,8 +298,9 @@ executePreprocess (NGOList e) args _block v = do
     return $ NGOList res
 
 executePreprocess (NGOReadSet file enc template) args (Block ([Variable var]) expr) _ = do
-        _ <- liftIO $ (printNglessLn $ "executePreprocess on " ++ (B.unpack file)) 
-        rs <- liftIO $ readReadSet enc file
+        rs <- liftIO $ do
+            printNglessLn $ "executePreprocess on " ++ (B.unpack file) 
+            readReadSet enc file
         env <- gets snd
         let rs' = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env) rs
         newfp <- liftIO $ writeReadSet file rs' enc

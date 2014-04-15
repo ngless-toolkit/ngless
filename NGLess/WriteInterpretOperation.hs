@@ -57,6 +57,6 @@ writeToFile el@(NGOMappedReadSet fp) args = do
         Nothing -> writeToUncFile el newfp
         Just x -> case x of 
             (NGOSymbol "bam") -> convertSamToBam (T.unpack fp) (T.unpack newfp) --newfp will contain the bam
-            _     -> writeToUncFile el newfp 
+            _     -> writeToUncFile el newfp -- Sam file is the kept format so no need to convert.
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
