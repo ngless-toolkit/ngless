@@ -19,6 +19,7 @@ import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Unboxed.Mutable as VM
 
 import Data.Maybe (fromMaybe)
+import Data.Foldable(traverse_)
 
 import Control.DeepSeq
 import Control.Monad.ST
@@ -66,7 +67,7 @@ instance NFData GffLine where
             (gffAttributes gl) `seq`
             ()
 
-gffGeneId g = lookup (S8.pack "ID") (parseGffAttributes $ gffAttributes g)
+gffGeneId g = lookup (S8.pack "gene_id") (parseGffAttributes $ gffAttributes g)
 
 intervals :: [GffLine] -> (IM.IntervalMap Int (S.ByteString, Int), Int)
 intervals = foldl insertg (IM.empty, 0)
@@ -83,7 +84,10 @@ searchAnnotation = IM.search
 getAnnotatStats gffFp samFp = do
     gff <- L8.readFile gffFp
     sam <- L8.readFile samFp
-    return $ compStatsAnnot gff sam
+    let imGff = intervals . readAnnotations $ gff
+        res = compStatsAnnot (imGff) sam
+
+    traverse_ (\(n,k) -> putStrLn ((show n) ++ " " ++ (show $ V.unsafeIndex res k))) (fst imGff)
 
 readAnnotations :: L.ByteString -> [GffLine]
 readAnnotations = readAnnotations' . L8.lines
@@ -133,12 +137,11 @@ strict :: L.ByteString -> S.ByteString
 strict = S.concat . L.toChunks
 
 
-compStatsAnnot gff sam = runST $ do
+compStatsAnnot (annots, lim) sam = runST $ do
     idCounts <- zeroVec lim -- keep results by index
     mapM_ (update annots idCounts) sams
-    V.freeze idCounts >>= return
+    V.freeze idCounts >>= return 
    where
-    (annots, lim) = intervals . readAnnotations $ gff
     sams = readAlignments sam
 
 
@@ -152,5 +155,5 @@ incVec v i = do
 
 zeroVec n = do
     vec <- VM.unsafeNew n
-    VM.set vec 0
+    VM.set vec (0 :: Int)
     return vec
