@@ -6,7 +6,7 @@ module Annotation
     , GffStrand(..)
     , gffGeneId
     , intervals
-    , compStatsAnnot
+    , getAnnotatStats
     ) where
 
 import qualified Data.ByteString as S
@@ -77,10 +77,6 @@ intervals = foldl insertg (IM.empty, 0)
         genId g = fromMaybe (S8.pack "unknown") $ gffGeneId g
 
 
-searchAnnotation :: Int -> IM.IntervalMap Int a -> [(IM.Interval Int, a)]
-searchAnnotation = IM.search 
-
-
 getAnnotatStats gffFp samFp = do
     gff <- L8.readFile gffFp
     sam <- L8.readFile samFp
@@ -146,8 +142,10 @@ compStatsAnnot (annots, lim) sam = runST $ do
 
 
 update annots counts samLine = do
-    let res = searchAnnotation (samPos samLine) annots -- [(x,1) (y,3)]
+    let res = IM.intersections (interval samLine) annots -- [(x,1) (y,3)]
     mapM_ (\(_,(_,k)) -> incVec counts k) res
+  where
+    interval y = IM.Interval (samPos y) (samPos y + samTLen y)
 
 incVec v i = do
     cur <- VM.unsafeRead v i
