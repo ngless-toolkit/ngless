@@ -67,7 +67,7 @@ instance NFData GffLine where
             (gffAttributes gl) `seq`
             ()
 
-gffGeneId g = lookup (S8.pack "gene_id") (parseGffAttributes $ gffAttributes g)
+gffGeneId g = lookup (S8.pack "ID") (parseGffAttributes $ gffAttributes g)
 
 intervals :: [GffLine] -> (IM.IntervalMap Int (S.ByteString, Int), Int)
 intervals = foldl insertg (IM.empty, 0)
