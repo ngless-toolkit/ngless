@@ -1,0 +1,7 @@
+ngless "0.0"
+input = fastq('../samples/sample_1.fq')
+preprocess(input) using |read|:
+    if len(read) < 20:
+        discard
+mapped = map(input,reference='sacCer3')
+write(input, ofile='../samples/filtered.bam', format={bam})

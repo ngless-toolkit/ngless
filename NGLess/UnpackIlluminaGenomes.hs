@@ -8,7 +8,7 @@ module UnpackIlluminaGenomes
       bwaGenomePath,
       defGenomeDir,
       getGenomeRootPath,
-      getGenomePath,
+      getIndexPath,
       getGenomeDirName,
       getGenRootPathFromGenName
     ) where
@@ -28,7 +28,10 @@ import qualified Data.Text as T
 
 
 bwaGenomePath :: FilePath
-bwaGenomePath = "Sequence/BWAIndex/version0.6.0"
+bwaGenomePath = "Sequence/WholeGenomeFasta"
+
+bwaIndexPath :: FilePath
+bwaIndexPath = "Sequence/BWAIndex/version0.6.0"
 
 defGenomeDir :: FilePath
 defGenomeDir = "../share/ngless/genomes"
@@ -38,6 +41,19 @@ genomesRep = "UCSC"
 
 ucscUrl :: FilePath
 ucscUrl = "http://kdbio.inesc-id.pt/~prrm/genomes"
+
+defaultGenomes :: [(T.Text, FilePath)]
+defaultGenomes = [
+                    ("hg19", "Homo_sapiens"),
+                    ("mm10", "Mus_musculus"),
+                    ("rn4",  "Rattus_norvegicus"),
+                    ("bosTau4",  "Bos_taurus"),   
+                    ("canFam2","Canis_familiaris"),
+                    ("dm3","Drosophila_melanogaster"),
+                    ("TAIR10","Arabidopsis_thaliana"),
+                    ("ce10","Caenorhabditis_elegans"),
+                    ("sacCer3","Saccharomyces_cerevisiae")
+                 ]
 
 getUcscUrl :: FilePath -> FilePath
 getUcscUrl genome = do
@@ -65,29 +81,15 @@ getGenRootPathFromGenName fp =
     where
         mapGens = Map.fromList defaultGenomes  
 
-getGenomePath :: FilePath -> FilePath
-getGenomePath gen = do
+getIndexPath :: FilePath -> FilePath
+getIndexPath gen = do
     case Map.lookupIndex (T.pack gen) mapGens of
         Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
         Just index -> do
             let res =  Map.elemAt index mapGens 
-            getGenomeDirName res </> getGenomeRootPath res </> "Sequence/BWAIndex/version0.6.0/genome.fa"
+            getGenomeDirName res </> getGenomeRootPath res </> bwaIndexPath </> "genome.fa"
     where
         mapGens = Map.fromList defaultGenomes
-
-defaultGenomes :: [(T.Text, FilePath)]
-defaultGenomes = [
-                    ("hg19", "Homo_sapiens"),
-                    ("mm10", "Mus_musculus"),
-                    ("rn4",  "Rattus_norvegicus"),
-                    ("bosTau4",  "Bos_taurus"),   
-                    ("canFam2","Canis_familiaris"),
-                    ("dm3","Drosophila_melanogaster"),
-                    ("TAIR10","Arabidopsis_thaliana"),
-                    ("ce10","Caenorhabditis_elegans"),
-                    ("sacCer3","Saccharomyces_cerevisiae")
-                 ]
-
 
 
 unpack :: Exception e => FilePath -> Tar.Entries e -> IO ()

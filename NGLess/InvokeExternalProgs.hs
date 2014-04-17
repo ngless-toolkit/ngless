@@ -3,7 +3,8 @@ module InvokeExternalProgs
     ( 
     indexReference,
     mapToReference,
-    convertSamToBam
+    convertSamToBam,
+    indexRequiredFormats
     ) where
 
 import GHC.Conc -- Returns number of cores available

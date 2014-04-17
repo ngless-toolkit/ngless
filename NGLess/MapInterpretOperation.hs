@@ -93,9 +93,11 @@ configGenome ref = do
 
     createDirectoryIfMissing True defGenomeDir
     nglessPath <- getCurrentDirectory 
-    let genomePath = nglessPath </> defGenomeDir </> getGenomePath ref
-    res <- doesFileExist genomePath -- should check for fasta or fa
-    when (not res) $ do 
+    let genomePath = nglessPath </> defGenomeDir </> getIndexPath ref
+
+    hasFiles <- doesDirContainFormats genomePath indexRequiredFormats
+
+    when (not hasFiles) $ do 
         let url = getUcscUrl ref
         downloadReference url (defGenomeDir </> tarName)
         switchToDir defGenomeDir
