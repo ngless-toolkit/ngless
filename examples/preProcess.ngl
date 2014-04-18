@@ -1,0 +1,10 @@
+ngless "0.0"
+input = fastq('../samples/sample_1.fq')
+preprocess(input) using |read|:
+    read = read[3:]
+    read = read[: len(read) ]
+    read = substrim(read, min_quality=26)
+    if len(read) > 20:
+        continue
+    if len(read) <= 20:
+        discard

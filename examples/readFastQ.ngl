@@ -1,0 +1,2 @@
+ngless "0.0"
+input = fastq('../samples/sample_1.fq')
