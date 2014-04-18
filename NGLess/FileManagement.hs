@@ -7,26 +7,20 @@ module FileManagement
         getFilesInDir,
         getTFilePathComp,
         getTemporaryDirectory,
-        getFileSize,
         setupRequiredFiles,
         openKFileHandles,
         closekFileHandles,
-        numFiles,
         doesDirContainFormats,
         printNglessLn,
         createOutputDir,
         setupHtmlViewer,
-        defaultDir,
         doesFileExist,
         createDirIfExists,
-        getNglessRoot,
         readPossiblyCompressedFile,
         unCompress,
         writeGZIP,
         appendFile',
-        write,
-        switchToNglessRoot,
-        switchToDir
+        write
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -39,44 +33,14 @@ import qualified Data.Text as T
 import System.FilePath.Posix
 import System.Directory
 import System.IO
-import System.Environment (getExecutablePath)
 
 import Control.Monad
 
 import System.Posix.Internals (c_getpid)
 
 import System.Console.CmdArgs.Verbosity
+import Data.DefaultValues
 
-
-
-
--- relative paths 
-
-htmlDefaultDirLibs :: String
-htmlDefaultDirLibs = "htmllibs"
-
-htmlDefaultFonts :: String
-htmlDefaultFonts = "fonts"
-
-htmlDefaultDir :: String
-htmlDefaultDir = "../share/ngless/Html"
-
---- getExecutablePath
--- Returns for example: /usr/local/bin/ngless
--- Symbolic link to deps at /usr/local/opt/ngless
--- from exec to deps is "../../opt/ngless/Html"
---- 
-
-maxFileSize :: Num a => a
-maxFileSize = 300000000 -- 100MB
-
-calcSize :: Integer -> Integer
-calcSize s = ceiling $ ((fromInteger s) / maxFileSize :: Double) 
-
-numFiles :: FilePath -> IO Integer
-numFiles path = do
-    size' <- getFileSize path
-    return $ calcSize size'
 
 openKFileHandles :: Int -> FilePath -> IO [Handle]
 openKFileHandles k dest = do
@@ -86,10 +50,6 @@ openKFileHandles k dest = do
 closekFileHandles :: [Handle] -> IO ()
 closekFileHandles fhs = mapM_ (hClose) fhs
 
-defaultDir :: IO String
-defaultDir = do 
-  tdir <- getTemporaryDirectory
-  return $ tdir </> "ngless.outputs/"
 
 isDot :: FilePath -> Bool
 isDot f = f `notElem` [".", ".."]
@@ -98,20 +58,6 @@ getFilesInDir :: FilePath -> IO [FilePath]
 getFilesInDir p = do
  files <- getDirectoryContents p
  return $ map ((</>) p) (filter (isDot) files)
-
-switchToNglessRoot :: IO ()
-switchToNglessRoot = do
-  nglessRootPath<- getExecutablePath -- this retrieves the actual path from the symLink
-  setCurrentDirectory $ takeDirectory nglessRootPath
-
-switchToDir :: FilePath -> IO ()
-switchToDir = setCurrentDirectory 
-
-
-getNglessRoot :: IO FilePath
-getNglessRoot = do
-  nglessRootPath<- getExecutablePath -- this retrieves the actual path from the symLink
-  return $ takeDirectory nglessRootPath
 
 
 setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
@@ -185,8 +131,6 @@ createTempDirectory dir template = do
       case r of
         False  -> return dirpath
         True -> findTempName (x+1)
-
-getFileSize path = withFile path ReadMode hFileSize
 
 doesDirContainFormats :: String -> [String] -> IO Bool
 doesDirContainFormats _ [] = return True

@@ -15,6 +15,8 @@ import System.FilePath.Posix
 import PrintFastqBasicStats
 import FastQFileData
 import FileManagement
+
+import Data.DefaultValues
 import Data.Json
 
 

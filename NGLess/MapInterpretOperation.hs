@@ -37,15 +37,11 @@ import SamBamOperations
 import Language
 import FileManagement
 import UnpackIlluminaGenomes
+import Data.DefaultValues
 
-
-
--- Constants 
 
 numDecimalPlaces :: Int
 numDecimalPlaces = 2
-
-----
 
 isDefaultGenome :: T.Text -> Bool
 isDefaultGenome name = name `elem` (map fst defaultGenomes)

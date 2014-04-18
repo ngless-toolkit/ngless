@@ -22,6 +22,8 @@ import Language
 import ProcessFastQ
 import FileManagement
 
+import Data.DefaultValues
+
 
 readFileN :: Int -> NGLessObject -> Int
 readFileN k (NGOShortRead _ r _) = 

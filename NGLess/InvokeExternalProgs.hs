@@ -20,35 +20,7 @@ import System.IO
 
 import Language
 import FileManagement
-
--- Constants
-
-samDirPath :: String
-samDirPath = "../share/ngless/samtools-0.1.19" --setup puts the samtools directory on project root.
-
-samAlg :: String
-samAlg = "samtools"
-
-bwaDirPath :: String
-bwaDirPath = "../share/ngless/bwa-0.7.7" --setup puts the bwa directory on project root.
-
-mapAlg :: String
-mapAlg = "bwa"
-
-indexRequiredFormats :: [String]
-indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
-
-----
-
-getBWAPath :: IO String
-getBWAPath = do
-    rootDir <- getNglessRoot
-    return $ rootDir </> bwaDirPath
-
-getSAMPath :: IO String
-getSAMPath = do
-    rootDir <- getNglessRoot
-    return $ rootDir </> samDirPath
+import Data.DefaultValues
 
 
 indexReference refPath = do

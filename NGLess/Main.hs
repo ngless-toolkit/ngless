@@ -13,6 +13,7 @@ import Language
 import Tokens
 import Types
 import Parse
+import Data.DefaultValues
 
 import Control.Applicative
 import System.Console.CmdArgs
