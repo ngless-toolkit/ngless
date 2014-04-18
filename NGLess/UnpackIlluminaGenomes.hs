@@ -25,6 +25,7 @@ import qualified Data.ByteString.Lazy as BS
 import qualified Data.Map as Map
 
 import qualified Data.Text as T
+import Data.DefaultValues
 
 
 bwaGenomePath :: FilePath
@@ -32,9 +33,6 @@ bwaGenomePath = "Sequence/WholeGenomeFasta"
 
 bwaIndexPath :: FilePath
 bwaIndexPath = "Sequence/BWAIndex/version0.6.0"
-
-defGenomeDir :: FilePath
-defGenomeDir = "../share/ngless/genomes"
 
 genomesRep :: FilePath
 genomesRep = "UCSC"

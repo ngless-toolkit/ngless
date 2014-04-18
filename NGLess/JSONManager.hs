@@ -53,7 +53,6 @@ updateFilesProcessedJson jsonData jsonPath = do
     contents <- BL.readFile jsonPath
     let jsonContents = snd $ BL.splitAt 21 contents --This is an hack: ('var filesProcessed =' , [jsondata]). This way the operation is allways O(1).
         res = decode jsonContents :: Maybe [FilesProcessed]
-    _ <- printNglessLn (show res)   
     case res of
         Just a -> createFilesProcessedJson (encode (jsonData : a)) jsonPath
         Nothing -> error ("updateFilesProcessedJson: there was an error with the json file")

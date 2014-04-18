@@ -12,6 +12,7 @@ module Data.DefaultValues
     , indexRequiredFormats
     , mapAlg
     , samAlg
+    , defGenomeDir
     ) where
 
 import System.Directory
@@ -46,6 +47,9 @@ mapAlg = "bwa"
 
 indexRequiredFormats :: [String]
 indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
+
+defGenomeDir :: FilePath
+defGenomeDir = "../share/ngless/genomes"
 
 ----
 
@@ -97,5 +101,5 @@ numFiles :: FilePath -> IO Integer
 numFiles path = do
     size' <- getFileSize path
     return $ calcSize size'
-  where
-  	getFileSize p = withFile p ReadMode hFileSize
+ where
+   getFileSize p = withFile p ReadMode hFileSize

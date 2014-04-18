@@ -37,7 +37,9 @@ import SamBamOperations
 import Language
 import FileManagement
 import UnpackIlluminaGenomes
+
 import Data.DefaultValues
+import Data.Sam
 
 
 numDecimalPlaces :: Int
