@@ -51,7 +51,7 @@ If you are developing on Ubuntu, you can also install the packages globally
         libghc-parsec3-dev \
         libghc-test-framework-dev \
         libghc-test-framework-th-dev \
-        libghc-test-framework-quickcheck2-dev
+        libghc-test-framework-quickcheck2-dev \
         libghc-text-dev \
         libghc-test-framework-hunit-dev \
         libghc-cmdargs-dev \
