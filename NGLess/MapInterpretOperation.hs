@@ -93,8 +93,6 @@ showFloat' num = showFFloat (Just numDecimalPlaces) num ""
 
 configGenome :: FilePath -> IO FilePath
 configGenome ref = do
-    scriptEnvDir' <- getCurrentDirectory
-    switchToNglessRoot
 
     defGenomeDir' <- defGenomeDir
     let genomePath = defGenomeDir' </> getIndexPath ref
@@ -105,10 +103,8 @@ configGenome ref = do
     when (not hasFiles) $ do 
         let url = getUcscUrl ref
         downloadReference url (defGenomeDir' </> tarName)
-        switchToDir defGenomeDir'
-        MTar.unpack dirName . Tar.read . GZip.decompress =<< LB.readFile tarName
+        MTar.unpack (defGenomeDir' </> dirName) . Tar.read . GZip.decompress =<< LB.readFile (defGenomeDir' </> tarName)
 
-    setCurrentDirectory scriptEnvDir'
     return genomePath
     where 
         mapGens = Map.fromList defaultGenomes
