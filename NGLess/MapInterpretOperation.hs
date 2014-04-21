@@ -89,16 +89,16 @@ configGenome ref = do
     scriptEnvDir' <- getCurrentDirectory
     switchToNglessRoot
 
-    createDirectoryIfMissing True defGenomeDir
-    nglessPath <- getCurrentDirectory 
-    let genomePath = nglessPath </> defGenomeDir </> getIndexPath ref
+    defGenomeDir' <- defGenomeDir
+    let genomePath = defGenomeDir' </> getIndexPath ref
 
+    createDirectoryIfMissing True defGenomeDir'
     hasFiles <- doesDirContainFormats genomePath indexRequiredFormats
 
     when (not hasFiles) $ do 
         let url = getUcscUrl ref
-        downloadReference url (defGenomeDir </> tarName)
-        switchToDir defGenomeDir
+        downloadReference url (defGenomeDir' </> tarName)
+        switchToDir defGenomeDir'
         MTar.unpack dirName . Tar.read . GZip.decompress =<< LB.readFile tarName
 
     setCurrentDirectory scriptEnvDir'

@@ -48,8 +48,8 @@ mapAlg = "bwa"
 indexRequiredFormats :: [String]
 indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
 
-defGenomeDir :: FilePath
-defGenomeDir = "../share/ngless/genomes"
+defGenomeDir :: IO FilePath
+defGenomeDir = getHomeDirectory >>= \x -> return ( x </> ".ngless/genomes" )
 
 ----
 
