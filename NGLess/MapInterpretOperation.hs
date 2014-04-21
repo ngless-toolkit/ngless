@@ -59,19 +59,26 @@ interpretMapOp ref ds = do
                                 True   -> configGenome (T.unpack r)
 
 
-getSamStats (NGOMappedReadSet fname) = do
-    contents <- unCompress (T.unpack fname)
+getSamStats (NGOMappedReadSet fname) = unCompress (T.unpack fname) >>= printSamStats . calcSamStats
+getSamStats err = error $ "Type must be NGOMappedReadSet, but is: " ++ (show err)
+
+
+calcSamStats contents = do
     let res' = samStats contents
         total' = getV res' (fromEnum Total)
         aligned' = getV res' (fromEnum Aligned)
         unique' = getV res' (fromEnum Unique)
-    putStrLn $ "Total reads: " ++ (show total')
-    putStrLn $ "Total reads aligned: " ++ (show aligned') ++ "[" ++ (showFloat' $ calcDiv aligned' total') ++ "%]"
-    putStrLn $ "Total reads Unique map: " ++ (show unique') ++ "[" ++ (showFloat' $ calcDiv unique' aligned') ++ "%]"
-    putStrLn $ "Total reads Non-Unique map: " ++ (show $ aligned' - unique') ++ "[" ++ (showFloat' $ 100 - (calcDiv unique' aligned')) ++ "%]"
+    [total', aligned', unique']
 
-
-getSamStats err = error $ "Type must be NGOMappedReadSet, but is: " ++ (show err)
+printSamStats stats = do
+    putStrLn $ "Total reads: " ++ (show total)
+    putStrLn $ "Total reads aligned: " ++ (show aligned) ++ "[" ++ (showFloat' $ calcDiv aligned total) ++ "%]"
+    putStrLn $ "Total reads Unique map: " ++ (show unique) ++ "[" ++ (showFloat' $ calcDiv unique aligned) ++ "%]"
+    putStrLn $ "Total reads Non-Unique map: " ++ (show $ aligned - unique) ++ "[" ++ (showFloat' $ 100 - (calcDiv unique aligned)) ++ "%]"
+  where
+    total = stats !! 0
+    aligned = stats !! 1
+    unique = stats !! 2
 
 getV vec i =  V.unsafeIndex vec i
 
