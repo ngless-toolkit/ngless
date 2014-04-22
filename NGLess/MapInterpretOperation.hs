@@ -4,6 +4,7 @@
 module MapInterpretOperation
     (
     interpretMapOp
+    , configGenome
     ) where
 
 import qualified UnpackIlluminaGenomes as MTar
@@ -94,13 +95,14 @@ showFloat' num = showFFloat (Just numDecimalPlaces) num ""
 configGenome :: FilePath -> InstallMode -> IO FilePath
 configGenome ref Root = do
     nglessRoot' <- getNglessRoot
-    let genomePath = nglessRoot' </> suGenomeDir </> getIndexPath ref
+    let dirPath = nglessRoot' </> suGenomeDir
+        genomePath = dirPath </> getIndexPath ref
 
     hasFiles <- doesDirContainFormats genomePath indexRequiredFormats
 
     when (not hasFiles) $ do 
-        createDirectoryIfMissing True suGenomeDir -- should have Permissions to do this
-        installGenome ref suGenomeDir
+        createDirectoryIfMissing True dirPath -- should have Permissions to do this
+        installGenome ref dirPath
 
     return genomePath
 
@@ -115,7 +117,6 @@ configGenome ref User = do
         installGenome ref defGenomeDir'
 
     return genomePath
-
 
 
 

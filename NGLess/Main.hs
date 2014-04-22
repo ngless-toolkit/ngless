@@ -13,6 +13,7 @@ import Language
 import Tokens
 import Types
 import Parse
+import MapInterpretOperation
 import Data.DefaultValues
 
 import Control.Applicative
@@ -25,20 +26,29 @@ import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as S
 
-version = "0.0.0"
-data NGLessArgs = NGLessArgs
-    { debug_mode :: String
-    , input :: String
-    } deriving (Eq, Show, Data, Typeable)
 
-nglessargs = NGLessArgs
+version = "0.0.0"
+data NGLessArgs = 
+        DefaultMode 
+              { debug_mode :: String
+              , input :: String
+              }
+        | InstallGenMode 
+              { input :: String
+              } 
+           deriving (Eq, Show, Data, Typeable)
+
+nglessargs = DefaultMode
         { debug_mode = "ngless"
         , input = "-" &= argPos 0 &= opt ("-" :: String)
-        } &=
-        verbosity &=
-        summary sumtext &=
-        details ["ngless implement the NGLess language"]
-    where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013"]
+        } 
+
+installargs = InstallGenMode
+        {
+            input = "Reference" &= argPos 0
+        } 
+        &= name "--install-reference-data" 
+        &= details  [ "Example:" , "(sudo) ngless -i sacCer3" ]
 
 
 -- | function implements the debug-mode argument.
@@ -59,15 +69,26 @@ function "tokens" fname text = case tokenize fname text of
 
 function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 
-main = do
-    NGLessArgs dmode fname <- cmdArgs nglessargs
+
+-- | This function is used to install Genomes globally in /shared directory.
+-- Requires SUPER USER permissions
+installGenome :: String -> IO ()
+installGenome "Reference" = return ()
+installGenome ref = do
+    hasPerm <- hasPermissions suGenomeDir -- running under SUDO or not.
+    _ <- putStrLn $ ref ++ " " ++ (show hasPerm)
+    case hasPerm of
+        True -> configGenome ref Root >> return ()
+        False -> configGenome ref User >> return ()
+
+
+optsExec (DefaultMode dmode fname) = do
     --Note that the input for ngless is always UTF-8.
     --Always. This means that we cannot use T.readFile
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
     _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
-    getVerbosity >>= \verb -> putStrLn $ "verbosity: " ++ (show verb)
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     _ <- setCurrentDirectory (takeDirectory fname) 
     -- from now on all paths inside the script are relative to the script location
@@ -75,3 +96,20 @@ main = do
     case engltext of
         Left err -> putStrLn (show err)
         Right ngltext -> function dmode fname ngltext
+
+optsExec (InstallGenMode ref) = do
+    -- if user uses the flag -i he will install a Reference Genome to all users
+    installGenome ref
+
+
+getModes :: Mode (CmdArgs NGLessArgs)
+getModes = cmdArgsMode $ modes [nglessargs &= auto, installargs]
+    &= verbosity
+    &= summary sumtext  
+    &= help "ngless implement the NGLess language"
+    where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013"]
+
+main = do
+    args' <- cmdArgsRun getModes
+    optsExec args'
+    
