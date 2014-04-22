@@ -23,8 +23,8 @@ import System.Directory
 import System.FilePath.Posix
 
 import Data.Conduit
+import Data.Maybe
 import Data.Conduit.Binary (sinkFile)
-
 
 import Network.HTTP.Conduit
 
@@ -57,8 +57,11 @@ interpretMapOp ref ds = do
     where 
         indexReference' r = case isDefaultGenome r of
                                 False  -> indexReference r
-                                True   -> configGenome (T.unpack r) User
-
+                                True   -> do
+                                    res <- isIndexCalculated (T.unpack r) 
+                                    case res of 
+                                        Nothing -> configGenome (T.unpack r) User
+                                        Just p  -> return p
 
 getSamStats (NGOMappedReadSet fname) = unCompress (T.unpack fname) >>= printSamStats . calcSamStats
 getSamStats err = error $ "Type must be NGOMappedReadSet, but is: " ++ (show err)
@@ -91,33 +94,55 @@ calcDiv a b =
 
 showFloat' num = showFFloat (Just numDecimalPlaces) num ""
 
+-- check both SU and normal user Genomes dir for <ref> 
+isIndexCalculated :: FilePath -> IO (Maybe FilePath)
+isIndexCalculated ref = do
+    -- super user genomes dir --
+    hasSUFiles <- isIndexCalcAux ref Root
+    -- normal user genomes dir --
+    hasFiles <- isIndexCalcAux ref User
+
+    case isJust hasSUFiles of
+        True  -> return hasSUFiles -- installed in SU dir
+        False -> case isJust hasFiles of
+                True  -> return hasFiles -- installed in $HOME
+                False -> return Nothing -- not installed
+
+
+isIndexCalcAux :: FilePath -> InstallMode -> IO (Maybe FilePath)
+isIndexCalcAux ref Root = do
+    nglessRoot' <- getNglessRoot
+    let dirPath = nglessRoot' </> suGenomeDir
+    hasIndex <- doesDirContainFormats (dirPath </> getIndexPath ref) indexRequiredFormats
+    case hasIndex of
+        True  -> return $ (Just $ dirPath </> getIndexPath ref)
+        False -> return Nothing
+
+isIndexCalcAux ref User = do
+    defGenomeDir' <- defGenomeDir
+    hasIndex <- doesDirContainFormats (defGenomeDir' </> getIndexPath ref) indexRequiredFormats
+    case hasIndex of
+        True  -> return $ (Just $ defGenomeDir' </> getIndexPath ref)
+        False -> return Nothing
 
 configGenome :: FilePath -> InstallMode -> IO FilePath
 configGenome ref Root = do
     nglessRoot' <- getNglessRoot
     let dirPath = nglessRoot' </> suGenomeDir
-        genomePath = dirPath </> getIndexPath ref
-
-    hasFiles <- doesDirContainFormats genomePath indexRequiredFormats
-
-    when (not hasFiles) $ do 
-        createDirectoryIfMissing True dirPath -- should have Permissions to do this
-        installGenome ref dirPath
-
-    return genomePath
+    installGenome' dirPath ref Root
 
 configGenome ref User = do
     defGenomeDir' <- defGenomeDir
-    let genomePath = defGenomeDir' </> getIndexPath ref
+    installGenome' defGenomeDir' ref User
 
-    hasFiles <- doesDirContainFormats genomePath indexRequiredFormats
+installGenome' p ref mode = do
+    hasIndex <- isIndexCalcAux ref mode
 
-    when (not hasFiles) $ do 
-        createDirectoryIfMissing True defGenomeDir'
-        installGenome ref defGenomeDir'
-
-    return genomePath
-
+    when (isNothing hasIndex) $ do 
+        createDirectoryIfMissing True p
+        installGenome ref p
+    
+    return (p </> getIndexPath ref)
 
 
 installGenome ref d = do
