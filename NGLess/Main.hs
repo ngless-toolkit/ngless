@@ -97,9 +97,8 @@ optsExec (DefaultMode dmode fname) = do
         Left err -> putStrLn (show err)
         Right ngltext -> function dmode fname ngltext
 
-optsExec (InstallGenMode ref) = do
-    -- if user uses the flag -i he will install a Reference Genome to all users
-    installGenome ref
+-- if user uses the flag -i he will install a Reference Genome to all users
+optsExec (InstallGenMode ref) = installGenome ref
 
 
 getModes :: Mode (CmdArgs NGLessArgs)
