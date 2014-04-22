@@ -56,7 +56,7 @@ interpretMapOp ref ds = do
     where 
         indexReference' r = case isDefaultGenome r of
                                 False  -> indexReference r
-                                True   -> configGenome (T.unpack r)
+                                True   -> configGenome (T.unpack r) User
 
 
 getSamStats (NGOMappedReadSet fname) = unCompress (T.unpack fname) >>= printSamStats . calcSamStats
@@ -91,22 +91,39 @@ calcDiv a b =
 showFloat' num = showFFloat (Just numDecimalPlaces) num ""
 
 
-configGenome :: FilePath -> IO FilePath
-configGenome ref = do
+configGenome :: FilePath -> InstallMode -> IO FilePath
+configGenome ref Root = do
+    nglessRoot' <- getNglessRoot
+    let genomePath = nglessRoot' </> suGenomeDir </> getIndexPath ref
 
-    defGenomeDir' <- defGenomeDir
-    let genomePath = defGenomeDir' </> getIndexPath ref
-
-    createDirectoryIfMissing True defGenomeDir'
     hasFiles <- doesDirContainFormats genomePath indexRequiredFormats
 
     when (not hasFiles) $ do 
-        let url = getUcscUrl ref
-        downloadReference url (defGenomeDir' </> tarName)
-        MTar.unpack (defGenomeDir' </> dirName) . Tar.read . GZip.decompress =<< LB.readFile (defGenomeDir' </> tarName)
+        createDirectoryIfMissing True suGenomeDir -- should have Permissions to do this
+        installGenome ref suGenomeDir
 
     return genomePath
-    where 
+
+configGenome ref User = do
+    defGenomeDir' <- defGenomeDir
+    let genomePath = defGenomeDir' </> getIndexPath ref
+
+    hasFiles <- doesDirContainFormats genomePath indexRequiredFormats
+
+    when (not hasFiles) $ do 
+        createDirectoryIfMissing True defGenomeDir'
+        installGenome ref defGenomeDir'
+
+    return genomePath
+
+
+
+
+installGenome ref d = do
+    let url = getUcscUrl ref
+    downloadReference url (d </> tarName)
+    MTar.unpack (d </> dirName) . Tar.read . GZip.decompress =<< LB.readFile (d </> tarName)
+   where 
         mapGens = Map.fromList defaultGenomes
         dirName = case Map.lookupIndex (T.pack ref) mapGens of
             Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
@@ -114,7 +131,6 @@ configGenome ref = do
                 let res =  Map.elemAt index mapGens
                 getGenomeDirName res
         tarName = dirName <.> "tar.gz"
-
 
 downloadReference url destPath = runResourceT $ do
     manager <- liftIO $ newManager conduitManagerSettings
