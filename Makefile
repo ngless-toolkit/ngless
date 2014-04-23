@@ -40,25 +40,33 @@ URLS_FONTS += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-h
 GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
-install: 
-	cabal install --prefix=$(prefix)
-	mkdir -p $(deps);
+install: install-dir install-html install-bwa install-sam
+	cp dist/build/nglesstest/nglesstest $(exec)/nglesstest
+	cp dist/build/ngless/ngless $(exec)/ngless
+
+install-html:
 	cp -r $(HTML) $(deps)
+
+install-bwa:
 	cp -r $(BWA) $(deps)
+
+install-sam:
 	cp -r $(SAM) $(deps)
+
+install-dir:
+	mkdir -p $(exec)
+	mkdir -p $(deps);
 
 compile: nglessconf
 	cabal sandbox init
 	cabal install --only-dependencies --force-reinstalls
+	cabal build
 
 nglessconf: bwaconf samconf confhtmllibs
 
 clean:
-	rm -rf $(BWA) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs $(deps) $(exec)/ngless*
+	rm -rf $(BWA) $(SAM) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs $(deps)
 	cabal sandbox delete
-
-clean-local-rep:
-	rm -rf $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(BWA) $(SAM)
 
 variables:
 	@echo $(BWA)
@@ -67,6 +75,11 @@ variables:
 	@echo $(exec)
 	@echo $(HTML_LIBS_DIR)
 	@echo $(HTML_FONTS_DIR)
+
+
+uninstall:
+	rm -rf $(deps) $(exec)/ngless* $(HOME)/.ngless
+
 
 ##### auxiliary functions to setup required files
 
@@ -112,6 +125,7 @@ githublogo:
 	fi
 
 ######
+
 
 #Generate self-contained executables
 64-MAC-PATH := 64-Mac
