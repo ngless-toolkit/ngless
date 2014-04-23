@@ -1,11 +1,13 @@
 =====================================
 NGLess: NGS Processing with Less Work
 =====================================
-
+=============
 Requirements:
+=============
 
 GHC version 7.6.3 or higher
 Cabal 1.8.0.3 or higher
+An internet connection
 
 Both can be installed via haskell-plataform package.
 
@@ -38,10 +40,19 @@ Check if the new version is higher than 1.8.0.3, if it isn't one of the followin
 	2. A older version of cabal is installed in some directory which comes first than '/usr/local' in your $PATH variable.	
 
 
-Installation steps:
+==========================
+NGLess Installation steps:
+==========================
 
-1. make
-2. make install prefix=dir (default is /usr/local)
+Start by download all NGLess dependencies by running the following command.
+
+	1. make
+
+This will take a while, so go ahead and drink some tea! After the previous command is completed (without errors) you are ready to install it wherever you want it to be.
+
+	2. make install prefix=dir (default is /usr/local)
+
+After this ngless is ready to use!
 
 More options:
 
