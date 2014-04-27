@@ -17,6 +17,7 @@ import qualified Data.Vector.Unboxed.Mutable as VM
 
 import Data.STRef
 import Data.Char
+import VectorOperations
 
 data Result =  Result {bpCounts :: (Int, Int, Int, Int) , lc :: Char, qualCounts ::  [V.Vector Int], nSeq :: Int, seqSize :: (Int,Int)} deriving(Show)
 
@@ -61,14 +62,6 @@ update charCounts qualCountsT (P3 n minSeq maxSeq) (bps,qs) = do
         incVec qv qi
     return $! P3 (n + 1) (min minSeq len) (max maxSeq len)
 
-incVec v i = do
-    cur <- VM.unsafeRead v i
-    VM.unsafeWrite v i (cur + 1)
-
-zeroVec n = do
-    vec <- VM.unsafeNew n
-    VM.set vec 0
-    return vec
 
 getV c p = do
     lower <- VM.read c (ord p)

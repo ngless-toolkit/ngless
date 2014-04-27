@@ -21,6 +21,8 @@ import Control.DeepSeq
 import Control.Monad.ST
 
 import SamBamOperations
+import VectorOperations
+
 import Data.GFF
 
 
@@ -57,13 +59,4 @@ update annots counts samLine = do
     let res = IM.intersections (interval samLine) annots -- [(x,1) (y,3)]
     mapM_ (\(_,(_,k)) -> incVec counts k) res
   where
-    interval y = IM.Interval (samPos y) (samPos y + samTLen y)
-
-incVec v i = do
-    cur <- VM.unsafeRead v i
-    VM.unsafeWrite v i (cur + 1)
-
-zeroVec n = do
-    vec <- VM.unsafeNew n
-    VM.set vec (0 :: Int)
-    return vec
+    interval y = IM.Interval (sam
