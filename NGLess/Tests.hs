@@ -28,6 +28,7 @@ import Types
 import PrintFastqBasicStats
 import PerBaseQualityScores
 import FPreProcess
+import FileManagement
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -258,3 +259,11 @@ case_bop_mul_3 = evalBinary BOpMul (NGOInteger 10) (NGOInteger 10) @?= (NGOInteg
 case_uop_minus_1 = evalMinus (NGOInteger 10) @?= (NGOInteger (-10))
 case_uop_minus_2 = evalMinus (NGOInteger (-10)) @?= (NGOInteger 10)
 
+--
+
+-- Assuming instalation in 'share/ngless'
+case_files_in_dir = do
+    x <- getFilesInDir "docs"
+    length x @?= 2
+
+case_parse_filename = parseFileName "/var/folders/sample_1.9168$afterQC" @?= ("/var/folders/","sample_1")

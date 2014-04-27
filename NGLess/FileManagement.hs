@@ -20,7 +20,8 @@ module FileManagement
         unCompress,
         writeGZIP,
         appendFile',
-        write
+        write,
+        parseFileName
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -83,15 +84,18 @@ generateTempFilePath fd template = do
     hClose (snd res)   
     return (fst res)
 
+parseFileName :: FilePath -> (FilePath, FilePath)
+parseFileName = splitFileName . fst . break ((==) '$') . fst . splitExtensions
+
 getTempFilePath :: FilePath -> IO FilePath
 getTempFilePath fp = do
-    let oldFilePath = splitFileName . fst . break ((==) '$') . fst . splitExtensions $ fp
+    let oldFilePath = parseFileName fp
     generateTempFilePath (fst oldFilePath) (snd oldFilePath)
     
 
 getTFilePathComp :: FilePath -> IO FilePath
 getTFilePathComp fp = do
-    let oldFilePath = splitFileName . fst . break ((==) '$') . fst . splitExtensions $ fp
+    let oldFilePath = parseFileName fp
     generateTempFilePath (fst oldFilePath) ((snd oldFilePath) ++ ".gz")
     
 
