@@ -261,7 +261,6 @@ case_uop_minus_2 = evalMinus (NGOInteger (-10)) @?= (NGOInteger 10)
 
 --
 
--- Assuming instalation in 'share/ngless'
 case_files_in_dir = do
     x <- getFilesInDir "docs"
     length x @?= 2
