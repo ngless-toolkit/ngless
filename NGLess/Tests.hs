@@ -18,6 +18,8 @@ import Text.Parsec (SourcePos)
 import Text.Parsec.Pos (newPos)
 
 import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Lazy.Char8 as L
+
 import qualified Data.Text as T
 
 import Language
@@ -29,6 +31,8 @@ import PrintFastqBasicStats
 import PerBaseQualityScores
 import FPreProcess
 import FileManagement
+
+import Data.Sam
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -266,3 +270,19 @@ case_files_in_dir = do
     length x @?= 2
 
 case_parse_filename = parseFileName "/var/folders/sample_1.9168$afterQC" @?= ("/var/folders/","sample_1")
+
+
+-- Sam operations
+
+case_isAligned = isAligned (SamLine ud 16 ud 0 0 ud ud 0 0 ud ud) @? "Should be aligned"
+case_isNotAligned = (not $ isAligned (SamLine ud 4 ud 0 0 ud ud 0 0 ud ud)) @? "Should not be aligned"
+
+case_isUnique = isUnique (SamLine ud 16 ud 0 10 ud ud 0 0 ud ud) @? "Should be unique"
+case_isNotUnique = (not $ isUnique (SamLine ud 4 ud 0 0 ud ud 0 0 ud ud)) @? "Should not be unique"
+ud = undefined
+
+case_read_one_Sam_Line = readAlignments samLineFlat @?= [samLine]
+case_read_mul_Sam_Line = readAlignments (L.unlines $ replicate 10 samLineFlat) @?= replicate 10 samLine
+
+samLineFlat = "IRIS:7:3:1046:1723#0\t4\t*\t0\t0\t*\t*\t0\t0\tAAAAAAAAAAAAAAAAAAAAAAA\taaaaaaaaaaaaaaaaaa`aa`^\tAS:i:0  XS:i:0"
+samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*", samPos = 0, samMapq = 0, samCigar = "*", samRNext = "*", samPNext = 0, samTLen = 0, samSeq = "AAAAAAAAAAAAAAAAAAAAAAA", samQual = "aaaaaaaaaaaaaaaaaa`aa`^"}   
