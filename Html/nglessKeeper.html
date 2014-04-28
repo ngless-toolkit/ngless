@@ -132,7 +132,10 @@
       }
       $scope.trustSrc = function(src) {
         console.log(src);
-        return $sce.trustAsResourceUrl(src);
+        var p = src.split("/");
+        var path = p.splice(p.length - 2, p.length).join("/");
+
+        return $sce.trustAsResourceUrl(path);
       }
     }
 
