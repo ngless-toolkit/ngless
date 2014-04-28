@@ -14,6 +14,7 @@ import Tokens
 import Types
 import Parse
 import MapInterpretOperation
+import WebServer
 import Data.DefaultValues
 
 import Control.Applicative
@@ -34,14 +35,17 @@ data NGLessArgs =
               , input :: String
               }
         | InstallGenMode 
-              { input :: String
-              } 
+              { input :: String}
+        | VisualizeMode 
+              { port :: Int} 
            deriving (Eq, Show, Data, Typeable)
 
 nglessargs = DefaultMode
         { debug_mode = "ngless"
         , input = "-" &= argPos 0 &= opt ("-" :: String)
         } 
+        &= details  [ "Example:" , "ngless -v ../example/script.ngl" ]
+
 
 installargs = InstallGenMode
         {
@@ -50,6 +54,10 @@ installargs = InstallGenMode
         &= name "--install-reference-data" 
         &= details  [ "Example:" , "(sudo) ngless -i sacCer3" ]
 
+visualizeargs = VisualizeMode
+        {
+            port = 8000
+        }
 
 -- | function implements the debug-mode argument.
 -- The only purpose is to aid in debugging by printing intermediate
@@ -99,10 +107,10 @@ optsExec (DefaultMode dmode fname) = do
 
 -- if user uses the flag -i he will install a Reference Genome to all users
 optsExec (InstallGenMode ref) = installGenome ref
-
+optsExec (VisualizeMode p) = runWebServer p
 
 getModes :: Mode (CmdArgs NGLessArgs)
-getModes = cmdArgsMode $ modes [nglessargs &= auto, installargs]
+getModes = cmdArgsMode $ modes [nglessargs &= auto, installargs, visualizeargs]
     &= verbosity
     &= summary sumtext  
     &= help "ngless implement the NGLess language"

@@ -1,20 +1,16 @@
-module WebServer 
-	(
-		runWebServer
-	) where
+module WebServer (runWebServer) where
 
-import Happstack.Server ( Browsing(EnableBrowsing), nullConf
+import Happstack.Server.Internal.Types
+import Happstack.Server ( Browsing(EnableBrowsing)
                         , serveDirectory, simpleHTTP
                         )
 
 import Data.DefaultValues
 
 serverConf :: Int -> Conf
-serverConf port = Conf
-    { port      = port
-    , validator = Nothing
-    , logAccess = Nothing
-    , timeout   = 30
-    }
+serverConf p = nullConf { port = p }
 
-runWebServer port = defaultDir >>= simpleHTTP (serverConf port) $ serveDirectory EnableBrowsing []
+runWebServer port = do
+    putStrLn $ "Launching WebServer at: " ++ (show port)
+    putStrLn $ "You can acess it at: http://localhost:" ++ (show port)
+    defaultDir >>= \x -> simpleHTTP (serverConf port) $ serveDirectory EnableBrowsing [] x

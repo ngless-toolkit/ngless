@@ -45,7 +45,8 @@ executable ngless
     conduit >= 1.0 && < 1.1,
     http-conduit >= 2.0,
     tar,
-    fingertree
+    fingertree,
+    happstack-server
   hs-source-dirs: NGLess/
   default-language:    Haskell2010
 
@@ -79,6 +80,7 @@ executable nglesstest
     conduit >= 1.0 && < 1.1,
     http-conduit >= 2.0,
     tar,
-    fingertree
+    fingertree,
+    happstack-server
   hs-source-dirs: NGLess/
   default-language:    Haskell2010
