@@ -19,7 +19,7 @@ import Control.Applicative
 import Control.Monad
 
 data BasicInfo = BasicInfo String Double String Int (Int,Int) deriving (Show)
-data FilesProcessed = FilesProcessed String String T.Text deriving (Show)
+data FilesProcessed = FilesProcessed String String T.Text deriving (Show, Eq)
 
 
 instance ToJSON BasicInfo where

@@ -33,6 +33,7 @@ import FPreProcess
 import FileManagement
 
 import Data.Sam
+import Data.Json
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -271,6 +272,16 @@ case_files_in_dir = do
 
 case_parse_filename = parseFileName "/var/folders/sample_1.9168$afterQC" @?= ("/var/folders/","sample_1")
 
+
+-- Json Operations
+
+case_basicInfoJson = basicInfoToJson "x1" 1.0 "x2" 2 (3,4) @?= "{\"GC\":1,\"SeqLength\":[3,4],\"fileName\":\"x1\",\"Encoding\":\"x2\",\"NumSeqs\":2}" 
+
+-- should be the same
+case_createFileProcessed = do
+    x <- createFilesProcessed "test" (T.pack "script")
+    y <- createFilesProcessed "test" (T.pack "script")
+    x @?= y
 
 -- Sam operations
 
