@@ -13,4 +13,4 @@ serverConf p = nullConf { port = p }
 runWebServer port = do
     putStrLn $ "Launching WebServer at: " ++ (show port)
     putStrLn $ "You can acess it at: http://localhost:" ++ (show port)
-    defaultDir >>= \x -> simpleHTTP (serverConf port) $ serveDirectory EnableBrowsing [] x
+    defaultDir >>= \x -> simpleHTTP (serverConf port) $ serveDirectory EnableBrowsing ["nglessKeeper.html"] x
