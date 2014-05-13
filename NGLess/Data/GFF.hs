@@ -8,6 +8,15 @@ module Data.GFF
     , readAnnotations
     ) where
 
+
+import Control.DeepSeq
+
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy.Char8 as L8
+
+
 data GffType = GffExon
                 | GffGene
                 | GffCDS
@@ -52,7 +61,6 @@ gffGeneId g = lookup (S8.pack "ID") (parseGffAttributes $ gffAttributes g)
 
 readAnnotations :: L.ByteString -> [GffLine]
 readAnnotations = readAnnotations' . L8.lines
-
 
 readAnnotations' :: [L.ByteString] -> [GffLine]
 readAnnotations' [] = []

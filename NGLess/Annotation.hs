@@ -12,18 +12,16 @@ import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.IntervalMap.FingerTree as IM
 
 import qualified Data.Vector.Unboxed as V
-import qualified Data.Vector.Unboxed.Mutable as VM
 
 import Data.Maybe (fromMaybe)
 import Data.Foldable(traverse_)
 
-import Control.DeepSeq
 import Control.Monad.ST
 
-import SamBamOperations
 import VectorOperations
 
 import Data.GFF
+import Data.Sam
 
 
 intervals :: [GffLine] -> (IM.IntervalMap Int (S.ByteString, Int), Int)
@@ -59,4 +57,4 @@ update annots counts samLine = do
     let res = IM.intersections (interval samLine) annots -- [(x,1) (y,3)]
     mapM_ (\(_,(_,k)) -> incVec counts k) res
   where
-    interval y = IM.Interval (sam
+    interval y = IM.Interval (samPos y) (samPos y + samTLen y)
