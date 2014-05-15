@@ -33,10 +33,10 @@ import PrintFastqBasicStats
 import PerBaseQualityScores
 import FPreProcess
 import FileManagement
+import MapInterpretOperation
 
 import Data.Sam
 import Data.Json
-import Data.DefaultValues
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -305,23 +305,36 @@ samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*
 -- Tests with scripts
 
 preprocess_s = "ngless '0.0'\n\
-\input = fastq('samples/sample.fq')\n\
-\preprocess(input) using |read|:\n\
-\   read = read[3:]\n\
-\   read = read[: len(read) ]\n\
-\   read = substrim(read, min_quality=26)\n\
-\   if len(read) > 20:\n\
-\       continue\n\
-\   if len(read) <= 20:\n\
-\       discard\n\
-\write(input, ofile='samples/resultSampleFiltered.txt')\n"
+    \input = fastq('samples/sample.fq')\n\
+    \preprocess(input) using |read|:\n\
+    \   read = read[3:]\n\
+    \   read = read[: len(read) ]\n\
+    \   read = substrim(read, min_quality=26)\n\
+    \   if len(read) > 20:\n\
+    \       continue\n\
+    \   if len(read) <= 20:\n\
+    \       discard\n\
+    \write(input, ofile='samples/resultSampleFiltered.txt')\n"
 
 
-case_preprocess_script = do
-    
-    case parsetest preprocess_s >>= checktypes of
+map_s = "ngless '0.0'\n\
+    \input = fastq('samples/sample.fq')\n\
+    \preprocess(input) using |read|:\n\
+    \    if len(read) < 20:\n\
+    \        discard\n\
+    \mapped = map(input,reference='sacCer3')\n\
+    \write(input, ofile='samples/resultSampleSam.sam',format={sam})\n"
+
+case_preprocess_script = case parsetest preprocess_s >>= checktypes of
         Left err -> T.putStrLn err
         Right expr -> do
             (interpret preprocess_s) . nglBody $ expr
             res' <- B.readFile "samples/resultSampleFiltered.txt"
             (length $ B.lines res') @?= (16 :: Int)
+
+case_map_script = case parsetest map_s >>= checktypes of
+        Left err -> T.putStrLn err
+        Right expr -> do
+            (interpret map_s) . nglBody $ expr
+            res' <- unCompress "samples/resultSampleSam.sam"
+            calcSamStats res' @?= [5,0,0]
