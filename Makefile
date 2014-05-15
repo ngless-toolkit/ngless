@@ -41,7 +41,7 @@ GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
 #
 
 install: install-dir install-html install-bwa install-sam
-	cp dist/build/nglesstest/nglesstest nglesstest
+	cp dist/build/nglesstest/nglesstest $(exec)/nglesstest
 	cp dist/build/ngless/ngless $(exec)/ngless
 
 install-html:

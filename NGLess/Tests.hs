@@ -21,6 +21,8 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
 
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
+
 
 import Language
 import Interpret
@@ -34,6 +36,7 @@ import FileManagement
 
 import Data.Sam
 import Data.Json
+import Data.DefaultValues
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -297,3 +300,28 @@ case_read_mul_Sam_Line = readAlignments (L.unlines $ replicate 10 samLineFlat) @
 
 samLineFlat = "IRIS:7:3:1046:1723#0\t4\t*\t0\t0\t*\t*\t0\t0\tAAAAAAAAAAAAAAAAAAAAAAA\taaaaaaaaaaaaaaaaaa`aa`^\tAS:i:0  XS:i:0"
 samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*", samPos = 0, samMapq = 0, samCigar = "*", samRNext = "*", samPNext = 0, samTLen = 0, samSeq = "AAAAAAAAAAAAAAAAAAAAAAA", samQual = "aaaaaaaaaaaaaaaaaa`aa`^"}   
+
+
+-- Tests with scripts
+
+preprocess_s = "ngless '0.0'\n\
+\input = fastq('samples/sample.fq')\n\
+\preprocess(input) using |read|:\n\
+\   read = read[3:]\n\
+\   read = read[: len(read) ]\n\
+\   read = substrim(read, min_quality=26)\n\
+\   if len(read) > 20:\n\
+\       continue\n\
+\   if len(read) <= 20:\n\
+\       discard\n\
+\write(input, ofile='samples/resultSampleFiltered.txt')\n"
+
+
+case_preprocess_script = do
+    
+    case parsetest preprocess_s >>= checktypes of
+        Left err -> T.putStrLn err
+        Right expr -> do
+            (interpret preprocess_s) . nglBody $ expr
+            res' <- B.readFile "samples/resultSampleFiltered.txt"
+            (length $ B.lines res') @?= (16 :: Int)
