@@ -5,6 +5,7 @@ module MapInterpretOperation
     (
     interpretMapOp
     , configGenome
+    , calcSamStats
     ) where
 
 import qualified UnpackIlluminaGenomes as MTar
