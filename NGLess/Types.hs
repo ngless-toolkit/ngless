@@ -121,6 +121,10 @@ checklist (Lookup (Variable v)) = do
 checklist _ = errorInLine "List expected"
 
 checkfunccall :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
+-- No verification should be made for Fwrite and Fprint since it can be any NGLtype
+checkfunccall Fwrite arg = funcCallNoVerification arg
+checkfunccall Fprint arg = funcCallNoVerification arg
+
 checkfunccall f arg = do
         targ <- nglTypeOf arg
         let etype = function_arg_type f
@@ -132,3 +136,12 @@ checkfunccall f arg = do
     where
         checkfunctype t t' = when (t /= t') (errorInLineC
                                     ["Bad type in function call (function '", show f,"' expects ", show t, " got ", show t', ")."])
+
+
+funcCallNoVerification arg = do
+    targ <- nglTypeOf arg
+    case targ of
+        Just (NGList t) -> return $ Just (NGList t)    
+        Just t -> return (Just t)
+        Nothing -> errorInLine "Could not infer type of argument"
+
