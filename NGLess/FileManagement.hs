@@ -131,7 +131,7 @@ createTempDirectory dir template = do
   where
     findTempName x = do
       let dirpath = dir </> template ++ "." ++ show x
-      r <- doesDirectoryExist dirpath
+      r <- doesDirectoryExist (dirpath ++ "$" ++ "beforeQC")
       case r of
         False  -> return dirpath
         True -> findTempName (x+1)
