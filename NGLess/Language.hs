@@ -37,8 +37,9 @@ function_argtype_return_type Fpreprocess =  (NGLVoid,            NGLReadSet)
 function_argtype_return_type Fsubstrim =    (NGLRead,            NGLRead)
 function_argtype_return_type Fmap =         (NGLMappedReadSet,   NGLReadSet)
 function_argtype_return_type Fcount =       (NGLCounts,          NGLMappedReadSet)
-function_argtype_return_type Fwrite =       (NGLVoid,            NGLReadSet)
-function_argtype_return_type Fprint =       (NGLVoid,            NGLVoid)
+function_argtype_return_type err = error ("Function " ++ (show err) ++ " shouldn't reach this")
+--function_argtype_return_type Fwrite =       (NGLVoid,            NGLVoid)
+--function_argtype_return_type Fprint =       (NGLVoid,            NGLVoid)
 
 function_return_type :: FuncName -> NGLType
 function_return_type = fst . function_argtype_return_type
