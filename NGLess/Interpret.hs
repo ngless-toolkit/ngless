@@ -231,7 +231,6 @@ topFunction Fmap expr@(Lookup (Variable varName)) args _ = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
     res' <- executeMap expr' args'
-    setVariableValue varName res'
     return res'
 
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
