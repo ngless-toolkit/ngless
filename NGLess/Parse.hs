@@ -136,6 +136,7 @@ funcname = funcname' <?> "function name"
                 "unique" -> pure Funique
                 "write" -> pure Fwrite
                 "print" -> pure Fprint
+                "annotate" -> pure Fannotate
                 _ -> fail "Function not found"
 
 kwargs = many (operator ',' *> kwarg) <?> "keyword argument list"
