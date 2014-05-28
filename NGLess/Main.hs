@@ -41,7 +41,7 @@ data NGLessArgs =
            deriving (Eq, Show, Data, Typeable)
 
 nglessargs = DefaultMode
-        { debug_mode = "ast"
+        { debug_mode = "ngless"
         , input = "-" &= argPos 0 &= opt ("-" :: String)
         } 
         &= details  [ "Example:" , "ngless -v ../example/script.ngl" ]

@@ -233,6 +233,12 @@ topFunction Fmap expr@(Lookup (Variable _varName)) args _ = do
     res' <- executeMap expr' args'
     return res'
 
+topFunction Fannotate expr@(Lookup (Variable _varName)) args _ = do
+    expr' <- runInROEnvIO $ interpretExpr expr
+    args' <- runInROEnvIO $ evaluateArguments args
+    res' <- executeAnnotation expr' args'
+    return res' 
+
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
