@@ -207,10 +207,10 @@ topFunction Ffastq expr _args _block = do
     expr' <- runInROEnvIO $ interpretExpr expr
     executeQualityProcess expr'
 
-topFunction Funique expr@(Lookup (Variable varName)) args _block = do
+topFunction Funique expr@(Lookup (Variable _varName)) args _block = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
-    res' <- executeUnique expr' args' varName
+    res' <- executeUnique expr' args'
     return res'
 
 topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
@@ -227,7 +227,7 @@ topFunction Fwrite expr args _ = do
     res' <- liftIO (writeToFile expr' args')
     return res'
 
-topFunction Fmap expr@(Lookup (Variable varName)) args _ = do
+topFunction Fmap expr@(Lookup (Variable _varName)) args _ = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
     res' <- executeMap expr' args'
@@ -265,12 +265,12 @@ executeMap (NGOReadSet file _enc _) args = do
                 Nothing -> error ("a reference must be suplied")
 executeMap _ _ = error ("Not implemented yet")
 
-executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> T.Text -> InterpretationEnvIO NGLessObject
-executeUnique (NGOList e) args v = do
-     res <- mapM (\x -> executeUnique x args v) e
+executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
+executeUnique (NGOList e) args = do
+     res <- mapM (\x -> executeUnique x args) e
      return $ NGOList res
 
-executeUnique (NGOReadSet file enc template) args _ = do
+executeUnique (NGOReadSet file enc template) args = do
         rs <- liftIO $ readReadSet enc file
         dirName <- liftIO $ writeToNFiles (B.unpack file) enc rs
         let map' = Map.fromList args
@@ -287,7 +287,7 @@ executeUnique (NGOReadSet file enc template) args _ = do
             newfp <- liftIO $ writeReadSet file rs' enc
             return $ NGOReadSet (B.pack newfp) enc template
 
-executeUnique _ _ _ = error "executeUnique: Should not have happened"
+executeUnique _ _ = error "executeUnique: Should not have happened"
 
 
 
