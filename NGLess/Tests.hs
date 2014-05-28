@@ -37,6 +37,7 @@ import MapInterpretOperation
 
 import Data.Sam
 import Data.Json
+import Data.DefaultValues
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -323,11 +324,12 @@ map_s = "ngless '0.0'\n\
     \    if len(read) < 20:\n\
     \        discard\n\
     \mapped = map(input,reference='sacCer3')\n\
-    \write(input, ofile='samples/resultSampleSam.sam',format={sam})\n"
+    \write(mapped, ofile='samples/resultSampleSam.sam',format={sam})\n"
 
 case_preprocess_script = case parsetest preprocess_s >>= checktypes of
         Left err -> T.putStrLn err
         Right expr -> do
+            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
             (interpret preprocess_s) . nglBody $ expr
             res' <- B.readFile "samples/resultSampleFiltered.txt"
             (length $ B.lines res') @?= (16 :: Int)
@@ -335,6 +337,7 @@ case_preprocess_script = case parsetest preprocess_s >>= checktypes of
 case_map_script = case parsetest map_s >>= checktypes of
         Left err -> T.putStrLn err
         Right expr -> do
+            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
             (interpret map_s) . nglBody $ expr
             res' <- unCompress "samples/resultSampleSam.sam"
             calcSamStats res' @?= [5,0,0]
