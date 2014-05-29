@@ -34,6 +34,7 @@ import PerBaseQualityScores
 import FPreProcess
 import FileManagement
 import MapInterpretOperation
+import Annotation
 
 import Data.Sam
 import Data.Json
@@ -360,3 +361,27 @@ case_trim_attrs_4  = GFF.trimString "x = 10" @?= "x = 10"
 
 case_parse_gff_line = GFF.readLine gff_line @?= gff_structure
 case_parse_gff_atributes = (GFF.parseGffAttributes (GFF.gffAttributes gff_structure)) @?= [("gene_id","\"Y74C9A.3\""), ("transcript_id" ,"\"NM_058260\""), ("gene_name", "\"Y74C9A.3\""), ("p_id", "\"P23728\""), ("tss_id", "\"TSS14501\"")]
+
+
+-- Setup
+
+gff_structure_Exon = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+gff_structure_CDS = GFF.GffLine "chrI" "unknown" GFF.GffCDS 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+gff_structure_Gene = GFF.GffLine "chrI" "unknown" GFF.GffGene 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+
+
+gff_features_all = Just (NGOList  [ NGOSymbol "gene", NGOSymbol "cds", NGOSymbol "exon"])
+gff_features_gene = Just (NGOList [ NGOSymbol "gene"])
+gff_features_cds = Just (NGOList  [ NGOSymbol "cds" ])
+
+gff_lines_ex = [gff_structure_Exon,gff_structure_CDS,gff_structure_Gene]
+
+----
+
+case_filter_features_1 = filter (filterFeatures gff_features_all) gff_lines_ex @?= gff_lines_ex
+case_filter_features_2 = filter (filterFeatures Nothing) gff_lines_ex @?= gff_lines_ex
+case_filter_features_3 = filter (filterFeatures gff_features_gene) gff_lines_ex @?= [gff_structure_Gene]
+case_filter_features_4 = filter (filterFeatures gff_features_cds) gff_lines_ex @?= [gff_structure_CDS]
+case_filter_features_5 = filter (filterFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
+
+
