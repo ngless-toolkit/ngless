@@ -38,6 +38,7 @@ import MapInterpretOperation
 import Data.Sam
 import Data.Json
 import Data.DefaultValues
+import qualified Data.GFF as GFF
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -341,3 +342,21 @@ case_map_script = case parsetest map_s >>= checktypes of
             (interpret map_s) . nglBody $ expr
             res' <- unCompress "samples/resultSampleSam.sam"
             calcSamStats res' @?= [5,0,0]
+
+
+-- Parse GFF lines
+
+gff_line = "chrI\tunknown\texon\t4124\t4358\t.\t-\t.\tgene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+gff_structure = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+
+case_check_attr_tag_1 = GFF.checkAttrTag "id = 10;" @?= '='
+case_check_attr_tag_2 = GFF.checkAttrTag "id 10;" @?= ' '
+
+case_trim_attrs_1  = GFF.trimString " x = 10" @?= "x = 10"
+case_trim_attrs_2  = GFF.trimString " x = 10 " @?= "x = 10"
+case_trim_attrs_3  = GFF.trimString "x = 10 " @?= "x = 10"
+case_trim_attrs_4  = GFF.trimString "x = 10" @?= "x = 10"
+
+
+case_parse_gff_line = GFF.readLine gff_line @?= gff_structure
+case_parse_gff_atributes = (GFF.parseGffAttributes (GFF.gffAttributes gff_structure)) @?= [("gene_id","\"Y74C9A.3\""), ("transcript_id" ,"\"NM_058260\""), ("gene_name", "\"Y74C9A.3\""), ("p_id", "\"P23728\""), ("tss_id", "\"TSS14501\"")]

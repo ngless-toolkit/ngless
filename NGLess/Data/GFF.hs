@@ -6,6 +6,10 @@ module Data.GFF
     , GffStrand(..)
     , gffGeneId
     , readAnnotations
+    , readLine
+    , parseGffAttributes
+    , checkAttrTag
+    , trimString
     ) where
 
 
@@ -15,7 +19,6 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
-
 
 data GffType = GffExon
                 | GffGene
@@ -41,9 +44,31 @@ data GffLine = GffLine
 
 
 parseGffAttributes :: S.ByteString -> [(S.ByteString, S.ByteString)]
-parseGffAttributes = map (\(aid,aval) -> (aid,S.tail aval))
-                        . map (S8.break (=='='))
+parseGffAttributes = map (\(aid,aval) -> (aid, S.tail aval))
+                        . map (\x -> S8.break (== (checkAttrTag x)) x)
+                        . map trimString
                         . S8.split ';'
+                        . S.init -- remove last ';'
+
+--Check if the atribution tag is '=' or ' '
+checkAttrTag :: S.ByteString -> Char
+checkAttrTag s = case S8.elemIndex '=' s of
+    Nothing -> ' '
+    _       -> '='
+
+-- remove ' ' from begining and end.
+trimString :: S.ByteString -> S.ByteString
+trimString = trimBeg . trimEnd
+    where
+        trimBeg x = if isSpace $ S8.index x 0 -- first element
+                        then S8.tail x
+                        else x
+        trimEnd x = if isSpace $ S8.last x -- last element 
+                        then S8.init x
+                        else x
+
+isSpace :: Char -> Bool
+isSpace = (== ' ')
 
 instance NFData GffLine where
     rnf gl = (gffSeqId gl) `seq`
@@ -57,7 +82,13 @@ instance NFData GffLine where
             (gffAttributes gl) `seq`
             ()
 
-gffGeneId g = lookup (S8.pack "ID") (parseGffAttributes $ gffAttributes g)
+gffGeneId g = do
+    let attrs = (parseGffAttributes $ gffAttributes g)
+        res = lookup (S8.pack "ID") attrs
+        res' = lookup (S8.pack "gene_id") attrs
+    case res of
+        Nothing -> res'
+        _ -> res
 
 readAnnotations :: L.ByteString -> [GffLine]
 readAnnotations = readAnnotations' . L8.lines
