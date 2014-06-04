@@ -385,3 +385,6 @@ case_filter_features_4 = filter (filterFeatures gff_features_cds) gff_lines_ex @
 case_filter_features_5 = filter (filterFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
 
 
+case_cigar_to_length_1 = cigarTLen "18M2D19M" @?= 39
+case_cigar_to_length_2 = cigarTLen "37M" @?= 37
+case_cigar_to_length_3 = cigarTLen "3M1I3M1D5M" @?= 12
