@@ -5,14 +5,18 @@ module Data.Sam
  , isAligned
  , readAlignments
  , isUnique
-    ) where
+ , cigarTLen
+) where
 
 
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as L8
+import qualified Data.ByteString.Char8 as S8
+
 import Data.Bits (testBit)
 
+import Text.Regex
 
 import Control.DeepSeq
 
@@ -77,3 +81,40 @@ readSamLine line = case L8.split '\t' line of
 
 strict :: L.ByteString -> S.ByteString
 strict = S.concat . L.toChunks
+
+
+-- Discard 'I' since it does not represent anything in size.
+cigarTLen :: S.ByteString -> Int
+cigarTLen c = calcLen c [] 0
+
+{-- 
+Op     Description
+M alignment match (can be a sequence match or mismatch)
+I insertion to the reference
+D deletion from the reference
+N skipped region from the reference
+S soft clipping (clipped sequences present inSEQ)
+H hard clipping (clipped sequences NOT present inSEQ)
+P padding (silent deletion from padded reference)
+= sequence match
+X sequence mismatch
+--}
+
+calcLen s val acc = 
+    case S8.null s of
+        True  -> acc 
+        False -> do 
+            case S8.head s of
+                'M' -> calcLen sRest [] ((read val) + acc)
+                'D' -> calcLen sRest [] ((read val) + acc)
+                'N' -> calcLen sRest [] ((read val) + acc)
+                'S' -> calcLen sRest [] ((read val) + acc)
+                'H' -> calcLen sRest [] ((read val) + acc)
+                'P' -> calcLen sRest [] ((read val) + acc)
+                '=' -> calcLen sRest [] ((read val) + acc)
+                'X' -> calcLen sRest [] ((read val) + acc)
+                'I' -> calcLen sRest [] acc -- ignore
+                _  -> calcLen sRest (val ++ [S8.head s]) acc 
+   where
+      sRest = S8.tail s
+
