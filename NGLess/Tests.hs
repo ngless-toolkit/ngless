@@ -58,9 +58,13 @@ case_parse_fastq = parseBody fastqcalls @?= fastqcall
         fastqcalls = "fastq(\"input.fq\")"
         fastqcall  = [FunctionCall Ffastq (ConstStr "input.fq") [] Nothing]
 
+case_parse_count = parseBody countcalls @?= countcall
+    where
+        countcalls = "count(annotated, count={gene})"
+        countcall  = [FunctionCall Fcount (Lookup (Variable "annotated")) [(Variable "count",ConstSymbol "gene")] Nothing]
+
 case_parse_assignment =  parseBody "reads = \"something\"" @?=
         [Assignment (Variable "reads") (ConstStr "something")]
-
 
 case_parse_sequence = parseBody seqs @?= seqr
     where
@@ -378,11 +382,11 @@ gff_lines_ex = [gff_structure_Exon,gff_structure_CDS,gff_structure_Gene]
 
 ----
 
-case_filter_features_1 = filter (filterFeatures gff_features_all) gff_lines_ex @?= gff_lines_ex
-case_filter_features_2 = filter (filterFeatures Nothing) gff_lines_ex @?= gff_lines_ex
-case_filter_features_3 = filter (filterFeatures gff_features_gene) gff_lines_ex @?= [gff_structure_Gene]
-case_filter_features_4 = filter (filterFeatures gff_features_cds) gff_lines_ex @?= [gff_structure_CDS]
-case_filter_features_5 = filter (filterFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
+case_filter_features_1 = filter (GFF.filterFeatures gff_features_all) gff_lines_ex @?= gff_lines_ex
+case_filter_features_2 = filter (GFF.filterFeatures Nothing) gff_lines_ex @?= gff_lines_ex
+case_filter_features_3 = filter (GFF.filterFeatures gff_features_gene) gff_lines_ex @?= [gff_structure_Gene]
+case_filter_features_4 = filter (GFF.filterFeatures gff_features_cds) gff_lines_ex @?= [gff_structure_CDS]
+case_filter_features_5 = filter (GFF.filterFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
 
 
 case_cigar_to_length_1 = cigarTLen "18M2D19M" @?= 39
