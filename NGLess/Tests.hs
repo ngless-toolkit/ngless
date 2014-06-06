@@ -35,6 +35,7 @@ import FPreProcess
 import FileManagement
 import MapInterpretOperation
 import Annotation
+import Validation
 
 import Data.Sam
 import Data.Json
@@ -232,7 +233,34 @@ case_indent_empty_line = isOkTypes $ parsetest indent_empty_line >>= checktypes
             \    if len(read) < 24:\n\
             \        discard\n"
 
+-----
+--- Validation pure functions
 
+case_bad_function_attr_count = isError $ parsetest function_attr >>= validate
+    where function_attr = "ngless '0.0'\n\
+            \count(annotated, count={gene})\n"
+
+case_good_function_attr_count_1 = isOkTypes $ parsetest good_function_attr >>= validate
+    where good_function_attr = "ngless '0.0'\n\
+            \write(count(annotated, count={gene}),ofile='gene_counts.csv',format={csv})"
+
+case_good_function_attr_count_2 = isOkTypes $ parsetest good_function_attr >>= validate
+    where good_function_attr = "ngless '0.0'\n\
+            \counts = count(annotated, count={gene})"
+
+case_bad_function_attr_map = isError $ parsetest function_attr >>= validate
+    where function_attr = "ngless '0.0'\n\
+            \map(input,reference='sacCer3')\n"
+
+case_good_function_attr_map_1 = isOkTypes $ parsetest good_function_attr >>= validate
+    where good_function_attr = "ngless '0.0'\n\
+            \write(map(input,reference='sacCer3'),ofile='result.sam',format={sam})"
+
+case_good_function_attr_map_2 = isOkTypes $ parsetest good_function_attr >>= validate
+    where good_function_attr = "ngless '0.0'\n\
+            \counts = map(input,reference='sacCer3')"
+
+-----
 -- Type Validate pre process operations
 
 case_pre_process_indexation_1 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 5), Nothing] @?= (NGOShortRead "@IRIS" "CAA" "aaa")
