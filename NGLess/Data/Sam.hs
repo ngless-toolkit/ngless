@@ -16,8 +16,6 @@ import qualified Data.ByteString.Char8 as S8
 
 import Data.Bits (testBit)
 
-import Text.Regex
-
 import Control.DeepSeq
 
 
@@ -105,16 +103,17 @@ calcLen s val acc =
         True  -> acc 
         False -> do 
             case S8.head s of
-                'M' -> calcLen sRest [] ((read val) + acc)
-                'D' -> calcLen sRest [] ((read val) + acc)
-                'N' -> calcLen sRest [] ((read val) + acc)
-                'S' -> calcLen sRest [] ((read val) + acc)
-                'H' -> calcLen sRest [] ((read val) + acc)
-                'P' -> calcLen sRest [] ((read val) + acc)
-                '=' -> calcLen sRest [] ((read val) + acc)
-                'X' -> calcLen sRest [] ((read val) + acc)
-                'I' -> calcLen sRest [] acc -- ignore
+                'M' -> calc' $ (read val) + acc
+                'D' -> calc' $ (read val) + acc
+                'N' -> calc' $ (read val) + acc
+                'S' -> calc' $ (read val) + acc
+                'H' -> calc' $ (read val) + acc
+                'P' -> calc' $ (read val) + acc
+                '=' -> calc' $ (read val) + acc
+                'X' -> calc' $ (read val) + acc
+                'I' -> calc' acc -- ignore
                 _  -> calcLen sRest (val ++ [S8.head s]) acc 
    where
+      calc' = calcLen sRest []
       sRest = S8.tail s
 
