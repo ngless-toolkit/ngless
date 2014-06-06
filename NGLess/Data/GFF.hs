@@ -10,6 +10,8 @@ module Data.GFF
     , parseGffAttributes
     , checkAttrTag
     , trimString
+    , filterFeatures
+    , showType
     ) where
 
 
@@ -19,6 +21,10 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
+
+import Data.Maybe
+
+import Language
 
 data GffType = GffExon
                 | GffGene
@@ -133,3 +139,21 @@ readLine line = if length tokens == 9
 
 strict :: L.ByteString -> S.ByteString
 strict = S.concat . L.toChunks
+
+filterFeatures :: Maybe NGLessObject -> GffLine -> Bool
+filterFeatures feats gffL = maybe True (fFeat gffL) feats
+  where 
+        fFeat g (NGOList f) = foldl (\a b -> a || b) False (map (filterFeatures' g) f)
+        fFeat _ err = error("Type should be NGOList but received: " ++ (show err))
+
+filterFeatures' :: GffLine -> NGLessObject -> Bool
+filterFeatures' g (NGOSymbol "gene") = (==GffGene) . gffType $ g
+filterFeatures' g (NGOSymbol "exon") = (==GffExon) . gffType $ g
+filterFeatures' g (NGOSymbol "cds" ) = (==GffCDS) . gffType  $ g
+filterFeatures' g f = error ("not yet implemented feature" ++ (show g) ++ " " ++ (show f))
+
+
+showType :: GffType -> S.ByteString
+showType GffExon = "exon"
+showType GffGene = "gene"
+showType GffCDS = "CDS"
