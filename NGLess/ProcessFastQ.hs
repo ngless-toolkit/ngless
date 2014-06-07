@@ -39,7 +39,6 @@ asFastQ :: [NGLessObject] -> Int -> BL.ByteString
 asFastQ rs enc = BL.unlines . (fmap (showRead enc)) $ rs 
 
 
-
 readReadSet :: Int -> B.ByteString -> IO [NGLessObject]
 readReadSet enc fn = (parseReadSet enc) `fmap` (readPossiblyCompressedFile fn)
 

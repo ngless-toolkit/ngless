@@ -225,22 +225,28 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
 topFunction Fwrite expr args _ = do 
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
-    res' <- liftIO (writeToFile expr' args')
-    return res'
+    liftIO (writeToFile expr' args') >>= return
 
 topFunction Fmap expr@(Lookup (Variable _varName)) args _ = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
-    res' <- executeMap expr' args'
-    return res'
+    executeMap expr' args' >>= return
 
 topFunction Fannotate expr@(Lookup (Variable _varName)) args _ = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
-    res' <- executeAnnotation expr' args'
-    return res' 
+    executeAnnotation expr' args' >>= return
+
+topFunction Fcount expr@(Lookup (Variable _varName)) args _ = do
+    expr' <- runInROEnvIO $ interpretExpr expr
+    args' <- runInROEnvIO $ evaluateArguments args
+    executeCount expr' args' >>= return
+
 
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
+
+executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
+executeCount x y = return NGOVoid
 
 executeAnnotation :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeAnnotation (NGOList e) args = do
