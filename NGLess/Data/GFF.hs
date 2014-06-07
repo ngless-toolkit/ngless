@@ -22,8 +22,6 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
 
-import Data.Maybe
-
 import Language
 
 data GffType = GffExon
@@ -157,3 +155,4 @@ showType :: GffType -> S.ByteString
 showType GffExon = "exon"
 showType GffGene = "gene"
 showType GffCDS = "CDS"
+showType (GffOther b) = b
