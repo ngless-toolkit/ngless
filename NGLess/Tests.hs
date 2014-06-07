@@ -63,6 +63,11 @@ case_parse_count = parseBody countcalls @?= countcall
         countcalls = "count(annotated, count={gene})"
         countcall  = [FunctionCall Fcount (Lookup (Variable "annotated")) [(Variable "count",ConstSymbol "gene")] Nothing]
 
+case_parse_count_mult_counts = parseBody countcalls @?= countcall
+    where
+        countcalls = "count(annotated, count=[{gene},{cds}])"
+        countcall  = [FunctionCall Fcount (Lookup (Variable "annotated")) [(Variable "count", ListExpression [ConstSymbol "gene", ConstSymbol "cds"])] Nothing]
+
 case_parse_assignment =  parseBody "reads = \"something\"" @?=
         [Assignment (Variable "reads") (ConstStr "something")]
 
