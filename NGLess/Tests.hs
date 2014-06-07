@@ -34,7 +34,6 @@ import PerBaseQualityScores
 import FPreProcess
 import FileManagement
 import MapInterpretOperation
-import Annotation
 import Validation
 
 import Data.Sam
