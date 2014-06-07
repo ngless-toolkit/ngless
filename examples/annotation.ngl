@@ -1,0 +1,4 @@
+ngless "0.0"
+input = fastq('../samples/sample_1.fq')
+mapped = map(input,reference='sacCer3')
+annotated = annotate(mapped, features=[{gene},{cds},{exon}], gff='../samples/genes.gff')
