@@ -23,11 +23,11 @@ getNGOString _ = error "Error: Type is different of String"
 elFromMap el args = Map.lookup (T.pack el) (Map.fromList args)
 
 
-writeToUncFile (NGOMappedReadSet path) newfp = do
+writeToUncFile (NGOMappedReadSet path defGen) newfp = do
     let path' = T.unpack path
     contents' <- readPossiblyCompressedFile (B.pack path') 
     write (T.unpack newfp) $ contents' 
-    return $ NGOMappedReadSet newfp
+    return $ NGOMappedReadSet newfp defGen
 
 writeToUncFile (NGOReadSet path enc tmplate) newfp = do
     let newfp' = T.unpack newfp
@@ -49,14 +49,14 @@ writeToFile el@(NGOReadSet _ _ _) args = do
     let newfp = getNGOString ( elFromMap "ofile" args )
     writeToUncFile el newfp
 
-writeToFile el@(NGOMappedReadSet fp) args = do
-    let map' = Map.fromList args
-        newfp = getNGOString ( Map.lookup (T.pack "ofile") map') --
-        format = Map.lookup (T.pack "format") map'
+writeToFile el@(NGOMappedReadSet fp defGen) args = do
+    let newfp = getNGOString (lookup (T.pack "ofile") args) --
+        format = lookup (T.pack "format") args
     case format of
         Nothing -> writeToUncFile el newfp
-        Just x -> case x of 
-            (NGOSymbol "bam") -> convertSamToBam (T.unpack fp) (T.unpack newfp) --newfp will contain the bam
+        Just format' -> case format' of 
+            (NGOSymbol "bam") -> convertSamToBam (T.unpack fp) (T.unpack newfp) 
+                                            >>= \x -> return $ NGOMappedReadSet x defGen --newfp will contain the bam
             _     -> writeToUncFile el newfp -- Sam file is the kept format so no need to convert.
 
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"

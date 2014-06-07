@@ -49,7 +49,7 @@ mapToReference refIndex readSet = do
     jHandle <- mapToReference' newfp' refIndex readSet
     exitCode <- waitForProcess jHandle
     case exitCode of
-       ExitSuccess -> return (NGOMappedReadSet (T.pack newfp'))
+       ExitSuccess -> return newfp'
        ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
 
 
@@ -73,7 +73,7 @@ convertSamToBam samfp newfp = do
     jHandle <- convSamToBam' samfp newfp
     exitCode <- waitForProcess jHandle
     case exitCode of
-       ExitSuccess -> return (NGOMappedReadSet (T.pack newfp))
+       ExitSuccess -> return (T.pack newfp)
        ExitFailure err -> error ("Failure on converting sam to bam" ++ (show err))
 
 convSamToBam' samFP newfp = do

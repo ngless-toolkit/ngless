@@ -51,22 +51,23 @@ isDefaultGenome :: T.Text -> Bool
 isDefaultGenome name = name `elem` (map fst defaultGenomes)
 
 interpretMapOp ref ds = do
-    ref' <- indexReference' ref
-    execMap' <- mapToReference (T.pack ref') (B.unpack ds)
-    getSamStats execMap'
-    return execMap'
+    (ref', defGen') <- indexReference' ref
+    samPath' <- mapToReference (T.pack ref') (B.unpack ds)
+    getSamStats samPath'
+    return $ NGOMappedReadSet (T.pack samPath') defGen'
     where 
-        indexReference' r = case isDefaultGenome r of
-                                False  -> indexReference r
-                                True   -> do
-                                    res <- isIndexCalculated (T.unpack r) 
-                                    case res of 
-                                        Nothing -> configGenome (T.unpack r) User
-                                        Just p  -> return p
+        indexReference' :: T.Text -> IO (FilePath, Maybe T.Text)
+        indexReference' r = 
+            case isDefaultGenome r of
+                False  -> indexReference r >>= \x -> return (x, Nothing)
+                True   -> do
+                    res <- isIndexCalculated (T.unpack r) 
+                    case res of 
+                        Nothing -> configGenome (T.unpack r) User >>= \x -> return (x, Nothing)
+                        Just p  -> return (p , Nothing)
 
-getSamStats (NGOMappedReadSet fname) = unCompress (T.unpack fname) >>= printSamStats . calcSamStats
-getSamStats err = error $ "Type must be NGOMappedReadSet, but is: " ++ (show err)
-
+getSamStats :: FilePath -> IO ()
+getSamStats fname = unCompress fname >>= printSamStats . calcSamStats
 
 calcSamStats contents = do
     let res' = samStats contents
