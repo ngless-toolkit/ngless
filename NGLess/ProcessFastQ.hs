@@ -28,8 +28,6 @@ import JSONManager
 
 -- Uncompression of a given fastQ file if it's compressed in a .gz format.
 
-
-
 writeReadSet :: B.ByteString -> [NGLessObject] -> Int -> IO FilePath
 writeReadSet fn rs enc = do
     temp <- getTemporaryDirectory 

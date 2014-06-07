@@ -34,6 +34,7 @@ import FileManagement
 import JSONManager
 import WriteInterpretOperation
 import MapInterpretOperation
+import Annotation
 
 {- Interpretation is done inside 3 Monads
  -  1. InterpretationEnvIO
@@ -241,10 +242,24 @@ topFunction Fannotate expr@(Lookup (Variable _varName)) args _ = do
 
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
 
+executeAnnotation :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
+executeAnnotation (NGOList e) args = do
+    res <- mapM (\x -> executeAnnotation x args) e
+    return (NGOList res)
+
+executeAnnotation (NGOMappedReadSet e _) args = do
+    let f = lookup "features" args
+        gff = lookup "gff" args
+    res <-  liftIO $ annotate (T.unpack e) gff f
+    return $ NGOAnnotatedSet res
+
+executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
+
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = do
     res <- mapM (executeQualityProcess) e
     return (NGOList res)
+
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     newTemplate <- liftIO $ createOutputDir fname' -- new template only calculated once.
@@ -266,7 +281,7 @@ executeMap (NGOList e) args = do
     return (NGOList res)
 
 executeMap (NGOReadSet file _enc _) args = do
-            case Map.lookup (T.pack "reference") (Map.fromList args) of 
+            case lookup "reference" args of 
                 Just refPath' -> liftIO $ interpretMapOp (evalString refPath') file
                 Nothing -> error ("a reference must be suplied")
 executeMap _ _ = error ("Not implemented yet")
@@ -279,9 +294,8 @@ executeUnique (NGOList e) args = do
 executeUnique (NGOReadSet file enc template) args = do
         rs <- liftIO $ readReadSet enc file
         dirName <- liftIO $ writeToNFiles (B.unpack file) enc rs
-        let map' = Map.fromList args
-            numMaxOccur = Map.lookup (T.pack "max_copies") map'
-        case numMaxOccur of
+        let numMaxOccur = lookup "max_copies" args
+        case numMaxOccur  of
             Just value' -> do
                 let numMaxOccur' = fromIntegral (evalInteger $ value')
                 uniqueCalculations' numMaxOccur' dirName
