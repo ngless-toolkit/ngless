@@ -35,6 +35,7 @@ import JSONManager
 import WriteInterpretOperation
 import MapInterpretOperation
 import Annotation
+import CountOperation
 
 {- Interpretation is done inside 3 Monads
  -  1. InterpretationEnvIO
@@ -246,7 +247,14 @@ topFunction Fcount expr@(Lookup (Variable _varName)) args _ = do
 topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
 
 executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeCount x y = return NGOVoid
+executeCount (NGOList e) args = return . NGOList =<< mapM (\x -> executeCount x args) e
+
+executeCount (NGOAnnotatedSet p) args = do
+    let c = lookup "counts" args
+    res <- liftIO $ countAnnotatedSet p c
+    return NGOVoid
+
+executeCount e y = return NGOVoid
 
 executeAnnotation :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeAnnotation (NGOList e) args = do
@@ -262,9 +270,7 @@ executeAnnotation (NGOMappedReadSet e _) args = do
 executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
-executeQualityProcess (NGOList e) = do
-    res <- mapM (executeQualityProcess) e
-    return (NGOList res)
+executeQualityProcess (NGOList e) = return . NGOList =<< mapM (executeQualityProcess) e
 
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname

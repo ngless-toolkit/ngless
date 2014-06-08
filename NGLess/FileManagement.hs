@@ -188,6 +188,7 @@ writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents
 write :: String -> BL.ByteString -> IO ()
 write fp contents = BL.writeFile fp contents 
 
+unCompress :: FilePath -> IO BL.ByteString
 unCompress fname =
     if T.isInfixOf (T.pack ".gz") (T.pack fname)
         then fmap GZip.decompress (BL.readFile fname)

@@ -35,11 +35,14 @@ import FPreProcess
 import FileManagement
 import MapInterpretOperation
 import Validation
+import CountOperation
 
 import Data.Sam
 import Data.Json
 import Data.DefaultValues
+import Data.AnnotRes
 import qualified Data.GFF as GFF
+
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -424,3 +427,35 @@ case_filter_features_5 = filter (GFF.filterFeatures gff_features_cds) [gff_struc
 case_cigar_to_length_1 = cigarTLen "18M2D19M" @?= 39
 case_cigar_to_length_2 = cigarTLen "37M" @?= 37
 case_cigar_to_length_3 = cigarTLen "3M1I3M1D5M" @?= 12
+
+--- Count operation
+ds_annot_gene = "x\tgene\t10\n"
+ds_annot_cds = "x\tCDS\t11\n"
+ds_annot_exon = "x\texon\t12\n"
+ds_annot_counts = L.concat [ds_annot_gene, ds_annot_cds, ds_annot_exon]
+
+annot_features_gene = Just (NGOList  [ NGOSymbol "gene" ])
+annot_features_cds =  Just (NGOList  [ NGOSymbol "cds"  ])
+annot_features_exon = Just (NGOList  [ NGOSymbol "exon" ])
+
+annot_features_gene_cds = Just (NGOList  [ NGOSymbol "gene", NGOSymbol "cds" ])
+annot_features_cds_exon = Just (NGOList  [ NGOSymbol "exon", NGOSymbol "cds" ])
+
+annot_features_all =  Just (NGOList  [ NGOSymbol "gene", NGOSymbol "cds", NGOSymbol "exon" ])
+
+
+case_annot_count_none = filterAnnot ds_annot_counts Nothing @?= readAnnotCounts ds_annot_counts
+case_annot_count_all = filterAnnot ds_annot_counts annot_features_all @?= readAnnotCounts ds_annot_counts
+
+-- simple case. Filter all but one element
+case_annot_count_gene = filterAnnot ds_annot_counts annot_features_gene @?= readAnnotCounts ds_annot_gene
+case_annot_count_cds = filterAnnot ds_annot_counts annot_features_cds @?= readAnnotCounts ds_annot_cds
+case_annot_count_exon = filterAnnot ds_annot_counts annot_features_exon @?= readAnnotCounts ds_annot_exon
+
+-- empty case
+case_annot_count_other_empty = filterAnnot ds_annot_counts (Just (NGOList  [ NGOSymbol "other" ])) @?= []
+
+-- Filter all but one element
+case_annot_count_gene_cds = filterAnnot ds_annot_counts annot_features_gene_cds @?= (readAnnotCounts $ L.concat [ds_annot_gene, ds_annot_cds])
+case_annot_count_cds_exon = filterAnnot ds_annot_counts annot_features_cds_exon @?= (readAnnotCounts $ L.concat [ds_annot_cds, ds_annot_exon])
+
