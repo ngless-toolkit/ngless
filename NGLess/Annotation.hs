@@ -14,9 +14,6 @@ import qualified Data.Text as T
 
 import qualified Data.IntervalMap.Strict as IM
 
-import System.FilePath.Posix((</>), splitFileName)
-
-import FileManagement
 import Language
 
 import Data.Maybe (fromMaybe)
@@ -45,7 +42,7 @@ annotate' samFp (NGOString gffFp) feats = do
     gff <- L8.readFile (T.unpack gffFp)
     sam <- L8.readFile samFp
     let imGff = intervals . filter (filterFeatures feats) . readAnnotations $ gff
-    writeAnnotation samFp (compStatsAnnot imGff sam)
+    writeAnnotCount samFp $ map snd . IM.toList $ compStatsAnnot imGff sam
 
 annotate' _ s _ = error ("Should be a NGOString but is a: " ++ (show s))
 
@@ -63,11 +60,3 @@ update annots samLine = do
     incCount (GffCount gId gT gC) = (GffCount gId gT (gC + 1))
     interval y = IM.ClosedInterval (samPos y) (samPos y + (cigarTLen $ samCigar y))
 
-
-writeAnnotation :: FilePath -> IM.IntervalMap Int GffCount -> IO T.Text
-writeAnnotation fn im = do
-    temp <- getTemporaryDirectory 
-    newfp <- getTFilePathComp (temp </> (snd . splitFileName $ fn))
-    printNglessLn $ "Writing Annotation results to:" ++ newfp
-    writeGZIP newfp $ showGffCount . map snd . IM.toList $ im
-    return .  T.pack $ newfp

@@ -7,6 +7,8 @@ module Data.AnnotRes
       , readAnnotCounts
       , filterCounts
       , isMinAmount
+      , writeAnnotCount
+      , showGffCountDel
     ) where
 
 import qualified Data.Text as T
@@ -16,7 +18,9 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
 
 import Control.DeepSeq
+import System.FilePath.Posix((</>), splitFileName)
 
+import FileManagement
 import Language
 
 import Data.GFF
@@ -34,10 +38,13 @@ instance NFData GffCount where
             ()
 
 showGffCount :: [GffCount] -> L8.ByteString 
-showGffCount = L8.unlines . fmap showCounts
+showGffCount = L8.unlines . fmap (showCounts "\t")
 
-showCounts :: GffCount -> L8.ByteString
-showCounts (GffCount s t c) = L8.fromChunks [s, "\t" , showType t, "\t", encode c]
+showGffCountDel :: S8.ByteString -> [GffCount] -> L8.ByteString 
+showGffCountDel del c = L8.unlines . fmap (showCounts del) $ c
+
+showCounts :: S8.ByteString -> GffCount -> L8.ByteString
+showCounts del (GffCount s t c) = L8.fromChunks [s, del, showType t, del, encode c]
     where encode = S8.pack . show --could be used Data.Binary (encode)
 
 
@@ -78,3 +85,11 @@ filterCounts' _ err = error ("Type should be NGOList but received: " ++ (show er
 isMinAmount :: NGLessObject -> GffCount ->  Bool
 isMinAmount (NGOInteger l) g = (toInteger $ annotCount g) >= l
 isMinAmount err _ = error ("Type should be NGOInteger but received: " ++ (show err))
+
+writeAnnotCount :: FilePath -> [GffCount] -> IO T.Text
+writeAnnotCount fn im = do
+    temp <- getTemporaryDirectory 
+    newfp <- getTFilePathComp (temp </> (snd . splitFileName $ fn))
+    printNglessLn $ "Writing Annotation results to:" ++ newfp
+    writeGZIP newfp $ showGffCount im
+    return .  T.pack $ newfp

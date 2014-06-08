@@ -12,11 +12,11 @@ import FileManagement (unCompress)
 
 import Data.AnnotRes
 
-countAnnotatedSet :: T.Text -> Maybe NGLessObject -> NGLessObject -> IO NGLessObject
+countAnnotatedSet :: T.Text -> Maybe NGLessObject -> NGLessObject -> IO T.Text
 countAnnotatedSet p f m = do
-    fc <- unCompress (T.unpack p)
-    print (length $ filterAnnot fc f m)
-    return NGOVoid
+    fc <- unCompress p'
+    writeAnnotCount p' $ filterAnnot fc f m
+   where p' = T.unpack p
 --countAnnotatedSet p Nothing = return NGOVoid
 
 filterAnnot :: L8.ByteString -> Maybe NGLessObject -> NGLessObject -> [GffCount]

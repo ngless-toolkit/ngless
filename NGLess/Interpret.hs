@@ -253,7 +253,7 @@ executeCount (NGOAnnotatedSet p) args = do
     let c = lookup "counts" args
         m = fromMaybe (NGOInteger 1) $ lookup "min" args
     res <- liftIO $ countAnnotatedSet p c m
-    return NGOVoid
+    return $ NGOAnnotatedSet res
 
 executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ (show err))
 
