@@ -6,21 +6,23 @@ module Data.GFF
     , GffStrand(..)
     , gffGeneId
     , readAnnotations
-    , readLine
     , parseGffAttributes
     , checkAttrTag
     , trimString
     , filterFeatures
     , showType
+    , parsegffType
+    , readLine
     ) where
 
 
-import Control.DeepSeq
-
+import qualified Data.Text as  T
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
+
+import Control.DeepSeq
 
 import Language
 
@@ -120,10 +122,6 @@ readLine line = if length tokens == 9
     where
         tokens = L8.split '\t' line
         [tk0,tk1,tk2,tk3,tk4,tk5,tk6,tk7,tk8] = tokens
-        parsegffType "exon" = GffExon
-        parsegffType "gene" = GffGene
-        parsegffType "CDS" = GffCDS
-        parsegffType t = GffOther t
         score "." = Nothing
         score v = Just (read $ L8.unpack v)
         strand '.' = GffUnStranded
@@ -133,6 +131,12 @@ readLine line = if length tokens == 9
         strand _ = error "unhandled value for strand"
         phase "." = -1
         phase r = read (L8.unpack r)
+
+parsegffType :: S.ByteString -> GffType
+parsegffType "exon" = GffExon
+parsegffType "gene" = GffGene
+parsegffType "CDS" = GffCDS
+parsegffType t = GffOther t
 
 
 strict :: L.ByteString -> S.ByteString
@@ -148,7 +152,8 @@ filterFeatures' :: GffLine -> NGLessObject -> Bool
 filterFeatures' g (NGOSymbol "gene") = (==GffGene) . gffType $ g
 filterFeatures' g (NGOSymbol "exon") = (==GffExon) . gffType $ g
 filterFeatures' g (NGOSymbol "cds" ) = (==GffCDS) . gffType  $ g
-filterFeatures' g f = error ("not yet implemented feature" ++ (show g) ++ " " ++ (show f))
+filterFeatures' g (NGOSymbol s) = (S8.unpack . showType . gffType $ g) == (T.unpack s)
+filterFeatures' g s = error ("Type should be NGOList but received: " ++ (show s))
 
 
 showType :: GffType -> S.ByteString
