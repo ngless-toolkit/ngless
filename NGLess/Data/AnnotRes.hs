@@ -6,7 +6,7 @@ module Data.AnnotRes
       , showGffCount
       , readAnnotCounts
       , filterCounts
-      , filterMinAmount
+      , isMinAmount
     ) where
 
 import qualified Data.Text as T
@@ -75,6 +75,6 @@ filterCounts' g (NGOSymbol s) = (S8.unpack . showType . annotType $ g) == (T.unp
 filterCounts' _ err = error ("Type should be NGOList but received: " ++ (show err))
 
 
-filterMinAmount :: GffCount -> NGLessObject -> Bool
-filterMinAmount g (NGOInteger l) = (toInteger $ annotCount g) >= l
-filterMinAmount _ err = error ("Type should be NGOInteger but received: " ++ (show err))
+isMinAmount :: NGLessObject -> GffCount ->  Bool
+isMinAmount (NGOInteger l) g = (toInteger $ annotCount g) >= l
+isMinAmount err _ = error ("Type should be NGOInteger but received: " ++ (show err))

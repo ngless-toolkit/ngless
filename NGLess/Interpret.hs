@@ -251,10 +251,11 @@ executeCount (NGOList e) args = return . NGOList =<< mapM (\x -> executeCount x 
 
 executeCount (NGOAnnotatedSet p) args = do
     let c = lookup "counts" args
-    res <- liftIO $ countAnnotatedSet p c
+        m = fromMaybe (NGOInteger 1) $ lookup "min" args
+    res <- liftIO $ countAnnotatedSet p c m
     return NGOVoid
 
-executeCount e y = return NGOVoid
+executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ (show err))
 
 executeAnnotation :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeAnnotation (NGOList e) args = do

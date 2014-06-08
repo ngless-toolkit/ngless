@@ -429,6 +429,7 @@ case_cigar_to_length_2 = cigarTLen "37M" @?= 37
 case_cigar_to_length_3 = cigarTLen "3M1I3M1D5M" @?= 12
 
 --- Count operation
+
 ds_annot_gene = "x\tgene\t10\n"
 ds_annot_cds = "x\tCDS\t11\n"
 ds_annot_exon = "x\texon\t12\n"
@@ -444,18 +445,25 @@ annot_features_cds_exon = Just (NGOList  [ NGOSymbol "exon", NGOSymbol "cds" ])
 annot_features_all =  Just (NGOList  [ NGOSymbol "gene", NGOSymbol "cds", NGOSymbol "exon" ])
 
 
-case_annot_count_none = filterAnnot ds_annot_counts Nothing @?= readAnnotCounts ds_annot_counts
-case_annot_count_all = filterAnnot ds_annot_counts annot_features_all @?= readAnnotCounts ds_annot_counts
+case_annot_count_none = filterAnnot ds_annot_counts Nothing (NGOInteger 0) @?= readAnnotCounts ds_annot_counts
+case_annot_count_all = filterAnnot ds_annot_counts annot_features_all (NGOInteger 0) @?= readAnnotCounts ds_annot_counts
 
 -- simple case. Filter all but one element
-case_annot_count_gene = filterAnnot ds_annot_counts annot_features_gene @?= readAnnotCounts ds_annot_gene
-case_annot_count_cds = filterAnnot ds_annot_counts annot_features_cds @?= readAnnotCounts ds_annot_cds
-case_annot_count_exon = filterAnnot ds_annot_counts annot_features_exon @?= readAnnotCounts ds_annot_exon
+case_annot_count_gene = filterAnnot ds_annot_counts annot_features_gene (NGOInteger 0) @?= readAnnotCounts ds_annot_gene
+case_annot_count_cds = filterAnnot ds_annot_counts annot_features_cds (NGOInteger 0) @?= readAnnotCounts ds_annot_cds
+case_annot_count_exon = filterAnnot ds_annot_counts annot_features_exon (NGOInteger 0) @?= readAnnotCounts ds_annot_exon
 
 -- empty case
-case_annot_count_other_empty = filterAnnot ds_annot_counts (Just (NGOList  [ NGOSymbol "other" ])) @?= []
+case_annot_count_other_empty = filterAnnot ds_annot_counts (Just (NGOList  [ NGOSymbol "other" ])) (NGOInteger 0) @?= []
 
 -- Filter all but one element
-case_annot_count_gene_cds = filterAnnot ds_annot_counts annot_features_gene_cds @?= (readAnnotCounts $ L.concat [ds_annot_gene, ds_annot_cds])
-case_annot_count_cds_exon = filterAnnot ds_annot_counts annot_features_cds_exon @?= (readAnnotCounts $ L.concat [ds_annot_cds, ds_annot_exon])
+case_annot_count_gene_cds = filterAnnot ds_annot_counts annot_features_gene_cds (NGOInteger 0) @?= (readAnnotCounts $ L.concat [ds_annot_gene, ds_annot_cds])
+case_annot_count_cds_exon = filterAnnot ds_annot_counts annot_features_cds_exon (NGOInteger 0) @?= (readAnnotCounts $ L.concat [ds_annot_cds, ds_annot_exon])
 
+
+-- Min value of occurrences to count operation
+case_annot_count_lim_no_feat = filterAnnot ds_annot_counts Nothing (NGOInteger 30) @?= []
+case_annot_count_lim_feat = filterAnnot ds_annot_counts annot_features_all (NGOInteger 30) @?= []
+
+
+-----
