@@ -144,10 +144,7 @@ interpretIO [] = return ()
 interpretIO ((ln,e):es) = (setlno ln >> interpretTop e >> interpretIO es)
 
 interpretTop :: Expression -> InterpretationEnvIO ()
-interpretTop (Assignment (Variable var) val) = do
-    val' <- interpretTopValue val
-    setVariableValue var val'
-    return ()
+interpretTop (Assignment (Variable var) val) = interpretTopValue val >>= setVariableValue var
 interpretTop (FunctionCall f e args b) = void $ topFunction f e args b
 interpretTop (Condition c ifTrue ifFalse) = do
     c' <- runInROEnvIO (interpretExpr c)
@@ -182,19 +179,13 @@ interpretExpr (IndexExpression expr ie) = do
     ie' <- interpretIndex ie
     let r = evalIndex expr' ie'
     return r
-interpretExpr (FunctionCall Fsubstrim var args _) = do 
-    var' <- interpretExpr var
-    let r = substrim (getvalue args) var'
-    return r
+
 interpretExpr (ListExpression e) = do
     res <- mapM (interpretExpr) e
     return (NGOList $ res)
 
 interpretExpr _ = throwError $ "Not an expression"
 
-getvalue :: [(Variable, Expression)] -> Int
-getvalue [((Variable v),(ConstNum value))] = assert (v == (T.pack "min_quality")) fromIntegral value
-getvalue _ = error "unexpected"
 
 interpretIndex :: Index -> InterpretationROEnv [Maybe NGLessObject]
 interpretIndex (IndexTwo a b) = forM [a,b] maybeInterpretExpr
@@ -206,14 +197,13 @@ maybeInterpretExpr (Just e) = interpretExpr e >>= return . Just
 
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
 topFunction Ffastq expr _args _block = do
-    expr' <- runInROEnvIO $ interpretExpr expr
+    expr' <- interpretTopValue expr
     executeQualityProcess expr'
 
-topFunction Funique expr@(Lookup (Variable _varName)) args _block = do
-    expr' <- runInROEnvIO $ interpretExpr expr
+topFunction Funique expr args _block = do
+    expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ evaluateArguments args
-    res' <- executeUnique expr' args'
-    return res'
+    executeUnique expr' args' >>= return
 
 topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
@@ -222,24 +212,25 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     res'' <- executeQualityProcess res' 
     setVariableValue varName res''
     return res''
+topFunction Fpreprocess expr _ _ = error ("Passed type must be variable.")
 
 topFunction Fwrite expr args _ = do 
-    expr' <- runInROEnvIO $ interpretExpr expr
+    expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ evaluateArguments args
     liftIO (writeToFile expr' args') >>= return
 
-topFunction Fmap expr@(Lookup (Variable _varName)) args _ = do
-    expr' <- runInROEnvIO $ interpretExpr expr
+topFunction Fmap expr args _ = do
+    expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ evaluateArguments args
     executeMap expr' args' >>= return
 
-topFunction Fannotate expr@(Lookup (Variable _varName)) args _ = do
-    expr' <- runInROEnvIO $ interpretExpr expr
+topFunction Fannotate expr args _ = do
+    expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ evaluateArguments args
     executeAnnotation expr' args' >>= return
 
-topFunction Fcount expr@(Lookup (Variable _varName)) args _ = do
-    expr' <- runInROEnvIO $ interpretExpr expr
+topFunction Fcount expr args _ = do
+    expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ evaluateArguments args
     executeCount expr' args' >>= return
 
@@ -248,7 +239,6 @@ topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
 
 executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeCount (NGOList e) args = return . NGOList =<< mapM (\x -> executeCount x args) e
-
 executeCount (NGOAnnotatedSet p) args = do
     let c = lookup "counts" args
         m = fromMaybe (NGOInteger 1) $ lookup "min" args
@@ -272,7 +262,7 @@ executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappe
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = return . NGOList =<< mapM (executeQualityProcess) e
-
+executeQualityProcess (NGOReadSet fname _ nt) = executeQualityProcess' (B.unpack fname) "afterQC" (B.unpack nt)
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     newTemplate <- liftIO $ createOutputDir fname' -- new template only calculated once.
@@ -282,8 +272,7 @@ executeQualityProcess (NGOString fname) = do
         Just r' -> do
                  _ <- liftIO $ insertFilesProcessedJson newTemplate (evalString r')
                  executeQualityProcess' fname' "beforeQC" newTemplate
-    
-executeQualityProcess (NGOReadSet fname _ nt) = executeQualityProcess' (B.unpack fname) "afterQC" (B.unpack nt)
+
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
 
 executeQualityProcess' fname info nt = liftIO $ readFastQ fname info nt
@@ -331,7 +320,7 @@ executePreprocess (NGOList e) args _block v = do
 
 executePreprocess (NGOReadSet file enc template) args (Block ([Variable var]) expr) _ = do
         rs <- liftIO $ do
-            printNglessLn $ "executePreprocess on " ++ (B.unpack file) 
+            printNglessLn $ "ExecutePreprocess on " ++ (B.unpack file) 
             readReadSet enc file
         env <- gets snd
         let rs' = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env) rs
@@ -386,7 +375,17 @@ interpretBlock1 vs (Sequence expr) = interpretBlock vs expr -- interpret [expr]
 interpretBlock1 vs x = error ("interpretBlock1: This should not have happened " ++ show vs ++ " " ++ show x)
 
 interpretBlockExpr :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv NGLessObject
-interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpretExpr val)
+interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpretPreProcessExpr val)
+
+interpretPreProcessExpr :: Expression -> InterpretationROEnv NGLessObject
+interpretPreProcessExpr (FunctionCall Fsubstrim var args _) = do
+    expr' <- interpretExpr var
+    args' <- evaluateArguments args 
+    return $ substrim (getvalue args') expr'
+    where
+        getvalue args = fromIntegral . evalInteger $ fromMaybe (NGOInteger 0) (lookup "min_quality" args)
+
+interpretPreProcessExpr expr = interpretExpr expr
 
 evalUOP :: UOp -> NGLessObject -> NGLessObject
 evalUOP UOpMinus x@(NGOInteger _) = evalMinus x

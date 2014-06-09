@@ -267,7 +267,7 @@ case_good_function_attr_map_2 = isOkTypes $ parsetest good_function_attr >>= val
     where good_function_attr = "ngless '0.0'\n\
             \counts = map(input,reference='sacCer3')"
 
------
+
 -- Type Validate pre process operations
 
 case_pre_process_indexation_1 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 5), Nothing] @?= (NGOShortRead "@IRIS" "CAA" "aaa")
