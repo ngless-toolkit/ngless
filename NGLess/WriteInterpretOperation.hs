@@ -9,7 +9,6 @@ module WriteInterpretOperation
 import qualified Data.ByteString.Char8 as B
 
 import qualified Data.Text as T
-import qualified Data.Map as Map
 
 import Control.Monad
 
@@ -59,7 +58,7 @@ writeToFile el@(NGOMappedReadSet fp defGen) args = do
                                             >>= \x -> return $ NGOMappedReadSet x defGen --newfp will contain the bam
             _     -> writeToUncFile el newfp -- Sam file is the kept format so no need to convert.
 
-writeToFile el@(NGOAnnotatedSet fp) args = do
+writeToFile (NGOAnnotatedSet fp) args = do
     let newfp = getNGOString (lookup "ofile" args)
     printNglessLn $ "Writing your NGOAnnotatedSet to: " ++ (T.unpack newfp)
     cont <- unCompress (T.unpack fp)
