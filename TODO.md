@@ -1,5 +1,5 @@
 # To do
-- [ ] Change format of Default Tar.gz DS.
+- [x] Change format of Default Tar.gz DS.
 - [ ] Connect Default DS with Annotation.
 
 
