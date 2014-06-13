@@ -22,7 +22,7 @@ import qualified Data.ByteString.Lazy.Char8 as L
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-
+import Data.Aeson
 
 import Language
 import Interpret
@@ -320,12 +320,13 @@ case_parse_filename = parseFileName "/var/folders/sample_1.9168$afterQC" @?= ("/
 
 -- Json Operations
 
-case_basicInfoJson = basicInfoToJson "x1" 1.0 "x2" 2 (3,4) @?= "{\"GC\":1,\"SeqLength\":[3,4],\"fileName\":\"x1\",\"Encoding\":\"x2\",\"NumSeqs\":2}" 
+case_basicInfoJson = basicInfoToJson "x1" 1.0 "x2" 2 (3,4) @?= (encode $ BasicInfo "x1" 1.0 "x2" 2 (3,4))
+
 
 -- should be the same
 case_createFileProcessed = do
-    x <- createFilesProcessed "test" (T.pack "script")
-    y <- createFilesProcessed "test" (T.pack "script")
+    x <- createFilesProcessed "test" "script"
+    y <- createFilesProcessed "test" "script"
     x @?= y
 
 -- Sam operations
