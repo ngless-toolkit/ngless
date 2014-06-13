@@ -153,7 +153,7 @@ filterFeatures' g (NGOSymbol "gene") = (==GffGene) . gffType $ g
 filterFeatures' g (NGOSymbol "exon") = (==GffExon) . gffType $ g
 filterFeatures' g (NGOSymbol "cds" ) = (==GffCDS) . gffType  $ g
 filterFeatures' g (NGOSymbol s) = (S8.unpack . showType . gffType $ g) == (T.unpack s)
-filterFeatures' g s = error ("Type should be NGOList but received: " ++ (show s))
+filterFeatures' _ s = error ("Type should be NGOList but received: " ++ (show s))
 
 
 showType :: GffType -> S.ByteString

@@ -8,8 +8,6 @@ module MapInterpretOperation
     , calcSamStats
     ) where
 
-import qualified UnpackIlluminaGenomes as MTar
-
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 
@@ -59,12 +57,34 @@ interpretMapOp ref ds = do
         indexReference' :: T.Text -> IO (FilePath, Maybe T.Text)
         indexReference' r = 
             case isDefaultGenome r of
-                False  -> indexReference r >>= \x -> return (x, Nothing)
+                False  -> indexReference r >>= \x -> return (x, Nothing) --user supplies genome
                 True   -> do
-                    res <- isIndexCalculated (T.unpack r) 
+                    let r' = T.unpack r
+                    res <- isIndexCalculated r'
+                    rootGen <- getGenomeDir r'
                     case res of 
-                        Nothing -> configGenome (T.unpack r) User >>= \x -> return (x, Nothing)
-                        Just p  -> return (p , Nothing)
+                        Nothing -> configGenome r' User >>= \x -> return (x, Just rootGen) -- download and install genome on User mode
+                        Just p  -> return (T.unpack p , Just rootGen) -- already installed
+
+
+
+{-
+    Receives - A default genome name
+    Returns  - The root dir for that genome
+-}
+getGenomeDir :: FilePath -> IO T.Text
+getGenomeDir n = do
+    let n' = T.pack n
+    nglessRoot' <- getNglessRoot
+    let dirPath = nglessRoot' </> suGenomeDir </> getGenomeRootPath n'
+    doesExist <- doesDirectoryExist dirPath
+    case doesExist of
+        True  -> return $ T.pack dirPath
+        False -> do
+            defGenomeDir' <- defGenomeDir
+            return . T.pack $ defGenomeDir' </>  getGenomeRootPath n' 
+
+
 
 getSamStats :: FilePath -> IO ()
 getSamStats fname = unCompress fname >>= printSamStats . calcSamStats
@@ -97,7 +117,7 @@ calcDiv a b =
 showFloat' num = showFFloat (Just numDecimalPlaces) num ""
 
 -- check both SU and normal user Genomes dir for <ref> 
-isIndexCalculated :: FilePath -> IO (Maybe FilePath)
+isIndexCalculated :: FilePath -> IO (Maybe T.Text)
 isIndexCalculated ref = do
     -- super user genomes dir --
     hasSUFiles <- isIndexCalcAux ref Root
@@ -111,20 +131,20 @@ isIndexCalculated ref = do
                 False -> return Nothing -- not installed
 
 
-isIndexCalcAux :: FilePath -> InstallMode -> IO (Maybe FilePath)
+isIndexCalcAux :: FilePath -> InstallMode -> IO (Maybe T.Text)
 isIndexCalcAux ref Root = do
     nglessRoot' <- getNglessRoot
     let dirPath = nglessRoot' </> suGenomeDir
     hasIndex <- doesDirContainFormats (dirPath </> getIndexPath ref) indexRequiredFormats
     case hasIndex of
-        True  -> return $ (Just $ dirPath </> getIndexPath ref)
+        True  -> return $ (Just $ T.pack (dirPath </> getIndexPath ref))
         False -> return Nothing
 
 isIndexCalcAux ref User = do
     defGenomeDir' <- defGenomeDir
     hasIndex <- doesDirContainFormats (defGenomeDir' </> getIndexPath ref) indexRequiredFormats
     case hasIndex of
-        True  -> return $ (Just $ defGenomeDir' </> getIndexPath ref)
+        True  -> return $ (Just $ T.pack (defGenomeDir' </> getIndexPath ref))
         False -> return Nothing
 
 configGenome :: FilePath -> InstallMode -> IO FilePath
@@ -150,14 +170,11 @@ installGenome' p ref mode = do
 installGenome ref d = do
     let url = getUcscUrl ref
     downloadReference url (d </> tarName)
-    MTar.unpack (d </> dirName) . Tar.read . GZip.decompress =<< LB.readFile (d </> tarName)
+    Tar.unpack d . Tar.read . GZip.decompress =<< LB.readFile ( d </> tarName)
    where 
-        mapGens = Map.fromList defaultGenomes
-        dirName = case Map.lookupIndex (T.pack ref) mapGens of
+        dirName = case lookup (T.pack ref) defaultGenomes of
             Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-            Just index -> do
-                let res =  Map.elemAt index mapGens
-                getGenomeDirName res
+            Just v -> v
         tarName = dirName <.> "tar.gz"
 
 downloadReference url destPath = runResourceT $ do

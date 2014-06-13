@@ -12,7 +12,6 @@ module Interpret
      evalMinus
     ) where
 
-import Control.Exception.Base
 
 import Control.Monad.Error
 import Control.Monad.Identity
@@ -212,7 +211,7 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     res'' <- executeQualityProcess res' 
     setVariableValue varName res''
     return res''
-topFunction Fpreprocess expr _ _ = error ("Passed type must be variable.")
+topFunction Fpreprocess expr _ _ = error ("Passed type must be variable. but is: " ++ (show expr))
 
 topFunction Fwrite expr args _ = do 
     expr' <- interpretTopValue expr
@@ -248,16 +247,12 @@ executeCount (NGOAnnotatedSet p) args = do
 executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ (show err))
 
 executeAnnotation :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeAnnotation (NGOList e) args = do
-    res <- mapM (\x -> executeAnnotation x args) e
-    return (NGOList res)
-
+executeAnnotation (NGOList e) args = mapM (\x -> executeAnnotation x args) e >>= return . NGOList
 executeAnnotation (NGOMappedReadSet e _) args = do
     let f = lookup "features" args
         gff = lookup "gff" args
     res <-  liftIO $ annotate (T.unpack e) gff f
     return $ NGOAnnotatedSet res
-
 executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
@@ -383,7 +378,7 @@ interpretPreProcessExpr (FunctionCall Fsubstrim var args _) = do
     args' <- evaluateArguments args 
     return $ substrim (getvalue args') expr'
     where
-        getvalue args = fromIntegral . evalInteger $ fromMaybe (NGOInteger 0) (lookup "min_quality" args)
+        getvalue els = fromIntegral . evalInteger $ fromMaybe (NGOInteger 0) (lookup "min_quality" els)
 
 interpretPreProcessExpr expr = interpretExpr expr
 

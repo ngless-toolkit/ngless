@@ -2,40 +2,31 @@
 
 module UnpackIlluminaGenomes
     ( 
-      unpack,
       defaultGenomes,
       getUcscUrl,
-      bwaGenomePath,
       defGenomeDir,
-      getGenomeRootPath,
       getIndexPath,
-      getGenomeDirName,
-      getGenRootPathFromGenName
+      getGff,
+      getGenomeRootPath
     ) where
 
+import qualified Data.Text as T
 import System.FilePath( (</>), (<.>) )
 
-import qualified System.FilePath as FP (takeDirectory)
-import System.Directory(createDirectoryIfMissing)
-import Control.Exception(Exception)
-
-import qualified Codec.Archive.Tar as Tar
-import qualified Data.ByteString.Lazy as BS
-
-import qualified Data.Map as Map
-
-import qualified Data.Text as T
 import Data.DefaultValues
 
 
-bwaGenomePath :: FilePath
-bwaGenomePath = "Sequence/WholeGenomeFasta"
+--bwaGenomePath :: FilePath
+--bwaGenomePath = "Sequence/BWAIndex/genome.fa"
 
 bwaIndexPath :: FilePath
-bwaIndexPath = "Sequence/BWAIndex/version0.6.0"
+bwaIndexPath = "Sequence/BWAIndex"
 
-genomesRep :: FilePath
-genomesRep = "UCSC"
+gffPath :: FilePath
+gffPath = "Annotation/genes.gtf"
+
+getGff :: T.Text -> FilePath
+getGff n = (getGenomeRootPath n) </> gffPath
 
 ucscUrl :: FilePath
 ucscUrl = "http://kdbio.inesc-id.pt/~prrm/genomes"
@@ -54,63 +45,55 @@ defaultGenomes = [
                  ]
 
 getUcscUrl :: FilePath -> FilePath
-getUcscUrl genome = do
-    let genomeMap = Map.fromList defaultGenomes
-        i = Map.lookupIndex (T.pack genome) genomeMap
-    case i of
+getUcscUrl genome = 
+    case lookup (T.pack genome) defaultGenomes of
         Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-        Just index -> do
-            let res =  Map.elemAt index genomeMap 
-            ucscUrl </>  (getGenomeDirName res) <.> "tar.gz"
+        Just v -> ucscUrl </> v <.> "tar.gz"
 
-getGenomeDirName :: (T.Text, FilePath) -> FilePath
-getGenomeDirName (a,d) = d ++ "_" ++ genomesRep ++ "_" ++ (T.unpack a)
 
-getGenomeRootPath :: (T.Text, FilePath) -> FilePath
-getGenomeRootPath (a,d) = d </> genomesRep </> (T.unpack a)
-
-getGenRootPathFromGenName :: FilePath -> FilePath
-getGenRootPathFromGenName fp = 
-    case Map.lookupIndex (T.pack fp) mapGens of
+getGenomeRootPath :: T.Text -> FilePath
+getGenomeRootPath d = 
+   case lookup d defaultGenomes of
         Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-        Just index -> do
-            let res =  Map.elemAt index mapGens 
-            getGenomeRootPath res
-    where
-        mapGens = Map.fromList defaultGenomes  
+        Just v -> v </> (T.unpack d)
 
+ 
 getIndexPath :: FilePath -> FilePath
-getIndexPath gen = do
-    case Map.lookupIndex (T.pack gen) mapGens of
-        Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-        Just index -> do
-            let res =  Map.elemAt index mapGens 
-            getGenomeDirName res </> getGenomeRootPath res </> bwaIndexPath </> "genome.fa"
-    where
-        mapGens = Map.fromList defaultGenomes
+getIndexPath gen = getGenomeRootPath (T.pack gen) </> bwaIndexPath </> "genome.fa"
 
 
-unpack :: Exception e => FilePath -> Tar.Entries e -> IO ()
-unpack baseDir entries = unpackEntries entries
-  where
-    unpackEntries (Tar.Fail err)      = error ("Error on entry " ++ (show err))
-    unpackEntries Tar.Done            = return ()
-    unpackEntries (Tar.Next entry es) = do
-      case Tar.entryContent entry of
-          Tar.NormalFile file _ -> extractFile path file >> unpackEntries es
-          Tar.Directory         -> extractDir path >> unpackEntries es
-          _                     -> unpackEntries es --ignore other file types
-      where
-        path = Tar.entryPath entry
 
-    extractFile path content = do
-      createDirectoryIfMissing True absDir
-      BS.writeFile absPath content
-      where
-        absDir  = baseDir </> FP.takeDirectory path
-        absPath = baseDir </> path
+--import qualified Data.ByteString.Lazy as BS
+--import qualified System.FilePath as FP (takeDirectory)
+--import System.Directory(createDirectoryIfMissing)
+--import Control.Exception(Exception)
 
-    extractDir path = createDirectoryIfMissing True (baseDir </> path)
+--import qualified Codec.Archive.Tar       as Tar
+--import qualified Codec.Archive.Tar.Entry as Tar
+--import qualified Data.Map as Map
+
+
+--unpack :: Exception e => FilePath -> Tar.Entries e -> IO ()
+--unpack baseDir entries = unpackEntries entries
+--  where
+--    unpackEntries (Tar.Fail err)      = error ("Error on entry " ++ (show err))
+--    unpackEntries Tar.Done            = return ()
+--    unpackEntries (Tar.Next entry es) = do
+--      case Tar.entryContent entry of
+--          Tar.NormalFile file _ -> print path >> extractFile path file >> unpackEntries es
+--          Tar.Directory         -> print path >> extractDir path >> unpackEntries es
+--          _                     -> print path >> unpackEntries es --ignore other file types
+--      where
+--        path = Tar.fromTarPathToPosixPath $ Tar.entryTarPath entry
+
+--    extractFile path content = do
+--      createDirectoryIfMissing True absDir
+--      BS.writeFile absPath content
+--      where
+--        absDir  = baseDir </> FP.takeDirectory path
+--        absPath = baseDir </> path
+
+--    extractDir path = createDirectoryIfMissing True (baseDir </> path)
 
 
 -- bwa does not work with symlinks
