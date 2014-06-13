@@ -5,15 +5,14 @@ NGLess: NGS Processing with Less Work
 Requirements:
 -------------
 
-Before starting make sure you have an Internet connection!
+Before starting, make sure you have an Internet connection!
 
-This are the required programms you must have installed
+These are the required programms you must have installed
 
-- GHC version 7.6.3 or higher
+- GHC (version 7.6.3 or higher)
+- Cabal (1.8.0.3 or higher)
 
-- Cabal 1.8.0.3 or higher
-
-Both can be installed via haskell-plataform package.
+Both can be installed via the haskell-platform package.
 
 =====
 Cabal
@@ -23,18 +22,18 @@ Cabal
 
 Cabal by default comes with a old version installed. Start by running ::
 	
-	cabal version
+	cabal --version
 
-If the version is equal or higher than 1.8.0.3 you are ready to install NGLess and no more steps are required! 
-
-
-Otherwise continue this installation process wich will update your cabal version. Start by running the following command::
+If the version is equal or higher than 1.8.0.3 you are ready to install NGLess
+and no more steps are required!  Otherwise continue this installation process
+wich will update your cabal version. Start by running the following command::
 
 	cabal install cabal-install --prefix=/usr/local
 
-This command should have installed everything and since '/usr/local' is by default in $PATH you should be ready to go. To be sure, run again ::
+This command should have installed everything and since '/usr/local' is by
+default in $PATH you should be ready to go. To be sure, run again ::
 
-	cabal version
+	cabal --version
 
 Check if the new version is higher than 1.8.0.3. 
 
@@ -55,15 +54,17 @@ Start by download and configure all NGLess dependencies by running the following
 
 	1. make
 
-This will take a while, so go ahead and go make some tea! After the previous command is completed (without errors) you are ready to install it wherever you want it to be.
+This will take a while, so go ahead and make some tea! After the previous
+command is completed (without errors) you are ready to install it wherever you
+want it to be.
 
 	2. make install prefix=dir (default dir is /usr/local)
 
 After this ngless is ready to use!
 
-===========
+=============
 More options:
-===========
+=============
 
 clean - remove local generated files by compilation
 

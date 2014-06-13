@@ -211,7 +211,8 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     res'' <- executeQualityProcess res' 
     setVariableValue varName res''
     return res''
-topFunction Fpreprocess expr _ _ = error ("Passed type must be variable. but is: " ++ (show expr))
+
+topFunction Fpreprocess expr _ _ = error ("Passed type must be variable, but is: " ++ (show expr))
 
 topFunction Fwrite expr args _ = do 
     expr' <- interpretTopValue expr
