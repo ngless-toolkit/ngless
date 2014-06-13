@@ -54,7 +54,16 @@ parseGffAttributes = map (\(aid,aval) -> (aid, S.tail aval))
                         . map (\x -> S8.break (== (checkAttrTag x)) x)
                         . map trimString
                         . S8.split ';'
-                        . S.init -- remove last ';'
+                        . removeLastDel
+                        . f -- remove white space from the beginning
+                        . f -- remove white space from the end
+       where f = S8.reverse . S8.dropWhile isSpace
+                 
+--
+removeLastDel :: S8.ByteString -> S8.ByteString
+removeLastDel s = case S8.last s of
+    ';' -> S8.init s
+    _   -> s
 
 --Check if the atribution tag is '=' or ' '
 checkAttrTag :: S.ByteString -> Char
