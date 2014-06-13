@@ -13,11 +13,12 @@ import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.Text as T
 
 import qualified Data.IntervalMap.Strict as IM
+import Data.Maybe (fromMaybe, fromJust)
+import Data.List (foldl')
 
 import Language
-
-import Data.Maybe (fromMaybe)
-import Data.List (foldl')
+import FileManagement(printNglessLn)
+import UnpackIlluminaGenomes
 
 import Data.GFF
 import Data.Sam
@@ -32,20 +33,23 @@ intervals = foldl' (insertg) IM.empty
         genId g = fromMaybe (S8.pack "unknown") $ gffGeneId g
 
 
-annotate :: FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> IO T.Text
-annotate samFP (Just gffFP) feats = annotate' samFP gffFP feats
-annotate samFP Nothing feats = annotate' samFP (NGOString "to-be-determided") feats
+annotate :: FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> Maybe T.Text -> IO T.Text
+annotate samFP (Just g) feats _ = 
+    printNglessLn ("annotate with GFF: " ++ (eval g)) >> annotate' samFP (eval g) feats  -- ignore default GFF
+    where eval (NGOString n) =  getGff n
+          eval _ = error ("Provided type for gff must be a NGOString.")
+annotate samFP Nothing  feats g = 
+    printNglessLn ("annotate with default GFF: " ++ (show . fromJust $ g)) >> 
+        case g of
+            Just v  -> annotate' samFP (getGff v) feats                            -- used default GFF
+            Nothing -> error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
 
-
-annotate' :: FilePath -> NGLessObject -> Maybe NGLessObject -> IO T.Text
-annotate' samFp (NGOString gffFp) feats = do
-    gff <- L8.readFile (T.unpack gffFp)
+annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> IO T.Text
+annotate' samFp gffFp feats = do
+    gff <- L8.readFile gffFp
     sam <- L8.readFile samFp
     let imGff = intervals . filter (filterFeatures feats) . readAnnotations $ gff
     writeAnnotCount samFp $ map snd . IM.toList $ compStatsAnnot imGff sam
-
-annotate' _ s _ = error ("Should be a NGOString but is a: " ++ (show s))
-
 
 compStatsAnnot :: IM.IntervalMap Int GffCount -> L8.ByteString -> IM.IntervalMap Int GffCount
 compStatsAnnot imGff sam = foldl' update imGff sams

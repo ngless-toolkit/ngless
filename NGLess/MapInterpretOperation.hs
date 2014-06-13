@@ -61,29 +61,23 @@ interpretMapOp ref ds = do
                 True   -> do
                     let r' = T.unpack r
                     res <- isIndexCalculated r'
-                    rootGen <- getGenomeDir r'
+                    rootGen <- getGenomeDir r
                     case res of 
                         Nothing -> configGenome r' User >>= \x -> return (x, Just rootGen) -- download and install genome on User mode
                         Just p  -> return (T.unpack p , Just rootGen) -- already installed
-
 
 
 {-
     Receives - A default genome name
     Returns  - The root dir for that genome
 -}
-getGenomeDir :: FilePath -> IO T.Text
+getGenomeDir :: T.Text -> IO T.Text
 getGenomeDir n = do
-    let n' = T.pack n
     nglessRoot' <- getNglessRoot
-    let dirPath = nglessRoot' </> suGenomeDir </> getGenomeRootPath n'
-    doesExist <- doesDirectoryExist dirPath
+    doesExist <- doesDirectoryExist $ nglessRoot' </> suGenomeDir </> getGenomeRootPath n
     case doesExist of
-        True  -> return $ T.pack dirPath
-        False -> do
-            defGenomeDir' <- defGenomeDir
-            return . T.pack $ defGenomeDir' </>  getGenomeRootPath n' 
-
+        True  -> return $ T.pack (nglessRoot' </> suGenomeDir </> getGenomeRootPath n)
+        False -> defGenomeDir >>= \x -> return . T.pack $ x </> getGenomeRootPath n
 
 
 getSamStats :: FilePath -> IO ()

@@ -249,10 +249,10 @@ executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotate
 
 executeAnnotation :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeAnnotation (NGOList e) args = mapM (\x -> executeAnnotation x args) e >>= return . NGOList
-executeAnnotation (NGOMappedReadSet e _) args = do
+executeAnnotation (NGOMappedReadSet e dDS) args = do
     let f = lookup "features" args
-        gff = lookup "gff" args
-    res <-  liftIO $ annotate (T.unpack e) gff f
+        g = lookup "gff" args
+    res <-  liftIO $ annotate (T.unpack e) g f dDS
     return $ NGOAnnotatedSet res
 executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
 

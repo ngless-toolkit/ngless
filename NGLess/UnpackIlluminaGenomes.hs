@@ -26,7 +26,7 @@ gffPath :: FilePath
 gffPath = "Annotation/genes.gtf"
 
 getGff :: T.Text -> FilePath
-getGff n = (getGenomeRootPath n) </> gffPath
+getGff n = (T.unpack n) </> gffPath
 
 ucscUrl :: FilePath
 ucscUrl = "http://kdbio.inesc-id.pt/~prrm/genomes"
