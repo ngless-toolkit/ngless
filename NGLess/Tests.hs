@@ -24,6 +24,9 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Aeson
 
+import qualified Data.IntervalMap.Strict as IM
+import qualified Data.IntervalMap.Interval as IM
+
 import Language
 import Interpret
 import Parse
@@ -36,6 +39,7 @@ import FileManagement
 import MapInterpretOperation
 import Validation
 import CountOperation
+import Annotation
 
 import Data.Sam
 import Data.Json
@@ -471,5 +475,17 @@ case_annot_count_cds_exon = filterAnnot ds_annot_counts annot_features_cds_exon 
 case_annot_count_lim_no_feat = filterAnnot ds_annot_counts Nothing (NGOInteger 30) @?= []
 case_annot_count_lim_feat = filterAnnot ds_annot_counts annot_features_all (NGOInteger 30) @?= []
 
+
+-- interval mode 
+--case_annot_interval_none = getIntervalQuery Nothing == IM.intersecting
+case_interval_map_subsumes_1 = IM.subsumes (IM.ClosedInterval (1 :: Integer) (5 :: Integer)) (IM.ClosedInterval (3 :: Integer) (6 :: Integer)) @?= False
+case_interval_map_subsumes_2 = IM.subsumes (IM.ClosedInterval (1 :: Integer) (5 :: Integer)) (IM.ClosedInterval (3 :: Integer) (5 :: Integer)) @?= True
+case_interval_map_subsumes_4 = IM.subsumes (IM.ClosedInterval (3 :: Integer) (5 :: Integer)) (IM.ClosedInterval (1 :: Integer) (500 :: Integer)) @?= False
+case_interval_map_subsumes_3 = IM.subsumes (IM.ClosedInterval (1 :: Integer) (500 :: Integer)) (IM.ClosedInterval (3 :: Integer) (5 :: Integer)) @?= True
+
+
+case_interval_map_overlaps_1 = IM.overlaps  (IM.ClosedInterval (1 :: Integer) (5 :: Integer)) (IM.ClosedInterval 6 7) @?= False
+case_interval_map_overlaps_2 = IM.overlaps  (IM.ClosedInterval (3 :: Integer) (6 :: Integer)) (IM.ClosedInterval (1 :: Integer) 5) @?= True
+case_interval_map_overlaps_3 = IM.overlaps  (IM.ClosedInterval (300 :: Integer)(400 :: Integer)) (IM.ClosedInterval 200 300) @?= True
 
 -----

@@ -252,7 +252,8 @@ executeAnnotation (NGOList e) args = mapM (\x -> executeAnnotation x args) e >>=
 executeAnnotation (NGOMappedReadSet e dDS) args = do
     let f = lookup "features" args
         g = lookup "gff" args
-    res <-  liftIO $ annotate (T.unpack e) g f dDS
+        m = lookup "mode" args
+    res <-  liftIO $ annotate (T.unpack e) g f dDS m
     return $ NGOAnnotatedSet res
 executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
 
