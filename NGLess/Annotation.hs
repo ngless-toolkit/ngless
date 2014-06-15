@@ -38,12 +38,12 @@ intervals = foldl' (insertg) IM.empty
 
 annotate :: FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> Maybe T.Text -> Maybe NGLessObject -> IO T.Text
 annotate samFP (Just g) feats _ m = 
-    printNglessLn ("annotate with GFF: " ++ (eval g)) >> annotate' samFP (eval g) feats (getIntervalQuery m)  -- ignore default GFF
+    printNglessLn ("annotate with GFF: " ++ (eval g) ++ (show m)) >> annotate' samFP (eval g) feats (getIntervalQuery m)  -- ignore default GFF
     where eval (NGOString n) =  getGff n
           eval _ = error ("Provided type for gff must be a NGOString.")
 
 annotate samFP Nothing  feats g m = 
-    printNglessLn ("annotate with default GFF: " ++ (show . fromJust $ g)) >> 
+    printNglessLn ("annotate with default GFF: " ++ (show . fromJust $ g) ++ (show m)) >> 
         case g of
             Just v  -> annotate' samFP (getGff v) feats (getIntervalQuery m)       -- used default GFF
             Nothing -> error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
@@ -54,8 +54,8 @@ getIntervalQuery m = fromMaybe (IM.overlaps) (getMode m)
 getMode m = case m of
             Nothing -> Nothing
             Just v  -> case v of
-                    (NGOString "intersecting") -> Just IM.overlaps
-                    (NGOString "within")       -> Just IM.subsumes
+                    (NGOString "intersect") -> Just IM.overlaps
+                    (NGOString "within")    -> Just IM.subsumes
                     _ -> error ("Provided type for 'mode' has to be either 'intersecting' or 'withing'")
 
 
@@ -72,9 +72,9 @@ compStatsAnnot imGff sam f = foldl' (update f) imGff sams
     sams = filter isAligned . readAlignments $ sam
 
 update :: (IM.Interval Int -> IM.Interval Int -> Bool) -> IM.IntervalMap Int GffCount -> SamLine -> IM.IntervalMap Int GffCount
-update f annots samLine = IM.mapWithKey (\k v -> update' f k (interval samLine) v) annots
+update f annots samLine = IM.mapWithKey (\k v -> update' k (interval samLine) v) annots
     where
-        update' f gffK samK v = case f gffK samK of 
+        update' gffK samK v = case f gffK samK of 
             True  -> incCount v
             False -> v
         incCount (GffCount gId gT gC) = (GffCount gId gT (gC + 1))
