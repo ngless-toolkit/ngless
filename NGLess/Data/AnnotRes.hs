@@ -9,6 +9,7 @@ module Data.AnnotRes
       , isMinAmount
       , writeAnnotCount
       , showGffCountDel
+      , isEqual
     ) where
 
 import qualified Data.Text as T
@@ -36,6 +37,9 @@ instance NFData GffCount where
             (annotType gl) `seq`
             (annotCount gl) `seq`
             ()
+
+isEqual :: GffCount -> GffCount -> Bool
+isEqual (GffCount a _ _) (GffCount b _ _) = a == b
 
 showGffCount :: [GffCount] -> L8.ByteString 
 showGffCount = L8.unlines . fmap (showCounts "\t")
@@ -78,6 +82,7 @@ filterCounts' :: GffCount -> NGLessObject -> Bool
 filterCounts' g (NGOSymbol "gene") = (==GffGene) . annotType $ g
 filterCounts' g (NGOSymbol "exon") = (==GffExon) . annotType $ g
 filterCounts' g (NGOSymbol "cds" ) = (==GffCDS) . annotType  $ g
+filterCounts' g (NGOSymbol "CDS" ) = (==GffCDS) . annotType  $ g
 filterCounts' g (NGOSymbol s) = (S8.unpack . showType . annotType $ g) == (T.unpack s)
 filterCounts' _ err = error ("Type should be NGOList but received: " ++ (show err))
 

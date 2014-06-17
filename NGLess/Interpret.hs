@@ -241,7 +241,7 @@ executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO 
 executeCount (NGOList e) args = return . NGOList =<< mapM (\x -> executeCount x args) e
 executeCount (NGOAnnotatedSet p) args = do
     let c = lookup "counts" args
-        m = fromMaybe (NGOInteger 1) $ lookup "min" args
+        m = fromMaybe (NGOInteger 0) $ lookup "min" args
     res <- liftIO $ countAnnotatedSet p c m
     return $ NGOAnnotatedSet res
 
@@ -253,7 +253,9 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
     let f = lookup "features" args
         g = lookup "gff" args
         m = lookup "mode" args
-    res <-  liftIO $ annotate (T.unpack e) g f dDS m
+        a = lookup "ambiguity" args
+    _ <- liftIO $ print g
+    res <-  liftIO $ annotate (T.unpack e) g f dDS m a
     return $ NGOAnnotatedSet res
 executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
 
