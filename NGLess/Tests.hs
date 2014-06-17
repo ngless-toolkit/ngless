@@ -489,17 +489,78 @@ case_interval_map_overlaps_2 = IM.overlaps  (IM.ClosedInterval (3 :: Integer) 6)
 case_interval_map_overlaps_3 = IM.overlaps  (IM.ClosedInterval (300 :: Integer) 400) (IM.ClosedInterval 200 300) @?= True
 
 
-case_interval_query_Nothing_true = (getIntervalQuery Nothing) (IM.ClosedInterval 1 5) (IM.ClosedInterval 3 6)
-                                    @?= IM.overlaps (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 3 6)
+--case_interval_query_Nothing_true = (getIntervalQuery Nothing) (IM.ClosedInterval 1 5) (IM.ClosedInterval 3 6)
+--                                    @?= IM.overlaps (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 3 6)
 
-case_interval_query_intersect_true = (getIntervalQuery (Just $ NGOString "intersect")) (IM.ClosedInterval 1 5) (IM.ClosedInterval 3 6)
-                                    @?= IM.overlaps (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 3 6)
+--case_interval_query_intersect_true = (getIntervalQuery (Just $ NGOString "intersect")) (IM.ClosedInterval 1 5) (IM.ClosedInterval 3 6)
+--                                    @?= IM.overlaps (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 3 6)
 
-case_interval_query_within_false = (getIntervalQuery (Just $ NGOString "within")) (IM.ClosedInterval 1 5) (IM.ClosedInterval 3 6)
-                                    @?= IM.subsumes (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 3 6)
+--case_interval_query_within_false = (getIntervalQuery (Just $ NGOString "within")) (IM.ClosedInterval 1 5) (IM.ClosedInterval 3 6)
+--                                    @?= IM.subsumes (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 3 6)
 
 
-case_interval_query_within_true = (getIntervalQuery (Just $ NGOString "within")) (IM.ClosedInterval 1 500) (IM.ClosedInterval 200 300)
-                                    @?= IM.subsumes (IM.ClosedInterval (1 :: Integer) 500) (IM.ClosedInterval 200 300)
+--case_interval_query_within_true = (getIntervalQuery (Just $ NGOString "within")) (IM.ClosedInterval 1 500) (IM.ClosedInterval 200 300)
+--                                    @?= IM.subsumes (IM.ClosedInterval (1 :: Integer) 500) (IM.ClosedInterval 200 300)
+
+
+
+case_not_InsideInterval_1 = isInsideInterval 0 (IM.ClosedInterval 1 5) @?= False
+case_not_InsideInterval_2 = isInsideInterval 6 (IM.ClosedInterval 1 5) @?= False
+
+case_isInsideInterval_1 = isInsideInterval 3 (IM.ClosedInterval 1 5) @?= True
+case_isInsideInterval_2 = isInsideInterval 1 (IM.ClosedInterval 1 5) @?= True
+case_isInsideInterval_3 = isInsideInterval 5 (IM.ClosedInterval 3 5) @?= True
+
+
+k1 = (IM.ClosedInterval 10 20, head $ readAnnotCounts "x\tgene\t10")
+k2 = (IM.ClosedInterval 1 5,   head $ readAnnotCounts "y\tgene\t10")
+k3 = (IM.ClosedInterval 30 30, head $ readAnnotCounts "x\tgene\t20")
+
+imap1   = IM.fromList [k1]
+imap2   = IM.fromList [k2]
+imapAll = IM.fromList [k1, k2]
+
+imap1Dup   = IM.fromList [k2, k2] -- same pair
+imap2Dup   = IM.fromList [k1, k3] -- same pair
+imap3Dup   = IM.fromList [k1, k3, k1] -- same id
+
+-- union
+case_union_empty       = union [IM.empty, IM.empty] @?= IM.empty
+case_union_one_empty_1 = union [imapAll, IM.empty]   @?= imapAll
+case_union_one_empty_2 = union [IM.empty, imapAll]   @?= imapAll
+
+case_union_same  = union [imapAll, imapAll] @?= imapAll
+case_union_dif   = union [imap1, imap2]     @?= imapAll
+
+-- intersection_strict
+case_intersection_strict_empty       = intersection_strict [IM.empty, IM.empty] @?= IM.empty
+case_intersection_strict_one_empty_1 = intersection_strict [imapAll, IM.empty]   @?= IM.empty
+case_intersection_strict_one_empty_2 = intersection_strict [IM.empty, imapAll]   @?= IM.empty
+
+case_intersection_strict_dif      = intersection_strict [imap1, imap2] @?= IM.empty
+case_intersection_strict_normal_1 = intersection_strict [imap1, imapAll] @?= imap1
+case_intersection_strict_normal_2 = intersection_strict [imapAll, imap1] @?= imap1
+case_intersection_strict_same     = intersection_strict [imapAll, imapAll] @?= imapAll
+
+-- intersection_non_empty
+case_intersection_nonempty_empty   = intersection_non_empty [IM.empty, IM.empty] @?= IM.empty
+case_intersection_nonempty_empty_1 = intersection_non_empty [imapAll, IM.empty]   @?= imapAll
+case_intersection_nonempty_empty_2 = intersection_non_empty [IM.empty, imapAll]   @?= imapAll
+
+case_intersection_nonempty_dif      = intersection_non_empty [imap1, imap2] @?= IM.empty
+case_intersection_nonempty_normal_1 = intersection_non_empty [imap1, imapAll] @?= imap1
+case_intersection_nonempty_normal_2 = intersection_non_empty [imapAll, imap1] @?= imap1
+case_intersection_nonempty_same     = intersection_non_empty [imapAll, imapAll] @?= imapAll
+
+
+case_size_no_dup_normal = sizeNoDup imapAll @?= 2
+case_size_no_dup_empty  = sizeNoDup IM.empty @?= 0
+
+case_size_no_dup_duplicate_1 = sizeNoDup imap1Dup @?= 1
+case_size_no_dup_duplicate_2 = sizeNoDup imap2Dup @?= 1
+case_size_no_dup_duplicate_3 = sizeNoDup imap3Dup @?= 1
+
 
 -----
+
+
