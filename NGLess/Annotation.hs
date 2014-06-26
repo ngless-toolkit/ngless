@@ -27,7 +27,7 @@ import Data.Maybe (fromMaybe, fromJust)
 import Data.List (foldl')
 
 import Language
-import FileManagement(printNglessLn)
+import FileManagement(printNglessLn, unCompress)
 import UnpackIlluminaGenomes
 
 import Data.GFF
@@ -69,8 +69,8 @@ getMode m = case m of
 
 annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> ([IM.IntervalMap Int GffCount] -> IM.IntervalMap Int GffCount) -> IO T.Text
 annotate' samFp gffFp feats f a = do
-    gff <- L8.readFile gffFp
-    sam <- L8.readFile samFp
+    gff <- unCompress gffFp
+    sam <- unCompress samFp
     let imGff = intervals . filter (filterFeatures feats) . readAnnotations $ gff
     writeAnnotCount samFp $ map snd . IM.toList $ compStatsAnnot imGff sam f a
 

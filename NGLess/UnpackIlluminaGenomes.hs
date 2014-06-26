@@ -23,7 +23,7 @@ bwaIndexPath :: FilePath
 bwaIndexPath = "Sequence/BWAIndex"
 
 gffPath :: FilePath
-gffPath = "Annotation/genes.gtf"
+gffPath = "Annotation/annot.gtf.gz"
 
 getGff :: T.Text -> FilePath
 getGff n = (T.unpack n) </> gffPath
@@ -39,7 +39,6 @@ defaultGenomes = [
                     ("bosTau4",  "Bos_taurus"),   
                     ("canFam2","Canis_familiaris"),
                     ("dm3","Drosophila_melanogaster"),
-                    ("TAIR10","Arabidopsis_thaliana"),
                     ("ce10","Caenorhabditis_elegans"),
                     ("sacCer3","Saccharomyces_cerevisiae")
                  ]
@@ -55,11 +54,11 @@ getGenomeRootPath :: T.Text -> FilePath
 getGenomeRootPath d = 
    case lookup d defaultGenomes of
         Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-        Just v -> v </> (T.unpack d)
+        Just v -> v
 
  
 getIndexPath :: FilePath -> FilePath
-getIndexPath gen = getGenomeRootPath (T.pack gen) </> bwaIndexPath </> "genome.fa"
+getIndexPath gen = getGenomeRootPath (T.pack gen) </> bwaIndexPath </> "genome.fa.gz"
 
 
 
