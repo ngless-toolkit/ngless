@@ -33,10 +33,10 @@ data GffCount = GffCount
             } deriving (Eq,Show)
 
 instance NFData GffCount where
-    rnf gl =(annotSeqId gl) `seq`
-            (annotType gl) `seq`
-            (annotCount gl) `seq`
-            ()
+    rnf gl = (annotSeqId gl) `seq`
+             (annotType gl) `seq`
+             (annotCount gl) `seq`
+             ()
 
 isEqual :: GffCount -> GffCount -> Bool
 isEqual (GffCount a _ _) (GffCount b _ _) = a == b
@@ -91,10 +91,11 @@ isMinAmount :: NGLessObject -> GffCount ->  Bool
 isMinAmount (NGOInteger l) g = (toInteger $ annotCount g) >= l
 isMinAmount err _ = error ("Type should be NGOInteger but received: " ++ (show err))
 
-writeAnnotCount :: FilePath -> [GffCount] -> IO T.Text
+writeAnnotCount :: FilePath -> [GffCount]-> IO T.Text
 writeAnnotCount fn im = do
     temp <- getTemporaryDirectory 
-    newfp <- getTFilePathComp (temp </> (snd . splitFileName $ fn))
+    newfp <- getTempFilePath (temp </> (snd . splitFileName $ fn))
     printNglessLn $ "Writing Annotation results to:" ++ newfp
-    writeGZIP newfp $ showGffCount im
+    L8.writeFile newfp $ showGffCount im
+    putStrLn "Write completed"
     return .  T.pack $ newfp

@@ -30,7 +30,7 @@ data GffType = GffExon
                 | GffGene
                 | GffCDS
                 | GffOther S.ByteString
-            deriving (Eq, Show)
+            deriving (Eq, Ord, Show)
 
 data GffStrand = GffPosStrand | GffNegStrand | GffUnknownStrand | GffUnStranded
             deriving (Eq, Show, Enum)
@@ -144,6 +144,7 @@ readLine line = if length tokens == 9
 parsegffType :: S.ByteString -> GffType
 parsegffType "exon" = GffExon
 parsegffType "gene" = GffGene
+parsegffType "cds" = GffCDS
 parsegffType "CDS" = GffCDS
 parsegffType t = GffOther t
 
@@ -161,6 +162,7 @@ filterFeatures' :: GffLine -> NGLessObject -> Bool
 filterFeatures' g (NGOSymbol "gene") = (==GffGene) . gffType $ g
 filterFeatures' g (NGOSymbol "exon") = (==GffExon) . gffType $ g
 filterFeatures' g (NGOSymbol "cds" ) = (==GffCDS) . gffType  $ g
+filterFeatures' g (NGOSymbol "CDS" ) = (==GffCDS) . gffType  $ g
 filterFeatures' g (NGOSymbol s) = (S8.unpack . showType . gffType $ g) == (T.unpack s)
 filterFeatures' _ s = error ("Type should be NGOList but received: " ++ (show s))
 

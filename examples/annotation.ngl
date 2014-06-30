@@ -1,5 +1,6 @@
 ngless "0.0"
-input = fastq('../samples/sample_1.fq')
-mapped = map(input,reference='sacCer3')
-annotated = annotate(mapped, mode="union", ambiguity={allow}, features=[{gene},{exon},{CDS}])
-write(count(annotated, min=1), ofile="../samples/CountsResult.txt", format={tsv})
+input = fastq('../samples/ce.fq')
+mapped = map(input,reference='ce10')
+annotated = annotate(mapped, mode="union", ambiguity={allow}, features=[{exon}])
+counts = count(annotated, min=1)
+write(counts, ofile="../samples/CountsResult.txt")

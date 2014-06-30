@@ -22,7 +22,7 @@ import qualified Data.Text as T
 import qualified Data.IntervalMap.Strict as IM
 
 import qualified Data.Set as Set
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 import Data.Maybe (fromMaybe, fromJust)
 import Data.List (foldl')
@@ -67,18 +67,24 @@ annotate' samFp gffFp feats f a = do
     sam <- unCompress samFp
     let imGff = intervals . filter (filterFeatures feats) . readAnnotations $ gff
         counts = compStatsAnnot imGff sam f a -- Map 'feats' (Map chr (Imap key val))
-    writeAnnotCount samFp $ map snd . concat . map IM.toList . concat . map M.elems . M.elems $ counts 
+    writeAnnotCount samFp (toGffM . foldl' (++) [] . map (M.elems) . M.elems $ counts)
+    --writeAnnotCount samFp . IM.toList . unlines . map M.elems . M.elems $ counts 
                                                 -- [Map k v, Map k v, Map k v, Map k v] -> [[v], [v], [v], [v]] -> [v]
                                                 -- v = Imap key Gffcounts
 
+toGffM :: [IM.IntervalMap Int GffCount] -> [GffCount]
+toGffM = foldl' (\a b -> (++) (toGff b) a) [] 
 
-compStatsAnnot ::  M.Map S8.ByteString (M.Map S8.ByteString (IM.IntervalMap Int GffCount)) -> L8.ByteString -> Maybe NGLessObject -> ([IM.IntervalMap Int GffCount] -> IM.IntervalMap Int GffCount) -> M.Map S8.ByteString (M.Map S8.ByteString (IM.IntervalMap Int GffCount)) 
+toGff :: IM.IntervalMap Int GffCount -> [GffCount]
+toGff = IM.foldl (\k v -> v : k) []
+
+compStatsAnnot ::  M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int GffCount)) -> L8.ByteString -> Maybe NGLessObject -> ([IM.IntervalMap Int GffCount] -> IM.IntervalMap Int GffCount) -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int GffCount)) 
 compStatsAnnot imGff sam a f = foldl (iterSam f a) imGff sams
    where 
     sams = filter isAligned . readAlignments $ sam
 
 
-iterSam :: ([IM.IntervalMap Int GffCount] -> IM.IntervalMap Int GffCount) -> Maybe NGLessObject -> M.Map S8.ByteString (M.Map S8.ByteString (IM.IntervalMap Int GffCount)) -> SamLine -> M.Map S8.ByteString (M.Map S8.ByteString (IM.IntervalMap Int GffCount))
+iterSam :: ([IM.IntervalMap Int GffCount] -> IM.IntervalMap Int GffCount) -> Maybe NGLessObject -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int GffCount)) -> SamLine -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int GffCount))
 iterSam f a im y = M.map (\v -> M.alter (\x -> alterCounts x) k v) im 
     where
         alterCounts x = case x of
@@ -88,15 +94,11 @@ iterSam f a im y = M.map (\v -> M.alter (\x -> alterCounts x) k v) im
 
 
 modeAnnotation :: ([IM.IntervalMap Int GffCount] -> IM.IntervalMap Int GffCount) -> Maybe NGLessObject -> IM.IntervalMap Int GffCount -> SamLine -> IM.IntervalMap Int GffCount
-modeAnnotation f a im y = do
-    let res = f [fStart, fEnd] -- with pair ended need to add the other 2 intervals of the pair 
-    countsAmbiguity a res im
+modeAnnotation f a im y = countsAmbiguity a (f posR) im
   where 
     sStart = samPos y
     sEnd   = sStart + (cigarTLen $ samCigar y)
-    im'    = IM.fromList $ IM.intersecting im (IM.ClosedInterval sStart sEnd) -- this allows to filter im to only the ones needed.
-    fStart = filterByInterval sStart im'
-    fEnd   = filterByInterval sEnd im'
+    posR   = map (\k -> IM.fromList $ IM.containing im k) [sStart..sEnd]
 
 countsAmbiguity :: Maybe NGLessObject -> IM.IntervalMap Int GffCount -> IM.IntervalMap Int GffCount -> IM.IntervalMap Int GffCount
 countsAmbiguity (Just a) toU imR =
@@ -108,13 +110,10 @@ countsAmbiguity Nothing toU imR = updateWithAmb toU imR
 
 updateWithAmb toU imR = uCounts toU imR
 updateWithoutAmb toU imR = 
-    case IM.size imR of  
+    case IM.size toU of  
         0 -> imR --"no_feature"
         1 -> uCounts toU imR --"feature not ambiguous"
-        2 -> do
-            case sizeNoDup imR of --garantees that same feature separated do not count as 2
-                1 -> uCounts toU imR -- same feature, increase both
-                _ -> imR -- "ambiguous"
+        2 -> imR -- ' to change '
         _ -> imR --"ambiguous"
 
 
@@ -152,10 +151,10 @@ sizeNoDup im = Set.size $ IM.foldl (\m v -> Set.insert (annotSeqId v) m) Set.emp
 
 --------------------
 
-intervals :: [GffLine] -> M.Map S8.ByteString (M.Map S8.ByteString (IM.IntervalMap Int GffCount))
-intervals = foldl' (insertg) (M.empty)
+intervals :: [GffLine] -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int GffCount))
+intervals = foldl' (insertg) M.empty
     where
-        insertg im g = M.alter (\mF -> updateF g mF) (showType . gffType $ g) im
+        insertg im g = M.alter (\mF -> updateF g mF) (gffType g) im
         updateF g mF = case mF of
             Nothing  -> Just $ updateF' g M.empty  
             Just mF' -> Just $ updateF' g mF'
