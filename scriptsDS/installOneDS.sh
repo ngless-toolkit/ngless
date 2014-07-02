@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #version ensembl
 version=75
 
