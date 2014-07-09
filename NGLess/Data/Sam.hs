@@ -6,6 +6,7 @@ module Data.Sam
  , readAlignments
  , isUnique
  , cigarTLen
+ , hasQual
 ) where
 
 
@@ -38,13 +39,22 @@ instance NFData SamLine where
     rnf (SamLine qn f r p m c rn pn tl s qual) = qn `seq` f `seq` r `seq` p `seq` m `seq` c `seq` rn `seq` pn `seq` tl `seq` s `seq` qual `seq` ()
 
 
-data SamResult = Total | Aligned | Unique deriving (Enum)
+data SamResult = Total | Aligned | Unique | LowQual deriving (Enum)
 
 isAligned :: SamLine -> Bool
 isAligned = not . (`testBit` 2) . samFlag
 
+isNegative :: SamLine -> Bool
+isNegative = (`testBit` 16) . samFlag
+
+isPositive :: SamLine -> Bool
+isPositive = not . isNegative
+
 isUnique :: SamLine -> Bool
 isUnique =  (> 0) . samMapq
+
+hasQual :: SamLine -> Bool
+hasQual = (`testBit` 512) . samFlag
 
 
 readAlignments :: L.ByteString -> [SamLine]

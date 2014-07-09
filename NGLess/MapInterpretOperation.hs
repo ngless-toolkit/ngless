@@ -88,17 +88,20 @@ calcSamStats contents = do
         total' = getV res' (fromEnum Total)
         aligned' = getV res' (fromEnum Aligned)
         unique' = getV res' (fromEnum Unique)
-    [total', aligned', unique']
+        lowQual' = getV res' (fromEnum LowQual)
+    [total', aligned', unique', lowQual']
 
 printSamStats stats = do
     putStrLn $ "Total reads: " ++ (show total)
     putStrLn $ "Total reads aligned: " ++ (show aligned) ++ "[" ++ (showFloat' $ calcDiv aligned total) ++ "%]"
     putStrLn $ "Total reads Unique map: " ++ (show unique) ++ "[" ++ (showFloat' $ calcDiv unique aligned) ++ "%]"
     putStrLn $ "Total reads Non-Unique map: " ++ (show $ aligned - unique) ++ "[" ++ (showFloat' $ 100 - (calcDiv unique aligned)) ++ "%]"
+    putStrLn $ "Total reads without enough qual: " ++ (show lowQ)
   where
-    total = stats !! 0
+    total   = stats !! 0
     aligned = stats !! 1
-    unique = stats !! 2
+    unique  = stats !! 2
+    lowQ    = stats !! 3
 
 getV vec i =  V.unsafeIndex vec i
 

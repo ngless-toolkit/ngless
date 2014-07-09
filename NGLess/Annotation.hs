@@ -113,9 +113,7 @@ updateWithoutAmb toU imR =
     case IM.size toU of  
         0 -> imR --"no_feature"
         1 -> uCounts toU imR --"feature not ambiguous"
-        2 -> imR -- ' to change '
-        _ -> imR --"ambiguous"
-
+        _ -> uCounts toU imR
 
 uCounts :: IM.IntervalMap Int GffCount -> IM.IntervalMap Int GffCount -> IM.IntervalMap Int GffCount 
 uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust (incCount) k res) im keys 

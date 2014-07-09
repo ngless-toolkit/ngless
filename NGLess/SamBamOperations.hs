@@ -18,7 +18,7 @@ import VectorOperations
 samStats = computeStats . readAlignments
 
 computeStats sams = runST $ do
-    initVec <- zeroVec 3
+    initVec <- zeroVec 4
     forM_ sams $ \x -> do
         update initVec x
     V.freeze initVec
@@ -27,5 +27,7 @@ update result samLine = do
     incV True result (fromEnum Total)
     incV (isAligned samLine) result (fromEnum Aligned)
     incV (isUnique samLine) result (fromEnum Unique) 
+    incV (hasQual samLine) result (fromEnum LowQual) 
+
 
   

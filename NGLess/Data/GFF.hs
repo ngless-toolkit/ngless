@@ -50,7 +50,7 @@ data GffLine = GffLine
 
 
 parseGffAttributes :: S.ByteString -> [(S.ByteString, S.ByteString)]
-parseGffAttributes = map (\(aid,aval) -> (aid, S.tail aval))
+parseGffAttributes = map (\(aid,aval) -> (aid, S8.filter (/='\"') . S.tail $ aval))
                         . map (\x -> S8.break (== (checkAttrTag x)) x)
                         . map trimString
                         . S8.split ';'
