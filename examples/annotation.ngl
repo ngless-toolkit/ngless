@@ -1,6 +1,6 @@
 ngless "0.0"
 input = fastq('../samples/ce.fq')
 mapped = map(input,reference='ce10')
-annotated = annotate(mapped, mode="union", ambiguity={deny}, features=[{exon}], gff="../samples/sample.gff3")
+annotated = annotate(mapped, strand={yes}, mode="union", ambiguity={deny}, features=[{exon}], gff="../samples/sample.gff3")
 counts = count(annotated, min=1)
 write(counts, ofile="../samples/CountsResult.txt")

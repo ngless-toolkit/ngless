@@ -95,11 +95,11 @@ iterSam f a s im y = M.map (\v -> M.alter (\x -> alterCounts x) k v) im
 
 
 modeAnnotation :: ([IM.IntervalMap Int GffCount] -> IM.IntervalMap Int GffCount) -> Maybe NGLessObject -> IM.IntervalMap Int GffCount -> SamLine -> Maybe NGLessObject -> IM.IntervalMap Int GffCount
-modeAnnotation f a im y s = countsAmbiguity a (f posR) im
+modeAnnotation f a im y s = countsAmbiguity a ((filterStrand s asStrand) . f $ posR) im
   where 
     sStart = samPos y
     sEnd   = sStart + (cigarTLen $ samCigar y)
-    posR   = map (\k -> (filterStrand s asStrand) . IM.fromList $ IM.containing im k) [sStart..sEnd]
+    posR   = map (\k -> IM.fromList $ IM.containing im k) [sStart..sEnd]
     asStrand = if isPositive y then GffPosStrand else GffNegStrand
 
 filterStrand :: Maybe NGLessObject -> GffStrand -> IM.IntervalMap Int GffCount -> IM.IntervalMap Int GffCount
@@ -123,7 +123,10 @@ updateWithoutAmb toU imR =
     case IM.size toU of  
         0 -> imR --"no_feature"
         1 -> uCounts toU imR --"feature not ambiguous"
-        _ -> uCounts toU imR
+        _ -> case sizeNoDup toU of
+            1 -> uCounts (IM.fromList . take 1 . IM.toList $ toU) imR -- same feature multiple times. increase that feature ONCE.
+            _ -> imR --'ambiguous' 
+
 
 uCounts :: IM.IntervalMap Int GffCount -> IM.IntervalMap Int GffCount -> IM.IntervalMap Int GffCount 
 uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust (incCount) k res) im keys 
