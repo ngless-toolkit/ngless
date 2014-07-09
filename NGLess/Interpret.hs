@@ -254,8 +254,9 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
         g = lookup "gff" args
         m = lookup "mode" args
         a = lookup "ambiguity" args
+        s = lookup "strand" args
     _ <- liftIO $ print g
-    res <-  liftIO $ annotate (T.unpack e) g f dDS m a
+    res <-  liftIO $ annotate (T.unpack e) g f dDS m a s
     return $ NGOAnnotatedSet res
 executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
 

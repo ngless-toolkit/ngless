@@ -13,6 +13,8 @@ module Data.GFF
     , showType
     , parsegffType
     , readLine
+    , strand
+    , showStrand
     ) where
 
 
@@ -43,7 +45,7 @@ data GffLine = GffLine
             , gffStart :: Int
             , gffEnd :: Int
             , gffScore :: Maybe Float
-            , gffString :: GffStrand
+            , gffStrand :: GffStrand
             , gffPhase :: Int -- ^phase: use -1 to denote .
             , gffAttributes :: S.ByteString
             } deriving (Eq,Show)
@@ -92,7 +94,7 @@ instance NFData GffLine where
             (gffStart gl) `seq`
             (gffEnd gl) `seq`
             (gffScore gl) `deepseq`
-            (gffString gl) `seq`
+            (gffStrand gl) `seq`
             (gffPhase gl) `seq`
             (gffAttributes gl) `seq`
             ()
@@ -133,11 +135,6 @@ readLine line = if length tokens == 9
         [tk0,tk1,tk2,tk3,tk4,tk5,tk6,tk7,tk8] = tokens
         score "." = Nothing
         score v = Just (read $ L8.unpack v)
-        strand '.' = GffUnStranded
-        strand '+' = GffPosStrand
-        strand '-' = GffNegStrand
-        strand '?' = GffUnknownStrand
-        strand _ = error "unhandled value for strand"
         phase "." = -1
         phase r = read (L8.unpack r)
 
@@ -148,6 +145,18 @@ parsegffType "cds" = GffCDS
 parsegffType "CDS" = GffCDS
 parsegffType t = GffOther t
 
+strand :: Char -> GffStrand
+strand '.' = GffUnStranded
+strand '+' = GffPosStrand
+strand '-' = GffNegStrand
+strand '?' = GffUnknownStrand
+strand _ = error "unhandled value for strand"
+
+showStrand :: GffStrand -> S.ByteString
+showStrand GffUnStranded    = "."
+showStrand GffPosStrand     = "+"
+showStrand GffNegStrand     = "-"
+showStrand GffUnknownStrand = "?"
 
 strict :: L.ByteString -> S.ByteString
 strict = S.concat . L.toChunks
@@ -170,5 +179,5 @@ filterFeatures' _ s = error ("Type should be NGOList but received: " ++ (show s)
 showType :: GffType -> S.ByteString
 showType GffExon = "exon"
 showType GffGene = "gene"
-showType GffCDS = "CDS"
+showType GffCDS  = "CDS"
 showType (GffOther b) = b

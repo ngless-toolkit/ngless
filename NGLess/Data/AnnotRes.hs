@@ -30,16 +30,18 @@ data GffCount = GffCount
             { annotSeqId :: S.ByteString
             , annotType :: GffType
             , annotCount :: Int
+            , annotStrand :: GffStrand
             } deriving (Eq,Show)
 
 instance NFData GffCount where
     rnf gl = (annotSeqId gl) `seq`
              (annotType gl) `seq`
              (annotCount gl) `seq`
+             (annotStrand gl) `seq`
              ()
 
 isEqual :: GffCount -> GffCount -> Bool
-isEqual (GffCount a _ _) (GffCount b _ _) = a == b
+isEqual (GffCount a _ _ _) (GffCount b _ _ _) = a == b
 
 showGffCount :: [GffCount] -> L8.ByteString 
 showGffCount = L8.unlines . fmap (showCounts "\t")
@@ -48,7 +50,7 @@ showGffCountDel :: S8.ByteString -> [GffCount] -> L8.ByteString
 showGffCountDel del c = L8.unlines . fmap (showCounts del) $ c
 
 showCounts :: S8.ByteString -> GffCount -> L8.ByteString
-showCounts del (GffCount s t c) = L8.fromChunks [s, del, showType t, del, encode c]
+showCounts del (GffCount s t c st) = L8.fromChunks [s, del, showType t, del, encode c, del, showStrand st]
     where encode = S8.pack . show --could be used Data.Binary (encode)
 
 
@@ -60,15 +62,16 @@ readAnnotCounts' [] = []
 readAnnotCounts' (l:ls) = readAnnotLine l : readAnnotCounts' ls
 
 readAnnotLine :: L.ByteString -> GffCount
-readAnnotLine line = if length tokens == 3
+readAnnotLine line = if length tokens == 4
             then GffCount
                 (L8.toStrict tk0)
                 (parsegffType $ L8.toStrict tk1)
                 (read $ L8.unpack tk2)
+                (strand $ L8.head tk3)
             else error (concat ["unexpected line in Annotated Gff: ", show line])
     where
         tokens = L8.split '\t' line
-        [tk0,tk1,tk2] = tokens
+        [tk0,tk1,tk2,tk3] = tokens
 
 
 --- Quite similar to the filterFeatures in GFF but access different field name.
