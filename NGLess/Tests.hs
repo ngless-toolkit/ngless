@@ -35,6 +35,7 @@ import Types
 import PrintFastqBasicStats
 import PerBaseQualityScores
 import FPreProcess
+import FastQFileData
 import FileManagement
 import MapInterpretOperation
 import Validation
@@ -392,6 +393,11 @@ case_map_script = case parsetest map_s >>= checktypes of
             res' <- unCompress "samples/resultSampleSam.sam"
             calcSamStats res' @?= [5,0,0,0]
 
+-- Test compute stats
+
+case_compute_stats_lc = do
+    contents <- unCompress "samples/resultSampleFiltered.txt"
+    (lc $ computeStats contents) @?= 'X'
 
 -- Parse GFF lines
 
