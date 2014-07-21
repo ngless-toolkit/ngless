@@ -1,5 +1,5 @@
 {- Copyright 2013-2014 NGLess Authors
- - License: GPL, version 3 or later
+ - License: MIT
  -}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}

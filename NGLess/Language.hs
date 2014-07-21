@@ -1,5 +1,5 @@
 {- Copyright 2013 NGLess Authors
- - License: GPL, version 3 or later
+ - License: MIT
  -}
 
 module Language
