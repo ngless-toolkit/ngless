@@ -47,7 +47,7 @@ computeStats' seqs = runST $ do
     tCount <- getV charCounts 't'
     return (Result (aCount, cCount, gCount, tCount) (chr lcT) qualCountsT' n (minSeq, maxSeq))
 
-update charCounts qualCountsT (P4 n lc minSeq maxSeq) (bps,qs) = do
+update charCounts qualCountsT (P4 n lcT minSeq maxSeq) (bps,qs) = do
     forM_ [0 .. B.length bps - 1] $ \i -> do
         let bi = ord (B.index bps i)
         incVec charCounts bi
@@ -60,7 +60,7 @@ update charCounts qualCountsT (P4 n lc minSeq maxSeq) (bps,qs) = do
     forM_ (zip [0 .. B.length qs - 1] qualCountsT') $ \(i,qv) -> do
         let qi = ord (B.index qs i)
         incVec qv qi
-    return $! P4 (n + 1) (min qsM lc) (min minSeq len) (max maxSeq len)
+    return $! P4 (n + 1) (min qsM lcT) (min minSeq len) (max maxSeq len)
 
 
 getV c p = do

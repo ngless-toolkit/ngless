@@ -360,7 +360,7 @@ preprocess_s = "ngless '0.0'\n\
     \preprocess(input) using |read|:\n\
     \   read = read[3:]\n\
     \   read = read[: len(read) ]\n\
-    \   read = substrim(read, min_quality=26)\n\
+    \   read = substrim(read, min_quality=5)\n\
     \   if len(read) > 20:\n\
     \       continue\n\
     \   if len(read) <= 20:\n\
@@ -390,7 +390,7 @@ case_map_script = case parsetest map_s >>= checktypes of
             _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
             (interpret map_s) . nglBody $ expr
             res' <- unCompress "samples/resultSampleSam.sam"
-            calcSamStats res' @?= [5,0,0]
+            calcSamStats res' @?= [5,0,0,0]
 
 
 -- Parse GFF lines
@@ -408,7 +408,7 @@ case_trim_attrs_4  = GFF.trimString "x = 10" @?= "x = 10"
 
 
 case_parse_gff_line = GFF.readLine gff_line @?= gff_structure
-case_parse_gff_atributes = (GFF.parseGffAttributes (GFF.gffAttributes gff_structure)) @?= [("gene_id","\"Y74C9A.3\""), ("transcript_id" ,"\"NM_058260\""), ("gene_name", "\"Y74C9A.3\""), ("p_id", "\"P23728\""), ("tss_id", "\"TSS14501\"")]
+case_parse_gff_atributes = (GFF.parseGffAttributes (GFF.gffAttributes gff_structure)) @?= [("gene_id","Y74C9A.3"), ("transcript_id" ,"NM_058260"), ("gene_name", "Y74C9A.3"), ("p_id", "P23728"), ("tss_id", "TSS14501")]
 
 -- teste parseGffAttributes
 case_parse_gff_atributes_normal_1 = GFF.parseGffAttributes "ID=chrI;dbxref=NCBI:NC_001133;Name=chrI" @?= [("ID","chrI"),("dbxref","NCBI:NC_001133"),("Name","chrI")]
@@ -444,9 +444,9 @@ case_cigar_to_length_3 = cigarTLen "3M1I3M1D5M" @?= 12
 
 --- Count operation
 
-ds_annot_gene = "x\tgene\t10\n"
-ds_annot_cds = "x\tCDS\t11\n"
-ds_annot_exon = "x\texon\t12\n"
+ds_annot_gene = "x\tgene\t10\t+\n"
+ds_annot_cds = "x\tCDS\t11\t+\n"
+ds_annot_exon = "x\texon\t12\t+\n"
 ds_annot_counts = L.concat [ds_annot_gene, ds_annot_cds, ds_annot_exon]
 
 annot_features_gene = Just (NGOList  [ NGOSymbol "gene" ])
@@ -516,9 +516,9 @@ case_isInsideInterval_2 = isInsideInterval 1 (IM.ClosedInterval 1 5) @?= True
 case_isInsideInterval_3 = isInsideInterval 5 (IM.ClosedInterval 3 5) @?= True
 
 
-k1 = (IM.ClosedInterval 10 20, head $ readAnnotCounts "x\tgene\t10")
-k2 = (IM.ClosedInterval 1 5,   head $ readAnnotCounts "y\tgene\t10")
-k3 = (IM.ClosedInterval 30 30, head $ readAnnotCounts "x\tgene\t20")
+k1 = (IM.ClosedInterval 10 20, head $ readAnnotCounts "x\tgene\t10\t+\n")
+k2 = (IM.ClosedInterval 1 5,   head $ readAnnotCounts "y\tgene\t10\t+\n")
+k3 = (IM.ClosedInterval 30 30, head $ readAnnotCounts "x\tgene\t20\t+\n")
 
 imap1   = IM.fromList [k1]
 imap2   = IM.fromList [k2]
