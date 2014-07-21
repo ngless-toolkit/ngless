@@ -22,7 +22,7 @@ import VectorOperations
 data Result =  Result {bpCounts :: (Int, Int, Int, Int) , lc :: Char, qualCounts ::  [V.Vector Int], nSeq :: Int, seqSize :: (Int,Int)} deriving(Show)
 
 -- strict tuple
-data P3 = P3 !Int !Int !Int
+data P4 = P4 !Int !Int !Int !Int
 
 computeStats :: BL.ByteString -> Result
 computeStats = computeStats' . fastqParse
@@ -39,20 +39,20 @@ fastqParse = fastqParse' . BL.lines
 computeStats' seqs = runST $ do
     charCounts <- zeroVec 256
     qualCountsT <- newSTRef []
-    P3 n minSeq maxSeq <- foldM (update charCounts qualCountsT) (P3 0 (maxBound :: Int) 0) seqs
+    P4 n lcT minSeq maxSeq <- foldM (update charCounts qualCountsT) (P4 0 256 (maxBound :: Int) 0) seqs
     qualCountsT' <- readSTRef qualCountsT >>= mapM V.freeze
     aCount <- getV charCounts 'a'
     cCount <- getV charCounts 'c'
     gCount <- getV charCounts 'g'
     tCount <- getV charCounts 't'
-    lcT <- getLC charCounts
-    return (Result (aCount, cCount, gCount, tCount) lcT qualCountsT' n (minSeq, maxSeq))
+    return (Result (aCount, cCount, gCount, tCount) (chr lcT) qualCountsT' n (minSeq, maxSeq))
 
-update charCounts qualCountsT (P3 n minSeq maxSeq) (bps,qs) = do
+update charCounts qualCountsT (P4 n lc minSeq maxSeq) (bps,qs) = do
     forM_ [0 .. B.length bps - 1] $ \i -> do
         let bi = ord (B.index bps i)
         incVec charCounts bi
     let len = B.length bps
+        qsM = ord . B.minimum $ qs
     replicateM_ (len - maxSeq) $ do
         nv <- zeroVec 256
         modifySTRef' qualCountsT (++[nv])
@@ -60,7 +60,7 @@ update charCounts qualCountsT (P3 n minSeq maxSeq) (bps,qs) = do
     forM_ (zip [0 .. B.length qs - 1] qualCountsT') $ \(i,qv) -> do
         let qi = ord (B.index qs i)
         incVec qv qi
-    return $! P3 (n + 1) (min minSeq len) (max maxSeq len)
+    return $! P4 (n + 1) (min qsM lc) (min minSeq len) (max maxSeq len)
 
 
 getV c p = do
@@ -70,10 +70,10 @@ getV c p = do
 
 getLC c = getLC' 0
     where
-        n = VM.length c
-        getLC' i | n == i = return (chr n)
+        n = V.length c
+        getLC' i | n == i = return n
         getLC' i = do
-            ci <- VM.read c i
+            ci <- V.unsafeIndex c i
             if ci > 0
-                then return (chr i)
+                then return i
                 else getLC' (i + 1)
