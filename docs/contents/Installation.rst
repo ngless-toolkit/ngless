@@ -1,12 +1,14 @@
-#Installation
+Installation
+============
 
-## Automated
-
+Automated
 -----
 
-## From source
+From source
+-----
 
-###Requirements
+Requirements
+~~~~~~~~~~
 
 Before starting, make sure you have an Internet connection!
 
@@ -18,7 +20,8 @@ These are the required programms you must have installed
 
 Both GHC and Cabal can be installed via the haskell-platform package.
 
-###Update cabal
+Update cabal
+~~~~~~~~~~
 
 Cabal by default comes with a old version installed. Start by running::
 	
@@ -46,7 +49,8 @@ If it isn't, one of the following problems might be occurring
 	2) A older version of cabal is installed in some directory which comes first than '/usr/local' in your $PATH variable.
 
 
-###Steps
+Steps
+~~~~~~~~~~
 
 Start by download latest NGLess version from Github.
 
@@ -66,7 +70,8 @@ want it to be.
 After this ngless is ready to use!
 
 
-#### Options:
+Options:
+~~~~~~~~~~
 
 The following are options to the Makefile.
 
@@ -78,6 +83,5 @@ compile - compiles NGLess and haskell dependencies
 
 nglessconf - downloads and configures all ngless dependencies
 
-## Binary
-
+Binary
 --------
