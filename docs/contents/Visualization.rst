@@ -33,10 +33,11 @@ If we open one box, there can be seen three main things:
 - The quality control at the begining
 - The quality control after the pre-processing (this one being optional).
 
-The executed script is very important as it allows to keep associated results with the script executed, allowing 
-in this way to easily reproduce an experiment. The script can be consulted has shown in the next figure.
+Is crucial to save the script that lead to some results. For that reason, scripts are allways associated with the 
+results that they generate, allowing this way to easily reproduce an experiment. The script can be 
+consulted has shown in the next figure.
 
-.. image: ../images/scriptNgless.png
+.. image:: ../images/scriptNgless.png
 
 Before Quality Control
 ----------------------
