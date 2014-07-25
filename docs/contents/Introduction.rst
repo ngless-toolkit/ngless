@@ -13,7 +13,6 @@ is to allow the creation of a pipeline of work for all the first phase of NGS an
 of annotation. We want to do this while achieving the following goals:
 
 - Ease the development of NGS Tools;
-  - through a context aware user interface; 
 - Enable an easy identification of errors;
 - Easily reproduce an experiment;
 - Easy configuration and execution of workflows;
