@@ -50,6 +50,29 @@ NGless supports the following basic types:
 In addition, it supports the composite type List of X where X is a basic type. Lists are built
 with square brackes (e.g., [1,2,3]). All elements in a list must have the same data type.
 
+String
+~~~~~~~~~
+
+A string can start with either **ASCII 0x22 (")** or **ASCII 0x27 (')** and end with the same character. They can
+contain any number of characters.
+
+Special sequences start with a **\\**. Standard backslashed escapes can be used as **ASCII LF** and **CR** (**\\n** 
+and **\\r** respectively), quotation marks (**\\'**) or slash (**\\\\**).
+
+Integer
+~~~~~~~~~
+Integers are specified as decimals ``[0-9]+`` or as hexadecimals ``0x[0-9a-fA-F]+``. They are non negative, but 
+can be negative through the use of the operator ``(-)``
+
+Boolean
+~~~~~~~~~
+Booleans are denoted as the word \textbf{true} or \textbf{false}, with the first letter in upper or lower case.
+
+Symbol
+~~~~~~~~~~
+A symbol is denoted as a token surrounded by curly braces (e.g., ``{symbol}`` or ``{gene}``).
+
+
 Variables
 -------------------
 NGless is a statically typed language and variables are typed. Types are automatically inferred from context.
