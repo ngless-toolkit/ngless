@@ -73,6 +73,7 @@ Symbol
 A symbol is denoted as a token surrounded by curly braces (e.g., ``{symbol}`` or ``{gene}``).
 
 
+
 Variables
 -------------------
 NGless is a statically typed language and variables are typed. Types are automatically inferred from context.
@@ -81,11 +82,60 @@ Assignment is performed with = operator:
 ::
  variable = value
 
-
 Constants
 ~~~~~~~~~~~~~~~~~~~
 
 A variable that is all upper-case is a constant and can only be assigned to once.
+
+
+Operators
+-------------------
+
+Unary
+~~~~~~~~~~
+The operator **(-)** returns the symmetric of it's integer argument.
+
+The operator **len** returns the length of a ShortRead.
+
+Binary
+~~~~~~~~~~
+
+All operators can only be applied to integers. The operators described are available:
+::
+ + - < > >= <= == !=
+
+Indexation
+~~~~~~~~~~
+Can be used to access only one element or a range of elements in a ShortRead. To access one element, 
+is required a identifier followed by an expression between brackets. (e.g, x[10]).
+
+To obtain a range, is required an identifier and two expressions separated by a ':' and between brackets. Example: 
+
++----------+------------------------------------------------------+
+| x[:]     | returns from position 0 until length of variable x   |
++----------+------------------------------------------------------+
+| x[10:]   | returns from position 10 util length of variable x   |
++----------+------------------------------------------------------+
+| x[:10]   | returns from position 0 until 10                     |
++----------+------------------------------------------------------+
+
+Conditional
+------------------
+
+If the expression, following the word **if**, is **true** then the block that follows the ':' is executed. 
+::
+    if true:
+       val = 10 // will be executed
+
+If the expression returns **false**, is present the reserved word **else** and delimiter ':' , the else block is
+executed.
+::
+    if 5 > 10:
+       val = 10
+    else:
+       val = 20 // will be execute
+
+If is returned **false** and the word **else** is not present, nothing happens.
 
 Functions
 -------------------
