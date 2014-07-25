@@ -1,3 +1,5 @@
+.. _Organisms:
+
 Organisms
 =============
 

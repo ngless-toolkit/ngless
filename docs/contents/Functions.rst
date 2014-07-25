@@ -1,5 +1,8 @@
+.. _Functions:
+
+=========
 Functions
-=======
+=========
 
 Fastq
 -----

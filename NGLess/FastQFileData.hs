@@ -19,7 +19,7 @@ import Data.STRef
 import Data.Char
 import VectorOperations
 
-data Result =  Result {bpCounts :: (Int, Int, Int, Int) , lc :: Char, qualCounts ::  [V.Vector Int], nSeq :: Int, seqSize :: (Int,Int)} deriving(Show)
+data Result =  Result {bpCounts :: (Int, Int, Int, Int) , lc :: Char, qualCounts ::  [V.Vector Int], nSeq :: Int, seqSize :: (Int,Int)} deriving(Eq,Show)
 
 -- strict tuple
 data P4 = P4 !Int !Int !Int !Int

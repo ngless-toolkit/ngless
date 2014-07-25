@@ -133,7 +133,7 @@ githublogo:
 64x-macos: nglessconf
 	mkdir -p $(64-MAC-PATH)/share $(64-MAC-PATH)/bin
 	cabal build
-	cp dist/dist*/build/$(progname)/$(progname) $(64-MAC-PATH)/bin
+	cp dist/build/$(progname)/$(progname) $(64-MAC-PATH)/bin
 	cp -r $(BWA) $(64-MAC-PATH)/share
 	cp -r $(SAM) $(64-MAC-PATH)/share
 	cp -r $(HTML) $(64-MAC-PATH)/share

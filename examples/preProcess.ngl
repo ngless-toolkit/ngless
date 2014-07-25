@@ -1,12 +1,11 @@
 ngless "0.0"
 input = fastq('../samples/sample.fq')
 
+val = ((5 + 5) * 2)
+val = 20
+
 preprocess(input) using |read|:
-    read = read[3:]
-    read = read[: len(read) ]
+    read = read[: val ]
     read = substrim(read, min_quality=5)
-    if len(read) > 20:
-       continue
-    if len(read) < 20:
-       discard
+
 write(input, ofile='../samples/resultSampleFiltered.txt')
