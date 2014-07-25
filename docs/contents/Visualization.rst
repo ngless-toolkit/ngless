@@ -64,7 +64,12 @@ The used statistical measures are in relation to each base pair and are:
 The Quality control can be accessed in the web interface through the tab **before QC** and a vertical menu allows to
 choose which dataset in question. Can be seen an example next:
 
-<image>
+.. image:: ../images/beforeQC.png
+
+The plot can be adjusted to show one statistic at a time, and the plot limits adapt to the presented values. An image
+of only the upper quartile shown looks like the following:
+
+.. image:: ../images/beforeQCUQ.png
 
 
 After Quality Control
