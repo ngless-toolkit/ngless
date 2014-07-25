@@ -53,7 +53,7 @@ These archives are all created using version 75 of `Ensembl <http://www.ensembl.
   |--- Annotation
         |-- annot.gtf.gz
 
-
+The base name of Description.tar.gz (Description) will have the description name of the respective organism (i.e, Mus_musculus.tar.gz). 
 
 Automatic installation
 --------------------
@@ -79,7 +79,7 @@ And to install globally is::
 When trying to install an organism if is returned **True** it means that the organism is already installed, and there is
 no reason to install again. Otherwise, a progress bar is launched to provide information on the download.
  
-Note: Can be used flag --i instead of --intall-reference-data
+Note: Can be used flag --i instead of --install-reference-data
 
 
 
