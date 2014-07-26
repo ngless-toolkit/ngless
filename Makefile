@@ -101,7 +101,13 @@ variables:
 uninstall:
 	rm -rf $(deps) $(exec)/ngless* $(HOME)/.ngless
 
+
 #####  Setup required files
+conffonts:
+	mkdir -p $(HTML_FONTS_DIR);
+
+confhtmllibdir:
+	mkdir -p $(HTML_LIBS_DIR);
 
 $(BWA):
 	@echo Configuring BWA...
@@ -121,7 +127,7 @@ $(SAM):
 	@echo SAM completed...
 
 
-$(HTML_LIBS_DIR)/%.js:
+$(HTML_LIBS_DIR)/%.js: 
 	echo $(notdir $@)
 	wget -O $@ $($(notdir $@))
 
@@ -139,22 +145,13 @@ $(HTML_FONTS_DIR)/%.ttf:
 	echo $(notdir $@)
 	wget -O $@ $($(notdir $@))
 
-confhtmllibs: 
-	@echo configuring html libraries...
-	@$(foreach url,$(URLS_FONTS), wget -nc -O $(HTML_FONTS_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
-
-conffonts:
-	mkdir -p $(HTML_FONTS_DIR);
-
-confhtmllibdir:
-	mkdir -p $(HTML_LIBS_DIR);
-
 $(HTML_LIBS_DIR)/Octocat.png:
 	wget -nc -O $(HTML_LIBS_DIR)/$(notdir $(GIT-LOGO)) $(GIT-LOGO);
 	unzip $(HTML_LIBS_DIR)/$(notdir $(GIT-LOGO)) -d $(HTML_LIBS_DIR);
 	cp $(HTML_LIBS_DIR)/Octocat/Octocat.png $(HTML_LIBS_DIR)/Octocat.png;
 	rm -rf $(HTML_LIBS_DIR)/__MACOSX $(HTML_LIBS_DIR)/Octocat $(HTML_LIBS_DIR)/Octocats.zip;
 	echo $(GIT-LOGO) configured;
+
 
 ######
 
