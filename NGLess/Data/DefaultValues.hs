@@ -7,8 +7,6 @@ module Data.DefaultValues
     , numFiles
     , getBWAPath
     , getSAMPath
-    , switchToNglessRoot
-    , switchToDir
     , indexRequiredFormats
     , mapAlg
     , samAlg
@@ -16,6 +14,8 @@ module Data.DefaultValues
     , suGenomeDir
     , getNglessRoot
     , hasPermissions
+    , switchToCurDirectory
+    , switchToNglessRoot
     , InstallMode(..)
     ) where
 
@@ -66,15 +66,10 @@ suGenomeDir :: FilePath
 suGenomeDir = "../share/ngless/genomes"
 
 
-----
 
+-- this retrieves the actual path from the symLink
 switchToNglessRoot :: IO ()
-switchToNglessRoot = do
-  nglessRootPath<- getExecutablePath -- this retrieves the actual path from the symLink
-  setCurrentDirectory $ takeDirectory nglessRootPath
-
-switchToDir :: FilePath -> IO ()
-switchToDir = setCurrentDirectory 
+switchToNglessRoot =  getExecutablePath >>= setCurrentDirectory . takeDirectory
 
 ---
 getNglessRoot :: IO FilePath
@@ -83,22 +78,19 @@ getNglessRoot = do
   return $ takeDirectory nglessRootPath
 
 getBWAPath :: IO String
-getBWAPath = do
-    rootDir <- getNglessRoot
-    return $ rootDir </> bwaDirPath
+getBWAPath = getNglessRoot >>= return . (</> bwaDirPath)
 
 getSAMPath :: IO String
-getSAMPath = do
-    rootDir <- getNglessRoot
-    return $ rootDir </> samDirPath
+getSAMPath = getNglessRoot >>= return . (</> samDirPath)
 
+switchToCurDirectory :: IO ()
+switchToCurDirectory = getCurrentDirectory >>= setCurrentDirectory
 
 --- getExecutablePath
 -- Returns for example: /usr/local/bin/ngless
 -- Symbolic link to deps at /usr/local/opt/ngless
 -- from exec to deps is "../../opt/ngless/Html"
 --- 
-
 
 defaultDir :: IO String
 defaultDir = do 
@@ -107,7 +99,7 @@ defaultDir = do
 
 
 maxFileSize :: Num a => a
-maxFileSize = 300000000 -- 100MB
+maxFileSize = 100*1000*1000 -- 100MB
 
 calcSize :: Integer -> Integer
 calcSize s = ceiling $ ((fromInteger s) / maxFileSize :: Double) 
