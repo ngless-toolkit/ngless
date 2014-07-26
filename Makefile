@@ -8,7 +8,7 @@ exec=$(prefix)/bin
 
 SOURCES=NGLess/*
 
-all: compile nglessconf
+all: compile
 
 BWA = bwa-0.7.7
 BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
@@ -25,19 +25,40 @@ HTML_FONTS_DIR = $(HTML)/fonts
 current_dir = $(shell pwd)
 
 # Required html Librarys
-URLS := http://code.jquery.com/jquery-latest.min.js 
-URLS += https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0-beta.1/angular.min.js
-URLS += http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css
-URLS += http://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-theme.min.css
-URLS += http://netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js
-URLS += http://cdnjs.cloudflare.com/ajax/libs/d3/3.1.6/d3.min.js
-URLS += http://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.js
-URLS += http://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.css
-URLS += http://code.angularjs.org/1.3.0-beta.1/angular-sanitize.js
-URLS += http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css
-URLS_FONTS := https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.woff
-URLS_FONTS += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.ttf
+HTMLFILES := jquery-latest.min.js
+HTMLFILES += angular.min.js
+HTMLFILES += bootstrap.min.css
+HTMLFILES += bootstrap-theme.min.css
+HTMLFILES += bootstrap.min.js
+HTMLFILES += d3.min.js
+HTMLFILES += nv.d3.js
+HTMLFILES += nv.d3.css
+HTMLFILES += angular-sanitize.js
+HTMLFILES += bootstrap-glyphicons.css
+
+# Required fonts
+FONTFILES := glyphicons-halflings-regular.woff
+FONTFILES += glyphicons-halflings-regular.ttf
+
+#URLS
+jquery-latest.min.js = code.jquery.com/jquery-latest.min.js 
+d3.min.js = cdnjs.cloudflare.com/ajax/libs/d3/3.1.6/d3.min.js
+nv.d3.js = cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.js
+nv.d3.css = cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.css
+angular-sanitize.js = code.angularjs.org/1.3.0-beta.1/angular-sanitize.js
+bootstrap.min.js = netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js
+bootstrap.min.css = netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css
+angular.min.js = ajax.googleapis.com/ajax/libs/angularjs/1.3.0-beta.1/angular.min.js
+bootstrap-glyphicons.css += netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css
+bootstrap-theme.min.css = netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-theme.min.css
+glyphicons-halflings-regular.woff = netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.woff
+glyphicons-halflings-regular.ttf = netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.ttf
+
 GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
+
+reqhtmllibs = $(addprefix $(HTML_LIBS_DIR)/, $(HTMLFILES))
+reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
+reqLogo = $(HTML_LIBS_DIR)/Octocat.png
 #
 
 install: install-dir install-html install-bwa install-sam
@@ -62,7 +83,7 @@ compile: nglessconf
 	cabal install --only-dependencies --force-reinstalls
 	cabal build
 
-nglessconf: bwaconf samconf confhtmllibs
+nglessconf: confhtmllibdir conffonts  $(SAM) $(BWA) $(reqhtmllibs) $(reqfonts) $(reqlogo)
 
 clean:
 	rm -rf $(BWA) $(SAM) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs $(deps)
@@ -80,33 +101,46 @@ variables:
 uninstall:
 	rm -rf $(deps) $(exec)/ngless* $(HOME)/.ngless
 
+#####  Setup required files
 
-##### auxiliary functions to setup required files
-
-bwaconf: 
+$(BWA):
 	@echo Configuring BWA...
-	@if [ ! -d $(BWA) ]; then \
-		wget $(BWA_URL);\
-		tar xvfj $(BWA_DIR) ;\
-		rm $(BWA_DIR);\
-		cd $(BWA);\
-		$(MAKE);\
-	fi
+	wget $(BWA_URL);
+	tar xvfj $(BWA_DIR) ;
+	rm $(BWA_DIR);
+	cd $(BWA);
+	$(MAKE);
 
-samconf: 
-	@echo Configuring BWA...
-	@if [ ! -d $(SAM) ]; then \
-		wget $(SAM_URL);\
-		tar xvfj $(SAM_DIR) ;\
-		rm $(SAM_DIR);\
-		cd $(SAM);\
-		$(MAKE);\
-	fi
-	@echo BWA completed...
+$(SAM): 
+	@echo Configuring SAM...
+	wget $(SAM_URL);
+	tar xvfj $(SAM_DIR) ;
+	rm $(SAM_DIR);
+	cd $(SAM);
+	$(MAKE);
+	@echo SAM completed...
 
-confhtmllibs: confhtmllibdir conffonts githublogo
+
+$(HTML_LIBS_DIR)/%.js:
+	echo $(notdir $@)
+	wget -O $@ $($(notdir $@))
+
+
+$(HTML_LIBS_DIR)/%.css:
+	echo $(notdir $@)
+	wget -O $@ $($(notdir $@))
+
+
+$(HTML_FONTS_DIR)/%.woff:
+	echo $(notdir $@)
+	wget -O $@ $($(notdir $@))
+
+$(HTML_FONTS_DIR)/%.ttf:
+	echo $(notdir $@)
+	wget -O $@ $($(notdir $@))
+
+confhtmllibs: 
 	@echo configuring html libraries...
-	@$(foreach url,$(URLS), wget -nc -O $(HTML_LIBS_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
 	@$(foreach url,$(URLS_FONTS), wget -nc -O $(HTML_FONTS_DIR)/$(notdir $(url)) $(url) ; echo $(url) configured;)
 
 conffonts:
@@ -115,14 +149,12 @@ conffonts:
 confhtmllibdir:
 	mkdir -p $(HTML_LIBS_DIR);
 
-githublogo:
-	@if [ ! -f $(HTML_LIBS_DIR)/Octocat.png ]; then \
-		wget -nc -O $(HTML_LIBS_DIR)/$(notdir $(GIT-LOGO)) $(GIT-LOGO); \
-		unzip $(HTML_LIBS_DIR)/$(notdir $(GIT-LOGO)) -d $(HTML_LIBS_DIR); \
-		cp $(HTML_LIBS_DIR)/Octocat/Octocat.png $(HTML_LIBS_DIR)/Octocat.png; \
-		rm -rf $(HTML_LIBS_DIR)/__MACOSX $(HTML_LIBS_DIR)/Octocat $(HTML_LIBS_DIR)/Octocats.zip; \
-		echo $(GIT-LOGO) configured; \
-	fi
+$(HTML_LIBS_DIR)/Octocat.png:
+	wget -nc -O $(HTML_LIBS_DIR)/$(notdir $(GIT-LOGO)) $(GIT-LOGO);
+	unzip $(HTML_LIBS_DIR)/$(notdir $(GIT-LOGO)) -d $(HTML_LIBS_DIR);
+	cp $(HTML_LIBS_DIR)/Octocat/Octocat.png $(HTML_LIBS_DIR)/Octocat.png;
+	rm -rf $(HTML_LIBS_DIR)/__MACOSX $(HTML_LIBS_DIR)/Octocat $(HTML_LIBS_DIR)/Octocats.zip;
+	echo $(GIT-LOGO) configured;
 
 ######
 
