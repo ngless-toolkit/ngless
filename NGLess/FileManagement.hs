@@ -53,29 +53,25 @@ closekFileHandles fhs = mapM_ (hClose) fhs
 
 
 isDot :: FilePath -> Bool
-isDot f = f `notElem` [".", ".."]
+isDot f = f `elem` [".", ".."]
 
 getFilesInDir :: FilePath -> IO [FilePath]
 getFilesInDir p = do
  files <- getDirectoryContents p
- return $ map ((</>) p) (filter (isDot) files)
+ return $ map ((</>) p) (filter (not . isDot) files)
 
 
 setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
 setupRequiredFiles info dirTemplate = do
-    scriptEnvDir' <- getCurrentDirectory
-    switchToNglessRoot
-    -- run under ngless root environment   
     let destDir' = dirTemplate ++ "$" ++ info
+    htmlSourceP <- htmlDefaultDir
     createDirectory destDir'
-    copyFile (htmlDefaultDir </> "perBaseQualScores.css") (destDir' </> "perBaseQualScores.css")
-    copyFile (htmlDefaultDir </> "perBaseQualityScores.js") (destDir' </> "perBaseQualityScores.js")
+    copyFile (htmlSourceP </> "perBaseQualScores.css") (destDir' </> "perBaseQualScores.css")
+    copyFile (htmlSourceP </> "perBaseQualityScores.js") (destDir' </> "perBaseQualityScores.js")
     case info of
-        "beforeQC" -> copyFile (htmlDefaultDir </> "beforeQC.html") (destDir' </> "index.html")
-        "afterQC" -> copyFile (htmlDefaultDir </> "afterQC.html") (destDir' </> "index.html")
+        "beforeQC" -> copyFile (htmlSourceP </> "beforeQC.html") (destDir' </> "index.html")
+        "afterQC" -> copyFile (htmlSourceP </> "afterQC.html") (destDir' </> "index.html")
         err -> error ("Has to be either before or after QC. it is: " ++ (show err))
-    -- run under script environment
-    setCurrentDirectory scriptEnvDir'
     return destDir'
 
 generateTempFilePath :: FilePath -> String -> IO FilePath
@@ -149,33 +145,26 @@ printNglessLn x = whenLoud $ putStrLn x
 
 setupHtmlViewer :: IO ()
 setupHtmlViewer = do
-    scriptEnvDir' <- getCurrentDirectory
-    switchToNglessRoot
-    -- run under ngless root environment   
+    htmlP <- htmlDefaultDir
     dir <- defaultDir
-    doesExist <- doesFileExist (dir </> "nglessKeeper.html")
-    case doesExist of 
+    doesFileExist (p' dir) >>= \x -> case x of 
         True   -> return ()
-        False  -> do copyFile (htmlDefaultDir </> "nglessKeeper.html") (dir </> "nglessKeeper.html")
-                     copyFile (htmlDefaultDir </> "nglessKeeperafterQC.html") (dir </> "nglessKeeperafterQC.html")
-                     copyFile (htmlDefaultDir </> "nglessKeeperbeforeQC.html") (dir </> "nglessKeeperbeforeQC.html")
-                     copyFile (htmlDefaultDir </> "nglessKeepervisualize.html") (dir </> "nglessKeepervisualize.html")
-                     copyFile (htmlDefaultDir </> "nglessKeeper.css")  (dir </> "nglessKeeper.css")
-                     copyDir  (htmlDefaultDir </> htmlDefaultDirLibs)  (dir </> htmlDefaultDirLibs)
-                     copyDir  (htmlDefaultDir </> htmlDefaultFonts)  (dir </> htmlDefaultFonts)
-    -- run under script environment
-    setCurrentDirectory scriptEnvDir'
-
+        False  -> do copyFile (htmlP </> "nglessKeeper.html") (dir </> "nglessKeeper.html")
+                     copyFile (htmlP </> "nglessKeeperafterQC.html") (dir </> "nglessKeeperafterQC.html")
+                     copyFile (htmlP </> "nglessKeeperbeforeQC.html") (dir </> "nglessKeeperbeforeQC.html")
+                     copyFile (htmlP </> "nglessKeepervisualize.html") (dir </> "nglessKeepervisualize.html")
+                     copyFile (htmlP </> "nglessKeeper.css")  (dir </> "nglessKeeper.css")
+                     copyDir  (htmlP </> htmlDefaultDirLibs)  (dir </> htmlDefaultDirLibs)
+                     copyDir  (htmlP </> htmlDefaultFonts)  (dir </> htmlDefaultFonts)
+    where p' = (</> "nglessKeeper.html")
 
 copyDir ::  FilePath -> FilePath -> IO ()
 copyDir src dst = do
   createDirectory dst
   content <- getDirectoryContents src
-  let xs = filter (`notElem` [".", ".."]) content
+  let xs = filter (not . isDot) content
   forM_ xs $ \name -> do
-    let srcPath = src </> name
-    let dstPath = dst </> name
-    copyFile srcPath dstPath
+    copyFile (src </> name) (dst </> name)
 
 
 readPossiblyCompressedFile ::  B.ByteString -> IO BL.ByteString
