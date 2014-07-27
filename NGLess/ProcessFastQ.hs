@@ -32,11 +32,11 @@ writeReadSet :: B.ByteString -> [NGLessObject] -> Int -> IO FilePath
 writeReadSet fn rs enc = do
     temp <- getTemporaryDirectory 
     newfp <- getTFilePathComp (temp </> (template $ (B.unpack fn)))
-    writeGZIP newfp $ asFastQ rs enc
+    writeGZIP newfp asFastQ
     return newfp
   where
-    asFastQ :: [NGLessObject] -> Int -> BL.ByteString
-    asFastQ rs enc = BL.unlines . (fmap (showRead enc)) $ rs 
+    asFastQ :: BL.ByteString
+    asFastQ = BL.unlines . (fmap (showRead enc)) $ rs 
 
 
 readReadSet :: Int -> B.ByteString -> IO [NGLessObject]
@@ -63,7 +63,7 @@ readFastQ f info dirT = do
         p "Generation of statistics for " dst
         createBasicStatsJson (dst ++ "/basicStats.js") fd f -- generate JSON DATA file: basicStats.js
         p "Simple Statistics completed for: " dst
-        p "Base pair: " (show $ length (qualCounts fd)) 
+        p "number of base pairs: " (show $ length (qualCounts fd)) 
         p "Lowest char is: " (show $ lc fd)
         printHtmlStatisticsData (qualCounts fd) (enc fd) dst -- " " " file: perBaseQualScoresData.js
         p "Loaded file: " f
