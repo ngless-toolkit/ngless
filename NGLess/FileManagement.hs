@@ -1,6 +1,5 @@
 module FileManagement
     ( 
-        removeFileIfExists,
         createDir,
         getTempFilePath,
         copyFile,
@@ -12,16 +11,16 @@ module FileManagement
         closekFileHandles,
         doesDirContainFormats,
         printNglessLn,
-        createOutputDir,
+        generateDirId,
         setupHtmlViewer,
         doesFileExist,
-        createDirIfExists,
+        createDirIfNotExists,
         readPossiblyCompressedFile,
         unCompress,
         writeGZIP,
-        appendFile',
         write,
-        parseFileName
+        parseFileName,
+        template
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -42,7 +41,7 @@ import System.Posix.Internals (c_getpid)
 import System.Console.CmdArgs.Verbosity
 import Data.DefaultValues
 
-
+-- Open and close file handles
 openKFileHandles :: Int -> FilePath -> IO [Handle]
 openKFileHandles k dest = do
     forM [0..k - 1] $ \x -> do
@@ -50,16 +49,16 @@ openKFileHandles k dest = do
 
 closekFileHandles :: [Handle] -> IO ()
 closekFileHandles fhs = mapM_ (hClose) fhs
-
+------------------------------------------
 
 isDot :: FilePath -> Bool
 isDot f = f `elem` [".", ".."]
 
+---- Files in a Directory
 getFilesInDir :: FilePath -> IO [FilePath]
 getFilesInDir p = do
  files <- getDirectoryContents p
  return $ map ((</>) p) (filter (not . isDot) files)
-
 
 setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
 setupRequiredFiles info dirTemplate = do
@@ -74,60 +73,53 @@ setupRequiredFiles info dirTemplate = do
         err -> error ("Has to be either before or after QC. it is: " ++ (show err))
     return destDir'
 
+-- 
 generateTempFilePath :: FilePath -> String -> IO FilePath
-generateTempFilePath fd template = do
-    res <- openTempFile fd template   
-    hClose (snd res)   
-    return (fst res)
+generateTempFilePath dst t = do
+    (f,s) <- openTempFile dst t   
+    hClose s   
+    return f
 
+--Example: "folders/sample_1.9168$afterQC" @?= ("folders/","sample_1")
 parseFileName :: FilePath -> (FilePath, FilePath)
 parseFileName = splitFileName . fst . break ((==) '$') . fst . splitExtensions
 
 getTempFilePath :: FilePath -> IO FilePath
 getTempFilePath fp = do
-    let oldFilePath = parseFileName fp
-    generateTempFilePath (fst oldFilePath) (snd oldFilePath)
+    let (dst, t) = parseFileName fp
+    generateTempFilePath dst t
     
-
 getTFilePathComp :: FilePath -> IO FilePath
 getTFilePathComp fp = do
-    let oldFilePath = parseFileName fp
-    generateTempFilePath (fst oldFilePath) ((snd oldFilePath) ++ ".gz")
+    let (dst, t) = parseFileName fp
+    generateTempFilePath dst (t <.> "gz")
+
+---- generate template from path
+template :: FilePath -> FilePath
+template = snd . splitFileName . fst . splitExtensions
     
-
-removeFileIfExists fp = do    
-    fexist' <- doesFileExist fp
-    when fexist' $ removeFile fp
-
--- Removes the destiny directory if it already exists from previous executions.
-
-createDir destDir = do
-    tdir <- getTemporaryDirectory
-    let template = snd . splitFileName . fst . splitExtensions $ destDir
-    fp <- createTempDirectory tdir template
+createDir :: FilePath -> IO FilePath
+createDir dst = do
+    fp <- getTemporaryDirectory >>= flip createTempDirectory (template dst)
     createDirectory fp
     return fp
 
-createOutputDir destDir = do
-    let template = snd . splitFileName . fst . splitExtensions $ destDir
-    tdir' <- defaultDir
-    createTempDirectory tdir' template >>= return
+generateDirId :: FilePath -> IO FilePath
+generateDirId dst = defaultDir >>= flip createTempDirectory (template dst) >>= return
     
-
-createDirIfExists tdir =  do
-  exists <- doesDirectoryExist tdir
-  when (not exists) $ createDirectory tdir 
+createDirIfNotExists :: FilePath -> IO ()
+createDirIfNotExists dst =  doesDirectoryExist dst >>= \x -> when (not x) $ createDirectory dst
 
 
 createTempDirectory :: FilePath -> String -> IO FilePath
-createTempDirectory dir template = do
+createTempDirectory dir t = do
   pid <- c_getpid
   fp <- findTempName pid
   return fp
   where
     findTempName x = do
-      let dirpath = dir </> template ++ "." ++ show x
-      r <- doesDirectoryExist (dirpath ++ "$" ++ "beforeQC")
+      let dirpath = dir </> t <.> show x
+      r <- doesDirectoryExist (dirpath ++ "$beforeQC")
       case r of
         False  -> return dirpath
         True -> findTempName (x+1)
@@ -146,29 +138,22 @@ printNglessLn x = whenLoud $ putStrLn x
 setupHtmlViewer :: IO ()
 setupHtmlViewer = do
     htmlP <- htmlDefaultDir
-    dir <- defaultDir
-    doesFileExist (p' dir) >>= \x -> case x of 
+    dst <- defaultDir
+    doesFileExist (p' dst) >>= \x -> case x of 
         True   -> return ()
-        False  -> do copyFile (htmlP </> "nglessKeeper.html") (dir </> "nglessKeeper.html")
-                     copyFile (htmlP </> "nglessKeeperafterQC.html") (dir </> "nglessKeeperafterQC.html")
-                     copyFile (htmlP </> "nglessKeeperbeforeQC.html") (dir </> "nglessKeeperbeforeQC.html")
-                     copyFile (htmlP </> "nglessKeepervisualize.html") (dir </> "nglessKeepervisualize.html")
-                     copyFile (htmlP </> "nglessKeeper.css")  (dir </> "nglessKeeper.css")
-                     copyDir  (htmlP </> htmlDefaultDirLibs)  (dir </> htmlDefaultDirLibs)
-                     copyDir  (htmlP </> htmlDefaultFonts)  (dir </> htmlDefaultFonts)
+        False  -> copyDir htmlP dst
     where p' = (</> "nglessKeeper.html")
 
 copyDir ::  FilePath -> FilePath -> IO ()
 copyDir src dst = do
-  createDirectory dst
-  content <- getDirectoryContents src
-  let xs = filter (not . isDot) content
-  forM_ xs $ \name -> do
-    copyFile (src </> name) (dst </> name)
+  createDirIfNotExists dst
+  xs <- getDirectoryContents src >>= return . filter (not . isDot)
+  forM_ xs $ \n -> do
+    x <- doesDirectoryExist (src </> n)
+    case x of 
+        True  -> copyDir (src </> n) (dst </> n)
+        False -> copyFile (src </> n) (dst </> n)
 
-
-readPossiblyCompressedFile ::  B.ByteString -> IO BL.ByteString
-readPossiblyCompressedFile fileName = unCompress (B.unpack fileName)
 
 
 writeGZIP :: String -> BL.ByteString -> IO ()
@@ -177,11 +162,14 @@ writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents
 write :: String -> BL.ByteString -> IO ()
 write fp contents = BL.writeFile fp contents 
 
+
+-------- read files
 unCompress :: FilePath -> IO BL.ByteString
 unCompress fname =
     if T.isInfixOf (T.pack ".gz") (T.pack fname)
         then fmap GZip.decompress (BL.readFile fname)
         else BL.readFile fname -- not compressed
 
-
-appendFile' = BL.hPutStrLn
+readPossiblyCompressedFile ::  B.ByteString -> IO BL.ByteString
+readPossiblyCompressedFile fileName = unCompress (B.unpack fileName)
+-----------

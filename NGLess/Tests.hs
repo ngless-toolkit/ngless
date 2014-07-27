@@ -17,6 +17,9 @@ import Text.ParserCombinators.Parsec.Prim (GenParser)
 import Text.Parsec (SourcePos)
 import Text.Parsec.Pos (newPos)
 
+import System.Directory(removeFile, getCurrentDirectory)
+import System.FilePath.Posix((</>))
+
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
 
@@ -176,8 +179,8 @@ case_tok_word_ = tokenize' "test" "word_with_underscore" @?= Right expected
 
 -- Test Encoding
 case_calculateEncoding_sanger = calculateEncoding 55 @?= Encoding "Sanger / Illumina 1.9" sanger_encoding_offset
-case_calculateEncoding_illumina_1 = calculateEncoding 60 @?= Encoding "Illumina <1.3" illumina_1_encoding_offset
-case_calculateEncoding_illumina_1_5 = calculateEncoding 100 @?= Encoding "Illumina 1.5" illumina_1_3_encoding_offset
+case_calculateEncoding_illumina_1 = calculateEncoding 65 @?= Encoding "Illumina 1.3" illumina_encoding_offset
+case_calculateEncoding_illumina_1_5 = calculateEncoding 100 @?= Encoding "Illumina 1.5" illumina_encoding_offset
 
 --Test the calculation of the Mean
 case_calc_simple_mean = calcMean (500 :: Int) (10 :: Int) @?= (50 :: Double) 
@@ -318,10 +321,23 @@ case_uop_minus_2 = evalMinus (NGOInteger (-10)) @?= (NGOInteger 10)
 
 case_files_in_dir = do
     x <- getFilesInDir "docs"
-    length x @?= 2
+    length x @?= 5
+
+case_template_id = template "a/B/c/d/xpto_1.fq" @?= template "a/B/c/d/xpto_1.fq"
+case_template    = template "a/B/c/d/xpto_1.fq" @?= "xpto_1"
 
 case_parse_filename = parseFileName "/var/folders/sample_1.9168$afterQC" @?= ("/var/folders/","sample_1")
 
+case_temp_fp      = assertNotEqual (getTempFilePath "xpto") (getTempFilePath "xpto")
+case_temp_fp_comp = assertNotEqual (getTFilePathComp "xpto") (getTFilePathComp "xpto")
+
+assertNotEqual a b = do
+    a' <- a 
+    b' <- b
+    mapM_ removeFile [a', b'] -- a' and b' creates a file, this line removes it.
+    assertBool "a' and b' should be different" (a' /= b')
+
+case_dir_contain_formats = doesDirContainFormats "NGLess/Tests" [".hs"] >>= assertBool "doesDirContainFormats \"NGLess/Tests\" [\".hs\"]" 
 
 -- Json Operations
 
@@ -354,44 +370,44 @@ samLineFlat = "IRIS:7:3:1046:1723#0\t4\t*\t0\t0\t*\t*\t0\t0\tAAAAAAAAAAAAAAAAAAA
 samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*", samPos = 0, samMapq = 0, samCigar = "*", samRNext = "*", samPNext = 0, samTLen = 0, samSeq = "AAAAAAAAAAAAAAAAAAAAAAA", samQual = "aaaaaaaaaaaaaaaaaa`aa`^"}   
 
 
--- Tests with scripts
+-- Tests with scripts (This will pass to a shell script)
 
-preprocess_s = "ngless '0.0'\n\
-    \input = fastq('samples/sample.fq')\n\
-    \preprocess(input) using |read|:\n\
-    \   read = read[3:]\n\
-    \   read = read[: len(read) ]\n\
-    \   read = substrim(read, min_quality=5)\n\
-    \   if len(read) > 20:\n\
-    \       continue\n\
-    \   if len(read) <= 20:\n\
-    \       discard\n\
-    \write(input, ofile='samples/resultSampleFiltered.txt')\n"
+--preprocess_s = "ngless '0.0'\n\
+--    \input = fastq('samples/sample.fq')\n\
+--    \preprocess(input) using |read|:\n\
+--    \   read = read[3:]\n\
+--    \   read = read[: len(read) ]\n\
+--    \   read = substrim(read, min_quality=5)\n\
+--    \   if len(read) > 20:\n\
+--    \       continue\n\
+--    \   if len(read) <= 20:\n\
+--    \       discard\n\
+--    \write(input, ofile='samples/resultSampleFiltered.txt')\n"
 
 
-map_s = "ngless '0.0'\n\
-    \input = fastq('samples/sample.fq')\n\
-    \preprocess(input) using |read|:\n\
-    \    if len(read) < 20:\n\
-    \        discard\n\
-    \mapped = map(input,reference='sacCer3')\n\
-    \write(mapped, ofile='samples/resultSampleSam.sam',format={sam})\n"
+--map_s = "ngless '0.0'\n\
+--    \input = fastq('samples/sample.fq')\n\
+--    \preprocess(input) using |read|:\n\
+--    \    if len(read) < 20:\n\
+--    \        discard\n\
+--    \mapped = map(input,reference='sacCer3')\n\
+--    \write(mapped, ofile='samples/resultSampleSam.sam',format={sam})\n"
 
-case_preprocess_script = case parsetest preprocess_s >>= checktypes of
-        Left err -> T.putStrLn err
-        Right expr -> do
-            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
-            (interpret preprocess_s) . nglBody $ expr
-            res' <- B.readFile "samples/resultSampleFiltered.txt"
-            (length $ B.lines res') @?= (16 :: Int)
+--case_preprocess_script = case parsetest preprocess_s >>= checktypes of
+--        Left err -> T.putStrLn err
+--        Right expr -> do
+--            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
+--            (interpret preprocess_s) . nglBody $ expr
+--            res' <- B.readFile "samples/resultSampleFiltered.txt"
+--            (length $ B.lines res') @?= (16 :: Int)
 
-case_map_script = case parsetest map_s >>= checktypes of
-        Left err -> T.putStrLn err
-        Right expr -> do
-            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
-            (interpret map_s) . nglBody $ expr
-            res' <- unCompress "samples/resultSampleSam.sam"
-            calcSamStats res' @?= [5,0,0,0]
+--case_map_script = case parsetest map_s >>= checktypes of
+--        Left err -> T.putStrLn err
+--        Right expr -> do
+--            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
+--            (interpret map_s) . nglBody $ expr
+--            res' <- unCompress "samples/resultSampleSam.sam"
+--            calcSamStats res' @?= [5,0,0,0]
 
 -- Test compute stats
 
