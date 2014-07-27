@@ -15,7 +15,6 @@ module Data.DefaultValues
     , getNglessRoot
     , hasPermissions
     , switchToCurDirectory
-    , switchToNglessRoot
     , InstallMode(..)
     ) where
 
@@ -39,8 +38,8 @@ htmlDefaultDirLibs = "htmllibs"
 htmlDefaultFonts :: String
 htmlDefaultFonts = "fonts"
 
-htmlDefaultDir :: String
-htmlDefaultDir = "../share/ngless/Html"
+htmlDefaultDir :: IO FilePath
+htmlDefaultDir = getNglessRoot >>= return . (</> "../share/ngless/Html")
 
 samDirPath :: String
 samDirPath = "../share/ngless/samtools-0.1.19" --setup puts the samtools directory on project root.
@@ -66,16 +65,9 @@ suGenomeDir :: FilePath
 suGenomeDir = "../share/ngless/genomes"
 
 
-
 -- this retrieves the actual path from the symLink
-switchToNglessRoot :: IO ()
-switchToNglessRoot =  getExecutablePath >>= setCurrentDirectory . takeDirectory
-
----
 getNglessRoot :: IO FilePath
-getNglessRoot = do
-  nglessRootPath<- getExecutablePath -- this retrieves the actual path from the symLink
-  return $ takeDirectory nglessRootPath
+getNglessRoot = getExecutablePath >>= return . takeDirectory
 
 getBWAPath :: IO String
 getBWAPath = getNglessRoot >>= return . (</> bwaDirPath)
