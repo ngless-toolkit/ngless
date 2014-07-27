@@ -31,12 +31,12 @@ import JSONManager
 writeReadSet :: B.ByteString -> [NGLessObject] -> Int -> IO FilePath
 writeReadSet fn rs enc = do
     temp <- getTemporaryDirectory 
-    newfp <- getTFilePathComp (temp </> (snd . splitFileName $ (B.unpack fn)))
+    newfp <- getTFilePathComp (temp </> (template $ (B.unpack fn)))
     writeGZIP newfp $ asFastQ rs enc
     return newfp
-
-asFastQ :: [NGLessObject] -> Int -> BL.ByteString
-asFastQ rs enc = BL.unlines . (fmap (showRead enc)) $ rs 
+  where
+    asFastQ :: [NGLessObject] -> Int -> BL.ByteString
+    asFastQ rs enc = BL.unlines . (fmap (showRead enc)) $ rs 
 
 
 readReadSet :: Int -> B.ByteString -> IO [NGLessObject]
@@ -57,16 +57,20 @@ decodeQual enc = B.map (chr . (flip (-) enc) . ord)
 encodeQual enc = B.map (chr . (flip (+) enc) . ord)
 
 readFastQ :: FilePath -> FilePath -> FilePath -> IO NGLessObject
-readFastQ fname info dirTemplate = do
-        contents <- unCompress fname
-        let fileData = computeStats contents
-        destDir <- setupRequiredFiles info dirTemplate 
-        printNglessLn $ "Generation of statistics for " ++ destDir
-        createBasicStatsJson (destDir ++ "/basicStats.js") fileData fname -- generate JSON DATA file: basicStats.js
-        printNglessLn $ "Simple Statistics for: " ++ destDir ++ " completed "  ++ (show $ length (qualCounts fileData)) ++ " Base pairs. Lowest char is: " ++ (show $ lc fileData)
-        printHtmlStatisticsData (qualCounts fileData) (ord (lc fileData)) destDir -- " " " file: perBaseQualScoresData.js
-        printNglessLn $ "File: " ++ fname ++ " loaded"
-        return $ NGOReadSet (B.pack fname) (ord (lc fileData)) (B.pack dirTemplate)
+readFastQ f info dirT = do
+        dst <- setupRequiredFiles info dirT                
+        fd <- unCompress f >>= return . computeStats
+        p "Generation of statistics for " dst
+        createBasicStatsJson (dst ++ "/basicStats.js") fd f -- generate JSON DATA file: basicStats.js
+        p "Simple Statistics completed for: " dst
+        p "Base pair: " (show $ length (qualCounts fd)) 
+        p "Lowest char is: " (show $ lc fd)
+        printHtmlStatisticsData (qualCounts fd) (enc fd) dst -- " " " file: perBaseQualScoresData.js
+        p "Loaded file: " f
+        return $ NGOReadSet (B.pack f) (enc fd) (B.pack dirT)
+    where
+        p s obj = printNglessLn $ s ++ obj
+        enc = ord . lc
 
 --remove encodeQual when not Pre-Processing.
 showRead :: Int -> NGLessObject -> BL.ByteString

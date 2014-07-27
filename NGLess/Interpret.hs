@@ -179,10 +179,7 @@ interpretExpr (IndexExpression expr ie) = do
     let r = evalIndex expr' ie'
     return r
 
-interpretExpr (ListExpression e) = do
-    res <- mapM (interpretExpr) e
-    return (NGOList $ res)
-
+interpretExpr (ListExpression e) = return . NGOList =<< mapM (interpretExpr) e
 interpretExpr _ = throwError $ "Not an expression"
 
 
@@ -207,12 +204,11 @@ topFunction Funique expr args _block = do
 topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ evaluateArguments args
-    res' <- executePreprocess expr' args' _block varName
-    res'' <- executeQualityProcess res' 
-    setVariableValue varName res''
-    return res''
+    res' <- executePreprocess expr' args' _block varName >>= executeQualityProcess 
+    setVariableValue varName res'
+    return res'
 
-topFunction Fpreprocess expr _ _ = error ("Passed type must be variable, but is: " ++ (show expr))
+topFunction Fpreprocess expr _ _ = error ("Should be used a variable with a NGOReadSet, but is: " ++ (show expr))
 
 topFunction Fwrite expr args _ = do 
     expr' <- interpretTopValue expr
@@ -255,8 +251,9 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
         m = lookup "mode" args
         a = lookup "ambiguity" args
         s = lookup "strand" args
-    _ <- liftIO $ print g
-    res <-  liftIO $ annotate (T.unpack e) g f dDS m a s
+    res <- liftIO $ do
+        print g
+        annotate (T.unpack e) g f dDS m a s
     return $ NGOAnnotatedSet res
 executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
 
@@ -265,7 +262,7 @@ executeQualityProcess (NGOList e) = return . NGOList =<< mapM (executeQualityPro
 executeQualityProcess (NGOReadSet fname _ nt) = executeQualityProcess' (B.unpack fname) "afterQC" (B.unpack nt)
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
-    newTemplate <- liftIO $ createOutputDir fname' -- new template only calculated once.
+    newTemplate <- liftIO $ generateDirId fname' -- new template only calculated once.
     r <- runInROEnvIO $ lookupVariable ".script"
     case r of
         Nothing -> throwError "Variable lookup error: .script"
@@ -278,55 +275,45 @@ executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]"
 executeQualityProcess' fname info nt = liftIO $ readFastQ fname info nt
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeMap (NGOList e) args = do
-    res <- mapM (\x -> executeMap x args) e
-    return (NGOList res)
-
+executeMap (NGOList e) args = return . NGOList =<< mapM (\x -> executeMap x args) e
 executeMap (NGOReadSet file _enc _) args = do
             case lookup "reference" args of 
                 Just refPath' -> liftIO $ interpretMapOp (evalString refPath') file
-                Nothing -> error ("a reference must be suplied")
+                Nothing       -> error ("A reference must be suplied")
+
 executeMap _ _ = error ("Not implemented yet")
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeUnique (NGOList e) args = do
-     res <- mapM (\x -> executeUnique x args) e
-     return $ NGOList res
-
-executeUnique (NGOReadSet file enc template) args = do
-        rs <- liftIO $ readReadSet enc file
-        dirName <- liftIO $ writeToNFiles (B.unpack file) enc rs
-        let numMaxOccur = lookup "max_copies" args
-        case numMaxOccur  of
-            Just value' -> do
-                let numMaxOccur' = fromIntegral (evalInteger $ value')
-                uniqueCalculations' numMaxOccur' dirName
-            _ -> uniqueCalculations' 2 dirName--default
+executeUnique (NGOList e) args = return . NGOList =<< mapM (\x -> executeUnique x args) e
+executeUnique (NGOReadSet file enc t) args = do
+        d <- liftIO $ 
+            readReadSet enc file 
+                        >>= writeToNFiles (B.unpack file) enc
+        case lookup "max_copies" args of
+            Just v -> uniqueCalculations' (v' v) d
+            _      -> uniqueCalculations' 2 d --default
     where 
+        v' = fromIntegral . evalInteger
         uniqueCalculations' :: Int -> FilePath -> InterpretationEnvIO NGLessObject
-        uniqueCalculations' numMaxOccur' dirName = do
-            rs' <- liftIO $ readNFiles enc numMaxOccur' dirName
-            newfp <- liftIO $ writeReadSet file rs' enc
-            return $ NGOReadSet (B.pack newfp) enc template
+        uniqueCalculations' numMaxOccur' d = do
+            nFp <- liftIO $ 
+                readNFiles enc numMaxOccur' d >>= \x -> writeReadSet file x enc 
+            return $ NGOReadSet (B.pack nFp) enc t
 
 executeUnique _ _ = error "executeUnique: Should not have happened"
 
 
-
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
-executePreprocess (NGOList e) args _block v = do
-    res <- mapM (\x -> executePreprocess x args _block v) e
-    return $ NGOList res
-
-executePreprocess (NGOReadSet file enc template) args (Block ([Variable var]) expr) _ = do
+executePreprocess (NGOList e) args _block v = return . NGOList =<< mapM (\x -> executePreprocess x args _block v) e
+executePreprocess (NGOReadSet file enc t) args (Block ([Variable var]) expr) _ = do
         rs <- liftIO $ do
             printNglessLn $ "ExecutePreprocess on " ++ (B.unpack file) 
             readReadSet enc file
         env <- gets snd
-        let rs' = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env) rs
-        newfp <- liftIO $ writeReadSet file rs' enc
-        return $ NGOReadSet (B.pack newfp) enc template
+        newfp <- liftIO $ writeReadSet file (execBlock env rs) enc
+        return $ NGOReadSet (B.pack newfp) enc t
     where
+        execBlock env = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env)
         interpretPBlock1 :: NGLessObject -> InterpretationROEnv (Maybe NGLessObject)
         interpretPBlock1 r = do
             r' <- interpretBlock1 ((var, r) : args) expr
