@@ -17,7 +17,7 @@ import qualified Data.Vector.Unboxed.Mutable as VM
 
 import Data.STRef
 import Data.Char
-import VectorOperations
+import VectorOperations(zeroVec, incVec)
 
 data Result =  Result {bpCounts :: (Int, Int, Int, Int) , lc :: Char, qualCounts ::  [V.Vector Int], nSeq :: Int, seqSize :: (Int,Int)} deriving(Eq,Show)
 

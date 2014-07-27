@@ -15,7 +15,6 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.Text as T
 
-import qualified Data.Vector.Unboxed as V
 import qualified Data.Map as Map
 
 import System.Directory
@@ -37,6 +36,7 @@ import SamBamOperations
 import Language
 import FileManagement
 import UnpackIlluminaGenomes
+import VectorOperations(getV)
 
 import Data.DefaultValues
 import Data.Sam
@@ -45,24 +45,23 @@ import Data.Sam
 numDecimalPlaces :: Int
 numDecimalPlaces = 2
 
-isDefaultGenome :: T.Text -> Bool
+isDefaultGenome :: T.Text -> Bool 
 isDefaultGenome name = name `elem` (map fst defaultGenomes)
 
-interpretMapOp ref ds = do
-    (ref', defGen') <- indexReference' ref
+interpretMapOp r ds = do
+    (ref', defGen') <- indexReference'
     samPath' <- mapToReference (T.pack ref') (B.unpack ds)
     getSamStats samPath'
     return $ NGOMappedReadSet (T.pack samPath') defGen'
     where 
-        indexReference' :: T.Text -> IO (FilePath, Maybe T.Text)
-        indexReference' r = 
+        r' = T.unpack r
+        indexReference' :: IO (FilePath, Maybe T.Text)
+        indexReference' = 
             case isDefaultGenome r of
                 False  -> indexReference r >>= \x -> return (x, Nothing) --user supplies genome
-                True   -> do
-                    let r' = T.unpack r
-                    res <- isIndexCalculated r'
+                True   -> do 
                     rootGen <- getGenomeDir r
-                    case res of 
+                    isIndexCalculated r' >>= \res -> case res of 
                         Nothing -> configGenome r' User >>= \x -> return (x, Just rootGen) -- download and install genome on User mode
                         Just p  -> return (T.unpack p , Just rootGen) -- already installed
 
@@ -102,8 +101,6 @@ printSamStats stats = do
     aligned = stats !! 1
     unique  = stats !! 2
     lowQ    = stats !! 3
-
-getV vec i =  V.unsafeIndex vec i
 
 calcDiv :: Int -> Int -> Double
 calcDiv a b = 
@@ -149,7 +146,6 @@ configGenome ref Root = do
     nglessRoot' <- getNglessRoot
     let dirPath = nglessRoot' </> suGenomeDir
     installGenome' dirPath ref Root
-
 configGenome ref User = do
     defGenomeDir' <- defGenomeDir
     installGenome' defGenomeDir' ref User
@@ -165,14 +161,14 @@ installGenome' p ref mode = do
 
 
 installGenome ref d = do
-    let url = getUcscUrl ref
     downloadReference url (d </> tarName)
     Tar.unpack d . Tar.read . GZip.decompress =<< LB.readFile ( d </> tarName)
    where 
         dirName = case lookup (T.pack ref) defaultGenomes of
             Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-            Just v -> v
+            Just v  -> v
         tarName = dirName <.> "tar.gz"
+        url = getUcscUrl ref
 
 downloadReference url destPath = runResourceT $ do
     manager <- liftIO $ newManager conduitManagerSettings

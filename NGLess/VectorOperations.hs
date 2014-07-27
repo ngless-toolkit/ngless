@@ -8,6 +8,8 @@ module VectorOperations
  ) where
 
 import qualified Data.Vector.Unboxed.Mutable as VM
+import qualified Data.Vector.Unboxed as V
+
 
 zeroVec n = do
     vec <- VM.unsafeNew n

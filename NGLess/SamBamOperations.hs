@@ -28,6 +28,3 @@ update result samLine = do
     incV (isAligned samLine) result (fromEnum Aligned)
     incV (isUnique samLine) result (fromEnum Unique) 
     incV (hasQual samLine) result (fromEnum LowQual) 
-
-
-  
