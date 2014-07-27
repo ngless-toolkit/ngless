@@ -61,8 +61,12 @@ reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
 reqLogo = $(HTML_LIBS_DIR)/Octocat.png
 #
 
+test: compile
+	cp dist/build/nglesstest/nglesstest .
+	./nglesstest
+
 install: install-dir install-html install-bwa install-sam
-	cp dist/build/nglesstest/nglesstest $(exec)/nglesstest
+#	cp dist/build/nglesstest/nglesstest $(exec)/nglesstest
 	cp dist/build/ngless/ngless $(exec)/ngless
 
 install-html:
