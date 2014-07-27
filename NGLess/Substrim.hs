@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module FPreProcess
+module Substrim
     ( substrim
     , calculateSubStrim
     , removeBps
@@ -17,9 +17,8 @@ removeBps :: B.ByteString -> (Int,Int) -> B.ByteString
 removeBps bps (index,size) = B.take size (B.drop index bps)
 
 substrim :: Int -> NGLessObject -> NGLessObject
-substrim cutoff (NGOShortRead rId rSeq rQual) = do
-    let res = calculateSubStrim rQual (chr cutoff)
-    NGOShortRead rId (removeBps rSeq res) (removeBps rQual res)
+substrim cutoff (NGOShortRead rId rS rQ) = NGOShortRead rId (removeBps rS r) (removeBps rQ r)
+    where r = calculateSubStrim rQ (chr cutoff)
 
 substrim _ _ = error "substrim: must have type Int and NGOShortRead"
 

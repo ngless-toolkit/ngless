@@ -27,7 +27,7 @@ import Data.Maybe
 
 import Unique
 import ProcessFastQ
-import FPreProcess
+import Substrim
 import Language
 import FileManagement
 import JSONManager

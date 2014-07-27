@@ -67,13 +67,3 @@ getV c p = do
     lower <- VM.read c (ord p)
     upper <- VM.read c (ord . toUpper $ p)
     return (lower + upper)
-
-getLC c = getLC' 0
-    where
-        n = V.length c
-        getLC' i | n == i = return n
-        getLC' i = do
-            ci <- V.unsafeIndex c i
-            if ci > 0
-                then return i
-                else getLC' (i + 1)

@@ -1,10 +1,11 @@
 
 module VectorOperations
-    (
+ (
  zeroVec,
  incV,
- incVec
-    ) where
+ incVec,
+ getV
+ ) where
 
 import qualified Data.Vector.Unboxed.Mutable as VM
 
@@ -13,10 +14,10 @@ zeroVec n = do
     VM.set vec (0 :: Int)
     return vec
 
-
 incV False _ _ = return ()
-incV True v i = incVec v i
+incV True  v i = incVec v i
    
-incVec v i = do
-    cur <- VM.unsafeRead v i
-    VM.unsafeWrite v i (cur + 1)
+incVec v i = VM.unsafeRead v i >>= \c -> VM.unsafeWrite v i (c + 1)
+
+getV vec i =  V.unsafeIndex vec i
+

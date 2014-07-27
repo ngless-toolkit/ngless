@@ -17,14 +17,12 @@ import Text.ParserCombinators.Parsec.Prim (GenParser)
 import Text.Parsec (SourcePos)
 import Text.Parsec.Pos (newPos)
 
-import System.Directory(removeFile, getCurrentDirectory)
-import System.FilePath.Posix((</>))
+import System.Directory(removeFile)
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
 
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import Data.Aeson
 
 import qualified Data.IntervalMap.Strict as IM
@@ -37,17 +35,15 @@ import Tokens
 import Types
 import PrintFastqBasicStats
 import PerBaseQualityScores
-import FPreProcess
+import Substrim
 import FastQFileData
 import FileManagement
-import MapInterpretOperation
 import Validation
 import CountOperation
 import Annotation
 
 import Data.Sam
 import Data.Json
-import Data.DefaultValues
 import Data.AnnotRes
 import qualified Data.GFF as GFF
 
