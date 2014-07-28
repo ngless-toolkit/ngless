@@ -64,7 +64,7 @@ check_assignment Nothing _ = return ()
 check_assignment a b = guard (a == b)
 
 nglTypeOf :: Expression -> TypeMSt (Maybe NGLType)
-nglTypeOf (FunctionCall f arg _ _) = checkfunccall f arg
+nglTypeOf (FunctionCall f arg args _) = checkfuncargs f args *> checkfunccall f arg
 nglTypeOf (Lookup (Variable v)) = envLookup v
 nglTypeOf (ConstStr _) = return (Just NGLString)
 nglTypeOf (ConstNum _) = return (Just NGLInteger)
@@ -90,12 +90,12 @@ checkuop UOpMinus e = checkinteger e
 checkbop BOpAdd a b = checkinteger a *> checkinteger b
 checkbop BOpMul a b = checkinteger a *> checkinteger b 
 
-checkbop BOpGT  a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
-checkbop BOpGTE a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
-checkbop BOpLT  a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
-checkbop BOpLTE a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
-checkbop BOpEQ  a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
-checkbop BOpNEQ a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
+checkbop BOpGT  a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
+checkbop BOpGTE a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
+checkbop BOpLT  a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
+checkbop BOpLTE a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
+checkbop BOpEQ  a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
+checkbop BOpNEQ a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
 
 
 checkbool (ConstBool _) = return (Just NGLBool)
@@ -156,4 +156,21 @@ funcCallNoVerification arg = do
         Just (NGList t) -> return $ Just (NGList t)    
         Just t -> return (Just t)
         Nothing -> errorInLine "Could not infer type of argument"
+
+checkfuncargs :: FuncName -> [(Variable, Expression)] -> TypeMSt ()
+checkfuncargs f args = mapM_ (checkfuncarg f) args
+
+checkfuncarg :: FuncName -> (Variable, Expression) -> TypeMSt ()
+checkfuncarg f (v, e) = do
+    eType <- nglTypeOf e
+    let arg_type = function_opt_arg_type f v
+    case eType of
+        Just v  -> checkargtype v arg_type *> return ()
+        Nothing -> errorInLine "Could not infer type of argument"
+    where
+        checkargtype t t' = when (t /= t') (errorInLineC
+                            ["Bad argument type in ", show f ,", variable " , show v,". expects ", show t, " got ", show t', "."])
+
+
+
 
