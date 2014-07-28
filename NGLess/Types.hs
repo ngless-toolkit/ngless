@@ -87,10 +87,23 @@ nglTypeOf (Sequence _es) = error "unexpected nglTypeOf(Sequence)"
 checkuop UOpLen e = checklist e *> return (Just NGLInteger)
 checkuop UOpMinus e = checkinteger e
 
-checkbop _ a b = checkinteger a *> checkinteger b
+checkbop BOpAdd a b = checkinteger a *> checkinteger b
+checkbop BOpMul a b = checkinteger a *> checkinteger b 
+
+checkbop BOpGT  a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
+checkbop BOpGTE a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
+checkbop BOpLT  a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
+checkbop BOpLTE a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
+checkbop BOpEQ  a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
+checkbop BOpNEQ a b = checkinteger a *> checkinteger b >> return (Just NGLBool)
+
 
 checkbool (ConstBool _) = return (Just NGLBool)
-checkbool _ = errorInLine "Expected boolean"
+checkbool expr = do
+    t <- nglTypeOf expr
+    if t /= Just NGLBool
+        then  errorInLine "Expected boolean."
+        else return t
 
 checkinteger (ConstNum _) = return (Just NGLInteger)
 checkinteger expr = do
@@ -120,11 +133,10 @@ checklist (Lookup (Variable v)) = do
         _ -> errorInLine "List expected"
 checklist _ = errorInLine "List expected"
 
-checkfunccall :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
 -- No verification should be made for Fwrite and Fprint since it can be any NGLtype
+checkfunccall :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
 checkfunccall Fwrite arg = funcCallNoVerification arg
 checkfunccall Fprint arg = funcCallNoVerification arg
-
 checkfunccall f arg = do
         targ <- nglTypeOf arg
         let etype = function_arg_type f
