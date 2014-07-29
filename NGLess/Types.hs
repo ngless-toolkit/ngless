@@ -165,11 +165,11 @@ checkfuncarg f (v, e) = do
     eType <- nglTypeOf e
     let arg_type = function_opt_arg_type f v
     case eType of
-        Just v  -> checkargtype v arg_type *> return ()
+        Just x  -> checkargtype x arg_type *> return ()
         Nothing -> errorInLine "Could not infer type of argument"
     where
         checkargtype t t' = when (t /= t') (errorInLineC
-                            ["Bad argument type in ", show f ,", variable " , show v,". expects ", show t, " got ", show t', "."])
+                            ["Bad argument type in ", show f ,", variable " , show v,". expects ", show t', " got ", show t, "."])
 
 
 

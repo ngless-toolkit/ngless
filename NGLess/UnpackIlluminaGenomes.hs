@@ -7,7 +7,8 @@ module UnpackIlluminaGenomes
       defGenomeDir,
       getIndexPath,
       getGff,
-      getGenomeRootPath
+      getGenomeRootPath,
+      isDefaultGenome
     ) where
 
 import qualified Data.Text as T
@@ -42,6 +43,8 @@ defaultGenomes = [
                     ("ce10","Caenorhabditis_elegans"),
                     ("sacCer3","Saccharomyces_cerevisiae")
                  ]
+isDefaultGenome :: T.Text -> Bool 
+isDefaultGenome name = name `elem` (map fst defaultGenomes)
 
 getUcscUrl :: FilePath -> FilePath
 getUcscUrl genome = 

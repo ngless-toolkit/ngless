@@ -213,7 +213,7 @@ case_type_complete = isOkTypes $ (parsetest complete) >>= checktypes
 
 complete = "ngless '0.0'\n\
     \reads = fastq('input1.fq')\n\
-    \reads = unique(reads,maxCopies=2)\n\
+    \reads = unique(reads,max_copies=2)\n\
     \preprocess(reads) using |read|:\n\
     \    read = read[5:]\n\
     \    read = substrim(read, minQuality=24)\n\
@@ -253,11 +253,11 @@ case_bad_function_attr_count = isError $ parsetest function_attr >>= validate
 
 case_good_function_attr_count_1 = isOkTypes $ parsetest good_function_attr >>= validate
     where good_function_attr = "ngless '0.0'\n\
-            \write(count(annotated, count={gene}),ofile='gene_counts.csv',format={csv})"
+            \write(count(annotated, counts=[{gene}]),ofile='gene_counts.csv',format={csv})"
 
 case_good_function_attr_count_2 = isOkTypes $ parsetest good_function_attr >>= validate
     where good_function_attr = "ngless '0.0'\n\
-            \counts = count(annotated, count={gene})"
+            \counts = count(annotated, counts=[{gene}])"
 
 case_bad_function_attr_map = isError $ parsetest function_attr >>= validate
     where function_attr = "ngless '0.0'\n\
@@ -409,7 +409,7 @@ samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*
 
 case_compute_stats_lc = do
     contents <- unCompress "samples/resultSampleFiltered.txt"
-    (lc $ computeStats contents) @?= 'X'
+    (lc $ computeStats contents) @?= ']'
 
 -- Parse GFF lines
 

@@ -19,7 +19,6 @@ import Data.DefaultValues
 
 import Control.Applicative
 import System.Console.CmdArgs
-import System.Directory
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -95,7 +94,6 @@ optsExec (DefaultMode dmode fname) = do
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
-    getCurrentDirectory >>= print
     _ <- defaultDir >>= createDirIfNotExists  -- this is the dir where everything will be kept.
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of

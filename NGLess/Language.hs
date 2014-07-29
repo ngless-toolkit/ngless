@@ -53,20 +53,20 @@ function_arg_type = snd . function_argtype_return_type
 
 
 function_opt_arg_type :: FuncName -> Variable -> NGLType
-function_opt_arg_type Ffastq  _      = error ("Fastq function does not have any argument")
+function_opt_arg_type Funique     (Variable "max_copies")  = NGLInteger
+function_opt_arg_type Fmap        (Variable "reference")   = NGLString
+function_opt_arg_type Fannotate   (Variable "gff")         = NGLString
+function_opt_arg_type Fannotate   (Variable "mode")        = NGLString
+function_opt_arg_type Fannotate   (Variable "features")    = NGList NGLSymbol
+function_opt_arg_type Fannotate   (Variable "ambiguity")   = NGLSymbol
+function_opt_arg_type Fannotate   (Variable "strand")      = NGLSymbol
+function_opt_arg_type Fcount      (Variable "counts")      = NGList NGLSymbol
+function_opt_arg_type Fcount      (Variable "min")         = NGLSymbol
+function_opt_arg_type Fsubstrim   (Variable "min_quality") = NGLInteger
+function_opt_arg_type Fwrite      (Variable "ofile")       = NGLString
+function_opt_arg_type Fwrite      (Variable "format")      = NGLSymbol
+function_opt_arg_type Ffastq       _ = error ("Fastq function does not have any argument")
 function_opt_arg_type Fpreprocess  _ = error ("Preprocess function does not have any argument")
-function_opt_arg_type Funique (Variable "max_copies")    = NGLInteger
-function_opt_arg_type Fmap    (Variable "reference")     = NGLString
-function_opt_arg_type Fannotate (Variable "gff")         = NGLString
-function_opt_arg_type Fannotate (Variable "mode")        = NGLString
-function_opt_arg_type Fannotate (Variable "features")    = NGList NGLSymbol
-function_opt_arg_type Fannotate (Variable "ambiguity")   = NGLSymbol
-function_opt_arg_type Fannotate (Variable "strand")      = NGLSymbol
-function_opt_arg_type Fcount (Variable "counts")         = NGList NGLSymbol
-function_opt_arg_type Fcount (Variable "min")            = NGLSymbol
-function_opt_arg_type Fsubstrim (Variable "min_quality") = NGLInteger
-function_opt_arg_type Fwrite (Variable "ofile")          = NGLString
-function_opt_arg_type Fwrite (Variable "format")         = NGLString
 function_opt_arg_type e (Variable x) = error ("Function " ++ (show e) ++ " does not have argument: " ++ show x)
 
 
