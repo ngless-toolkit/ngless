@@ -146,7 +146,7 @@ parsegffType "CDS" = GffCDS
 parsegffType t = GffOther t
 
 strand :: Char -> GffStrand
-strand '.' = GffUnStranded
+strand '.' = GffUnStranded -- present in both strands
 strand '+' = GffPosStrand
 strand '-' = GffNegStrand
 strand '?' = GffUnknownStrand
@@ -162,18 +162,28 @@ strict :: L.ByteString -> S.ByteString
 strict = S.concat . L.toChunks
 
 filterFeatures :: Maybe NGLessObject -> GffLine -> Bool
-filterFeatures feats gffL = maybe True (fFeat gffL) feats
-  where 
-        fFeat g (NGOList f) = foldl (\a b -> a || b) False (map (filterFeatures' g) f)
-        fFeat _ err = error("Type should be NGOList but received: " ++ (show err))
+filterFeatures feats gffL = case feats of
+    Nothing          -> (==GffGene) . gffType $ gffL
+    Just (NGOList f) -> foldl (\a b -> a || b) False (map (filterFeatures' gffL) f)
+    err              -> error("Type should be NGOList but received: " ++ (show err))
+
 
 filterFeatures' :: GffLine -> NGLessObject -> Bool
-filterFeatures' g (NGOSymbol "gene") = (==GffGene) . gffType $ g
-filterFeatures' g (NGOSymbol "exon") = (==GffExon) . gffType $ g
-filterFeatures' g (NGOSymbol "cds" ) = (==GffCDS) . gffType  $ g
-filterFeatures' g (NGOSymbol "CDS" ) = (==GffCDS) . gffType  $ g
+filterFeatures' g (NGOSymbol "gene") = isGene g
+filterFeatures' g (NGOSymbol "exon") = isExon g
+filterFeatures' g (NGOSymbol "cds" ) = isCDS  g
+filterFeatures' g (NGOSymbol "CDS" ) = isCDS  g 
 filterFeatures' g (NGOSymbol s) = (S8.unpack . showType . gffType $ g) == (T.unpack s)
 filterFeatures' _ s = error ("Type should be NGOList but received: " ++ (show s))
+
+isGene :: GffLine -> Bool
+isGene = (==GffGene) . gffType
+
+isExon :: GffLine -> Bool
+isExon = (==GffExon) . gffType
+
+isCDS :: GffLine -> Bool
+isCDS = (==GffExon) . gffType
 
 
 showType :: GffType -> S.ByteString

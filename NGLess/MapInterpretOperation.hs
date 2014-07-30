@@ -45,8 +45,6 @@ import Data.Sam
 numDecimalPlaces :: Int
 numDecimalPlaces = 2
 
-isDefaultGenome :: T.Text -> Bool 
-isDefaultGenome name = name `elem` (map fst defaultGenomes)
 
 interpretMapOp r ds = do
     (ref', defGen') <- indexReference'

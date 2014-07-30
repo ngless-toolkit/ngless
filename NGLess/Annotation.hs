@@ -56,9 +56,9 @@ getIntervalQuery m = fromMaybe (union) (getMode m)
 getMode m = case m of
             Nothing -> Nothing
             Just v  -> case v of
-                    (NGOString "union")                  -> Just union
-                    (NGOString "intersection_strict")    -> Just intersection_strict
-                    (NGOString "intersection_non_empty") -> Just intersection_non_empty
+                    (NGOSymbol "union")                  -> Just union
+                    (NGOSymbol "intersection_strict")    -> Just intersection_strict
+                    (NGOSymbol "intersection_non_empty") -> Just intersection_non_empty
                     _ -> error ("Provided type for 'mode' has to be either 'intersecting' or 'withing'")
 
 
