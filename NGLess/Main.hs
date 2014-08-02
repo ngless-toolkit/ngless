@@ -9,6 +9,7 @@ module Main
 import FileManagement
 import Interpret
 import Validation
+import ValidationNotPure
 import Language
 import Tokens
 import Types
@@ -63,7 +64,7 @@ visualizeargs = VisualizeMode
 function :: String -> String -> T.Text -> IO ()
 function "ngless" fname text = case parsengless fname text >>= validate >>= checktypes of
             Left err -> T.putStrLn err
-            Right expr -> (interpret text) . nglBody $ expr
+            Right expr -> (interpret text) . nglBody =<< validate_io expr
 
 function "ast" fname text = case parsengless fname text >>= validate of
             Left err -> T.putStrLn (T.concat ["Error in parsing: ", err])
