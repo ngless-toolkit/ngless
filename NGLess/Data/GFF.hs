@@ -183,7 +183,7 @@ isExon :: GffLine -> Bool
 isExon = (==GffExon) . gffType
 
 isCDS :: GffLine -> Bool
-isCDS = (==GffExon) . gffType
+isCDS = (==GffCDS) . gffType
 
 
 showType :: GffType -> S.ByteString
