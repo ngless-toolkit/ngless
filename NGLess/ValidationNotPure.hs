@@ -41,9 +41,15 @@ validate_fp :: Script -> IO (Maybe T.Text)
 validate_fp (Script _ es) = check_toplevel validate_fp' es
     where
         validate_fp' (FunctionCall Ffastq (ConstStr x) _ _) = isValidFile x
+--        validate_fp' (FunctionCall Fwrite _ args _) = valArgument "ofile" args 
+        validate_fp' (FunctionCall Fannotate _ args _) = valArgument "gff" args 
         validate_fp' (Assignment _ e) = validate_fp' e
         validate_fp' _ = return Nothing
  
+valArgument :: T.Text -> [(Variable,Expression)] -> IO (Maybe T.Text)
+valArgument v args = case lookup (Variable v) args of
+        Just (ConstStr x) -> isValidFile x  
+        _                 -> return Nothing
 
 validate_def_genomes :: Script -> IO (Maybe T.Text)
 validate_def_genomes (Script _ es) = check_toplevel validate_def_genomes' es
