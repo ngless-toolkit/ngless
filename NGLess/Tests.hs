@@ -416,14 +416,48 @@ case_invalid_fwrite_format = isError $ parsetest f_attr >>= checktypes
 
 -- Validation non pure functions
 
+-----------------------------------
+----------  IMPORTANT -------------
+-- File: Makefile allways exists.
+-- File: fq never exists.
+-----------------------------------
 
-
-case_invalid_fp_fastq = case parsetest function_attr of
-    Left  _ -> assertFailure "Error on parse (not being test). Should not have happened."
-    Right e -> isError =<< validate_io' e
+case_valid_not_pure_fp_fastq = isError =<< validate_io' (fromRight . parsetest $ f_attr)
     where 
-        function_attr = "ngless '0.0'\n\
-                         \fastq('fq')\n"
+        f_attr = "ngless '0.0'\n\
+                 \fastq('fq')\n"
+
+case_invalid_not_pure_fp_fastq = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
+    where 
+        f_attr = "ngless '0.0'\n\
+                 \fastq('Makefile')\n" --File Makefile Allways Exists
+
+case_valid_not_pure_map_reference = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
+    where 
+        f_attr = "ngless '0.0'\n\
+                 \map(x, reference='Makefile')\n"
+
+case_invalid_not_pure_map_def_reference = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
+    where 
+        f_attr = "ngless '0.0'\n\
+                 \map(x, reference='sacCer3')\n"
+
+case_invalid_not_pure_map_reference = isError =<< validate_io' (fromRight . parsetest $ f_attr)
+    where 
+        f_attr = "ngless '0.0'\n\
+                 \map(x, reference='fq')\n"
+
+
+
+case_valid_not_pure_annotate_gff = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
+    where 
+        f_attr = "ngless '0.0'\n\
+                 \annotate(x, gff='Makefile')\n"
+
+case_invalid_not_pure_annotate_gff = isError =<< validate_io' (fromRight . parsetest $ f_attr)
+    where 
+        f_attr = "ngless '0.0'\n\
+                 \annotate(x, gff='fq')\n"
 
 --- Validation pure functions
 
