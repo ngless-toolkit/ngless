@@ -5,7 +5,8 @@
 
 module ValidationNotPure
     ( 
-        validate_io
+        validate_io,
+        validate_io'
     ) where
 
 import Language
@@ -18,10 +19,17 @@ import qualified Data.Text as T
 
 validate_io :: Script -> IO Script
 validate_io expr = do
+    r <- validate_io' expr 
+    case r of
+        Left  err -> error . T.unpack $ err
+        Right e   -> return e
+
+validate_io' :: Script -> IO (Either T.Text Script)
+validate_io' expr = do
     err <- mapM ($expr) checks
     case catMaybes err of
-        [] -> return expr
-        errors -> error . T.unpack $ T.concat errors
+        [] -> return . Right $ expr
+        errors -> return . Left . T.concat $ errors
     where
         checks =
             [validate_fp,
