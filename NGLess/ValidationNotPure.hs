@@ -16,13 +16,12 @@ import System.Directory
 import Data.Maybe
 import qualified Data.Text as T
 
-
 validate_io :: Script -> IO Script
 validate_io expr = do
     err <- mapM ($expr) checks
     case catMaybes err of
         [] -> return expr
-        errors -> error . show $ (T.concat errors)
+        errors -> error . T.unpack $ T.concat errors
     where
         checks =
             [validate_fp,
@@ -34,13 +33,15 @@ validate_fp :: Script -> IO (Maybe T.Text)
 validate_fp (Script _ es) = check_toplevel validate_fp' es
     where
         validate_fp' (FunctionCall Ffastq (ConstStr x) _ _) = isValidFile x
+        validate_fp' (Assignment _ e) = validate_fp' e
         validate_fp' _ = return Nothing
  
 
 validate_def_genomes :: Script -> IO (Maybe T.Text)
 validate_def_genomes (Script _ es) = check_toplevel validate_def_genomes' es
     where
-        validate_def_genomes' (FunctionCall Fmap _ args _) = isValidateRef (fromJust $ lookup "reference" (eval_vars args)) -- fromJust can be used, since reference is always required and already validated.
+        validate_def_genomes' (FunctionCall Fmap _ args _) = isValidRef (fromJust $ lookup "reference" (eval_vars args)) -- fromJust can be used, since reference is always required and already validated.
+        validate_def_genomes' (Assignment _ e) = validate_def_genomes' e
         validate_def_genomes' _ = return Nothing
         eval_vars = map (\(Variable k,e) -> (k, e))
 
@@ -63,14 +64,14 @@ isValidFile x = do
         True  -> return $ Nothing
         False -> return $ Just (T.concat ["File name: ", x, " does not exist."])
 
-isValidateRef :: Expression -> IO (Maybe T.Text)
-isValidateRef x = case x of
-    ConstStr v -> isValidateRef' v
+isValidRef :: Expression -> IO (Maybe T.Text)
+isValidRef x = case x of
+    ConstStr v -> isValidRef' v
     _          -> return Nothing
     where
-        isValidateRef' v = do
+        isValidRef' v = do
             r <- doesFileExist (T.unpack v)
-            case isDefaultGenome v && r of
+            case isDefaultGenome v || r of
                 True  -> return $ Nothing
                 False -> return $ Just (T.concat ["Value of argument reference ", v, " is neither a filepath or a default genome."])
 
