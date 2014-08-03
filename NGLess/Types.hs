@@ -52,6 +52,11 @@ inferM (Assignment (Variable v) expr) = do
 inferM (Condition c te fe) = checkbool c >> inferM te >> inferM fe
 inferM e = void (nglTypeOf e)
 
+inferBlock :: Maybe Block -> TypeMSt ()
+inferBlock b = case b of
+    Just (Block vars es) -> mapM_ (\(Variable v) -> envInsert v NGLRead) vars >> inferM es
+    Nothing -> return ()
+
 envLookup :: T.Text -> TypeMSt (Maybe NGLType)
 envLookup v = Map.lookup v . snd <$> get
 
@@ -64,7 +69,7 @@ check_assignment Nothing _ = return ()
 check_assignment a b = guard (a == b)
 
 nglTypeOf :: Expression -> TypeMSt (Maybe NGLType)
-nglTypeOf (FunctionCall f arg args _) = checkfuncargs f args *> checkfunccall f arg
+nglTypeOf (FunctionCall f arg args b) = inferBlock b *> checkfuncargs f args *> checkfunccall f arg
 nglTypeOf (Lookup (Variable v)) = envLookup v
 nglTypeOf (ConstStr _) = return (Just NGLString)
 nglTypeOf (ConstNum _) = return (Just NGLInteger)
@@ -130,7 +135,8 @@ checklist (Lookup (Variable v)) = do
     vtype <- envLookup v
     case vtype of
         Just (NGList btype) -> return (Just btype)
-        _ -> errorInLine "List expected"
+        Just NGLRead -> return (Just NGLRead)
+        e -> errorInLine $ T.concat ["List expected. Type ", T.pack . show $ e , " provided."]
 checklist _ = errorInLine "List expected"
 
 -- No verification should be made for Fwrite and Fprint since it can be any NGLtype
@@ -163,7 +169,7 @@ checkfuncargs f args = mapM_ (checkfuncarg f) args
 checkfuncarg :: FuncName -> (Variable, Expression) -> TypeMSt ()
 checkfuncarg f (v, e) = do
     eType <- nglTypeOf e
-    let arg_type = function_opt_arg_type f v
+    arg_type <- checkfuncarg' f v
     case eType of
         Just x  -> checkargtype x arg_type *> return ()
         Nothing -> errorInLine "Could not infer type of argument"
@@ -172,5 +178,8 @@ checkfuncarg f (v, e) = do
                             ["Bad argument type in ", show f ,", variable " , show v,". expects ", show t', " got ", show t, "."])
 
 
+checkfuncarg' f v = case function_opt_arg_type f v of
+    Left  err -> errorInLine err
+    Right e   -> return e
 
 
