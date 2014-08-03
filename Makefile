@@ -115,20 +115,18 @@ confhtmllibdir:
 
 $(BWA):
 	@echo Configuring BWA...
-	wget $(BWA_URL);
-	tar xvfj $(BWA_DIR) ;
-	rm $(BWA_DIR);
-	cd $(BWA);
-	$(MAKE);
+	wget $(BWA_URL)
+	tar xvfj $(BWA_DIR)
+	rm $(BWA_DIR)
+	cd $(BWA); $(MAKE)
 
 $(SAM): 
 	@echo Configuring SAM...
-	wget $(SAM_URL);
-	tar xvfj $(SAM_DIR) ;
-	rm $(SAM_DIR);
-	cd $(SAM);
-	$(MAKE);
-	@echo SAM completed...
+	wget $(SAM_URL)
+	tar xvfj $(SAM_DIR)
+	rm $(SAM_DIR)
+	cd $(SAM); $(MAKE)
+	@echo Sam tools completed...
 
 
 $(HTML_LIBS_DIR)/%.js: 
