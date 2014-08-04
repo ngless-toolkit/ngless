@@ -321,14 +321,14 @@ case_valid_fannot_mode = isOkTypes $ parsetest f_attr >>= checktypes
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
                   \y = map(x, reference='xpto')\n\
-                  \annotate(y, mode='union')"
+                  \annotate(y, mode={union})"
 
 case_invalid_fannot_mode = isError $ parsetest f_attr >>= checktypes
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
                   \y = map(x, reference='xpto')\n\
-                  \annotate(y, mode={union})"
+                  \annotate(y, mode='union')"
 
 case_valid_fannot_features = isOkTypes $ parsetest f_attr >>= checktypes
     where 
