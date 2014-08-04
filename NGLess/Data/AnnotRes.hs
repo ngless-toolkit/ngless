@@ -10,6 +10,7 @@ module Data.AnnotRes
       , writeAnnotCount
       , showGffCountDel
       , isEqual
+      , showUniqIdCounts
     ) where
 
 import qualified Data.Text as T
@@ -17,6 +18,8 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
+
+import qualified Data.Map.Strict as Map
 
 import Control.DeepSeq
 import System.FilePath.Posix((</>), splitFileName)
@@ -102,3 +105,19 @@ writeAnnotCount fn im = do
     L8.writeFile newfp $ showGffCount im
     putStrLn "Write completed"
     return .  T.pack $ newfp
+
+showUniqIdCounts :: S8.ByteString -> L8.ByteString -> L8.ByteString
+showUniqIdCounts del cont = uniqueIdCountMap del . mergeIds . readAnnotCounts $ cont
+
+uniqueIdCountMap :: S8.ByteString -> Map.Map S.ByteString Int -> L8.ByteString
+uniqueIdCountMap del m = Map.foldrWithKey' (\k v r -> L8.append (showIdVal k v) r) L8.empty m
+  where 
+    encode = S8.pack . show
+    showIdVal k v = L8.fromChunks [k, del, encode v, "\n"]
+
+mergeIds :: [GffCount] -> Map.Map S.ByteString Int
+mergeIds s = foldl (updateM) Map.empty s
+
+updateM :: Map.Map S.ByteString Int -> GffCount -> Map.Map S.ByteString Int
+updateM m g = Map.insertWith (+) (annotSeqId g) (annotCount g) m
+

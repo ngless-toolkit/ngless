@@ -112,7 +112,9 @@ check_symbol_val_in_arg f a = case f of
                                         ,("strand"    ,str_v)
                                         ,("mode"      ,mode_v)]
         Fcount    -> check "counts" (get_v "counts", symbols_list)
-        Fwrite    -> check "format" (get_v "format", format_v)
+        Fwrite    -> errors_from_list $ map (\(k,v) -> check k (get_v k, v)) 
+                                                [("format", format_v)
+                                                ,("verbose", str_v)]
         _         -> Nothing
     where 
         amb_v   = ["allow", "deny"]

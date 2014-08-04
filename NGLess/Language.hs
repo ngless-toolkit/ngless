@@ -56,7 +56,7 @@ function_opt_arg_type :: FuncName -> Variable -> Either T.Text NGLType
 function_opt_arg_type Funique     (Variable "max_copies")  = Right NGLInteger
 function_opt_arg_type Fmap        (Variable "reference")   = Right NGLString
 function_opt_arg_type Fannotate   (Variable "gff")         = Right NGLString
-function_opt_arg_type Fannotate   (Variable "mode")        = Right NGLString
+function_opt_arg_type Fannotate   (Variable "mode")        = Right NGLSymbol
 function_opt_arg_type Fannotate   (Variable "features")    = Right $ NGList NGLSymbol
 function_opt_arg_type Fannotate   (Variable "ambiguity")   = Right NGLSymbol
 function_opt_arg_type Fannotate   (Variable "strand")      = Right NGLSymbol
@@ -65,6 +65,7 @@ function_opt_arg_type Fcount      (Variable "min")         = Right NGLInteger
 function_opt_arg_type Fsubstrim   (Variable "min_quality") = Right NGLInteger
 function_opt_arg_type Fwrite      (Variable "ofile")       = Right NGLString
 function_opt_arg_type Fwrite      (Variable "format")      = Right NGLSymbol
+function_opt_arg_type Fwrite      (Variable "verbose")     = Right NGLSymbol
 function_opt_arg_type Ffastq       _ = Left "Fastq function does not have any argument"
 function_opt_arg_type Fpreprocess  _ = Left "Preprocess function does not have any argument"
 function_opt_arg_type e (Variable x) = Left $ T.concat ["Function " ,T.pack . show $ e ," does not have argument: ", x]

@@ -58,16 +58,22 @@ writeToFile el@(NGOMappedReadSet fp defGen) args = do
             _     -> writeToUncFile el newfp -- Sam file is the kept format so no need to convert.
 
 writeToFile (NGOAnnotatedSet fp) args = do
-    let newfp = getNGOString (lookup "ofile" args)
+    let newfp = getNGOString $ lookup "ofile" args
+        del = getDelimiter  $ lookup "format" args
     printNglessLn $ "Writing your NGOAnnotatedSet to: " ++ (T.unpack newfp)
     cont <- unCompress (T.unpack fp)
-    writeAnnotResWDel' newfp cont $ getDelimiter (lookup "format" args)
+    case lookup "verbose" args of
+        Just (NGOSymbol "no")  -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
+        Just (NGOSymbol "yes") -> writeAnnotResWDel' newfp (showGffCountDel del . readAnnotCounts $ cont)
+        Just err -> error ("verbose received a " ++ (show err) ++ " but value can only be yes or no.")
+        Nothing -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
     where
-        writeAnnotResWDel' p cont del = do
-            write (T.unpack p) (showGffCountDel del . readAnnotCounts $ cont)
+        writeAnnotResWDel' p cont = do
+            write (T.unpack p) cont
             return $ NGOAnnotatedSet p
             
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
+
 
 
 getDelimiter :: Maybe NGLessObject -> B.ByteString
