@@ -17,7 +17,7 @@ import Text.ParserCombinators.Parsec.Prim (GenParser)
 import Text.Parsec (SourcePos)
 import Text.Parsec.Pos (newPos)
 
-import System.Directory(removeFile)
+import System.Directory(removeFile, removeDirectoryRecursive)
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
@@ -28,11 +28,14 @@ import Data.Aeson
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.IntervalMap.Interval as IM
 
+import qualified Data.Vector.Unboxed as V
+
 import Language
 import Interpret
 import Parse
 import Tokens
 import Types
+import Unique
 import PrintFastqBasicStats
 import PerBaseQualityScores
 import Substrim
@@ -42,6 +45,9 @@ import Validation
 import CountOperation
 import Annotation
 import ValidationNotPure
+import SamBamOperations
+import VectorOperations
+import ProcessFastQ
 
 import Data.Sam
 import Data.Json
@@ -588,7 +594,7 @@ samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*
 -- Tests with scripts (This will pass to a shell script)
 
 --preprocess_s = "ngless '0.0'\n\
---    \input = fastq('samples/sample.fq')\n\
+--    \input = fastq('test_samples/sample.fq')\n\
 --    \preprocess(input) using |read|:\n\
 --    \   read = read[3:]\n\
 --    \   read = read[: len(read) ]\n\
@@ -597,23 +603,23 @@ samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*
 --    \       continue\n\
 --    \   if len(read) <= 20:\n\
 --    \       discard\n\
---    \write(input, ofile='samples/resultSampleFiltered.txt')\n"
+--    \write(input, ofile='test_samples/sample.fq')\n"
 
 
 --map_s = "ngless '0.0'\n\
---    \input = fastq('samples/sample.fq')\n\
+--    \input = fastq('test_samples/sample.fq')\n\
 --    \preprocess(input) using |read|:\n\
 --    \    if len(read) < 20:\n\
 --    \        discard\n\
 --    \mapped = map(input,reference='sacCer3')\n\
---    \write(mapped, ofile='samples/resultSampleSam.sam',format={sam})\n"
+--    \write(mapped, ofile='test_samples/sample.sam',format={sam})\n"
 
 --case_preprocess_script = case parsetest preprocess_s >>= checktypes of
 --        Left err -> T.putStrLn err
 --        Right expr -> do
 --            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
 --            (interpret preprocess_s) . nglBody $ expr
---            res' <- B.readFile "samples/resultSampleFiltered.txt"
+--            res' <- B.readFile "test_samples/sample.fq"
 --            (length $ B.lines res') @?= (16 :: Int)
 
 --case_map_script = case parsetest map_s >>= checktypes of
@@ -621,13 +627,13 @@ samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*
 --        Right expr -> do
 --            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
 --            (interpret map_s) . nglBody $ expr
---            res' <- unCompress "samples/resultSampleSam.sam"
+--            res' <- unCompress "test_samples/sample.sam"
 --            calcSamStats res' @?= [5,0,0,0]
 
 -- Test compute stats
 
 case_compute_stats_lc = do
-    contents <- unCompress "samples/resultSampleFiltered.txt"
+    contents <- unCompress "test_samples/sample.fq"
     (lc $ computeStats contents) @?= ']'
 
 -- Parse GFF lines
@@ -730,21 +736,6 @@ case_interval_map_overlaps_2 = IM.overlaps  (IM.ClosedInterval (3 :: Integer) 6)
 case_interval_map_overlaps_3 = IM.overlaps  (IM.ClosedInterval (300 :: Integer) 400) (IM.ClosedInterval 200 300) @?= True
 
 
---case_interval_query_Nothing_true = (getIntervalQuery Nothing) (IM.ClosedInterval 1 5) (IM.ClosedInterval 3 6)
---                                    @?= IM.overlaps (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 3 6)
-
---case_interval_query_intersect_true = (getIntervalQuery (Just $ NGOString "intersect")) (IM.ClosedInterval 1 5) (IM.ClosedInterval 3 6)
---                                    @?= IM.overlaps (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 3 6)
-
---case_interval_query_within_false = (getIntervalQuery (Just $ NGOString "within")) (IM.ClosedInterval 1 5) (IM.ClosedInterval 3 6)
---                                    @?= IM.subsumes (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 3 6)
-
-
---case_interval_query_within_true = (getIntervalQuery (Just $ NGOString "within")) (IM.ClosedInterval 1 500) (IM.ClosedInterval 200 300)
---                                    @?= IM.subsumes (IM.ClosedInterval (1 :: Integer) 500) (IM.ClosedInterval 200 300)
-
-
-
 case_not_InsideInterval_1 = isInsideInterval 0 (IM.ClosedInterval 1 5) @?= False
 case_not_InsideInterval_2 = isInsideInterval 6 (IM.ClosedInterval 1 5) @?= False
 
@@ -802,6 +793,75 @@ case_size_no_dup_duplicate_2 = sizeNoDup imap2Dup @?= 1
 case_size_no_dup_duplicate_3 = sizeNoDup imap3Dup @?= 1
 
 
------
+
+----- VectorOperations.hs
+case_zero_vec = do
+  v <- zeroVec 4 >>= V.freeze
+  v @?= V.fromList [0,0,0,0]
+
+case_get_v = getV (V.fromList [(1 :: Int),2,3]) 2 @?= (3 :: Int)
+----- SamBamOperations.hs
+
+case_sam_stats_length = do
+    contents <- unCompress "test_samples/sample.sam"
+    V.length (samStats contents) @?= 4
+
+case_sam_stats_res = do
+    contents <- unCompress "test_samples/sample.sam"
+    samStats contents @?= V.fromList [997504,8312,29,0]
 
 
+--- Unique.hs
+
+--File "test_samples/data_set_repeated.fq" has 216 reads in which 54 are unique. 
+
+case_hash_idemp = readFileN 10 r @?= readFileN 10 r
+  where r = (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa")
+
+case_num_files_1 = do
+  n <- numFiles "test_samples/data_set_repeated.fq" 
+  n @?= 1
+
+case_num_files_2 = do
+  n <- numFiles "test_samples/sample.sam" 
+  n @?= 2
+
+case_write_1_files = do
+    c <- readReadSet enc "test_samples/data_set_repeated.fq" 
+    p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
+    ds <- readNFiles enc 1  p
+    removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
+    length ds @?=  54
+  where enc = 64
+
+case_write_2_files = do
+    c <- readReadSet enc "test_samples/data_set_repeated.fq" 
+    p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
+    ds <- readNFiles enc 2 p 
+    removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
+    length ds @?=  (2 * 54)
+  where enc = 64
+
+case_write_3_files = do
+    c <- readReadSet enc "test_samples/data_set_repeated.fq" 
+    p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
+    ds <- readNFiles enc 3 p 
+    removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
+    length ds @?=  (3 * 54)
+  where enc = 64
+
+case_write_4_files = do
+    c <- readReadSet enc "test_samples/data_set_repeated.fq" 
+    p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
+    ds <- readNFiles enc 4 p 
+    removeDirectoryRecursive p -- need to do this by hand to emulate normal execution.     
+    length ds @?=  (4 * 54)
+  where enc = 64
+
+case_write_5_files = do
+    c <- readReadSet enc "test_samples/data_set_repeated.fq" 
+    p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
+    ds <- readNFiles enc 5 p 
+    removeDirectoryRecursive p -- need to do this by hand to emulate normal execution.     
+    length ds @?=  (4 * 54)
+  where enc = 64

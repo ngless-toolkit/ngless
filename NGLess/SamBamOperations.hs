@@ -4,7 +4,8 @@
 
 module SamBamOperations
     (
- samStats
+ samStats,
+ update
     ) where
 
 import Control.Monad

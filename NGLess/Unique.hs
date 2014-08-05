@@ -5,10 +5,10 @@ module Unique
         readNFiles,
         readUniqueFile,
         writeToNFiles,
-        numFiles
+        numFiles,
+        readFileN
     ) where
 
-import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as BL
 
 import Data.Map as Map
@@ -48,12 +48,12 @@ writeToNFiles fname enc rs = do
 
 
 readNFiles :: Int -> Int -> FilePath -> IO [NGLessObject]
-readNFiles enc k d = getFilesInDir d >>= mapM (\x -> readUniqueFile k enc (B.pack x)) >>= return . concat
+readNFiles enc k d = getFilesInDir d >>= mapM (\x -> readUniqueFile k enc x) >>= return . concat
 
-readUniqueFile :: Int -> Int -> B.ByteString -> IO [NGLessObject]
+readUniqueFile :: Int -> Int -> FilePath -> IO [NGLessObject]
 readUniqueFile k enc fname = do
-    _ <- printNglessLn $ "Unique -> Read: " ++ (B.unpack fname)
-    (getk k . parseReadSet enc) `fmap` (readPossiblyCompressedFile fname)
+    _ <- printNglessLn $ "Unique -> Read: " ++ fname
+    (getk k . parseReadSet enc) `fmap` (unCompress fname)
 
 getk :: Int -> [NGLessObject] -> [NGLessObject]
 getk k rs = runST $ do
