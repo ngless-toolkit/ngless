@@ -1,0 +1,12 @@
+data = [
+{ "bp" :1, "mean" :33, "median" :33, "Lower Quartile" :33, "Upper Quartile" :33},
+{ "bp" :2, "mean" :33, "median" :34, "Lower Quartile" :33, "Upper Quartile" :34},
+{ "bp" :3, "mean" :33, "median" :33, "Lower Quartile" :33, "Upper Quartile" :33},
+{ "bp" :4, "mean" :33, "median" :33, "Lower Quartile" :33, "Upper Quartile" :34},
+{ "bp" :5, "mean" :33, "median" :33, "Lower Quartile" :33, "Upper Quartile" :34},
+{ "bp" :6, "mean" :33, "median" :33, "Lower Quartile" :33, "Upper Quartile" :33},
+{ "bp" :7, "mean" :32, "median" :33, "Lower Quartile" :32, "Upper Quartile" :33},
+{ "bp" :8, "mean" :31, "median" :32, "Lower Quartile" :32, "Upper Quartile" :32},
+{ "bp" :9, "mean" :33, "median" :33, "Lower Quartile" :33, "Upper Quartile" :34},
+{ "bp" :10, "mean" :32, "median" :33, "Lower Quartile" :33, "Upper Quartile" :33},
+]

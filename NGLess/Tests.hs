@@ -810,7 +810,7 @@ case_sam_stats_length = do
 
 case_sam_stats_res = do
     contents <- unCompress "test_samples/sample.sam"
-    samStats contents @?= V.fromList [297504,2619,8,0]
+    samStats contents @?= V.fromList [150000,1253,3,0]
 
 
 --- Unique.hs
@@ -900,3 +900,10 @@ case_calc_statistics_normal = do
     s <- unCompress "test_samples/data_set_repeated.fq" >>= return . computeStats
     head (stats' s) @?= (25,33,31,33)
   where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
+
+case_json_statistics = do
+    s <- unCompress "test_samples/sample.fq" >>= return . computeStats
+    r <- unCompress "test_samples/res_json_statistics.txt" >>= return . L.unpack
+    createDataString (stats' s) @?= r
+  where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
+--

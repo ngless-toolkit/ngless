@@ -6,7 +6,8 @@ module PerBaseQualityScores
         calcPerc,
         percentile50,
         lowerQuartile,
-        upperQuartile
+        upperQuartile,
+        createDataString
     ) where
 
 import qualified Data.Vector.Unboxed as V
@@ -19,9 +20,6 @@ import Control.Monad.ST
 import Data.STRef
 import Control.Monad
 
--- JSON File Dest
-dataFileName = "perbaseQualScoresData.js"
---
 
 --constants
 percentile50 = 0.5 :: Double
@@ -38,21 +36,22 @@ accUntilLim bps lim = do
       Just v -> v
       Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ (show i))
 
-concatData :: (Int, Int, Int, Int) -> String -> Int -> String
-concatData (mean, median, lq, uq) content bp =
-    content ++ "{ \"bp\" :" ++ show bp ++
-    ", \"mean\" :" ++ show mean ++
-    ", \"median\" :" ++ show median ++
-    ", \"Lower Quartile\" :" ++ show lq ++
-    ", \"Upper Quartile\" :" ++ show uq ++
-     "},\n"
 
-createDataString stats = createDataString' stats "data = [\n " 1
+createDataString stats = createDataString' stats "data = [\n" (1 :: Int)
     where createDataString' [] content _ = (content ++ "]\n")
           createDataString' (eachBp:xs) content bp = createDataString' xs (concatData eachBp content bp) (bp + 1)
+          concatData (mean, median, lq, uq) content bp =
+            content ++ "{ \"bp\" :" ++ show bp ++
+            ", \"mean\" :" ++ show mean ++
+            ", \"median\" :" ++ show median ++
+            ", \"Lower Quartile\" :" ++ show lq ++
+            ", \"Upper Quartile\" :" ++ show uq ++
+             "},\n"
+
 
 printHtmlStatisticsData qCounts minChar destDir = writeFile (destDir </> dataFileName) (createDataString statisticsData')
         where statisticsData' = calculateStatistics qCounts minChar
+              dataFileName = "perbaseQualScoresData.js"
 
 calculateStatistics qCounts minChar = Prelude.map (statistics encScheme') qCounts
     where encScheme' = offset (calculateEncoding minChar)
