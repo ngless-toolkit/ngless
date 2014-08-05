@@ -865,3 +865,20 @@ case_write_5_files = do
     removeDirectoryRecursive p -- need to do this by hand to emulate normal execution.     
     length ds @?=  (4 * 54)
   where enc = 64
+
+-- PerBaseQualityScores 
+
+case_calc_perc_med = calcPerc bps eT percentile50 @?= 4
+    where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
+          eT  = V.sum bps -- 21 -> mul: 0,5  +- 11 in arr = 13 index 4
+
+case_calc_perc_lq = calcPerc bps eT lowerQuartile @?= 2 
+    where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
+          eT  = V.sum bps -- 21 -> mul: 0,25 -> 6 in arr = 6 index 2
+
+case_calc_perc_uq = calcPerc bps eT upperQuartile @?= 5 
+    where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
+          eT  = V.sum bps -- 8 -> mul: 0,75 -> 16 in arr = 18 index 5
+
+
+

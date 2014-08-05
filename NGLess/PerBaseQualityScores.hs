@@ -3,7 +3,10 @@ module PerBaseQualityScores
         calculateStatistics,
         printHtmlStatisticsData,
         calcMean,
-        calcPerc
+        calcPerc,
+        percentile50,
+        lowerQuartile,
+        upperQuartile
     ) where
 
 import qualified Data.Vector.Unboxed as V
@@ -35,7 +38,6 @@ accUntilLim bps lim = do
       Just v -> v
       Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ (show i))
 
--- TODO: lQ, uQ, tenthPerc, ninetiethPerc
 concatData :: (Double, Int, Int, Int) -> String -> Int -> String
 concatData (mean, median, lq, uq) content bp =
     content ++ "{ \"bp\" :" ++ show bp ++
