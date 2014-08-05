@@ -23,7 +23,9 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
 
 import qualified Data.Text as T
+
 import Data.Aeson
+import Data.Char
 
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.IntervalMap.Interval as IM
@@ -186,7 +188,7 @@ case_calculateEncoding_illumina_1 = calculateEncoding 65 @?= Encoding "Illumina 
 case_calculateEncoding_illumina_1_5 = calculateEncoding 100 @?= Encoding "Illumina 1.5" illumina_encoding_offset
 
 --Test the calculation of the Mean
-case_calc_simple_mean = calcMean (500 :: Int) (10 :: Int) @?= (50 :: Double) 
+case_calc_simple_mean = calcMean (500 :: Int) (10 :: Int) @?= (50 :: Int) 
 
 --- SETUP to reduce imports.
 -- test array: "\n\v\f{zo\n\v\NUL" -> [10,11,12,123,122,111,10,11,0]
@@ -881,4 +883,20 @@ case_calc_perc_uq = calcPerc bps eT upperQuartile @?= 5
           eT  = V.sum bps -- 8 -> mul: 0,75 -> 16 in arr = 18 index 5
 
 
+-- negative tests quality on value 60 char ';'. Value will be 60 - 64 which is -4
+case_calc_statistics_negative = do
+    s <- unCompress "test_samples/sample_low_qual.fq" >>= return . computeStats
+    head (stats' s) @?= (-4,-4,-4,-4)
+  where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
 
+-- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
+case_calc_statistics_low_positive = do
+    s <- unCompress "test_samples/sample_low_qual.fq" >>= return . computeStats
+    last (stats' s) @?= (1,1,1,1)
+  where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
+
+
+case_calc_statistics_normal = do
+    s <- unCompress "test_samples/data_set_repeated.fq" >>= return . computeStats
+    head (stats' s) @?= (25,33,31,33)
+  where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
