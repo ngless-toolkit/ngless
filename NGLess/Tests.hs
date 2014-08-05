@@ -808,7 +808,7 @@ case_sam_stats_length = do
 
 case_sam_stats_res = do
     contents <- unCompress "test_samples/sample.sam"
-    samStats contents @?= V.fromList [997504,8312,29,0]
+    samStats contents @?= V.fromList [297504,2619,8,0]
 
 
 --- Unique.hs
@@ -822,9 +822,9 @@ case_num_files_1 = do
   n <- numFiles "test_samples/data_set_repeated.fq" 
   n @?= 1
 
-case_num_files_2 = do
+case_num_files_2 = do -- github rejects files with more than 100MB
   n <- numFiles "test_samples/sample.sam" 
-  n @?= 2
+  n @?= 1
 
 case_write_1_files = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
