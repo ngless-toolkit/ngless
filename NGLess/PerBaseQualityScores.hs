@@ -38,7 +38,7 @@ accUntilLim bps lim = do
       Just v -> v
       Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ (show i))
 
-concatData :: (Double, Int, Int, Int) -> String -> Int -> String
+concatData :: (Int, Int, Int, Int) -> String -> Int -> String
 concatData (mean, median, lq, uq) content bp =
     content ++ "{ \"bp\" :" ++ show bp ++
     ", \"mean\" :" ++ show mean ++
@@ -58,7 +58,7 @@ calculateStatistics qCounts minChar = Prelude.map (statistics encScheme') qCount
     where encScheme' = offset (calculateEncoding minChar)
 
 --statistics :: Calculates the Quality Statistics of a given FastQ.
-statistics :: Fractional a => Int -> V.Vector Int -> (a, Int, Int, Int)
+statistics :: Int -> V.Vector Int -> (Int, Int, Int, Int)
 statistics encScheme bps = (calcMean bpSum' elemTotal' ,
                                    (calcPerc' percentile50) - encScheme,
                                    (calcPerc' lowerQuartile) - encScheme,
@@ -78,7 +78,7 @@ calcBPSum qc es = runST $ do
 
 -- calcMean :: Used to calculate the mean
 calcMean _ 0 = error "The total number of quality elements in the fastQ needs to be higher than 0"
-calcMean bpSum elemTotal = fromIntegral bpSum / fromIntegral elemTotal
+calcMean bpSum elemTotal = div bpSum elemTotal
 
 
 --calcPerc :: Given a specific percentil,  calculates it's results.
