@@ -706,6 +706,15 @@ case_compute_stats_lc = do
 
 -- Parse GFF lines
 
+case_read_annotation_comp = do
+    c <- unCompress "test_samples/sample.gtf.gz" 
+    length (GFF.readAnnotations c) @?= 42247
+
+case_read_annotation_uncomp = do
+    c <- unCompress "test_samples/sample.gtf" 
+    length (GFF.readAnnotations c) @?= 42247
+
+
 gff_line = "chrI\tunknown\texon\t4124\t4358\t.\t-\t.\tgene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
 gff_structure = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
 
@@ -894,7 +903,7 @@ case_num_files_2 = do -- github rejects files with more than 100MB
   n <- numFiles "test_samples/sample.sam" 
   n @?= 1
 
-case_write_1_files = do
+case_unique_1_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
     p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
     ds <- readNFiles enc 1  p
@@ -902,7 +911,7 @@ case_write_1_files = do
     length ds @?=  54
   where enc = 64
 
-case_write_2_files = do
+case_unique_2_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
     p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
     ds <- readNFiles enc 2 p 
@@ -910,7 +919,7 @@ case_write_2_files = do
     length ds @?=  (2 * 54)
   where enc = 64
 
-case_write_3_files = do
+case_unique_3_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
     p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
     ds <- readNFiles enc 3 p 
@@ -918,7 +927,7 @@ case_write_3_files = do
     length ds @?=  (3 * 54)
   where enc = 64
 
-case_write_4_files = do
+case_unique_4_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
     p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
     ds <- readNFiles enc 4 p 
@@ -926,7 +935,7 @@ case_write_4_files = do
     length ds @?=  (4 * 54)
   where enc = 64
 
-case_write_5_files = do
+case_unique_5_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
     p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
     ds <- readNFiles enc 5 p 
