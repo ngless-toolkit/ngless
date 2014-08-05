@@ -499,18 +499,43 @@ case_invalid_not_pure_annotate_gff_lit = isError =<< validate_io' (fromRight . p
                  \annotate(x, gff='fq')\n"
 
 
-case_valid_not_pure_annotate_gff = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
+case_valid_not_pure_annotate_gff_const = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
     where 
         f_attr = "ngless '0.0'\n\
                  \v = 'Makefile'\n\
                  \annotate(x, gff=v)\n"
 
-case_invalid_not_pure_annotate_gff = isError =<< validate_io' (fromRight . parsetest $ f_attr)
+case_invalid_not_pure_annotate_gff_const = isError =<< validate_io' (fromRight . parsetest $ f_attr)
     where 
         f_attr = "ngless '0.0'\n\
                  \v = 'fq'\n\
                  \annotate(x, gff=v)\n"
 
+
+
+case_valid_not_pure_annotate_gff_const2 = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
+    where 
+        f_attr = "ngless '0.0'\n\
+                 \v = 'fq'\n\
+                 \v = 'Makefile'\n\
+                 \annotate(x, gff=v)\n"
+
+case_invalid_not_pure_annotate_gff_const2 = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
+    where 
+        f_attr = "ngless '0.0'\n\
+                 \v = 'fq'\n\
+                 \v = 'fq'\n\
+                 \annotate(x, gff=v)\n"
+
+
+case_validate_not_pure_io_script_idemp = do
+    r <- validate_io script 
+    r @?= script
+  where 
+      script = fromRight . parsetest $ f_attr
+      f_attr = "ngless '0.0'\n\
+                \v = 'Makefile'\n\
+                \annotate(x, gff=v)\n"
 
 
 --- Validation pure functions
@@ -538,11 +563,6 @@ case_good_function_attr_map_1 = isOkTypes $ parsetest good_function_attr >>= val
 case_good_function_attr_map_2 = isOkTypes $ parsetest good_function_attr >>= validate
     where good_function_attr = "ngless '0.0'\n\
             \counts = map(input,reference='sacCer3')"
-
-
-
-
-
 
 
 -- Type Validate pre process operations
