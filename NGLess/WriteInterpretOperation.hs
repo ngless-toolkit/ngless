@@ -43,9 +43,7 @@ writeToFile (NGOList el) args = do
     res <- zipWithM (\x y -> writeToUncFile x y) el newFPS'
     return (NGOList res)
 
-writeToFile el@(NGOReadSet _ _ _) args = do
-    let newfp = getNGOString ( lookup "ofile" args )
-    writeToUncFile el newfp
+writeToFile el@(NGOReadSet _ _ _) args = writeToUncFile el $ getNGOString ( lookup "ofile" args )
 
 writeToFile el@(NGOMappedReadSet fp defGen) args = do
     let newfp = getNGOString (lookup (T.pack "ofile") args) --
