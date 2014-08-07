@@ -50,6 +50,7 @@ import ValidationNotPure
 import SamBamOperations
 import VectorOperations
 import ProcessFastQ
+import WriteInterpretOperation
 
 import Data.Sam
 import Data.Json
@@ -981,4 +982,42 @@ case_json_statistics = do
     r <- unCompress "test_samples/res_json_statistics.txt" >>= return . L.unpack
     createDataString (stats' s) @?= r
   where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
---
+
+-- Annotate
+
+ngo_gff_fp = (Just (NGOString "test_samples/sample.gtf"))
+
+all_default_annot = do
+  annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing Nothing Nothing Nothing >>= unCompress . T.unpack
+
+-- test default values
+case_annotate_features_default_idemp = do
+    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing Nothing Nothing Nothing 
+    res1 <- unCompress $ T.unpack a1
+    res2 <- all_default_annot
+    res1 @?= res2
+  where feats = Just $ NGOList [NGOSymbol "gene"]
+
+
+case_annotate_mode_default_idemp = do
+    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing s Nothing Nothing
+    res1 <- unCompress $ T.unpack a1
+    res2 <- all_default_annot
+    res1 @?= res2
+  where s = Just $ NGOSymbol "union"
+
+
+case_annotate_amb_default_idemp = do
+    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing Nothing amb Nothing
+    res1 <- unCompress $ T.unpack a1
+    res2 <- all_default_annot
+    res1 @?= res2
+  where amb = Just $ NGOSymbol "allow"
+
+case_annotate_strand_default_idemp = do
+    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing Nothing Nothing s
+    res1 <- unCompress $ T.unpack a1
+    res2 <- all_default_annot
+    res1 @?= res2
+  where s = Just $ NGOSymbol "no"
+
