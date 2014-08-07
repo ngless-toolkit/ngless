@@ -5,6 +5,11 @@ fname=$dirname.tar.gz
 
 url=http://pypi.python.org/packages/source/H/HTSeq/$fname#md5=b7f4f38a9f4278b9b7f948d1efbc1f05
 
+#remove last 5 lines of htseq, which has statistics.
+filterEndL (){
+  sed -n -e :a -e "1,$1!{P;N;D;};N;ba" $2
+}
+
 download(){
   echo "start downloading" $2
   wget -O $1 $2 &> /dev/null;
@@ -35,13 +40,13 @@ downloadURL $url
 
 # -a 0 allows to ignore all htseq filter on quality.
 # Test features
-python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m union > htseq_gene_noStrand_union.txt 
-python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t exon -m union > htseq_exon_noStrand_union.txt 
-python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t CDS  -m union >  htseq_cds_noStrand_union.txt 
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m union | filterEndL 5 > htseq_gene_noStrand_union.txt 
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t exon -m union | filterEndL 5 > htseq_exon_noStrand_union.txt 
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t CDS  -m union | filterEndL 5 >  htseq_cds_noStrand_union.txt 
 
 # Test mode
-python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m intersection-strict   > htseq_gene_noStrand_inters-strict.txt 
-python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m intersection-nonempty > htseq_gene_noStrand_inters-nempty.txt 
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m intersection-strict   | filterEndL 5 > htseq_gene_noStrand_inters-strict.txt 
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m intersection-nonempty | filterEndL 5 > htseq_gene_noStrand_inters-nempty.txt 
 
 # Test strand Positive. Negative tested before
-python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s yes -t gene -m union > htseq_gene_yesStrand_union.txt 
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s yes -t gene -m union | filterEndL 5 > htseq_gene_yesStrand_union.txt 
