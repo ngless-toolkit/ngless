@@ -103,7 +103,7 @@ writeAnnotCount fn im = do
     newfp <- getTempFilePath (temp </> (snd . splitFileName $ fn))
     printNglessLn $ "Writing Annotation results to:" ++ newfp
     L8.writeFile newfp $ showGffCount im
-    putStrLn "Write completed"
+    printNglessLn "Write completed"
     return .  T.pack $ newfp
 
 showUniqIdCounts :: S8.ByteString -> L8.ByteString -> L8.ByteString
