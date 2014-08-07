@@ -63,8 +63,8 @@ reqLogo = $(HTML_LIBS_DIR)/Octocat.png
 
 test: compile
 	cp dist/build/nglesstest/nglesstest .
-	cd test_samples/htseq-res/; ./generateHtseqFiles.sh
 	cd test_samples/; gzip -dkf sample.gtf.gz
+	cd test_samples/htseq-res/; ./generateHtseqFiles.sh
 	./nglesstest
 
 install: install-dir install-html install-bwa install-sam
