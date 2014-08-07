@@ -63,6 +63,8 @@ reqLogo = $(HTML_LIBS_DIR)/Octocat.png
 
 test: compile
 	cp dist/build/nglesstest/nglesstest .
+	cd test_samples/htseq-res/; ./generateHtseqFiles.sh
+	cd test_samples/; gzip -dkf sample.gtf.gz
 	./nglesstest
 
 install: install-dir install-html install-bwa install-sam
@@ -92,6 +94,9 @@ nglessconf: confhtmllibdir conffonts  $(SAM) $(BWA) $(reqhtmllibs) $(reqfonts) $
 clean:
 	rm -rf $(BWA) $(SAM) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs $(deps)
 	cabal sandbox delete
+
+clean-tests:
+	rm test_samples/htseq-res/*.txt
 
 variables:
 	@echo $(BWA)
