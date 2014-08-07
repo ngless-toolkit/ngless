@@ -1021,3 +1021,41 @@ case_annotate_strand_default_idemp = do
     res1 @?= res2
   where s = Just $ NGOSymbol "no"
 
+
+case_annotate_gene_noStrand_union = do
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
+    resNG <- unCompress $ T.unpack p
+    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_union.txt"
+    resHT @?= resNG
+  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_union.txt"),("verbose", NGOSymbol "no")]
+        feats = Just $ NGOList [NGOSymbol "gene"]
+        m = Just $ NGOSymbol "union"
+        amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
+        s = Just $ NGOSymbol "no"
+
+
+case_annotate_exon_noStrand_union = do
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
+    resNG <- unCompress $ T.unpack p
+    resHT <- unCompress $ "test_samples/htseq-res/htseq_exon_noStrand_union.txt"
+    resHT @?= resNG
+  where args = [("ofile", NGOString "test_samples/htseq-res/htseq_exon_noStrand_union.txt"),("verbose", NGOSymbol "no")]
+        feats = Just $ NGOList [NGOSymbol "exon"]
+        m = Just $ NGOSymbol "union"
+        amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
+        s = Just $ NGOSymbol "no"
+
+
+case_annotate_cds_noStrand_union = do
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
+    resNG <- unCompress $ T.unpack p
+    resHT <- unCompress $ "test_samples/htseq-res/htseq_exon_noStrand_union.txt"
+    resHT @?= resNG
+  where args = [("ofile", NGOString "test_samples/htseq-res/htseq_exon_noStrand_union.txt"),("verbose", NGOSymbol "no")]
+        feats = Just $ NGOList [NGOSymbol "CDS"]
+        m = Just $ NGOSymbol "union"
+        amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
+        s = Just $ NGOSymbol "no"
