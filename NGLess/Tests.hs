@@ -886,7 +886,7 @@ case_sam_stats_length = do
 
 case_sam_stats_res = do
     contents <- unCompress "test_samples/sample.sam"
-    samStats contents @?= V.fromList [150000,1253,3,0]
+    samStats contents @?= V.fromList [1400000,11658,40,0]
 
 
 --- Unique.hs
@@ -902,7 +902,7 @@ case_num_files_1 = do
 
 case_num_files_2 = do -- github rejects files with more than 100MB
   n <- numFiles "test_samples/sample.sam" 
-  n @?= 1
+  n @?= 2
 
 case_unique_1_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
@@ -1059,3 +1059,41 @@ case_annotate_cds_noStrand_union = do
         m = Just $ NGOSymbol "union"
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
         s = Just $ NGOSymbol "no"
+
+
+case_annotate_gene_noStrand_inters_strict = do
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
+    resNG <- unCompress $ T.unpack p
+    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
+    resHT @?= resNG
+  where args = [("ofile", NGOString "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
+        feats = Just $ NGOList [NGOSymbol "gene"]
+        m = Just $ NGOSymbol "intersection_strict"
+        amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
+        s = Just $ NGOSymbol "no"
+
+
+case_annotate_gene_noStrand_inters_non_empty = do
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
+    resNG <- unCompress $ T.unpack p
+    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
+    resHT @?= resNG
+  where args = [("ofile", NGOString "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
+        feats = Just $ NGOList [NGOSymbol "gene"]
+        m = Just $ NGOSymbol "intersection_non_empty"
+        amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
+        s = Just $ NGOSymbol "no"
+
+case_annotate_gene_yesStrand_union = do
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
+    resNG <- unCompress $ T.unpack p
+    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
+    resHT @?= resNG
+  where args = [("ofile", NGOString "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
+        feats = Just $ NGOList [NGOSymbol "gene"]
+        m = Just $ NGOSymbol "union"
+        amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
+        s = Just $ NGOSymbol "yes"
