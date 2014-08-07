@@ -67,6 +67,8 @@ interpretMapOp r ds = do
 {-
     Receives - A default genome name
     Returns  - The root dir for that genome
+    
+    If not installed in SU mode, return user mode path since it will be installed on User mode next.
 -}
 getGenomeDir :: T.Text -> IO T.Text
 getGenomeDir n = do
