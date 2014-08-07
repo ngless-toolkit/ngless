@@ -39,14 +39,14 @@ import Data.AnnotRes
 
 annotate :: FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> Maybe T.Text -> Maybe NGLessObject -> Maybe NGLessObject -> Maybe NGLessObject -> IO T.Text
 annotate samFP (Just g) feats _ m a s = 
-    printNglessLn ("annotate with GFF: " ++ (eval g) ++ (show m) ++ (show s)) 
+    printNglessLn (concat ["annotate with GFF: ", eval g])
             >> annotate' samFP (eval g) feats a (getIntervalQuery m) s  -- ignore default GFF
     where eval (NGOString n) = T.unpack n
           eval _ = error ("Provided type for gff must be a NGOString.")
 
-annotate samFP Nothing  feats g m a s = 
-    printNglessLn ("annotate with default GFF: " ++ (show . fromJust $ g) ++ (show m) ++ (show s)) >> 
-        case g of
+annotate samFP Nothing feats dDs m a s = 
+    printNglessLn (concat ["annotate with default GFF: ", show . fromJust $ dDs]) >> 
+        case dDs of
             Just v  -> annotate' samFP (getGff v) feats a (getIntervalQuery m) s   -- used default GFF
             Nothing -> error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
 
@@ -107,7 +107,7 @@ filterStrand modeS s m = maybe m (filterStrand') modeS
     where 
         filterStrand' modeS' = case modeS' of
                         NGOSymbol "yes" -> IM.filter (\a -> s == annotStrand a) m 
-                        NGOSymbol "no"  -> m
+                        NGOSymbol "no"  -> m -- by default no
                         err              -> error ("Type must be a NGOSymbol with value 'yes' or 'no', but was passed: " ++ (show err))
 
 countsAmbiguity :: Maybe NGLessObject -> IM.IntervalMap Int GffCount -> IM.IntervalMap Int GffCount -> IM.IntervalMap Int GffCount
