@@ -8,7 +8,8 @@ module ProcessFastQ
     readFastQ,
     readReadSet,
     showRead,
-    writeReadSet
+    writeReadSet,
+    executeQProc
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -56,9 +57,11 @@ parseReadSet enc contents = parse' . map BL.toStrict . BL.lines $ contents
 decodeQual enc = B.map (chr . (flip (-) enc) . ord)
 encodeQual enc = B.map (chr . (flip (+) enc) . ord)
 
+executeQProc :: FilePath -> FilePath -> FilePath -> IO NGLessObject
+executeQProc f info dirT = setupRequiredFiles info dirT >>= \x -> readFastQ f x dirT
+
 readFastQ :: FilePath -> FilePath -> FilePath -> IO NGLessObject
-readFastQ f info dirT = do
-        dst <- setupRequiredFiles info dirT                
+readFastQ f dst dirT = do
         fd <- unCompress f >>= return . computeStats
         p "Generation of statistics for " dst
         createBasicStatsJson (dst ++ "/basicStats.js") fd f -- generate JSON DATA file: basicStats.js
