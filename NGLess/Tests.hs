@@ -18,6 +18,7 @@ import Text.Parsec (SourcePos)
 import Text.Parsec.Pos (newPos)
 
 import System.Directory(removeFile, removeDirectoryRecursive)
+import System.FilePath.Posix((</>))
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
@@ -51,10 +52,14 @@ import SamBamOperations
 import VectorOperations
 import ProcessFastQ
 import WriteInterpretOperation
+import MapInterpretOperation
+import UnpackIlluminaGenomes
+
 
 import Data.Sam
 import Data.Json
 import Data.AnnotRes
+import Data.DefaultValues
 import qualified Data.GFF as GFF
 
 
@@ -702,7 +707,7 @@ samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*
 -- Test compute stats
 
 case_compute_stats_lc = do
-    contents <- unCompress "test_samples/sample.fq"
+    contents <- unCompress "test_samples/sample_small.fq"
     (lc $ computeStats contents) @?= ']'
 
 -- Parse GFF lines
@@ -886,8 +891,11 @@ case_sam_stats_length = do
 
 case_sam_stats_res = do
     contents <- unCompress "test_samples/sample.sam"
-    samStats contents @?= V.fromList [1400000,11658,40,0]
+    samStats contents @?= V.fromList [1330600,6267,3015,0]
 
+case_calc_sam_stats = do
+  r <- unCompress "test_samples/sample.sam" >>= return . calcSamStats
+  r @?= [1330600,6267,3015,0]
 
 --- Unique.hs
 
@@ -978,7 +986,7 @@ case_calc_statistics_normal = do
   where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
 
 case_json_statistics = do
-    s <- unCompress "test_samples/sample.fq" >>= return . computeStats
+    s <- unCompress "test_samples/sample_small.fq" >>= return . computeStats
     r <- unCompress "test_samples/res_json_statistics.txt" >>= return . L.unpack
     createDataString (stats' s) @?= r
   where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
@@ -1097,3 +1105,30 @@ case_annotate_gene_yesStrand_union = do
         m = Just $ NGOSymbol "union"
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
         s = Just $ NGOSymbol "yes"
+
+
+-- MapOperations
+
+-- install genome User mode
+
+case_install_genome_user_mode = do
+  r1 <- configGenome "ce10" User
+  p <- defGenomeDir >>= return . (</> (getIndexPath "ce10"))
+  r1 @?= p 
+
+-- ProcessFastQ
+case_read_and_write_fastQ = do
+    rs <- readReadSet 64 "test_samples/sample.fq"
+    fp <- writeReadSet "test_samples/sample.fq" rs 64
+    newrs <- readReadSet 64 (B.pack fp)
+    newrs @?= rs
+
+-- hack: jump over copy of .html and .css
+case_read_fastQ = do
+    nt <- generateDirId fp 
+    createDirIfNotExists (dstDir nt)
+    len <- readFastQ fp (dstDir nt) nt >> getFilesInDir (dstDir nt) >>= return . length --populates dir nt
+    removeDirectoryRecursive $ dstDir nt -- delete test generated data.
+    len @?= 2
+  where fp = "test_samples/sample.fq"
+        dstDir nt = nt ++ "$beforeQC"
