@@ -10,7 +10,7 @@ isNotCompleted () {
   if fileExists $1; then
      ! fileSizeCorrect $1 $2
     else
-    return $?
+    return 0
   fi
 }
 
