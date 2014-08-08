@@ -9,7 +9,8 @@ module Interpret
      evalIndex,
      evalLen,
      evalBinary,
-     evalMinus
+     evalMinus,
+     executeQualityProcess
     ) where
 
 
@@ -272,11 +273,12 @@ executeQualityProcess (NGOString fname) = do
 
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
 
-executeQualityProcess' fname info nt = liftIO $ readFastQ fname info nt
+executeQualityProcess' fname info nt = liftIO $ executeQProc fname info nt
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeMap (NGOList e) args = return . NGOList =<< mapM (\x -> executeMap x args) e
 executeMap (NGOReadSet file _enc _) args = do
+            _ <- liftIO $ print (show file ++ " " ++ show (evalString . fromJust $ lookup "reference" args) )
             case lookup "reference" args of 
                 Just refPath' -> liftIO $ interpretMapOp (evalString refPath') file
                 Nothing       -> error ("A reference must be suplied")
