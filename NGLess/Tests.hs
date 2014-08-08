@@ -891,11 +891,11 @@ case_sam_stats_length = do
 
 case_sam_stats_res = do
     contents <- unCompress "test_samples/sample.sam"
-    samStats contents @?= V.fromList [1330600,6267,3015,0]
+    samStats contents @?= V.fromList [1400000,11658,40,0]
 
 case_calc_sam_stats = do
   r <- unCompress "test_samples/sample.sam" >>= return . calcSamStats
-  r @?= [1330600,6267,3015,0]
+  r @?= [1400000,11658,40,0]
 
 --- Unique.hs
 
