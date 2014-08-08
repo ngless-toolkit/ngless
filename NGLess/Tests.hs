@@ -1132,3 +1132,8 @@ case_read_fastQ = do
     len @?= 2
   where fp = "test_samples/sample.fq"
         dstDir nt = nt ++ "$beforeQC"
+
+
+
+case_get_gff = getGff "path_to_gff" @?= "path_to_gff/Annotation/annot.gtf.gz"
+
