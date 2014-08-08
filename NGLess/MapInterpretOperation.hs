@@ -82,13 +82,12 @@ getGenomeDir n = do
 getSamStats :: FilePath -> IO ()
 getSamStats fname = unCompress fname >>= printSamStats . calcSamStats
 
-calcSamStats contents = do
-    let res' = samStats contents
-        total' = getV res' (fromEnum Total)
-        aligned' = getV res' (fromEnum Aligned)
-        unique' = getV res' (fromEnum Unique)
-        lowQual' = getV res' (fromEnum LowQual)
-    [total', aligned', unique', lowQual']
+calcSamStats contents = [total', aligned', unique', lowQual']
+    where res' = samStats contents
+          total' = getV res' (fromEnum Total)
+          aligned' = getV res' (fromEnum Aligned)
+          unique' = getV res' (fromEnum Unique)
+          lowQual' = getV res' (fromEnum LowQual)
 
 printSamStats stats = do
     putStrLn $ "Total reads: " ++ (show total)
@@ -101,15 +100,13 @@ printSamStats stats = do
     aligned = stats !! 1
     unique  = stats !! 2
     lowQ    = stats !! 3
-
-calcDiv :: Int -> Int -> Double
-calcDiv a b = 
-      let x = fromIntegral a
-          y = fromIntegral b
-      in (x / y) * (100 :: Double) 
-
-showFloat' num = showFFloat (Just numDecimalPlaces) num ""
-
+    showFloat' num = showFFloat (Just numDecimalPlaces) num ""
+    calcDiv :: Int -> Int -> Double
+    calcDiv a b = 
+          let x = fromIntegral a
+              y = fromIntegral b
+          in (x / y) * (100 :: Double) 
+    
 -- check both SU and normal user Genomes dir for <ref> 
 isIndexCalculated :: FilePath -> IO (Maybe T.Text)
 isIndexCalculated ref = do
