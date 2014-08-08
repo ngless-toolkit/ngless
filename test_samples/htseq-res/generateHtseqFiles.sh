@@ -46,7 +46,13 @@ downloadURL(){
 	if [ ! -d "$dirname" ]; then
   		download $fname $1
       	tar -xzvf $fname
-  		cd $dirname; python setup.py install --user; cd ..
+  		cd $dirname; python setup.py install --user;
+      if [[ $r != 0 ]] ; then
+        rm -rf $1
+        echo "ERROR installing HTSEQ."
+        exit 3 
+      fi
+      cd ..
   		echo "[HTSEQ] installed"
   	else
   		echo "[HTSEQ] Already installed"
@@ -68,3 +74,5 @@ isNotCompleted htseq_gene_noStrand_inters-nempty.txt 7126 && python -m HTSeq.scr
 
 # Test strand Positive. Negative tested before
 isNotCompleted htseq_gene_yesStrand_union.txt 7126 && python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s yes -t gene -m union | filterEndL 5 > htseq_gene_yesStrand_union.txt 
+
+exit 0
