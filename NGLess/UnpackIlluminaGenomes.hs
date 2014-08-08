@@ -4,7 +4,6 @@ module UnpackIlluminaGenomes
     ( 
       defaultGenomes,
       getUcscUrl,
-      defGenomeDir,
       getIndexPath,
       getGff,
       getGenomeRootPath,
@@ -13,9 +12,6 @@ module UnpackIlluminaGenomes
 
 import qualified Data.Text as T
 import System.FilePath( (</>), (<.>) )
-
-import Data.DefaultValues
-
 
 --bwaGenomePath :: FilePath
 --bwaGenomePath = "Sequence/BWAIndex/genome.fa"
