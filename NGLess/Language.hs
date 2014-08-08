@@ -19,7 +19,6 @@ module Language
     , function_return_type
     , function_arg_type
     , readSeq
-    , readQual
     ) where
 
 {- This module defines the internal representation the language -}
@@ -31,7 +30,7 @@ newtype Variable = Variable T.Text
 
 -- | functions are hard coded here
 data FuncName = Ffastq | Funique | Fpreprocess | Fsubstrim | Fmap | Fcount | Fwrite | Fprint | Fannotate
-    deriving (Eq, Show, Ord)
+    deriving (Eq, Show)
 
 function_argtype_return_type :: FuncName -> (NGLType, NGLType)
 function_argtype_return_type Ffastq =       (NGLReadSet,         NGLString)
@@ -126,10 +125,6 @@ data NGLessObject =
 readSeq :: NGLessObject -> B.ByteString
 readSeq (NGOShortRead _ x _) = x
 readSeq x = error ("Expected a NGOShortRead, but the type was " ++ (show x))
-
-readQual :: NGLessObject -> B.ByteString
-readQual (NGOShortRead _ _ x) = x 
-readQual x = error ("Expected a NGOShortRead, but the type was " ++ (show x))
 
 
 -- | 'Expression' is the main type for holding the AST.
