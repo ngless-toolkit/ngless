@@ -67,8 +67,10 @@ check_assignment :: Maybe NGLType -> Maybe NGLType -> TypeMSt ()
 check_assignment _ (Just NGLVoid) = errorInLine "Assigning void value to variable"
 check_assignment Nothing _ = return ()
 check_assignment a b = case a == b of
-    True  -> return ()
-    False -> errorInLine $ T.concat ["Assigning type ", T.pack $ show b, " to variable that has type ", T.pack $ show a]
+        True  -> return ()
+        False -> errorInLine $ T.concat ["Assigning type ", showType b, " to a variable that has type ", showType a]
+    where
+        showType = T.pack . show . fromJust
 
 nglTypeOf :: Expression -> TypeMSt (Maybe NGLType)
 nglTypeOf (FunctionCall f arg args b) = inferBlock b *> checkfuncargs f args *> checkfunccall f arg
