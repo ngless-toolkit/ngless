@@ -66,7 +66,9 @@ envInsert v t = modify (\(lno,m) -> (lno, Map.insert v t m))
 check_assignment :: Maybe NGLType -> Maybe NGLType -> TypeMSt ()
 check_assignment _ (Just NGLVoid) = errorInLine "Assigning void value to variable"
 check_assignment Nothing _ = return ()
-check_assignment a b = guard (a == b)
+check_assignment a b = case a == b of
+    True  -> return ()
+    False -> errorInLine $ T.concat ["Assigning type ", T.pack $ show b, " to variable that has type ", T.pack $ show a]
 
 nglTypeOf :: Expression -> TypeMSt (Maybe NGLType)
 nglTypeOf (FunctionCall f arg args b) = inferBlock b *> checkfuncargs f args *> checkfunccall f arg
