@@ -293,7 +293,7 @@ executeUnique (NGOReadSet file enc t) args = do
                         >>= writeToNFiles (B.unpack file) enc
         case lookup "max_copies" args of
             Just v -> uniqueCalculations' (v' v) d
-            _      -> uniqueCalculations' 2 d --default
+            _      -> uniqueCalculations' 1 d --default
     where 
         v' = fromIntegral . evalInteger
         uniqueCalculations' :: Int -> FilePath -> InterpretationEnvIO NGLessObject
