@@ -4,8 +4,10 @@ module Data.Json
     (
         BasicInfo(..),
         FilesProcessed(..),
+        CountsProcessed(..),
         basicInfoToJson,
-        createFilesProcessed
+        createFilesProcessed,
+        createCountsProcessed
     ) where
 
 import qualified Data.Text as T
@@ -20,6 +22,7 @@ import Control.Monad
 
 data BasicInfo = BasicInfo String Double String Int (Int,Int) deriving (Show)
 data FilesProcessed = FilesProcessed String String T.Text deriving (Show, Eq)
+data CountsProcessed = CountsProcessed String deriving (Show, Eq)
 
 
 instance ToJSON BasicInfo where
@@ -53,11 +56,21 @@ instance FromJSON FilesProcessed where
     parseJSON _          = mzero
 
 
+instance ToJSON CountsProcessed where
+   toJSON (CountsProcessed a) = object [ "fp" .= a ]
+
+instance FromJSON CountsProcessed where
+    parseJSON (Object v) = CountsProcessed <$>
+                            v .: "fp"
+    parseJSON _          = mzero
+
+
 basicInfoToJson :: String -> Double -> String -> Int -> (Int,Int) -> BL.ByteString
 basicInfoToJson fname gc enc numSeq seqL = encode $ BasicInfo fname gc enc numSeq seqL
 
 
 createFilesProcessed :: String -> T.Text -> IO FilesProcessed
-createFilesProcessed template script = do
-    currentTime <- getClockTime
-    return $ FilesProcessed template (show currentTime) script
+createFilesProcessed template script = getClockTime >>= \x -> return $ FilesProcessed template (show x) script
+
+createCountsProcessed :: String -> CountsProcessed
+createCountsProcessed fp = CountsProcessed fp

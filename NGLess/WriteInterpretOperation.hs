@@ -14,8 +14,11 @@ import Control.Monad
 import InvokeExternalProgs
 import Language
 import FileManagement
+import JSONManager
 
 import Data.AnnotRes
+
+import System.Directory (canonicalizePath)
 
 getNGOString (Just (NGOString s)) = s
 getNGOString _ = error "Error: Type is different of String"
@@ -67,6 +70,7 @@ writeToFile (NGOAnnotatedSet fp) args = do
         Nothing -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
     where
         writeAnnotResWDel' p cont = do
+            canonicalizePath (T.unpack p) >>= insertCountsProcessedJson 
             write (T.unpack p) cont
             return $ NGOAnnotatedSet p
             
