@@ -39,7 +39,7 @@ validate expr = case errors of
 
 -- symbols that can be used directly
 symbols :: [T.Text]
-symbols = ["union", "intersection-strict", "intersection-nonempty", "allow", "deny", "yes", "no", "csv", "tsv", "bam", "sam"]
+symbols = ["union", "intersection_strict", "intersection_non_empty", "allow", "deny", "yes", "no", "csv", "tsv", "bam", "sam"]
 
 -- symbols that can be used inside a list.
 symbols_list :: [T.Text]
@@ -119,7 +119,7 @@ check_symbol_val_in_arg f a = case f of
     where 
         amb_v   = ["allow", "deny"]
         str_v   = ["yes", "no"]
-        mode_v  = ["union", "intersection-strict", "intersection-nonempty"]
+        mode_v  = ["union", "intersection_strict", "intersection_non_empty"]
         format_v= ["tsv", "csv", "bam", "sam"]
         get_v k = lookup k $ map (\(Variable x,e) -> (x, e)) a
         check arg (e,values) = 
