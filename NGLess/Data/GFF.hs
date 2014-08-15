@@ -146,7 +146,7 @@ parsegffType "CDS" = GffCDS
 parsegffType t = GffOther t
 
 strand :: Char -> GffStrand
-strand '.' = GffUnStranded -- present in both strands
+strand '.' = GffUnStranded
 strand '+' = GffPosStrand
 strand '-' = GffNegStrand
 strand '?' = GffUnknownStrand
