@@ -70,8 +70,8 @@ writeToFile (NGOAnnotatedSet fp) args = do
         Nothing -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
     where
         writeAnnotResWDel' p cont = do
-            canonicalizePath (T.unpack p) >>= insertCountsProcessedJson 
             write (T.unpack p) cont
+            canonicalizePath (T.unpack p) >>= insertCountsProcessedJson 
             return $ NGOAnnotatedSet p
             
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
