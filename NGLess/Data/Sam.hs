@@ -105,15 +105,15 @@ cigarTLen c = calcLen c [] 0
 
 {-- 
 Op     Description
-M alignment match (can be a sequence match or mismatch)
+M alignment match (can be a sequence match or mismatch).
 I insertion to the reference
-D deletion from the reference
-N skipped region from the reference
+D deletion from the reference.
+N skipped region from the reference.
 S soft clipping (clipped sequences present inSEQ)
 H hard clipping (clipped sequences NOT present inSEQ)
-P padding (silent deletion from padded reference)
-= sequence match
-X sequence mismatch
+P padding (silent deletion from padded reference).
+= sequence match.
+X sequence mismatch.
 --}
 
 calcLen s val acc = 
@@ -124,12 +124,12 @@ calcLen s val acc =
                 'M' -> calc' $ (read val) + acc
                 'D' -> calc' $ (read val) + acc
                 'N' -> calc' $ (read val) + acc
-                'S' -> calc' $ (read val) + acc
-                'H' -> calc' $ (read val) + acc
+                'X' -> calc' $ (read val) + acc
                 'P' -> calc' $ (read val) + acc
                 '=' -> calc' $ (read val) + acc
-                'X' -> calc' $ (read val) + acc
-                'I' -> calc' acc -- ignore
+                'H' -> calc' acc -- ignore
+                'S' -> calc' acc
+                'I' -> calc' acc
                 _  -> calcLen sRest (val ++ [S8.head s]) acc 
    where
       calc' = calcLen sRest []
