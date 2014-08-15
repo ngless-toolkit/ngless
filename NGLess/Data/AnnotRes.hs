@@ -11,6 +11,7 @@ module Data.AnnotRes
       , showGffCountDel
       , isEqual
       , showUniqIdCounts
+      , filterByStrand
     ) where
 
 import qualified Data.Text as T
@@ -120,4 +121,12 @@ mergeIds s = foldl (updateM) Map.empty s
 
 updateM :: Map.Map S.ByteString Int -> GffCount -> Map.Map S.ByteString Int
 updateM m g = Map.insertWith (+) (annotSeqId g) (annotCount g) m
+
+
+filterByStrand :: GffStrand -> [GffCount] -> [GffCount]
+filterByStrand s a = filter (filterByStrand') a
+  where 
+    filterByStrand' g = isUnstrand s || isSameStrand s (annotStrand g)
+    isUnstrand    = (==GffUnStranded)
+    isSameStrand  = (==)
 
