@@ -54,8 +54,10 @@ parseReadSet enc contents = parse' . map BL.toStrict . BL.lines $ contents
                 _ -> error "Number of lines is not multiple of 4!"
 
 -- Change to only apply this function when Pre-Processing
-decodeQual enc = B.map (chr . (flip (-) enc) . ord)
-encodeQual enc = B.map (chr . (flip (+) enc) . ord)
+decodeQual enc = B.map (chr . sub . ord)
+    where 
+        sub v = v - enc
+encodeQual enc = B.map (chr . (+) enc . ord)
 
 executeQProc :: FilePath -> FilePath -> FilePath -> IO NGLessObject
 executeQProc f info dirT = setupRequiredFiles info dirT >>= \x -> readFastQ f x dirT
