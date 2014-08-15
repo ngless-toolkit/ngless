@@ -714,11 +714,11 @@ case_compute_stats_lc = do
 
 case_read_annotation_comp = do
     c <- unCompress "test_samples/sample.gtf.gz" 
-    length (GFF.readAnnotations c) @?= 42247
+    length (GFF.readAnnotations c) @?= 199994
 
 case_read_annotation_uncomp = do
     c <- unCompress "test_samples/sample.gtf" 
-    length (GFF.readAnnotations c) @?= 42247
+    length (GFF.readAnnotations c) @?= 199994
 
 
 gff_line = "chrI\tunknown\texon\t4124\t4358\t.\t-\t.\tgene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
@@ -827,9 +827,9 @@ case_isInsideInterval_2 = isInsideInterval 1 (IM.ClosedInterval 1 5) @?= True
 case_isInsideInterval_3 = isInsideInterval 5 (IM.ClosedInterval 3 5) @?= True
 
 
-k1 = (IM.ClosedInterval 10 20, head $ readAnnotCounts "x\tgene\t10\t+\n")
-k2 = (IM.ClosedInterval 1 5,   head $ readAnnotCounts "y\tgene\t10\t+\n")
-k3 = (IM.ClosedInterval 30 30, head $ readAnnotCounts "x\tgene\t20\t+\n")
+k1 = (IM.ClosedInterval 10 20, readAnnotCounts "x\tgene\t10\t+\n")
+k2 = (IM.ClosedInterval 1 5,   readAnnotCounts "y\tgene\t10\t+\n")
+k3 = (IM.ClosedInterval 30 30, readAnnotCounts "x\tgene\t20\t+\n")
 
 imap1   = IM.fromList [k1]
 imap2   = IM.fromList [k2]
@@ -891,11 +891,11 @@ case_sam_stats_length = do
 
 case_sam_stats_res = do
     contents <- unCompress "test_samples/sample.sam"
-    samStats contents @?= V.fromList [1400000,11658,40,0]
+    samStats contents @?= V.fromList  [3072,1610,1554,0]
 
 case_calc_sam_stats = do
   r <- unCompress "test_samples/sample.sam" >>= return . calcSamStats
-  r @?= [1400000,11658,40,0]
+  r @?=  [3072,1610,1554,0]
 
 --- Unique.hs
 
@@ -910,7 +910,7 @@ case_num_files_1 = do
 
 case_num_files_2 = do -- github rejects files with more than 100MB
   n <- numFiles "test_samples/sample.sam" 
-  n @?= 2
+  n @?= 1
 
 case_unique_1_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
@@ -1049,7 +1049,7 @@ case_annotate_exon_noStrand_union = do
     resNG <- unCompress $ T.unpack p
     resHT <- unCompress $ "test_samples/htseq-res/htseq_exon_noStrand_union.txt"
     resHT @?= resNG
-  where args = [("ofile", NGOString "test_samples/htseq-res/htseq_exon_noStrand_union.txt"),("verbose", NGOSymbol "no")]
+  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_exon_noStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "exon"]
         m = Just $ NGOSymbol "union"
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
@@ -1060,9 +1060,9 @@ case_annotate_cds_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
     (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
     resNG <- unCompress $ T.unpack p
-    resHT <- unCompress $ "test_samples/htseq-res/htseq_exon_noStrand_union.txt"
+    resHT <- unCompress $ "test_samples/htseq-res/htseq_cds_noStrand_union.txt"
     resHT @?= resNG
-  where args = [("ofile", NGOString "test_samples/htseq-res/htseq_exon_noStrand_union.txt"),("verbose", NGOSymbol "no")]
+  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_cds_noStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "CDS"]
         m = Just $ NGOSymbol "union"
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
@@ -1075,7 +1075,7 @@ case_annotate_gene_noStrand_inters_strict = do
     resNG <- unCompress $ T.unpack p
     resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
     resHT @?= resNG
-  where args = [("ofile", NGOString "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
+  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "gene"]
         m = Just $ NGOSymbol "intersection_strict"
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
@@ -1086,26 +1086,27 @@ case_annotate_gene_noStrand_inters_non_empty = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
     (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
     resNG <- unCompress $ T.unpack p
-    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
+    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_inters-nempty.txt"
     resHT @?= resNG
-  where args = [("ofile", NGOString "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
+  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-nempty.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "gene"]
         m = Just $ NGOSymbol "intersection_non_empty"
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
         s = Just $ NGOSymbol "no"
 
-case_annotate_gene_yesStrand_union = do
-    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- unCompress $ T.unpack p
-    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
-    resHT @?= resNG
-  where args = [("ofile", NGOString "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
-        feats = Just $ NGOList [NGOSymbol "gene"]
-        m = Just $ NGOSymbol "union"
-        amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
-        s = Just $ NGOSymbol "yes"
 
+
+--case_annotate_gene_yesStrand_union = do
+--    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
+--    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
+--    resNG <- unCompress $ T.unpack p
+--    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
+--    resHT @?= resNG
+--  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
+--        feats = Just $ NGOList [NGOSymbol "gene"]
+--        m = Just $ NGOSymbol "union"
+--        amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
+--        s = Just $ NGOSymbol "yes"
 
 -- MapOperations
 
@@ -1116,12 +1117,18 @@ case_install_genome_user_mode = do
   p <- defGenomeDir >>= return . (</> (getIndexPath "ce10"))
   r1 @?= p 
 
+
 -- ProcessFastQ
+low_char_int = do
+  unCompress "test_samples/sample.fq" >>= return . ord . lc . computeStats
+
 case_read_and_write_fastQ = do
-    rs <- readReadSet 64 "test_samples/sample.fq"
-    fp <- writeReadSet "test_samples/sample.fq" rs 64
-    newrs <- readReadSet 64 (B.pack fp)
+    enc <- low_char_int >>= return . offset . calculateEncoding
+    rs <- readReadSet enc "test_samples/sample.fq"
+    fp <- writeReadSet "test_samples/sample.fq" rs enc
+    newrs <- readReadSet enc $ B.pack fp
     newrs @?= rs
+
 
 -- hack: jump over copy of .html and .css
 case_read_fastQ = do
