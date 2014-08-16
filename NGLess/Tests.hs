@@ -714,11 +714,11 @@ case_compute_stats_lc = do
 
 case_read_annotation_comp = do
     c <- unCompress "test_samples/sample.gtf.gz" 
-    length (GFF.readAnnotations c) @?= 199994
+    length (GFF.readAnnotations c) @?= 98994
 
 case_read_annotation_uncomp = do
     c <- unCompress "test_samples/sample.gtf" 
-    length (GFF.readAnnotations c) @?= 199994
+    length (GFF.readAnnotations c) @?= 98994
 
 
 gff_line = "chrI\tunknown\texon\t4124\t4358\t.\t-\t.\tgene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
