@@ -1,12 +1,18 @@
 module WebServer (runWebServer) where
 
+import qualified Data.Text as T
+import qualified Data.ByteString.Lazy as L
+
 import Happstack.Server.Internal.Types
 import Happstack.Server 
 
 import Control.Monad
 import Control.Applicative
 
+import Data.Maybe
 import Data.DefaultValues
+import Data.Json
+
 
 serverConf :: Int -> Conf
 serverConf p = nullConf { port = p }
@@ -18,12 +24,12 @@ runWebServer port = do
 
 
 myApp :: String -> ServerPart Response
-myApp x = msum [ dir "removeDS" $ queryParams "id",
-				serveDirectory EnableBrowsing ["nglessKeeper.html"] x ]
+myApp x = msum [ dir "removeDS" $ queryParams "id" >>= ok . toResponse . fromJust
+                 , dir "serveF" $ queryParams "id" >>= serveFile (guessContentTypeM mimeTypes) . fromJust
+                 , serveDirectory EnableBrowsing ["nglessKeeper.html"] x ]
 
 
+serveF :: String -> ServerPart Response
+serveF p = serveFile (guessContentTypeM mimeTypes) p
 
-queryParams :: String -> ServerPart Response
-queryParams param =
-     do mFoo <- optional $ lookText param
-        ok $ (toResponse (show mFoo))
+queryParams param = optional $ look param
