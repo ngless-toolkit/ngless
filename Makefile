@@ -35,6 +35,8 @@ HTMLFILES += nv.d3.js
 HTMLFILES += nv.d3.css
 HTMLFILES += angular-sanitize.js
 HTMLFILES += bootstrap-glyphicons.css
+HTMLFILES += ng-table.js
+HTMLFILES += ng-table.css
 
 # Required fonts
 FONTFILES := glyphicons-halflings-regular.woff
@@ -45,6 +47,8 @@ jquery-latest.min.js = code.jquery.com/jquery-latest.min.js
 d3.min.js = cdnjs.cloudflare.com/ajax/libs/d3/3.1.6/d3.min.js
 nv.d3.js = cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.js
 nv.d3.css = cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.css
+ng-table.js = bazalt-cms.com/assets/ng-table/0.3.0/ng-table.js
+ng-table.css = bazalt-cms.com/assets/ng-table/0.3.0/ng-table.css
 angular-sanitize.js = code.angularjs.org/1.3.0-beta.1/angular-sanitize.js
 bootstrap.min.js = netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js
 bootstrap.min.css = netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css
@@ -54,7 +58,7 @@ bootstrap-theme.min.css = netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-
 glyphicons-halflings-regular.woff = netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.woff
 glyphicons-halflings-regular.ttf = netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.ttf
 
-GIT-LOGO += https://github-media-downloads.s3.amazonaws.com/Octocats.zip
+GIT-LOGO += github-media-downloads.s3.amazonaws.com/Octocats.zip
 
 reqhtmllibs = $(addprefix $(HTML_LIBS_DIR)/, $(HTMLFILES))
 reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
