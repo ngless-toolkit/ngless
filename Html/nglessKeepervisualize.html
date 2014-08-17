@@ -1,20 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<!-- Load angular JS from google -->
-<script src="htmllibs/angular.min.js"></script>
-<!-- Load angular JS from google -->
-<script src="htmllibs/angular-sanitize.js"></script>
+
 <!-- Bootstrap core CSS -->
 <link href="htmllibs/bootstrap.min.css" rel="stylesheet">    
 <!-- Custom styles for this template -->
 <link href="nglessKeeper.css" rel="stylesheet">
 <link href="htmllibs/bootstrap-glyphicons.css" rel="stylesheet">   
+<link rel="stylesheet" href="htmllibs/ng-table.css">
+
+
+<!-- Load angular JS from google -->
+<script src="htmllibs/angular.min.js"></script>
+<!-- Load angular JS from google -->
+<script src="htmllibs/angular-sanitize.js"></script>
+<script src="htmllibs/ng-table.js"></script>
 
 
 <title>Ngless</title>
 
-<body>
+<body data-target=".navbar-example">
 
   <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
     <div class="container">
@@ -38,42 +43,146 @@
     </div>
   </div>
 
-  <div  ng-app="myApp" ng-controller="FilesProcessedCtrl" class="container">
-
-    <div class="textTitle">
-      <h1>TODO</h1>
-    </div>
-
-
-  </div><!-- /.container -->
-
-    <div id="footer">
+  <div class="bs-docs-header" id="content">
       <div class="container">
-        <p>Happily designed by <a href="https://github.com/luispedro">Luis Pedro Coelho</a> and <a href="https://github.com/montoias">Paulo Monteiro</a>. <a href="https://github.com/luispedro/ngless"><img align="right" style="float:right; width:36px" src="htmllibs/Octocat/Octocat.png"> </img> </a></p>
+        <h1>Visualization</h1>
+        <p>Browse through your NGLess counts</p>
       </div>
+  </div>
+
+  <div  ng-app="myApp" ng-controller="CountsProcessedCtrl">
+    <div class="row">
+      <div id="leftcolumn">
+          <h1 id="headList">Files</h1>
+          <ul class="nav nav-pills nav-stacked">
+             <li ng-repeat="f in countsProcessed" >
+                <a id="leftitem" href="#file{{$index}}" ng-click="displayData(f.fp)"> 
+                 <span style="float:right" class="glyphicon glyphicon-chevron-right"></span>
+                    {{getFileName(f.fp)}}
+                </a>
+            </li>
+          </ul>
+      </div>
+
+
+      <div id="rightCont" class="table-cont" >
+       <table ng-table="tableParams" show-filter="true" class="table">
+          <tr ng-repeat="d in $data track by $index" ng-class="{ 'emphasis': d.counts > 10 }">
+            <td data-title="'Name'" filter="{ 'name': 'text' }">{{d.name}}</td>
+            <td data-title="'Feature'">{{d.features}}</td>
+            <td data-title="'Strand'">{{d.strand}}</td>
+            <td sortable="counts" data-title="'Count'">{{d.counts}}</td>
+          </tr>
+        </table>
+      </div>
+ 
+    </div><!-- /.container -->
+  </div>
+
+  <div id="footer">
+    <div class="container">
+      <p> Happily designed by 
+        <a href="https://github.com/luispedro"> Luis Pedro Coelho </a> and 
+        <a href="https://github.com/montoias">Paulo Monteiro</a>. 
+        <a href="https://github.com/luispedro/ngless">
+          <img align="right" style="float:right; width:36px" src="htmllibs/Octocat/Octocat.png"> </img> 
+        </a>
+      </p>
     </div>
+  </div>
 
   <!-- Bootstrap core JavaScript
   ================================================== -->
   <!-- Placed at the end of the document so the pages load faster -->
   <script src="htmllibs/jquery-latest.min.js"></script>
   <script src="htmllibs/bootstrap.min.js"></script>
-  <script src="filesProcessed.js"></script>
+  <script src="countsProcessed.js"></script>
 
-  <!-- Angular Script to load different URLs -->
+  <script type="text/javascript">
+    
+    $("ul").on('click', 'li', function(e) {
+      $("li.active").removeClass( "active" );
+      $(this).addClass("active");
+    });
+    
+    
+    function tsvJSON(csv, headers){
+        var lines   = csv.split("\n");
+        var result  = [];
+        var head_test = lines[0].split("\t");
+
+        if(head_test.length == 2){
+          headers = ['name', 'counts']
+        }
+
+        for(var i=0;i < lines.length ;i++){
+          var obj = {};
+          var currentline=lines[i].split("\t");
+     
+          for(var j=0; j<headers.length ;j++){
+            obj[headers[j]] = currentline[j];
+          }
+     
+          result.push(obj);
+        }
+  
+      return JSON.stringify(result); //JSON
+    }
+
+  </script>
+
   <script>
 
-    var app = angular.module('myApp', ['ngSanitize']);
+    var app = angular.module('myApp', ['ngSanitize', 'ngTable']);
 
-    app.factory('FilesProcessed', function() {
-      return filesProcessed;
+    app.factory('CountsProcessed', function() {
+      return countsProcessed;
     });
 
-    function FilesProcessedCtrl($scope, $sce, FilesProcessed){
-      $scope.filesprocessed = FilesProcessed;
+    function CountsProcessedCtrl($scope, $sce, $http, $filter,CountsProcessed, ngTableParams){
+      $scope.countsProcessed = CountsProcessed;
+      $scope.data = [];
+
+      $scope.displayData = function(p) {
+        var url     = "serveF?id=" + p;
+        var headers = ["name", "features", "counts" ,  "strand"]
+
+        $http.get(url).
+           success(function(content) {
+              $scope.data = angular.fromJson(tsvJSON(content, headers));
+              $scope.tableParams.reload();
+        });
+      }
+
+      $scope.tableParams = new ngTableParams({
+          page: 1,            // show first page
+          count: 20           // count per page
+      }, {
+          total: $scope.data.length, // length of data
+          getData: function($defer, params) {
+              $.each($scope.data, function(i, obj) {
+                obj.counts = parseInt(obj.counts);
+              });
+
+              var data = $scope.data;
+
+              var filteredData = params.filter() ?
+                    $filter('filter')(data, params.filter()) :
+                    data;
+
+              var orderedData = params.sorting() ?
+                    $filter('orderBy')(filteredData, params.orderBy()) :
+                    data;
+
+              data = orderedData.slice((params.page() - 1) * params.count(), params.page() * params.count());
+
+              params.total(orderedData.length); // set total for recalc pagination
+              $defer.resolve(data);
+
+          }
+      });
 
       $scope.getFileName = function(path){
-         console.log(path);
          var pos = path.split("/").length;
              fileName = path.split("/")[pos - 1];
          return fileName.split('.')[0];    
@@ -85,6 +194,7 @@
 
         return $sce.trustAsResourceUrl(path);
       }
+
     }
 
   </script>
