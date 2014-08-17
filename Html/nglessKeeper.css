@@ -1,6 +1,3 @@
-body {
-  padding-top: 30px;
-}
 
 .textTitle {
   padding: 80px 15px;
@@ -8,17 +5,17 @@ body {
 }
 
 .frameFastQ {
-	height: 900px;
-	width: 100%; 
-	display: block;
+  height: 900px;
+  width: 100%; 
+  display: block;
 }
 
 .timetext {
-	float:right ;
+  float:right ;
 }
 
 .titletext {
-	float: left;
+  float: left;
 }
 
 div.panel-title {
@@ -112,6 +109,15 @@ div.panel-title {
     }
 }
 
+
+.navbar {
+    position:relative;
+    min-height:40px;
+    margin:0px;
+    /* Add padding: 0 */
+    border:0px solid transparent;
+}
+
 #nav.affix {
     position: fixed;
     top: 70px;
@@ -202,3 +208,27 @@ html,body {
     }
 }
 
+#leftcolumn {
+  background-color: grey;
+  font-size: 12px;
+  text-align: left;
+  color: white;
+  width: 20%; 
+  float:left;
+}
+
+#rightCont {
+  width: 70%; 
+  float:right;
+  margin-left: 10px;
+  margin-right: 50px;
+}
+
+#leftitem {
+  margin-left: 6px;
+  color: white;
+}
+
+#headList {
+  text-align: center;
+}
