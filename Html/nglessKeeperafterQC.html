@@ -112,16 +112,30 @@
     });
 
     function FilesProcessedCtrl($scope, $sce, FilesProcessed){
-      $scope.filesprocessed = FilesProcessed;
+      $scope.filesprocessed = validateFiles(FilesProcessed);
+
+      function validateFiles (files) {
+        var filteredFiles = names.filter(function(obj) {
+          return urlExists("serveF?id=" + files[0].name + '$afterQC/index.html')
+        });
+
+        return files;
+      }
+      
+      function urlExists(url)
+      {
+        var http = new XMLHttpRequest();
+        http.open('HEAD', url, false);
+        http.send();
+        return http.status != 404;
+      }
 
       $scope.getFileName = function(path){
-         console.log(path);
          var pos = path.split("/").length;
              fileName = path.split("/")[pos - 1];
          return fileName.split('.')[0];    
       }
       $scope.trustSrc = function(src) {
-        console.log(src);
         var p = src.split("/");
         var path = p.splice(p.length - 2, p.length).join("/");
 
