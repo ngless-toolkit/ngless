@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="htmllibs/bootstrap.min.css">
+    <link rel="stylesheet" href="forms/style.css">
+    
+    <!-- JS -->
+    <!-- load angular, nganimate, and ui-router -->
+    <script src="htmllibs/angular.min.js"></script>
+    <script src="htmllibs/angular-ui-router.min.js"></script>
+    <script src="htmllibs/angular-animate.min.js"></script>
+
+</head>
+<body ng-app="formApp">
+
+    <div class="container">
+        <div ui-view></div>
+    </div>
+
+    <script>
+        
+        var app = angular.module('formApp', ['ngAnimate', 'ui.router']);
+
+        app.config(function($stateProvider, $urlRouterProvider) {
+            
+            $stateProvider
+            
+                // route to show our basic form (/form)
+                .state('form', {
+                    url: '/form',
+                    templateUrl: 'forms/form.html',
+                    controller: 'formController'
+                })
+                
+                // nested states 
+                // each of these sections will have their own view
+                // url will be nested (/form/profile)
+                .state('form.load', {
+                    url: '/load',
+                    templateUrl: 'forms/form-load.html'
+                })
+                .state('form.preprocess', {
+                    url: '/preprocess',
+                    templateUrl: 'forms/form-preprocess.html'
+                })
+                .state('form.unique', {
+                    url: '/unique',
+                    templateUrl: 'forms/form-unique.html'
+                })
+                .state('form.map', {
+                    url: '/map',
+                    templateUrl: 'forms/form-map.html'
+                })
+                .state('form.annotate', {
+                    url: '/annotate',
+                    templateUrl: 'forms/form-annotate.html'
+                })
+                .state('form.count', {
+                    url: '/count',
+                    templateUrl: 'forms/form-count.html'
+                })
+                .state('form.write', {
+                    url: '/write',
+                    templateUrl: 'forms/form-write.html'
+                })
+                .state('form.end', {
+                    url: '/end',
+                    templateUrl: 'forms/form-end.html'
+                });
+               
+            // catch all route
+            // send users to the form page 
+            $urlRouterProvider.otherwise('/form/load');
+        })
+
+        // our controller for the form
+        // =============================================================================
+        app.controller('formController', function($scope) {
+            
+            $scope.preprocessF = [
+                {'name': 'substrim'},
+                {'name': 'indexation'},
+                {'name': 'if-length' },
+                {'name': 'if-indexation' }
+            ];
+
+
+            $scope.features = { cds:  false, gene: true, exon: false };
+            $scope.counts = { cds:  false, gene: true, exon: false };
+
+            
+            // we will store all of our form data in this object
+            $scope.formData = {'files': [], 'preprocess': []};
+            $scope.auxData = {};
+            
+            $scope.insertFiles = function() {
+                document.getElementById("next").style.visibility = "visible";
+                $scope.formData.files.push({});
+            }
+
+            $scope.insertpreprocess = function () {
+                $scope.formData.preprocess.push({})
+            }
+
+            var getIntVar = function (k, v) {
+                return "," + k + v
+            }
+            
+            var getStrVar = function (k, v) {
+                return "," + k + "'" + v + "'"
+            }
+
+            var getSymbolVar = function (k, v) {
+                return "," + k + "{" + v + "}"
+            }
+
+            var getSymbolArray = function (k, a) {
+                var s = []
+                if(a.cds){
+                    s.push("{cds}")
+                }
+                if(a.exon){
+                    s.push("{exon}")
+                }
+                if(a.gene){
+                    s.push("{gene}")
+                }
+
+                return "," + k + '[' + s.join(",") + ']'
+
+            }
+
+            var getNameFromArray = function (a) {
+                var res = [];
+                for (var i = 0; i < a.length; i++){
+                    res.push("'" + a[i].name + "'")
+                }
+
+                return res;
+            }
+
+            $scope.generateScript = function () {
+                var res = [];
+                
+                var x  = "in = fastq([" + getNameFromArray($scope.formData.files) + "])"
+                res.push(x); // fastq is allways needed.
+
+                if($scope.formData['unique']){
+                    x  = "in = unique(in" + getIntVar("max_copies=", $scope.formData.unique) + ")";
+                    res.push(x); //unique is optional
+                }
+                
+                if($scope.formData['map']){
+                    x  = "m = map(in" + getStrVar("reference=", $scope.formData.map) + ")";
+                    res.push(x);
+                } else return res.join("\n");
+
+                if($scope.formData['annotate']){
+                    var str = ""
+                    
+                    if($scope.formData.annotate['gff']){
+                        str += getStrVar("gff=", $scope.formData.annotate.gff);
+                    }
+
+                    if($scope.formData.annotate['ambiguity']){
+                        str += getSymbolVar("ambiguity=", $scope.formData.annotate.ambiguity);
+                    }
+
+                    if($scope.formData.annotate['strand']){
+                        str += getSymbolVar("strand=", $scope.formData.annotate.strand);
+                    }
+
+                    if($scope.formData.annotate['mode']){
+                        str += getSymbolVar("mode=", $scope.formData.annotate.mode);
+                    }
+
+                    if($scope.formData.annotate['features']){
+                        str += getSymbolArray("features=", $scope.formData.annotate.features);
+                    }
+
+                    x  = "a = annotate(m" + str + ")";
+                    res.push(x);
+
+                } else return res.join("\n");
+                
+
+                if($scope.formData['count']){
+                    var str = ""
+                    
+                    if($scope.formData.count['counts']){
+                        str += getSymbolArray("counts=", $scope.formData.count.counts);
+                    }
+
+                    if($scope.formData.count['min']){
+                        str += getIntVar("min=", $scope.formData.count.min);
+                    }
+
+                    x  = "c = count(a" + str + ")";
+                    res.push(x);
+                } else return res.join("\n");
+
+                if($scope.formData['write']){
+                    var str = ""
+                    
+                    if($scope.formData.write['ofile']){
+                        str += getStrVar("ofile=", $scope.formData.write.ofile);
+                    }
+
+                    x  = "write(c" + str + ")";
+                    res.push(x);
+
+                } else return res.join("\n");
+
+                return res.join("\n");
+            }
+
+            $scope.alertTest = function(x, k){
+                switch (x) {
+                    case "substrim":
+                        var retVal = prompt("Enter your quality value : ", "your value here");
+                        alert("You have entered : " +  retVal );
+                        $scope.formData.preprocess[k] = {substrim: retVal};
+                        break;
+                    case "indexation":
+                        var retVal = prompt("Enter your range of values : ", "[ val : val ]");
+                        alert("You have entered : " +  retVal );
+                        $scope.formData.preprocess[k] = {indexation: retVal};
+                        break;
+                    case "if-length":
+                    case "if-indexation":
+                        alert("not implemented");
+                        break;       
+                    }
+                return;    
+            }
+
+        });
+
+    </script>
+
+</body>
+</html>
