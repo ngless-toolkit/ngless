@@ -1,0 +1,22 @@
+<label>Let's filter the fastQ!</label>
+
+<div class="form-group">
+    <ul>
+        <li ng-repeat="f in formData.preprocess">
+          <select ng-click="alertTest(name.name, $index)" ng-model="name" ng-options="x.name for x in preprocessF"></select>
+          [<a href ng-click="formData.preprocess.splice($index, 1)"> X </a>]
+        </li>
+        <li>
+           <a ng-click="insertpreprocess()"> Add Instruction </a>
+        </li>
+    </ul>
+</div>
+
+<div class="form-group row">
+<div class="col-xs-6 col-xs-offset-3">
+    <a ui-sref="form.unique" class="btn btn-block btn-info">
+    Next Section <span class="glyphicon glyphicon-circle-arrow-right"></span>
+    </a>
+</div>
+</div>
+

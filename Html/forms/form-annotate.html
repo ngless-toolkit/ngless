@@ -1,0 +1,64 @@
+<div class="form-group">
+    <label for="email">Gff</label>
+	<input type="text" name="input" ng-model="formData.annotate.gff" required>
+</div>
+
+<div class="form-group">
+	<label>Features to filter</label>
+	<ul ng-repeat="(color,enabled) in features">
+	  <input type="checkbox" data-ng-init="formData.annotate.features=features" ng-click="formData.annotate.features=features" ng-model="features[color]" /> {{color}} 
+	</ul>
+</div>
+
+<div class="form-group">
+	<label>Mode of annotation</label>
+    <div class="radio">
+        <label>
+           <input type="radio" ng-model="formData.annotate.mode" value="union" checked>
+           union
+        </label>
+    </div>
+    <div class="radio">
+        <label>
+            <input type="radio" ng-model="formData.annotate.mode" value="intersection-strict">
+            intersection_strict
+        </label>
+    </div>
+    <div class="radio">
+        <label>
+            <input type="radio" ng-model="formData.annotate.mode" value="intersection_non_empty">
+            intersection_non_empty
+        </label>
+    </div>
+</div>
+
+
+<div class="form-group">
+	<label>Allow ambiguity</label>
+    <div class="radio">
+        <label><input type="radio" ng-model="formData.annotate.ambiguity" value="allow" checked>allow</label>
+    </div>
+    <div class="radio">
+        <label><input type="radio" ng-model="formData.annotate.ambiguity" value="deny">deny</label>
+    </div>
+</div>
+
+
+<div class="form-group">
+	<label>Alignement strand specific</label>
+    <div class="radio">
+        <label><input type="radio" ng-model="formData.annotate.strand" value="yes" checked>yes</label>
+    </div>
+    <div class="radio">
+        <label><input type="radio" ng-model="formData.annotate.strand" value="no">no</label>
+    </div>
+</div>
+
+
+<div class="form-group row">
+<div class="col-xs-6 col-xs-offset-3">
+    <a ui-sref="form.count" class="btn btn-block btn-info">
+    Next Section <span class="glyphicon glyphicon-circle-arrow-right"></span>
+    </a>
+</div>
+</div>
