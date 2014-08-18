@@ -1,17 +1,24 @@
+<h2> Annotate </h2>
+
+<p>This section allows to define the parameters to annotate a given data set.</p>
+
 <div class="form-group">
-    <label for="email">Gff</label>
+    <h3 >GFF</h3>
+    <p> Provide a valid filepath to a gff. If a default reference was used in the map, this field can be left blank. </p>
 	<input type="text" name="input" ng-model="formData.annotate.gff" required>
 </div>
 
 <div class="form-group">
-	<label>Features to filter</label>
-	<ul ng-repeat="(color,enabled) in features">
-	  <input type="checkbox" data-ng-init="formData.annotate.features=features" ng-click="formData.annotate.features=features" ng-model="features[color]" /> {{color}} 
+	<h3>Features to filter</h3>
+    <p> Choose between the possible genomic features the ones you're interested in. </p>
+	<ul ng-repeat="(c,enabled) in features">
+	  <input type="checkbox" data-ng-init="formData.annotate.features=features" ng-click="formData.annotate.features=features" ng-model="features[c]" /> {{c}} 
 	</ul>
 </div>
 
 <div class="form-group">
-	<label>Mode of annotation</label>
+    <h3>Mode of annotation</h3>
+    <p> Choose the mode of annotation that is most suitable for you data set. </p>
     <div class="radio">
         <label>
            <input type="radio" ng-model="formData.annotate.mode" value="union" checked>
@@ -34,7 +41,8 @@
 
 
 <div class="form-group">
-	<label>Allow ambiguity</label>
+    <h3>Allow ambiguity</h3>
+    <p> Choose wether you allow a given read to have more than one associated feature.  </p>
     <div class="radio">
         <label><input type="radio" ng-model="formData.annotate.ambiguity" value="allow" checked>allow</label>
     </div>
@@ -45,7 +53,8 @@
 
 
 <div class="form-group">
-	<label>Alignement strand specific</label>
+    <h3> Strand Specific </h3>
+    <p> The genomic feature must have the same strand as the strand of the alignment? </p>
     <div class="radio">
         <label><input type="radio" ng-model="formData.annotate.strand" value="yes" checked>yes</label>
     </div>

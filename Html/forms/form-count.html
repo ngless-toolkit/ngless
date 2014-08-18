@@ -1,12 +1,18 @@
+<h2> Counts </h2>
+
+<p> In this section can be defined the count parameters. </p>
+
 <div class="form-group">
-	<label>Choose features to filter the counts </label>
+	<h3>Features to filter</h3>
+    <p> Choose between the possible genomic features the ones you're interested in for the result of the counts. </p>
 	<ul ng-repeat="(c,enabled) in counts">
 	  <input type="checkbox" data-ng-init="formData.count.counts=counts" ng-click="formData.count.counts=counts" ng-model="counts[c]" /> {{c}} 
 	</ul>
 </div>
 
 <div class="form-group">
-	<label>What's minimal count amount? </label>
+	<h3> Minimum value </h3>
+	<p> What's minimal count amount that you are interested to see? The minimum value is 0.</p>
 	<input type="number" name="input" ng-model="formData.count.min" min="0" required>
 </div>
 
