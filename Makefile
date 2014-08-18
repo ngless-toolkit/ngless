@@ -37,6 +37,10 @@ HTMLFILES += angular-sanitize.js
 HTMLFILES += bootstrap-glyphicons.css
 HTMLFILES += ng-table.js
 HTMLFILES += ng-table.css
+HTMLFILES += angular-ui-router.min.js
+HTMLFILES += angular-animate.min.js
+HTMLFILES += ace.js
+HTMLFILES += mode-python.js
 
 # Required fonts
 FONTFILES := glyphicons-halflings-regular.woff
@@ -57,6 +61,10 @@ bootstrap-glyphicons.css += netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstra
 bootstrap-theme.min.css = netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-theme.min.css
 glyphicons-halflings-regular.woff = netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.woff
 glyphicons-halflings-regular.ttf = netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.ttf
+angular-animate.min.js = ajax.googleapis.com/ajax/libs/angularjs/1.2.16/angular-animate.min.js
+angular-ui-router.min.js = cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.10/angular-ui-router.min.js
+ace.js = cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/ace.js
+mode-python.js = cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/mode-python.js
 
 GIT-LOGO += github-media-downloads.s3.amazonaws.com/Octocats.zip
 
