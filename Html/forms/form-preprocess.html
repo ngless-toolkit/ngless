@@ -1,6 +1,10 @@
-<label>Let's filter the fastQ!</label>
+<h2> Pre-process a data set. </h2>
+
+<p> In this section can be created instructions to filter the data set. </p>
 
 <div class="form-group">
+  <h3> Instructions </h3>
+  <p> Choose between the possible instructions to add. </p>
     <ul>
         <li ng-repeat="f in formData.preprocess">
           <select ng-click="alertTest(name.name, $index)" ng-model="name" ng-options="x.name for x in preprocessF"></select>

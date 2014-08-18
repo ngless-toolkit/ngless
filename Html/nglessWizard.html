@@ -153,6 +153,20 @@
                     res.push(x); //unique is optional
                 }
                 
+                if($scope.formData['preprocess'].length > 0){
+                    x  = "preprocess(in) using |read|:\n"
+                    for (var i = 0; i < $scope.formData.preprocess.length; i++){
+                        var k = $scope.formData.preprocess[i];
+                        if(k['substrim']){
+                            x += "    read = substrim(read" + getIntVar("min_quality=", k['substrim']) + ")\n";
+                        }
+                        if(k['indexation']){
+                            x += "    read = read" + k['indexation'] + "\n";
+                        }
+                    }
+                    res.push(x);
+                }
+
                 if($scope.formData['map']){
                     x  = "m = map(in" + getStrVar("reference=", $scope.formData.map) + ")";
                     res.push(x);
