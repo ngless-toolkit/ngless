@@ -135,9 +135,8 @@ doesDirContainFormats path (x:xs) = do
 printNglessLn :: String -> IO ()
 printNglessLn x = whenLoud $ putStrLn x 
 
-setupHtmlViewer :: IO ()
-setupHtmlViewer = do
-    htmlP <- htmlDefaultDir
+setupHtmlViewer :: FilePath -> IO ()
+setupHtmlViewer htmlP = do
     dst <- defaultDir
     doesFileExist (p' dst) >>= \x -> case x of 
         True   -> return ()
@@ -173,3 +172,4 @@ unCompress fname =
 readPossiblyCompressedFile ::  B.ByteString -> IO BL.ByteString
 readPossiblyCompressedFile fileName = unCompress (B.unpack fileName)
 -----------
+

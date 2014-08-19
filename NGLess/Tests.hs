@@ -616,7 +616,7 @@ case_uop_minus_2 = evalMinus (NGOInteger (-10)) @?= (NGOInteger 10)
 
 case_files_in_dir = do
     x <- getFilesInDir "docs"
-    length x @?= 5
+    length x @?= 4
 
 case_template_id = template "a/B/c/d/xpto_1.fq" @?= template "a/B/c/d/xpto_1.fq"
 case_template    = template "a/B/c/d/xpto_1.fq" @?= "xpto_1"
@@ -994,6 +994,14 @@ case_json_statistics = do
 -- Annotate
 
 ngo_gff_fp = (Just (NGOString "test_samples/sample.gtf"))
+
+case_test_setup_html_view = do
+    _ <- setupHtmlViewer "Html/"  -- Make sure tmp has the required files, but use source to populate it.
+    dst <- defaultDir
+    doesFileExist (p' dst) >>= \x -> x @?= True -- make sure keeper.html exist
+  where 
+    p' = (</> "nglessKeeper.html")
+
 
 all_default_annot = do
   annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing Nothing Nothing Nothing >>= unCompress . T.unpack

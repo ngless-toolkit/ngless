@@ -37,6 +37,9 @@ import MapInterpretOperation
 import Annotation
 import CountOperation
 
+import Data.DefaultValues
+
+
 {- Interpretation is done inside 3 Monads
  -  1. InterpretationEnvIO
  -      This is the IO Monad with a variable environment
@@ -133,7 +136,7 @@ runInROEnvIO = runInEnv . runInROEnv
 interpret :: T.Text -> [(Int,Expression)] -> IO ()
 interpret script es = do
     let nglessScript = NGOString script 
-    _ <- setupHtmlViewer 
+    _ <- htmlDefaultDir >>= setupHtmlViewer 
     r <- evalStateT (runErrorT (interpretIO es)) (0, Map.insert ".script" nglessScript Map.empty)
     case r of
         Right _ -> return ()
@@ -435,3 +438,4 @@ add (NGOInteger x) (NGOInteger y) = NGOInteger $ x + y
 add _ _ = error "BinaryOP add: Arguments Should be of type NGOInteger" 
 mul (NGOInteger x) (NGOInteger y) = NGOInteger $ x * y
 mul _ _ = error "BinaryOP mul: Arguments Should be of type NGOInteger"
+
