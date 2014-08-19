@@ -106,7 +106,7 @@ filterStrand :: Maybe NGLessObject -> GffStrand -> IM.IntervalMap Int [GffCount]
 filterStrand modeS s m = maybe m (filterStrand') modeS
     where 
         filterStrand' modeS' = case modeS' of
-            NGOSymbol "yes" -> IM.map (filterByStrand s) m 
+            NGOSymbol "yes" -> IM.filter (not . null) . IM.map (filterByStrand s) $ m 
             NGOSymbol "no"  -> m -- by default no
             err              -> error ("Type must be a NGOSymbol with value 'yes' or 'no', but was passed: " ++ (show err))
 
