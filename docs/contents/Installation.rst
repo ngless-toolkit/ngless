@@ -109,3 +109,12 @@ Fedora / RHEL / CentOS Linux::
 	yum install ncurses-devel ncurses
 	
 	
+**During 'make' an error was reported saying 'Error: SSE2 instruction set not enabled'. How do I fix it?**::
+
+This is a known problem when compiling the Burrows-Wheeler Aligner(BWA) tool when under a **32 bits** operating system. To fix it,
+you have to change the Makefile inside the directory **bwa-0.7.7/** in
+
+	Line 3) CFLAGS= -g -Wall -O2 -msse -mmmx -msse2
+
+	Line 6) DFLAGS= -DHAVE_PTHREAD
+	
