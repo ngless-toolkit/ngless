@@ -91,3 +91,21 @@ nglessconf - downloads and configures all ngless dependencies
 
 Binary
 --------
+
+FAQ
+--------
+**During 'make' an error was reported saying 'curses.h: No such file or directory.'. How do I fix it?**::
+
+You need to install the curses library which include routines for a terminal-independent method of updating
+character screens with reasonable optimization. 
+The fix depends on the Operating System you are currently in.
+
+Ubuntu::
+	
+	sudo apt-get install libncurses5-dev libncursesw5-dev
+		
+Fedora / RHEL / CentOS Linux::
+	
+	yum install ncurses-devel ncurses
+	
+	
