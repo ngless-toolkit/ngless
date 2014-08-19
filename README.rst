@@ -10,7 +10,7 @@ Example
 
 ::
 
-    ngless 0.0
+    ngless "0.0"
     input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
     preprocess(input) using |read|:
         if read in contanminants:
