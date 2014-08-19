@@ -93,10 +93,9 @@ install-dir:
 	mkdir -p $(deps);
 
 compile: nglessconf
+	cabal install --only-dependencies --force-reinstalls
 	cabal build
 
-install:
-	cabal install --only-dependencies --force-reinstalls
 
 nglessconf: .cabal.sandbox htmldirs  $(SAM) $(BWA) $(reqhtmllibs) $(reqfonts) $(reqlogo)
 
