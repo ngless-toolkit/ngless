@@ -1096,17 +1096,17 @@ case_annotate_gene_noStrand_inters_non_empty = do
 
 
 
---case_annotate_gene_yesStrand_union = do
---    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
---    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
---    resNG <- unCompress $ T.unpack p
---    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
---    resHT @?= resNG
---  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
---        feats = Just $ NGOList [NGOSymbol "gene"]
---        m = Just $ NGOSymbol "union"
---        amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
---        s = Just $ NGOSymbol "yes"
+case_annotate_gene_yesStrand_union = do
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
+    resNG <- unCompress $ T.unpack p
+    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_yesStrand_union.txt"
+    resHT @?= resNG
+  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_yesStrand_union.txt"),("verbose", NGOSymbol "no")]
+        feats = Just $ NGOList [NGOSymbol "gene"]
+        m = Just $ NGOSymbol "union"
+        amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
+        s = Just $ NGOSymbol "yes"
 
 -- MapOperations
 
