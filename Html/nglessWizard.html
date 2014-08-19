@@ -93,7 +93,7 @@
 
             
             // we will store all of our form data in this object
-            $scope.formData = {'files': [], 'preprocess': []};
+            $scope.formData = {'files': []};
             $scope.auxData = {};
             
             $scope.insertFiles = function() {
@@ -153,16 +153,20 @@
                     res.push(x); //unique is optional
                 }
                 
-                if($scope.formData['preprocess'].length > 0){
+                if($scope.formData['preprocess']){
                     x  = "preprocess(in) using |read|:\n"
-                    for (var i = 0; i < $scope.formData.preprocess.length; i++){
-                        var k = $scope.formData.preprocess[i];
-                        if(k['substrim']){
-                            x += "    read = substrim(read" + getIntVar("min_quality=", k['substrim']) + ")\n";
-                        }
-                        if(k['indexation']){
-                            x += "    read = read" + k['indexation'] + "\n";
-                        }
+                    var k = $scope.formData.preprocess;
+                    if(k['left']){
+                        x += "    read = read[" + k['left'] + ":]\n";
+                    }
+                    if(k['right']){
+                        x += "    read = read[:" + k['right'] + "]\n";
+                    }
+                    if(k['subs']){
+                        x += "    read = substrim(read" + getIntVar("min_quality=", k['subs']) + ")\n";
+                    }
+                    if(k['disc']){
+                        x += "    if len(read) < " + k['disc'] + ":\n        discard\n";
                     }
                     res.push(x);
                 }
@@ -229,26 +233,6 @@
                 } else return res.join("\n");
 
                 return res.join("\n");
-            }
-
-            $scope.alertTest = function(x, k){
-                switch (x) {
-                    case "substrim":
-                        var retVal = prompt("Enter your quality value : ", "your value here");
-                        alert("You have entered : " +  retVal );
-                        $scope.formData.preprocess[k] = {substrim: retVal};
-                        break;
-                    case "indexation":
-                        var retVal = prompt("Enter your range of values : ", "[ val : val ]");
-                        alert("You have entered : " +  retVal );
-                        $scope.formData.preprocess[k] = {indexation: retVal};
-                        break;
-                    case "if-length":
-                    case "if-indexation":
-                        alert("not implemented");
-                        break;       
-                    }
-                return;    
             }
 
         });
