@@ -6,8 +6,6 @@ prefix=/usr/local
 deps=$(prefix)/share/$(progname)
 exec=$(prefix)/bin
 
-SOURCES=NGLess/*
-
 all: compile
 
 BWA = bwa-0.7.7
@@ -21,8 +19,6 @@ SAM_DIR = samtools-0.1.19.tar.bz2
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
 HTML_FONTS_DIR = $(HTML)/fonts
-
-current_dir = $(shell pwd)
 
 # Required html Librarys
 HTMLFILES := jquery-latest.min.js
@@ -97,11 +93,15 @@ install-dir:
 	mkdir -p $(deps);
 
 compile: nglessconf
-	cabal sandbox init
-	cabal install --only-dependencies --force-reinstalls
 	cabal build
 
-nglessconf: confhtmllibdir conffonts  $(SAM) $(BWA) $(reqhtmllibs) $(reqfonts) $(reqlogo)
+install:
+	cabal install --only-dependencies --force-reinstalls
+
+nglessconf: .cabal.sandbox htmldirs  $(SAM) $(BWA) $(reqhtmllibs) $(reqfonts) $(reqlogo)
+
+.cabal.sandbox:
+	cabal sandbox init
 
 clean:
 	rm -rf $(BWA) $(SAM) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs $(deps)
@@ -124,11 +124,9 @@ uninstall:
 
 
 #####  Setup required files
-conffonts:
-	mkdir -p $(HTML_FONTS_DIR);
-
-confhtmllibdir:
-	mkdir -p $(HTML_LIBS_DIR);
+htmldirs:
+	mkdir -p $(HTML_FONTS_DIR)
+	mkdir -p $(HTML_LIBS_DIR)
 
 $(BWA):
 	@echo Configuring BWA...

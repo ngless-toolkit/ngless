@@ -6,7 +6,7 @@ version:             0.0.0
 -- synopsis:
 -- description:
 license:             MIT
---license-file:        LICENSE
+license-file:        COPYING
 author:              Luis Pedro Coelho and Paulo Monteiro
 maintainer:          luis@luispedro.org
 -- copyright:
@@ -38,9 +38,6 @@ executable ngless
     parsec,
     zlib,
     test-framework-th,
-    HUnit,
-    test-framework-hunit,
-    test-framework-quickcheck2,
     hashable,
     conduit >= 1.0 && < 1.1,
     http-conduit >= 2.0,
