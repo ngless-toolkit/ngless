@@ -35,9 +35,9 @@ and no more steps are required!  Otherwise continue this installation process
 wich will update your cabal version. Start by running the following commands::
 
 	cabal update
-	sudo cabal install cabal-install --prefix=/usr/local
+	sudo cabal install cabal-install --prefix=/usr
 
-These commands require **super user privilege** and install the correct version of cabal in '/usr/local' which is by
+These commands require **super user privilege** and install the correct version of cabal in '/usr' which is by
 default in **$PATH**. In case you only have **user privileges** you can choose a **--prefix** anywhere else 
 (that you have permissions) but **make sure that is in your $PATH environment**. 
 After the installation you should be ready to go. To be sure, run again::
