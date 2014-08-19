@@ -28,21 +28,21 @@ Update cabal
 
 Cabal by default comes with a old version installed. Start by running::
 	
-	cabal --version
+	$ cabal --version
 
 If the version is equal or higher than 1.8.0.3 you are ready to install NGLess
 and no more steps are required!  Otherwise continue this installation process
 wich will update your cabal version. Start by running the following commands::
 
-	cabal update
-	sudo cabal install cabal-install --prefix=/usr
+	$ cabal update
+	$ sudo cabal install cabal-install --prefix=/usr
 
 These commands require **super user privilege** and install the correct version of cabal in '/usr' which is by
 default in **$PATH**. In case you only have **user privileges** you can choose a **--prefix** anywhere else 
 (that you have permissions) but **make sure that is in your $PATH environment**. 
 After the installation you should be ready to go. To be sure, run again::
 
-	cabal --version
+	$ cabal --version
 
 Check if the new version is higher than 1.8.0.3. 
 
@@ -58,20 +58,20 @@ If it isn't, one of the following problems might be occurring
 Steps
 ~~~~~~~~~~
 
-Start by download latest NGLess version from Github.
+Start by download latest NGLess version from Github.::
 
-    1. git clone https://github.com/luispedro/ngless
-    2. cd ngless
+    $ git clone https://github.com/luispedro/ngless
+    $ cd ngless
 
-Then download and configure all NGLess dependencies by running the following command.
+Then download and configure all NGLess dependencies by running the following command.::
 
-    2. make
+    $ make
 
 This will take a while, so go ahead and make some tea! After the previous
 command is completed (without errors) you are ready to install it wherever you
-want it to be.
+want it to be.::
 
-    3. make install prefix=dir (default dir is /usr/local)
+    $ make install prefix=dir (default dir is /usr/local)
 
 After this ngless is ready to use!
 
