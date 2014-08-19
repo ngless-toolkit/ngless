@@ -17,7 +17,7 @@ cabal-version:       >=1.18.0.3
 
 executable ngless
   main-is: Main.hs
-  ghc-options: -odir .objs -hidir .objs -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2
+  ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2
   -- other-modules:
   other-extensions:    BangPatterns, OverloadedStrings, DeriveDataTypeable, TemplateHaskell, TupleSections
   build-depends:
@@ -52,7 +52,7 @@ executable ngless
 
 executable nglesstest
   main-is: Tests.hs
-  ghc-options: -odir .objs -hidir .objs -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2
+  ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2
   -- other-modules:
   other-extensions:    BangPatterns, OverloadedStrings, DeriveDataTypeable, TemplateHaskell, TupleSections
   build-depends:
