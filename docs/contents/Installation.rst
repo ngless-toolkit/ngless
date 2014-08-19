@@ -32,12 +32,15 @@ Cabal by default comes with a old version installed. Start by running::
 
 If the version is equal or higher than 1.8.0.3 you are ready to install NGLess
 and no more steps are required!  Otherwise continue this installation process
-wich will update your cabal version. Start by running the following command::
+wich will update your cabal version. Start by running the following commands::
 
-	cabal install cabal-install --prefix=/usr/local
+	cabal update
+	sudo cabal install cabal-install --prefix=/usr/local
 
-This command should have installed everything and since '/usr/local' is by
-default in **$PATH** you should be ready to go. To be sure, run again::
+These commands require **super user privilege** and install the correct version of cabal in '/usr/local' which is by
+default in **$PATH**. In case you only have **user privileges** you can choose a **--prefix** anywhere else 
+(that you have permissions) but **make sure that is in your $PATH environment**. 
+After the installation you should be ready to go. To be sure, run again::
 
 	cabal --version
 
@@ -47,7 +50,7 @@ If it is, you are now ready to install NGLess.
 
 If it isn't, one of the following problems might be occurring
 
-	1) /usr/local is not in your $PATH.
+	1) The path used as --prefix is not in your $PATH.
 
 	2) A older version of cabal is installed in some directory which comes first than '/usr/local' in your $PATH variable.
 
