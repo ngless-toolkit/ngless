@@ -68,10 +68,13 @@ Then download and configure all NGLess dependencies by running the following com
     $ make
 
 This will take a while, so go ahead and make some tea! After the previous
-command is completed (without errors) you are ready to install it wherever you
-want it to be.::
+command is completed (without errors) you are ready to install ngless wherever you
+want it to be.
+::
 
-    $ make install prefix=dir (default dir is /usr/local)
+    $ sudo make install prefix=dir (default dir is /usr/local)
+
+(Note: **sudo** is only required when installing on a directoy with **super user privileges**)
 
 After this ngless is ready to use!
 
