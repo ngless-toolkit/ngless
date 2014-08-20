@@ -1,7 +1,6 @@
 module VectorOperations
  ( zeroVec
- , incV
- , incVec
+ , unsafeIncrement
  ) where
 
 import qualified Data.Vector.Unboxed.Mutable as VM
@@ -12,8 +11,7 @@ zeroVec n = do
     VM.set vec (0 :: Int)
     return vec
 
-incV False _ _ = return ()
-incV True  v i = incVec v i
-   
-incVec v i = VM.unsafeRead v i >>= \c -> VM.unsafeWrite v i (c + 1)
+unsafeIncrement v i = do
+    c <- VM.unsafeRead v i
+    VM.unsafeWrite v i (c + 1)
 

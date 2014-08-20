@@ -3,9 +3,7 @@
 
 
 module SamBamOperations
-    (
- samStats,
- update
+    ( samStats
     ) where
 
 import Control.Monad
@@ -25,7 +23,10 @@ computeStats sams = runST $ do
     V.freeze initVec
 
 update result samLine = do
-    incV True result (fromEnum Total)
-    incV (isAligned samLine) result (fromEnum Aligned)
-    incV (isUnique samLine) result (fromEnum Unique) 
-    incV (hasQual samLine) result (fromEnum LowQual) 
+        incV True Total
+        incV (isAligned samLine) Aligned
+        incV (isUnique samLine) Unique
+        incV (hasQual samLine) LowQual
+    where
+        incV cond e = (when cond) (unsafeIncrement result (fromEnum e))
+

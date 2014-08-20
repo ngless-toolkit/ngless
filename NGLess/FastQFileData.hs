@@ -17,7 +17,7 @@ import qualified Data.Vector.Unboxed.Mutable as VM
 
 import Data.STRef
 import Data.Char
-import VectorOperations(zeroVec, incVec)
+import VectorOperations(zeroVec, unsafeIncrement)
 
 data Result =  Result {bpCounts :: (Int, Int, Int, Int) , lc :: Char, qualCounts ::  [V.Vector Int], nSeq :: Int, seqSize :: (Int,Int)} deriving(Eq,Show)
 
@@ -50,7 +50,7 @@ computeStats' seqs = runST $ do
 update charCounts qualCountsT (P4 n lcT minSeq maxSeq) (bps,qs) = do
     forM_ [0 .. B.length bps - 1] $ \i -> do
         let bi = ord (B.index bps i)
-        incVec charCounts bi
+        unsafeIncrement charCounts bi
     let len = B.length bps
         qsM = ord . B.minimum $ qs
     replicateM_ (len - maxSeq) $ do
@@ -59,7 +59,7 @@ update charCounts qualCountsT (P4 n lcT minSeq maxSeq) (bps,qs) = do
     qualCountsT' <- readSTRef qualCountsT
     forM_ (zip [0 .. B.length qs - 1] qualCountsT') $ \(i,qv) -> do
         let qi = ord (B.index qs i)
-        incVec qv qi
+        unsafeIncrement qv qi
     return $! P4 (n + 1) (min qsM lcT) (min minSeq len) (max maxSeq len)
 
 
