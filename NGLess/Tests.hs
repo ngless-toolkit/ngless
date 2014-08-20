@@ -1136,7 +1136,6 @@ case_read_and_write_fastQ = do
     newrs <- readReadSet enc $ B.pack fp
     newrs @?= rs
 
-
 -- hack: jump over copy of .html and .css
 case_read_fastQ = do
     nt <- generateDirId fp 
@@ -1147,7 +1146,19 @@ case_read_fastQ = do
   where fp = "test_samples/sample.fq"
         dstDir nt = nt ++ "$beforeQC"
 
-
+-- "test_samples/sample.fq" has 33 as lowest char from the initial data set
+case_read_fastQ_store_enc = do
+    nt <- generateDirId fp 
+    createDirIfNotExists $ dstDirBef nt
+    createDirIfNotExists $ dstDirAft nt
+    (NGOReadSet _ eb _) <- readFastQ Nothing   fp (dstDirBef nt) nt
+    (NGOReadSet _ ea _) <- readFastQ (Just eb) fp (dstDirAft nt) nt
+    removeDirectoryRecursive $ dstDirBef nt -- delete test generated data.
+    removeDirectoryRecursive $ dstDirAft nt -- delete test generated data.
+    eb @?= ea
+  where fp = "test_samples/sample.fq"
+        dstDirBef = (++ "$beforeQC")
+        dstDirAft = (++ "$afterQC")
 
 case_get_gff = getGff "path_to_gff" @?= "path_to_gff/Annotation/annot.gtf.gz"
 
