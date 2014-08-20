@@ -63,7 +63,7 @@ validate_symbol s (ConstSymbol k) = case elem k s of
 validate_symbol _ _ = Nothing
 
 
--- | check whether function result of function calls are used
+-- | check whether results of calling pure functions are use
 validate_pure_function (Script _ es) = check_toplevel validate_pure_function' es
     where
         validate_pure_function' (FunctionCall f _ _ _)
