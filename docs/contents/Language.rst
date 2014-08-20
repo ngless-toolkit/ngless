@@ -8,9 +8,10 @@ Version declaration
 -------------------
 The first line of an NGLess file should be a version declaration:
 ::
- ngless "0.0"
+ 
+  ngless "0.0"
 
-Future versions of ngless will increase the string value. Also serves as a magic constant for other tools
+Future versions of ngless will increase the string value. Also serves as a magic constant for other tools.
 
 Comments
 -------------------
@@ -20,6 +21,7 @@ Explicative
 
 Start with **#** or **//** and end at the end of the line.
 ::
+
   i = 10 // This variable is used to explain Explicative comments
 
 Operational
@@ -27,6 +29,7 @@ Operational
 
 Start with **/*** and end with ***/**. Can't be nested.
 ::
+  
   /*
      This comment is used to explain operational comments.
   */
@@ -48,7 +51,7 @@ NGless supports the following basic types:
 - mappedreadset
 
 In addition, it supports the composite type List of X where X is a basic type. Lists are built
-with square brackes (e.g., [1,2,3]). All elements in a list must have the same data type.
+with square brackets (e.g., [1,2,3]). All elements of a list must have the same data type.
 
 String
 ~~~~~~~~~
@@ -62,7 +65,7 @@ and **\\r** respectively), quotation marks (**\\'**) or slash (**\\\\**).
 Integer
 ~~~~~~~~~
 Integers are specified as decimals ``[0-9]+`` or as hexadecimals ``0x[0-9a-fA-F]+``. They are non negative, but 
-can be negative through the use of the operator ``(-)``
+can be negative through the use of the operator ``(-)``.
 
 Boolean
 ~~~~~~~~~
@@ -70,8 +73,7 @@ Booleans are denoted as the word \textbf{true} or \textbf{false}, with the first
 
 Symbol
 ~~~~~~~~~~
-A symbol is denoted as a token surrounded by curly braces (e.g., ``{symbol}`` or ``{gene}``).
-
+A symbol is denoted as a token surrounded by curly braces (e.g.. ``{symbol}`` or ``{gene}``).
 
 
 Variables
@@ -80,7 +82,9 @@ NGless is a statically typed language and variables are typed. Types are automat
 
 Assignment is performed with = operator:
 ::
+
  variable = value
+
 
 Constants
 ~~~~~~~~~~~~~~~~~~~
@@ -102,12 +106,13 @@ Binary
 
 All operators can only be applied to integers. The operators described are available:
 ::
- + - < > >= <= == !=
+
+  + - < > >= <= == !=
 
 Indexation
 ~~~~~~~~~~
 Can be used to access only one element or a range of elements in a ShortRead. To access one element, 
-is required a identifier followed by an expression between brackets. (e.g, x[10]).
+is required an identifier followed by an expression between brackets. (e.g, x[10]).
 
 To obtain a range, is required an identifier and two expressions separated by a ':' and between brackets. Example: 
 
@@ -124,12 +129,14 @@ Conditional
 
 If the expression, following the word **if**, is **true** then the block that follows the ':' is executed. 
 ::
+
     if true:
-       val = 10 // will be executed
+      val = 10 // will be executed
 
 If the expression returns **false**, is present the reserved word **else** and delimiter ':' , the else block is
 executed.
 ::
+    
     if 5 > 10:
        val = 10
     else:
@@ -142,19 +149,22 @@ Functions
 
 Functions are called with parentheses:
 ::
+  
   result = f(arg, arg1=2)
 
 Functions have a single positional parameter, all other must be given by name:
 ::
+
   unique(reads, max_copies=2)
 
-The exception are constructs which take a block: they take a single positional parameter and a block. The block is passed using the using keyword:
+The exception is constructs which take a block: they take a single positional parameter and a block. The block is passed using the using keyword:
 ::
+  
   preprocess(reads) using |read|:
     block
     ...
     
-There is no possibility of defining new functions. Only the builtin functions are available.
+There is no possibility of defining new functions. Only the built-in functions are available.
 
 Pure functions
 ~~~~~~~~~~~~~~~~~~~~

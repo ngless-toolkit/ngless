@@ -7,11 +7,12 @@ Visualization
 Launch
 -----------------
 
-In order to visualize the script results a web server needs to be launched.
+In order to visualize the script results a web server is launched with the following command.
 ::
-  > ngless visualizemode
-  $ Launching WebServer at: 8000
-  $ You can acess it at: http://localhost:8000   
+
+  $ ngless visualizemode
+  > Launching WebServer at: 8000
+  > You can access it at: http://localhost:8000   
 
 To change the port from the default 8000, as to be used the flag **-p** [int] or --port=[Int].
 
@@ -21,7 +22,7 @@ If everything went correctly, you should see something like this.
 
 Visualize Runs
 -----------------
-All past executions of NGLess can be consulted, and are organized in a drop down list fashion.
+All prior executions of NGLess can be consulted, and are organized in a drop down list fashion.
 
 .. image:: ../images/listScripts.png
 
@@ -30,10 +31,10 @@ Each box has information outside as the data set name that we used and the date 
 If we open one box, there can be seen three main things: 
 
 - The executed script
-- The quality control at the begining
-- The quality control after the pre-processing (this one being optional).
+- The quality control at the beginning
+- Quality controls after the pre-processing (this one being optional).
 
-Is crucial to save the script that lead to some results. For that reason, scripts are allways associated with the 
+Is crucial to save the script that lead to some results. For that reason, scripts are always associated with the 
 results that they generate, allowing this way to easily reproduce an experiment. The script can be 
 consulted has shown in the next figure.
 
@@ -41,18 +42,18 @@ consulted has shown in the next figure.
 
 Before Quality Control
 ----------------------
+
 This quality control is always present and it allows to visualize the quality and basic info about a given data set. 
 
 The basic information provided is:
 
 - The original file path
-- The percentage of guanine and citosine in the whole data set.
+- The percentage of guanine and cytosine in the whole data set.
 - Encoding prediction.
 - The number of sequences.
-- The minimum and maximum sequence length of the whole data set.
+- The minimum and maximum sequence length of the entire data set.
 
-Not only basic information is provided, but also statistical calculations are made. These statistics are made in relation
-to each base pair, and are presented in a interactive plot that allows show/hide these metrics. 
+Not only basic information is supplied, but also statistical calculations are made. These statistics are made in relation to each base pair, and are presented in an interactive plot that allows show/hide these metrics. 
 
 The used statistical measures are in relation to each base pair and are:
 
@@ -61,13 +62,11 @@ The used statistical measures are in relation to each base pair and are:
 - Lower Quartile (25%)
 - Upper Quartile (75%)
 
-The Quality control can be accessed in the web interface through the tab **before QC** and a vertical menu allows to
-choose which dataset in question. Can be seen an example next:
+The Quality control can be accessed in the web interface through the tab **before QC** and a vertical menu allows to choose which dataset in question. Can be seen an example next:
 
 .. image:: ../images/beforeQC.png
 
-The plot can be adjusted to show one statistic at a time, and the plot limits adapt to the presented values. An image
-of only the upper quartile shown looks like the following:
+The plot can be adjusted to show one statistic at a time, and the plot limits adapt to the presented values. An image of only the upper quartile shown looks like the following:
 
 .. image:: ../images/beforeQCUQ.png
 

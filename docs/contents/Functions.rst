@@ -25,17 +25,11 @@ none
 
 The only compression method supported for the data sets is **gzip** (.gz).
 
-The encoding prediction is based on the lowest ASCII character of the
-fastQ file.
+The encoding prediction is built on the lowest ASCII character of the fastQ file.
 
-When loading a data set, quality control is performed and statistics can
-be visualised in a graphical user interface (GUI).
+When loading a data set, quality control is carried out and statistics can be visualised in a graphical user interface (GUI).
 
-The simple statistics calculated are percentage of guanine and cytosine
-(%GC), encoding, number of sequences and minimum/maximum sequence
-length. The more complex statistics calculated are the mean, median,
-lower quartile and upper quartile for each position of the base pairs.
-
+Simple statistics calculated are percentage of guanine and cytosine (%GC), encoding, number of sequences and minimum maximum sequence length. The more complex statistics calculated are the mean, median, lower quartile and upper quartile for each position of the base pairs.
 
 
 Unique
@@ -156,10 +150,7 @@ NGLess are:
 | mm10      | mus\_musculus               | GRCm38      |
 +-----------+-----------------------------+-------------+
 
-If one of the previous data sets are chosen, the data sets will be
-downloaded (if they are not already locally). This data set contains the
-BWA index files and a gene annotation file.
-
+The argument **reference** can either be a path to a data set or the **name** of a NGLess provided data set. Provided data sets of NGLess are:
 
 
 Annotate
@@ -200,19 +191,12 @@ Arguments by value:
 | strand      | NGOSymbol       | no         |
 +-------------+-----------------+------------+
 
-The **gff** argument is required, unless it was used a data set
-provided by NGLess on the map (map section).
 
-The argument **features** represents which features to keep,
-discarding everything else. If nothing is provided everything is
-considered to be important. The possible symbols are **{gene}**,
-**{exon}** and **{cds}**.
+The **gff** argument is required, unless was used a data set provided by NGLess on the map (map section).
 
-**Mode** is a string that represents the mode to handle reads
-overlapping more than one feature. The possible values for **mode** are
-**“union”**, **“intersection-strict”** and **“intersection-nonempty”**
-(default: “union”). For each read position is obtained features that
-intersect it, which is called sets. The different modes are:
+The argument **features** represents which features to keep, discarding everything else. If nothing is provided everything is considered to be significant. Possible symbols are **{gene}**, **{exon}** and **{cds}**.
+
+**Mode** is a string that represents the mode to handle reads overlapping more than one feature. Possible values for **mode** are **“union”**, **“intersection-strict”** and **“intersection-nonempty”** (default: “union”). For each read position are obtained features that intersect it, which is known as sets. The different modes are:
 
 -  **union** the union of all the sets.
 
@@ -220,15 +204,10 @@ intersect it, which is called sets. The different modes are:
 
 -  **intersection-nonempty** the intersection of all non-empty sets.
 
-The **ambiguity** argument allows to decide whether to allow reads
-that overlap with more than one feature. The possible values are {allow}
-and {deny} (default: {allow}).
+The **ambiguity** argument is an opportunity to decide whether to allow reads that overlap with more than one feature. Possible values are {allow} and {deny} (default: {allow}).
 
-Argument **strand** represents whether the data is from a
-strand-specific and the possible values can be **{yes}** or **{no}**
-(default: {no}). For {no}, a read is always overlapping with a feature
-independently of whether maps to the same or the opposite strand. For
-{yes}, the read has to be mapped to the same strand as the feature.
+Argument **strand** represents whether the data are from a strand-specific and the possible values can be **{yes}** or **{no}** (default: {no}). For {no}, a read is always overlapping with a feature independently of whether maps to the same or the opposite strand. For {yes}, the read has to be mapped to the same strand as the feature.
+
 
 
 Count
@@ -261,12 +240,9 @@ Arguments by value:
 | min      | NGOInteger      |  no        |
 +----------+-----------------+------------+
 
-The argument **counts** represents which features to keep, discarding
-everything else. The possible symbols are gene, exon and cds. If nothing
-is provided everything is considered to be important.
+The argument **counts** represents which features to keep, discarding everything else. Possible symbols are gene, exon and cds. If nothing is provided everything is considered to be important.
 
-**Min** defines the minimum amount of overlaps a given feature must
-have, at least, to be kept (default: 0).
+**Min** defines the minimum amount of overlaps a given feature must have, at least, to be kept (default: 0).
 
 
 Substrim
@@ -322,7 +298,7 @@ Return:
 NGOVoid
 
 Arguments by value:
-##########
+###################
 
 +---------+-------------+------------+
 | Name    | Type        | Required   |
@@ -346,7 +322,7 @@ Return:
 NGOVoid
 
 Arguments by value:
-##########
+###################
 
 +----------+-------------+------------+
 | Name     | Type        | Required   |
@@ -372,7 +348,7 @@ Return:
 NGOVoid
 
 Arguments by value:
-##########
+###################
 
 +----------+-------------+------------+
 | Name     | Type        | Required   |
@@ -384,10 +360,7 @@ Arguments by value:
 
 **Format** can have value **{csv}** or **{tsv}** (default: {tsv}).
 
-If a list of **any** of the previous mentioned data types is provided,
-the **ofile** argument must use an **{index}** in the template name to
-differentiate between the files in the list. For example for a list with
-two elements:
+If a list of **any** of the previously mentioned data types is provided, the **ofile** argument must use an **{index}** in the template name to differentiate between the files in the list. For example for a list with two elements:
 
 ::
 

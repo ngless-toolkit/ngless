@@ -17,3 +17,4 @@ Welcome to ngless's documentation!
    Language
    Functions
    Documents
+   Tests

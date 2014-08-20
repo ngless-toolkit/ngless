@@ -4,7 +4,7 @@
 Tests
 ============
 
-These are the required programms you must have installed to test the ngless tool
+These are the required programs you must have installed to test the ngless tool
 
 - GHC (version 7.6.3 or higher)
 - Cabal (1.8.0.3 or higher)
@@ -32,7 +32,7 @@ RedHat, Fedora, CentOS
   
 Mac
 ~~~~~~~~~~
-Using **macports** can be installed by running the following command::
+Using **macports**, can be installed by running the following command::
   
   $ sudo port install py27-numpy py27-matplotlib
 
@@ -45,6 +45,6 @@ Start by download latest NGLess version from Github.::
     $ git clone https://github.com/luispedro/ngless
     $ cd ngless
 
-Then compite and run ngless by executing the following command.::
+Then compite and run nglesstest by executing the following command.::
 
     $ make test
