@@ -116,11 +116,9 @@
       $scope.filesprocessed = validateFiles(FilesProcessed);
 
       function validateFiles (files) {
-        var filteredFiles = names.filter(function(obj) {
-          return urlExists("serveF?id=" + files[0].name + '$afterQC/index.html')
+        return files.filter(function(obj) {
+          return urlExists("serveF?id=" + obj.name + '$afterQC/index.html')
         });
-
-        return files;
       }
       
       function urlExists(url)
