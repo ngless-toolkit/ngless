@@ -32,19 +32,19 @@ validate_io' expr = do
         errors -> return . Left . T.concat $ errors
     where
         checks =
-            [validate_fp,
+            [validate_files,
              validate_def_genomes]
 
 
--- | check whether function result of function calls are used
-validate_fp :: Script -> IO (Maybe T.Text)
-validate_fp (Script _ es) = check_toplevel validate_fp' es
+-- | check that necessary files exist
+validate_files :: Script -> IO (Maybe T.Text)
+validate_files (Script _ es) = check_toplevel validate_files' es
     where
-        validate_fp' (FunctionCall Ffastq (ConstStr x) _ _) = isValidFile x
-        validate_fp' (FunctionCall Ffastq (Lookup   x) _ _) = validateVar isValidFile x es
-        validate_fp' (FunctionCall Fannotate _ args _) = validateArg isValidFile "gff" args es
-        validate_fp' (Assignment _ e) = validate_fp' e
-        validate_fp' _ = return Nothing
+        validate_files' (FunctionCall Ffastq (ConstStr x) _ _) = check_can_read_file x
+        validate_files' (FunctionCall Ffastq (Lookup   x) _ _) = validateVar check_can_read_file x es
+        validate_files' (FunctionCall Fannotate _ args _) = validateArg check_can_read_file "gff" args es
+        validate_files' (Assignment _ e) = validate_files' e
+        validate_files' _ = return Nothing
  
 validate_def_genomes :: Script -> IO (Maybe T.Text)
 validate_def_genomes (Script _ es) = check_toplevel validate_def_genomes' es
@@ -84,16 +84,19 @@ get_const_val v s = do
             _ -> Right Nothing -- do not validate
     where 
         isAssignToVar :: Variable -> Expression -> Maybe T.Text
-        isAssignToVar v1 (Assignment v2 (ConstStr val)) = if v1 == v2 then Just val else Nothing
+        isAssignToVar v1 (Assignment v2 (ConstStr val)) | v1 == v2 = Just val
         isAssignToVar _  _ = Nothing
 
--------------
-isValidFile :: T.Text -> IO (Maybe T.Text)
-isValidFile x = do
-    r <- doesFileExist (T.unpack x)
-    case r of
-        True  -> return $ Nothing
-        False -> return $ Just (T.concat ["File name: ", x, " does not exist."])
+check_can_read_file :: T.Text -> IO (Maybe T.Text)
+check_can_read_file fname = let fname' = T.unpack fname in do
+    r <- doesFileExist fname'
+    if not r
+        then return $ Just (T.concat ["File `", fname, "` does not exist."])
+        else do
+            p <- getPermissions fname'
+            if readable p
+                then return Nothing
+                else return $ Just (T.concat ["File `", fname, "` is not readable (permissions problem)."])
 
 isValidRef :: T.Text -> IO (Maybe T.Text)
 isValidRef v = do
