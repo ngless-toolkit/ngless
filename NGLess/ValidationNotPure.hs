@@ -9,13 +9,13 @@ module ValidationNotPure
         validate_io'
     ) where
 
-import Language
-import UnpackIlluminaGenomes
-
 import System.Directory 
-
 import Data.Maybe
+
 import qualified Data.Text as T
+
+import Language
+import ReferenceDatabases
 
 validate_io :: Script -> IO Script
 validate_io expr = do

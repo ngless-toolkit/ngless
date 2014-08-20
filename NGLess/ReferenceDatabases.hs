@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module UnpackIlluminaGenomes
+module ReferenceDatabases
     ( 
       defaultGenomes,
       getUcscUrl,
@@ -25,8 +25,8 @@ gffPath = "Annotation/annot.gtf.gz"
 getGff :: T.Text -> FilePath
 getGff n = (T.unpack n) </> gffPath
 
-ucscUrl :: FilePath
-ucscUrl = "http://kdbio.inesc-id.pt/~prrm/genomes"
+nglessDataBaseURL :: FilePath
+nglessDataBaseURL = "http://kdbio.inesc-id.pt/~prrm/genomes"
 
 defaultGenomes :: [(T.Text, FilePath)]
 defaultGenomes = [
@@ -46,7 +46,7 @@ getUcscUrl :: FilePath -> FilePath
 getUcscUrl genome = 
     case lookup (T.pack genome) defaultGenomes of
         Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-        Just v -> ucscUrl </> v <.> "tar.gz"
+        Just v -> nglessDataBaseURL </> v <.> "tar.gz"
 
 
 getGenomeRootPath :: T.Text -> FilePath

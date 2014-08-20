@@ -29,7 +29,7 @@ import Data.List (foldl')
 
 import Language
 import FileManagement(printNglessLn, unCompress)
-import UnpackIlluminaGenomes
+import ReferenceDatabases
 
 import Data.GFF
 import Data.Sam

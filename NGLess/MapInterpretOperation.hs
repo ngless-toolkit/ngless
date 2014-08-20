@@ -36,7 +36,7 @@ import InvokeExternalProgs
 import SamBamOperations
 import Language
 import FileManagement
-import UnpackIlluminaGenomes
+import ReferenceDatabases
 
 import Data.DefaultValues
 import Data.Sam
