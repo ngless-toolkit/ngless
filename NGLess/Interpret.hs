@@ -255,9 +255,7 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
         m = lookup "mode" args
         a = lookup "ambiguity" args
         s = lookup "strand" args
-    res <- liftIO $ do
-        print g
-        annotate (T.unpack e) g f dDS m a s
+    res <- liftIO $ annotate (T.unpack e) g f dDS m a s
     return $ NGOAnnotatedSet res
 executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
 
@@ -280,9 +278,7 @@ executeQualityProcess' fname info nt = liftIO $ executeQProc fname info nt
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeMap (NGOList e) args = return . NGOList =<< mapM (\x -> executeMap x args) e
-executeMap (NGOReadSet file _enc _) args = do
-            _ <- liftIO $ print (show file ++ " " ++ show (evalString . fromJust $ lookup "reference" args) )
-            case lookup "reference" args of 
+executeMap (NGOReadSet file _enc _) args = case lookup "reference" args of 
                 Just refPath' -> liftIO $ interpretMapOp (evalString refPath') file
                 Nothing       -> error ("A reference must be suplied")
 
