@@ -59,23 +59,25 @@ decodeQual enc = B.map (chr . sub . ord)
         sub v = v - enc
 encodeQual enc = B.map (chr . (+) enc . ord)
 
-executeQProc :: FilePath -> FilePath -> FilePath -> IO NGLessObject
-executeQProc f info dirT = setupRequiredFiles info dirT >>= \x -> readFastQ f x dirT
+executeQProc :: Maybe Int -> FilePath -> FilePath -> FilePath -> IO NGLessObject
+executeQProc enc f info dirT = setupRequiredFiles info dirT >>= \x -> readFastQ enc f x dirT
 
-readFastQ :: FilePath -> FilePath -> FilePath -> IO NGLessObject
-readFastQ f dst dirT = do
+readFastQ :: Maybe Int -> FilePath -> FilePath -> FilePath -> IO NGLessObject
+readFastQ enc f dst dirT = do
         fd <- unCompress f >>= return . computeStats
+        let enc' = encFromM fd -- when Nothing calculate encoding, else use value from Just.
         p "Generation of statistics for " dst
-        createBasicStatsJson (dst ++ "/basicStats.js") fd f -- generate JSON DATA file: basicStats.js
+        createBasicStatsJson (dst ++ "/basicStats.js") fd f (chr enc') -- generate JSON DATA file: basicStats.js
         p "Simple Statistics completed for: " dst
-        p "number of base pairs: " (show $ length (qualCounts fd)) 
-        p "Lowest char is: " (show $ lc fd)
-        printHtmlStatisticsData (qualCounts fd) (enc fd) dst -- " " " file: perBaseQualScoresData.js
+        p "Number of base pairs: "      (show $ length (qualCounts fd)) 
+        p "Encoding is: "               (show $ enc')
+        p "Number of sequences: "   (show $ nSeq fd)
+        printHtmlStatisticsData (qualCounts fd) enc' dst -- " " " file: perBaseQualScoresData.js
         p "Loaded file: " f
-        return $ NGOReadSet (B.pack f) (enc fd) (B.pack dirT)
+        return $ NGOReadSet (B.pack f) enc' (B.pack dirT)
     where
-        p s obj = printNglessLn $ s ++ obj
-        enc = ord . lc
+        p s obj  = printNglessLn $ s ++ obj
+        encFromM fd = maybe (ord . lc $ fd) id enc
 
 --remove encodeQual when not Pre-Processing.
 showRead :: Int -> NGLessObject -> BL.ByteString

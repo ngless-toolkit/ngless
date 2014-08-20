@@ -24,14 +24,14 @@ import Data.Json
 fProc = "var filesProcessed = "
 cProc = "var countsProcessed = "
 
-createBasicStatsJson filePath fileData fname = BL.writeFile filePath resJS        
+createBasicStatsJson filePath fileData fname enc = BL.writeFile filePath resJS        
         where
             res    = basicInfoToJson fname gc' enc' nSeq' sSize'
             resJS  = BL.concat["var basicInfo = [", res, "];"] 
             sSize' = seqSize fileData
             nSeq'  = nSeq fileData
             gc'    = getGCPercent $ bpCounts fileData
-            enc'   = getEncoding $ lc fileData
+            enc'   = getEncoding enc
 
 
 insertFilesProcessedJson :: FilePath -> T.Text -> IO ()

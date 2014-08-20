@@ -261,7 +261,7 @@ executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappe
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = return . NGOList =<< mapM (executeQualityProcess) e
-executeQualityProcess (NGOReadSet fname _ nt) = executeQualityProcess' (B.unpack fname) "afterQC" (B.unpack nt)
+executeQualityProcess (NGOReadSet fname enc nt) = executeQualityProcess' (Just enc) (B.unpack fname) "afterQC" (B.unpack nt)
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     newTemplate <- liftIO $ generateDirId fname' -- new template only calculated once.
@@ -270,11 +270,11 @@ executeQualityProcess (NGOString fname) = do
         Nothing -> throwError "Variable lookup error: .script"
         Just r' -> do
                  _ <- liftIO $ insertFilesProcessedJson newTemplate (evalString r')
-                 executeQualityProcess' fname' "beforeQC" newTemplate
+                 executeQualityProcess' Nothing fname' "beforeQC" newTemplate
 
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
 
-executeQualityProcess' fname info nt = liftIO $ executeQProc fname info nt
+executeQualityProcess' enc fname info nt = liftIO $ executeQProc enc fname info nt
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeMap (NGOList e) args = return . NGOList =<< mapM (\x -> executeMap x args) e
