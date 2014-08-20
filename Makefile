@@ -77,16 +77,16 @@ test: compile
 
 install: install-dir install-html install-bwa install-sam
 #	cp dist/build/nglesstest/nglesstest $(exec)/nglesstest
-	cp dist/build/ngless/ngless $(exec)/ngless
+	cp -f dist/build/ngless/ngless $(exec)/ngless
 
 install-html:
-	cp -r $(HTML) $(deps)
+	cp -rf $(HTML) $(deps)
 
 install-bwa:
-	cp -r $(BWA) $(deps)
+	cp -rf $(BWA) $(deps)
 
 install-sam:
-	cp -r $(SAM) $(deps)
+	cp -rf $(SAM) $(deps)
 
 install-dir:
 	mkdir -p $(exec)
