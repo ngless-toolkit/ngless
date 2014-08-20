@@ -66,7 +66,7 @@ GIT-LOGO += github-media-downloads.s3.amazonaws.com/Octocats.zip
 
 reqhtmllibs = $(addprefix $(HTML_LIBS_DIR)/, $(HTMLFILES))
 reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
-reqLogo = $(HTML_LIBS_DIR)/Octocat.png
+reqlogo = $(HTML_LIBS_DIR)/Octocat.png
 #
 
 test: compile
