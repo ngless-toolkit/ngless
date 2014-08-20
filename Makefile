@@ -12,9 +12,9 @@ BWA = bwa-0.7.7
 BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
 BWA_DIR = bwa-0.7.7.tar.bz2
 
-SAM = samtools-0.1.19
-SAM_URL = http://sourceforge.net/projects/samtools/files/samtools/0.1.19/samtools-0.1.19.tar.bz2
-SAM_DIR = samtools-0.1.19.tar.bz2
+SAM = samtools-1.0
+SAM_URL = http://sourceforge.net/projects/samtools/files/samtools/1.0/samtools-1.0.tar.bz2
+SAM_DIR = samtools-1.0.tar.bz2
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs

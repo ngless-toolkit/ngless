@@ -42,7 +42,7 @@ htmlDefaultDir :: IO FilePath
 htmlDefaultDir = getNglessRoot >>= return . (</> "../share/ngless/Html")
 
 samDirPath :: String
-samDirPath = "../share/ngless/samtools-0.1.19" --setup puts the samtools directory on project root.
+samDirPath = "../share/ngless/samtools-1.0" --setup puts the samtools directory on project root.
 
 samAlg :: String
 samAlg = "samtools"

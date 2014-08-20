@@ -68,7 +68,7 @@ mapToReference' newfp refIndex readSet = do
 
 
 convertSamToBam samfp newfp = do
-    printNglessLn $ "Start to convert Bam to Sam. from " ++ samfp ++ "to -> " ++ newfp
+    printNglessLn $ "Start to convert Sam to Bam. from " ++ samfp ++ " to -> " ++ newfp
     jHandle <- convSamToBam' samfp newfp
     exitCode <- waitForProcess jHandle
     case exitCode of
