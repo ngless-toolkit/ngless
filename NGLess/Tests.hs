@@ -882,7 +882,6 @@ case_zero_vec = do
   v <- zeroVec 4 >>= V.freeze
   v @?= V.fromList [0,0,0,0]
 
-case_get_v = getV (V.fromList [(1 :: Int),2,3]) 2 @?= (3 :: Int)
 ----- SamBamOperations.hs
 
 case_sam_stats_length = do

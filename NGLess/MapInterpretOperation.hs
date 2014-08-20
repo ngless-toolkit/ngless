@@ -14,6 +14,7 @@ import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.Text as T
+import qualified Data.Vector.Unboxed as V
 
 import qualified Data.Map as Map
 
@@ -36,7 +37,6 @@ import SamBamOperations
 import Language
 import FileManagement
 import UnpackIlluminaGenomes
-import VectorOperations(getV)
 
 import Data.DefaultValues
 import Data.Sam
@@ -84,10 +84,10 @@ getSamStats fname = unCompress fname >>= printSamStats . calcSamStats
 
 calcSamStats contents = [total', aligned', unique', lowQual']
     where res' = samStats contents
-          total' = getV res' (fromEnum Total)
-          aligned' = getV res' (fromEnum Aligned)
-          unique' = getV res' (fromEnum Unique)
-          lowQual' = getV res' (fromEnum LowQual)
+          total' = V.unsafeIndex res' (fromEnum Total)
+          aligned' = V.unsafeIndex res' (fromEnum Aligned)
+          unique' = V.unsafeIndex res' (fromEnum Unique)
+          lowQual' = V.unsafeIndex res' (fromEnum LowQual)
 
 printSamStats stats = do
     putStrLn $ "Total reads: " ++ (show total)
