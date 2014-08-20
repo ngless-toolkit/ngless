@@ -71,7 +71,7 @@
             <div class="page-header"> <h2>Statistics of {{getFileName(f.name)}}</h2></div>
              <p > Here can be seen the resultant statistics of the applied NGLess script to the dataset <strong>{{getFileName(f.name)}}</strong>. </p>
              <p class="titletext"> The file was processed at {{f.time}}. </p>
-             <iframe class="frameFastQ" seamless ng-src="{{trustSrc(f.name + '$afterQC/index.html')}}"></iframe>
+             <iframe class="frameFastQ" frameborder="0" ng-src="{{trustSrc(f.name + '$afterQC/index.html')}}"></iframe>
            </section>
           </div>
         </div>
