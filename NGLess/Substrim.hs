@@ -3,7 +3,7 @@
 
 module Substrim
     ( substrim
-    , calculateSubStrim
+    , subtrimPos
     , removeBps
     ) where
 
@@ -18,20 +18,19 @@ removeBps bps (index,size) = B.take size (B.drop index bps)
 
 substrim :: Int -> NGLessObject -> NGLessObject
 substrim cutoff (NGOShortRead rId rS rQ) = NGOShortRead rId (removeBps rS r) (removeBps rQ r)
-    where r = calculateSubStrim rQ (chr cutoff)
-
+    where r = subtrimPos rQ (chr cutoff)
 substrim _ _ = error "substrim: must have type Int and NGOShortRead"
 
 -- Receives a Quality array and returns a pair with the index and size of the subsequence which has the most consecutive bps respecting the cutoff.
-calculateSubStrim :: B.ByteString -> Char -> (Int,Int)
-calculateSubStrim quality cutoff = fst $ B.foldl (\a b -> calcSubStrim' cutoff a b) ((0,0),(0,0)) quality
-    
-calcSubStrim' :: Char -> ((Int,Int), (Int,Int)) -> Char -> ((Int,Int), (Int,Int))    
-calcSubStrim' cutoff ((i,s),(n_i,n_s)) q = do
-    if q >= cutoff
-        then (updateIndexs' , (n_i, n_s + 1))
-        else ((i,s)         , (n_s + n_i + 1, 0)) --new start index n_s + n_i + 1
-    where updateIndexs' = if (n_s + 1 > s)
-                            then (n_i, n_s + 1) -- new max
-                            else (i,s) -- same max
+subtrimPos :: B.ByteString -> Char -> (Int,Int)
+subtrimPos quality cutoff = fst $ B.foldl (\a b -> calcSubStrim' a b) ((0,0),(0,0)) quality
+    where
+        calcSubStrim' :: ((Int,Int), (Int,Int)) -> Char -> ((Int,Int), (Int,Int))
+        calcSubStrim' ((i,s),(n_i,n_s)) q = do
+            if q >= cutoff
+                then (updated, (n_i, n_s + 1))
+                else ((i,s)  , (n_s + n_i + 1, 0)) --new start index n_s + n_i + 1
+            where updated = if n_s + 1 > s
+                                then (n_i, n_s + 1) -- new max
+                                else (i,s) -- same max
 

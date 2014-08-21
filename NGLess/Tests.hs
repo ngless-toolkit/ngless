@@ -202,16 +202,16 @@ case_calc_simple_mean = calcMean (500 :: Int) (10 :: Int) @?= (50 :: Int)
 
 --Property 1: For every s, the size must be allways smaller than the input
 prop_substrim_maxsize s = st >= 0 && e <= B.length (B.pack s)
-    where (st,e) = calculateSubStrim (B.pack s) '\DC4'
+    where (st,e) = subtrimPos (B.pack s) '\DC4'
 
 -- Property 2: substrim should be idempotent
 prop_substrim_idempotent s = st == 0 && e == B.length s1
     where
-        s1 = removeBps (B.pack s) (calculateSubStrim (B.pack s) '\DC4')
-        (st,e) = calculateSubStrim s1 '\DC4'
+        s1 = removeBps (B.pack s) (subtrimPos (B.pack s) '\DC4')
+        (st,e) = subtrimPos s1 '\DC4'
                         
-case_substrim_normal_exec =  calculateSubStrim "\n\v\f{zo\n\v\NUL" '\DC4' @?= (3,3)
-case_substrim_empty_quals = calculateSubStrim "" '\DC4' @?= (0,0)
+case_substrim_normal_exec =  subtrimPos "\n\v\f{zo\n\v\NUL" '\DC4' @?= (3,3)
+case_substrim_empty_quals = subtrimPos "" '\DC4' @?= (0,0)
 
 -- Test Types
 isError (Right _) = assertFailure "error not caught"
