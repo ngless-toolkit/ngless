@@ -165,7 +165,7 @@ installGenome ref d = do
             Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
             Just v  -> v
         tarName = dirName <.> "tar.gz"
-        url = getUcscUrl ref
+        url = downloadURL ref
 
 downloadReference url destPath = runResourceT $ do
     manager <- liftIO $ newManager conduitManagerSettings

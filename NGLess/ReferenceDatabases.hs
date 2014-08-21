@@ -1,13 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module ReferenceDatabases
-    ( 
-      defaultGenomes,
-      getUcscUrl,
-      getIndexPath,
-      getGff,
-      getGenomeRootPath,
-      isDefaultGenome
+    ( isDefaultGenome
+    , defaultGenomes
+    , downloadURL
+    , getGenomeRootPath
+    , getIndexPath
+    , getGff
     ) where
 
 import qualified Data.Text as T
@@ -42,9 +41,9 @@ defaultGenomes = [
 isDefaultGenome :: T.Text -> Bool 
 isDefaultGenome name = name `elem` (map fst defaultGenomes)
 
-getUcscUrl :: FilePath -> FilePath
-getUcscUrl genome = 
-    case lookup (T.pack genome) defaultGenomes of
+-- | Get download URL for an reference
+downloadURL :: FilePath -> FilePath
+downloadURL genome = case lookup (T.pack genome) defaultGenomes of
         Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
         Just v -> nglessDataBaseURL </> v <.> "tar.gz"
 
