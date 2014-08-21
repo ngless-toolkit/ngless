@@ -900,9 +900,6 @@ case_calc_sam_stats = do
 
 --File "test_samples/data_set_repeated.fq" has 216 reads in which 54 are unique. 
 
-case_hash_idemp = readFileN 10 r @?= readFileN 10 r
-  where r = (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa")
-
 case_num_files_1 = do
   n <- numFiles "test_samples/data_set_repeated.fq" 
   n @?= 1
