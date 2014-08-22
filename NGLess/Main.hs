@@ -1,4 +1,4 @@
-{- Copyright 2013 NGLess Authors
+{- Copyright 2013-2014 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE DeriveDataTypeable, OverloadedStrings #-}
@@ -20,6 +20,7 @@ import Data.DefaultValues
 
 import Control.Applicative
 import System.Console.CmdArgs
+import System.Directory
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -77,12 +78,10 @@ function "tokens" fname text = case tokenize fname text of
 function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 
 
--- | This function is used to install Genomes globally in /shared directory.
--- Requires SUPER USER permissions
+-- | This function is used to install reference data
 installGenome :: String -> IO ()
-installGenome "Reference" = return ()
 installGenome ref = do
-    hasPerm <- hasPermissions suGenomeDir -- running under SUDO or not.
+    hasPerm <- writable <$> getPermissions suGenomeDir -- check whether can write globally
     _ <- putStrLn $ ref ++ " " ++ (show hasPerm)
     case hasPerm of
         True -> configGenome ref Root >> return ()
@@ -112,7 +111,4 @@ getModes = cmdArgsMode $ modes [nglessargs &= auto, installargs, visualizeargs]
     &= help "ngless implement the NGLess language"
     where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013"]
 
-main = do
-    args' <- cmdArgsRun getModes
-    optsExec args'
-    
+main = cmdArgsRun getModes >>= optsExec

@@ -13,7 +13,6 @@ module Data.DefaultValues
     , defGenomeDir
     , suGenomeDir
     , getNglessRoot
-    , hasPermissions
     , switchToCurDirectory
     , InstallMode(..)
     ) where
@@ -102,9 +101,4 @@ numFiles path = do
     return $ calcSize size'
  where
    getFileSize p = withFile p ReadMode hFileSize
-
-hasPermissions :: FilePath -> IO Bool
-hasPermissions dir = do
-  perm <- getPermissions dir
-  return (writable perm)
 
