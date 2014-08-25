@@ -13,7 +13,6 @@ module Data.DefaultValues
     , defGenomeDir
     , suGenomeDir
     , getNglessRoot
-    , switchToCurDirectory
     , InstallMode(..)
     ) where
 
@@ -73,15 +72,6 @@ getBWAPath = getNglessRoot >>= return . (</> bwaDirPath)
 
 getSAMPath :: IO String
 getSAMPath = getNglessRoot >>= return . (</> samDirPath)
-
-switchToCurDirectory :: IO ()
-switchToCurDirectory = getCurrentDirectory >>= setCurrentDirectory
-
---- getExecutablePath
--- Returns for example: /usr/local/bin/ngless
--- Symbolic link to deps at /usr/local/opt/ngless
--- from exec to deps is "../../opt/ngless/Html"
---- 
 
 defaultDir :: IO String
 defaultDir = do 
