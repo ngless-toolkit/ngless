@@ -23,7 +23,7 @@ import System.FilePath.Posix
 
 import FileManagement
 import PerBaseQualityScores
-import FastQFileData
+import FastQStatistics
 import Language
 import JSONManager
 

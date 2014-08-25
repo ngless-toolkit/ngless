@@ -42,7 +42,7 @@ import Unique
 import PrintFastqBasicStats
 import PerBaseQualityScores
 import Substrim
-import FastQFileData
+import FastQStatistics
 import FileManagement
 import Validation
 import CountOperation

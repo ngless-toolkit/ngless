@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module FastQFileData
+module FastQStatistics
     ( Result(..)
     , computeStats
     ) where

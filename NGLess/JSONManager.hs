@@ -13,12 +13,11 @@ import qualified Data.Text as T
 import Data.Aeson
 import System.FilePath.Posix
 
-import PrintFastqBasicStats
-import FastQFileData
-import FileManagement
-
 import Data.DefaultValues
 import Data.Json
+import PrintFastqBasicStats
+import FastQStatistics
+import FileManagement
 
 
 fProc = "var filesProcessed = "
