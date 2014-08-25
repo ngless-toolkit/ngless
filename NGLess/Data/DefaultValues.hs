@@ -4,7 +4,6 @@ module Data.DefaultValues
     , htmlDefaultDirLibs
     , htmlDefaultFonts
     , htmlDefaultDir
-    , numFiles
     , getBWAPath
     , getSAMPath
     , indexRequiredFormats
@@ -14,11 +13,11 @@ module Data.DefaultValues
     , suGenomeDir
     , getNglessRoot
     , InstallMode(..)
+    , maxTempFileSize
     ) where
 
 import System.Directory
 import System.FilePath.Posix
-import System.IO
 
 import System.Environment (getExecutablePath)
 
@@ -79,16 +78,6 @@ defaultDir = do
   return $ tdir </> "ngless.outputs/"
 
 
-maxFileSize :: Num a => a
-maxFileSize = 100*1000*1000 -- 100MB
-
-calcSize :: Integer -> Integer
-calcSize s = ceiling $ ((fromInteger s) / maxFileSize :: Double) 
-
-numFiles :: FilePath -> IO Integer
-numFiles path = do
-    size' <- getFileSize path
-    return $ calcSize size'
- where
-   getFileSize p = withFile p ReadMode hFileSize
+maxTempFileSize :: Num a => a
+maxTempFileSize = 100*1000*1000 -- 100MB
 

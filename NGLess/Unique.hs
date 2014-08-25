@@ -15,6 +15,7 @@ import Data.Map as Map
 import Control.Monad
 import Control.Monad.ST
 
+import System.IO
 import Data.STRef
 import Data.Hashable
 
@@ -74,4 +75,13 @@ put1k k r dups_ref = do
         Just (a,b) -> case a == k of
                 True  -> return ()
                 False -> writeSTRef dups_ref (Map.insert index ((a + 1), r : b) mdups)
+
+numFiles :: FilePath -> IO Integer
+numFiles path = do
+    size' <- withFile path ReadMode hFileSize
+    return $ calcSize size'
+ where
+    calcSize :: Integer -> Integer
+    calcSize s = ceiling $ ((fromInteger s) / maxTempFileSize :: Double)
+
 
