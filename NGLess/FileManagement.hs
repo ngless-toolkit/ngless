@@ -2,7 +2,6 @@ module FileManagement
     ( 
         createDir,
         getTempFilePath,
-        copyFile,
         getFilesInDir,
         getTFilePathComp,
         getTemporaryDirectory,
@@ -18,7 +17,6 @@ module FileManagement
         readPossiblyCompressedFile,
         unCompress,
         writeGZIP,
-        write,
         parseFileName,
         template
     ) where
@@ -32,6 +30,7 @@ import qualified Data.Text as T
 
 import System.FilePath.Posix
 import System.Directory
+import System.IO.Error
 import System.IO
 
 import Control.Monad
@@ -108,7 +107,7 @@ generateDirId :: FilePath -> IO FilePath
 generateDirId dst = defaultDir >>= flip createTempDirectory (template dst) >>= return
     
 createDirIfNotExists :: FilePath -> IO ()
-createDirIfNotExists dst =  doesDirectoryExist dst >>= \x -> when (not x) $ createDirectory dst
+createDirIfNotExists dst = (createDirectory dst) `catchIOError` (\err -> if isAlreadyExistsError err then return () else ioError err)
 
 
 createTempDirectory :: FilePath -> String -> IO FilePath
@@ -157,10 +156,6 @@ copyDir src dst = do
 
 writeGZIP :: String -> BL.ByteString -> IO ()
 writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents 
-
-write :: String -> BL.ByteString -> IO ()
-write fp contents = BL.writeFile fp contents 
-
 
 -------- read files
 unCompress :: FilePath -> IO BL.ByteString

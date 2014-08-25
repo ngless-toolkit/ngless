@@ -6,6 +6,7 @@ module WriteInterpretOperation
     ) where
 
 
+import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 
@@ -27,13 +28,13 @@ getNGOString _ = error "Error: Type is different of String"
 writeToUncFile (NGOMappedReadSet path defGen) newfp = do
     let path' = T.unpack path
     contents' <- readPossiblyCompressedFile (B.pack path') 
-    write (T.unpack newfp) $ contents' 
+    BL.writeFile (T.unpack newfp) $ contents'
     return $ NGOMappedReadSet newfp defGen
 
 writeToUncFile (NGOReadSet path enc tmplate) newfp = do
     let newfp' = T.unpack newfp
     contents' <- readPossiblyCompressedFile path
-    write newfp' $ contents' 
+    BL.writeFile newfp' $ contents'
     return $ NGOReadSet (B.pack newfp') enc tmplate
 
 writeToUncFile err _ = error ("writeToUncFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ (show err))
@@ -70,7 +71,7 @@ writeToFile (NGOAnnotatedSet fp) args = do
         Nothing -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
     where
         writeAnnotResWDel' p cont = do
-            write (T.unpack p) cont
+            BL.writeFile (T.unpack p) cont
             canonicalizePath (T.unpack p) >>= insertCountsProcessedJson 
             return $ NGOAnnotatedSet p
             
