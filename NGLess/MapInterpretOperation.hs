@@ -184,7 +184,7 @@ printProgress genSize = loop 0
         (\bs -> do
             let len' = len + B.length bs
                 progress = fromIntegral len' / fromIntegral genSize
-            liftIO (putProgress $ drawProgressBar 40 progress ++ " " ++ drawPercentage progress)
+            liftIO (putProgressBar 40 progress)
             yield bs
             loop len'
         )

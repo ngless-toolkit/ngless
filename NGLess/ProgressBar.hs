@@ -1,14 +1,12 @@
-
-
 module ProgressBar
-    ( 
-    drawProgressBar,
-    putProgress,
-    drawPercentage
+    ( putProgressBar
     ) where
 
 import System.IO
 import Text.Printf
+
+putProgressBar :: Int -> Rational -> IO ()
+putProgressBar width progress =  putProgress $ drawProgressBar width progress ++ " " ++ printPercentage progress
 
 putProgress :: String -> IO ()
 putProgress s = hPutStr stderr $ "\r\ESC[K" ++ s
@@ -19,6 +17,6 @@ drawProgressBar width progress =
   where bars = round (progress * fromIntegral width)
         spaces = width - bars
 
-drawPercentage :: Rational -> String
-drawPercentage progress = printf "%3d%%" (truncate (progress * 100) :: Int)
+printPercentage :: Rational -> String
+printPercentage progress = printf "%3d%%" (truncate (progress * 100) :: Int)
 
