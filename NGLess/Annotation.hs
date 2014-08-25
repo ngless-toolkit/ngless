@@ -32,7 +32,7 @@ import FileManagement(printNglessLn, unCompress)
 import ReferenceDatabases
 
 import Data.GFF
-import Data.Sam
+import Data.Sam (SamLine(..), isAligned, isPositive, cigarTLen, readAlignments)
 import Data.AnnotRes
 
 
