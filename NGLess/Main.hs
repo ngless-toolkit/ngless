@@ -21,6 +21,7 @@ import Data.DefaultValues
 import Control.Applicative
 import System.Console.CmdArgs
 import System.Directory
+import System.FilePath.Posix((</>))
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -81,12 +82,16 @@ function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 -- | This function is used to install reference data
 installGenome :: String -> IO ()
 installGenome ref = do
-    hasPerm <- writable <$> getPermissions suGenomeDir -- check whether can write globally
-    _ <- putStrLn $ ref ++ " " ++ (show hasPerm)
+    p' <- getNglessRoot >>= return . (</> suGenomeDir)
+    createDirIfNotExists p' -- make sure the genome dir exists.
+    hasPerm <- writable <$> getPermissions p' -- check whether can write globally
+    _ <- putStrLn $ "Reference: " ++ ref ++ ". Mode: " ++ (showPerm hasPerm)
     case hasPerm of
-        True -> configGenome ref Root >> return ()
-        False -> configGenome ref User >> return ()
-
+        True  -> configGenome ref Root >> return ()
+        False -> defGenomeDir >>= createDirIfNotExists >> configGenome ref User >> return ()
+    where
+        showPerm True  = "Root." 
+        showPerm False = "User."
 
 optsExec (DefaultMode dmode fname) = do
     --Note that the input for ngless is always UTF-8.
