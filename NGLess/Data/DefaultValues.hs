@@ -12,7 +12,6 @@ module Data.DefaultValues
     , defGenomeDir
     , suGenomeDir
     , getNglessRoot
-    , InstallMode(..)
     , maxTempFileSize
     ) where
 
@@ -20,11 +19,6 @@ import System.Directory
 import System.FilePath.Posix
 
 import System.Environment (getExecutablePath)
-
-
-data InstallMode = User
-                | Root
-            deriving (Eq, Show)
 
 
 -- relative paths 
@@ -56,11 +50,9 @@ indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
 defGenomeDir :: IO FilePath
 defGenomeDir = getHomeDirectory >>= \x -> return ( x </> ".ngless/genomes" )
 
-
 -- used to install genomes across all users
 suGenomeDir :: FilePath
 suGenomeDir = "../share/ngless/genomes"
-
 
 -- this retrieves the actual path from the symLink
 getNglessRoot :: IO FilePath

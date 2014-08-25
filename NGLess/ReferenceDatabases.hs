@@ -11,9 +11,7 @@ module ReferenceDatabases
 
 import qualified Data.Text as T
 import System.FilePath( (</>), (<.>) )
-
---bwaGenomePath :: FilePath
---bwaGenomePath = "Sequence/BWAIndex/genome.fa"
+import Configuration
 
 bwaIndexPath :: FilePath
 bwaIndexPath = "Sequence/BWAIndex"
@@ -23,9 +21,6 @@ gffPath = "Annotation/annot.gtf.gz"
 
 getGff :: T.Text -> FilePath
 getGff n = (T.unpack n) </> gffPath
-
-nglessDataBaseURL :: FilePath
-nglessDataBaseURL = "http://kdbio.inesc-id.pt/~prrm/genomes"
 
 defaultGenomes :: [(T.Text, FilePath)]
 defaultGenomes = [
@@ -42,10 +37,12 @@ isDefaultGenome :: T.Text -> Bool
 isDefaultGenome name = name `elem` (map fst defaultGenomes)
 
 -- | Get download URL for an reference
-downloadURL :: FilePath -> FilePath
+downloadURL :: FilePath -> IO FilePath
 downloadURL genome = case lookup (T.pack genome) defaultGenomes of
         Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-        Just v -> nglessDataBaseURL </> v <.> "tar.gz"
+        Just v -> do
+            baseURL <- nglessDataBaseURL
+            return (baseURL </> v <.> "tar.gz")
 
 
 getGenomeRootPath :: T.Text -> FilePath

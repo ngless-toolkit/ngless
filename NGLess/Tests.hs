@@ -54,7 +54,7 @@ import ProcessFastQ
 import WriteInterpretOperation
 import MapInterpretOperation
 import ReferenceDatabases
-
+import Configuration
 
 import Data.Sam
 import Data.Json

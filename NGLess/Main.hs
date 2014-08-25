@@ -17,6 +17,7 @@ import Parse
 import MapInterpretOperation
 import WebServer
 import Data.DefaultValues
+import Configuration
 
 import Control.Applicative
 import System.Console.CmdArgs

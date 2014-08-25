@@ -37,6 +37,7 @@ import SamBamOperations
 import Language
 import FileManagement
 import ReferenceDatabases
+import Configuration
 
 import Data.DefaultValues
 import Data.Sam
@@ -149,15 +150,15 @@ configGenome ref User = do
 
 installGenome' p ref mode = do
     hasIndex <- isIndexCalcAux ref mode
-
     when (isNothing hasIndex) $ do 
         createDirectoryIfMissing True p
         installGenome ref p
-    
     return (p </> getIndexPath ref)
 
 
+installGenome :: FilePath -> FilePath -> IO ()
 installGenome ref d = do
+    url <- downloadURL ref
     downloadReference url (d </> tarName)
     Tar.unpack d . Tar.read . GZip.decompress =<< LB.readFile ( d </> tarName)
    where 
@@ -165,7 +166,6 @@ installGenome ref d = do
             Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
             Just v  -> v
         tarName = dirName <.> "tar.gz"
-        url = downloadURL ref
 
 downloadReference url destPath = runResourceT $ do
     manager <- liftIO $ newManager conduitManagerSettings
