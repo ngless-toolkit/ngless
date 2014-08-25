@@ -47,9 +47,10 @@ executable ngless
   hs-source-dirs: NGLess/
   default-language:    Haskell2010
 
-executable nglesstest
-  main-is: Tests.hs
-  ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2
+Test-Suite nglesstest
+  type:         exitcode-stdio-1.0
+  main-is:      Tests.hs
+  ghc-options:  -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2
   -- other-modules:
   other-extensions:    BangPatterns, OverloadedStrings, DeriveDataTypeable, TemplateHaskell, TupleSections
   build-depends:
