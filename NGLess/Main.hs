@@ -22,7 +22,6 @@ import Configuration
 import Control.Applicative
 import System.Console.CmdArgs
 import System.Directory
-import System.FilePath.Posix((</>))
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -83,13 +82,13 @@ function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 -- | This function is used to install reference data
 installGenome :: String -> IO ()
 installGenome ref = do
-    p' <- getNglessRoot >>= return . (</> suGenomeDir)
+    p' <- globalDataDirectory
     createDirIfNotExists p' -- make sure the genome dir exists.
     hasPerm <- writable <$> getPermissions p' -- check whether can write globally
     _ <- putStrLn $ "Reference: " ++ ref ++ ". Mode: " ++ (showPerm hasPerm)
     case hasPerm of
         True  -> configGenome ref Root >> return ()
-        False -> defGenomeDir >>= createDirIfNotExists >> configGenome ref User >> return ()
+        False -> userDataDirectory >>= createDirIfNotExists >> configGenome ref User >> return ()
     where
         showPerm True  = "Root." 
         showPerm False = "User."
@@ -100,7 +99,7 @@ optsExec (DefaultMode dmode fname) = do
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
-    _ <- defaultDir >>= createDirIfNotExists  -- this is the dir where everything will be kept.
+    defaultDir >>= createDirIfNotExists  -- this is the dir where everything will be kept.
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of
         Left err -> putStrLn (show err)

@@ -9,8 +9,6 @@ module Data.DefaultValues
     , indexRequiredFormats
     , mapAlg
     , samAlg
-    , defGenomeDir
-    , suGenomeDir
     , getNglessRoot
     , maxTempFileSize
     ) where
@@ -46,13 +44,6 @@ mapAlg = "bwa"
 
 indexRequiredFormats :: [String]
 indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
-
-defGenomeDir :: IO FilePath
-defGenomeDir = getHomeDirectory >>= \x -> return ( x </> ".ngless/genomes" )
-
--- used to install genomes across all users
-suGenomeDir :: FilePath
-suGenomeDir = "../share/ngless/genomes"
 
 -- this retrieves the actual path from the symLink
 getNglessRoot :: IO FilePath

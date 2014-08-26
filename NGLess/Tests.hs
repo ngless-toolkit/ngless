@@ -1118,7 +1118,7 @@ case_annotate_gene_yesStrand_union = do
 
 case_install_genome_user_mode = do
   r1 <- configGenome "ce10" User
-  p <- defGenomeDir >>= return . (</> (getIndexPath "ce10"))
+  p <- userDataDirectory  >>= return . (</> (getIndexPath "ce10"))
   r1 @?= p 
 
 

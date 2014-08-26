@@ -28,6 +28,7 @@ import Data.Conduit.Binary (sinkFile)
 import Network.HTTP.Conduit
 
 import Control.Monad
+import Control.Applicative ((<$>))
 import Control.Monad.Error (liftIO)
 
 import ProgressBar
@@ -39,7 +40,6 @@ import FileManagement
 import ReferenceDatabases
 import Configuration
 
-import Data.DefaultValues
 import Data.Sam
 
 
@@ -72,12 +72,12 @@ interpretMapOp r ds = do
     If not installed in SU mode, return user mode path since it will be installed on User mode next.
 -}
 getGenomeDir :: T.Text -> IO T.Text
-getGenomeDir n = do
-    nglessRoot' <- getNglessRoot
-    doesExist <- doesDirectoryExist $ nglessRoot' </> suGenomeDir </> getGenomeRootPath n
+getGenomeDir n = T.pack <$> do
+    dataDir <- globalDataDirectory
+    doesExist <- doesDirectoryExist $ dataDir </> getGenomeRootPath n
     case doesExist of
-        True  -> return $ T.pack (nglessRoot' </> suGenomeDir </> getGenomeRootPath n)
-        False -> defGenomeDir >>= \x -> return . T.pack $ x </> getGenomeRootPath n
+        True  -> return (dataDir </> getGenomeRootPath n)
+        False -> (</> getGenomeRootPath n) <$> userDataDirectory
 
 
 getSamStats :: FilePath -> IO ()
@@ -125,28 +125,26 @@ isIndexCalculated ref = do
 
 isIndexCalcAux :: FilePath -> InstallMode -> IO (Maybe T.Text)
 isIndexCalcAux ref Root = do
-    nglessRoot' <- getNglessRoot
-    let dirPath = nglessRoot' </> suGenomeDir
+    dirPath <- globalDataDirectory
     hasIndex <- doesDirContainFormats (dirPath </> getIndexPath ref) indexRequiredFormats
     case hasIndex of
         True  -> return $ (Just $ T.pack (dirPath </> getIndexPath ref))
         False -> return Nothing
 
 isIndexCalcAux ref User = do
-    defGenomeDir' <- defGenomeDir
-    hasIndex <- doesDirContainFormats (defGenomeDir' </> getIndexPath ref) indexRequiredFormats
+    udir <- userDataDirectory
+    hasIndex <- doesDirContainFormats (udir </> getIndexPath ref) indexRequiredFormats
     case hasIndex of
-        True  -> return $ (Just $ T.pack (defGenomeDir' </> getIndexPath ref))
+        True  -> return $ (Just $ T.pack (udir </> getIndexPath ref))
         False -> return Nothing
 
 configGenome :: FilePath -> InstallMode -> IO FilePath
 configGenome ref Root = do
-    nglessRoot' <- getNglessRoot
-    let dirPath = nglessRoot' </> suGenomeDir
+    dirPath <- globalDataDirectory
     installGenome' dirPath ref Root
 configGenome ref User = do
-    defGenomeDir' <- defGenomeDir
-    installGenome' defGenomeDir' ref User
+    udir <- userDataDirectory
+    installGenome' udir ref User
 
 installGenome' p ref mode = do
     hasIndex <- isIndexCalcAux ref mode
