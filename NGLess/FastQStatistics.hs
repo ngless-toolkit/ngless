@@ -3,6 +3,7 @@
 
 module FastQStatistics
     ( Result(..)
+    , gcFraction
     , computeStats
     ) where
 
@@ -26,6 +27,13 @@ data P4 = P4 !Int !Int !Int !Int
 
 computeStats :: BL.ByteString -> Result
 computeStats = computeStats' . fastqParse
+
+gcFraction :: Result -> Double
+gcFraction res = (gcCount / allBpCount)
+    where
+        (bpA,bpC,bpG,bpT) = bpCounts res
+        gcCount = fromIntegral $ bpC + bpG
+        allBpCount = fromIntegral $ bpA + bpC + bpG + bpT
 
 fastqParse :: BL.ByteString -> [(B.ByteString, B.ByteString)]
 fastqParse = fastqParse' . BL.lines
@@ -67,3 +75,4 @@ getV c p = do
     lower <- VM.read c (ord p)
     upper <- VM.read c (ord . toUpper $ p)
     return (lower + upper)
+

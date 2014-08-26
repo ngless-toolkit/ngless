@@ -6,7 +6,6 @@ module PrintFastqBasicStats
         calculateEncoding,
         sanger_encoding_offset,
         illumina_encoding_offset,
-        getGCPercent,
         getEncoding,
         Encoding(..)
     ) where
@@ -19,12 +18,6 @@ data Encoding = Encoding {name :: String, offset :: Int} deriving(Show,Eq)
 sanger_encoding_offset = 33
 illumina_encoding_offset = 64
 
-
-getGCPercent :: (Int,Int,Int,Int) -> Double
-getGCPercent (bpA,bpC,bpG,bpT) = (gcCount / allBpCount) * 100
-    where 
-        gcCount = fromIntegral $ bpC + bpG
-        allBpCount = fromIntegral $ bpA + bpC + bpG + bpT
 
 getEncoding :: Char -> String
 getEncoding lowC = name (calculateEncoding $ ord lowC)

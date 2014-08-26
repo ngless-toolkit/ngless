@@ -16,20 +16,21 @@ import System.FilePath.Posix
 import Data.DefaultValues
 import Data.Json
 import PrintFastqBasicStats
-import FastQStatistics
+import qualified FastQStatistics as FQ
 import FileManagement
 
 
 fProc = "var filesProcessed = "
 cProc = "var countsProcessed = "
 
-createBasicStatsJson filePath fileData fname enc = BL.writeFile filePath resJS        
+createBasicStatsJson :: FilePath -> FQ.Result -> [Char] -> Char -> IO ()
+createBasicStatsJson filePath fileData fname enc = BL.writeFile filePath resJS
         where
             res    = basicInfoToJson fname gc' enc' nSeq' sSize'
             resJS  = BL.concat["var basicInfo = [", res, "];"] 
-            sSize' = seqSize fileData
-            nSeq'  = nSeq fileData
-            gc'    = getGCPercent $ bpCounts fileData
+            sSize' = FQ.seqSize fileData
+            nSeq'  = FQ.nSeq fileData
+            gc'    = FQ.gcFraction fileData
             enc'   = getEncoding enc
 
 
