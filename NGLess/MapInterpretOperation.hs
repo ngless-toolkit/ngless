@@ -178,14 +178,14 @@ downloadReference url destPath = runResourceT $ do
             liftIO $ putStrLn " Genome download completed! "
 
 printProgress :: Int -> Conduit B.ByteString (ResourceT IO) B.ByteString
-printProgress genSize = loop 0
+printProgress genSize = do
+    pbar <- liftIO (mkProgressBar 40)
+    loop 0 pbar
   where
-    loop len = await >>= maybe (return ()) 
-        (\bs -> do
+    loop len pbar = await >>= maybe (return ()) (\bs -> do
             let len' = len + B.length bs
-                progress = fromIntegral len' / fromIntegral genSize
-            liftIO (putProgressBar 40 progress)
+                progress = (fromIntegral len' / fromIntegral genSize)
+            pbar' <- liftIO (updateProgressBar pbar progress)
             yield bs
-            loop len'
-        )
-
+            loop len' pbar'
+            )
