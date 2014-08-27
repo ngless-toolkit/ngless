@@ -22,7 +22,6 @@ import qualified Data.Text.Encoding as TE
 import System.FilePath.Posix
 
 import FileManagement
-import PerBaseQualityScores
 import FastQStatistics
 import Language
 import JSONManager

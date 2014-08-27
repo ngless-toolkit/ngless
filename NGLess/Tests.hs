@@ -40,7 +40,6 @@ import Tokens
 import Types
 import Unique
 import PrintFastqBasicStats
-import PerBaseQualityScores
 import Substrim
 import FastQStatistics
 import FileManagement
