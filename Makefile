@@ -93,17 +93,19 @@ install-dir:
 	mkdir -p $(deps);
 
 compile: nglessconf
-	cabal install --only-dependencies --force-reinstalls
 	cabal build
 
 
-nglessconf: .cabal.sandbox htmldirs  $(SAM) $(BWA) $(reqhtmllibs) $(reqfonts) $(reqlogo)
+nglessconf: cabal.sandbox.config htmldirs  $(SAM) $(BWA) $(reqhtmllibs) $(reqfonts) $(reqlogo)
 
-.cabal.sandbox:
+cabal.sandbox.config:
 	cabal sandbox init
+	cabal install --only-dependencies --force-reinstalls
 
 clean:
-	rm -rf $(BWA) $(SAM) $(HTML_LIBS_DIR) $(HTML_FONTS_DIR) $(64-MAC-PATH)*  dist .objs $(deps)
+	rm -rf dist
+
+clean-sandbox:
 	cabal sandbox delete
 
 clean-tests:
