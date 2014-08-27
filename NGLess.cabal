@@ -23,6 +23,7 @@ executable ngless
   build-depends:
     base,
     bytestring,
+    convertible,
     vector,
     filepath,
     directory,
@@ -56,6 +57,7 @@ Test-Suite nglesstest
   build-depends:
     base,
     bytestring,
+    convertible,
     vector,
     filepath,
     directory,
