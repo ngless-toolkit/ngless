@@ -192,9 +192,6 @@ case_calculateEncoding_sanger = calculateEncoding 55 @?= Encoding "Sanger / Illu
 case_calculateEncoding_illumina_1 = calculateEncoding 65 @?= Encoding "Illumina 1.3" illumina_encoding_offset
 case_calculateEncoding_illumina_1_5 = calculateEncoding 100 @?= Encoding "Illumina 1.5" illumina_encoding_offset
 
---Test the calculation of the Mean
-case_calc_simple_mean = calcMean (500 :: Int) (10 :: Int) @?= (50 :: Int) 
-
 --- SETUP to reduce imports.
 -- test array: "\n\v\f{zo\n\v\NUL" -> [10,11,12,123,122,111,10,11,0]
 -- test cutoff: chr 20 -> '\DC4'
@@ -949,15 +946,15 @@ case_unique_5_read = do
 
 -- PerBaseQualityScores 
 
-case_calc_perc_med = calcPerc bps eT percentile50 @?= 4
+case_calc_perc_med = _calcPercentile bps eT percentile50 @?= 4
     where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
           eT  = V.sum bps -- 21 -> mul: 0,5  +- 11 in arr = 13 index 4
 
-case_calc_perc_lq = calcPerc bps eT lowerQuartile @?= 2 
+case_calc_perc_lq = _calcPercentile bps eT lowerQuartile @?= 2
     where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
           eT  = V.sum bps -- 21 -> mul: 0,25 -> 6 in arr = 6 index 2
 
-case_calc_perc_uq = calcPerc bps eT upperQuartile @?= 5 
+case_calc_perc_uq = _calcPercentile bps eT upperQuartile @?= 5
     where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
           eT  = V.sum bps -- 8 -> mul: 0,75 -> 16 in arr = 18 index 5
 

@@ -7,8 +7,7 @@ module FastQStatistics
     , computeStats
     , calculateStatistics
     , printHtmlStatisticsData
-    , calcMean
-    , calcPerc
+    , _calcPercentile
     , percentile50
     , lowerQuartile
     , upperQuartile
@@ -110,6 +109,7 @@ accUntilLim bps lim = do
       Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ (show i))
 
 
+createDataString :: [(Int, Int, Int, Int)] -> String
 createDataString stats = createDataString' stats "data = [\n" (1 :: Int)
     where createDataString' [] content _ = (content ++ "]\n")
           createDataString' (eachBp:xs) content bp = createDataString' xs (concatData eachBp content bp) (bp + 1)
@@ -131,13 +131,13 @@ calculateStatistics qCounts minChar = Prelude.map (statistics encScheme') qCount
 
 --statistics :: Calculates the Quality Statistics of a given FastQ.
 statistics :: Int -> V.Vector Int -> (Int, Int, Int, Int)
-statistics encScheme bps = (calcMean bpSum' elemTotal',
-                                   (calcPerc' percentile50) - encScheme,
-                                   (calcPerc' lowerQuartile) - encScheme,
-                                   (calcPerc' upperQuartile) - encScheme)
-        where bpSum' = calcBPSum bps encScheme
-              elemTotal' = V.sum bps
-              calcPerc' x = calcPerc bps elemTotal' x
+statistics encScheme bps = (bpSum `div` elemTotal,
+                                   (_calcPercentile' percentile50) - encScheme,
+                                   (_calcPercentile' lowerQuartile) - encScheme,
+                                   (_calcPercentile' upperQuartile) - encScheme)
+        where bpSum = calcBPSum bps encScheme
+              elemTotal = V.sum bps
+              _calcPercentile' = _calcPercentile bps elemTotal
 
 -- Calculates [('a',1), ('b',2)] = 0 + 'a' * 1 + 'b' * 2.
 -- 'a' and 'b' minus encoding.
@@ -148,12 +148,7 @@ calcBPSum qc es = runST $ do
                   modifySTRef n ((+) $ (i - es) * (V.unsafeIndex qc i))
               readSTRef n
 
--- calcMean :: Used to calculate the mean
-calcMean _ 0 = error "The total number of quality elements in the fastQ needs to be higher than 0"
-calcMean bpSum elemTotal = div bpSum elemTotal
-
-
---calcPerc :: Given a specific percentil,  calculates it's results.
-calcPerc bps elemTotal perc = accUntilLim bps val'
+--_calcPercentile :: Given a specific percentil,  calculates it's results.
+_calcPercentile bps elemTotal perc = accUntilLim bps val'
     where val' = (ceiling (fromIntegral elemTotal * perc) :: Int)
 
