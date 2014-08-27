@@ -4,10 +4,8 @@
 
 module ProcessFastQ
     (
-    parseReadSet,
     readFastQ,
     readReadSet,
-    showRead,
     writeReadSet,
     executeQProc,
     ) where
@@ -23,21 +21,16 @@ import Data.FastQ
 import Language
 import JSONManager
 
--- Uncompression of a given fastQ file if it's compressed in a .gz format.
-
 writeReadSet :: B.ByteString -> [ShortRead] -> FastQEncoding -> IO FilePath
 writeReadSet fn rs enc = do
     temp <- getTemporaryDirectory 
     newfp <- getTFilePathComp (temp </> (template $ (B.unpack fn)))
-    writeGZIP newfp asFastQ
+    writeGZIP newfp (asFastQ enc rs)
     return newfp
-  where
-    asFastQ :: BL.ByteString
-    asFastQ = BL.unlines . (fmap (showRead enc)) $ rs 
 
 
 readReadSet :: FastQEncoding -> B.ByteString -> IO [ShortRead]
-readReadSet enc fn = (parseReadSet enc) `fmap` (readPossiblyCompressedFile fn)
+readReadSet enc fn = (parseFastQ enc) `fmap` (readPossiblyCompressedFile fn)
 
 executeQProc :: Maybe FastQEncoding -> FilePath -> FilePath -> FilePath -> IO NGLessObject
 executeQProc enc f info dirT = setupRequiredFiles info dirT >>= \x -> readFastQ enc f x dirT

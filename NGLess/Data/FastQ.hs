@@ -7,8 +7,8 @@ module Data.FastQ
     , guessEncoding
     , encodingOffset
     , encodingName
-    , parseReadSet
-    , showRead
+    , parseFastQ
+    , asFastQ
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -40,8 +40,8 @@ guessEncoding lowC
     | otherwise = SolexaEncoding
 
 
-parseReadSet :: FastQEncoding -> BL.ByteString -> [ShortRead]
-parseReadSet enc contents = parse' . map BL.toStrict . BL.lines $ contents
+parseFastQ :: FastQEncoding -> BL.ByteString -> [ShortRead]
+parseFastQ enc contents = parse' . map BL.toStrict . BL.lines $ contents
     where
         parse' [] = []
         parse' (lid:lseq:_:lqs:xs) = (createRead lid lseq lqs) : parse' xs
@@ -51,9 +51,11 @@ parseReadSet enc contents = parse' . map BL.toStrict . BL.lines $ contents
         decodeQual = B.map sub
         sub v = v - offset
 
-showRead :: FastQEncoding -> ShortRead -> BL.ByteString
-showRead enc (ShortRead a b c) = BL.fromChunks [a, "\n", b, "\n+\n", encodeQual c]
+asFastQ :: FastQEncoding -> [ShortRead] -> BL.ByteString
+asFastQ enc rs = BL.fromChunks (asFastQ' rs)
     where
+        asFastQ' [] = []
+        asFastQ' ((ShortRead a b c):rss) = [a, "\n", b, "\n+\n", encodeQual c] ++ asFastQ' rss
         encodeQual = B.map ((+) (encodingOffset enc))
 
 

@@ -18,7 +18,6 @@ import System.IO
 import Data.STRef
 import Data.Hashable
 
-import ProcessFastQ
 import FileManagement
 
 import Data.FastQ
@@ -35,7 +34,7 @@ writeToNFiles fname enc rs = do
     fhs  <- openKFileHandles k dest    
     forM_ rs $ \x -> do
         let pos = hashRead k x
-        BL.hPutStrLn (fhs !! pos) (showRead enc x)
+        BL.hPutStrLn (fhs !! pos) (asFastQ enc [x])
     _ <- do
         printNglessLn $ "Wrote N Files to: " ++ dest 
         closekFileHandles fhs
@@ -48,7 +47,7 @@ readNFiles enc k d = getFilesInDir d >>= mapM (\x -> readUniqueFile k enc x) >>=
 readUniqueFile :: Int -> FastQEncoding -> FilePath -> IO [ShortRead]
 readUniqueFile k enc fname = do
     _ <- printNglessLn $ "Unique -> Read: " ++ fname
-    (getk k . parseReadSet enc) `fmap` (unCompress fname)
+    (getk k . parseFastQ enc) `fmap` (unCompress fname)
 
 getk :: Int -> [ShortRead] -> [ShortRead]
 getk k rs = runST $ do
