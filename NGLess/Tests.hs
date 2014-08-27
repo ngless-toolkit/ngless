@@ -26,6 +26,7 @@ import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.Text as T
 
 import Data.Aeson
+import Data.Convert
 import Data.Char
 
 import qualified Data.IntervalMap.Strict as IM
@@ -39,7 +40,6 @@ import Parse
 import Tokens
 import Types
 import Unique
-import PrintFastqBasicStats
 import Substrim
 import FastQStatistics
 import FileManagement
@@ -55,6 +55,7 @@ import MapInterpretOperation
 import ReferenceDatabases
 import Configuration
 
+import Data.FastQ
 import Data.Sam
 import Data.Json
 import Data.AnnotRes
@@ -188,9 +189,9 @@ case_tok_word_ = tokenize' "test" "word_with_underscore" @?= Right expected
 
 
 -- Test Encoding
-case_calculateEncoding_sanger = calculateEncoding 55 @?= Encoding "Sanger / Illumina 1.9" sanger_encoding_offset
-case_calculateEncoding_illumina_1 = calculateEncoding 65 @?= Encoding "Illumina 1.3" illumina_encoding_offset
-case_calculateEncoding_illumina_1_5 = calculateEncoding 100 @?= Encoding "Illumina 1.5" illumina_encoding_offset
+case_calculateEncoding_sanger = guessEncoding 55 @?= SangerEncoding
+case_calculateEncoding_illumina_1 = guessEncoding 65 @?= SolexaEncoding
+case_calculateEncoding_illumina_1_5 = guessEncoding 100 @?= SolexaEncoding
 
 --- SETUP to reduce imports.
 -- test array: "\n\v\f{zo\n\v\NUL" -> [10,11,12,123,122,111,10,11,0]
@@ -203,7 +204,7 @@ prop_substrim_maxsize s = st >= 0 && e <= B.length (B.pack s)
 -- Property 2: substrim should be idempotent
 prop_substrim_idempotent s = st == 0 && e == B.length s1
     where
-        s1 = removeBps (B.pack s) (subtrimPos (B.pack s) '\DC4')
+        s1 = cutByteString (B.pack s) (subtrimPos (B.pack s) '\DC4')
         (st,e) = subtrimPos s1 '\DC4'
                         
 case_substrim_normal_exec =  subtrimPos "\n\v\f{zo\n\v\NUL" '\DC4' @?= (3,3)
@@ -568,12 +569,14 @@ case_good_function_attr_map_2 = isOkTypes $ parsetest good_function_attr >>= val
 
 
 -- Type Validate pre process operations
+sr i s q = NGOShortRead (ShortRead i s q)
 
-case_pre_process_indexation_1 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 5), Nothing] @?= (NGOShortRead "@IRIS" "CAA" "aaa")
-case_pre_process_indexation_2 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Nothing, Just (NGOInteger 3)] @?= (NGOShortRead "@IRIS" "AGT" "aa`")
-case_pre_process_indexation_3 = evalIndex (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 2), Just (NGOInteger 5)] @?= (NGOShortRead "@IRIS" "TAC" "`aa")
+case_pre_process_indexation_1 = evalIndex (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 5), Nothing] @?= (sr "@IRIS" "CAA" "aaa")
+case_pre_process_indexation_2 = evalIndex (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [Nothing, Just (NGOInteger 3)] @?= (sr "@IRIS" "AGT" "aa`")
+case_pre_process_indexation_3 = evalIndex (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 2), Just (NGOInteger 5)] @?= (sr "@IRIS" "TAC" "`aa")
 
-case_pre_process_length_1 = evalLen (NGOShortRead "@IRIS" "AGTACCAA" "aa`aaaaa") @?= (NGOInteger 8)
+
+case_pre_process_length_1 = evalLen (sr "@IRIS" "AGTACCAA" "aa`aaaaa") @?= (NGOInteger 8)
 
 case_bop_gte_1 = evalBinary BOpGTE (NGOInteger 10) (NGOInteger 10) @?= (NGOBool True)
 case_bop_gte_2 = evalBinary BOpGTE (NGOInteger 11) (NGOInteger 10) @?= (NGOBool True)
@@ -704,7 +707,7 @@ samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*
 
 case_compute_stats_lc = do
     contents <- unCompress "test_samples/sample_small.fq"
-    (lc $ computeStats contents) @?= ']'
+    (convert . lc $ computeStats contents) @?= ']'
 
 -- Parse GFF lines
 
@@ -910,7 +913,7 @@ case_unique_1_read = do
     ds <- readNFiles enc 1  p
     removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
     length ds @?=  54
-  where enc = 64
+  where enc = SolexaEncoding
 
 case_unique_2_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
@@ -918,7 +921,7 @@ case_unique_2_read = do
     ds <- readNFiles enc 2 p 
     removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
     length ds @?=  (2 * 54)
-  where enc = 64
+  where enc = SolexaEncoding
 
 case_unique_3_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
@@ -926,7 +929,7 @@ case_unique_3_read = do
     ds <- readNFiles enc 3 p 
     removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
     length ds @?=  (3 * 54)
-  where enc = 64
+  where enc = SolexaEncoding
 
 case_unique_4_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
@@ -934,7 +937,7 @@ case_unique_4_read = do
     ds <- readNFiles enc 4 p 
     removeDirectoryRecursive p -- need to do this by hand to emulate normal execution.     
     length ds @?=  (4 * 54)
-  where enc = 64
+  where enc = SolexaEncoding
 
 case_unique_5_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
@@ -942,7 +945,7 @@ case_unique_5_read = do
     ds <- readNFiles enc 5 p 
     removeDirectoryRecursive p -- need to do this by hand to emulate normal execution.     
     length ds @?=  (4 * 54)
-  where enc = 64
+  where enc = SolexaEncoding
 
 -- PerBaseQualityScores 
 
@@ -961,27 +964,27 @@ case_calc_perc_uq = _calcPercentile bps eT upperQuartile @?= 5
 
 -- negative tests quality on value 60 char ';'. Value will be 60 - 64 which is -4
 case_calc_statistics_negative = do
-    s <- unCompress "test_samples/sample_low_qual.fq" >>= return . computeStats
+    s <- computeStats <$> unCompress "test_samples/sample_low_qual.fq"
     head (stats' s) @?= (-4,-4,-4,-4)
-  where stats' s = _calculateStatistics (qualCounts s) (ord . lc $ s)
+  where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 -- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
 case_calc_statistics_low_positive = do
     s <- unCompress "test_samples/sample_low_qual.fq" >>= return . computeStats
     last (stats' s) @?= (1,1,1,1)
-  where stats' s = _calculateStatistics (qualCounts s) (ord . lc $ s)
+  where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 
 case_calc_statistics_normal = do
     s <- unCompress "test_samples/data_set_repeated.fq" >>= return . computeStats
     head (stats' s) @?= (25,33,31,33)
-  where stats' s = _calculateStatistics (qualCounts s) (ord . lc $ s)
+  where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 case_json_statistics = do
         s <- unCompress "test_samples/sample_small.fq" >>= return . computeStats
         r <- unCompress "test_samples/res_json_statistics.txt" >>= return . L.unpack
         _createDataString (stats' s) @?= r
-    where stats' s = _calculateStatistics (qualCounts s) (ord . lc $ s)
+    where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 -- Annotate
 
@@ -1120,10 +1123,10 @@ case_install_genome_user_mode = do
 
 -- ProcessFastQ
 low_char_int = do
-  unCompress "test_samples/sample.fq" >>= return . ord . lc . computeStats
+  unCompress "test_samples/sample.fq" >>= return . lc . computeStats
 
 case_read_and_write_fastQ = do
-    enc <- low_char_int >>= return . offset . calculateEncoding
+    enc <- guessEncoding <$> low_char_int
     rs <- readReadSet enc "test_samples/sample.fq"
     fp <- writeReadSet "test_samples/sample.fq" rs enc
     newrs <- readReadSet enc $ B.pack fp

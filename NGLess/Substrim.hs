@@ -4,22 +4,21 @@
 module Substrim
     ( substrim
     , subtrimPos
-    , removeBps
+    , cutByteString
     ) where
 
 import qualified Data.ByteString.Char8 as B
 
 import Data.Char
-import Language
+import Data.FastQ
 
 
-removeBps :: B.ByteString -> (Int,Int) -> B.ByteString
-removeBps bps (index,size) = B.take size (B.drop index bps)
+cutByteString :: B.ByteString -> (Int,Int) -> B.ByteString
+cutByteString bps (index,size) = B.take size (B.drop index bps)
 
-substrim :: Int -> NGLessObject -> NGLessObject
-substrim cutoff (NGOShortRead rId rS rQ) = NGOShortRead rId (removeBps rS r) (removeBps rQ r)
+substrim :: Int -> ShortRead -> ShortRead
+substrim cutoff (ShortRead rId rS rQ) = ShortRead rId (cutByteString rS r) (cutByteString rQ r)
     where r = subtrimPos rQ (chr cutoff)
-substrim _ _ = error "substrim: must have type Int and NGOShortRead"
 
 -- Receives a Quality array and returns a pair with the index and size of the subsequence which has the most consecutive bps respecting the cutoff.
 subtrimPos :: B.ByteString -> Char -> (Int,Int)

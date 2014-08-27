@@ -26,13 +26,14 @@ import System.FilePath.Posix
 
 import Data.STRef
 import Data.Char
-import VectorOperations(zeroVec, unsafeIncrement)
+import Data.Word
 
-import PrintFastqBasicStats
+import Data.FastQ
+import VectorOperations(zeroVec, unsafeIncrement)
 
 data Result =  Result
                 { bpCounts :: (Int, Int, Int, Int)
-                , lc :: Char
+                , lc :: Word8
                 , qualCounts ::  [V.Vector Int]
                 , nSeq :: Int
                 , seqSize :: (Int,Int)
@@ -69,7 +70,7 @@ computeStats' seqs = runST $ do
     cCount <- getV charCounts 'c'
     gCount <- getV charCounts 'g'
     tCount <- getV charCounts 't'
-    return (Result (aCount, cCount, gCount, tCount) (chr lcT) qualCountsT' n (minSeq, maxSeq))
+    return (Result (aCount, cCount, gCount, tCount) (fromIntegral lcT) qualCountsT' n (minSeq, maxSeq))
 
 update charCounts qualCountsT (P4 n lcT minSeq maxSeq) (bps,qs) = do
     forM_ [0 .. B.length bps - 1] $ \i -> do
@@ -120,13 +121,14 @@ _createDataString stats = createDataString' stats "data = [\n" (1 :: Int)
              "},\n"
 
 
-printHtmlStatisticsData qCounts minChar destDir = writeFile (destDir </> dataFileName) (_createDataString statisticsData')
+printHtmlStatisticsData qCounts enc destDir = writeFile (destDir </> dataFileName) (_createDataString statisticsData')
     where
-        statisticsData' = _calculateStatistics qCounts minChar
+        statisticsData' = _calculateStatistics qCounts enc
         dataFileName = "perbaseQualScoresData.js"
 
-_calculateStatistics qCounts minChar = Prelude.map (statistics encOffset') qCounts
-    where encOffset' = offset (calculateEncoding minChar)
+_calculateStatistics :: [V.Vector Int] -> FastQEncoding -> [(Int, Int, Int, Int)]
+_calculateStatistics qCounts enc = Prelude.map (statistics encOffset) qCounts
+    where encOffset = encodingOffset enc
 
 --statistics :: Calculates the Quality Statistics of a given FastQ.
 statistics :: Int -> V.Vector Int -> (Int, Int, Int, Int)

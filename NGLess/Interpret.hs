@@ -14,6 +14,7 @@ module Interpret
     ) where
 
 
+import Control.Applicative
 import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.Reader
@@ -37,6 +38,7 @@ import MapInterpretOperation
 import Annotation
 import CountOperation
 
+import Data.FastQ
 import Data.DefaultValues
 
 
@@ -307,11 +309,10 @@ executeUnique _ _ = error "executeUnique: Should not have happened"
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block v = return . NGOList =<< mapM (\x -> executePreprocess x args _block v) e
 executePreprocess (NGOReadSet file enc t) args (Block ([Variable var]) expr) _ = do
-        rs <- liftIO $ do
-            printNglessLn $ "ExecutePreprocess on " ++ (B.unpack file) 
-            readReadSet enc file
+        liftIO $printNglessLn $ "ExecutePreprocess on " ++ (B.unpack file) 
+        rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         env <- gets snd
-        newfp <- liftIO $ writeReadSet file (execBlock env rs) enc
+        newfp <- liftIO $ writeReadSet file (map asShortRead (execBlock env rs)) enc
         return $ NGOReadSet (B.pack newfp) enc t
     where
         execBlock env = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env)
@@ -323,7 +324,7 @@ executePreprocess (NGOReadSet file enc t) args (Block ([Variable var]) expr) _ =
                 _ -> do
                     let newRead = lookup var (blockValues r')
                     case newRead of
-                        Just value -> case evalInteger $ evalLen value of 
+                        Just value -> case evalInteger $ evalLen value of
                             0 -> return Nothing
                             _ -> return newRead
                         _ -> throwError "A read should have been returned."
@@ -368,8 +369,8 @@ interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpr
 interpretPreProcessExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretPreProcessExpr (FunctionCall Fsubstrim var args _) = do
     expr' <- interpretExpr var
-    args' <- evaluateArguments args 
-    return $ substrim (getvalue args') expr'
+    args' <- evaluateArguments args
+    return . NGOShortRead $ substrim (getvalue args') (asShortRead expr')
     where
         getvalue els = fromIntegral . evalInteger $ fromMaybe (NGOInteger 0) (lookup "min_quality" els)
 
@@ -377,26 +378,27 @@ interpretPreProcessExpr expr = interpretExpr expr
 
 evalUOP :: UOp -> NGLessObject -> NGLessObject
 evalUOP UOpMinus x@(NGOInteger _) = evalMinus x
-evalUOP UOpLen sr@(NGOShortRead _ _ _) = evalLen sr
+evalUOP UOpLen sr@(NGOShortRead _) = evalLen sr
 evalUOP _ _ = error "invalid unary operation. "
 
-evalLen (NGOShortRead _ rSeq _) = NGOInteger . toInteger $ B.length rSeq
+evalLen (NGOShortRead r) = NGOInteger . toInteger $ srLength r
 evalLen err = error ("Length must receive a Read. Received a " ++ (show err))
 
 evalMinus (NGOInteger n) = NGOInteger (-n)
 evalMinus err = error ("Minus operator must receive a integer. Received a" ++ (show err))
 
-evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject 
-evalIndex sr index@[Just (NGOInteger a)] = evalIndex sr $ (Just $ NGOInteger (a + 1)) : index   
-evalIndex (NGOShortRead rId rSeq rQual) [Just (NGOInteger s), Nothing] = 
-    NGOShortRead rId (B.drop (fromIntegral s) rSeq) (B.drop (fromIntegral s) rQual)
-evalIndex (NGOShortRead rId rSeq rQual) [Nothing, Just (NGOInteger e)] = 
-    NGOShortRead rId (B.take (fromIntegral e) rSeq) (B.take (fromIntegral e) rQual)
-evalIndex (NGOShortRead rId rSeq rQual) [Just (NGOInteger s), Just (NGOInteger e)] = do
+evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject
+evalIndex sr index@[Just (NGOInteger a)] = evalIndex sr $ (Just $ NGOInteger (a + 1)) : index
+evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Nothing] =
+    NGOShortRead $ ShortRead rId (B.drop (fromIntegral s) rSeq) (B.drop (fromIntegral s) rQual)
+evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Nothing, Just (NGOInteger e)] =
+    NGOShortRead $ ShortRead rId (B.take (fromIntegral e) rSeq) (B.take (fromIntegral e) rQual)
+
+evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Just (NGOInteger e)] = do
     let e' = (fromIntegral e)
         s' = (fromIntegral s)
-        e'' = e'- s' 
-    NGOShortRead rId (B.take e'' . B.drop s' $ rSeq) (B.take e'' . B.drop s' $ rQual)       
+        e'' = e'- s'
+    NGOShortRead (ShortRead rId (B.take e'' . B.drop s' $ rSeq) (B.take e'' . B.drop s' $ rQual))
 evalIndex _ _ = error "evalIndex: invalid operation"
 
 evalBool (NGOBool x) = x
@@ -434,4 +436,8 @@ add (NGOInteger x) (NGOInteger y) = NGOInteger $ x + y
 add _ _ = error "BinaryOP add: Arguments Should be of type NGOInteger" 
 mul (NGOInteger x) (NGOInteger y) = NGOInteger $ x * y
 mul _ _ = error "BinaryOP mul: Arguments Should be of type NGOInteger"
+
+
+asShortRead (NGOShortRead r) = r
+asShortRead _ = error "Short read expected"
 

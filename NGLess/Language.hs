@@ -18,12 +18,13 @@ module Language
     , function_opt_arg_type
     , function_return_type
     , function_arg_type
-    , readSeq
     ) where
 
 {- This module defines the internal representation the language -}
 import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as B
+
+import Data.FastQ
 
 newtype Variable = Variable T.Text
     deriving (Eq, Show)
@@ -113,18 +114,13 @@ data NGLessObject =
         | NGOInteger Integer
         | NGOSymbol T.Text
         | NGOFilename T.Text
-        | NGOShortRead T.Text B.ByteString B.ByteString
-        | NGOReadSet B.ByteString Int B.ByteString
+        | NGOShortRead ShortRead
+        | NGOReadSet B.ByteString FastQEncoding B.ByteString
         | NGOMappedReadSet T.Text (Maybe T.Text) 
         | NGOAnnotatedSet T.Text
         | NGOVoid
         | NGOList [NGLessObject]
     deriving (Eq, Show, Ord)
-
-
-readSeq :: NGLessObject -> B.ByteString
-readSeq (NGOShortRead _ x _) = x
-readSeq x = error ("Expected a NGOShortRead, but the type was " ++ (show x))
 
 
 -- | 'Expression' is the main type for holding the AST.

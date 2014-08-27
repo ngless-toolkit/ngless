@@ -15,7 +15,7 @@ import System.FilePath.Posix
 
 import Data.DefaultValues
 import Data.Json
-import PrintFastqBasicStats
+import Data.FastQ
 import qualified FastQStatistics as FQ
 import FileManagement
 
@@ -23,7 +23,7 @@ import FileManagement
 fProc = "var filesProcessed = "
 cProc = "var countsProcessed = "
 
-createBasicStatsJson :: FQ.Result -> [Char] -> Char -> BL.ByteString
+createBasicStatsJson :: FQ.Result -> [Char] -> FastQEncoding -> BL.ByteString
 createBasicStatsJson fileData fname enc = resJS
         where
             res    = basicInfoToJson fname gc' enc' nSeq' sSize'
@@ -31,7 +31,7 @@ createBasicStatsJson fileData fname enc = resJS
             sSize' = FQ.seqSize fileData
             nSeq'  = FQ.nSeq fileData
             gc'    = FQ.gcFraction fileData
-            enc'   = getEncoding enc
+            enc'   = encodingName enc
 
 
 insertFilesProcessedJson :: FilePath -> T.Text -> IO ()
