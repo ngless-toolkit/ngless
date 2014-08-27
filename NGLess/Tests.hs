@@ -26,7 +26,7 @@ import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.Text as T
 
 import Data.Aeson
-import Data.Convert
+import Data.Convertible
 import Data.Char
 
 import qualified Data.IntervalMap.Strict as IM
