@@ -67,13 +67,11 @@ GIT-LOGO += github-media-downloads.s3.amazonaws.com/Octocats.zip
 reqhtmllibs = $(addprefix $(HTML_LIBS_DIR)/, $(HTMLFILES))
 reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
 reqlogo = $(HTML_LIBS_DIR)/Octocat.png
-#
 
-test: compile
-	cp dist/build/nglesstest/nglesstest .
+test:
 	cd test_samples/; gzip -dkf *.gz;
 	cd test_samples/htseq-res/; ./generateHtseqFiles.sh
-	./nglesstest
+	cabal test
 
 install: install-dir install-html install-bwa install-sam
 #	cp dist/build/nglesstest/nglesstest $(exec)/nglesstest
