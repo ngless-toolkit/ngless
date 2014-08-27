@@ -23,8 +23,8 @@ import FileManagement
 fProc = "var filesProcessed = "
 cProc = "var countsProcessed = "
 
-createBasicStatsJson :: FilePath -> FQ.Result -> [Char] -> Char -> IO ()
-createBasicStatsJson filePath fileData fname enc = BL.writeFile filePath resJS
+createBasicStatsJson :: FQ.Result -> [Char] -> Char -> BL.ByteString
+createBasicStatsJson fileData fname enc = resJS
         where
             res    = basicInfoToJson fname gc' enc' nSeq' sSize'
             resJS  = BL.concat["var basicInfo = [", res, "];"] 

@@ -67,7 +67,8 @@ readFastQ enc f dst dirT = do
         fd <- unCompress f >>= return . computeStats
         let enc' = encFromM fd -- when Nothing calculate encoding, else use value from Just.
         p "Generation of statistics for " dst
-        createBasicStatsJson (dst ++ "/basicStats.js") fd f (chr enc') -- generate JSON DATA file: basicStats.js
+        let json = createBasicStatsJson  fd f (chr enc') -- generate JSON DATA file: basicStats.js
+        BL.writeFile (dst ++ "/basicStats.js") json
         p "Simple Statistics completed for: " dst
         p "Number of base pairs: "      (show $ length (qualCounts fd)) 
         p "Encoding is: "               (show $ enc')
