@@ -102,11 +102,9 @@ upperQuartile = 0.75 :: Double
 -- accUntilLim :: given lim, each position of the array is added until lim.
 -- Is returned the elem of the array in that position.
 accUntilLim :: V.Vector Int -> Int -> Int
-accUntilLim bps lim = do
-    let i = V.findIndex (>= lim) $ V.postscanl (+) 0 bps
-    case i of
+accUntilLim bps lim = case V.findIndex (>= lim) $ V.postscanl (+) 0 bps of
       Just v -> v
-      Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ (show i))
+      Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ (show lim))
 
 
 _createDataString :: [(Int, Int, Int, Int)] -> String
@@ -142,6 +140,7 @@ statistics encOffset bps = (bpSum `div` elemTotal
 
 -- Calculates [('a',1), ('b',2)] = 0 + 'a' * 1 + 'b' * 2.
 -- 'a' and 'b' minus encoding.
+calcBPSum :: V.Vector Int -> Int -> Int
 calcBPSum qc es = runST $ do
               n <- newSTRef 0
               let s = V.length qc
