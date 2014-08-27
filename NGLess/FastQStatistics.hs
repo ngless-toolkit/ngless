@@ -5,13 +5,13 @@ module FastQStatistics
     ( Result(..)
     , gcFraction
     , computeStats
-    , calculateStatistics
     , printHtmlStatisticsData
     , _calcPercentile
+    , _calculateStatistics
     , percentile50
     , lowerQuartile
     , upperQuartile
-    , createDataString
+    , _createDataString
     ) where
 
 import Control.Monad
@@ -109,8 +109,8 @@ accUntilLim bps lim = do
       Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ (show i))
 
 
-createDataString :: [(Int, Int, Int, Int)] -> String
-createDataString stats = createDataString' stats "data = [\n" (1 :: Int)
+_createDataString :: [(Int, Int, Int, Int)] -> String
+_createDataString stats = createDataString' stats "data = [\n" (1 :: Int)
     where createDataString' [] content _ = (content ++ "]\n")
           createDataString' (eachBp:xs) content bp = createDataString' xs (concatData eachBp content bp) (bp + 1)
           concatData (mean, median, lq, uq) content bp =
@@ -122,22 +122,23 @@ createDataString stats = createDataString' stats "data = [\n" (1 :: Int)
              "},\n"
 
 
-printHtmlStatisticsData qCounts minChar destDir = writeFile (destDir </> dataFileName) (createDataString statisticsData')
-        where statisticsData' = calculateStatistics qCounts minChar
-              dataFileName = "perbaseQualScoresData.js"
+printHtmlStatisticsData qCounts minChar destDir = writeFile (destDir </> dataFileName) (_createDataString statisticsData')
+    where
+        statisticsData' = _calculateStatistics qCounts minChar
+        dataFileName = "perbaseQualScoresData.js"
 
-calculateStatistics qCounts minChar = Prelude.map (statistics encScheme') qCounts
-    where encScheme' = offset (calculateEncoding minChar)
+_calculateStatistics qCounts minChar = Prelude.map (statistics encOffset') qCounts
+    where encOffset' = offset (calculateEncoding minChar)
 
 --statistics :: Calculates the Quality Statistics of a given FastQ.
 statistics :: Int -> V.Vector Int -> (Int, Int, Int, Int)
-statistics encScheme bps = (bpSum `div` elemTotal,
-                                   (_calcPercentile' percentile50) - encScheme,
-                                   (_calcPercentile' lowerQuartile) - encScheme,
-                                   (_calcPercentile' upperQuartile) - encScheme)
-        where bpSum = calcBPSum bps encScheme
+statistics encOffset bps = (bpSum `div` elemTotal
+                            , _calcPercentile' percentile50
+                            , _calcPercentile' lowerQuartile
+                            , _calcPercentile' upperQuartile)
+        where bpSum = calcBPSum bps encOffset
               elemTotal = V.sum bps
-              _calcPercentile' = _calcPercentile bps elemTotal
+              _calcPercentile' p = (_calcPercentile bps elemTotal p) - encOffset
 
 -- Calculates [('a',1), ('b',2)] = 0 + 'a' * 1 + 'b' * 2.
 -- 'a' and 'b' minus encoding.

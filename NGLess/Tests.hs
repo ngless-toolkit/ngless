@@ -963,25 +963,25 @@ case_calc_perc_uq = _calcPercentile bps eT upperQuartile @?= 5
 case_calc_statistics_negative = do
     s <- unCompress "test_samples/sample_low_qual.fq" >>= return . computeStats
     head (stats' s) @?= (-4,-4,-4,-4)
-  where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
+  where stats' s = _calculateStatistics (qualCounts s) (ord . lc $ s)
 
 -- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
 case_calc_statistics_low_positive = do
     s <- unCompress "test_samples/sample_low_qual.fq" >>= return . computeStats
     last (stats' s) @?= (1,1,1,1)
-  where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
+  where stats' s = _calculateStatistics (qualCounts s) (ord . lc $ s)
 
 
 case_calc_statistics_normal = do
     s <- unCompress "test_samples/data_set_repeated.fq" >>= return . computeStats
     head (stats' s) @?= (25,33,31,33)
-  where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
+  where stats' s = _calculateStatistics (qualCounts s) (ord . lc $ s)
 
 case_json_statistics = do
-    s <- unCompress "test_samples/sample_small.fq" >>= return . computeStats
-    r <- unCompress "test_samples/res_json_statistics.txt" >>= return . L.unpack
-    createDataString (stats' s) @?= r
-  where stats' s = calculateStatistics (qualCounts s) (ord . lc $ s)
+        s <- unCompress "test_samples/sample_small.fq" >>= return . computeStats
+        r <- unCompress "test_samples/res_json_statistics.txt" >>= return . L.unpack
+        _createDataString (stats' s) @?= r
+    where stats' s = _calculateStatistics (qualCounts s) (ord . lc $ s)
 
 -- Annotate
 
