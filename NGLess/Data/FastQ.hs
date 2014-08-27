@@ -36,7 +36,7 @@ encodingName SolexaEncoding = "Solexa (older Illumina)"
 guessEncoding :: Word8 -> FastQEncoding
 guessEncoding lowC
     | lowC < 33 = error ("No known encodings with chars < 33 (Yours was "++ (show lowC) ++ ")")
-    | lowC < 64 = SangerEncoding
+    | lowC < 58 = SangerEncoding
     | otherwise = SolexaEncoding
 
 
@@ -45,7 +45,7 @@ parseFastQ enc contents = parse' . map BL.toStrict . BL.lines $ contents
     where
         parse' [] = []
         parse' (lid:lseq:_:lqs:xs) = (createRead lid lseq lqs) : parse' xs
-        parse' _ = error "Number of lines is not multiple of 4!"
+        parse' xs = error (concat ["Number of lines is not multiple of 4! EOF:" ++ show xs])
         createRead rid rseq rqs = ShortRead rid rseq (decodeQual rqs)
         offset = encodingOffset enc
         decodeQual = B.map sub
@@ -55,7 +55,7 @@ asFastQ :: FastQEncoding -> [ShortRead] -> BL.ByteString
 asFastQ enc rs = BL.fromChunks (asFastQ' rs)
     where
         asFastQ' [] = []
-        asFastQ' ((ShortRead a b c):rss) = [a, "\n", b, "\n+\n", encodeQual c] ++ asFastQ' rss
+        asFastQ' ((ShortRead a b c):rss) = [a, "\n", b, "\n+\n", encodeQual c, "\n"] ++ asFastQ' rss
         encodeQual = B.map ((+) (encodingOffset enc))
 
 

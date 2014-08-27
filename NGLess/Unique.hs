@@ -34,7 +34,7 @@ writeToNFiles fname enc rs = do
     fhs  <- openKFileHandles k dest    
     forM_ rs $ \x -> do
         let pos = hashRead k x
-        BL.hPutStrLn (fhs !! pos) (asFastQ enc [x])
+        BL.hPutStr (fhs !! pos) (asFastQ enc [x])
     _ <- do
         printNglessLn $ "Wrote N Files to: " ++ dest 
         closekFileHandles fhs

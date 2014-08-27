@@ -6,6 +6,7 @@ module Main where
 -- Import basic functionality and our own modules
 
 
+import Test.Framework
 import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
@@ -27,7 +28,6 @@ import qualified Data.Text as T
 
 import Data.Aeson
 import Data.Convertible
-import Data.Char
 
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.IntervalMap.Interval as IM
@@ -62,6 +62,8 @@ import Data.AnnotRes
 import Data.DefaultValues
 import qualified Data.GFF as GFF
 
+import Tests.FastQ
+test_FastQ = [tgroup_FastQ]
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -187,11 +189,6 @@ case_tok_word_ = tokenize' "test" "word_with_underscore" @?= Right expected
         expected = [TWord "word_with_underscore"]
 
 
-
--- Test Encoding
-case_calculateEncoding_sanger = guessEncoding 55 @?= SangerEncoding
-case_calculateEncoding_illumina_1 = guessEncoding 65 @?= SolexaEncoding
-case_calculateEncoding_illumina_1_5 = guessEncoding 100 @?= SolexaEncoding
 
 --- SETUP to reduce imports.
 -- test array: "\n\v\f{zo\n\v\NUL" -> [10,11,12,123,122,111,10,11,0]

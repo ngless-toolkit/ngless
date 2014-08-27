@@ -57,10 +57,11 @@ fastqParse = fastqParse' . BL.lines
     where
         fastqParse' [] = []
         fastqParse' (_:s:_:q:ls) = ((toStrict s, toStrict q):fastqParse' ls)
-        fastqParse' _ = error "Malformed file (nr of lines not a multiple of 4)"
+        fastqParse' _ = error "fastqParse (statistics module): malformed file (nr of lines not a multiple of 4)"
         toStrict = B.concat . BL.toChunks
 
 
+computeStats' :: [(B.ByteString, B.ByteString)] -> Result
 computeStats' seqs = runST $ do
     charCounts <- zeroVec 256
     qualCountsT <- newSTRef []
@@ -127,18 +128,17 @@ printHtmlStatisticsData qCounts enc destDir = writeFile (destDir </> dataFileNam
         dataFileName = "perbaseQualScoresData.js"
 
 _calculateStatistics :: [V.Vector Int] -> FastQEncoding -> [(Int, Int, Int, Int)]
-_calculateStatistics qCounts enc = Prelude.map (statistics encOffset) qCounts
-    where encOffset = encodingOffset enc
-
---statistics :: Calculates the Quality Statistics of a given FastQ.
-statistics :: Int -> V.Vector Int -> (Int, Int, Int, Int)
-statistics encOffset bps = (bpSum `div` elemTotal
-                            , _calcPercentile' percentile50
-                            , _calcPercentile' lowerQuartile
-                            , _calcPercentile' upperQuartile)
-        where bpSum = calcBPSum bps encOffset
-              elemTotal = V.sum bps
-              _calcPercentile' p = (_calcPercentile bps elemTotal p) - encOffset
+_calculateStatistics qCounts enc = Prelude.map statistics qCounts
+    where
+        encOffset = encodingOffset enc
+        statistics :: V.Vector Int -> (Int, Int, Int, Int)
+        statistics bps = (bpSum `div` elemTotal
+                                , _calcPercentile' percentile50
+                                , _calcPercentile' lowerQuartile
+                                , _calcPercentile' upperQuartile)
+            where bpSum = calcBPSum bps encOffset
+                  elemTotal = V.sum bps
+                  _calcPercentile' p = (_calcPercentile bps elemTotal p) - encOffset
 
 -- Calculates [('a',1), ('b',2)] = 0 + 'a' * 1 + 'b' * 2.
 -- 'a' and 'b' minus encoding.
