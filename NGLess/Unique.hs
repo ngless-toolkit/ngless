@@ -22,7 +22,7 @@ import FileManagement
 
 import Data.FastQ
 import Data.DefaultValues
-
+import Configuration
 
 hashRead :: Int -> ShortRead -> Int
 hashRead k (ShortRead _ r _) = mod (hash r) k
@@ -46,7 +46,6 @@ readNFiles enc k d = getFilesInDir d >>= mapM (\x -> readUniqueFile k enc x) >>=
 
 readUniqueFile :: Int -> FastQEncoding -> FilePath -> IO [ShortRead]
 readUniqueFile k enc fname = do
-    _ <- printNglessLn $ "Unique -> Read: " ++ fname
     (getk k . parseFastQ enc) `fmap` (unCompress fname)
 
 getk :: Int -> [ShortRead] -> [ShortRead]

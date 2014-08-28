@@ -28,6 +28,7 @@ import System.FilePath.Posix((</>), splitFileName)
 import FileManagement
 import Language
 
+import Configuration
 import Data.GFF
 
 data GffCount = GffCount

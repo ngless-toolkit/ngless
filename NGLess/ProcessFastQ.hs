@@ -20,6 +20,7 @@ import FastQStatistics
 import Data.FastQ
 import Language
 import JSONManager
+import Configuration
 
 writeReadSet :: B.ByteString -> [ShortRead] -> FastQEncoding -> IO FilePath
 writeReadSet fn rs enc = do

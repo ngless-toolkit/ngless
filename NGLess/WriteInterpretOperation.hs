@@ -9,6 +9,7 @@ module WriteInterpretOperation
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
+import System.Directory (canonicalizePath)
 
 import qualified Data.Map as M
 
@@ -18,10 +19,9 @@ import InvokeExternalProgs
 import Language
 import FileManagement
 import JSONManager
+import Configuration
 
 import Data.AnnotRes
-
-import System.Directory (canonicalizePath)
 
 getNGOString (Just (NGOString s)) = s
 getNGOString _ = error "Error: Type is different of String"

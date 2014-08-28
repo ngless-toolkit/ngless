@@ -20,6 +20,7 @@ import System.IO
 
 import FileManagement
 import Data.DefaultValues
+import Configuration
 
 
 indexReference refPath = do

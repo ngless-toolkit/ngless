@@ -9,7 +9,6 @@ module FileManagement
         openKFileHandles,
         closekFileHandles,
         doesDirContainFormats,
-        printNglessLn,
         generateDirId,
         setupHtmlViewer,
         doesFileExist,
@@ -130,9 +129,6 @@ doesDirContainFormats path (x:xs) = do
     case x' of 
         True -> doesDirContainFormats path xs
         False -> return False
-
-printNglessLn :: String -> IO ()
-printNglessLn x = whenLoud $ putStrLn x 
 
 setupHtmlViewer :: FilePath -> IO ()
 setupHtmlViewer htmlP = do

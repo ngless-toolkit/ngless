@@ -37,6 +37,7 @@ import WriteInterpretOperation
 import MapInterpretOperation
 import Annotation
 import CountOperation
+import Configuration
 
 import Data.FastQ
 import Data.DefaultValues
@@ -275,7 +276,6 @@ executeQualityProcess (NGOString fname) = do
                  executeQualityProcess' Nothing fname' "beforeQC" newTemplate
 
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
-
 executeQualityProcess' enc fname info nt = liftIO $ executeQProc enc fname info nt
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject

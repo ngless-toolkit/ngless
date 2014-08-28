@@ -3,12 +3,14 @@ module Configuration
     , InstallMode(..)
     , globalDataDirectory
     , userDataDirectory
+    , printNglessLn
     ) where
 
 import Control.Applicative ((<$>))
 import System.Environment (getExecutablePath)
 import System.Directory
 import System.FilePath.Posix
+import System.Console.CmdArgs.Verbosity (whenLoud)
 
 data InstallMode = User | Root deriving (Eq, Show)
 
@@ -24,3 +26,5 @@ globalDataDirectory = do
 userDataDirectory :: IO FilePath
 userDataDirectory = (</> ".ngless/data") <$> getHomeDirectory
 
+printNglessLn :: String -> IO ()
+printNglessLn msg = whenLoud (putStrLn msg)

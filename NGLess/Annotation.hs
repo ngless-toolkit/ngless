@@ -28,8 +28,9 @@ import Data.Maybe (fromMaybe, fromJust)
 import Data.List (foldl')
 
 import Language
-import FileManagement(printNglessLn, unCompress)
+import FileManagement(unCompress)
 import ReferenceDatabases
+import Configuration
 
 import Data.GFF
 import Data.Sam (SamLine(..), isAligned, isPositive, cigarTLen, readAlignments)
