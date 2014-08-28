@@ -10,6 +10,8 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 
+import qualified Data.Map as M
+
 import Control.Monad
 
 import InvokeExternalProgs
@@ -26,26 +28,27 @@ getNGOString _ = error "Error: Type is different of String"
 
 
 writeToUncFile (NGOMappedReadSet path defGen) newfp = do
-    let path' = T.unpack path
-    contents' <- readPossiblyCompressedFile (B.pack path') 
-    BL.writeFile (T.unpack newfp) $ contents'
+    let path' = B.pack . T.unpack $ path
+    readPossiblyCompressedFile path' >>= BL.writeFile (T.unpack newfp)
     return $ NGOMappedReadSet newfp defGen
 
 writeToUncFile (NGOReadSet path enc tmplate) newfp = do
     let newfp' = T.unpack newfp
-    contents' <- readPossiblyCompressedFile path
-    BL.writeFile newfp' $ contents'
+    readPossiblyCompressedFile path >>= BL.writeFile newfp'
     return $ NGOReadSet (B.pack newfp') enc tmplate
 
 writeToUncFile err _ = error ("writeToUncFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ (show err))
 
+
 writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO NGLessObject   
 writeToFile (NGOList el) args = do
-    let templateFP = getNGOString ( lookup "ofile" args )
+      let templateFP = getNGOString $ lookup "ofile" args
+          newFPS' = map (\x -> T.replace "{index}" x templateFP) indexFPs
+      res <- zipWithM (\x fp -> writeToFile x (fp' fp)) el newFPS'
+      return (NGOList res)
+    where
         indexFPs = map (T.pack . show) [1..(length el)]
-        newFPS' = map (\x -> T.replace (T.pack "{index}") x templateFP) indexFPs
-    res <- zipWithM (\x y -> writeToUncFile x y) el newFPS'
-    return (NGOList res)
+        fp' fp = M.toList $ M.insert "ofile" (NGOString fp) (M.fromList args)
 
 writeToFile el@(NGOReadSet _ _ _) args = writeToUncFile el $ getNGOString ( lookup "ofile" args )
 
