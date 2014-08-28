@@ -6,7 +6,6 @@ module Data.DefaultValues
     , htmlDefaultDir
     , getBWAPath
     , getSAMPath
-    , indexRequiredFormats
     , mapAlg
     , samAlg
     , getNglessRoot
@@ -41,9 +40,6 @@ bwaDirPath = "../share/ngless/bwa-0.7.7" --setup puts the bwa directory on proje
 
 mapAlg :: String
 mapAlg = "bwa"
-
-indexRequiredFormats :: [String]
-indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
 
 -- this retrieves the actual path from the symLink
 getNglessRoot :: IO FilePath

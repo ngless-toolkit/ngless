@@ -6,6 +6,8 @@ module Interpretation.Map
     interpretMapOp
     , configGenome
     , calcSamStats
+    , indexReference
+    , mapToReference
     ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -20,20 +22,24 @@ import qualified Data.Map as Map
 
 import System.Directory
 import System.FilePath.Posix
+import Numeric
 
 import Data.Conduit
 import Data.Maybe
 import Data.Conduit.Binary (sinkFile)
 
 import Network.HTTP.Conduit
+import GHC.Conc (numCapabilities)
+
+import System.Process
+import System.Exit
+import System.IO
 
 import Control.Monad
 import Control.Applicative ((<$>))
 import Control.Monad.Error (liftIO)
 
 import ProgressBar
-import Numeric
-import InvokeExternalProgs
 import SamBamOperations
 import Language
 import FileManagement
@@ -41,7 +47,63 @@ import ReferenceDatabases
 import Configuration
 
 import Data.Sam
+import Data.DefaultValues
 
+indexRequiredFormats :: [String]
+indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
+
+
+indexReference refPath = do
+    let refPath' = (T.unpack refPath)
+    res <- doesDirContainFormats refPath' indexRequiredFormats
+    case res of
+        False -> do
+            bwaPath <- getBWAPath
+            (exitCode, hout, herr) <-
+                readProcessWithExitCode (bwaPath </> mapAlg) ["index", refPath'] []
+            printNglessLn herr
+            printNglessLn hout
+            case exitCode of
+                ExitSuccess -> return ()
+                ExitFailure _err -> error (herr)
+        True -> printNglessLn $ "index for " ++ refPath' ++ " as been sucessfully generated."
+            -- already contain reference index
+    return refPath'
+
+
+
+mapToReference refIndex readSet = do
+    newfp <- getTempFilePath readSet
+    let newfp' = newfp ++ ".sam"
+    printNglessLn $ "write .sam file to: " ++ (show newfp')
+    jHandle <- mapToReference' newfp' refIndex readSet
+    exitCode <- waitForProcess jHandle
+    case exitCode of
+       ExitSuccess -> return newfp'
+       ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
+
+
+-- Process to execute BWA and write to <handle h> .sam file
+mapToReference' newfp refIndex readSet = do
+    bwaPath <- getBWAPath
+    (_, Just hout, Just herr, jHandle) <-
+        createProcess (
+            proc
+                (bwaPath </> mapAlg)
+                ["mem","-t",(show numCapabilities),(T.unpack refIndex), readSet]
+            ) { std_out = CreatePipe,
+                std_err = CreatePipe }
+    writeToFile hout newfp
+    hGetContents herr >>= printNglessLn
+    return jHandle
+
+
+
+writeToFile :: Handle -> FilePath -> IO ()
+writeToFile handle path = do
+    contents <- B.hGetContents handle
+    B.writeFile path contents
+    hClose handle
 
 numDecimalPlaces :: Int
 numDecimalPlaces = 2
@@ -52,15 +114,15 @@ interpretMapOp r ds = do
     samPath' <- mapToReference (T.pack ref') (B.unpack ds)
     getSamStats samPath'
     return $ NGOMappedReadSet (T.pack samPath') defGen'
-    where 
+    where
         r' = T.unpack r
         indexReference' :: IO (FilePath, Maybe T.Text)
-        indexReference' = 
+        indexReference' =
             case isDefaultGenome r of
                 False  -> indexReference r >>= \x -> return (x, Nothing) --user supplies genome
-                True   -> do 
+                True   -> do
                     rootGen <- getGenomeDir r
-                    isIndexCalculated r' >>= \res -> case res of 
+                    isIndexCalculated r' >>= \res -> case res of
                         Nothing -> configGenome r' User >>= \x -> return (x, Just rootGen) -- download and install genome on User mode
                         Just p  -> return (T.unpack p , Just rootGen) -- already installed
 
@@ -68,7 +130,7 @@ interpretMapOp r ds = do
 {-
     Receives - A default genome name
     Returns  - The root dir for that genome
-    
+
     If not installed in SU mode, return user mode path since it will be installed on User mode next.
 -}
 getGenomeDir :: T.Text -> IO T.Text
@@ -103,12 +165,12 @@ printSamStats stats = do
     lowQ    = stats !! 3
     showFloat' num = showFFloat (Just numDecimalPlaces) num ""
     calcDiv :: Int -> Int -> Double
-    calcDiv a b = 
+    calcDiv a b =
           let x = fromIntegral a
               y = fromIntegral b
-          in (x / y) * (100 :: Double) 
-    
--- check both SU and normal user Genomes dir for <ref> 
+          in (x / y) * (100 :: Double)
+
+-- check both SU and normal user Genomes dir for <ref>
 isIndexCalculated :: FilePath -> IO (Maybe T.Text)
 isIndexCalculated ref = do
     -- super user genomes dir --
@@ -148,7 +210,7 @@ configGenome ref User = do
 
 installGenome' p ref mode = do
     hasIndex <- isIndexCalcAux ref mode
-    when (isNothing hasIndex) $ do 
+    when (isNothing hasIndex) $ do
         createDirectoryIfMissing True p
         installGenome ref p
     return (p </> getIndexPath ref)
@@ -159,7 +221,7 @@ installGenome ref d = do
     url <- downloadURL ref
     downloadReference url (d </> tarName)
     Tar.unpack d . Tar.read . GZip.decompress =<< LB.readFile ( d </> tarName)
-   where 
+   where
         dirName = case lookup (T.pack ref) defaultGenomes of
             Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
             Just v  -> v

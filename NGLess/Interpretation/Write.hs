@@ -1,31 +1,30 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Interpretation.Write
-    (
-    writeToFile
+    ( writeToFile
     ) where
 
 
+import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
-import System.Directory (canonicalizePath)
-
 import qualified Data.Map as M
+import System.Directory (canonicalizePath)
+import System.FilePath.Posix ((</>))
+import System.Process
+import System.Exit
+import System.IO
 
-import Control.Monad
-
-import InvokeExternalProgs
 import Language
 import FileManagement
 import JSONManager
 import Configuration
-
+import Data.DefaultValues
 import Data.AnnotRes
 
 getNGOString (Just (NGOString s)) = s
 getNGOString _ = error "Error: Type is different of String"
-
 
 writeToUncFile (NGOMappedReadSet path defGen) newfp = do
     let path' = B.pack . T.unpack $ path
@@ -88,3 +87,30 @@ getDelimiter x = case x of
         (Just (NGOSymbol "tsv")) -> "\t"
         (Just err) ->  error ("Type must be NGOSymbol, but was given" ++ (show err))
         Nothing -> "\t"
+
+convertSamToBam samfp newfp = do
+    printNglessLn $ "Start to convert Sam to Bam. from " ++ samfp ++ " to -> " ++ newfp
+    jHandle <- convSamToBam' samfp newfp
+    exitCode <- waitForProcess jHandle
+    case exitCode of
+       ExitSuccess -> return (T.pack newfp)
+       ExitFailure err -> error ("Failure on converting sam to bam" ++ (show err))
+
+convSamToBam' samFP newfp = do
+    samPath <- getSAMPath
+    (_, Just hout, Just herr, jHandle) <- createProcess (
+        proc
+            (samPath </> samAlg)
+            ["view", "-bS" ,samFP ]
+        ){ std_out = CreatePipe,
+           std_err = CreatePipe }
+    writeToFile' hout newfp
+    hGetContents herr >>= printNglessLn
+    return jHandle
+
+writeToFile' :: Handle -> FilePath -> IO ()
+writeToFile' handle path = do
+    contents <- B.hGetContents handle
+    B.writeFile path contents
+    hClose handle
+
