@@ -14,10 +14,10 @@ import Language
 import Tokens
 import Types
 import Parse
-import MapInterpretOperation
 import WebServer
 import Data.DefaultValues
 import Configuration
+import Interpretation.Map (configGenome)
 
 import Control.Applicative
 import System.Console.CmdArgs

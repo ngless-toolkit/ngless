@@ -50,10 +50,11 @@ import ValidationNotPure
 import SamBamOperations
 import VectorOperations
 import ProcessFastQ
-import WriteInterpretOperation
-import MapInterpretOperation
 import ReferenceDatabases
 import Configuration
+
+import Interpretation.Write
+import Interpretation.Map
 
 import Data.FastQ
 import Data.Sam

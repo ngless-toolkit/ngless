@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module MapInterpretOperation
+module Interpretation.Map
     (
     interpretMapOp
     , configGenome

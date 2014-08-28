@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module WriteInterpretOperation
+module Interpretation.Write
     (
     writeToFile
     ) where

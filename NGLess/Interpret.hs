@@ -33,12 +33,12 @@ import Substrim
 import Language
 import FileManagement
 import JSONManager
-import WriteInterpretOperation
-import MapInterpretOperation
 import Annotation
 import CountOperation
 import Configuration
 
+import Interpretation.Write
+import Interpretation.Map
 import Data.FastQ
 import Data.DefaultValues
 
