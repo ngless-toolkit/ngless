@@ -17,9 +17,10 @@ import Control.Monad.ST
 import System.IO
 import Data.STRef
 import Data.Hashable
+import System.FilePath.Posix
 
-import FileManagement
 
+import FileManagement (createDir, getFilesInDir, unCompress)
 import Data.FastQ
 import Data.DefaultValues
 import Configuration
@@ -37,7 +38,7 @@ writeToNFiles fname enc rs = do
         BL.hPutStr (fhs !! pos) (asFastQ enc [x])
     _ <- do
         printNglessLn $ "Wrote N Files to: " ++ dest 
-        closekFileHandles fhs
+        mapM_ hClose fhs
     return dest
 
 
@@ -74,4 +75,10 @@ numFiles path = do
     calcSize :: Integer -> Integer
     calcSize s = ceiling $ ((fromInteger s) / maxTempFileSize :: Double)
 
+
+-- Open and close file handles
+openKFileHandles :: Int -> FilePath -> IO [Handle]
+openKFileHandles k dest = do
+    forM [0..k - 1] $ \x -> do
+        openFile (dest </> (show x)) AppendMode
 

@@ -6,8 +6,6 @@ module FileManagement
         getTFilePathComp,
         getTemporaryDirectory,
         setupRequiredFiles,
-        openKFileHandles,
-        closekFileHandles,
         doesDirContainFormats,
         generateDirId,
         setupHtmlViewer,
@@ -36,18 +34,7 @@ import Control.Monad
 
 import System.Posix.Internals (c_getpid)
 
-import System.Console.CmdArgs.Verbosity
 import Data.DefaultValues
-
--- Open and close file handles
-openKFileHandles :: Int -> FilePath -> IO [Handle]
-openKFileHandles k dest = do
-    forM [0..k - 1] $ \x -> do
-        openFile (dest </> (show x)) AppendMode
-
-closekFileHandles :: [Handle] -> IO ()
-closekFileHandles fhs = mapM_ (hClose) fhs
-------------------------------------------
 
 isDot :: FilePath -> Bool
 isDot f = f `elem` [".", ".."]
