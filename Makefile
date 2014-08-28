@@ -1,20 +1,20 @@
-VERSION=1.0
+VERSION := 0.0.0
 
-progname=ngless
+progname := ngless
+distdir := ngless-${VERSION}
 
 prefix=/usr/local
 deps=$(prefix)/share/$(progname)
 exec=$(prefix)/bin
 
-all: compile
 
-BWA = bwa-0.7.7
+BWA_DIR = bwa-0.7.7
 BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
-BWA_DIR = bwa-0.7.7.tar.bz2
+BWA_TAR = bwa-0.7.7.tar.bz2
 
-SAM = samtools-1.0
+SAM_DIR = samtools-1.0
 SAM_URL = http://sourceforge.net/projects/samtools/files/samtools/1.0/samtools-1.0.tar.bz2
-SAM_DIR = samtools-1.0.tar.bz2
+SAM_TAR = samtools-1.0.tar.bz2
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
@@ -43,7 +43,7 @@ FONTFILES := glyphicons-halflings-regular.woff
 FONTFILES += glyphicons-halflings-regular.ttf
 
 #URLS
-jquery-latest.min.js = code.jquery.com/jquery-latest.min.js 
+jquery-latest.min.js = code.jquery.com/jquery-latest.min.js
 d3.min.js = cdnjs.cloudflare.com/ajax/libs/d3/3.1.6/d3.min.js
 nv.d3.js = cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.js
 nv.d3.css = cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.css
@@ -62,39 +62,35 @@ angular-ui-router.min.js = cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.
 ace.js = cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/ace.js
 mode-python.js = cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/mode-python.js
 
-GIT-LOGO += github-media-downloads.s3.amazonaws.com/Octocats.zip
+GIT_LOGO := github-media-downloads.s3.amazonaws.com/Octocats.zip
 
 reqhtmllibs = $(addprefix $(HTML_LIBS_DIR)/, $(HTMLFILES))
 reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
 reqlogo = $(HTML_LIBS_DIR)/Octocat.png
 
-test:
-	cd test_samples/; gzip -dkf *.gz;
-	cd test_samples/htseq-res/; ./generateHtseqFiles.sh
-	cabal test
-
-install: install-dir install-html install-bwa install-sam
-#	cp dist/build/nglesstest/nglesstest $(exec)/nglesstest
-	cp -f dist/build/ngless/ngless $(exec)/ngless
-
-install-html:
-	cp -rf $(HTML) $(deps)
-
-install-bwa:
-	cp -rf $(BWA) $(deps)
-
-install-sam:
-	cp -rf $(SAM) $(deps)
-
-install-dir:
-	mkdir -p $(exec)
-	mkdir -p $(deps);
-
-compile: nglessconf
+all: nglessconf
 	cabal build
 
+dist: ngless-${VERSION}.tar.gz
 
-nglessconf: cabal.sandbox.config htmldirs  $(SAM) $(BWA) $(reqhtmllibs) $(reqfonts) $(reqlogo)
+testinputfiles=test_samples/htseq-res/htseq_cds_noStrand_union.txt
+
+test_samples/htseq-res/htseq_cds_noStrand_union.txt:
+	cd test_samples/ && gzip -dkf *.gz
+	cd test_samples/htseq-res && ./generateHtseqFiles.sh
+
+check: ${testinputfiles}
+	cabal test
+
+install:
+	mkdir -p $(exec)
+	mkdir -p $(deps)
+	cp -rf $(HTML) $(deps)
+	cp -rf $(BWA_DIR) $(deps)
+	cp -rf $(SAM_DIR) $(deps)
+	cp -f dist/build/ngless/ngless $(exec)/ngless
+
+nglessconf: cabal.sandbox.config $(SAM_DIR) $(BWA_DIR) $(reqhtmllibs) $(reqfonts) $(reqlogo)
 
 cabal.sandbox.config:
 	cabal sandbox init
@@ -103,47 +99,43 @@ cabal.sandbox.config:
 clean:
 	rm -rf dist
 
-clean-sandbox:
-	cabal sandbox delete
-
-clean-tests:
-	rm test_samples/htseq-res/*.txt
-
-variables:
-	@echo $(BWA)
-	@echo $(prefix)
-	@echo $(deps)
-	@echo $(exec)
-	@echo $(HTML_LIBS_DIR)
-	@echo $(HTML_FONTS_DIR)
-
+distclean: clean
+	if [ -d .cabal.sandobox ]; then cabal sandbox delete; fi
+	rm -rf $(HTML_FONTS_DIR) $(HTML_LIBS_DIR)
+	rm -rf $(BWA_DIR)
+	rm -rf $(SAM_DIR)
+	rm -f test_samples/htseq-res/*.txt
 
 uninstall:
 	rm -rf $(deps) $(exec)/ngless* $(HOME)/.ngless
 
 
 #####  Setup required files
-htmldirs:
+$(HTML_FONTS_DIR)/:
 	mkdir -p $(HTML_FONTS_DIR)
+
+$(HTML_LIBS_DIR):
 	mkdir -p $(HTML_LIBS_DIR)
 
-$(BWA):
-	@echo Configuring BWA...
+$(BWA_DIR):
 	wget $(BWA_URL)
-	tar xvfj $(BWA_DIR)
-	rm $(BWA_DIR)
-	cd $(BWA); $(MAKE)
+	tar xvfj $(BWA_TAR)
+	rm $(BWA_TAR)
 
-$(SAM): 
-	@echo Configuring SAM...
+$(BWA_DIR)/ngless-bwa-static: $(BWA_DIR)
+	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"
+
+
+$(SAM_DIR):
 	wget $(SAM_URL)
-	tar xvfj $(SAM_DIR)
-	rm $(SAM_DIR)
-	cd $(SAM); $(MAKE)
-	@echo Sam tools completed...
+	tar xvfj $(SAM_TAR)
+	rm $(SAM_TAR)
+
+$(SAM_DIR)/samtools: $(SAM_DIR)
+	cd $(SAM_DIR) && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC"
 
 
-$(HTML_LIBS_DIR)/%.js: 
+$(HTML_LIBS_DIR)/%.js:
 	echo $(notdir $@)
 	wget -O $@ $($(notdir $@))
 
@@ -162,27 +154,22 @@ $(HTML_FONTS_DIR)/%.ttf:
 	wget -O $@ $($(notdir $@))
 
 $(HTML_LIBS_DIR)/Octocat.png:
-	wget -O $(HTML_LIBS_DIR)/$(notdir $(GIT-LOGO)) $(GIT-LOGO);
-	unzip $(HTML_LIBS_DIR)/$(notdir $(GIT-LOGO)) -d $(HTML_LIBS_DIR);
+	wget -O $(HTML_LIBS_DIR)/$(notdir $(GIT_LOGO)) $(GIT_LOGO);
+	unzip $(HTML_LIBS_DIR)/$(notdir $(GIT_LOGO)) -d $(HTML_LIBS_DIR);
 	cp $(HTML_LIBS_DIR)/Octocat/Octocat.png $(HTML_LIBS_DIR)/Octocat.png;
 	rm -rf $(HTML_LIBS_DIR)/__MACOSX $(HTML_LIBS_DIR)/Octocat $(HTML_LIBS_DIR)/Octocats.zip;
-	echo $(GIT-LOGO) configured;
+	echo $(GIT_LOGO) configured;
 
 
-######
 
-
-#Generate self-contained executables
-64-MAC-PATH := 64-Mac
-
-64x-macos: nglessconf
-	mkdir -p $(64-MAC-PATH)/share $(64-MAC-PATH)/bin
+ngless-${VERSION}.tar.gz: nglessconf
+	mkdir -p $(distdir)/share $(distdir)/bin
 	cabal build
-	cp dist/build/$(progname)/$(progname) $(64-MAC-PATH)/bin
-	cp -r $(BWA) $(64-MAC-PATH)/share
-	cp -r $(SAM) $(64-MAC-PATH)/share
-	cp -r $(HTML) $(64-MAC-PATH)/share
-	tar -zcvf $(64-MAC-PATH).tar.gz $(64-MAC-PATH)
-	rm -rf $(64-MAC-PATH)
+	cp dist/build/$(progname)/$(progname) $(distdir)/bin
+	cp -r $(BWA_DIR) $(distdir)/share
+	cp -r $(SAM_DIR) $(distdir)/share
+	cp -r $(HTML) $(distdir)/share
+	tar -zcvf $(distdir).tar.gz $(distdir)
+	rm -rf $(distdir)
 
-#########
+.PHONY: build clean check nglessconf distclean dist
