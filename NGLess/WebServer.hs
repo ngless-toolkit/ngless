@@ -7,7 +7,7 @@ import Control.Monad
 import Control.Applicative
 
 import Data.Maybe
-import Data.DefaultValues
+import Configuration
 
 
 runWebServer nglessport = do

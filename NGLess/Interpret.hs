@@ -40,7 +40,6 @@ import Configuration
 import Interpretation.Write
 import Interpretation.Map
 import Data.FastQ
-import Data.DefaultValues
 
 
 {- Interpretation is done inside 3 Monads

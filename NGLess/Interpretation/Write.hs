@@ -11,7 +11,6 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 import qualified Data.Map as M
 import System.Directory (canonicalizePath)
-import System.FilePath.Posix ((</>))
 import System.Process
 import System.Exit
 import System.IO
@@ -20,7 +19,6 @@ import Language
 import FileManagement
 import JSONManager
 import Configuration
-import Data.DefaultValues
 import Data.AnnotRes
 
 getNGOString (Just (NGOString s)) = s
@@ -97,10 +95,9 @@ convertSamToBam samfp newfp = do
        ExitFailure err -> error ("Failure on converting sam to bam" ++ (show err))
 
 convSamToBam' samFP newfp = do
-    samPath <- getSAMPath
+    samPath <- samtoolsBin
     (_, Just hout, Just herr, jHandle) <- createProcess (
-        proc
-            (samPath </> samAlg)
+        proc samPath
             ["view", "-bS" ,samFP ]
         ){ std_out = CreatePipe,
            std_err = CreatePipe }

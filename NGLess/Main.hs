@@ -15,7 +15,6 @@ import Tokens
 import Types
 import Parse
 import WebServer
-import Data.DefaultValues
 import Configuration
 import Interpretation.Map (configGenome)
 

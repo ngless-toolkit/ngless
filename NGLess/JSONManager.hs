@@ -13,7 +13,7 @@ import qualified Data.Text as T
 import Data.Aeson
 import System.FilePath.Posix
 
-import Data.DefaultValues
+import Configuration
 import Data.Json
 import Data.FastQ
 import qualified FastQStatistics as FQ

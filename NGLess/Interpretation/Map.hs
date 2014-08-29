@@ -47,7 +47,6 @@ import ReferenceDatabases
 import Configuration
 
 import Data.Sam
-import Data.DefaultValues
 
 indexRequiredFormats :: [String]
 indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
@@ -58,9 +57,9 @@ indexReference refPath = do
     res <- doesDirContainFormats refPath' indexRequiredFormats
     case res of
         False -> do
-            bwaPath <- getBWAPath
+            bwaPath <- bwaBin
             (exitCode, hout, herr) <-
-                readProcessWithExitCode (bwaPath </> mapAlg) ["index", refPath'] []
+                readProcessWithExitCode bwaPath ["index", refPath'] []
             printNglessLn herr
             printNglessLn hout
             case exitCode of
@@ -85,11 +84,10 @@ mapToReference refIndex readSet = do
 
 -- Process to execute BWA and write to <handle h> .sam file
 mapToReference' newfp refIndex readSet = do
-    bwaPath <- getBWAPath
+    bwaPath <- bwaBin
     (_, Just hout, Just herr, jHandle) <-
         createProcess (
-            proc
-                (bwaPath </> mapAlg)
+            proc bwaPath
                 ["mem","-t",(show numCapabilities),(T.unpack refIndex), readSet]
             ) { std_out = CreatePipe,
                 std_err = CreatePipe }

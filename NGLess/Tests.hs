@@ -60,7 +60,6 @@ import Data.FastQ
 import Data.Sam
 import Data.Json
 import Data.AnnotRes
-import Data.DefaultValues
 import qualified Data.GFF as GFF
 
 import Tests.FastQ

@@ -22,7 +22,6 @@ import System.FilePath.Posix
 
 import FileManagement (createDir, getFilesInDir, unCompress)
 import Data.FastQ
-import Data.DefaultValues
 import Configuration
 
 hashRead :: Int -> ShortRead -> Int

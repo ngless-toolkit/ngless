@@ -31,10 +31,9 @@ import System.IO.Error
 import System.IO
 
 import Control.Monad
-
 import System.Posix.Internals (c_getpid)
 
-import Data.DefaultValues
+import Configuration
 
 isDot :: FilePath -> Bool
 isDot f = f `elem` [".", ".."]
