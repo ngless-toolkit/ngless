@@ -2,8 +2,7 @@
 
 
 module Interpretation.Map
-    (
-    interpretMapOp
+    ( interpretMapOp
     , configGenome
     , calcSamStats
     , indexReference
@@ -15,6 +14,7 @@ import qualified Codec.Compression.GZip as GZip
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as LB
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import qualified Data.Vector.Unboxed as V
 
@@ -51,58 +51,52 @@ import Data.Sam
 indexRequiredFormats :: [String]
 indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
 
-
+indexReference :: T.Text -> IO FilePath
 indexReference refPath = do
     let refPath' = (T.unpack refPath)
     res <- doAllFilesExist refPath' indexRequiredFormats
     case res of
         False -> do
             bwaPath <- bwaBin
-            (exitCode, hout, herr) <-
+            (exitCode, out, err) <-
                 readProcessWithExitCode bwaPath ["index", refPath'] []
-            printNglessLn herr
-            printNglessLn hout
+            printNglessLn err
+            printNglessLn out
             case exitCode of
                 ExitSuccess -> return ()
-                ExitFailure _err -> error (herr)
-        True -> printNglessLn $ "index for " ++ refPath' ++ " as been sucessfully generated."
-            -- already contain reference index
+                ExitFailure _err -> error err
+        True -> printNglessLn $ "index for " ++ refPath' ++ " already exists."
     return refPath'
 
 
 
--- mapToReference :: T.Text -> FilePath -> IO String
+mapToReference :: T.Text -> FilePath -> IO String
 mapToReference refIndex readSet = do
+    bwaPath <- bwaBin
     newfp <- getTempFilePath readSet
     let newfp' = newfp ++ ".sam"
     printNglessLn $ "write .sam file to: " ++ (show newfp')
-    jHandle <- mapToReference' newfp' refIndex readSet
-    exitCode <- waitForProcess jHandle
-    case exitCode of
-       ExitSuccess -> return newfp'
-       ExitFailure err -> error ("Failure on mapping against reference:" ++ (show err))
-
-
--- Process to execute BWA and write to <handle h> .sam file
-mapToReference' newfp refIndex readSet = do
-    bwaPath <- bwaBin
-    (_, Just hout, Just herr, jHandle) <-
-        createProcess (
-            proc bwaPath
-                ["mem","-t",(show numCapabilities),(T.unpack refIndex), readSet]
-            ) { std_out = CreatePipe,
-                std_err = CreatePipe }
-    contents <- B.hGetContents hout
-    B.writeFile newfp contents
-    hClose hout
-    hGetContents herr >>= printNglessLn
-    return jHandle
+    withFile newfp' ReadMode $ \hout -> do
+        (_, _, Just herr, jHandle) <-
+            createProcess (
+                proc bwaPath
+                    ["mem","-t",(show numCapabilities),(T.unpack refIndex), readSet]
+                ) { std_out = UseHandle hout,
+                    std_err = CreatePipe }
+        err <- hGetContents herr
+        putStrLn $ concat ["Error in bwa: ", err]
+        exitCode <- waitForProcess jHandle
+        hClose herr
+        case exitCode of
+           ExitSuccess -> return newfp'
+           ExitFailure code -> error ("Failure on mapping against reference:" ++ (show code))
 
 
 numDecimalPlaces :: Int
 numDecimalPlaces = 2
 
 
+interpretMapOp :: T.Text -> B.ByteString -> IO NGLessObject
 interpretMapOp r ds = do
     (ref', defGen') <- indexReference'
     samPath' <- mapToReference (T.pack ref') (B.unpack ds)
@@ -139,6 +133,7 @@ getGenomeDir n = T.pack <$> do
 getSamStats :: FilePath -> IO ()
 getSamStats fname = unCompress fname >>= printSamStats . calcSamStats
 
+calcSamStats :: BL.ByteString -> [Int]
 calcSamStats contents = [total', aligned', unique', lowQual']
     where res' = samStats contents
           total' = V.unsafeIndex res' (fromEnum Total)
