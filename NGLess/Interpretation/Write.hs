@@ -85,7 +85,7 @@ getDelimiter x = case x of
 convertSamToBam samfile newfp = do
     printNglessLn $ "Start to convert Sam to Bam. from " ++ samfile ++ " to -> " ++ newfp
     samPath <- samtoolsBin
-    withFile newfp ReadMode $ \hout -> do
+    withFile newfp WriteMode $ \hout -> do
         (_, _, Just herr, jHandle) <- createProcess (
             proc samPath
                 ["view", "-bS", samfile]

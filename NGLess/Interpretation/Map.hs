@@ -68,7 +68,7 @@ mapToReference refIndex readSet = do
     newfp <- getTempFilePath readSet
     let newfp' = newfp ++ ".sam"
     printNglessLn $ "write .sam file to: " ++ (show newfp')
-    withFile newfp' ReadMode $ \hout -> do
+    withFile newfp' WriteMode $ \hout -> do
         (_, _, Just herr, jHandle) <-
             createProcess (
                 proc bwaPath
