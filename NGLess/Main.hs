@@ -6,7 +6,6 @@ module Main
     ( main
     ) where
 
-import FileManagement
 import Interpret
 import Validation
 import ValidationNotPure
@@ -21,6 +20,7 @@ import Interpretation.Map (configGenome)
 import Control.Applicative
 import System.Console.CmdArgs
 import System.Directory
+import System.IO.Error
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -82,12 +82,13 @@ function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 installGenome :: String -> IO ()
 installGenome ref = do
     p' <- globalDataDirectory
-    createDirIfNotExists p' -- make sure the genome dir exists.
-    hasPerm <- writable <$> getPermissions p' -- check whether can write globally
-    _ <- putStrLn $ "Reference: " ++ ref ++ ". Mode: " ++ (show hasPerm)
+    created <- (createDirectoryIfMissing False p' >> return True) `catchIOError` (\_ -> return False)
+    hasPerm <- (if created
+                    then writable <$> getPermissions p' -- check whether can write globally
+                    else return False)
     case hasPerm of
         True  -> configGenome ref Root >> return ()
-        False -> userDataDirectory >>= createDirIfNotExists >> configGenome ref User >> return ()
+        False -> userDataDirectory >>= createDirectoryIfMissing False >> configGenome ref User >> return ()
 
 optsExec (DefaultMode dmode fname) = do
     --Note that the input for ngless is always UTF-8.
@@ -95,7 +96,8 @@ optsExec (DefaultMode dmode fname) = do
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
-    createDirIfNotExists =<< outputDirectory
+    odir <- outputDirectory
+    createDirectoryIfMissing False odir
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of
         Left err -> putStrLn (show err)

@@ -9,7 +9,6 @@ module FileManagement
         generateDirId,
         setupHtmlViewer,
         doesFileExist,
-        createDirIfNotExists,
         readPossiblyCompressedFile,
         unCompress,
         writeGZIP,
@@ -26,7 +25,6 @@ import qualified Data.Text as T
 
 import System.FilePath.Posix
 import System.Directory
-import System.IO.Error
 import System.IO
 
 import Control.Monad
@@ -92,10 +90,6 @@ generateDirId dst = do
     odir <- outputDirectory
     createTempDirectory odir (template dst)
     
-createDirIfNotExists :: FilePath -> IO ()
-createDirIfNotExists dst = (createDirectory dst) `catchIOError` (\err -> if isAlreadyExistsError err then return () else ioError err)
-
-
 createTempDirectory :: FilePath -> String -> IO FilePath
 createTempDirectory dir t = do
   pid <- c_getpid
@@ -119,7 +113,7 @@ setupHtmlViewer htmlP = do
 
 copyDir ::  FilePath -> FilePath -> IO ()
 copyDir src dst = do
-  createDirIfNotExists dst
+  createDirectoryIfMissing False dst
   xs <- getDirectoryContents src >>= return . filter (not . isDot)
   forM_ xs $ \n -> do
     x <- doesDirectoryExist (src </> n)

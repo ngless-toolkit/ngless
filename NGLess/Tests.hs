@@ -18,7 +18,7 @@ import Text.ParserCombinators.Parsec.Prim (GenParser)
 import Text.Parsec (SourcePos)
 import Text.Parsec.Pos (newPos)
 
-import System.Directory(removeFile, removeDirectoryRecursive)
+import System.Directory(removeFile, removeDirectoryRecursive, createDirectoryIfMissing)
 import System.FilePath.Posix((</>))
 
 import qualified Data.ByteString.Char8 as B
@@ -1130,7 +1130,7 @@ case_read_and_write_fastQ = do
 -- hack: jump over copy of .html and .css
 case_read_fastQ = do
     nt <- generateDirId fp 
-    createDirIfNotExists (dstDir nt)
+    createDirectoryIfMissing False (dstDir nt)
     len <- readFastQ Nothing fp (dstDir nt) nt >> getFilesInDir (dstDir nt) >>= return . length --populates dir nt
     removeDirectoryRecursive $ dstDir nt -- delete test generated data.
     len @?= 2
@@ -1140,8 +1140,8 @@ case_read_fastQ = do
 -- "test_samples/sample.fq" has 33 as lowest char from the initial data set
 case_read_fastQ_store_enc = do
     nt <- generateDirId fp 
-    createDirIfNotExists $ dstDirBef nt
-    createDirIfNotExists $ dstDirAft nt
+    createDirectoryIfMissing False $ dstDirBef nt
+    createDirectoryIfMissing False $ dstDirAft nt
     (NGOReadSet _ eb _) <- readFastQ Nothing   fp (dstDirBef nt) nt
     (NGOReadSet _ ea _) <- readFastQ (Just eb) fp (dstDirAft nt) nt
     removeDirectoryRecursive $ dstDirBef nt -- delete test generated data.
