@@ -116,9 +116,9 @@ interpretMapOp r ds = do
                 False  -> indexReference r >>= \x -> return (x, Nothing) --user supplies genome
                 True   -> do
                     rootGen <- getGenomeDir r
-                    isIndexCalculated r' >>= \res -> case res of
+                    findIndexFiles r' >>= \res -> case res of
                         Nothing -> configGenome r' User >>= \x -> return (x, Just rootGen) -- download and install genome on User mode
-                        Just p  -> return (T.unpack p , Just rootGen) -- already installed
+                        Just p  -> return (p, Just rootGen) -- already installed
 
 
 {-
@@ -165,34 +165,23 @@ printSamStats stats = do
           in (x / y) * (100 :: Double)
 
 -- check both SU and normal user Genomes dir for <ref>
-isIndexCalculated :: FilePath -> IO (Maybe T.Text)
-isIndexCalculated ref = do
-    -- super user genomes dir --
-    hasSUFiles <- isIndexCalcAux ref Root
-    -- normal user genomes dir --
-    hasFiles <- isIndexCalcAux ref User
+findIndexFiles :: FilePath -> IO (Maybe FilePath)
+findIndexFiles ref = do
+    globalIndex <- findIndexFilesIn ref Root
+    if isJust globalIndex
+        then return globalIndex
+        else findIndexFilesIn ref User
 
-    case isJust hasSUFiles of
-        True  -> return hasSUFiles -- installed in SU dir
-        False -> case isJust hasFiles of
-                True  -> return hasFiles -- installed in $HOME
-                False -> return Nothing -- not installed
-
-
-isIndexCalcAux :: FilePath -> InstallMode -> IO (Maybe T.Text)
-isIndexCalcAux ref Root = do
-    dirPath <- globalDataDirectory
-    hasIndex <- doAllFilesExist (dirPath </> getIndexPath ref) indexRequiredFormats
-    case hasIndex of
-        True  -> return $ (Just $ T.pack (dirPath </> getIndexPath ref))
-        False -> return Nothing
-
-isIndexCalcAux ref User = do
-    udir <- userDataDirectory
-    hasIndex <- doAllFilesExist (udir </> getIndexPath ref) indexRequiredFormats
-    case hasIndex of
-        True  -> return $ (Just $ T.pack (udir </> getIndexPath ref))
-        False -> return Nothing
+findIndexFilesIn :: FilePath -> InstallMode -> IO (Maybe FilePath)
+findIndexFilesIn ref mode = do
+    dirPath <- (if mode == Root
+                    then globalDataDirectory
+                    else userDataDirectory)
+    let indexPath = (dirPath </> getIndexPath ref)
+    hasIndex <- doAllFilesExist indexPath indexRequiredFormats
+    return (if hasIndex
+                then Just indexPath
+                else Nothing)
 
 configGenome :: FilePath -> InstallMode -> IO FilePath
 configGenome ref Root = do
@@ -203,8 +192,8 @@ configGenome ref User = do
     installGenome' udir ref User
 
 installGenome' p ref mode = do
-    hasIndex <- isIndexCalcAux ref mode
-    when (isNothing hasIndex) $ do
+    indexPath <- findIndexFilesIn ref mode
+    when (isNothing indexPath) $ do
         createDirectoryIfMissing True p
         installGenome ref p
     return (p </> getIndexPath ref)
