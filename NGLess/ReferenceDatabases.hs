@@ -3,14 +3,16 @@
 module ReferenceDatabases
     ( isDefaultGenome
     , defaultGenomes
-    , downloadURL
     , getGenomeRootPath
     , getIndexPath
     , getGff
+    , downloadReference
     ) where
 
 import qualified Data.Text as T
 import System.FilePath( (</>), (<.>) )
+
+import Utils.Network
 import Configuration
 
 bwaIndexPath :: FilePath
@@ -36,7 +38,7 @@ defaultGenomes = [
 isDefaultGenome :: T.Text -> Bool 
 isDefaultGenome name = name `elem` (map fst defaultGenomes)
 
--- | Get download URL for an reference
+-- | Get download URL for a reference
 downloadURL :: FilePath -> IO FilePath
 downloadURL genome = case lookup (T.pack genome) defaultGenomes of
         Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
@@ -55,4 +57,8 @@ getGenomeRootPath d =
 getIndexPath :: FilePath -> FilePath
 getIndexPath gen = getGenomeRootPath (T.pack gen) </> bwaIndexPath </> "genome.fa.gz"
 
-
+downloadReference :: String -> FilePath -> IO ()
+downloadReference ref destPath = do
+    url <- downloadURL ref
+    downloadFile url destPath
+    putStrLn " Reference download completed! "

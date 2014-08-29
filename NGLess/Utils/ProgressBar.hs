@@ -1,4 +1,4 @@
-module ProgressBar
+module Utils.ProgressBar
     ( mkProgressBar
     , updateProgressBar
     ) where

@@ -18,17 +18,12 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import qualified Data.Vector.Unboxed as V
 
-import qualified Data.Map as Map
-
 import System.Directory
 import System.FilePath.Posix
 import Numeric
 
-import Data.Conduit
 import Data.Maybe
-import Data.Conduit.Binary (sinkFile)
 
-import Network.HTTP.Conduit
 import GHC.Conc (numCapabilities)
 
 import System.Process
@@ -37,9 +32,7 @@ import System.IO
 
 import Control.Monad
 import Control.Applicative ((<$>))
-import Control.Monad.Error (liftIO)
 
-import ProgressBar
 import SamBamOperations
 import Language
 import FileManagement
@@ -67,7 +60,6 @@ indexReference refPath = do
                 ExitFailure _err -> error err
         True -> printNglessLn $ "index for " ++ refPath' ++ " already exists."
     return refPath'
-
 
 
 mapToReference :: T.Text -> FilePath -> IO String
@@ -159,13 +151,15 @@ printSamStats stats = do
               y = fromIntegral b
           in (x / y) * (100 :: Double)
 
--- check both SU and normal user Genomes dir for <ref>
+-- | checks first user and then global data directories for <ref>.
+-- The user directory is checked first to allow the user to override a
+-- problematic global installation.
 findIndexFiles :: FilePath -> IO (Maybe FilePath)
 findIndexFiles ref = do
-    globalIndex <- findIndexFilesIn ref Root
+    globalIndex <- findIndexFilesIn ref User
     if isJust globalIndex
         then return globalIndex
-        else findIndexFilesIn ref User
+        else findIndexFilesIn ref Root
 
 findIndexFilesIn :: FilePath -> InstallMode -> IO (Maybe FilePath)
 findIndexFilesIn ref mode = do
@@ -179,54 +173,26 @@ findIndexFilesIn ref mode = do
                 else Nothing)
 
 configGenome :: FilePath -> InstallMode -> IO FilePath
-configGenome ref Root = do
-    dirPath <- globalDataDirectory
-    installGenome' dirPath ref Root
-configGenome ref User = do
-    udir <- userDataDirectory
-    installGenome' udir ref User
-
-installGenome' p ref mode = do
+configGenome ref mode = do
+    dir <- (if mode == Root
+                then globalDataDirectory
+                else userDataDirectory)
     indexPath <- findIndexFilesIn ref mode
     when (isNothing indexPath) $ do
-        createDirectoryIfMissing True p
-        installGenome ref p
-    return (p </> getIndexPath ref)
+        createDirectoryIfMissing True dir
+        installGenome ref dir
+    return (dir </> getIndexPath ref)
 
 
 installGenome :: FilePath -> FilePath -> IO ()
 installGenome ref d = do
-    url <- downloadURL ref
-    downloadReference url (d </> tarName)
+    downloadReference ref (d </> tarName)
     Tar.unpack d . Tar.read . GZip.decompress =<< LB.readFile ( d </> tarName)
    where
         dirName = case lookup (T.pack ref) defaultGenomes of
             Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
             Just v  -> v
         tarName = dirName <.> "tar.gz"
-
-downloadReference url destPath = runResourceT $ do
-    manager <- liftIO $ newManager conduitManagerSettings
-    req <- liftIO $ parseUrl url
-    res <- http req manager
-    case Map.lookup "Content-Length" (Map.fromList $ responseHeaders res) of
-        Nothing -> error ("Error on http request")
-        Just genSize -> do
-            responseBody res $$+- printProgress (read (B.unpack genSize) :: Int) =$ sinkFile destPath
-            liftIO $ putStrLn " Genome download completed! "
-
-printProgress :: Int -> Conduit B.ByteString (ResourceT IO) B.ByteString
-printProgress genSize = do
-    pbar <- liftIO (mkProgressBar 40)
-    loop 0 pbar
-  where
-    loop len pbar = await >>= maybe (return ()) (\bs -> do
-            let len' = len + B.length bs
-                progress = (fromIntegral len' / fromIntegral genSize)
-            pbar' <- liftIO (updateProgressBar pbar progress)
-            yield bs
-            loop len' pbar'
-            )
 
 doAllFilesExist :: String -> [String] -> IO Bool
 doAllFilesExist _ [] = return True
