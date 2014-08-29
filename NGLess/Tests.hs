@@ -696,7 +696,7 @@ samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*
 --            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
 --            (interpret map_s) . nglBody $ expr
 --            res' <- unCompress "test_samples/sample.sam"
---            calcSamStats res' @?= [5,0,0,0]
+--            _calcSamStats res' @?= [5,0,0,0]
 
 -- Test compute stats
 
@@ -887,7 +887,7 @@ case_sam_stats_res = do
     samStats contents @?= V.fromList  [3072,1610,1554,0]
 
 case_calc_sam_stats = do
-  r <- unCompress "test_samples/sample.sam" >>= return . calcSamStats
+  r <- unCompress "test_samples/sample.sam" >>= return . _calcSamStats
   r @?=  [3072,1610,1554,0]
 
 --- Unique.hs

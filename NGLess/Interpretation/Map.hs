@@ -4,9 +4,9 @@
 module Interpretation.Map
     ( interpretMapOp
     , configGenome
-    , calcSamStats
     , indexReference
     , mapToReference
+    , _calcSamStats
     ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -123,10 +123,10 @@ getGenomeDir n = T.pack <$> do
 
 
 getSamStats :: FilePath -> IO ()
-getSamStats fname = unCompress fname >>= printSamStats . calcSamStats
+getSamStats fname = unCompress fname >>= printSamStats . _calcSamStats
 
-calcSamStats :: BL.ByteString -> [Int]
-calcSamStats contents = [total', aligned', unique', lowQual']
+_calcSamStats :: BL.ByteString -> [Int]
+_calcSamStats contents = [total', aligned', unique', lowQual']
     where res' = samStats contents
           total' = V.unsafeIndex res' (fromEnum Total)
           aligned' = V.unsafeIndex res' (fromEnum Aligned)

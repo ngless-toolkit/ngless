@@ -6,6 +6,7 @@ module SamBamOperations
     ( samStats
     ) where
 
+import qualified Data.ByteString.Lazy as BL
 import Control.Monad
 import Control.Monad.ST
 
@@ -14,13 +15,15 @@ import qualified Data.Vector.Unboxed as V
 import Data.Sam
 import VectorOperations
 
+samStats :: BL.ByteString -> V.Vector Int
 samStats = computeStats . readAlignments
 
+computeStats :: [SamLine] -> V.Vector Int
 computeStats sams = runST $ do
-    initVec <- zeroVec 4
-    forM_ sams $ \x -> do
-        update initVec x
-    V.freeze initVec
+    vec <- zeroVec 4
+    forM_ sams $ \samline -> do
+        update vec samline
+    V.freeze vec
 
 update result samLine = do
         incV True Total
