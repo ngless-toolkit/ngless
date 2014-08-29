@@ -9,8 +9,6 @@ module Configuration
     , bwaBin
     , outputDirectory
 
-    , htmlDefaultDirLibs
-    , htmlDefaultFonts
     , htmlDefaultDir
     , maxTempFileSize
     ) where
@@ -53,12 +51,6 @@ bwaBin = (</> bwaDirPath </> "bwa") <$> getNglessRoot
 
 bwaDirPath :: String
 bwaDirPath = "../share/ngless/bwa-0.7.7" --setup puts the bwa directory on project root.
-
-htmlDefaultDirLibs :: String
-htmlDefaultDirLibs = "htmllibs"
-
-htmlDefaultFonts :: String
-htmlDefaultFonts = "fonts"
 
 htmlDefaultDir :: IO FilePath
 htmlDefaultDir = getNglessRoot >>= return . (</> "../share/ngless/Html")
