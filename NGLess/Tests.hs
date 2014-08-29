@@ -989,7 +989,7 @@ ngo_gff_fp = (Just (NGOString "test_samples/sample.gtf"))
 
 case_test_setup_html_view = do
     _ <- setupHtmlViewer "Html/"  -- Make sure tmp has the required files, but use source to populate it.
-    dst <- defaultDir
+    dst <- outputDirectory
     doesFileExist (p' dst) >>= \x -> x @?= True -- make sure keeper.html exist
   where 
     p' = (</> "nglessKeeper.html")

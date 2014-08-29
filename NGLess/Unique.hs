@@ -68,11 +68,9 @@ put1k k r dups_ref = do
 
 numFiles :: FilePath -> IO Integer
 numFiles path = do
-    size' <- withFile path ReadMode hFileSize
-    return $ calcSize size'
- where
-    calcSize :: Integer -> Integer
-    calcSize s = ceiling $ ((fromInteger s) / maxTempFileSize :: Double)
+    fsize <- withFile path ReadMode hFileSize
+    tmpSize <- maxTempFileSize
+    return $ ceiling $ ((fromInteger fsize) / tmpSize  :: Double)
 
 
 -- Open and close file handles

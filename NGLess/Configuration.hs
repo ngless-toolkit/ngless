@@ -7,8 +7,8 @@ module Configuration
     , getNglessRoot
     , samtoolsBin
     , bwaBin
+    , outputDirectory
 
-    , defaultDir
     , htmlDefaultDirLibs
     , htmlDefaultFonts
     , htmlDefaultDir
@@ -63,11 +63,11 @@ htmlDefaultFonts = "fonts"
 htmlDefaultDir :: IO FilePath
 htmlDefaultDir = getNglessRoot >>= return . (</> "../share/ngless/Html")
 
-defaultDir :: IO String
-defaultDir = do
+outputDirectory :: IO String
+outputDirectory = do
   tdir <- getTemporaryDirectory
   return $ tdir </> "ngless.outputs/"
 
 
-maxTempFileSize :: Num a => a
-maxTempFileSize = 100*1000*1000 -- 100MB
+maxTempFileSize :: Num a => IO a
+maxTempFileSize = return (100*1000*1000) -- 100MB

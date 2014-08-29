@@ -98,7 +98,7 @@ optsExec (DefaultMode dmode fname) = do
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
-    defaultDir >>= createDirIfNotExists  -- this is the dir where everything will be kept.
+    createDirIfNotExists =<< outputDirectory
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of
         Left err -> putStrLn (show err)

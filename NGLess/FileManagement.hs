@@ -89,7 +89,9 @@ createDir dst = do
     return fp
 
 generateDirId :: FilePath -> IO FilePath
-generateDirId dst = defaultDir >>= flip createTempDirectory (template dst) >>= return
+generateDirId dst = do
+    odir <- outputDirectory
+    createTempDirectory odir (template dst)
     
 createDirIfNotExists :: FilePath -> IO ()
 createDirIfNotExists dst = (createDirectory dst) `catchIOError` (\err -> if isAlreadyExistsError err then return () else ioError err)
@@ -118,7 +120,7 @@ doesDirContainFormats path (x:xs) = do
 
 setupHtmlViewer :: FilePath -> IO ()
 setupHtmlViewer htmlP = do
-    dst <- defaultDir
+    dst <- outputDirectory
     doesFileExist (p' dst) >>= \x -> case x of 
         True   -> return ()
         False  -> copyDir htmlP dst

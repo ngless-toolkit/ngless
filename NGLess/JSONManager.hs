@@ -10,6 +10,7 @@ module JSONManager
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Text as T
 
+import Control.Applicative ((<$>))
 import Data.Aeson
 import System.FilePath.Posix
 
@@ -36,7 +37,7 @@ createBasicStatsJson fileData fname enc = resJS
 
 insertFilesProcessedJson :: FilePath -> T.Text -> IO ()
 insertFilesProcessedJson t script = do
-        jsonPath <- defaultDir >>= return . (</> "filesProcessed.js")
+        jsonPath <- (</> "filesProcessed.js") <$> outputDirectory
         doesFileExist jsonPath 
           >>= \x -> case x of
             True  -> createFilesProcessed t script >>= \v -> updateProcessedJson fProc v jsonPath 21
@@ -49,16 +50,13 @@ filesProcessedToJson tName script = createFilesProcessed tName script >>= return
 
 insertCountsProcessedJson :: FilePath -> IO ()
 insertCountsProcessedJson fp = do
-        jsonPath <- defaultDir >>= return . (</> "countsProcessed.js")
+        jsonPath <- (</> "countsProcessed.js") <$> outputDirectory
         doesFileExist jsonPath
           >>= \x -> case x of
             True  -> updateProcessedJson cProc jsonData jsonPath 22
             False -> createProcessedJson cProc (BL.concat ["[",encode jsonData,"]"]) jsonPath
     where
         jsonData = createCountsProcessed fp
-
-
-----------
 
 
 updateProcessedJson v jsonData jsonPath k = do
