@@ -54,7 +54,7 @@ indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
 
 indexReference refPath = do
     let refPath' = (T.unpack refPath)
-    res <- doesDirContainFormats refPath' indexRequiredFormats
+    res <- doAllFilesExist refPath' indexRequiredFormats
     case res of
         False -> do
             bwaPath <- bwaBin
@@ -71,6 +71,7 @@ indexReference refPath = do
 
 
 
+-- mapToReference :: T.Text -> FilePath -> IO String
 mapToReference refIndex readSet = do
     newfp <- getTempFilePath readSet
     let newfp' = newfp ++ ".sam"
@@ -91,17 +92,12 @@ mapToReference' newfp refIndex readSet = do
                 ["mem","-t",(show numCapabilities),(T.unpack refIndex), readSet]
             ) { std_out = CreatePipe,
                 std_err = CreatePipe }
-    writeToFile hout newfp
+    contents <- B.hGetContents hout
+    B.writeFile newfp contents
+    hClose hout
     hGetContents herr >>= printNglessLn
     return jHandle
 
-
-
-writeToFile :: Handle -> FilePath -> IO ()
-writeToFile handle path = do
-    contents <- B.hGetContents handle
-    B.writeFile path contents
-    hClose handle
 
 numDecimalPlaces :: Int
 numDecimalPlaces = 2
@@ -186,14 +182,14 @@ isIndexCalculated ref = do
 isIndexCalcAux :: FilePath -> InstallMode -> IO (Maybe T.Text)
 isIndexCalcAux ref Root = do
     dirPath <- globalDataDirectory
-    hasIndex <- doesDirContainFormats (dirPath </> getIndexPath ref) indexRequiredFormats
+    hasIndex <- doAllFilesExist (dirPath </> getIndexPath ref) indexRequiredFormats
     case hasIndex of
         True  -> return $ (Just $ T.pack (dirPath </> getIndexPath ref))
         False -> return Nothing
 
 isIndexCalcAux ref User = do
     udir <- userDataDirectory
-    hasIndex <- doesDirContainFormats (udir </> getIndexPath ref) indexRequiredFormats
+    hasIndex <- doAllFilesExist (udir </> getIndexPath ref) indexRequiredFormats
     case hasIndex of
         True  -> return $ (Just $ T.pack (udir </> getIndexPath ref))
         False -> return Nothing
@@ -248,10 +244,10 @@ printProgress genSize = do
             loop len' pbar'
             )
 
-doesDirContainFormats :: String -> [String] -> IO Bool
-doesDirContainFormats _ [] = return True
-doesDirContainFormats path (x:xs) = do
-    isThere <- doesFileExist (path ++ x)
+doAllFilesExist :: String -> [String] -> IO Bool
+doAllFilesExist _ [] = return True
+doAllFilesExist basepath (x:xs) = do
+    isThere <- doesFileExist (basepath ++ x)
     if isThere
-        then doesDirContainFormats path xs
+        then doAllFilesExist basepath xs
         else return False
