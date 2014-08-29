@@ -247,3 +247,11 @@ printProgress genSize = do
             yield bs
             loop len' pbar'
             )
+
+doesDirContainFormats :: String -> [String] -> IO Bool
+doesDirContainFormats _ [] = return True
+doesDirContainFormats path (x:xs) = do
+    isThere <- doesFileExist (path ++ x)
+    if isThere
+        then doesDirContainFormats path xs
+        else return False

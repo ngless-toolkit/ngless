@@ -6,7 +6,6 @@ module FileManagement
         getTFilePathComp,
         getTemporaryDirectory,
         setupRequiredFiles,
-        doesDirContainFormats,
         generateDirId,
         setupHtmlViewer,
         doesFileExist,
@@ -109,14 +108,6 @@ createTempDirectory dir t = do
       case r of
         False  -> return dirpath
         True -> findTempName (x+1)
-
-doesDirContainFormats :: String -> [String] -> IO Bool
-doesDirContainFormats _ [] = return True
-doesDirContainFormats path (x:xs) = do 
-    x' <- doesFileExist (path ++ x)
-    case x' of 
-        True -> doesDirContainFormats path xs
-        False -> return False
 
 setupHtmlViewer :: FilePath -> IO ()
 setupHtmlViewer htmlP = do

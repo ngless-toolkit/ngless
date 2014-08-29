@@ -628,8 +628,6 @@ assertNotEqual a b = do
     mapM_ removeFile [a', b'] -- a' and b' creates a file, this line removes it.
     assertBool "a' and b' should be different" (a' /= b')
 
-case_dir_contain_formats = doesDirContainFormats "NGLess/Tests" [".hs"] >>= assertBool "doesDirContainFormats \"NGLess/Tests\" [\".hs\"]" 
-
 -- Json Operations
 
 case_basicInfoJson = basicInfoToJson "x1" 1.0 "x2" 2 (3,4) @?= (encode $ BasicInfo "x1" 1.0 "x2" 2 (3,4))
