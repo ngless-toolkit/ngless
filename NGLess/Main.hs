@@ -29,30 +29,30 @@ import qualified Data.ByteString as S
 
 
 version = "0.0.0"
-data NGLessArgs = 
-        DefaultMode 
+data NGLess =
+        DefaultMode
               { debug_mode :: String
               , input :: String
               }
-        | InstallGenMode 
+        | InstallGenMode
               { input :: String}
-        | VisualizeMode 
-              { port :: Int} 
+        | VisualizeMode
+              { port :: Int}
            deriving (Eq, Show, Data, Typeable)
 
-nglessargs = DefaultMode
+ngless = DefaultMode
         { debug_mode = "ngless"
         , input = "-" &= argPos 0 &= opt ("-" :: String)
-        } 
-        &= details  [ "Example:" , "ngless -v ../example/script.ngl" ]
+        }
+        &= details  [ "Example:" , "ngless script.ngl" ]
 
 
 installargs = InstallGenMode
         {
             input = "Reference" &= argPos 0
-        } 
-        &= name "--install-reference-data" 
-        &= details  [ "Example:" , "(sudo) ngless -i sacCer3" ]
+        }
+        &= name "--install-reference-data"
+        &= details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
 
 visualizeargs = VisualizeMode
         {
@@ -84,13 +84,10 @@ installGenome ref = do
     p' <- globalDataDirectory
     createDirIfNotExists p' -- make sure the genome dir exists.
     hasPerm <- writable <$> getPermissions p' -- check whether can write globally
-    _ <- putStrLn $ "Reference: " ++ ref ++ ". Mode: " ++ (showPerm hasPerm)
+    _ <- putStrLn $ "Reference: " ++ ref ++ ". Mode: " ++ (show hasPerm)
     case hasPerm of
         True  -> configGenome ref Root >> return ()
         False -> userDataDirectory >>= createDirIfNotExists >> configGenome ref User >> return ()
-    where
-        showPerm True  = "Root." 
-        showPerm False = "User."
 
 optsExec (DefaultMode dmode fname) = do
     --Note that the input for ngless is always UTF-8.
@@ -108,11 +105,11 @@ optsExec (DefaultMode dmode fname) = do
 optsExec (InstallGenMode ref) = installGenome ref
 optsExec (VisualizeMode p) = runWebServer p
 
-getModes :: Mode (CmdArgs NGLessArgs)
-getModes = cmdArgsMode $ modes [nglessargs &= auto, installargs, visualizeargs]
+getModes :: Mode (CmdArgs NGLess)
+getModes = cmdArgsMode $ modes [ngless &= auto, installargs, visualizeargs]
     &= verbosity
-    &= summary sumtext  
+    &= summary sumtext
     &= help "ngless implement the NGLess language"
-    where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013"]
+    where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013-2014"]
 
 main = cmdArgsRun getModes >>= optsExec
