@@ -13,6 +13,7 @@ module Configuration
     , maxTempFileSize
     ) where
 
+import Control.Monad (when)
 import Control.Applicative ((<$>))
 import System.Environment (getExecutablePath)
 import System.Directory
@@ -41,16 +42,30 @@ printNglessLn msg = whenLoud (putStrLn msg)
 getNglessRoot :: IO FilePath
 getNglessRoot = takeDirectory <$> getExecutablePath
 
-samDirPath :: String
-samDirPath = "../share/ngless/samtools-1.0"
-samtoolsBin :: IO FilePath
-samtoolsBin = (</> samDirPath </> "samtools") <$> getNglessRoot
+check_executable name bin = do
+    exists <- doesFileExist bin
+    when (not exists)
+        (error $ concat [name, " binary not found!\n","Expected it at ", bin])
+    is_executable <- executable <$> getPermissions bin
+    when (not is_executable)
+        (error $ concat [name, " binary found at ", bin, ".\nHowever, it is not an executable file!"])
+    return bin
 
 bwaBin :: IO FilePath
-bwaBin = (</> bwaDirPath </> "bwa") <$> getNglessRoot
+bwaBin = do
+    bin <- (</> bwaDirPath </> "bwa") <$> getNglessRoot
+    check_executable "BWA" bin
 
 bwaDirPath :: String
 bwaDirPath = "../share/ngless/bwa-0.7.7" --setup puts the bwa directory on project root.
+
+samDirPath :: String
+samDirPath = "../share/ngless/samtools-1.0"
+samtoolsBin :: IO FilePath
+samtoolsBin = do
+    bin <- (</> samDirPath </> "samtools") <$> getNglessRoot
+    check_executable "samtools" bin
+
 
 htmlDefaultDir :: IO FilePath
 htmlDefaultDir = getNglessRoot >>= return . (</> "../share/ngless/Html")
