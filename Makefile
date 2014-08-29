@@ -111,20 +111,13 @@ uninstall:
 
 
 #####  Setup required files
-$(HTML_FONTS_DIR)/:
-	mkdir -p $(HTML_FONTS_DIR)
-
-$(HTML_LIBS_DIR):
-	mkdir -p $(HTML_LIBS_DIR)
-
 $(BWA_DIR):
 	wget $(BWA_URL)
 	tar xvfj $(BWA_TAR)
 	rm $(BWA_TAR)
 
 $(BWA_DIR)/ngless-bwa-static: $(BWA_DIR)
-	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"
-
+	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static" && cp bwa ngless-bwa-static
 
 $(SAM_DIR):
 	wget $(SAM_URL)
@@ -135,25 +128,32 @@ $(SAM_DIR)/samtools: $(SAM_DIR)
 	cd $(SAM_DIR) && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC"
 
 
+# We cannot depend on $(HTML_LIBS_DIR) as wget sets the mtime in the past
+# and it would cause the download to happen at every make run
 $(HTML_LIBS_DIR)/%.js:
+	mkdir -p $(HTML_LIBS_DIR)
 	echo $(notdir $@)
 	wget -O $@ $($(notdir $@))
 
 
 $(HTML_LIBS_DIR)/%.css:
+	mkdir -p $(HTML_LIBS_DIR)
 	echo $(notdir $@)
 	wget -O $@ $($(notdir $@))
 
 
 $(HTML_FONTS_DIR)/%.woff:
+	mkdir -p $(HTML_FONTS_DIR)
 	echo $(notdir $@)
 	wget -O $@ $($(notdir $@))
 
 $(HTML_FONTS_DIR)/%.ttf:
+	mkdir -p $(HTML_FONTS_DIR)
 	echo $(notdir $@)
 	wget -O $@ $($(notdir $@))
 
 $(HTML_LIBS_DIR)/Octocat.png:
+	mkdir -p $(HTML_LIBS_DIR)
 	wget -O $(HTML_LIBS_DIR)/$(notdir $(GIT_LOGO)) $(GIT_LOGO);
 	unzip $(HTML_LIBS_DIR)/$(notdir $(GIT_LOGO)) -d $(HTML_LIBS_DIR);
 	cp $(HTML_LIBS_DIR)/Octocat/Octocat.png $(HTML_LIBS_DIR)/Octocat.png;
