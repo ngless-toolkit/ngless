@@ -115,8 +115,8 @@ data NGLessObject =
         | NGOSymbol T.Text
         | NGOFilename T.Text
         | NGOShortRead ShortRead
-        | NGOReadSet FilePath FastQEncoding B.ByteString
-        | NGOMappedReadSet T.Text (Maybe T.Text) 
+        | NGOReadSet FilePath FastQEncoding B.ByteString -- ^ Read sets are saved on disk
+        | NGOMappedReadSet FilePath (Maybe T.Text) -- ^ This is represented by a SAM file on disk
         | NGOAnnotatedSet T.Text
         | NGOVoid
         | NGOList [NGLessObject]

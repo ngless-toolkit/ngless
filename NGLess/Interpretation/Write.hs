@@ -26,9 +26,8 @@ getNGOString (Just (NGOString s)) = s
 getNGOString _ = error "Error: Type is different of String"
 
 writeToUncFile (NGOMappedReadSet path defGen) newfp = do
-    let path' = B.pack . T.unpack $ path
-    readPossiblyCompressedFile (B.unpack path') >>= BL.writeFile (T.unpack newfp)
-    return $ NGOMappedReadSet newfp defGen
+    readPossiblyCompressedFile path >>= BL.writeFile (T.unpack newfp)
+    return $ NGOMappedReadSet (T.unpack newfp) defGen
 
 writeToUncFile (NGOReadSet path enc tmplate) newfp = do
     let newfp' = T.unpack newfp
@@ -55,7 +54,7 @@ writeToFile el@(NGOMappedReadSet fp defGen) args = do
     case format of
         (NGOSymbol "sam") -> writeToUncFile el newfp
         (NGOSymbol "bam") -> do
-                        newfp' <- convertSamToBam (T.unpack fp) (T.unpack newfp)
+                        newfp' <- convertSamToBam fp (T.unpack newfp)
                         return (NGOMappedReadSet newfp' defGen) --newfp will contain the bam
         _ -> error "This format should have been impossible"
 writeToFile (NGOAnnotatedSet fp) args = do
@@ -94,5 +93,5 @@ convertSamToBam samfile newfp = do
         hGetContents herr >>= putStrLn
         exitCode <- waitForProcess jHandle
         case exitCode of
-           ExitSuccess -> return (T.pack newfp)
+           ExitSuccess -> return newfp
            ExitFailure err -> error ("Failure on converting sam to bam" ++ (show err))

@@ -92,7 +92,7 @@ interpretMapOp r ds = do
     (ref', defGen') <- indexReference'
     samPath' <- mapToReference (T.pack ref') ds
     getSamStats samPath'
-    return $ NGOMappedReadSet (T.pack samPath') defGen'
+    return $ NGOMappedReadSet samPath' defGen'
     where
         r' = T.unpack r
         indexReference' :: IO (FilePath, Maybe T.Text)
