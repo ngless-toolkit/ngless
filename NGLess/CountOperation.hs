@@ -8,13 +8,13 @@ import qualified Data.Text as T
 import qualified Data.ByteString.Lazy.Char8 as L8
 
 import Language
-import FileManagement (unCompress)
+import FileManagement (readPossiblyCompressedFile)
 
 import Data.AnnotRes
 
 countAnnotatedSet :: T.Text -> Maybe NGLessObject -> NGLessObject -> IO T.Text
 countAnnotatedSet p f m = do
-    fc <- unCompress p'
+    fc <- readPossiblyCompressedFile p'
     writeAnnotCount p' $ filterAnnot fc f m
    where p' = T.unpack p
 --countAnnotatedSet p Nothing = return NGOVoid

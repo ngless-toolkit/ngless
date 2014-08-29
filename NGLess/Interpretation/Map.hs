@@ -12,7 +12,6 @@ module Interpretation.Map
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 
-import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
@@ -88,10 +87,10 @@ numDecimalPlaces :: Int
 numDecimalPlaces = 2
 
 
-interpretMapOp :: T.Text -> B.ByteString -> IO NGLessObject
+interpretMapOp :: T.Text -> FilePath -> IO NGLessObject
 interpretMapOp r ds = do
     (ref', defGen') <- indexReference'
-    samPath' <- mapToReference (T.pack ref') (B.unpack ds)
+    samPath' <- mapToReference (T.pack ref') ds
     getSamStats samPath'
     return $ NGOMappedReadSet (T.pack samPath') defGen'
     where
@@ -123,7 +122,7 @@ getGenomeDir n = T.pack <$> do
 
 
 getSamStats :: FilePath -> IO ()
-getSamStats fname = unCompress fname >>= printSamStats . _calcSamStats
+getSamStats fname = readPossiblyCompressedFile fname >>= printSamStats . _calcSamStats
 
 _calcSamStats :: BL.ByteString -> [Int]
 _calcSamStats contents = [total', aligned', unique', lowQual']

@@ -20,7 +20,7 @@ import Data.Hashable
 import System.FilePath.Posix
 
 
-import FileManagement (createDir, getFilesInDir, unCompress)
+import FileManagement (createDir, getFilesInDir, readPossiblyCompressedFile)
 import Data.FastQ
 import Configuration
 
@@ -46,7 +46,7 @@ readNFiles enc k d = getFilesInDir d >>= mapM (\x -> readUniqueFile k enc x) >>=
 
 readUniqueFile :: Int -> FastQEncoding -> FilePath -> IO [ShortRead]
 readUniqueFile k enc fname = do
-    (getk k . parseFastQ enc) `fmap` (unCompress fname)
+    (getk k . parseFastQ enc) `fmap` (readPossiblyCompressedFile fname)
 
 getk :: Int -> [ShortRead] -> [ShortRead]
 getk k rs = runST $ do

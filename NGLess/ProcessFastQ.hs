@@ -22,15 +22,15 @@ import Language
 import JSONManager
 import Configuration
 
-writeReadSet :: B.ByteString -> [ShortRead] -> FastQEncoding -> IO FilePath
+writeReadSet :: FilePath -> [ShortRead] -> FastQEncoding -> IO FilePath
 writeReadSet fn rs enc = do
     temp <- getTemporaryDirectory 
-    newfp <- getTFilePathComp (temp </> (template $ (B.unpack fn)))
+    newfp <- getTFilePathComp (temp </> (template $ fn))
     writeGZIP newfp (asFastQ enc rs)
     return newfp
 
 
-readReadSet :: FastQEncoding -> B.ByteString -> IO [ShortRead]
+readReadSet :: FastQEncoding -> FilePath -> IO [ShortRead]
 readReadSet enc fn = (parseFastQ enc) `fmap` (readPossiblyCompressedFile fn)
 
 executeQProc :: Maybe FastQEncoding -> FilePath -> FilePath -> FilePath -> IO NGLessObject
@@ -38,7 +38,7 @@ executeQProc enc f info dirT = setupRequiredFiles info dirT >>= \x -> readFastQ 
 
 readFastQ :: Maybe FastQEncoding -> FilePath -> FilePath -> FilePath -> IO NGLessObject
 readFastQ enc f dst dirT = do
-        fd <- unCompress f >>= return . computeStats
+        fd <- readPossiblyCompressedFile f >>= return . computeStats
         let enc' = encFromM fd -- when Nothing calculate encoding, else use value from Just.
         p "Generation of statistics for " dst
         let json = createBasicStatsJson  fd f enc' -- generate JSON DATA file: basicStats.js
@@ -49,7 +49,7 @@ readFastQ enc f dst dirT = do
         p "Number of sequences: "   (show $ nSeq fd)
         printHtmlStatisticsData (qualCounts fd) enc' dst -- " " " file: perBaseQualScoresData.js
         p "Loaded file: " f
-        return $ NGOReadSet (B.pack f) enc' (B.pack dirT)
+        return $ NGOReadSet f enc' (B.pack dirT)
     where
         p s obj  = printNglessLn $ s ++ obj
         encFromM fd = maybe (guessEncoding . lc $ fd) id enc

@@ -695,23 +695,23 @@ samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*
 --        Right expr -> do
 --            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
 --            (interpret map_s) . nglBody $ expr
---            res' <- unCompress "test_samples/sample.sam"
+--            res' <- readPossiblyCompressedFile "test_samples/sample.sam"
 --            _calcSamStats res' @?= [5,0,0,0]
 
 -- Test compute stats
 
 case_compute_stats_lc = do
-    contents <- unCompress "test_samples/sample_small.fq"
+    contents <- readPossiblyCompressedFile "test_samples/sample_small.fq"
     (convert . lc $ computeStats contents) @?= ']'
 
 -- Parse GFF lines
 
 case_read_annotation_comp = do
-    c <- unCompress "test_samples/sample.gtf.gz" 
+    c <- readPossiblyCompressedFile "test_samples/sample.gtf.gz" 
     length (GFF.readAnnotations c) @?= 98994
 
 case_read_annotation_uncomp = do
-    c <- unCompress "test_samples/sample.gtf" 
+    c <- readPossiblyCompressedFile "test_samples/sample.gtf" 
     length (GFF.readAnnotations c) @?= 98994
 
 
@@ -879,15 +879,15 @@ case_zero_vec = do
 ----- SamBamOperations.hs
 
 case_sam_stats_length = do
-    contents <- unCompress "test_samples/sample.sam"
+    contents <- readPossiblyCompressedFile "test_samples/sample.sam"
     V.length (samStats contents) @?= 4
 
 case_sam_stats_res = do
-    contents <- unCompress "test_samples/sample.sam"
+    contents <- readPossiblyCompressedFile "test_samples/sample.sam"
     samStats contents @?= V.fromList  [3072,1610,1554,0]
 
 case_calc_sam_stats = do
-  r <- unCompress "test_samples/sample.sam" >>= return . _calcSamStats
+  r <- readPossiblyCompressedFile "test_samples/sample.sam" >>= return . _calcSamStats
   r @?=  [3072,1610,1554,0]
 
 --- Unique.hs
@@ -959,25 +959,25 @@ case_calc_perc_uq = _calcPercentile bps eT upperQuartile @?= 5
 
 -- negative tests quality on value 60 char ';'. Value will be 60 - 64 which is -4
 case_calc_statistics_negative = do
-    s <- computeStats <$> unCompress "test_samples/sample_low_qual.fq"
+    s <- computeStats <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
     head (stats' s) @?= (-4,-4,-4,-4)
   where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 -- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
 case_calc_statistics_low_positive = do
-    s <- unCompress "test_samples/sample_low_qual.fq" >>= return . computeStats
+    s <- readPossiblyCompressedFile "test_samples/sample_low_qual.fq" >>= return . computeStats
     last (stats' s) @?= (1,1,1,1)
   where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 
 case_calc_statistics_normal = do
-    s <- unCompress "test_samples/data_set_repeated.fq" >>= return . computeStats
+    s <- readPossiblyCompressedFile "test_samples/data_set_repeated.fq" >>= return . computeStats
     head (stats' s) @?= (25,33,31,33)
   where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 case_json_statistics = do
-        s <- unCompress "test_samples/sample_small.fq" >>= return . computeStats
-        r <- unCompress "test_samples/res_json_statistics.txt" >>= return . L.unpack
+        s <- readPossiblyCompressedFile "test_samples/sample_small.fq" >>= return . computeStats
+        r <- readPossiblyCompressedFile "test_samples/res_json_statistics.txt" >>= return . L.unpack
         _createDataString (stats' s) @?= r
     where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
@@ -994,12 +994,12 @@ case_test_setup_html_view = do
 
 
 all_default_annot = do
-  annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing Nothing Nothing Nothing >>= unCompress . T.unpack
+  annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing Nothing Nothing Nothing >>= readPossiblyCompressedFile . T.unpack
 
 -- test default values
 case_annotate_features_default_idemp = do
     a1 <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing Nothing Nothing Nothing 
-    res1 <- unCompress $ T.unpack a1
+    res1 <- readPossiblyCompressedFile $ T.unpack a1
     res2 <- all_default_annot
     res1 @?= res2
   where feats = Just $ NGOList [NGOSymbol "gene"]
@@ -1007,7 +1007,7 @@ case_annotate_features_default_idemp = do
 
 case_annotate_mode_default_idemp = do
     a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing s Nothing Nothing
-    res1 <- unCompress $ T.unpack a1
+    res1 <- readPossiblyCompressedFile $ T.unpack a1
     res2 <- all_default_annot
     res1 @?= res2
   where s = Just $ NGOSymbol "union"
@@ -1015,14 +1015,14 @@ case_annotate_mode_default_idemp = do
 
 case_annotate_amb_default_idemp = do
     a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing Nothing amb Nothing
-    res1 <- unCompress $ T.unpack a1
+    res1 <- readPossiblyCompressedFile $ T.unpack a1
     res2 <- all_default_annot
     res1 @?= res2
   where amb = Just $ NGOSymbol "allow"
 
 case_annotate_strand_default_idemp = do
     a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing Nothing Nothing s
-    res1 <- unCompress $ T.unpack a1
+    res1 <- readPossiblyCompressedFile $ T.unpack a1
     res2 <- all_default_annot
     res1 @?= res2
   where s = Just $ NGOSymbol "no"
@@ -1031,8 +1031,8 @@ case_annotate_strand_default_idemp = do
 case_annotate_gene_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
     (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- unCompress $ T.unpack p
-    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_union.txt"
+    resNG <- readPossiblyCompressedFile $ T.unpack p
+    resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_noStrand_union.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "gene"]
@@ -1044,8 +1044,8 @@ case_annotate_gene_noStrand_union = do
 case_annotate_exon_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
     (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- unCompress $ T.unpack p
-    resHT <- unCompress $ "test_samples/htseq-res/htseq_exon_noStrand_union.txt"
+    resNG <- readPossiblyCompressedFile $ T.unpack p
+    resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_exon_noStrand_union.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_exon_noStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "exon"]
@@ -1057,8 +1057,8 @@ case_annotate_exon_noStrand_union = do
 case_annotate_cds_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
     (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- unCompress $ T.unpack p
-    resHT <- unCompress $ "test_samples/htseq-res/htseq_cds_noStrand_union.txt"
+    resNG <- readPossiblyCompressedFile $ T.unpack p
+    resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_cds_noStrand_union.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_cds_noStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "CDS"]
@@ -1070,8 +1070,8 @@ case_annotate_cds_noStrand_union = do
 case_annotate_gene_noStrand_inters_strict = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
     (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- unCompress $ T.unpack p
-    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
+    resNG <- readPossiblyCompressedFile $ T.unpack p
+    resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "gene"]
@@ -1083,8 +1083,8 @@ case_annotate_gene_noStrand_inters_strict = do
 case_annotate_gene_noStrand_inters_non_empty = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
     (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- unCompress $ T.unpack p
-    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_noStrand_inters-nempty.txt"
+    resNG <- readPossiblyCompressedFile $ T.unpack p
+    resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_noStrand_inters-nempty.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-nempty.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "gene"]
@@ -1097,8 +1097,8 @@ case_annotate_gene_noStrand_inters_non_empty = do
 case_annotate_gene_yesStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
     (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- unCompress $ T.unpack p
-    resHT <- unCompress $ "test_samples/htseq-res/htseq_gene_yesStrand_union.txt"
+    resNG <- readPossiblyCompressedFile $ T.unpack p
+    resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_yesStrand_union.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_yesStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "gene"]
@@ -1118,13 +1118,13 @@ case_install_genome_user_mode = do
 
 -- ProcessFastQ
 low_char_int = do
-  unCompress "test_samples/sample.fq" >>= return . lc . computeStats
+  readPossiblyCompressedFile "test_samples/sample.fq" >>= return . lc . computeStats
 
 case_read_and_write_fastQ = do
     enc <- guessEncoding <$> low_char_int
     rs <- readReadSet enc "test_samples/sample.fq"
     fp <- writeReadSet "test_samples/sample.fq" rs enc
-    newrs <- readReadSet enc $ B.pack fp
+    newrs <- readReadSet enc fp
     newrs @?= rs
 
 -- hack: jump over copy of .html and .css

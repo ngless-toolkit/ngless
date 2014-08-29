@@ -263,7 +263,7 @@ executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappe
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = return . NGOList =<< mapM (executeQualityProcess) e
-executeQualityProcess (NGOReadSet fname enc nt) = executeQualityProcess' (Just enc) (B.unpack fname) "afterQC" (B.unpack nt)
+executeQualityProcess (NGOReadSet fname enc nt) = executeQualityProcess' (Just enc) fname "afterQC" (B.unpack nt)
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     newTemplate <- liftIO $ generateDirId fname' -- new template only calculated once.
@@ -290,7 +290,7 @@ executeUnique (NGOList e) args = return . NGOList =<< mapM (\x -> executeUnique 
 executeUnique (NGOReadSet file enc t) args = do
         d <- liftIO $ 
             readReadSet enc file 
-                        >>= writeToNFiles (B.unpack file) enc
+                        >>= writeToNFiles file enc
         case lookup "max_copies" args of
             Just v -> uniqueCalculations' (v' v) d
             _      -> uniqueCalculations' 1 d --default
@@ -300,7 +300,7 @@ executeUnique (NGOReadSet file enc t) args = do
         uniqueCalculations' numMaxOccur' d = do
             nFp <- liftIO $ 
                 readNFiles enc numMaxOccur' d >>= \x -> writeReadSet file x enc 
-            return $ NGOReadSet (B.pack nFp) enc t
+            return $ NGOReadSet nFp enc t
 
 executeUnique _ _ = error "executeUnique: Should not have happened"
 
@@ -308,11 +308,11 @@ executeUnique _ _ = error "executeUnique: Should not have happened"
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block v = return . NGOList =<< mapM (\x -> executePreprocess x args _block v) e
 executePreprocess (NGOReadSet file enc t) args (Block ([Variable var]) expr) _ = do
-        liftIO $printNglessLn $ "ExecutePreprocess on " ++ (B.unpack file) 
+        liftIO $printNglessLn $ "ExecutePreprocess on " ++ file 
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         env <- gets snd
         newfp <- liftIO $ writeReadSet file (map asShortRead (execBlock env rs)) enc
-        return $ NGOReadSet (B.pack newfp) enc t
+        return $ NGOReadSet newfp enc t
     where
         execBlock env = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env)
         interpretPBlock1 :: NGLessObject -> InterpretationROEnv (Maybe NGLessObject)

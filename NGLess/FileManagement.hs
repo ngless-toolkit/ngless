@@ -10,14 +10,12 @@ module FileManagement
         setupHtmlViewer,
         doesFileExist,
         readPossiblyCompressedFile,
-        unCompress,
         writeGZIP,
         parseFileName,
         template
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
-import qualified Data.ByteString.Char8 as B
 
 import qualified Codec.Compression.GZip as GZip    
 
@@ -126,14 +124,9 @@ copyDir src dst = do
 writeGZIP :: String -> BL.ByteString -> IO ()
 writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents 
 
--------- read files
-unCompress :: FilePath -> IO BL.ByteString
-unCompress fname =
+readPossiblyCompressedFile ::  FilePath -> IO BL.ByteString
+readPossiblyCompressedFile fname =
     if T.isInfixOf (T.pack ".gz") (T.pack fname)
         then fmap GZip.decompress (BL.readFile fname)
         else BL.readFile fname -- not compressed
-
-readPossiblyCompressedFile ::  B.ByteString -> IO BL.ByteString
-readPossiblyCompressedFile fileName = unCompress (B.unpack fileName)
------------
 

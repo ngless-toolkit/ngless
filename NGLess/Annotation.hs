@@ -28,7 +28,7 @@ import Data.Maybe (fromMaybe, fromJust)
 import Data.List (foldl')
 
 import Language
-import FileManagement(unCompress)
+import FileManagement(readPossiblyCompressedFile)
 import ReferenceDatabases
 import Configuration
 
@@ -65,8 +65,8 @@ getMode m = case m of
 
 annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Maybe NGLessObject -> IO T.Text
 annotate' samFp gffFp feats f a s = do
-    gff <- unCompress gffFp
-    sam <- unCompress samFp
+    gff <- readPossiblyCompressedFile gffFp
+    sam <- readPossiblyCompressedFile samFp
     let imGff = intervals . filter (filterFeatures feats) . readAnnotations $ gff
         counts = compStatsAnnot imGff sam f a s -- Map 'feats' (Map chr (Imap key val))
     writeAnnotCount samFp (toGffM . concat . map (M.elems) . M.elems $ counts)

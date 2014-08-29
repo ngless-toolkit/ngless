@@ -27,13 +27,13 @@ getNGOString _ = error "Error: Type is different of String"
 
 writeToUncFile (NGOMappedReadSet path defGen) newfp = do
     let path' = B.pack . T.unpack $ path
-    readPossiblyCompressedFile path' >>= BL.writeFile (T.unpack newfp)
+    readPossiblyCompressedFile (B.unpack path') >>= BL.writeFile (T.unpack newfp)
     return $ NGOMappedReadSet newfp defGen
 
 writeToUncFile (NGOReadSet path enc tmplate) newfp = do
     let newfp' = T.unpack newfp
     readPossiblyCompressedFile path >>= BL.writeFile newfp'
-    return $ NGOReadSet (B.pack newfp') enc tmplate
+    return $ NGOReadSet newfp' enc tmplate
 
 writeToUncFile obj _ = error ("writeToUncFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ (show obj))
 
@@ -62,7 +62,7 @@ writeToFile (NGOAnnotatedSet fp) args = do
     let newfp = getNGOString $ lookup "ofile" args
         del = getDelimiter  $ lookup "format" args
     printNglessLn $ "Writing your NGOAnnotatedSet to: " ++ (T.unpack newfp)
-    cont <- unCompress (T.unpack fp)
+    cont <- readPossiblyCompressedFile (T.unpack fp)
     case lookup "verbose" args of
         Just (NGOSymbol "no")  -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
         Just (NGOSymbol "yes") -> writeAnnotResWDel' newfp (showGffCountDel del . readAnnotCounts $ cont)

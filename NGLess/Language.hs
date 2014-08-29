@@ -115,7 +115,7 @@ data NGLessObject =
         | NGOSymbol T.Text
         | NGOFilename T.Text
         | NGOShortRead ShortRead
-        | NGOReadSet B.ByteString FastQEncoding B.ByteString
+        | NGOReadSet FilePath FastQEncoding B.ByteString
         | NGOMappedReadSet T.Text (Maybe T.Text) 
         | NGOAnnotatedSet T.Text
         | NGOVoid
