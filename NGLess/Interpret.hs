@@ -245,7 +245,7 @@ executeCount (NGOAnnotatedSet p) args = do
     let c = lookup "counts" args
         m = fromMaybe (NGOInteger 0) $ lookup "min" args
     res <- liftIO $ countAnnotatedSet p c m
-    return $ NGOAnnotatedSet res
+    return $ NGOAnnotatedSet (T.unpack res)
 
 executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ (show err))
 
@@ -258,7 +258,7 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
         a = lookup "ambiguity" args
         s = lookup "strand" args
     res <- liftIO $ annotate e g f dDS m a s
-    return $ NGOAnnotatedSet res
+    return $ NGOAnnotatedSet (T.unpack res)
 executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject

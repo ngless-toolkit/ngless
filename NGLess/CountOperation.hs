@@ -12,11 +12,10 @@ import FileManagement (readPossiblyCompressedFile)
 
 import Data.AnnotRes
 
-countAnnotatedSet :: T.Text -> Maybe NGLessObject -> NGLessObject -> IO T.Text
+countAnnotatedSet :: FilePath -> Maybe NGLessObject -> NGLessObject -> IO T.Text
 countAnnotatedSet p f m = do
-    fc <- readPossiblyCompressedFile p'
-    writeAnnotCount p' $ filterAnnot fc f m
-   where p' = T.unpack p
+    fc <- readPossiblyCompressedFile p
+    writeAnnotCount p $ filterAnnot fc f m
 --countAnnotatedSet p Nothing = return NGOVoid
 
 filterAnnot :: L8.ByteString -> Maybe NGLessObject -> NGLessObject -> [GffCount]

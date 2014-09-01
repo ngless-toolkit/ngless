@@ -1030,8 +1030,8 @@ case_annotate_strand_default_idemp = do
 
 case_annotate_gene_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile $ T.unpack p
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_noStrand_union.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_union.txt"),("verbose", NGOSymbol "no")]
@@ -1043,8 +1043,8 @@ case_annotate_gene_noStrand_union = do
 
 case_annotate_exon_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile $ T.unpack p
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_exon_noStrand_union.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_exon_noStrand_union.txt"),("verbose", NGOSymbol "no")]
@@ -1056,8 +1056,8 @@ case_annotate_exon_noStrand_union = do
 
 case_annotate_cds_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile $ T.unpack p
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_cds_noStrand_union.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_cds_noStrand_union.txt"),("verbose", NGOSymbol "no")]
@@ -1069,8 +1069,8 @@ case_annotate_cds_noStrand_union = do
 
 case_annotate_gene_noStrand_inters_strict = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile $ T.unpack p
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
@@ -1082,8 +1082,8 @@ case_annotate_gene_noStrand_inters_strict = do
 
 case_annotate_gene_noStrand_inters_non_empty = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile $ T.unpack p
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_noStrand_inters-nempty.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-nempty.txt"),("verbose", NGOSymbol "no")]
@@ -1096,8 +1096,8 @@ case_annotate_gene_noStrand_inters_non_empty = do
 
 case_annotate_gene_yesStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile $ T.unpack p
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_yesStrand_union.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_yesStrand_union.txt"),("verbose", NGOSymbol "no")]
