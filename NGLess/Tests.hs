@@ -62,8 +62,12 @@ import Data.Json
 import Data.AnnotRes
 import qualified Data.GFF as GFF
 
+import Tests.Utils
 import Tests.FastQ
+import Tests.Validation
+
 test_FastQ = [tgroup_FastQ]
+test_Validation = [tgroup_Validation]
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -74,7 +78,6 @@ parseText p t = fromRight . parse p "test" . _cleanupindents . fromRight . token
 fromRight (Right r) = r
 fromRight (Left e) = error (concat ["Unexpected Left: ",show e])
 parseBody = map snd . parseText _nglbody
-parsetest = parsengless "test"
 
 case_parse_symbol = parseBody "{symbol}" @?= [ConstSymbol "symbol"]
 case_parse_fastq = parseBody fastqcalls @?= fastqcall
@@ -194,7 +197,7 @@ case_tok_word_ = tokenize' "test" "word_with_underscore" @?= Right expected
 -- test array: "\n\v\f{zo\n\v\NUL" -> [10,11,12,123,122,111,10,11,0]
 -- test cutoff: chr 20 -> '\DC4'
 
---Property 1: For every s, the size must be allways smaller than the input
+--Property 1: For every s, the size must be always smaller than the input
 prop_substrim_maxsize s = st >= 0 && e <= B.length (B.pack s)
     where (st,e) = subtrimPos (B.pack s) '\DC4'
 
@@ -208,11 +211,6 @@ case_substrim_normal_exec =  subtrimPos "\n\v\f{zo\n\v\NUL" '\DC4' @?= (3,3)
 case_substrim_empty_quals = subtrimPos "" '\DC4' @?= (0,0)
 
 -- Test Types
-isError (Right _) = assertFailure "error not caught"
-isError (Left _) = return ()
-
-isOk m (Left _) = assertFailure m
-isOk _ (Right _) = return ()
 isOkTypes = isOk "Type error on good code"
 
 case_bad_type_fastq = isError $ checktypes (Script "0.0" [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
@@ -426,7 +424,7 @@ case_invalid_fwrite_format = isError $ parsetest f_attr >>= checktypes
 
 -----------------------------------
 ----------  IMPORTANT -------------
--- File: Makefile allways exists.
+-- File: Makefile always exists.
 -- File: fq never exists.
 -----------------------------------
 
@@ -450,7 +448,7 @@ case_invalid_not_pure_fp_fastq_const = isOkTypes =<< validate_io' (fromRight . p
     where 
         f_attr = "ngless '0.0'\n\
                  \x = 'Makefile'\n\
-                 \fastq(x)\n" --File Makefile Allways Exists
+                 \fastq(x)\n" --File Makefile always Exists
 
 
 case_valid_not_pure_map_reference_lit = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
