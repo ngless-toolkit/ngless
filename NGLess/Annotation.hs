@@ -36,18 +36,14 @@ import Data.AnnotRes
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
 
-
-annotate :: FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> Maybe T.Text -> AnnotationIntersectionMode -> Maybe NGLessObject -> Maybe NGLessObject -> IO FilePath
-annotate samFP (Just g) feats _ m a s =
-    printNglessLn (concat ["annotate with GFF: ", eval g])
-            >> annotate' samFP (eval g) feats a (getIntervalQuery m) s  -- ignore default GFF
-    where eval (NGOString n) = T.unpack n
-          eval _ = error ("Provided type for gff must be a NGOString.")
-
+annotate :: FilePath -> Maybe FilePath -> Maybe NGLessObject -> Maybe T.Text -> AnnotationIntersectionMode -> Bool -> Maybe NGLessObject -> IO FilePath
+annotate samFP (Just g) feats _ m a s = do
+    printNglessLn (concat ["annotate with GFF: ", g])
+    annotate' samFP g feats (getIntervalQuery m) a s  -- ignore default GFF
 annotate samFP Nothing feats dDs m a s =
     printNglessLn (concat ["annotate with default GFF: ", show . fromJust $ dDs]) >>
         case dDs of
-            Just v  -> annotate' samFP (getGff v) feats a (getIntervalQuery m) s   -- used default GFF
+            Just v  -> annotate' samFP (getGff v) feats (getIntervalQuery m) a s   -- used default GFF
             Nothing -> error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
 
 getIntervalQuery :: AnnotationIntersectionMode -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount])
@@ -56,8 +52,8 @@ getIntervalQuery IntersectStrict = intersection_strict
 getIntervalQuery IntersectNonEmpty = intersection_non_empty
 
 
-annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Maybe NGLessObject -> IO FilePath
-annotate' samFp gffFp feats f a s = do
+annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> Maybe NGLessObject -> IO FilePath
+annotate' samFp gffFp feats a f s = do
     gff <- readPossiblyCompressedFile gffFp
     sam <- readPossiblyCompressedFile samFp
     let imGff = intervals . filter (filterFeatures feats) . readAnnotations $ gff
@@ -68,19 +64,18 @@ annotate' samFp gffFp feats f a s = do
                                                 -- v = Imap key Gffcounts
 
 toGffM :: [IM.IntervalMap Int [GffCount]] -> [GffCount]
-toGffM = concat . foldl (\a b -> (++) (toGff b) a) []
+toGffM = concat . foldl (\a b -> (++) (IM.elems b) a) []
 
-toGff :: IM.IntervalMap Int [GffCount] -> [[GffCount]]
-toGff = IM.elems
 
-compStatsAnnot ::  M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount])) -> L8.ByteString -> Maybe NGLessObject -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Maybe NGLessObject -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
+type AnnotationMap = M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
+compStatsAnnot ::  AnnotationMap -> L8.ByteString -> Bool -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Maybe NGLessObject -> AnnotationMap
 compStatsAnnot imGff sam a f s = foldl (iterSam f a s) imGff sams
    where
     sams = filter isAligned . readAlignments $ sam
 
 
-iterSam :: ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Maybe NGLessObject -> Maybe NGLessObject -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount])) -> SamLine -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
-iterSam f a s im y = M.map (\v -> M.alter (\x -> alterCounts x) k v) im
+iterSam :: ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> Maybe NGLessObject -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount])) -> SamLine -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
+iterSam f a s im y = M.map (\v -> M.alter alterCounts k v) im
     where
         alterCounts x = case x of
             Nothing -> Nothing
@@ -88,7 +83,7 @@ iterSam f a s im y = M.map (\v -> M.alter (\x -> alterCounts x) k v) im
         k = samRName y
 
 
-modeAnnotation :: ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Maybe NGLessObject -> IM.IntervalMap Int [GffCount] -> SamLine -> Maybe NGLessObject -> IM.IntervalMap Int [GffCount]
+modeAnnotation :: ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> IM.IntervalMap Int [GffCount] -> SamLine -> Maybe NGLessObject -> IM.IntervalMap Int [GffCount]
 modeAnnotation f a im y s = countsAmbiguity a ((filterStrand s asStrand) . f $ posR) im
   where
     sStart = samPos y
@@ -104,17 +99,9 @@ filterStrand modeS s m = maybe m (filterStrand') modeS
             NGOSymbol "no"  -> m -- by default no
             err              -> error ("Type must be a NGOSymbol with value 'yes' or 'no', but was passed: " ++ (show err))
 
-countsAmbiguity :: Maybe NGLessObject -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
-countsAmbiguity (Just a) toU imR =
-    case a of
-        NGOSymbol "allow" -> updateWithAmb    toU imR
-        NGOSymbol "deny"  -> updateWithoutAmb toU imR
-        err -> error ("NGOSymbol must be allow or deny, but was passed: " ++ (show err))
-countsAmbiguity Nothing toU imR = updateWithAmb toU imR
-
-updateWithAmb toU imR = uCounts toU imR
-updateWithoutAmb toU imR =
-    case IM.size toU of
+countsAmbiguity :: Bool -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
+countsAmbiguity True toU imR = uCounts toU imR
+countsAmbiguity False toU imR = case IM.size toU of
         0 -> imR --"no_feature"
         _ -> case _sizeNoDup toU of
             1 -> uCounts (IM.fromList . remAllButOneCount . IM.toList $ toU) imR -- same feature multiple times. increase that feature ONCE.

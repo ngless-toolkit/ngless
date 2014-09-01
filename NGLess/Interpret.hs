@@ -253,9 +253,9 @@ executeAnnotation :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationE
 executeAnnotation (NGOList e) args = mapM (\x -> executeAnnotation x args) e >>= return . NGOList
 executeAnnotation (NGOMappedReadSet e dDS) args = do
     let f = lookup "features" args
-        g = lookup "gff" args
+        g = T.unpack . evalString <$> lookup "gff" args
         m = parseAnnotationMode $ lookup "mode" args
-        a = lookup "ambiguity" args
+        a = fromMaybe False $ evalBool <$> lookup "ambiguity" args
         s = lookup "strand" args
     res <- liftIO $ annotate e g f dDS m a s
     return $ NGOAnnotatedSet res

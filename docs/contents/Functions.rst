@@ -162,7 +162,7 @@ each feature. An example:
 
 ::
 
-    annotated = annotate(mapped, strand={yes}, mode="union", ambiguity={deny})
+    annotated = annotate(mapped, strand={no}, mode="union", ambiguity={allow})
 
 Argument:
 ~~~~~~~~~
@@ -177,36 +177,48 @@ NGOAnnotatedSet
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 
-+-------------+-----------------+------------+
-| Name        | Type            | Required   |
-+=============+=================+============+
-| gff         | NGOString       | yes*       |
-+-------------+-----------------+------------+
-| features    | [ NGOSymbol ]   | no         |
-+-------------+-----------------+------------+
-| mode        | NGOString       | no         |
-+-------------+-----------------+------------+
-| ambiguity   | NGOSymbol       | no         |
-+-------------+-----------------+------------+
-| strand      | NGOSymbol       | no         |
-+-------------+-----------------+------------+
++-------------+-----------------+------------+----------------+
+| Name        | Type            | Required   | Default value  |
++=============+=================+============+================+
+| gff         | NGOString       | yes*       |  -             |
++-------------+-----------------+------------+----------------+
+| features    | [ NGOSymbol ]   | no         | {gene}         |
++-------------+-----------------+------------+----------------+
+| mode        | NGOString       | no         | {union}        |
++-------------+-----------------+------------+----------------+
+| ambiguity   | NGOSymbol       | no         | {allow}        |
++-------------+-----------------+------------+----------------+
+| strand      | NGOSymbol       | no         | {no}           |
++-------------+-----------------+------------+----------------+
 
 
-The **gff** argument is required, unless was used a data set provided by NGLess on the map (map section).
+The **gff** argument is required, unless a known reference was used for mapping.
 
-The argument **features** represents which features to keep, discarding everything else. If nothing is provided everything is considered to be significant. Possible symbols are **{gene}**, **{exon}** and **{cds}**.
+**features** represents which features to keep, discarding everything else. If
+nothing is provided, everything is considered to be significant. Possible
+symbols are **{gene}**, **{exon}**, and **{cds}**.
 
-**Mode** is a string that represents the mode to handle reads overlapping more than one feature. Possible values for **mode** are **“union”**, **“intersection-strict”** and **“intersection-nonempty”** (default: “union”). For each read position are obtained features that intersect it, which is known as sets. The different modes are:
+**Mode** is a symbol which dictates how to handle reads overlapping more than
+one feature. Possible values for ``mode`` are ``union``,
+``intersection-strict`` and ``intersection-nonempty`` (default: ``union``).
+For each read position are obtained features that intersect it, which is known
+as sets. The different modes are:
 
--  **union** the union of all the sets.
+-  ``union`` the union of all the sets.
 
--  **intersection-strict** the intersection of all the sets.
+-  ``intersection-strict`` the intersection of all the sets.
 
--  **intersection-nonempty** the intersection of all non-empty sets.
+-  ``intersection-nonempty`` the intersection of all non-empty sets.
 
-The **ambiguity** argument is an opportunity to decide whether to allow reads that overlap with more than one feature. Possible values are {allow} and {deny} (default: {allow}).
+The ``ambiguity`` argument is an opportunity to decide whether to annotate
+reads that overlap with more than one feature. Possible values are ``{allow}``
+and ``{deny}`` (default: ``{allow}``).
 
-Argument **strand** represents whether the data are from a strand-specific and the possible values can be **{yes}** or **{no}** (default: {no}). For {no}, a read is always overlapping with a feature independently of whether maps to the same or the opposite strand. For {yes}, the read has to be mapped to the same strand as the feature.
+Argument ``strand`` represents whether the data are from a strand-specific and
+the possible values can be **{yes}** or **{no}** (default: {no}). For {no}, a
+read is always overlapping with a feature independently of whether maps to the
+same or the opposite strand. For {yes}, the read has to be mapped to the same
+strand as the feature.
 
 
 
