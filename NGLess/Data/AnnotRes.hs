@@ -3,13 +3,11 @@
 module Data.AnnotRes
     ( 
       GffCount(..)
-      , showGffCount
       , readAnnotCounts
       , filterCounts
       , isMinAmount
       , writeAnnotCount
       , showGffCountDel
-      , isEqual
       , showUniqIdCounts
       , filterByStrand
     ) where
@@ -44,9 +42,6 @@ instance NFData GffCount where
              (annotCount gl) `seq`
              (annotStrand gl) `seq`
              ()
-
-isEqual :: GffCount -> GffCount -> Bool
-isEqual (GffCount a _ _ _) (GffCount b _ _ _) = a == b
 
 showGffCount :: [GffCount] -> L8.ByteString 
 showGffCount = L8.unlines . fmap (showCounts "\t")
