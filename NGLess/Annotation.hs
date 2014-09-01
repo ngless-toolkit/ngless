@@ -36,7 +36,7 @@ import Data.AnnotRes
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
 
-annotate :: FilePath -> Maybe FilePath -> Maybe NGLessObject -> Maybe T.Text -> AnnotationIntersectionMode -> Bool -> Maybe NGLessObject -> IO FilePath
+annotate :: FilePath -> Maybe FilePath -> Maybe NGLessObject -> Maybe T.Text -> AnnotationIntersectionMode -> Bool -> Bool -> IO FilePath
 annotate samFP (Just g) feats _ m a s = do
     printNglessLn (concat ["annotate with GFF: ", g])
     annotate' samFP g feats (getIntervalQuery m) a s  -- ignore default GFF
@@ -52,7 +52,7 @@ getIntervalQuery IntersectStrict = intersection_strict
 getIntervalQuery IntersectNonEmpty = intersection_non_empty
 
 
-annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> Maybe NGLessObject -> IO FilePath
+annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> IO FilePath
 annotate' samFp gffFp feats a f s = do
     gff <- readPossiblyCompressedFile gffFp
     sam <- readPossiblyCompressedFile samFp
@@ -68,13 +68,13 @@ toGffM = concat . foldl (\a b -> (++) (IM.elems b) a) []
 
 
 type AnnotationMap = M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
-compStatsAnnot ::  AnnotationMap -> L8.ByteString -> Bool -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Maybe NGLessObject -> AnnotationMap
+compStatsAnnot ::  AnnotationMap -> L8.ByteString -> Bool -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> AnnotationMap
 compStatsAnnot imGff sam a f s = foldl (iterSam f a s) imGff sams
    where
     sams = filter isAligned . readAlignments $ sam
 
 
-iterSam :: ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> Maybe NGLessObject -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount])) -> SamLine -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
+iterSam :: ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount])) -> SamLine -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
 iterSam f a s im y = M.map (\v -> M.alter alterCounts k v) im
     where
         alterCounts x = case x of
@@ -83,7 +83,7 @@ iterSam f a s im y = M.map (\v -> M.alter alterCounts k v) im
         k = samRName y
 
 
-modeAnnotation :: ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> IM.IntervalMap Int [GffCount] -> SamLine -> Maybe NGLessObject -> IM.IntervalMap Int [GffCount]
+modeAnnotation :: ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> IM.IntervalMap Int [GffCount] -> SamLine -> Bool -> IM.IntervalMap Int [GffCount]
 modeAnnotation f a im y s = countsAmbiguity a ((filterStrand s asStrand) . f $ posR) im
   where
     sStart = samPos y
@@ -91,13 +91,9 @@ modeAnnotation f a im y s = countsAmbiguity a ((filterStrand s asStrand) . f $ p
     posR   = map (\k -> IM.fromList $ IM.containing im k) [sStart..sEnd]
     asStrand = if isPositive y then GffPosStrand else GffNegStrand
 
-filterStrand :: Maybe NGLessObject -> GffStrand -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
-filterStrand modeS s m = maybe m (filterStrand') modeS
-    where
-        filterStrand' modeS' = case modeS' of
-            NGOSymbol "yes" -> IM.filter (not . null) . IM.map (filterByStrand s) $ m
-            NGOSymbol "no"  -> m -- by default no
-            err              -> error ("Type must be a NGOSymbol with value 'yes' or 'no', but was passed: " ++ (show err))
+filterStrand :: Bool -> GffStrand -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
+filterStrand True  s m =  IM.filter (not . null) . IM.map (filterByStrand s) $ m
+filterStrand False _ m = m
 
 countsAmbiguity :: Bool -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
 countsAmbiguity True toU imR = uCounts toU imR

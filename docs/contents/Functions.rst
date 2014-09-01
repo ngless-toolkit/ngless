@@ -162,7 +162,7 @@ each feature. An example:
 
 ::
 
-    annotated = annotate(mapped, strand={no}, mode="union", ambiguity={allow})
+    annotated = annotate(mapped, strand=false, mode="union", ambiguity=false)
 
 Argument:
 ~~~~~~~~~
@@ -186,9 +186,9 @@ Arguments by value:
 +-------------+-----------------+------------+----------------+
 | mode        | NGOString       | no         | {union}        |
 +-------------+-----------------+------------+----------------+
-| ambiguity   | NGOSymbol       | no         | {allow}        |
+| ambiguity   | bool            | no         | true           |
 +-------------+-----------------+------------+----------------+
-| strand      | NGOSymbol       | no         | {no}           |
+| strand      | bool            | no         | false          |
 +-------------+-----------------+------------+----------------+
 
 
@@ -211,14 +211,13 @@ as sets. The different modes are:
 -  ``intersection-nonempty`` the intersection of all non-empty sets.
 
 The ``ambiguity`` argument is an opportunity to decide whether to annotate
-reads that overlap with more than one feature. Possible values are ``{allow}``
-and ``{deny}`` (default: ``{allow}``).
+reads that overlap with more than one feature.
 
-Argument ``strand`` represents whether the data are from a strand-specific and
-the possible values can be **{yes}** or **{no}** (default: {no}). For {no}, a
-read is always overlapping with a feature independently of whether maps to the
-same or the opposite strand. For {yes}, the read has to be mapped to the same
-strand as the feature.
+Argument ``strand`` represents whether the data are from a strand-specific
+(default is ``false``). When the data is not strand-specific, a read is always
+overlapping with a feature independently of whether maps to the same or the
+opposite strand. For strand-specific data, the read has to be mapped to the
+same strand as the feature.
 
 
 

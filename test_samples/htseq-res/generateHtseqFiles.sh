@@ -60,15 +60,17 @@ downloadURL $url
 
 # -a 0 allows to ignore all htseq filter on quality.
 # Test features
-isNotCompleted htseq_gene_noStrand_union.txt 6252 && python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m union | filterEndL 5 > htseq_gene_noStrand_union.txt
-isNotCompleted htseq_exon_noStrand_union.txt 6254 && python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t exon -m union | filterEndL 5 > htseq_exon_noStrand_union.txt
-isNotCompleted htseq_cds_noStrand_union.txt 3185 && python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t CDS  -m union | filterEndL 5 >  htseq_cds_noStrand_union.txt
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m union | filterEndL 5 > htseq_gene_noStrand_union.txt
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t exon -m union | filterEndL 5 > htseq_exon_noStrand_union.txt
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t CDS  -m union | filterEndL 5 >  htseq_cds_noStrand_union.txt
 
 # Test mode
-isNotCompleted htseq_gene_noStrand_inters-strict.txt 6252 && python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m intersection-strict   | filterEndL 5 > htseq_gene_noStrand_inters-strict.txt 
-isNotCompleted htseq_gene_noStrand_inters-nempty.txt 6252 && python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m intersection-nonempty | filterEndL 5 > htseq_gene_noStrand_inters-nempty.txt 
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m intersection-strict   | filterEndL 5 > htseq_gene_noStrand_inters-strict.txt
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m intersection-nonempty | filterEndL 5 > htseq_gene_noStrand_inters-nempty.txt
 
 # Test strand Positive. Negative tested before
-isNotCompleted htseq_gene_yesStrand_union.txt 6252 && python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s yes -t gene -m union | filterEndL 5 > htseq_gene_yesStrand_union.txt 
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s yes -t gene -m union | filterEndL 5 > htseq_gene_yesStrand_union.txt
+
+python -m HTSeq.scripts.count ../sample.sam ../short.gtf -a 0 -s yes -t gene -m union | filterEndL 5 > htseq_gene_yesStrand_union_short.txt
 
 exit 0

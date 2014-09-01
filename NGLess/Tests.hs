@@ -53,7 +53,6 @@ import ProcessFastQ
 import ReferenceDatabases
 import Configuration
 
-import Interpretation.Write
 import Interpretation.Map
 
 import Data.FastQ
@@ -65,9 +64,11 @@ import qualified Data.GFF as GFF
 import Tests.Utils
 import Tests.FastQ
 import Tests.Validation
+import Tests.Annotation (tgroup_Annotation)
 
 test_FastQ = [tgroup_FastQ]
 test_Validation = [tgroup_Validation]
+test_Annotation = [tgroup_Annotation]
 
 -- The main test driver is automatically generated
 main = $(defaultMainGenerator)
@@ -971,109 +972,12 @@ case_json_statistics = do
         _createDataString (stats' s) @?= r
     where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
--- Annotate
-
-ngo_gff_fp = Just "test_samples/sample.gtf"
-
 case_test_setup_html_view = do
     _ <- setupHtmlViewer "Html/"  -- Make sure tmp has the required files, but use source to populate it.
     dst <- outputDirectory
     doesFileExist (p' dst) >>= \x -> x @?= True -- make sure keeper.html exist
   where 
     p' = (</> "nglessKeeper.html")
-
-
-all_default_annot = do
-  annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion True Nothing >>= readPossiblyCompressedFile
-
--- test default values
-case_annotate_features_default = do
-    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion True Nothing
-    res1 <- readPossiblyCompressedFile a1
-    res2 <- all_default_annot
-    res1 @?= res2
-  where feats = Just $ NGOList [NGOSymbol "gene"]
-
-
-case_annotate_strand_default = do
-    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion True s
-    res1 <- readPossiblyCompressedFile a1
-    res2 <- all_default_annot
-    res1 @?= res2
-  where s = Just $ NGOSymbol "no"
-
-
-case_annotate_gene_noStrand_union = do
-    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile p
-    resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_noStrand_union.txt"
-    resHT @?= resNG
-  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_union.txt"),("verbose", NGOSymbol "no")]
-        feats = Just $ NGOList [NGOSymbol "gene"]
-        m = IntersectUnion
-        amb = False
-        s = Just $ NGOSymbol "no"
-
-
-case_annotate_exon_noStrand_union = do
-    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile p
-    resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_exon_noStrand_union.txt"
-    resHT @?= resNG
-  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_exon_noStrand_union.txt"),("verbose", NGOSymbol "no")]
-        feats = Just $ NGOList [NGOSymbol "exon"]
-        amb = False
-        s = Just $ NGOSymbol "no"
-
-
-case_annotate_cds_noStrand_union = do
-    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion False s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile p
-    resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_cds_noStrand_union.txt"
-    resHT @?= resNG
-  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_cds_noStrand_union.txt"),("verbose", NGOSymbol "no")]
-        feats = Just $ NGOList [NGOSymbol "CDS"]
-        s = Just $ NGOSymbol "no"
-
-
-case_annotate_gene_noStrand_inters_strict = do
-    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m False s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile p
-    resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
-    resHT @?= resNG
-  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
-        feats = Just $ NGOList [NGOSymbol "gene"]
-        m = IntersectStrict
-        s = Just $ NGOSymbol "no"
-
-
-case_annotate_gene_noStrand_inters_non_empty = do
-    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m False s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile p
-    resHT <- readPossiblyCompressedFile "test_samples/htseq-res/htseq_gene_noStrand_inters-nempty.txt"
-    resHT @?= resNG
-  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-nempty.txt"),("verbose", NGOSymbol "no")]
-        feats = Just $ NGOList [NGOSymbol "gene"]
-        m = IntersectNonEmpty
-        s = Just $ NGOSymbol "no"
-
-
-
-case_annotate_gene_yesStrand_union = do
-    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m True s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
-    resNG <- readPossiblyCompressedFile p
-    resHT <- readPossiblyCompressedFile "test_samples/htseq-res/htseq_gene_yesStrand_union.txt"
-    resHT @?= resNG
-  where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_yesStrand_union.txt"),("verbose", NGOSymbol "no")]
-        feats = Just $ NGOList [NGOSymbol "gene"]
-        m = IntersectUnion
-        s = Just $ NGOSymbol "yes"
 
 -- MapOperations
 
