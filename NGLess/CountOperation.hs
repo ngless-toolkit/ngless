@@ -4,7 +4,6 @@ module CountOperation
       , filterAnnot
     ) where
 
-import qualified Data.Text as T
 import qualified Data.ByteString.Lazy.Char8 as L8
 
 import Language
@@ -12,7 +11,7 @@ import FileManagement (readPossiblyCompressedFile)
 
 import Data.AnnotRes
 
-countAnnotatedSet :: FilePath -> Maybe NGLessObject -> NGLessObject -> IO T.Text
+countAnnotatedSet :: FilePath -> Maybe NGLessObject -> NGLessObject -> IO FilePath
 countAnnotatedSet p f m = do
     fc <- readPossiblyCompressedFile p
     writeAnnotCount p $ filterAnnot fc f m

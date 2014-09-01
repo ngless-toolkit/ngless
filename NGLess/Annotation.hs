@@ -37,7 +37,7 @@ data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNo
     deriving (Eq, Show)
 
 
-annotate :: FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> Maybe T.Text -> AnnotationIntersectionMode -> Maybe NGLessObject -> Maybe NGLessObject -> IO T.Text
+annotate :: FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> Maybe T.Text -> AnnotationIntersectionMode -> Maybe NGLessObject -> Maybe NGLessObject -> IO FilePath
 annotate samFP (Just g) feats _ m a s =
     printNglessLn (concat ["annotate with GFF: ", eval g])
             >> annotate' samFP (eval g) feats a (getIntervalQuery m) s  -- ignore default GFF
@@ -56,7 +56,7 @@ getIntervalQuery IntersectStrict = intersection_strict
 getIntervalQuery IntersectNonEmpty = intersection_non_empty
 
 
-annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Maybe NGLessObject -> IO T.Text
+annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Maybe NGLessObject -> IO FilePath
 annotate' samFp gffFp feats f a s = do
     gff <- readPossiblyCompressedFile gffFp
     sam <- readPossiblyCompressedFile samFp

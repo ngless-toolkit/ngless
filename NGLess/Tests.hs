@@ -984,12 +984,12 @@ case_test_setup_html_view = do
 
 
 all_default_annot = do
-  annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion Nothing Nothing >>= readPossiblyCompressedFile . T.unpack
+  annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion Nothing Nothing >>= readPossiblyCompressedFile
 
 -- test default values
 case_annotate_features_default_idemp = do
     a1 <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion Nothing Nothing
-    res1 <- readPossiblyCompressedFile $ T.unpack a1
+    res1 <- readPossiblyCompressedFile a1
     res2 <- all_default_annot
     res1 @?= res2
   where feats = Just $ NGOList [NGOSymbol "gene"]
@@ -997,21 +997,21 @@ case_annotate_features_default_idemp = do
 
 case_annotate_mode_default_idemp = do
     a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion Nothing Nothing
-    res1 <- readPossiblyCompressedFile $ T.unpack a1
+    res1 <- readPossiblyCompressedFile a1
     res2 <- all_default_annot
     res1 @?= res2
 
 
 case_annotate_amb_default_idemp = do
     a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion amb Nothing
-    res1 <- readPossiblyCompressedFile $ T.unpack a1
+    res1 <- readPossiblyCompressedFile a1
     res2 <- all_default_annot
     res1 @?= res2
   where amb = Just $ NGOSymbol "allow"
 
 case_annotate_strand_default_idemp = do
     a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion Nothing s
-    res1 <- readPossiblyCompressedFile $ T.unpack a1
+    res1 <- readPossiblyCompressedFile a1
     res2 <- all_default_annot
     res1 @?= res2
   where s = Just $ NGOSymbol "no"
@@ -1019,7 +1019,7 @@ case_annotate_strand_default_idemp = do
 
 case_annotate_gene_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
     resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_noStrand_union.txt"
     resHT @?= resNG
@@ -1032,7 +1032,7 @@ case_annotate_gene_noStrand_union = do
 
 case_annotate_exon_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
     resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_exon_noStrand_union.txt"
     resHT @?= resNG
@@ -1044,7 +1044,7 @@ case_annotate_exon_noStrand_union = do
 
 case_annotate_cds_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
     resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_cds_noStrand_union.txt"
     resHT @?= resNG
@@ -1056,7 +1056,7 @@ case_annotate_cds_noStrand_union = do
 
 case_annotate_gene_noStrand_inters_strict = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
     resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
     resHT @?= resNG
@@ -1069,7 +1069,7 @@ case_annotate_gene_noStrand_inters_strict = do
 
 case_annotate_gene_noStrand_inters_non_empty = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
     resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_noStrand_inters-nempty.txt"
     resHT @?= resNG
@@ -1083,7 +1083,7 @@ case_annotate_gene_noStrand_inters_non_empty = do
 
 case_annotate_gene_yesStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
-    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
+    (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet a) args
     resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_gene_yesStrand_union.txt"
     resHT @?= resNG

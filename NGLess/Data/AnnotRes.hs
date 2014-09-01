@@ -99,14 +99,14 @@ isMinAmount :: NGLessObject -> GffCount ->  Bool
 isMinAmount (NGOInteger l) g = (toInteger $ annotCount g) >= l
 isMinAmount err _ = error ("Type should be NGOInteger but received: " ++ (show err))
 
-writeAnnotCount :: FilePath -> [GffCount]-> IO T.Text
+writeAnnotCount :: FilePath -> [GffCount]-> IO FilePath
 writeAnnotCount fn im = do
     temp <- getTemporaryDirectory 
     newfp <- getTempFilePath (temp </> (snd . splitFileName $ fn))
     printNglessLn $ "Writing Annotation results to:" ++ newfp
     L8.writeFile newfp $ showGffCount im
     printNglessLn "Write completed"
-    return .  T.pack $ newfp
+    return newfp
 
 showUniqIdCounts :: S8.ByteString -> L8.ByteString -> L8.ByteString
 showUniqIdCounts del cont = uniqueIdCountMap del . mergeIds . readAnnotCounts $ cont
