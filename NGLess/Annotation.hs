@@ -3,7 +3,8 @@
 
 
 module Annotation
-    ( annotate
+    ( AnnotationIntersectionMode(..)
+    , annotate
     , intersection_strict
     , intersection_non_empty
     , _sizeNoDup
@@ -32,9 +33,11 @@ import Data.GFF
 import Data.Sam (SamLine(..), isAligned, isPositive, cigarTLen, readAlignments)
 import Data.AnnotRes
 
+data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
+    deriving (Eq, Show)
 
 
-annotate :: FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> Maybe T.Text -> Maybe NGLessObject -> Maybe NGLessObject -> Maybe NGLessObject -> IO T.Text
+annotate :: FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> Maybe T.Text -> AnnotationIntersectionMode -> Maybe NGLessObject -> Maybe NGLessObject -> IO T.Text
 annotate samFP (Just g) feats _ m a s =
     printNglessLn (concat ["annotate with GFF: ", eval g])
             >> annotate' samFP (eval g) feats a (getIntervalQuery m) s  -- ignore default GFF
@@ -47,16 +50,10 @@ annotate samFP Nothing feats dDs m a s =
             Just v  -> annotate' samFP (getGff v) feats a (getIntervalQuery m) s   -- used default GFF
             Nothing -> error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
 
-getIntervalQuery :: Maybe NGLessObject -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount])
-getIntervalQuery m = fromMaybe (union) (getMode m)
-
-getMode m = case m of
-            Nothing -> Nothing
-            Just v  -> case v of
-                    (NGOSymbol "union")                  -> Just union
-                    (NGOSymbol "intersection_strict")    -> Just intersection_strict
-                    (NGOSymbol "intersection_non_empty") -> Just intersection_non_empty
-                    _ -> error ("Provided symbol for variable 'mode' can only be 'union' or 'insersection_strict' and 'intersection_non_empty")
+getIntervalQuery :: AnnotationIntersectionMode -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount])
+getIntervalQuery IntersectUnion = union
+getIntervalQuery IntersectStrict = intersection_strict
+getIntervalQuery IntersectNonEmpty = intersection_non_empty
 
 
 annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> Maybe NGLessObject -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Maybe NGLessObject -> IO T.Text

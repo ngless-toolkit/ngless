@@ -254,12 +254,19 @@ executeAnnotation (NGOList e) args = mapM (\x -> executeAnnotation x args) e >>=
 executeAnnotation (NGOMappedReadSet e dDS) args = do
     let f = lookup "features" args
         g = lookup "gff" args
-        m = lookup "mode" args
+        m = parseAnnotationMode $ lookup "mode" args
         a = lookup "ambiguity" args
         s = lookup "strand" args
     res <- liftIO $ annotate e g f dDS m a s
     return $ NGOAnnotatedSet (T.unpack res)
 executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
+
+parseAnnotationMode Nothing = IntersectUnion
+parseAnnotationMode (Just (NGOSymbol "union")) = IntersectUnion
+parseAnnotationMode (Just (NGOSymbol "intersection_strict")) = IntersectUnion
+parseAnnotationMode (Just (NGOSymbol "intersection_non_empty")) = IntersectNonEmpty
+parseAnnotationMode m = error (concat ["Unexpected annotation mode (", show m, "). Please submit a bug report."])
+
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = return . NGOList =<< mapM (executeQualityProcess) e

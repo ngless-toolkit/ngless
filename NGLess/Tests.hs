@@ -206,7 +206,7 @@ prop_substrim_idempotent s = st == 0 && e == B.length s1
     where
         s1 = cutByteString (B.pack s) (subtrimPos (B.pack s) '\DC4')
         (st,e) = subtrimPos s1 '\DC4'
-                        
+
 case_substrim_normal_exec =  subtrimPos "\n\v\f{zo\n\v\NUL" '\DC4' @?= (3,3)
 case_substrim_empty_quals = subtrimPos "" '\DC4' @?= (0,0)
 
@@ -984,11 +984,11 @@ case_test_setup_html_view = do
 
 
 all_default_annot = do
-  annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing Nothing Nothing Nothing >>= readPossiblyCompressedFile . T.unpack
+  annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion Nothing Nothing >>= readPossiblyCompressedFile . T.unpack
 
 -- test default values
 case_annotate_features_default_idemp = do
-    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing Nothing Nothing Nothing 
+    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion Nothing Nothing
     res1 <- readPossiblyCompressedFile $ T.unpack a1
     res2 <- all_default_annot
     res1 @?= res2
@@ -996,22 +996,21 @@ case_annotate_features_default_idemp = do
 
 
 case_annotate_mode_default_idemp = do
-    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing s Nothing Nothing
+    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion Nothing Nothing
     res1 <- readPossiblyCompressedFile $ T.unpack a1
     res2 <- all_default_annot
     res1 @?= res2
-  where s = Just $ NGOSymbol "union"
 
 
 case_annotate_amb_default_idemp = do
-    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing Nothing amb Nothing
+    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion amb Nothing
     res1 <- readPossiblyCompressedFile $ T.unpack a1
     res2 <- all_default_annot
     res1 @?= res2
   where amb = Just $ NGOSymbol "allow"
 
 case_annotate_strand_default_idemp = do
-    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing Nothing Nothing s
+    a1 <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion Nothing s
     res1 <- readPossiblyCompressedFile $ T.unpack a1
     res2 <- all_default_annot
     res1 @?= res2
@@ -1026,33 +1025,31 @@ case_annotate_gene_noStrand_union = do
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "gene"]
-        m = Just $ NGOSymbol "union"
+        m = IntersectUnion
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
         s = Just $ NGOSymbol "no"
 
 
 case_annotate_exon_noStrand_union = do
-    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion amb s
     (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
     resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_exon_noStrand_union.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_exon_noStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "exon"]
-        m = Just $ NGOSymbol "union"
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
         s = Just $ NGOSymbol "no"
 
 
 case_annotate_cds_noStrand_union = do
-    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing m amb s
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion amb s
     (NGOAnnotatedSet p) <- writeToFile (NGOAnnotatedSet $ T.unpack a) args
     resNG <- readPossiblyCompressedFile p
     resHT <- readPossiblyCompressedFile $ "test_samples/htseq-res/htseq_cds_noStrand_union.txt"
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_cds_noStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "CDS"]
-        m = Just $ NGOSymbol "union"
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
         s = Just $ NGOSymbol "no"
 
@@ -1065,7 +1062,7 @@ case_annotate_gene_noStrand_inters_strict = do
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "gene"]
-        m = Just $ NGOSymbol "intersection_strict"
+        m = IntersectStrict
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
         s = Just $ NGOSymbol "no"
 
@@ -1078,7 +1075,7 @@ case_annotate_gene_noStrand_inters_non_empty = do
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-nempty.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "gene"]
-        m = Just $ NGOSymbol "intersection_non_empty"
+        m = IntersectNonEmpty
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
         s = Just $ NGOSymbol "no"
 
@@ -1092,7 +1089,7 @@ case_annotate_gene_yesStrand_union = do
     resHT @?= resNG
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_yesStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "gene"]
-        m = Just $ NGOSymbol "union"
+        m = IntersectUnion
         amb = Just $ NGOSymbol "deny" --htseq does not allow ambiguity.
         s = Just $ NGOSymbol "yes"
 
