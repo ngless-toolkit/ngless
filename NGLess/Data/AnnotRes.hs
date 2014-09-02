@@ -13,6 +13,7 @@ module Data.AnnotRes
     ) where
 
 import qualified Data.Text as T
+import qualified Data.ByteString as B
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Char8 as S8
@@ -50,8 +51,10 @@ showGffCountDel :: S8.ByteString -> [GffCount] -> L8.ByteString
 showGffCountDel del c = L8.unlines . fmap (showCounts del) $ c
 
 showCounts :: S8.ByteString -> GffCount -> L8.ByteString
-showCounts del (GffCount s t c st) = L8.fromChunks [s, del, showType t, del, encode c, del, showStrand st]
-    where encode = S8.pack . show --could be used Data.Binary (encode)
+showCounts del (GffCount s t c st) = L8.fromChunks [s, del, encode t, del, encode c, del, showStrand st]
+    where
+        encode :: (Show a) => a -> B.ByteString
+        encode = S8.pack . show --could be used Data.Binary (encode)
 
 
 readAnnotCounts :: L.ByteString -> [GffCount]
@@ -86,7 +89,7 @@ filterCounts' g (NGOSymbol "gene") = (==GffGene) . annotType $ g
 filterCounts' g (NGOSymbol "exon") = (==GffExon) . annotType $ g
 filterCounts' g (NGOSymbol "cds" ) = (==GffCDS) . annotType  $ g
 filterCounts' g (NGOSymbol "CDS" ) = (==GffCDS) . annotType  $ g
-filterCounts' g (NGOSymbol s) = (S8.unpack . showType . annotType $ g) == (T.unpack s)
+filterCounts' g (NGOSymbol s) = (show . annotType $ g) == (T.unpack s)
 filterCounts' _ err = error ("Type should be NGOList but received: " ++ (show err))
 
 

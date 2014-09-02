@@ -9,7 +9,6 @@ module Data.GFF
     , parseGffAttributes
     , checkAttrTag
     , trimString
-    , showType
     , parsegffType
     , readLine
     , strand
@@ -19,6 +18,8 @@ module Data.GFF
 
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
 import Control.DeepSeq
@@ -26,8 +27,14 @@ import Control.DeepSeq
 data GffType = GffExon
                 | GffGene
                 | GffCDS
-                | GffOther S.ByteString
-            deriving (Eq, Ord, Show)
+                | GffOther B.ByteString
+            deriving (Eq, Ord)
+
+instance Show GffType where
+    show GffExon = "exon"
+    show GffGene = "gene"
+    show GffCDS  = "CDS"
+    show (GffOther b) = B.unpack b
 
 data GffStrand = GffPosStrand | GffNegStrand | GffUnknownStrand | GffUnStranded
             deriving (Eq, Show, Enum)
@@ -115,15 +122,15 @@ readAnnotations' (l:ls) = case L8.head l of
 readLine :: L.ByteString -> GffLine
 readLine line = if length tokens == 9
             then GffLine
-                (strict tk0)
-                (strict tk1)
-                (parsegffType $ strict tk2)
+                (BL.toStrict tk0)
+                (BL.toStrict tk1)
+                (parsegffType $ BL.toStrict tk2)
                 (read $ L8.unpack tk3)
                 (read $ L8.unpack tk4)
                 (score tk5)
                 (strand $ L8.head tk6)
                 (phase tk7)
-                (strict tk8)
+                (BL.toStrict tk8)
             else error (concat ["unexpected line in GFF: ", show line])
     where
         tokens = L8.split '\t' line
@@ -152,13 +159,3 @@ showStrand GffUnStranded    = "."
 showStrand GffPosStrand     = "+"
 showStrand GffNegStrand     = "-"
 showStrand GffUnknownStrand = "?"
-
-strict :: L.ByteString -> S.ByteString
-strict = S.concat . L.toChunks
-
-
-showType :: GffType -> S.ByteString
-showType GffExon = "exon"
-showType GffGene = "gene"
-showType GffCDS  = "CDS"
-showType (GffOther b) = b

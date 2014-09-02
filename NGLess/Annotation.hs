@@ -171,7 +171,7 @@ filterFeatures' g (NGOSymbol "gene") = isGene g
 filterFeatures' g (NGOSymbol "exon") = isExon g
 filterFeatures' g (NGOSymbol "cds" ) = isCDS  g
 filterFeatures' g (NGOSymbol "CDS" ) = isCDS  g
-filterFeatures' g (NGOSymbol s) = (S8.unpack . showType . gffType $ g) == (T.unpack s)
+filterFeatures' g (NGOSymbol s) = (show . gffType $ g) == (T.unpack s)
 filterFeatures' _ s = error ("Type should be NGOList but received: " ++ (show s))
 isGene :: GffLine -> Bool
 isGene = (==GffGene) . gffType
