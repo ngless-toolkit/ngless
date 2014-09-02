@@ -135,6 +135,9 @@ runInterpret action env = case runReaderT (runErrorT action) env of
 runInROEnvIO :: InterpretationROEnv a -> InterpretationEnvIO a
 runInROEnvIO = runInEnv . runInROEnv
 
+-- | By necessity, this code has several unreachable corners
+unreachable err = error ("Reached code that was thought to be unreachable!\n"++err)
+
 interpret :: T.Text -> [(Int,Expression)] -> IO ()
 interpret script es = do
     let nglessScript = NGOString script 
@@ -252,12 +255,16 @@ executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotate
 executeAnnotation :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeAnnotation (NGOList e) args = NGOList <$> mapM (\x -> executeAnnotation x args) e
 executeAnnotation (NGOMappedReadSet e dDS) args = do
-    let f = lookup "features" args
-        g = T.unpack . evalString <$> lookup "gff" args
+    let g = T.unpack . evalString <$> lookup "gff" args
         m = parseAnnotationMode $ lookup "mode" args
         a = fromMaybe False $ evalBool <$> lookup "ambiguity" args
         s = fromMaybe False $ evalBool <$> lookup "strand" args
-    res <- liftIO $ annotate e g f dDS m a s
+        features = lookup "features" args
+        fs = case features of
+            Nothing -> Nothing
+            Just (NGOList feats') -> Just $ (map (T.unpack . evalString)) $ feats'
+            Just _ -> unreachable "executeAnnotation: TYPE ERROR"
+    res <- liftIO $ annotate e g fs dDS m a s
     return $ NGOAnnotatedSet res
 executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
 

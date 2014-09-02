@@ -23,7 +23,6 @@ import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe, fromJust)
 import Data.List (foldl')
 
-import Language
 import FileManagement(readPossiblyCompressedFile)
 import ReferenceDatabases
 import Configuration
@@ -35,7 +34,7 @@ import Data.AnnotRes
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
 
-annotate :: FilePath -> Maybe FilePath -> Maybe NGLessObject -> Maybe T.Text -> AnnotationIntersectionMode -> Bool -> Bool -> IO FilePath
+annotate :: FilePath -> Maybe FilePath -> Maybe [String] -> Maybe T.Text -> AnnotationIntersectionMode -> Bool -> Bool -> IO FilePath
 annotate samFP (Just g) feats _ m a s = do
     printNglessLn (concat ["annotate with GFF: ", g])
     annotate' samFP g feats (getIntervalQuery m) a s  -- ignore default GFF
@@ -51,7 +50,7 @@ getIntervalQuery IntersectStrict = intersection_strict
 getIntervalQuery IntersectNonEmpty = intersection_non_empty
 
 
-annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> IO FilePath
+annotate' :: FilePath -> FilePath -> Maybe [String] -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> IO FilePath
 annotate' samFp gffFp feats a f s = do
     gff <- readPossiblyCompressedFile gffFp
     sam <- readPossiblyCompressedFile samFp
@@ -156,20 +155,18 @@ asInterval g = IM.ClosedInterval (gffStart g) (gffEnd g)
 genId :: GffLine -> S8.ByteString
 genId g = fromMaybe (S8.pack "unknown") $ gffGeneId g
 
-_filterFeatures :: Maybe NGLessObject -> GffLine -> Bool
-_filterFeatures feats gffL = case feats of
-    Nothing          -> (==GffGene) . gffType $ gffL
-    Just (NGOList f) -> foldl (\a b -> a || b) False (map (filterFeatures' gffL) f)
-    err              -> error("Type should be NGOList but received: " ++ show err)
+_filterFeatures :: Maybe [String] -> GffLine -> Bool
+_filterFeatures Nothing gf = (gffType gf) == GffGene
+_filterFeatures (Just fs) gf = any (filterFeatures' gf) fs
 
 
-filterFeatures' :: GffLine -> NGLessObject -> Bool
-filterFeatures' g (NGOSymbol "gene") = isGene g
-filterFeatures' g (NGOSymbol "exon") = isExon g
-filterFeatures' g (NGOSymbol "cds" ) = isCDS  g
-filterFeatures' g (NGOSymbol "CDS" ) = isCDS  g
-filterFeatures' g (NGOSymbol s) = (show . gffType $ g) == (T.unpack s)
-filterFeatures' _ s = error ("Type should be NGOList but received: " ++ (show s))
+filterFeatures' :: GffLine -> String -> Bool
+filterFeatures' g "gene" = isGene g
+filterFeatures' g "exon" = isExon g
+filterFeatures' g "cds"  = isCDS  g
+filterFeatures' g "CDS"  = isCDS  g
+filterFeatures' g s = (show . gffType $ g) == s
+
 isGene :: GffLine -> Bool
 isGene = (==GffGene) . gffType
 
