@@ -810,25 +810,25 @@ imap1Dup   = IM.fromList [k2, k2] -- same pair
 imap2Dup   = IM.fromList [k1, k3] -- same pair
 imap3Dup   = IM.fromList [k1, k3, k1] -- same id
 
--- intersection_strict
-case_intersection_strict_empty       = intersection_strict [IM.empty, IM.empty] @?= IM.empty
-case_intersection_strict_one_empty_1 = intersection_strict [imapAll, IM.empty]   @?= IM.empty
-case_intersection_strict_one_empty_2 = intersection_strict [IM.empty, imapAll]   @?= IM.empty
+-- _intersection_strict
+case_intersection_strict_empty       = _intersection_strict [IM.empty, IM.empty] @?= IM.empty
+case_intersection_strict_one_empty_1 = _intersection_strict [imapAll, IM.empty]   @?= IM.empty
+case_intersection_strict_one_empty_2 = _intersection_strict [IM.empty, imapAll]   @?= IM.empty
 
-case_intersection_strict_dif      = intersection_strict [imap1, imap2] @?= IM.empty
-case_intersection_strict_normal_1 = intersection_strict [imap1, imapAll] @?= imap1
-case_intersection_strict_normal_2 = intersection_strict [imapAll, imap1] @?= imap1
-case_intersection_strict_same     = intersection_strict [imapAll, imapAll] @?= imapAll
+case_intersection_strict_dif      = _intersection_strict [imap1, imap2] @?= IM.empty
+case_intersection_strict_normal_1 = _intersection_strict [imap1, imapAll] @?= imap1
+case_intersection_strict_normal_2 = _intersection_strict [imapAll, imap1] @?= imap1
+case_intersection_strict_same     = _intersection_strict [imapAll, imapAll] @?= imapAll
 
--- intersection_non_empty
-case_intersection_nonempty_empty   = intersection_non_empty [IM.empty, IM.empty] @?= IM.empty
-case_intersection_nonempty_empty_1 = intersection_non_empty [imapAll, IM.empty]   @?= imapAll
-case_intersection_nonempty_empty_2 = intersection_non_empty [IM.empty, imapAll]   @?= imapAll
+-- _intersection_non_empty
+case_intersection_nonempty_empty   = _intersection_non_empty [IM.empty, IM.empty] @?= IM.empty
+case_intersection_nonempty_empty_1 = _intersection_non_empty [imapAll, IM.empty]   @?= imapAll
+case_intersection_nonempty_empty_2 = _intersection_non_empty [IM.empty, imapAll]   @?= imapAll
 
-case_intersection_nonempty_dif      = intersection_non_empty [imap1, imap2] @?= IM.empty
-case_intersection_nonempty_normal_1 = intersection_non_empty [imap1, imapAll] @?= imap1
-case_intersection_nonempty_normal_2 = intersection_non_empty [imapAll, imap1] @?= imap1
-case_intersection_nonempty_same     = intersection_non_empty [imapAll, imapAll] @?= imapAll
+case_intersection_nonempty_dif      = _intersection_non_empty [imap1, imap2] @?= IM.empty
+case_intersection_nonempty_normal_1 = _intersection_non_empty [imap1, imapAll] @?= imap1
+case_intersection_nonempty_normal_2 = _intersection_non_empty [imapAll, imap1] @?= imap1
+case_intersection_nonempty_same     = _intersection_non_empty [imapAll, imapAll] @?= imapAll
 
 
 case_size_no_dup_normal = _sizeNoDup imapAll @?= 2

@@ -3,8 +3,8 @@
 module Annotation
     ( AnnotationIntersectionMode(..)
     , annotate
-    , intersection_strict
-    , intersection_non_empty
+    , _intersection_strict
+    , _intersection_non_empty
     , _filterFeatures
     , _sizeNoDup
     , _isInsideInterval
@@ -46,8 +46,8 @@ annotate samFP Nothing feats dDs m a s =
 
 getIntervalQuery :: AnnotationIntersectionMode -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount])
 getIntervalQuery IntersectUnion = union
-getIntervalQuery IntersectStrict = intersection_strict
-getIntervalQuery IntersectNonEmpty = intersection_non_empty
+getIntervalQuery IntersectStrict = _intersection_strict
+getIntervalQuery IntersectNonEmpty = _intersection_non_empty
 
 
 annotate' :: FilePath -> FilePath -> Maybe [String] -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> IO FilePath
@@ -116,12 +116,12 @@ _isInsideInterval _ err = error ("Expecting ClosedInterval but got: " ++ show er
 union :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
 union = IM.unions
 
-intersection_strict :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
-intersection_strict [] = IM.empty
-intersection_strict im = foldl (IM.intersection) (head im) im
+_intersection_strict :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
+_intersection_strict [] = IM.empty
+_intersection_strict im = foldl (IM.intersection) (head im) im
 
-intersection_non_empty :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
-intersection_non_empty im = intersection_strict . filter (not . IM.null) $ im
+_intersection_non_empty :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
+_intersection_non_empty im = _intersection_strict . filter (not . IM.null) $ im
 
 --------------------
 
