@@ -1,10 +1,7 @@
 {-# LANGUAGE TemplateHaskell, OverloadedStrings, TupleSections #-}
--- Unit tests are their own programme_.
+-- Unit tests are their own programme.
 
 module Main where
-
--- Import basic functionality and our own modules
-
 
 import Test.Framework
 import Test.Framework.TH
@@ -421,12 +418,6 @@ case_invalid_fwrite_format = isError $ parsetest f_attr >>= checktypes
 
 -- Validation non pure functions
 
------------------------------------
-----------  IMPORTANT -------------
--- File: Makefile always exists.
--- File: fq never exists.
------------------------------------
-
 case_valid_not_pure_fp_fastq_lit = isError =<< validate_io' (fromRight . parsetest $ f_attr)
     where 
         f_attr = "ngless '0.0'\n\
@@ -435,7 +426,7 @@ case_valid_not_pure_fp_fastq_lit = isError =<< validate_io' (fromRight . parsete
 case_invalid_not_pure_fp_fastq_lit = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
     where 
         f_attr = "ngless '0.0'\n\
-                 \fastq('Makefile')\n" --File Makefile Allways Exists
+                 \fastq('Makefile')\n" --File Makefile exists
 
 case_valid_not_pure_fp_fastq_const = isError =<< validate_io' (fromRight . parsetest $ f_attr)
     where 

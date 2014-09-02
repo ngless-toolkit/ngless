@@ -55,11 +55,8 @@ annotate' samFp gffFp feats a f s = do
     gff <- readPossiblyCompressedFile gffFp
     sam <- readPossiblyCompressedFile samFp
     let imGff = intervals . filter (_filterFeatures feats) . readAnnotations $ gff
-        counts = compStatsAnnot imGff sam f a s -- Map 'feats' (Map chr (Imap key val))
+        counts = compStatsAnnot imGff sam f a s
     writeAnnotCount samFp (toGffM . concat . map (M.elems) . M.elems $ counts)
-    --writeAnnotCount samFp . IM.toList . unlines . map M.elems . M.elems $ counts
-                                                -- [Map k v, Map k v, Map k v, Map k v] -> [[v], [v], [v], [v]] -> [v]
-                                                -- v = Imap key Gffcounts
 
 toGffM :: [IM.IntervalMap Int [GffCount]] -> [GffCount]
 toGffM = concat . foldl (\a b -> (++) (IM.elems b) a) []

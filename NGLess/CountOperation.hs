@@ -17,7 +17,6 @@ countAnnotatedSet :: FilePath -> Maybe NGLessObject -> NGLessObject -> IO FilePa
 countAnnotatedSet p f m = do
     fc <- readPossiblyCompressedFile p
     writeAnnotCount p $ filterAnnot fc f m
---countAnnotatedSet p Nothing = return NGOVoid
 
 filterAnnot :: L8.ByteString -> Maybe NGLessObject -> NGLessObject -> [GffCount]
 filterAnnot fc f m = filter filterAnnot' $ readAnnotCounts fc
