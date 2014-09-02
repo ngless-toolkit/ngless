@@ -37,7 +37,7 @@ createBasicStatsJson fileData fname enc = resJS
 
 insertFilesProcessedJson :: FilePath -> T.Text -> IO ()
 insertFilesProcessedJson t script = do
-        jsonPath <- (</> "filesProcessed.js") <$> outputDirectory
+        jsonPath <- (</> "filesProcessed.js") <$> outputDirectory t
         doesFileExist jsonPath 
           >>= \x -> case x of
             True  -> createFilesProcessed t script >>= \v -> updateProcessedJson fProc v jsonPath 21
@@ -50,7 +50,7 @@ filesProcessedToJson tName script = encode <$> createFilesProcessed tName script
 
 insertCountsProcessedJson :: FilePath -> IO ()
 insertCountsProcessedJson fp = do
-        jsonPath <- (</> "countsProcessed.js") <$> outputDirectory
+        jsonPath <- (</> "countsProcessed.js") <$> outputDirectory fp
         exists <- doesFileExist jsonPath
         if exists
             then updateProcessedJson cProc jsonData jsonPath 22

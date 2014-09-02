@@ -931,8 +931,8 @@ case_json_statistics = do
     where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 case_test_setup_html_view = do
-    _ <- setupHtmlViewer "Html/"  -- Make sure tmp has the required files, but use source to populate it.
-    dst <- outputDirectory
+    _ <- setupHtmlViewer "testing_tmp_dir" "Html/"  -- Make sure tmp has the required files, but use source to populate it.
+    dst <- outputDirectory "testing_tmp_dir"
     doesFileExist (p' dst) >>= \x -> x @?= True -- make sure keeper.html exist
   where 
     p' = (</> "nglessKeeper.html")
@@ -959,7 +959,7 @@ case_read_and_write_fastQ = do
 
 -- hack: jump over copy of .html and .css
 case_read_fastQ = do
-    nt <- generateDirId fp 
+    nt <- generateDirId "testing_tmp_dir" fp
     createDirectoryIfMissing False (dstDir nt)
     _ <- readFastQ Nothing fp (dstDir nt) nt --creates files in nt
     len <- length <$> getFilesInDir (dstDir nt)
@@ -970,7 +970,7 @@ case_read_fastQ = do
 
 -- "test_samples/sample.fq" has 33 as lowest char from the initial data set
 case_read_fastQ_store_enc = do
-    nt <- generateDirId fp 
+    nt <- generateDirId "testing_tmp_dir" fp
     createDirectoryIfMissing False $ dstDirBef nt
     createDirectoryIfMissing False $ dstDirAft nt
     (NGOReadSet _ eb _) <- readFastQ Nothing   fp (dstDirBef nt) nt

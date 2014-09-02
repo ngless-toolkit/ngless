@@ -70,8 +70,8 @@ samtoolsBin = do
 htmlDefaultDir :: IO FilePath
 htmlDefaultDir = (</> "../share/ngless/Html") <$> getNglessRoot
 
-outputDirectory :: IO String
-outputDirectory = do
+outputDirectory :: FilePath -> IO FilePath
+outputDirectory _ = do
   tdir <- getTemporaryDirectory
   return $ tdir </> "ngless.outputs/"
 

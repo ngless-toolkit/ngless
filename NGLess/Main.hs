@@ -37,7 +37,9 @@ data NGLess =
         | InstallGenMode
               { input :: String}
         | VisualizeMode
-              { port :: Int}
+              { input :: FilePath
+              , port :: Int
+              }
            deriving (Eq, Show, Data, Typeable)
 
 ngless = DefaultMode
@@ -55,9 +57,9 @@ installargs = InstallGenMode
         &= details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
 
 visualizeargs = VisualizeMode
-        {
-            port = 8000
-        }
+        { port = 8000
+        , input = "-" &= argPos 0
+        } &= name "--visualize"
 
 -- | function implements the debug-mode argument.
 -- The only purpose is to aid in debugging by printing intermediate
@@ -85,7 +87,7 @@ optsExec (DefaultMode dmode fname) = do
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
-    odir <- outputDirectory
+    odir <- outputDirectory fname
     createDirectoryIfMissing False odir
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of
@@ -97,7 +99,7 @@ optsExec (InstallGenMode ref)
     | isDefaultReference ref = void $ installData Nothing ref
     | otherwise =
         error (concat ["Reference ", ref, " is not a known reference."])
-optsExec (VisualizeMode p) = runWebServer p
+optsExec (VisualizeMode fname p) = runWebServer fname p
 
 getModes :: Mode (CmdArgs NGLess)
 getModes = cmdArgsMode $ modes [ngless &= auto, installargs, visualizeargs]

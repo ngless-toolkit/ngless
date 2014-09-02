@@ -84,9 +84,9 @@ createDir dst = do
     createDirectory fp
     return fp
 
-generateDirId :: FilePath -> IO FilePath
-generateDirId dst = do
-    odir <- outputDirectory
+generateDirId :: FilePath -> FilePath -> IO FilePath
+generateDirId fname dst = do
+    odir <- outputDirectory fname
     createTempDirectory odir (template dst)
     
 createTempDirectory :: FilePath -> String -> IO FilePath
@@ -101,9 +101,9 @@ createTempDirectory dir t = do
         False  -> return dirpath
         True -> findTempName (x+1)
 
-setupHtmlViewer :: FilePath -> IO ()
-setupHtmlViewer htmlP = do
-    dst <- outputDirectory
+setupHtmlViewer :: FilePath -> FilePath -> IO ()
+setupHtmlViewer fname htmlP = do
+    dst <- outputDirectory fname
     doesFileExist (p' dst) >>= \x -> case x of 
         True   -> return ()
         False  -> copyDir htmlP dst

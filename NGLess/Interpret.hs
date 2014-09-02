@@ -140,7 +140,7 @@ unreachable err = error ("Reached code that was thought to be unreachable!\n"++e
 interpret :: T.Text -> [(Int,Expression)] -> IO ()
 interpret script es = do
     let nglessScript = NGOString script 
-    _ <- htmlDefaultDir >>= setupHtmlViewer 
+    _ <- htmlDefaultDir >>= setupHtmlViewer (T.unpack script)
     r <- evalStateT (runErrorT (interpretIO es)) (0, Map.insert ".script" nglessScript Map.empty)
     case r of
         Right _ -> return ()
@@ -279,13 +279,13 @@ executeQualityProcess (NGOList e) = NGOList <$> mapM executeQualityProcess e
 executeQualityProcess (NGOReadSet fname enc nt) = executeQualityProcess' (Just enc) fname "afterQC" (B.unpack nt)
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
-    newTemplate <- liftIO $ generateDirId fname' -- new template only calculated once.
     r <- runInROEnvIO $ lookupVariable ".script"
     case r of
         Nothing -> throwError "Variable lookup error: .script"
-        Just r' -> do
-                 _ <- liftIO $ insertFilesProcessedJson newTemplate (evalString r')
-                 executeQualityProcess' Nothing fname' "beforeQC" newTemplate
+        Just (NGOString r') -> do
+                newTemplate <- liftIO $ generateDirId (T.unpack r') fname' -- new template only calculated once.
+                _ <- liftIO $ insertFilesProcessedJson newTemplate r'
+                executeQualityProcess' Nothing fname' "beforeQC" newTemplate
 
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
 executeQualityProcess' enc fname info nt = liftIO $ executeQProc enc fname info nt
