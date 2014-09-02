@@ -10,7 +10,6 @@ module Interpretation.Map
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
-import qualified Data.Vector.Unboxed as V
 
 import Numeric
 
@@ -22,7 +21,6 @@ import System.IO
 
 import Control.Applicative ((<$>))
 
-import SamBamOperations
 import Language
 import FileManagement
 import ReferenceDatabases
@@ -86,13 +84,20 @@ interpretMapOp r ds = do
 getSamStats :: FilePath -> IO ()
 getSamStats fname = readPossiblyCompressedFile fname >>= printSamStats . _calcSamStats
 
-_calcSamStats :: BL.ByteString -> (Int,Int,Int,Int)
-_calcSamStats contents = (total', aligned', unique', lowQual')
-    where res' = samStats contents
-          total' = V.unsafeIndex res' (fromEnum Total)
-          aligned' = V.unsafeIndex res' (fromEnum Aligned)
-          unique' = V.unsafeIndex res' (fromEnum Unique)
-          lowQual' = V.unsafeIndex res' (fromEnum LowQual)
+data P4 = P4 !Integer !Integer !Integer !Integer
+
+_calcSamStats :: BL.ByteString -> (Integer,Integer,Integer,Integer)
+_calcSamStats contents = (total, aligned, unique, lowQual)
+    where
+        P4 total aligned unique lowQual = computeStats . readAlignments $ contents
+        computeStats = foldl update (P4 0 0 0 0)
+        update (P4 t al u lQ) samLine =
+            P4 (t + 1)
+                (al + (asInteger . isAligned $ samLine))
+                (u  + (asInteger . isUnique $ samLine))
+                (lQ + (asInteger . hasQual $ samLine))
+        asInteger True = 1
+        asInteger False = 0
 
 printSamStats (total, aligned, unique, lowQ) = do
     putStrLn $ "Total reads: " ++ (show total)
@@ -102,7 +107,7 @@ printSamStats (total, aligned, unique, lowQ) = do
     putStrLn $ "Total reads without enough qual: " ++ (show lowQ)
   where
     showFloat' num = showFFloat (Just numDecimalPlaces) num ""
-    calcDiv :: Int -> Int -> Double
+    calcDiv :: Integer -> Integer -> Double
     calcDiv a b =
           let x = fromIntegral a
               y = fromIntegral b

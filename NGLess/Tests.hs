@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, OverloadedStrings, TupleSections #-}
--- Unit tests are their own programme.
+-- Unit tests are their own programme_.
 
 module Main where
 
@@ -46,7 +46,6 @@ import Validation
 import CountOperation
 import Annotation
 import ValidationNotPure
-import SamBamOperations
 import VectorOperations
 import ProcessFastQ
 import ReferenceDatabases
@@ -844,16 +843,6 @@ case_size_no_dup_duplicate_3 = _sizeNoDup imap3Dup @?= 1
 case_zero_vec = do
   v <- zeroVec 4 >>= V.freeze
   v @?= V.fromList [0,0,0,0]
-
------ SamBamOperations.hs
-
-case_sam_stats_length = do
-    contents <- readPossiblyCompressedFile "test_samples/sample.sam"
-    V.length (samStats contents) @?= 4
-
-case_sam_stats_res = do
-    contents <- readPossiblyCompressedFile "test_samples/sample.sam"
-    samStats contents @?= V.fromList  [3072,1610,1554,0]
 
 case_calc_sam_stats = do
   r <- _calcSamStats <$> readPossiblyCompressedFile "test_samples/sample.sam"
