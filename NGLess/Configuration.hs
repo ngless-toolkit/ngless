@@ -24,7 +24,7 @@ import System.Console.CmdArgs.Verbosity (whenLoud)
 data InstallMode = User | Root deriving (Eq, Show)
 
 nglessDataBaseURL :: IO FilePath
-nglessDataBaseURL = return "http://kdbio.inesc-id.pt/~prrm/genomes"
+nglessDataBaseURL = return "http://127.0.0.1/"
 
 globalDataDirectory :: IO FilePath
 globalDataDirectory = do
