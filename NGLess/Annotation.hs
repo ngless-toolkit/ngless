@@ -157,23 +157,11 @@ genId g = fromMaybe (S8.pack "unknown") $ gffGeneId g
 
 _filterFeatures :: Maybe [String] -> GffLine -> Bool
 _filterFeatures Nothing gf = (gffType gf) == GffGene
-_filterFeatures (Just fs) gf = any (filterFeatures' gf) fs
-
-
-filterFeatures' :: GffLine -> String -> Bool
-filterFeatures' g "gene" = isGene g
-filterFeatures' g "exon" = isExon g
-filterFeatures' g "cds"  = isCDS  g
-filterFeatures' g "CDS"  = isCDS  g
-filterFeatures' g s = (show . gffType $ g) == s
-
-isGene :: GffLine -> Bool
-isGene = (==GffGene) . gffType
-
-isExon :: GffLine -> Bool
-isExon = (==GffExon) . gffType
-
-isCDS :: GffLine -> Bool
-isCDS = (==GffCDS) . gffType
-
-
+_filterFeatures (Just fs) gf = any matchFeature fs
+    where
+        g = gffType gf
+        matchFeature "gene" = g == GffGene
+        matchFeature "exon" = g == GffExon
+        matchFeature "cds"  = g == GffCDS
+        matchFeature "CDS"  = g == GffCDS
+        matchFeature s = (show g) == s
