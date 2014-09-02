@@ -10,7 +10,6 @@ module Interpret
      evalLen,
      evalBinary,
      evalMinus,
-     executeQualityProcess
     ) where
 
 
@@ -207,12 +206,12 @@ topFunction Ffastq expr _args _block = do
 
 topFunction Funique expr args _block = do
     expr' <- interpretTopValue expr
-    args' <- runInROEnvIO $ evaluateArguments args
+    args' <- runInROEnvIO $ interpretArguments args
     executeUnique expr' args'
 
 topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
-    args' <- runInROEnvIO $ evaluateArguments args
+    args' <- runInROEnvIO $ interpretArguments args
     res' <- executePreprocess expr' args' _block varName >>= executeQualityProcess 
     setVariableValue varName res'
     return res'
@@ -221,22 +220,22 @@ topFunction Fpreprocess expr _ _ = error ("Should be used a variable with a NGOR
 
 topFunction Fwrite expr args _ = do 
     expr' <- interpretTopValue expr
-    args' <- runInROEnvIO $ evaluateArguments args
+    args' <- runInROEnvIO $ interpretArguments args
     liftIO (writeToFile expr' args')
 
 topFunction Fmap expr args _ = do
     expr' <- interpretTopValue expr
-    args' <- runInROEnvIO $ evaluateArguments args
+    args' <- runInROEnvIO $ interpretArguments args
     executeMap expr' args'
 
 topFunction Fannotate expr args _ = do
     expr' <- interpretTopValue expr
-    args' <- runInROEnvIO $ evaluateArguments args
+    args' <- runInROEnvIO $ interpretArguments args
     executeAnnotation expr' args'
 
 topFunction Fcount expr args _ = do
     expr' <- interpretTopValue expr
-    args' <- runInROEnvIO $ evaluateArguments args
+    args' <- runInROEnvIO $ interpretArguments args
     executeCount expr' args'
 
 
@@ -322,7 +321,7 @@ executeUnique _ _ = error "executeUnique: Should not have happened"
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block v = return . NGOList =<< mapM (\x -> executePreprocess x args _block v) e
 executePreprocess (NGOReadSet file enc t) args (Block ([Variable var]) expr) _ = do
-        liftIO $printNglessLn $ "ExecutePreprocess on " ++ file 
+        liftIO $printNglessLn $ "ExecutePreprocess on " ++ file
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         env <- gets snd
         newfp <- liftIO $ writeReadSet file (map asShortRead (execBlock env rs)) enc
@@ -344,12 +343,11 @@ executePreprocess (NGOReadSet file enc t) args (Block ([Variable var]) expr) _ =
              
 executePreprocess a _ _ _ = error ("executePreprocess: This should have not happened." ++ show a)
 
-evaluateArguments :: [(Variable, Expression)] -> InterpretationROEnv [(T.Text, NGLessObject)]
-evaluateArguments [] = return []
-evaluateArguments (((Variable v),e):args) = do
-    e' <- interpretExpr e
-    args' <- evaluateArguments args
-    return ((v,e'):args')
+interpretArguments :: [(Variable, Expression)] -> InterpretationROEnv [(T.Text, NGLessObject)]
+interpretArguments = mapM interpretArguments'
+    where interpretArguments' ((Variable v), e) = do
+            e' <- interpretExpr e
+            return (v,e')
 
 interpretBlock :: [(T.Text, NGLessObject)] -> [Expression] -> InterpretationROEnv BlockResult
 interpretBlock vs [] = return (BlockResult BlockOk vs)
@@ -381,7 +379,7 @@ interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpr
 interpretPreProcessExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretPreProcessExpr (FunctionCall Fsubstrim var args _) = do
     expr' <- interpretExpr var
-    args' <- evaluateArguments args
+    args' <- interpretArguments args
     return . NGOShortRead $ substrim (getvalue args') (asShortRead expr')
     where
         getvalue els = fromIntegral . evalInteger $ fromMaybe (NGOInteger 0) (lookup "min_quality" els)
