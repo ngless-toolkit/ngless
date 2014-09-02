@@ -279,13 +279,10 @@ executeQualityProcess (NGOList e) = NGOList <$> mapM executeQualityProcess e
 executeQualityProcess (NGOReadSet fname enc nt) = executeQualityProcess' (Just enc) fname "afterQC" (B.unpack nt)
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
-    r <- runInROEnvIO $ lookupVariable ".script"
-    case r of
-        Nothing -> throwError "Variable lookup error: .script"
-        Just (NGOString r') -> do
-                newTemplate <- liftIO $ generateDirId (T.unpack r') fname' -- new template only calculated once.
-                _ <- liftIO $ insertFilesProcessedJson newTemplate r'
-                executeQualityProcess' Nothing fname' "beforeQC" newTemplate
+    r <- getScriptName
+    newTemplate <- liftIO $ generateDirId (T.unpack r) fname' -- new template only calculated once.
+    _ <- liftIO $ insertFilesProcessedJson newTemplate r
+    executeQualityProcess' Nothing fname' "beforeQC" newTemplate
 
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
 executeQualityProcess' enc fname info nt = liftIO $ executeQProc enc fname info nt
@@ -451,3 +448,6 @@ mul _ _ = error "BinaryOP mul: Arguments Should be of type NGOInteger"
 asShortRead (NGOShortRead r) = r
 asShortRead _ = error "Short read expected"
 
+getScriptName = do
+    Just (NGOString script) <- runInROEnvIO $ lookupVariable ".script"
+    return script
