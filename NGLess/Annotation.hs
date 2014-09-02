@@ -42,7 +42,7 @@ annotate samFP (Just g) feats _ m a s = do
 annotate samFP Nothing feats dDs m a s =
     printNglessLn (concat ["annotate with default GFF: ", show . fromJust $ dDs]) >>
         case dDs of
-            Just v  -> annotate' samFP (getGff v) feats (getIntervalQuery m) a s   -- used default GFF
+            Just v  -> annotate' samFP (getGff $ T.unpack v) feats (getIntervalQuery m) a s   -- used default GFF
             Nothing -> error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
 
 getIntervalQuery :: AnnotationIntersectionMode -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount])

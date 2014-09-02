@@ -2,18 +2,13 @@
 
 module ReferenceDatabases
     ( isDefaultReference
-    , configGenome
-    , defaultGenomes
-    , getGenomeRootPath
+    , installData
     , getIndexPath
     , getGff
-    , indexRequiredFormats
     , ensureDataPresent
-    , doAllFilesExist
-    , findIndexFiles
+    , findDataFiles
     ) where
 
-import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
@@ -21,18 +16,16 @@ import qualified Codec.Compression.GZip as GZip
 
 import System.FilePath.Posix
 import System.Directory
-import Control.Monad
 import Data.Maybe
 
 import System.IO.Error
 
+import Control.Monad
 import Control.Applicative ((<$>))
 
 import Utils.Network
+import Utils.Bwa
 import Configuration
-
-indexRequiredFormats :: [String]
-indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
 
 bwaIndexPath :: FilePath
 bwaIndexPath = "Sequence/BWAIndex"
@@ -40,108 +33,88 @@ bwaIndexPath = "Sequence/BWAIndex"
 gffPath :: FilePath
 gffPath = "Annotation/annot.gtf.gz"
 
-getGff :: T.Text -> FilePath
-getGff n = (T.unpack n) </> gffPath
+getGff :: FilePath -> FilePath
+getGff n = n </> gffPath
 
-defaultGenomes :: [(T.Text, FilePath)]
-defaultGenomes = [
-                    ("hg19", "Homo_sapiens"),
-                    ("mm10", "Mus_musculus"),
-                    ("rn4",  "Rattus_norvegicus"),
-                    ("bosTau4",  "Bos_taurus"),
-                    ("canFam2","Canis_familiaris"),
-                    ("dm3","Drosophila_melanogaster"),
-                    ("ce10","Caenorhabditis_elegans"),
-                    ("sacCer3","Saccharomyces_cerevisiae")
-                 ]
-isDefaultReference :: T.Text -> Bool
-isDefaultReference name = name `elem` (map fst defaultGenomes)
-
--- | Get download URL for a reference
-downloadURL :: FilePath -> IO FilePath
-downloadURL genome = case lookup (T.pack genome) defaultGenomes of
-        Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-        Just v -> do
-            baseURL <- nglessDataBaseURL
-            return (baseURL </> v <.> "tar.gz")
-
-
-getGenomeRootPath :: T.Text -> FilePath
-getGenomeRootPath d = case lookup d defaultGenomes of
-        Nothing -> error ("getGenomeRootPath: Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
-        Just v -> v
+defaultGenomes :: [String]
+defaultGenomes =
+                [ "hg19" -- Homo_sapiens
+                , "mm10" -- Mus_musculus
+                , "rn4" --  Rattus_norvegicus
+                , "bosTau4" --  Bos_taurus
+                , "canFam2" --Canis_familiaris
+                , "dm3" --Drosophila_melanogaster
+                , "ce10" --Caenorhabditis_elegans
+                , "sacCer3" --Saccharomyces_cerevisiae
+                ]
+isDefaultReference :: String -> Bool
+isDefaultReference name = name `elem` defaultGenomes
 
 getIndexPath :: FilePath -> FilePath
-getIndexPath gen = getGenomeRootPath (T.pack gen) </> bwaIndexPath </> "genome.fa.gz"
+getIndexPath ref = ref </> bwaIndexPath </> "genome.fa.gz"
 
 downloadReference :: String -> FilePath -> IO ()
 downloadReference ref destPath = do
-    url <- downloadURL ref
+    when (not . isDefaultReference $ ref)
+        (error "Expected reference data")
+    baseURL <- nglessDataBaseURL
+    let url = (baseURL </> ref <.> "tar.gz")
     downloadFile url destPath
     putStrLn " Reference download completed! "
 
+
+-- | Make sure that reference data is present, downloading it if necessary.
+-- Returns the base path for the data.
 ensureDataPresent :: String -> IO FilePath
 ensureDataPresent ref = do
+    p <- findDataFiles ref
+    case p of
+        Just p' -> return p'
+        Nothing -> installData Nothing ref
+
+-- | Installs reference data uncondictionally
+-- When mode is Nothing, tries to install them in global directory, otherwise
+-- installs it in the user directory
+installData :: Maybe InstallMode -> String -> IO FilePath
+installData Nothing ref = do
     p' <- globalDataDirectory
     created <- (createDirectoryIfMissing False p' >> return True) `catchIOError` (\_ -> return False)
     canInstallGlobal <- (if created
-                    then writable <$> getPermissions p' -- check whether can write globally
+                    then writable <$> getPermissions p'
                     else return False)
     if canInstallGlobal
-        then configGenome Root ref
-        else do
-            udir <- userDataDirectory
-            createDirectoryIfMissing True udir
-            configGenome User ref
+        then installData (Just Root) ref
+        else installData (Just User) ref
+installData (Just mode) ref = do
+    basedir <- (if mode == Root
+                then globalDataDirectory
+                else userDataDirectory)
+    createDirectoryIfMissing True basedir
+    let tarName = basedir </> ref <.> "tar.gz"
+    downloadReference ref tarName
+    Tar.unpack basedir . Tar.read . GZip.decompress =<< BL.readFile tarName
+    return (basedir </> ref)
+
+
 
 -- | checks first user and then global data directories for <ref>.
 -- The user directory is checked first to allow the user to override a
 -- problematic global installation.
-findIndexFiles :: FilePath -> IO (Maybe FilePath)
-findIndexFiles ref = do
-    uindex <- findIndexFilesIn ref User
+findDataFiles :: FilePath -> IO (Maybe FilePath)
+findDataFiles ref = do
+    uindex <- findDataFilesIn ref User
     if isJust uindex
         then return uindex
-        else findIndexFilesIn ref Root
+        else findDataFilesIn ref Root
 
-findIndexFilesIn :: FilePath -> InstallMode -> IO (Maybe FilePath)
-findIndexFilesIn ref mode = do
-    dirPath <- (if mode == Root
+findDataFilesIn :: FilePath -> InstallMode -> IO (Maybe FilePath)
+findDataFilesIn ref mode = do
+    basedir <- (if mode == Root
                     then globalDataDirectory
                     else userDataDirectory)
-    let indexPath = (dirPath </> getIndexPath ref)
-    hasIndex <- doAllFilesExist indexPath indexRequiredFormats
+    let indexPath = (basedir </> getIndexPath ref)
+    hasIndex <- hasValidIndex indexPath
     return (if hasIndex
-                then Just indexPath
+                then Just basedir
                 else Nothing)
-
-configGenome :: InstallMode -> String -> IO FilePath
-configGenome mode ref = do
-    dir <- (if mode == Root
-                then globalDataDirectory
-                else userDataDirectory)
-    indexPath <- findIndexFilesIn ref mode
-    when (isNothing indexPath) $ do
-        createDirectoryIfMissing True dir
-        installGenome ref dir
-    return (dir </> getIndexPath ref)
-
-
-installGenome :: FilePath -> FilePath -> IO ()
-installGenome ref d = do
-    downloadReference ref (d </> tarName)
-    Tar.unpack d . Tar.read . GZip.decompress =<< BL.readFile ( d </> tarName)
-   where
-        dirName = case lookup (T.pack ref) defaultGenomes of
-            Nothing -> error ("Should be a valid genome. The available genomes are " ++ show defaultGenomes)
-            Just v  -> v
-        tarName = dirName <.> "tar.gz"
-
-doAllFilesExist :: String -> [String] -> IO Bool
-doAllFilesExist _ [] = return True
-doAllFilesExist basepath (x:xs) = do
-    isThere <- doesFileExist (basepath ++ x)
-    if isThere
-        then doAllFilesExist basepath xs
-        else return False
 

@@ -29,21 +29,14 @@ import ReferenceDatabases
 import Configuration
 
 import Data.Sam
+import Utils.Bwa
 
 indexReference :: T.Text -> IO FilePath
 indexReference refPath = do
     let refPath' = (T.unpack refPath)
-    res <- doAllFilesExist refPath' indexRequiredFormats
+    res <- hasValidIndex refPath'
     case res of
-        False -> do
-            bwaPath <- bwaBin
-            (exitCode, out, err) <-
-                readProcessWithExitCode bwaPath ["index", refPath'] []
-            printNglessLn err
-            printNglessLn out
-            case exitCode of
-                ExitSuccess -> return ()
-                ExitFailure _err -> error err
+        False -> createIndex refPath'
         True -> printNglessLn $ "index for " ++ refPath' ++ " already exists."
     return refPath'
 
@@ -84,7 +77,7 @@ interpretMapOp r ds = do
         r' = T.unpack r
         indexReference' :: IO (FilePath, Maybe T.Text)
         indexReference' =
-            if isDefaultReference r
+            if isDefaultReference (T.unpack r)
                 then do
                     gen <- ensureDataPresent r'
                     return (gen, Just r)

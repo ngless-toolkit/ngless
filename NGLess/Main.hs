@@ -78,12 +78,6 @@ function "tokens" fname text = case tokenize fname text of
 function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 
 
--- | This function is used to install reference data
-installData :: String -> IO ()
-installData ref
-    | isDefaultReference (T.pack ref) = void $ ensureDataPresent ref
-    | otherwise = do
-        error (concat ["Reference ", ref, " is not a known reference."])
 
 optsExec (DefaultMode dmode fname) = do
     --Note that the input for ngless is always UTF-8.
@@ -99,7 +93,10 @@ optsExec (DefaultMode dmode fname) = do
         Right ngltext -> function dmode fname ngltext
 
 -- if user uses the flag -i he will install a Reference Genome to all users
-optsExec (InstallGenMode ref) = installData ref
+optsExec (InstallGenMode ref)
+    | isDefaultReference ref = void $ installData Nothing ref
+    | otherwise = do
+        error (concat ["Reference ", ref, " is not a known reference."])
 optsExec (VisualizeMode p) = runWebServer p
 
 getModes :: Mode (CmdArgs NGLess)
