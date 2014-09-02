@@ -116,21 +116,18 @@ P padding (silent deletion from padded reference).
 X sequence mismatch.
 --}
 
-calcLen s val acc = 
-    case S8.null s of
-        True  -> acc 
-        False -> do 
-            case S8.head s of
-                'M' -> calc' $ (read val) + acc
-                'D' -> calc' $ (read val) + acc
-                'N' -> calc' $ (read val) + acc
-                'X' -> calc' $ (read val) + acc
-                'P' -> calc' $ (read val) + acc
-                '=' -> calc' $ (read val) + acc
-                'H' -> calc' acc -- ignore
-                'S' -> calc' acc
-                'I' -> calc' acc
-                _  -> calcLen sRest (val ++ [S8.head s]) acc 
+calcLen s _ acc | S8.null s = acc
+calcLen s val acc = case S8.head s of
+        'M' -> calc' $ (read val) + acc
+        'D' -> calc' $ (read val) + acc
+        'N' -> calc' $ (read val) + acc
+        'X' -> calc' $ (read val) + acc
+        'P' -> calc' $ (read val) + acc
+        '=' -> calc' $ (read val) + acc
+        'H' -> calc' acc -- ignore
+        'S' -> calc' acc
+        'I' -> calc' acc
+        _  -> calcLen sRest (val ++ [S8.head s]) acc 
    where
       calc' = calcLen sRest []
       sRest = S8.tail s

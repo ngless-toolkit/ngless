@@ -11,8 +11,8 @@ import Configuration
 
 
 runWebServer nglessport = do
-        putStrLn $ "Launching Webserver."
-        putStrLn $ "You can access it at: http://localhost:" ++ (show nglessport)
+        putStrLn "Launching Webserver."
+        putStrLn ("You can access it at: http://localhost:" ++ show nglessport)
         ddir <- outputDirectory
         simpleHTTP serverConf $ nglessApp ddir
     where

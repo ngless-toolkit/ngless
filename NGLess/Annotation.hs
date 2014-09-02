@@ -1,6 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BangPatterns #-}
-
 
 module Annotation
     ( AnnotationIntersectionMode(..)
@@ -72,7 +70,7 @@ type AnnotationMap = M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [Gff
 compStatsAnnot ::  AnnotationMap -> L8.ByteString -> Bool -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> AnnotationMap
 compStatsAnnot imGff sam a f s = foldl iterSam imGff $ filter isAligned . readAlignments $ sam
     where
-      iterSam im y = M.map (\v -> M.alter alterCounts k v) im
+      iterSam im y = M.map (M.alter alterCounts k) im
         where
             alterCounts Nothing = Nothing
             alterCounts (Just v) = Just $ modeAnnotation f a v y s
@@ -112,7 +110,7 @@ uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust (incCount) k res) im ke
 
 _isInsideInterval :: Int -> IM.Interval Int -> Bool
 _isInsideInterval k (IM.ClosedInterval l u) = k >= l && k <= u
-_isInsideInterval _ err = error("Expecting ClosedInterval but got: " ++ (show err))
+_isInsideInterval _ err = error ("Expecting ClosedInterval but got: " ++ show err)
 
 --- Diferent modes
 
@@ -120,9 +118,8 @@ union :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
 union = IM.unions
 
 intersection_strict :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
-intersection_strict im = case null im of
-            True  -> IM.empty
-            False -> foldl (IM.intersection) (head im) im
+intersection_strict [] = IM.empty
+intersection_strict im = foldl (IM.intersection) (head im) im
 
 intersection_non_empty :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
 intersection_non_empty im = intersection_strict . filter (not . IM.null) $ im
@@ -137,7 +134,7 @@ _sizeNoDup im = Set.size $ IM.foldl (\m v -> Set.union m (gffIds v)) Set.empty i
 --------------------
 
 intervals :: [GffLine] -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
-intervals = foldl' (insertg) M.empty
+intervals = foldl' insertg M.empty
     where
         insertg im g = M.alter (\mF -> updateF g mF) (gffType g) im
         updateF g mF = case mF of
@@ -163,7 +160,7 @@ _filterFeatures :: Maybe NGLessObject -> GffLine -> Bool
 _filterFeatures feats gffL = case feats of
     Nothing          -> (==GffGene) . gffType $ gffL
     Just (NGOList f) -> foldl (\a b -> a || b) False (map (filterFeatures' gffL) f)
-    err              -> error("Type should be NGOList but received: " ++ (show err))
+    err              -> error("Type should be NGOList but received: " ++ show err)
 
 
 filterFeatures' :: GffLine -> NGLessObject -> Bool

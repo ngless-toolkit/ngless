@@ -54,11 +54,7 @@ showCounts del (GffCount s t c st) = L8.fromChunks [s, del, encode t, del, encod
 
 
 readAnnotCounts :: L.ByteString -> [GffCount]
-readAnnotCounts = readAnnotCounts' . L8.lines
-
-readAnnotCounts' :: [L.ByteString] -> [GffCount]
-readAnnotCounts' [] = []
-readAnnotCounts' (l:ls) = readAnnotLine l : readAnnotCounts' ls
+readAnnotCounts = map readAnnotLine . L8.lines
 
 readAnnotLine :: L.ByteString -> GffCount
 readAnnotLine line = if length tokens == 4
@@ -91,14 +87,14 @@ uniqueIdCountMap del m = Map.foldrWithKey' (\k v r -> L8.append (showIdVal k v) 
     showIdVal k v = L8.fromChunks [k, del, encode v, "\n"]
 
 mergeIds :: [GffCount] -> Map.Map S.ByteString Int
-mergeIds s = foldl (updateM) Map.empty s
+mergeIds s = foldl updateM Map.empty s
 
 updateM :: Map.Map S.ByteString Int -> GffCount -> Map.Map S.ByteString Int
 updateM m g = Map.insertWith (+) (annotSeqId g) (annotCount g) m
 
 
 filterByStrand :: GffStrand -> [GffCount] -> [GffCount]
-filterByStrand s = filter (filterByStrand')
+filterByStrand s = filter filterByStrand'
   where 
     filterByStrand' g = isUnstrand (annotStrand g) || isSameStrand s (annotStrand g)
     isUnstrand    = (==GffUnStranded)

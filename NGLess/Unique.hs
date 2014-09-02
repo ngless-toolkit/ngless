@@ -62,9 +62,7 @@ put1k k r dups_ref = do
     let index = srSequence r
     case Map.lookup index mdups of
         Nothing -> writeSTRef dups_ref (Map.insert index (1,[r]) mdups)
-        Just (a,b) -> case a == k of
-                True  -> return ()
-                False -> writeSTRef dups_ref (Map.insert index ((a + 1), r : b) mdups)
+        Just (a,b) -> when (a /= k) (writeSTRef dups_ref (Map.insert index ((a + 1), r : b) mdups))
 
 numFiles :: FilePath -> IO Integer
 numFiles path = do
@@ -75,7 +73,7 @@ numFiles path = do
 
 -- Open and close file handles
 openKFileHandles :: Int -> FilePath -> IO [Handle]
-openKFileHandles k dest = do
-    forM [0..k - 1] $ \x -> do
-        openFile (dest </> (show x)) AppendMode
+openKFileHandles k dest =
+    forM [0..k - 1] $ \n -> do
+        openFile (dest </> show n) AppendMode
 

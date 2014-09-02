@@ -12,10 +12,9 @@ import Test.HUnit
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 import Control.Applicative
-import Text.Parsec (parse)
+import Text.Parsec (SourcePos, parse)
 import Text.Parsec.Combinator (eof)
 import Text.ParserCombinators.Parsec.Prim (GenParser)
-import Text.Parsec (SourcePos)
 import Text.Parsec.Pos (newPos)
 
 import System.Directory(removeFile, removeDirectoryRecursive, createDirectoryIfMissing)
@@ -857,7 +856,7 @@ case_sam_stats_res = do
     samStats contents @?= V.fromList  [3072,1610,1554,0]
 
 case_calc_sam_stats = do
-  r <- readPossiblyCompressedFile "test_samples/sample.sam" >>= return . _calcSamStats
+  r <- _calcSamStats <$> readPossiblyCompressedFile "test_samples/sample.sam"
   r @?=  [3072,1610,1554,0]
 
 --- Unique.hs
@@ -935,19 +934,19 @@ case_calc_statistics_negative = do
 
 -- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
 case_calc_statistics_low_positive = do
-    s <- readPossiblyCompressedFile "test_samples/sample_low_qual.fq" >>= return . computeStats
+    s <- computeStats <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
     last (stats' s) @?= (1,1,1,1)
   where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 
 case_calc_statistics_normal = do
-    s <- readPossiblyCompressedFile "test_samples/data_set_repeated.fq" >>= return . computeStats
+    s <- computeStats <$> readPossiblyCompressedFile "test_samples/data_set_repeated.fq"
     head (stats' s) @?= (25,33,31,33)
   where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 case_json_statistics = do
-        s <- readPossiblyCompressedFile "test_samples/sample_small.fq" >>= return . computeStats
-        r <- readPossiblyCompressedFile "test_samples/res_json_statistics.txt" >>= return . L.unpack
+        s <- computeStats <$> readPossiblyCompressedFile "test_samples/sample_small.fq"
+        r <- readFile "test_samples/res_json_statistics.txt"
         _createDataString (stats' s) @?= r
     where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
@@ -969,8 +968,7 @@ case_install_genome_user_mode = do
 
 
 -- ProcessFastQ
-low_char_int = do
-  readPossiblyCompressedFile "test_samples/sample.fq" >>= return . lc . computeStats
+low_char_int = (lc . computeStats) <$> readPossiblyCompressedFile "test_samples/sample.fq"
 
 case_read_and_write_fastQ = do
     enc <- guessEncoding <$> low_char_int

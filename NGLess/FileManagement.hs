@@ -19,7 +19,8 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 
 import qualified Codec.Compression.GZip as GZip    
 
-import qualified Data.Text as T
+import Control.Applicative ((<$>))
+import Data.List (isSuffixOf)
 
 import System.FilePath.Posix
 import System.Directory
@@ -91,8 +92,7 @@ generateDirId dst = do
 createTempDirectory :: FilePath -> String -> IO FilePath
 createTempDirectory dir t = do
   pid <- c_getpid
-  fp <- findTempName pid
-  return fp
+  findTempName pid
   where
     findTempName x = do
       let dirpath = dir </> t <.> show x
@@ -126,7 +126,7 @@ writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents
 
 readPossiblyCompressedFile ::  FilePath -> IO BL.ByteString
 readPossiblyCompressedFile fname =
-    if T.isInfixOf (T.pack ".gz") (T.pack fname)
-        then fmap GZip.decompress (BL.readFile fname)
-        else BL.readFile fname -- not compressed
+    if isSuffixOf ".gz" fname
+        then GZip.decompress <$> BL.readFile fname
+        else BL.readFile fname
 

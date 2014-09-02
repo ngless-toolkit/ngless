@@ -36,7 +36,7 @@ writeToUncFile (NGOReadSet path enc tmplate) newfp = do
     readPossiblyCompressedFile path >>= BL.writeFile newfp
     return $ NGOReadSet newfp enc tmplate
 
-writeToUncFile obj _ = error ("writeToUncFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ (show obj))
+writeToUncFile obj _ = error ("writeToUncFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ show obj)
 
 
 writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO NGLessObject
@@ -67,7 +67,7 @@ writeToFile (NGOAnnotatedSet fp) args = do
     case lookup "verbose" args of
         Just (NGOSymbol "no")  -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
         Just (NGOSymbol "yes") -> writeAnnotResWDel' newfp (showGffCountDel del . readAnnotCounts $ cont)
-        Just err -> error ("verbose received a " ++ (show err) ++ " but value can only be yes or no.")
+        Just err -> error ("verbose received a " ++ show err ++ " but value can only be yes or no.")
         Nothing -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
     where
         writeAnnotResWDel' p cont = do
@@ -80,7 +80,7 @@ getDelimiter :: Maybe NGLessObject -> B.ByteString
 getDelimiter x = case x of
         (Just (NGOSymbol "csv")) -> ","
         (Just (NGOSymbol "tsv")) -> "\t"
-        (Just err) ->  error ("Type must be NGOSymbol, but was given" ++ (show err))
+        (Just err) ->  error ("Type must be NGOSymbol, but was given" ++ show err)
         Nothing -> "\t"
 
 convertSamToBam samfile newfp = do
@@ -96,4 +96,4 @@ convertSamToBam samfile newfp = do
         exitCode <- waitForProcess jHandle
         case exitCode of
            ExitSuccess -> return newfp
-           ExitFailure err -> error ("Failure on converting sam to bam" ++ (show err))
+           ExitFailure err -> error ("Failure on converting sam to bam" ++ show err)

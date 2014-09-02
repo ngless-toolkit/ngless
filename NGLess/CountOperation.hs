@@ -20,7 +20,7 @@ countAnnotatedSet p f m = do
 --countAnnotatedSet p Nothing = return NGOVoid
 
 filterAnnot :: L8.ByteString -> Maybe NGLessObject -> NGLessObject -> [GffCount]
-filterAnnot fc f m = filter (filterAnnot') $ readAnnotCounts fc
+filterAnnot fc f m = filter filterAnnot' $ readAnnotCounts fc
     where
       filterAnnot' c = (isMinAmount m c) && (filterCounts f c)
 
@@ -29,8 +29,8 @@ filterAnnot fc f m = filter (filterAnnot') $ readAnnotCounts fc
 filterCounts :: Maybe NGLessObject -> GffCount -> Bool
 filterCounts feats annotL = maybe True (fFeat annotL) feats
   where
-        fFeat g (NGOList f) = foldl (\a b -> a || b) False (map (filterCounts' g) f)
-        fFeat _ err = error("Type should be NGOList but received: " ++ (show err))
+        fFeat g (NGOList f) = foldl (||) False (map (filterCounts' g) f)
+        fFeat _ err = error("Type should be NGOList but received: " ++ show err)
 
 filterCounts' :: GffCount -> NGLessObject -> Bool
 filterCounts' g (NGOSymbol "gene") = (==GffGene) . annotType $ g
@@ -38,8 +38,8 @@ filterCounts' g (NGOSymbol "exon") = (==GffExon) . annotType $ g
 filterCounts' g (NGOSymbol "cds" ) = (==GffCDS) . annotType  $ g
 filterCounts' g (NGOSymbol "CDS" ) = (==GffCDS) . annotType  $ g
 filterCounts' g (NGOSymbol s) = (show . annotType $ g) == (T.unpack s)
-filterCounts' _ err = error ("Type should be NGOList but received: " ++ (show err))
+filterCounts' _ err = error ("Type should be NGOList but received: " ++ show err)
 
 isMinAmount :: NGLessObject -> GffCount ->  Bool
 isMinAmount (NGOInteger l) g = (toInteger $ annotCount g) >= l
-isMinAmount err _ = error ("Type should be NGOInteger but received: " ++ (show err))
+isMinAmount err _ = error ("Type should be NGOInteger but received: " ++ show err)

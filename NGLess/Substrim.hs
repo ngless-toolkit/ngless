@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Substrim
@@ -25,7 +24,7 @@ subtrimPos :: B.ByteString -> Char -> (Int,Int)
 subtrimPos quality cutoff = fst $ B.foldl (\a b -> calcSubStrim' a b) ((0,0),(0,0)) quality
     where
         calcSubStrim' :: ((Int,Int), (Int,Int)) -> Char -> ((Int,Int), (Int,Int))
-        calcSubStrim' ((i,s),(n_i,n_s)) q = do
+        calcSubStrim' ((i,s),(n_i,n_s)) q =
             if q >= cutoff
                 then (updated, (n_i, n_s + 1))
                 else ((i,s)  , (n_s + n_i + 1, 0)) --new start index n_s + n_i + 1

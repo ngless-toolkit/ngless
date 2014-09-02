@@ -69,11 +69,11 @@ function "ngless" fname text = case parsengless fname text >>= validate >>= chec
 
 function "ast" fname text = case parsengless fname text >>= validate of
             Left err -> T.putStrLn (T.concat ["Error in parsing: ", err])
-            Right expr -> putStrLn . show . nglBody $ expr
+            Right expr -> print . nglBody $ expr
 
 function "tokens" fname text = case tokenize fname text of
             Left err -> T.putStrLn err
-            Right toks -> putStrLn . show . map snd $ toks
+            Right toks -> print . map snd $ toks
 
 function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 
@@ -100,7 +100,7 @@ optsExec (DefaultMode dmode fname) = do
     createDirectoryIfMissing False odir
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of
-        Left err -> putStrLn (show err)
+        Left err -> print err
         Right ngltext -> function dmode fname ngltext
 
 -- if user uses the flag -i he will install a Reference Genome to all users

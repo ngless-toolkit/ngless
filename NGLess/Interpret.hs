@@ -185,8 +185,8 @@ interpretExpr (IndexExpression expr ie) = do
     let r = evalIndex expr' ie'
     return r
 
-interpretExpr (ListExpression e) = return . NGOList =<< mapM (interpretExpr) e
-interpretExpr _ = throwError $ "Not an expression"
+interpretExpr (ListExpression e) = NGOList <$> mapM interpretExpr e
+interpretExpr _ = throwError "Not an expression"
 
 
 interpretIndex :: Index -> InterpretationROEnv [Maybe NGLessObject]
@@ -195,7 +195,7 @@ interpretIndex (IndexOne a) = forM [Just a] maybeInterpretExpr
 
 maybeInterpretExpr :: (Maybe Expression) -> InterpretationROEnv (Maybe NGLessObject)
 maybeInterpretExpr Nothing = return Nothing
-maybeInterpretExpr (Just e) = interpretExpr e >>= return . Just
+maybeInterpretExpr (Just e) = Just <$> interpretExpr e
 
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
 topFunction Ffastq expr _args _block = do
@@ -205,7 +205,7 @@ topFunction Ffastq expr _args _block = do
 topFunction Funique expr args _block = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ evaluateArguments args
-    executeUnique expr' args' >>= return
+    executeUnique expr' args'
 
 topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
@@ -219,7 +219,7 @@ topFunction Fpreprocess expr _ _ = error ("Should be used a variable with a NGOR
 topFunction Fwrite expr args _ = do 
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ evaluateArguments args
-    liftIO (writeToFile expr' args') >>= return
+    liftIO (writeToFile expr' args')
 
 topFunction Fmap expr args _ = do
     expr' <- interpretTopValue expr
@@ -229,28 +229,28 @@ topFunction Fmap expr args _ = do
 topFunction Fannotate expr args _ = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ evaluateArguments args
-    executeAnnotation expr' args' >>= return
+    executeAnnotation expr' args'
 
 topFunction Fcount expr args _ = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ evaluateArguments args
-    executeCount expr' args' >>= return
+    executeCount expr' args'
 
 
-topFunction _ _ _ _ = throwError $ "Unable to handle these functions"
+topFunction _ _ _ _ = throwError "Unable to handle these functions"
 
 executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeCount (NGOList e) args = return . NGOList =<< mapM (\x -> executeCount x args) e
+executeCount (NGOList e) args = NGOList <$> mapM (\x -> executeCount x args) e
 executeCount (NGOAnnotatedSet p) args = do
     let c = lookup "counts" args
         m = fromMaybe (NGOInteger 0) $ lookup "min" args
     res <- liftIO $ countAnnotatedSet p c m
     return $ NGOAnnotatedSet res
 
-executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ (show err))
+executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
 executeAnnotation :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeAnnotation (NGOList e) args = mapM (\x -> executeAnnotation x args) e >>= return . NGOList
+executeAnnotation (NGOList e) args = NGOList <$> mapM (\x -> executeAnnotation x args) e
 executeAnnotation (NGOMappedReadSet e dDS) args = do
     let f = lookup "features" args
         g = T.unpack . evalString <$> lookup "gff" args
@@ -269,7 +269,7 @@ parseAnnotationMode m = error (concat ["Unexpected annotation mode (", show m, "
 
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
-executeQualityProcess (NGOList e) = return . NGOList =<< mapM (executeQualityProcess) e
+executeQualityProcess (NGOList e) = NGOList <$> mapM executeQualityProcess e
 executeQualityProcess (NGOReadSet fname enc nt) = executeQualityProcess' (Just enc) fname "afterQC" (B.unpack nt)
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
@@ -337,6 +337,7 @@ executePreprocess (NGOReadSet file enc t) args (Block ([Variable var]) expr) _ =
              
 executePreprocess a _ _ _ = error ("executePreprocess: This should have not happened." ++ (show a))
 
+evaluateArguments :: [(Variable, Expression)] -> InterpretationROEnv [(T.Text, NGLessObject)]
 evaluateArguments [] = return []
 evaluateArguments (((Variable v),e):args) = do
     e' <- interpretExpr e
@@ -363,9 +364,7 @@ interpretBlock1 vs Discard = return (BlockResult BlockDiscarded vs)
 interpretBlock1 vs Continue = return (BlockResult BlockContinued vs)
 interpretBlock1 vs (Condition c ifT ifF) = do
     v' <- interpretBlockExpr vs c
-    if evalBool v'
-        then interpretBlock1 vs ifT
-        else interpretBlock1 vs ifF
+    interpretBlock1 vs (if evalBool v' then ifT else ifF)
 interpretBlock1 vs (Sequence expr) = interpretBlock vs expr -- interpret [expr]
 interpretBlock1 vs x = error ("interpretBlock1: This should not have happened " ++ show vs ++ " " ++ show x)
 
@@ -388,10 +387,10 @@ evalUOP UOpLen sr@(NGOShortRead _) = evalLen sr
 evalUOP _ _ = error "invalid unary operation. "
 
 evalLen (NGOShortRead r) = NGOInteger . toInteger $ srLength r
-evalLen err = error ("Length must receive a Read. Received a " ++ (show err))
+evalLen err = error ("Length must receive a Read. Received a " ++ show err)
 
 evalMinus (NGOInteger n) = NGOInteger (-n)
-evalMinus err = error ("Minus operator must receive a integer. Received a" ++ (show err))
+evalMinus err = error ("Minus operator must receive a integer. Received a" ++ show err)
 
 evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject
 evalIndex sr index@[Just (NGOInteger a)] = evalIndex sr $ (Just $ NGOInteger (a + 1)) : index

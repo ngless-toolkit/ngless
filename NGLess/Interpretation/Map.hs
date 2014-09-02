@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 
 module Interpretation.Map
@@ -97,9 +97,9 @@ interpretMapOp r ds = do
         r' = T.unpack r
         indexReference' :: IO (FilePath, Maybe T.Text)
         indexReference' =
-            case isDefaultGenome r of
-                False  -> indexReference r >>= \x -> return (x, Nothing) --user supplies genome
-                True   -> do
+            if not $ isDefaultGenome r
+                then (, Nothing) <$> indexReference r
+                else do
                     rootGen <- getGenomeDir r
                     findIndexFiles r' >>= \res -> case res of
                         Nothing -> configGenome r' User >>= \x -> return (x, Just rootGen) -- download and install genome on User mode
@@ -116,9 +116,9 @@ getGenomeDir :: T.Text -> IO T.Text
 getGenomeDir n = T.pack <$> do
     dataDir <- globalDataDirectory
     doesExist <- doesDirectoryExist $ dataDir </> getGenomeRootPath n
-    case doesExist of
-        True  -> return (dataDir </> getGenomeRootPath n)
-        False -> (</> getGenomeRootPath n) <$> userDataDirectory
+    if doesExist
+        then return (dataDir </> getGenomeRootPath n)
+        else (</> getGenomeRootPath n) <$> userDataDirectory
 
 
 getSamStats :: FilePath -> IO ()
@@ -189,7 +189,7 @@ installGenome ref d = do
     Tar.unpack d . Tar.read . GZip.decompress =<< LB.readFile ( d </> tarName)
    where
         dirName = case lookup (T.pack ref) defaultGenomes of
-            Nothing -> error ("Should be a valid genome. The available genomes are " ++ (show defaultGenomes))
+            Nothing -> error ("Should be a valid genome. The available genomes are " ++ show defaultGenomes)
             Just v  -> v
         tarName = dirName <.> "tar.gz"
 

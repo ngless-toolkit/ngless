@@ -24,7 +24,7 @@ import FileManagement
 fProc = "var filesProcessed = "
 cProc = "var countsProcessed = "
 
-createBasicStatsJson :: FQ.Result -> [Char] -> FastQEncoding -> BL.ByteString
+createBasicStatsJson :: FQ.Result -> FilePath -> FastQEncoding -> BL.ByteString
 createBasicStatsJson fileData fname enc = resJS
         where
             res    = basicInfoToJson fname gc' enc' nSeq' sSize'
@@ -51,10 +51,10 @@ filesProcessedToJson tName script = createFilesProcessed tName script >>= return
 insertCountsProcessedJson :: FilePath -> IO ()
 insertCountsProcessedJson fp = do
         jsonPath <- (</> "countsProcessed.js") <$> outputDirectory
-        doesFileExist jsonPath
-          >>= \x -> case x of
-            True  -> updateProcessedJson cProc jsonData jsonPath 22
-            False -> createProcessedJson cProc (BL.concat ["[",encode jsonData,"]"]) jsonPath
+        exists <- doesFileExist jsonPath
+        if exists
+            then updateProcessedJson cProc jsonData jsonPath 22
+            else createProcessedJson cProc (BL.concat ["[",encode jsonData,"]"]) jsonPath
     where
         jsonData = createCountsProcessed fp
 

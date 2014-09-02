@@ -57,9 +57,9 @@ validate_types (Script _ es) = check_toplevel validate_types' es
           validate_types' _ = Nothing
 
 validate_symbol :: [T.Text] -> Expression -> Maybe T.Text
-validate_symbol s (ConstSymbol k) = case elem k s of
-    True  -> Nothing
-    False -> Just (T.concat ["Symbol used is: ", k, " but possible symbols are: ", T.pack . show $ s])
+validate_symbol s (ConstSymbol k)
+    | elem k s = Nothing
+    | otherwise = Just (T.concat ["Symbol used is: ", k, " but possible symbols are: ", T.pack . show $ s])
 validate_symbol _ _ = Nothing
 
 
@@ -125,9 +125,9 @@ check_symbol_val_in_arg f a = case f of
         check arg (e,values) = 
             case e of
                 Nothing -> Nothing
-                Just (ConstSymbol x) -> case elem x values of
-                    True  -> Nothing
-                    False -> Just (T.concat ["Argument: \"", arg, "\" expects one of ", T.pack . show $ values, " but got \"", x, "\""])
+                Just (ConstSymbol x) -> if elem x values
+                    then Nothing
+                    else Just (T.concat ["Argument: \"", arg, "\" expects one of ", T.pack . show $ values, " but got \"", x, "\""])
                 Just (ListExpression es) -> errors_from_list $ map (\s -> check arg (Just s, values)) es
                 Just (Lookup _) -> Nothing
                 Just err -> Just (T.concat ["Expected a symbol, but got ", T.pack . show $ err])
