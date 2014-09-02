@@ -9,7 +9,6 @@ module Data.GFF
     , parseGffAttributes
     , checkAttrTag
     , trimString
-    , filterFeatures
     , showType
     , parsegffType
     , readLine
@@ -18,15 +17,11 @@ module Data.GFF
     ) where
 
 
-import qualified Data.Text as  T
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
-
 import Control.DeepSeq
-
-import Language
 
 data GffType = GffExon
                 | GffGene
@@ -160,30 +155,6 @@ showStrand GffUnknownStrand = "?"
 
 strict :: L.ByteString -> S.ByteString
 strict = S.concat . L.toChunks
-
-filterFeatures :: Maybe NGLessObject -> GffLine -> Bool
-filterFeatures feats gffL = case feats of
-    Nothing          -> (==GffGene) . gffType $ gffL
-    Just (NGOList f) -> foldl (\a b -> a || b) False (map (filterFeatures' gffL) f)
-    err              -> error("Type should be NGOList but received: " ++ (show err))
-
-
-filterFeatures' :: GffLine -> NGLessObject -> Bool
-filterFeatures' g (NGOSymbol "gene") = isGene g
-filterFeatures' g (NGOSymbol "exon") = isExon g
-filterFeatures' g (NGOSymbol "cds" ) = isCDS  g
-filterFeatures' g (NGOSymbol "CDS" ) = isCDS  g 
-filterFeatures' g (NGOSymbol s) = (S8.unpack . showType . gffType $ g) == (T.unpack s)
-filterFeatures' _ s = error ("Type should be NGOList but received: " ++ (show s))
-
-isGene :: GffLine -> Bool
-isGene = (==GffGene) . gffType
-
-isExon :: GffLine -> Bool
-isExon = (==GffExon) . gffType
-
-isCDS :: GffLine -> Bool
-isCDS = (==GffCDS) . gffType
 
 
 showType :: GffType -> S.ByteString

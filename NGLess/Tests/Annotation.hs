@@ -10,6 +10,7 @@ import qualified Data.ByteString.Lazy as BL
 
 import Language
 import Interpretation.Write
+import qualified Data.GFF as GFF
 
 import Annotation
 
@@ -87,3 +88,23 @@ case_annotate_gene_yesStrand_union_short = do
   where args = [("ofile", NGOString ofile),("verbose", NGOSymbol "no")]
         feats = Just $ NGOList [NGOSymbol "gene"]
         ofile = "test_samples/htseq-res/ngless_gene_yesStrand_union_short.txt"
+
+
+
+gff_structure_Exon = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+gff_structure_CDS = GFF.GffLine "chrI" "unknown" GFF.GffCDS 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+gff_structure_Gene = GFF.GffLine "chrI" "unknown" GFF.GffGene 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+
+
+gff_features_all = Just (NGOList  [ NGOSymbol "gene", NGOSymbol "cds", NGOSymbol "exon"])
+gff_features_gene = Just (NGOList [ NGOSymbol "gene"])
+gff_features_cds = Just (NGOList  [ NGOSymbol "cds" ])
+
+gff_lines_ex = [gff_structure_Exon,gff_structure_CDS,gff_structure_Gene]
+
+case_filter_features_1 = filter (_filterFeatures gff_features_all) gff_lines_ex @?= gff_lines_ex
+case_filter_features_2 = filter (_filterFeatures Nothing) gff_lines_ex @?= [gff_structure_Gene]
+case_filter_features_3 = filter (_filterFeatures gff_features_gene) gff_lines_ex @?= [gff_structure_Gene]
+case_filter_features_4 = filter (_filterFeatures gff_features_cds) gff_lines_ex @?= [gff_structure_CDS]
+case_filter_features_5 = filter (_filterFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
+

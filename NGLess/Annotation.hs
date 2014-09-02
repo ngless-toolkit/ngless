@@ -7,6 +7,7 @@ module Annotation
     , annotate
     , intersection_strict
     , intersection_non_empty
+    , _filterFeatures
     , _sizeNoDup
     , _isInsideInterval
     ) where
@@ -56,7 +57,7 @@ annotate' :: FilePath -> FilePath -> Maybe NGLessObject -> ([IM.IntervalMap Int 
 annotate' samFp gffFp feats a f s = do
     gff <- readPossiblyCompressedFile gffFp
     sam <- readPossiblyCompressedFile samFp
-    let imGff = intervals . filter (filterFeatures feats) . readAnnotations $ gff
+    let imGff = intervals . filter (_filterFeatures feats) . readAnnotations $ gff
         counts = compStatsAnnot imGff sam f a s -- Map 'feats' (Map chr (Imap key val))
     writeAnnotCount samFp (toGffM . concat . map (M.elems) . M.elems $ counts)
     --writeAnnotCount samFp . IM.toList . unlines . map M.elems . M.elems $ counts
@@ -69,18 +70,13 @@ toGffM = concat . foldl (\a b -> (++) (IM.elems b) a) []
 
 type AnnotationMap = M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
 compStatsAnnot ::  AnnotationMap -> L8.ByteString -> Bool -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> AnnotationMap
-compStatsAnnot imGff sam a f s = foldl (iterSam f a s) imGff sams
-   where
-    sams = filter isAligned . readAlignments $ sam
-
-
-iterSam :: ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount])) -> SamLine -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
-iterSam f a s im y = M.map (\v -> M.alter alterCounts k v) im
+compStatsAnnot imGff sam a f s = foldl iterSam imGff $ filter isAligned . readAlignments $ sam
     where
-        alterCounts x = case x of
-            Nothing -> Nothing
-            Just v  -> Just $ modeAnnotation f a v y s
-        k = samRName y
+      iterSam im y = M.map (\v -> M.alter alterCounts k v) im
+        where
+            alterCounts Nothing = Nothing
+            alterCounts (Just v) = Just $ modeAnnotation f a v y s
+            k = samRName y
 
 
 modeAnnotation :: ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> IM.IntervalMap Int [GffCount] -> SamLine -> Bool -> IM.IntervalMap Int [GffCount]
@@ -162,4 +158,28 @@ asInterval g = IM.ClosedInterval (gffStart g) (gffEnd g)
 
 genId :: GffLine -> S8.ByteString
 genId g = fromMaybe (S8.pack "unknown") $ gffGeneId g
+
+_filterFeatures :: Maybe NGLessObject -> GffLine -> Bool
+_filterFeatures feats gffL = case feats of
+    Nothing          -> (==GffGene) . gffType $ gffL
+    Just (NGOList f) -> foldl (\a b -> a || b) False (map (filterFeatures' gffL) f)
+    err              -> error("Type should be NGOList but received: " ++ (show err))
+
+
+filterFeatures' :: GffLine -> NGLessObject -> Bool
+filterFeatures' g (NGOSymbol "gene") = isGene g
+filterFeatures' g (NGOSymbol "exon") = isExon g
+filterFeatures' g (NGOSymbol "cds" ) = isCDS  g
+filterFeatures' g (NGOSymbol "CDS" ) = isCDS  g
+filterFeatures' g (NGOSymbol s) = (S8.unpack . showType . gffType $ g) == (T.unpack s)
+filterFeatures' _ s = error ("Type should be NGOList but received: " ++ (show s))
+isGene :: GffLine -> Bool
+isGene = (==GffGene) . gffType
+
+isExon :: GffLine -> Bool
+isExon = (==GffExon) . gffType
+
+isCDS :: GffLine -> Bool
+isCDS = (==GffCDS) . gffType
+
 

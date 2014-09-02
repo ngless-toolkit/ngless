@@ -735,27 +735,6 @@ case_parse_gff_atributes_normal_2 = GFF.parseGffAttributes "gene_id=chrI;dbxref=
 case_parse_gff_atributes_trail_del = GFF.parseGffAttributes "gene_id=chrI;dbxref=NCBI:NC_001133;Name=chrI;" @?= [("gene_id","chrI"),("dbxref","NCBI:NC_001133"),("Name","chrI")]
 case_parse_gff_atributes_trail_del_space = GFF.parseGffAttributes "gene_id=chrI;dbxref=NCBI:NC_001133;Name=chrI; " @?= [("gene_id","chrI"),("dbxref","NCBI:NC_001133"),("Name","chrI")]
 
--- Setup
-
-gff_structure_Exon = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-gff_structure_CDS = GFF.GffLine "chrI" "unknown" GFF.GffCDS 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-gff_structure_Gene = GFF.GffLine "chrI" "unknown" GFF.GffGene 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-
-
-gff_features_all = Just (NGOList  [ NGOSymbol "gene", NGOSymbol "cds", NGOSymbol "exon"])
-gff_features_gene = Just (NGOList [ NGOSymbol "gene"])
-gff_features_cds = Just (NGOList  [ NGOSymbol "cds" ])
-
-gff_lines_ex = [gff_structure_Exon,gff_structure_CDS,gff_structure_Gene]
-
-----
-
-case_filter_features_1 = filter (GFF.filterFeatures gff_features_all) gff_lines_ex @?= gff_lines_ex
-case_filter_features_2 = filter (GFF.filterFeatures Nothing) gff_lines_ex @?= [gff_structure_Gene]
-case_filter_features_3 = filter (GFF.filterFeatures gff_features_gene) gff_lines_ex @?= [gff_structure_Gene]
-case_filter_features_4 = filter (GFF.filterFeatures gff_features_cds) gff_lines_ex @?= [gff_structure_CDS]
-case_filter_features_5 = filter (GFF.filterFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
-
 
 case_cigar_to_length_1 = cigarTLen "18M2D19M" @?= 39
 case_cigar_to_length_2 = cigarTLen "37M" @?= 37
