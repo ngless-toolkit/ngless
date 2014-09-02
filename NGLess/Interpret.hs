@@ -137,11 +137,12 @@ runInROEnvIO = runInEnv . runInROEnv
 -- | By necessity, this code has several unreachable corners
 unreachable err = error ("Reached code that was thought to be unreachable!\n"++err)
 
-interpret :: T.Text -> [(Int,Expression)] -> IO ()
-interpret script es = do
+interpret :: FilePath -> T.Text -> [(Int,Expression)] -> IO ()
+interpret fname script es = do
     let nglessScript = NGOString script 
-    _ <- htmlDefaultDir >>= setupHtmlViewer (T.unpack script)
-    r <- evalStateT (runErrorT (interpretIO es)) (0, Map.insert ".script" nglessScript Map.empty)
+        nglessScriptFname = NGOFilename fname
+    _ <- htmlDefaultDir >>= setupHtmlViewer fname
+    r <- evalStateT (runErrorT (interpretIO es)) (0, Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty))
     case r of
         Right _ -> return ()
         Left err -> putStrLn (show err)
@@ -280,8 +281,8 @@ executeQualityProcess (NGOReadSet fname enc nt) = executeQualityProcess' (Just e
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     r <- getScriptName
-    newTemplate <- liftIO $ generateDirId (T.unpack r) fname' -- new template only calculated once.
-    _ <- liftIO $ insertFilesProcessedJson newTemplate r
+    newTemplate <- liftIO $ generateDirId r fname' -- new template only calculated once.
+    _ <- liftIO $ insertFilesProcessedJson newTemplate (T.pack r)
     executeQualityProcess' Nothing fname' "beforeQC" newTemplate
 
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
@@ -449,5 +450,6 @@ asShortRead (NGOShortRead r) = r
 asShortRead _ = error "Short read expected"
 
 getScriptName = do
-    Just (NGOString script) <- runInROEnvIO $ lookupVariable ".script"
-    return script
+    -- This cannot fail as we inserted the variable ourselves
+    Just (NGOFilename fname) <- runInROEnvIO $ lookupVariable ".scriptfname"
+    return fname

@@ -71,10 +71,7 @@ htmlDefaultDir :: IO FilePath
 htmlDefaultDir = (</> "../share/ngless/Html") <$> getNglessRoot
 
 outputDirectory :: FilePath -> IO FilePath
-outputDirectory _ = do
-  tdir <- getTemporaryDirectory
-  return $ tdir </> "ngless.outputs/"
-
+outputDirectory ifile = return $ replaceExtension ifile ".ngless_output/"
 
 maxTempFileSize :: Num a => IO a
 maxTempFileSize = return (100*1000*1000) -- 100MB

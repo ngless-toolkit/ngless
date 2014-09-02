@@ -27,14 +27,6 @@ import Utils.Network
 import Utils.Bwa
 import Configuration
 
-bwaIndexPath :: FilePath
-bwaIndexPath = "Sequence/BWAIndex"
-
-gffPath :: FilePath
-gffPath = "Annotation/annot.gtf.gz"
-
-getGff :: FilePath -> FilePath
-getGff n = n </> gffPath
 
 defaultGenomes :: [String]
 defaultGenomes =
@@ -51,7 +43,10 @@ isDefaultReference :: String -> Bool
 isDefaultReference name = name `elem` defaultGenomes
 
 getIndexPath :: FilePath -> FilePath
-getIndexPath ref = ref </> bwaIndexPath </> "genome.fa.gz"
+getIndexPath = (</> "Sequence/BWAIndex/genome.fa.gz")
+getGff :: FilePath -> FilePath
+getGff = (</> "Annotation/annot.gtf.gz")
+
 
 downloadReference :: String -> FilePath -> IO ()
 downloadReference ref destPath = do
@@ -112,9 +107,9 @@ findDataFilesIn ref mode = do
     basedir <- (if mode == Root
                     then globalDataDirectory
                     else userDataDirectory)
-    let indexPath = (basedir </> getIndexPath ref)
-    hasIndex <- hasValidIndex indexPath
+    let refdir = basedir </> ref
+    hasIndex <- hasValidIndex (getIndexPath refdir)
     return (if hasIndex
-                then Just basedir
+                then Just refdir
                 else Nothing)
 

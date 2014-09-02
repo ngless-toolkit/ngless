@@ -14,7 +14,6 @@ import Control.Applicative ((<$>))
 import Data.Aeson
 import System.FilePath.Posix
 
-import Configuration
 import Data.Json
 import Data.FastQ
 import qualified FastQStatistics as FQ
@@ -37,7 +36,7 @@ createBasicStatsJson fileData fname enc = resJS
 
 insertFilesProcessedJson :: FilePath -> T.Text -> IO ()
 insertFilesProcessedJson t script = do
-        jsonPath <- (</> "filesProcessed.js") <$> outputDirectory t
+        let jsonPath = (</> "filesProcessed.js") $ (takeDirectory t)
         doesFileExist jsonPath 
           >>= \x -> case x of
             True  -> createFilesProcessed t script >>= \v -> updateProcessedJson fProc v jsonPath 21
@@ -50,7 +49,7 @@ filesProcessedToJson tName script = encode <$> createFilesProcessed tName script
 
 insertCountsProcessedJson :: FilePath -> IO ()
 insertCountsProcessedJson fp = do
-        jsonPath <- (</> "countsProcessed.js") <$> outputDirectory fp
+        let jsonPath = (</> "countsProcessed.js") $ (takeDirectory fp)
         exists <- doesFileExist jsonPath
         if exists
             then updateProcessedJson cProc jsonData jsonPath 22

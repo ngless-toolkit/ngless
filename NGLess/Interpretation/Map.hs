@@ -39,7 +39,7 @@ indexReference refPath = do
     return refPath'
 
 
-mapToReference :: T.Text -> FilePath -> IO String
+mapToReference :: FilePath -> FilePath -> IO String
 mapToReference refIndex readSet = do
     bwaPath <- bwaBin
     newfp <- getTempFilePath readSet
@@ -49,7 +49,7 @@ mapToReference refIndex readSet = do
         (_, _, Just herr, jHandle) <-
             createProcess (
                 proc bwaPath
-                    ["mem","-t",(show numCapabilities),(T.unpack refIndex), readSet]
+                    ["mem","-t",(show numCapabilities), refIndex, readSet]
                 ) { std_out = UseHandle hout,
                     std_err = CreatePipe }
         err <- hGetContents herr
@@ -58,7 +58,9 @@ mapToReference refIndex readSet = do
         hClose herr
         case exitCode of
            ExitSuccess -> return newfp'
-           ExitFailure code -> error ("Failure on mapping against reference:" ++ show code)
+           ExitFailure code -> error $ concat ["Failed mapping\nCommand line was::\n\t",
+                                        bwaPath, "mem -t ", show numCapabilities, " '", refIndex, "' '", readSet, "'\n",
+                                        "Bwa error code was ", show code, "."]
 
 
 numDecimalPlaces :: Int
@@ -68,7 +70,7 @@ numDecimalPlaces = 2
 interpretMapOp :: T.Text -> FilePath -> IO NGLessObject
 interpretMapOp r ds = do
     (ref', defGen') <- indexReference'
-    samPath' <- mapToReference (T.pack ref') ds
+    samPath' <- mapToReference (getIndexPath ref') ds
     getSamStats samPath'
     return $ NGOMappedReadSet samPath' defGen'
     where
@@ -77,8 +79,8 @@ interpretMapOp r ds = do
         indexReference' =
             if isDefaultReference (T.unpack r)
                 then do
-                    gen <- ensureDataPresent r'
-                    return (gen, Just r)
+                    basedir  <- ensureDataPresent r'
+                    return (basedir, Just r)
                 else (, Nothing) <$> indexReference r
 
 getSamStats :: FilePath -> IO ()
