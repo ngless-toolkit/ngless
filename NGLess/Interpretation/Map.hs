@@ -3,25 +3,16 @@
 
 module Interpretation.Map
     ( interpretMapOp
-    , configGenome
     , indexReference
     , mapToReference
     , _calcSamStats
     ) where
 
-import qualified Codec.Archive.Tar as Tar
-import qualified Codec.Compression.GZip as GZip
-
-import qualified Data.ByteString.Lazy as LB
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import qualified Data.Vector.Unboxed as V
 
-import System.Directory
-import System.FilePath.Posix
 import Numeric
-
-import Data.Maybe
 
 import GHC.Conc (numCapabilities)
 
@@ -29,7 +20,6 @@ import System.Process
 import System.Exit
 import System.IO
 
-import Control.Monad
 import Control.Applicative ((<$>))
 
 import SamBamOperations
@@ -39,9 +29,6 @@ import ReferenceDatabases
 import Configuration
 
 import Data.Sam
-
-indexRequiredFormats :: [String]
-indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
 
 indexReference :: T.Text -> IO FilePath
 indexReference refPath = do
@@ -97,29 +84,11 @@ interpretMapOp r ds = do
         r' = T.unpack r
         indexReference' :: IO (FilePath, Maybe T.Text)
         indexReference' =
-            if not $ isDefaultGenome r
-                then (, Nothing) <$> indexReference r
-                else do
-                    rootGen <- getGenomeDir r
-                    findIndexFiles r' >>= \res -> case res of
-                        Nothing -> configGenome r' User >>= \x -> return (x, Just rootGen) -- download and install genome on User mode
-                        Just p  -> return (p, Just rootGen) -- already installed
-
-
-{-
-    Receives - A default genome name
-    Returns  - The root dir for that genome
-
-    If not installed in SU mode, return user mode path since it will be installed on User mode next.
--}
-getGenomeDir :: T.Text -> IO T.Text
-getGenomeDir n = T.pack <$> do
-    dataDir <- globalDataDirectory
-    doesExist <- doesDirectoryExist $ dataDir </> getGenomeRootPath n
-    if doesExist
-        then return (dataDir </> getGenomeRootPath n)
-        else (</> getGenomeRootPath n) <$> userDataDirectory
-
+            if isDefaultReference r
+                then do
+                    gen <- ensureDataPresent r'
+                    return (gen, Just r)
+                else (, Nothing) <$> indexReference r
 
 getSamStats :: FilePath -> IO ()
 getSamStats fname = readPossiblyCompressedFile fname >>= printSamStats . _calcSamStats
@@ -146,53 +115,3 @@ printSamStats (total, aligned, unique, lowQ) = do
               y = fromIntegral b
           in (x / y) * (100 :: Double)
 
--- | checks first user and then global data directories for <ref>.
--- The user directory is checked first to allow the user to override a
--- problematic global installation.
-findIndexFiles :: FilePath -> IO (Maybe FilePath)
-findIndexFiles ref = do
-    globalIndex <- findIndexFilesIn ref User
-    if isJust globalIndex
-        then return globalIndex
-        else findIndexFilesIn ref Root
-
-findIndexFilesIn :: FilePath -> InstallMode -> IO (Maybe FilePath)
-findIndexFilesIn ref mode = do
-    dirPath <- (if mode == Root
-                    then globalDataDirectory
-                    else userDataDirectory)
-    let indexPath = (dirPath </> getIndexPath ref)
-    hasIndex <- doAllFilesExist indexPath indexRequiredFormats
-    return (if hasIndex
-                then Just indexPath
-                else Nothing)
-
-configGenome :: FilePath -> InstallMode -> IO FilePath
-configGenome ref mode = do
-    dir <- (if mode == Root
-                then globalDataDirectory
-                else userDataDirectory)
-    indexPath <- findIndexFilesIn ref mode
-    when (isNothing indexPath) $ do
-        createDirectoryIfMissing True dir
-        installGenome ref dir
-    return (dir </> getIndexPath ref)
-
-
-installGenome :: FilePath -> FilePath -> IO ()
-installGenome ref d = do
-    downloadReference ref (d </> tarName)
-    Tar.unpack d . Tar.read . GZip.decompress =<< LB.readFile ( d </> tarName)
-   where
-        dirName = case lookup (T.pack ref) defaultGenomes of
-            Nothing -> error ("Should be a valid genome. The available genomes are " ++ show defaultGenomes)
-            Just v  -> v
-        tarName = dirName <.> "tar.gz"
-
-doAllFilesExist :: String -> [String] -> IO Bool
-doAllFilesExist _ [] = return True
-doAllFilesExist basepath (x:xs) = do
-    isThere <- doesFileExist (basepath ++ x)
-    if isThere
-        then doAllFilesExist basepath xs
-        else return False

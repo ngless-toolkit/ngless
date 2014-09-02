@@ -962,8 +962,8 @@ case_test_setup_html_view = do
 -- install genome User mode
 
 case_install_genome_user_mode = do
-  r1 <- configGenome "ce10" User
-  p <- userDataDirectory  >>= return . (</> (getIndexPath "ce10"))
+  r1 <- configGenome User "ce10"
+  p <- (</> (getIndexPath "ce10")) <$> userDataDirectory
   r1 @?= p 
 
 

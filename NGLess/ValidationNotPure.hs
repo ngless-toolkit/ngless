@@ -101,7 +101,7 @@ check_can_read_file fname = let fname' = T.unpack fname in do
 isValidRef :: T.Text -> IO (Maybe T.Text)
 isValidRef v = do
     r <- doesFileExist (T.unpack v)
-    return (if isDefaultGenome v || r
+    return (if isDefaultReference v || r
         then Nothing
         else Just (T.concat ["Value of argument reference ", v, " is neither a filepath or a default genome."]))
 

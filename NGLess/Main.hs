@@ -15,12 +15,12 @@ import Types
 import Parse
 import WebServer
 import Configuration
-import Interpretation.Map (configGenome)
+import ReferenceDatabases
 
+import Control.Monad
 import Control.Applicative
 import System.Console.CmdArgs
 import System.Directory
-import System.IO.Error
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -79,16 +79,11 @@ function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 
 
 -- | This function is used to install reference data
-installGenome :: String -> IO ()
-installGenome ref = do
-    p' <- globalDataDirectory
-    created <- (createDirectoryIfMissing False p' >> return True) `catchIOError` (\_ -> return False)
-    hasPerm <- (if created
-                    then writable <$> getPermissions p' -- check whether can write globally
-                    else return False)
-    case hasPerm of
-        True  -> configGenome ref Root >> return ()
-        False -> userDataDirectory >>= createDirectoryIfMissing False >> configGenome ref User >> return ()
+installData :: String -> IO ()
+installData ref
+    | isDefaultReference (T.pack ref) = void $ ensureDataPresent ref
+    | otherwise = do
+        error (concat ["Reference ", ref, " is not a known reference."])
 
 optsExec (DefaultMode dmode fname) = do
     --Note that the input for ngless is always UTF-8.
@@ -104,7 +99,7 @@ optsExec (DefaultMode dmode fname) = do
         Right ngltext -> function dmode fname ngltext
 
 -- if user uses the flag -i he will install a Reference Genome to all users
-optsExec (InstallGenMode ref) = installGenome ref
+optsExec (InstallGenMode ref) = installData ref
 optsExec (VisualizeMode p) = runWebServer p
 
 getModes :: Mode (CmdArgs NGLess)
