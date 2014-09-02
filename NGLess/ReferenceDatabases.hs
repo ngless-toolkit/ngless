@@ -7,7 +7,6 @@ module ReferenceDatabases
     , getGenomeRootPath
     , getIndexPath
     , getGff
-    , downloadReference
     , indexRequiredFormats
     , ensureDataPresent
     , doAllFilesExist
@@ -34,7 +33,6 @@ import Configuration
 
 indexRequiredFormats :: [String]
 indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
-
 
 bwaIndexPath :: FilePath
 bwaIndexPath = "Sequence/BWAIndex"
@@ -101,9 +99,9 @@ ensureDataPresent ref = do
 -- problematic global installation.
 findIndexFiles :: FilePath -> IO (Maybe FilePath)
 findIndexFiles ref = do
-    globalIndex <- findIndexFilesIn ref User
-    if isJust globalIndex
-        then return globalIndex
+    uindex <- findIndexFilesIn ref User
+    if isJust uindex
+        then return uindex
         else findIndexFilesIn ref Root
 
 findIndexFilesIn :: FilePath -> InstallMode -> IO (Maybe FilePath)
