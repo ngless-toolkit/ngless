@@ -124,25 +124,21 @@ getGenomeDir n = T.pack <$> do
 getSamStats :: FilePath -> IO ()
 getSamStats fname = readPossiblyCompressedFile fname >>= printSamStats . _calcSamStats
 
-_calcSamStats :: BL.ByteString -> [Int]
-_calcSamStats contents = [total', aligned', unique', lowQual']
+_calcSamStats :: BL.ByteString -> (Int,Int,Int,Int)
+_calcSamStats contents = (total', aligned', unique', lowQual')
     where res' = samStats contents
           total' = V.unsafeIndex res' (fromEnum Total)
           aligned' = V.unsafeIndex res' (fromEnum Aligned)
           unique' = V.unsafeIndex res' (fromEnum Unique)
           lowQual' = V.unsafeIndex res' (fromEnum LowQual)
 
-printSamStats stats = do
+printSamStats (total, aligned, unique, lowQ) = do
     putStrLn $ "Total reads: " ++ (show total)
     putStrLn $ "Total reads aligned: " ++ (show aligned) ++ "[" ++ (showFloat' $ calcDiv aligned total) ++ "%]"
     putStrLn $ "Total reads Unique map: " ++ (show unique) ++ "[" ++ (showFloat' $ calcDiv unique aligned) ++ "%]"
     putStrLn $ "Total reads Non-Unique map: " ++ (show $ aligned - unique) ++ "[" ++ (showFloat' $ 100 - (calcDiv unique aligned)) ++ "%]"
     putStrLn $ "Total reads without enough qual: " ++ (show lowQ)
   where
-    total   = stats !! 0
-    aligned = stats !! 1
-    unique  = stats !! 2
-    lowQ    = stats !! 3
     showFloat' num = showFFloat (Just numDecimalPlaces) num ""
     calcDiv :: Int -> Int -> Double
     calcDiv a b =

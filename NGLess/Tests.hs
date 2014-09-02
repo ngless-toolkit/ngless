@@ -857,7 +857,7 @@ case_sam_stats_res = do
 
 case_calc_sam_stats = do
   r <- _calcSamStats <$> readPossiblyCompressedFile "test_samples/sample.sam"
-  r @?=  [3072,1610,1554,0]
+  r @?=  (3072,1610,1554,0)
 
 --- Unique.hs
 
