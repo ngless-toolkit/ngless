@@ -16,6 +16,8 @@ module Language
     , Script(..)
     , NGLessObject(..)
     , function_opt_arg_type
+    , function_required_args
+    , function_args_allowed_symbols
     , function_return_type
     , function_arg_type
     ) where
@@ -70,6 +72,17 @@ function_opt_arg_type Ffastq       _ = Left "Fastq function does not have any ar
 function_opt_arg_type Fpreprocess  _ = Left "Preprocess function does not have any argument"
 function_opt_arg_type e (Variable x) = Left $ T.concat ["Function " ,T.pack . show $ e ," does not have argument: ", x]
 
+function_required_args :: FuncName -> [T.Text]
+function_required_args Fmap         = ["reference"]
+function_required_args Fwrite       = ["ofile"]
+function_required_args _            = []
+
+function_args_allowed_symbols :: FuncName -> T.Text -> [T.Text]
+function_args_allowed_symbols Fannotate "features"   = ["gene", "cds", "exon"]
+function_args_allowed_symbols Fannotate "mode"       = ["union", "intersection_strict", "intersection_non_empty"]
+function_args_allowed_symbols Fwrite "format"        = ["tsv", "csv", "bam", "sam"]
+function_args_allowed_symbols Fcount "counts"        = ["gene", "cds", "exon"]
+function_args_allowed_symbols _ _                    = []
 
 -- | unary operators
 data UOp = UOpLen | UOpMinus

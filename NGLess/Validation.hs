@@ -1,4 +1,4 @@
-{- Copyright 2013 NGLess Authors
+{- Copyright 2013-2014 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE OverloadedStrings #-}
@@ -59,7 +59,7 @@ validate_types (Script _ es) = check_toplevel validate_types' es
 validate_symbol :: [T.Text] -> Expression -> Maybe T.Text
 validate_symbol s (ConstSymbol k)
     | elem k s = Nothing
-    | otherwise = Just (T.concat ["Symbol used is: ", k, " but possible symbols are: ", T.pack . show $ s])
+    | otherwise = Just (T.concat ["Used symbol `", k, "` but possible symbols are: ", T.pack . show $ s])
 validate_symbol _ _ = Nothing
 
 
@@ -80,20 +80,16 @@ validate_req_function_args :: Script -> Maybe T.Text
 validate_req_function_args (Script _ es) = check_toplevel validate_req_function_args' es
     where
         validate_req_function_args' (Assignment  _ fc) = validate_req_function_args' fc
-        validate_req_function_args' (FunctionCall f _ args _) = exist_req_args f args
+        validate_req_function_args' (FunctionCall f _ args _) = has_required_args f args
         validate_req_function_args' _ = Nothing
 
-exist_req_args :: FuncName -> [(Variable, Expression)] -> Maybe T.Text
-exist_req_args f a = case f of
-        Fmap   -> lookupVar "reference"
-        Fwrite -> lookupVar "ofile"
-        _      -> Nothing
+has_required_args :: FuncName -> [(Variable, Expression)] -> Maybe T.Text
+has_required_args f args = errors_from_list $ map has1 (function_required_args f)
     where
-        lookupVar v = case lookup v eval_vars of
-            Just _  -> Nothing
-            Nothing -> Just (T.concat ["Function ", T.pack . show $ f, " requires variable ", v, "."])
-        eval_vars = map (\(Variable k,e) -> (k, e)) a
-
+        used = map (\(Variable k, _) -> k) args
+        has1 a = if a `elem` used
+                then Nothing
+                else Just (T.concat ["Function ", T.pack . show $ f, " requires argument ", a, "."])
 
 validate_val_function_args :: Script -> Maybe T.Text
 validate_val_function_args (Script _ es) = check_toplevel validate_val_function_args' es
@@ -105,33 +101,15 @@ validate_val_function_args (Script _ es) = check_toplevel validate_val_function_
 
 
 check_symbol_val_in_arg :: FuncName -> [(Variable, Expression)]-> Maybe T.Text
-check_symbol_val_in_arg f a = case f of
-        Fannotate -> errors_from_list $ map (\(k,v) -> check k (get_v k, v))  
-                                        [("features"  ,symbols_list)
-                                        ,("ambiguity" ,amb_v)
-                                        ,("strand"    ,str_v)
-                                        ,("mode"      ,mode_v)]
-        Fcount    -> check "counts" (get_v "counts", symbols_list)
-        Fwrite    -> errors_from_list $ map (\(k,v) -> check k (get_v k, v)) 
-                                                [("format", format_v)
-                                                ,("verbose", str_v)]
-        _         -> Nothing
-    where 
-        amb_v   = ["allow", "deny"]
-        str_v   = ["yes", "no"]
-        mode_v  = ["union", "intersection_strict", "intersection_non_empty"]
-        format_v= ["tsv", "csv", "bam", "sam"]
-        get_v k = lookup k $ map (\(Variable x,e) -> (x, e)) a
-        check arg (e,values) = 
-            case e of
-                Nothing -> Nothing
-                Just (ConstSymbol x) -> if elem x values
-                    then Nothing
-                    else Just (T.concat ["Argument: \"", arg, "\" expects one of ", T.pack . show $ values, " but got \"", x, "\""])
-                Just (ListExpression es) -> errors_from_list $ map (\s -> check arg (Just s, values)) es
-                Just (Lookup _) -> Nothing
-                Just err -> Just (T.concat ["Expected a symbol, but got ", T.pack . show $ err])
-
+check_symbol_val_in_arg f args = errors_from_list $ map check1 args
+    where
+        allowed = function_args_allowed_symbols f
+        check1 (Variable v, expr) = case expr of
+            ConstSymbol s       -> if s `elem` (allowed v)
+                                    then Nothing
+                                    else Just (T.concat ["Argument: `", v, "` expects one of ", T.pack . show $ allowed v, " but got `", s, "`"])
+            ListExpression es   -> errors_from_list $ map (\e -> check1 (Variable v, e)) es
+            _                   -> Nothing
 
 check_toplevel :: (Expression -> Maybe T.Text) -> [(Int, Expression)] -> Maybe T.Text
 check_toplevel _ [] = Nothing

@@ -48,7 +48,7 @@ validate_files (Script _ es) = check_toplevel validate_files' es
 validate_def_genomes :: Script -> IO (Maybe T.Text)
 validate_def_genomes (Script _ es) = check_toplevel validate_def_genomes' es
     where
-        validate_def_genomes' (FunctionCall Fmap _ args _) = validateArg isValidRef "reference" args es -- fromJust can be used, since reference is always required and already validated.
+        validate_def_genomes' (FunctionCall Fmap _ args _) = validateArg check_reference "reference" args es -- fromJust can be used, since reference is always required and already validated.
         validate_def_genomes' (Assignment _ e) = validate_def_genomes' e
         validate_def_genomes' _ = return Nothing
 
@@ -98,13 +98,15 @@ check_can_read_file fname = let fname' = T.unpack fname in do
                 then return Nothing
                 else return $ Just (T.concat ["File `", fname, "` is not readable (permissions problem)."])
 
-isValidRef :: T.Text -> IO (Maybe T.Text)
-isValidRef v = do
-    let v' = T.unpack v
-    r <- doesFileExist v'
-    return (if isDefaultReference v' || r
-        then Nothing
-        else Just (T.concat ["Value of argument reference ", v, " is neither a filepath or a default genome."]))
+check_reference :: T.Text -> IO (Maybe T.Text)
+check_reference v
+    | isDefaultReference v' = return Nothing
+    | otherwise = do
+        r <- doesFileExist v'
+        return (if r
+            then Nothing
+            else Just (T.concat ["Value of argument reference ", v, " is neither a filepath or a default genome."]))
+    where v' = T.unpack v
 
 
 
