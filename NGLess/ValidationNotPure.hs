@@ -1,7 +1,6 @@
-{- Copyright 2013 NGLess Authors
+{- Copyright 2013-2014 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings #-}
 
 module ValidationNotPure
     ( 
@@ -62,8 +61,9 @@ validateArg f v args es = case lookup (Variable v) args of
 
 validateVar :: (T.Text -> IO (Maybe T.Text)) -> Variable -> [(Int,Expression)] -> IO (Maybe T.Text)
 validateVar f x es = case get_const_val x es of 
-            Left  err -> return . Just $ err
-            Right v   -> if isNothing v then return Nothing else f . fromJust $ v
+            Left  err       -> return . Just $ err
+            Right Nothing   -> return Nothing
+            Right (Just t)  -> f t
 
 
 check_toplevel :: (Expression -> IO (Maybe T.Text)) -> [(Int,Expression)] -> IO (Maybe T.Text)

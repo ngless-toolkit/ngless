@@ -176,7 +176,7 @@ interpretExpr (ConstStr t) = return (NGOString t)
 interpretExpr (ConstBool b) = return (NGOBool b)
 interpretExpr (ConstSymbol s) = return (NGOSymbol s)
 interpretExpr (ConstNum n) = return (NGOInteger n)
-interpretExpr (UnaryOp op v) = interpretExpr v >>= return . evalUOP op
+interpretExpr (UnaryOp op v) = evalUOP op <$> interpretExpr v
 interpretExpr (BinaryOp bop v1 v2) = do
     v1' <- interpretExpr v1
     v2' <- interpretExpr v2
@@ -227,7 +227,7 @@ topFunction Fwrite expr args _ = do
 topFunction Fmap expr args _ = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ evaluateArguments args
-    executeMap expr' args' >>= return
+    executeMap expr' args'
 
 topFunction Fannotate expr args _ = do
     expr' <- interpretTopValue expr
@@ -342,7 +342,7 @@ executePreprocess (NGOReadSet file enc t) args (Block ([Variable var]) expr) _ =
                             _ -> return newRead
                         _ -> throwError "A read should have been returned."
              
-executePreprocess a _ _ _ = error ("executePreprocess: This should have not happened." ++ (show a))
+executePreprocess a _ _ _ = error ("executePreprocess: This should have not happened." ++ show a)
 
 evaluateArguments :: [(Variable, Expression)] -> InterpretationROEnv [(T.Text, NGLessObject)]
 evaluateArguments [] = return []

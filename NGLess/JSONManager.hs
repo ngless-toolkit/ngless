@@ -45,7 +45,7 @@ insertFilesProcessedJson t script = do
 
 
 filesProcessedToJson :: FilePath -> T.Text -> IO BL.ByteString
-filesProcessedToJson tName script = createFilesProcessed tName script >>= return . encode 
+filesProcessedToJson tName script = encode <$> createFilesProcessed tName script
 
 
 insertCountsProcessedJson :: FilePath -> IO ()

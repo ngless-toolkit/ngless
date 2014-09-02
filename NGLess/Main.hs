@@ -95,7 +95,7 @@ optsExec (DefaultMode dmode fname) = do
 -- if user uses the flag -i he will install a Reference Genome to all users
 optsExec (InstallGenMode ref)
     | isDefaultReference ref = void $ installData Nothing ref
-    | otherwise = do
+    | otherwise =
         error (concat ["Reference ", ref, " is not a known reference."])
 optsExec (VisualizeMode p) = runWebServer p
 

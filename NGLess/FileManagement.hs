@@ -31,14 +31,14 @@ import System.Posix.Internals (c_getpid)
 
 import Configuration
 
-isDot :: FilePath -> Bool
-isDot f = f `elem` [".", ".."]
+isNotDot :: FilePath -> Bool
+isNotDot f = f `notElem` [".", ".."]
 
 ---- Files in a Directory
 getFilesInDir :: FilePath -> IO [FilePath]
 getFilesInDir p = do
  files <- getDirectoryContents p
- return $ map ((</>) p) (filter (not . isDot) files)
+ return $ map ((</>) p) (filter isNotDot files)
 
 setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
 setupRequiredFiles info dirTemplate = do
@@ -112,12 +112,12 @@ setupHtmlViewer htmlP = do
 copyDir ::  FilePath -> FilePath -> IO ()
 copyDir src dst = do
   createDirectoryIfMissing False dst
-  xs <- getDirectoryContents src >>= return . filter (not . isDot)
+  xs <- filter isNotDot <$> getDirectoryContents src
   forM_ xs $ \n -> do
-    x <- doesDirectoryExist (src </> n)
-    case x of 
-        True  -> copyDir (src </> n) (dst </> n)
-        False -> copyFile (src </> n) (dst </> n)
+    exists <- doesDirectoryExist (src </> n)
+    if exists
+        then copyDir  (src </> n) (dst </> n)
+        else copyFile (src </> n) (dst </> n)
 
 
 
@@ -126,7 +126,7 @@ writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents
 
 readPossiblyCompressedFile ::  FilePath -> IO BL.ByteString
 readPossiblyCompressedFile fname =
-    if isSuffixOf ".gz" fname
+    if ".gz" `isSuffixOf` fname
         then GZip.decompress <$> BL.readFile fname
         else BL.readFile fname
 

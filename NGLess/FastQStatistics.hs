@@ -105,7 +105,7 @@ upperQuartile = 0.75 :: Double
 accUntilLim :: V.Vector Int -> Int -> Int
 accUntilLim bps lim = case V.findIndex (>= lim) $ V.postscanl (+) 0 bps of
       Just v -> v
-      Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ (show lim))
+      Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ show lim)
 
 
 _createDataString :: [(Int, Int, Int, Int)] -> String

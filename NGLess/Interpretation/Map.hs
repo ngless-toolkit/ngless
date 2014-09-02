@@ -32,10 +32,10 @@ import Utils.Bwa
 indexReference :: T.Text -> IO FilePath
 indexReference refPath = do
     let refPath' = (T.unpack refPath)
-    res <- hasValidIndex refPath'
-    case res of
-        False -> createIndex refPath'
-        True -> printNglessLn $ "index for " ++ refPath' ++ " already exists."
+    hasIndex <- hasValidIndex refPath'
+    if hasIndex
+        then printNglessLn $ "index for " ++ refPath' ++ " already exists."
+        else createIndex refPath'
     return refPath'
 
 
@@ -58,7 +58,7 @@ mapToReference refIndex readSet = do
         hClose herr
         case exitCode of
            ExitSuccess -> return newfp'
-           ExitFailure code -> error ("Failure on mapping against reference:" ++ (show code))
+           ExitFailure code -> error ("Failure on mapping against reference:" ++ show code)
 
 
 numDecimalPlaces :: Int

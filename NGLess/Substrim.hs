@@ -21,7 +21,7 @@ substrim cutoff (ShortRead rId rS rQ) = ShortRead rId (cutByteString rS r) (cutB
 
 -- Receives a Quality array and returns a pair with the index and size of the subsequence which has the most consecutive bps respecting the cutoff.
 subtrimPos :: B.ByteString -> Char -> (Int,Int)
-subtrimPos quality cutoff = fst $ B.foldl (\a b -> calcSubStrim' a b) ((0,0),(0,0)) quality
+subtrimPos quality cutoff = fst $ B.foldl calcSubStrim' ((0,0),(0,0)) quality
     where
         calcSubStrim' :: ((Int,Int), (Int,Int)) -> Char -> ((Int,Int), (Int,Int))
         calcSubStrim' ((i,s),(n_i,n_s)) q =

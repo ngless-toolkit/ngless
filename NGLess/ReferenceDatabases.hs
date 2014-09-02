@@ -55,7 +55,7 @@ getIndexPath ref = ref </> bwaIndexPath </> "genome.fa.gz"
 
 downloadReference :: String -> FilePath -> IO ()
 downloadReference ref destPath = do
-    when (not . isDefaultReference $ ref)
+    unless (isDefaultReference ref)
         (error "Expected reference data")
     baseURL <- nglessDataBaseURL
     let url = (baseURL </> ref <.> "tar.gz")

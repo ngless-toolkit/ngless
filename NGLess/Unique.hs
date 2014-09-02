@@ -45,7 +45,7 @@ readNFiles :: FastQEncoding -> Int -> FilePath -> IO [ShortRead]
 readNFiles enc k d = getFilesInDir d >>= mapM (\x -> readUniqueFile k enc x) >>= return . concat
 
 readUniqueFile :: Int -> FastQEncoding -> FilePath -> IO [ShortRead]
-readUniqueFile k enc fname = do
+readUniqueFile k enc fname =
     (getk k . parseFastQ enc) `fmap` (readPossiblyCompressedFile fname)
 
 getk :: Int -> [ShortRead] -> [ShortRead]

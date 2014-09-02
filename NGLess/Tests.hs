@@ -970,7 +970,8 @@ case_read_and_write_fastQ = do
 case_read_fastQ = do
     nt <- generateDirId fp 
     createDirectoryIfMissing False (dstDir nt)
-    len <- readFastQ Nothing fp (dstDir nt) nt >> getFilesInDir (dstDir nt) >>= return . length --populates dir nt
+    _ <- readFastQ Nothing fp (dstDir nt) nt --creates files in nt
+    len <- length <$> getFilesInDir (dstDir nt)
     removeDirectoryRecursive $ dstDir nt -- delete test generated data.
     len @?= 2
   where fp = "test_samples/sample.fq"

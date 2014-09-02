@@ -13,7 +13,7 @@ module Configuration
     , maxTempFileSize
     ) where
 
-import Control.Monad (when)
+import Control.Monad (unless)
 import Control.Applicative ((<$>))
 import System.Environment (getExecutablePath)
 import System.Directory
@@ -44,10 +44,10 @@ getNglessRoot = takeDirectory <$> getExecutablePath
 
 check_executable name bin = do
     exists <- doesFileExist bin
-    when (not exists)
+    unless exists
         (error $ concat [name, " binary not found!\n","Expected it at ", bin])
     is_executable <- executable <$> getPermissions bin
-    when (not is_executable)
+    unless is_executable
         (error $ concat [name, " binary found at ", bin, ".\nHowever, it is not an executable file!"])
     return bin
 
@@ -68,7 +68,7 @@ samtoolsBin = do
 
 
 htmlDefaultDir :: IO FilePath
-htmlDefaultDir = getNglessRoot >>= return . (</> "../share/ngless/Html")
+htmlDefaultDir = (</> "../share/ngless/Html") <$> getNglessRoot
 
 outputDirectory :: IO String
 outputDirectory = do

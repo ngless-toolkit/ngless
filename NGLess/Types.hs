@@ -90,7 +90,7 @@ nglTypeOf (Assignment _ expr) = nglTypeOf expr
 nglTypeOf (UnaryOp uop expr) = checkuop uop expr
 nglTypeOf (BinaryOp bop a b) = checkbop bop a b
 nglTypeOf (IndexExpression expr index) = checkindex expr index
-nglTypeOf (Condition _ _ _) = error "unexpected nglTypeOf(Condition)"
+nglTypeOf Condition{}    = error "unexpected nglTypeOf(Condition)"
 nglTypeOf (Sequence _es) = error "unexpected nglTypeOf(Sequence)"
 
 checkuop UOpLen e = checklist e *> return (Just NGLInteger)
@@ -132,7 +132,7 @@ checklist (ListExpression []) = return (Just NGLVoid)
 checklist (ListExpression es) = do
     types <- nglTypeOf `mapM` es
     let (t:ts) = catMaybes types
-    when (not $ all (==t) ts)
+    unless (all (==t) ts)
         (errorInLine "List of mixed type")
     return (Just t)
 checklist (Lookup (Variable v)) = do
