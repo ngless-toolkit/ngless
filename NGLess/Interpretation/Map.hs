@@ -3,8 +3,6 @@
 
 module Interpretation.Map
     ( interpretMapOp
-    , indexReference
-    , mapToReference
     , _calcSamStats
     ) where
 
@@ -59,13 +57,8 @@ mapToReference refIndex readSet = do
         case exitCode of
            ExitSuccess -> return newfp'
            ExitFailure code -> error $ concat ["Failed mapping\nCommand line was::\n\t",
-                                        bwaPath, "mem -t ", show numCapabilities, " '", refIndex, "' '", readSet, "'\n",
+                                        bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '", readSet, "'\n",
                                         "Bwa error code was ", show code, "."]
-
-
-numDecimalPlaces :: Int
-numDecimalPlaces = 2
-
 
 interpretMapOp :: T.Text -> FilePath -> IO NGLessObject
 interpretMapOp r ds = do
@@ -108,7 +101,7 @@ printSamStats (total, aligned, unique, lowQ) = do
     putStrLn $ "Total reads Non-Unique map: " ++ (show $ aligned - unique) ++ "[" ++ (showFloat' $ 100 - (calcDiv unique aligned)) ++ "%]"
     putStrLn $ "Total reads without enough qual: " ++ (show lowQ)
   where
-    showFloat' num = showFFloat (Just numDecimalPlaces) num ""
+    showFloat' num = showFFloat (Just 2) num ""
     calcDiv :: Integer -> Integer -> Double
     calcDiv a b =
           let x = fromIntegral a
