@@ -19,6 +19,7 @@ import ReferenceDatabases
 
 import Control.Monad
 import Control.Applicative
+import Control.Concurrent
 import System.Console.CmdArgs
 import System.Directory
 
@@ -33,6 +34,7 @@ data NGLess =
         DefaultMode
               { debug_mode :: String
               , input :: String
+              , n_threads :: Int
               }
         | InstallGenMode
               { input :: String}
@@ -45,6 +47,7 @@ data NGLess =
 ngless = DefaultMode
         { debug_mode = "ngless"
         , input = "-" &= argPos 0 &= opt ("-" :: String)
+        , n_threads = 0 &= name "n"
         }
         &= details  [ "Example:" , "ngless script.ngl" ]
 
@@ -81,12 +84,13 @@ function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 
 
 
-optsExec (DefaultMode dmode fname) = do
+optsExec (DefaultMode dmode fname n) = do
     --Note that the input for ngless is always UTF-8.
     --Always. This means that we cannot use T.readFile
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
+    setNumCapabilities n
     odir <- outputDirectory fname
     createDirectoryIfMissing False odir
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
