@@ -649,42 +649,42 @@ samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*
 
 -- Tests with scripts (This will pass to a shell script)
 
---preprocess_s = "ngless '0.0'\n\
---    \input = fastq('test_samples/sample.fq')\n\
---    \preprocess(input) using |read|:\n\
---    \   read = read[3:]\n\
---    \   read = read[: len(read) ]\n\
---    \   read = substrim(read, min_quality=5)\n\
---    \   if len(read) > 20:\n\
---    \       continue\n\
---    \   if len(read) <= 20:\n\
---    \       discard\n\
---    \write(input, ofile='test_samples/sample.fq')\n"
+preprocess_s = "ngless '0.0'\n\
+    \input = fastq('test_samples/sample.fq')\n\
+    \preprocess(input) using |read|:\n\
+    \   read = read[3:]\n\
+    \   read = read[: len(read) ]\n\
+    \   read = substrim(read, min_quality=5)\n\
+    \   if len(read) > 20:\n\
+    \       continue\n\
+    \   if len(read) <= 20:\n\
+    \       discard\n\
+    \write(input, ofile='test_samples/sample.fq')\n"
 
 
---map_s = "ngless '0.0'\n\
---    \input = fastq('test_samples/sample.fq')\n\
---    \preprocess(input) using |read|:\n\
---    \    if len(read) < 20:\n\
---    \        discard\n\
---    \mapped = map(input,reference='sacCer3')\n\
---    \write(mapped, ofile='test_samples/sample.sam',format={sam})\n"
+map_s = "ngless '0.0'\n\
+    \input = fastq('test_samples/sample.fq')\n\
+    \preprocess(input) using |read|:\n\
+    \    if len(read) < 20:\n\
+    \        discard\n\
+    \mapped = map(input,reference='sacCer3')\n\
+    \write(mapped, ofile='test_samples/sample.sam',format={sam})\n"
 
---case_preprocess_script = case parsetest preprocess_s >>= checktypes of
---        Left err -> T.putStrLn err
---        Right expr -> do
---            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
---            (interpret preprocess_s) . nglBody $ expr
---            res' <- B.readFile "test_samples/sample.fq"
---            (length $ B.lines res') @?= (16 :: Int)
+case_preprocess_script = case parsetest preprocess_s >>= checktypes of
+        Left err -> assertFailure (show err)
+        Right expr -> do
+            outputDirectory "testing" >>= createDirectoryIfMissing False
+            (interpret "test" preprocess_s) . nglBody $ expr
+            res' <- B.readFile "test_samples/sample.fq"
+            (length $ B.lines res') @?= (16 :: Int)
 
---case_map_script = case parsetest map_s >>= checktypes of
---        Left err -> T.putStrLn err
---        Right expr -> do
---            _ <- defaultDir >>= createDirIfExists  -- this is the dir where everything will be kept.
---            (interpret map_s) . nglBody $ expr
---            res' <- readPossiblyCompressedFile "test_samples/sample.sam"
---            _calcSamStats res' @?= [5,0,0,0]
+case_map_script = case parsetest map_s >>= checktypes of
+        Left err -> assertFailure (show err)
+        Right expr -> do
+            outputDirectory "testing" >>= createDirectoryIfMissing False
+            (interpret "testing" map_s) . nglBody $ expr
+            res' <- readPossiblyCompressedFile "test_samples/sample.sam"
+            _calcSamStats res' @?= (5,0,0,0)
 
 -- Test compute stats
 
@@ -943,7 +943,7 @@ case_test_setup_html_view = do
 
 case_install_genome_user_mode = do
   r1 <- installData (Just User) "ce10"
-  p <- (</> (getIndexPath "ce10")) <$> userDataDirectory
+  p <- (</> "ce10") <$> userDataDirectory
   r1 @?= p 
 
 
