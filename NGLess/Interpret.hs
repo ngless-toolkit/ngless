@@ -262,7 +262,8 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
         features = lookup "features" args
         fs = case features of
             Nothing -> Nothing
-            Just (NGOList feats') -> Just $ (map (T.unpack . evalString)) $ feats'
+            Just (NGOSymbol f) -> Just [T.unpack f]
+            Just (NGOList feats') -> Just $ (map (T.unpack . evalSymbol)) $ feats'
             Just _ -> unreachable "executeAnnotation: TYPE ERROR"
     res <- liftIO $ annotate e g fs dDS m a s
     return $ NGOAnnotatedSet res
@@ -412,11 +413,15 @@ evalIndex _ _ = error "evalIndex: invalid operation"
 evalBool (NGOBool x) = x
 evalBool _ = error "evalBool: Argument type must be NGOBool"
 
-evalString (NGOString x) = x
-evalString _ = error "evalString: Argument type must be NGOString"
+evalString (NGOString s) = s
+evalString o = error ("evalString: Argument type must be NGOString (received " ++ show o ++ ").")
 
-evalInteger (NGOInteger x) = x
-evalInteger _ = error "evalString: Argument type must be NGOInteger"
+evalSymbol (NGOSymbol s) = s
+evalSymbol o = error ("evalSymbol: Argument type must be NGOSymbol (received " ++ show o ++ ").")
+
+evalInteger (NGOInteger i) = i
+evalInteger o = error ("evalInteger: Argument type must be NGOInteger (got " ++ show o ++ ").")
+
 
 -- Binary Evaluation
 evalBinary :: BOp ->  NGLessObject -> NGLessObject -> NGLessObject
