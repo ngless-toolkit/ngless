@@ -780,14 +780,6 @@ case_interval_map_overlaps_2 = IM.overlaps  (IM.ClosedInterval (3 :: Integer) 6)
 case_interval_map_overlaps_3 = IM.overlaps  (IM.ClosedInterval (300 :: Integer) 400) (IM.ClosedInterval 200 300) @?= True
 
 
-case_not_InsideInterval_1 = _isInsideInterval 0 (IM.ClosedInterval 1 5) @?= False
-case_not_InsideInterval_2 = _isInsideInterval 6 (IM.ClosedInterval 1 5) @?= False
-
-case_isInsideInterval_1 = _isInsideInterval 3 (IM.ClosedInterval 1 5) @?= True
-case_isInsideInterval_2 = _isInsideInterval 1 (IM.ClosedInterval 1 5) @?= True
-case_isInsideInterval_3 = _isInsideInterval 5 (IM.ClosedInterval 3 5) @?= True
-
-
 k1 = (IM.ClosedInterval 10 20, readAnnotCounts "x\tgene\t10\t+\n")
 k2 = (IM.ClosedInterval 1 5,   readAnnotCounts "y\tgene\t10\t+\n")
 k3 = (IM.ClosedInterval 30 30, readAnnotCounts "x\tgene\t20\t+\n")

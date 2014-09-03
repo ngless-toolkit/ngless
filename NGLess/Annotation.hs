@@ -7,7 +7,6 @@ module Annotation
     , _intersection_non_empty
     , _filterFeatures
     , _sizeNoDup
-    , _isInsideInterval
     ) where
 
 
@@ -105,10 +104,6 @@ uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust (incCount) k res) im ke
         incCount (x:rs) = incCount' x : rs
         incCount' (GffCount gId gT gC gS) = (GffCount gId gT (gC + 1) gS)
 
-
-_isInsideInterval :: Int -> IM.Interval Int -> Bool
-_isInsideInterval k (IM.ClosedInterval l u) = k >= l && k <= u
-_isInsideInterval _ err = error ("Expecting ClosedInterval but got: " ++ show err)
 
 --- Diferent modes
 
