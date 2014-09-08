@@ -280,11 +280,11 @@ As a result of the execution, should be returned the following:
 
 .. code-block:: bash
 
-	Total reads:
-	Total reads aligned:
-	Total reads Unique map:
-	Total reads Non-Unique map: 
-	Total reads without enough qual:
+	Total reads: 32457019
+	Total reads aligned: 31316462[96.49%]
+	Total reads Unique map: 25218844[80.53%]
+	Total reads Non-Unique map: 6097618[19.47%]
+	Total reads without enough qual: 0
 
 These are statistics of the map of the file against the human genome.
 
