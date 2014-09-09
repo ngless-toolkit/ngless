@@ -47,7 +47,7 @@ data NGLess =
 ngless = DefaultMode
         { debug_mode = "ngless"
         , input = "-" &= argPos 0 &= opt ("-" :: String)
-        , n_threads = 0 &= name "n"
+        , n_threads = 1 &= name "n"
         }
         &= details  [ "Example:" , "ngless script.ngl" ]
 
