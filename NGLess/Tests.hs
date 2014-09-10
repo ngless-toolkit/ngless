@@ -629,22 +629,21 @@ case_createFileProcessed = do
 
 -- Sam operations
 
-case_isAligned_sam = isAligned (SamLine ud 16 ud 0 0 ud ud 0 0 ud ud) @? "Should be aligned"
+samLineFlat = "IRIS:7:3:1046:1723#0\t4\t*\t0\t0\t37M\t*\t0\t0\tAAAAAAAAAAAAAAAAAAAAAAA\taaaaaaaaaaaaaaaaaa`aa`^\tAS:i:0  XS:i:0"
+samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*", samPos = 0, samMapq = 0, samCigLen = 37, samRNext = "*", samPNext = 0, samTLen = 0, samSeq = "AAAAAAAAAAAAAAAAAAAAAAA", samQual = "aaaaaaaaaaaaaaaaaa`aa`^"}   
+
+case_isAligned_sam = isAligned (samLine {samFlag = 16}) @? "Should be aligned"
 case_isAligned_raw = isAligned (head . readAlignments $ r) @? "Should be aligned"
     where
         r = "SRR070372.3\t16\tV\t7198336\t21\t26M3D9M3D6M6D8M2D21M\t*\t0\t0\tCCCTTATGCAGGTCTTAACACAATTCTTGTATGTTCCATCGTTCTCCAGAATGAATATCAATGATACCAA\t014<<BBBBDDFFFDDDDFHHFFD?@??DBBBB5555::?=BBBBDDF@BBFHHHHHHHFFFFFD@@@@@\tNM:i:14\tMD:Z:26^TTT9^TTC6^TTTTTT8^AA21\tAS:i:3\tXS:i:0"
 
-case_isNotAligned = (not $ isAligned (SamLine ud 4 ud 0 0 ud ud 0 0 ud ud)) @? "Should not be aligned"
+case_isNotAligned = (not $ isAligned (samLine {samFlag = 4})) @? "Should not be aligned"
 
-case_isUnique = isUnique (SamLine ud 16 ud 0 10 ud ud 0 0 ud ud) @? "Should be unique"
-case_isNotUnique = (not $ isUnique (SamLine ud 4 ud 0 0 ud ud 0 0 ud ud)) @? "Should not be unique"
-ud = undefined
+case_isUnique = isUnique (samLine {samMapq = 5}) @? "Should be unique"
+case_isNotUnique = (not $ isUnique (samLine {samMapq = 0})) @? "Should not be unique"
 
 case_read_one_Sam_Line = readAlignments samLineFlat @?= [samLine]
 case_read_mul_Sam_Line = readAlignments (L.unlines $ replicate 10 samLineFlat) @?= replicate 10 samLine
-
-samLineFlat = "IRIS:7:3:1046:1723#0\t4\t*\t0\t0\t37M\t*\t0\t0\tAAAAAAAAAAAAAAAAAAAAAAA\taaaaaaaaaaaaaaaaaa`aa`^\tAS:i:0  XS:i:0"
-samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*", samPos = 0, samMapq = 0, samCigLen = 37, samRNext = "*", samPNext = 0, samTLen = 0, samSeq = "AAAAAAAAAAAAAAAAAAAAAAA", samQual = "aaaaaaaaaaaaaaaaaa`aa`^"}   
 
 
 -- Tests with scripts (This will pass to a shell script)

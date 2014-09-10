@@ -11,14 +11,14 @@ module Annotation
 
 
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.Text as T
 
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Map.Strict as M
 
 import Data.Maybe (fromJust)
-import Data.List (foldl')
+import Data.Foldable(foldl')
+import Control.DeepSeq
 
 import FileManagement(readPossiblyCompressedFile)
 import ReferenceDatabases
@@ -51,20 +51,23 @@ getIntervalQuery IntersectStrict = _intersection_strict
 getIntervalQuery IntersectNonEmpty = _intersection_non_empty
 
 
-annotate' :: FilePath -> FilePath -> Maybe [String] -> (IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> IO FilePath
+annotate' :: FilePath -> FilePath -> Maybe [String] -> (IM.IntervalMap Int [GffCount] -> (Int,Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> IO FilePath
 annotate' samFp gffFp feats a f s = do
-    gff <- readPossiblyCompressedFile gffFp
-    sam <- readPossiblyCompressedFile samFp
-    let imGff = intervals . filter (_filterFeatures feats) . readAnnotations $ gff
-        counts = compStatsAnnot imGff sam f a s
-    writeAnnotCount samFp (toGffM . concat . map (M.elems) . M.elems $ counts)
+        gffC <- readPossiblyCompressedFile gffFp >>= return . intervals . filter (_filterFeatures feats) . readAnnotations
+        samC <- readPossiblyCompressedFile samFp >>= return . filter isAligned . readAlignments 
+        let res = calculateAnnotation gffC samC
+        writeAnnotCount samFp (toGffM . concat . map (M.elems) . M.elems $ res)
+    where
+        calculateAnnotation :: AnnotationMap -> [SamLine] -> AnnotationMap
+        calculateAnnotation aMap sam = aMap `deepseq` compStatsAnnot aMap sam f a s
+
 
 toGffM :: [IM.IntervalMap Int [GffCount]] -> [GffCount]
-toGffM = concat . foldl (\a b -> (++) (IM.elems b) a) []
+toGffM = concat . concat . map IM.elems
 
 
-compStatsAnnot ::  AnnotationMap -> L8.ByteString -> Bool -> (IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> AnnotationMap
-compStatsAnnot imGff sam a f s = foldl iterSam imGff $ filter isAligned . readAlignments $ sam
+compStatsAnnot ::  AnnotationMap -> [SamLine] -> Bool -> (IM.IntervalMap Int [GffCount] -> (Int,Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> AnnotationMap
+compStatsAnnot imGff sam a f s = foldl iterSam imGff sam
     where
       iterSam im y = M.map (M.alter alterCounts k) im
         where
@@ -150,8 +153,14 @@ intervals = foldl' insertg M.empty
             Nothing -> Just $ insertCount g IM.empty
             Just a  -> Just $ insertCount g a
 
+
 insertCount :: GffLine -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
-insertCount g im = IM.insertWith ((++)) (asInterval g) [GffCount (gffId g) (gffType g) 0 (gffStrand g)] im
+insertCount g im = IM.alter (insertCount') intv im
+    where 
+          insertCount' Nothing  = Just [count]
+          insertCount' (Just v) = Just $ count : v
+          count = GffCount (gffId g) (gffType g) 0 (gffStrand g)  
+          intv  = asInterval g
 
 
 asInterval :: GffLine -> IM.Interval Int
