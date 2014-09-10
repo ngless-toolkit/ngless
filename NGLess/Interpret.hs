@@ -141,7 +141,7 @@ interpret :: FilePath -> T.Text -> [(Int,Expression)] -> IO ()
 interpret fname script es = do
     let nglessScript = NGOString script 
         nglessScriptFname = NGOFilename fname
-    _ <- htmlDefaultDir >>= setupHtmlViewer fname
+    _ <- htmlResourcePath >>= setupHtmlViewer fname
     r <- evalStateT (runErrorT (interpretIO es)) (0, Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty))
     case r of
         Right _ -> return ()

@@ -4,12 +4,10 @@ module Configuration
     , globalDataDirectory
     , userDataDirectory
     , printNglessLn
-    , getNglessRoot
     , samtoolsBin
     , bwaBin
     , outputDirectory
-
-    , htmlDefaultDir
+    , htmlResourcePath
     ) where
 
 import Control.Monad (unless)
@@ -66,8 +64,8 @@ samtoolsBin = do
     check_executable "samtools" bin
 
 
-htmlDefaultDir :: IO FilePath
-htmlDefaultDir = (</> "../share/ngless/Html") <$> getNglessRoot
+htmlResourcePath :: IO FilePath
+htmlResourcePath = (</> "../share/ngless/Html") <$> getNglessRoot
 
 outputDirectory :: FilePath -> IO FilePath
 outputDirectory ifile = return $ replaceExtension ifile ".ngless_output/"

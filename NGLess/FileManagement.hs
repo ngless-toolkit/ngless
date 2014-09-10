@@ -43,7 +43,7 @@ getFilesInDir p = do
 setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
 setupRequiredFiles info dirTemplate = do
     let destDir' = dirTemplate ++ "$" ++ info
-    htmlSourceP <- htmlDefaultDir
+    htmlSourceP <- htmlResourcePath
     createDirectory destDir'
     copyFile (htmlSourceP </> "perBaseQualScores.css") (destDir' </> "perBaseQualScores.css")
     copyFile (htmlSourceP </> "perBaseQualityScores.js") (destDir' </> "perBaseQualityScores.js")
