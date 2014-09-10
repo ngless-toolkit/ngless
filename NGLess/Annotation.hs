@@ -140,8 +140,8 @@ _allSameId im = all ((== sId) . annotSeqId) elems
 
 --------------------
 
-intervals :: [GffLine] -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
-intervals = foldl' insertg M.empty
+intervals :: [GffLine] -> AnnotationMap
+intervals = foldl (insertg) M.empty
     where
         insertg im g = M.alter (\mF -> updateF g mF) (gffType g) im
         updateF g mF = case mF of
