@@ -63,7 +63,7 @@ mapToReference refIndex readSet = do
 interpretMapOp :: T.Text -> FilePath -> IO NGLessObject
 interpretMapOp r ds = do
     (ref', defGen') <- indexReference'
-    samPath' <- mapToReference (getIndexPath ref') ds
+    samPath' <- mapToReference ref' ds
     getSamStats samPath'
     return $ NGOMappedReadSet samPath' defGen'
     where
@@ -73,7 +73,7 @@ interpretMapOp r ds = do
             if isDefaultReference (T.unpack r)
                 then do
                     basedir  <- ensureDataPresent r'
-                    return (basedir, Just r)
+                    return (getIndexPath basedir, Just r)
                 else (, Nothing) <$> indexReference r
 
 getSamStats :: FilePath -> IO ()
