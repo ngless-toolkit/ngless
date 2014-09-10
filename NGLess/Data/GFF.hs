@@ -15,6 +15,8 @@ module Data.GFF
     , showStrand
     ) where
 
+import Data.Maybe
+import Control.DeepSeq
 
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
@@ -22,7 +24,6 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
-import Control.DeepSeq
 
 data GffType = GffExon
                 | GffGene
@@ -44,13 +45,28 @@ data GffLine = GffLine
             { gffSeqId :: S.ByteString
             , gffSource :: S.ByteString
             , gffType :: GffType
-            , gffStart :: Int
-            , gffEnd :: Int
+            , gffStart :: !Int
+            , gffEnd :: !Int
             , gffScore :: Maybe Float
             , gffStrand :: GffStrand
-            , gffPhase :: Int -- ^phase: use -1 to denote .
-            , gffAttributes :: S.ByteString
+            , gffPhase :: !Int -- ^phase: use -1 to denote .
+            , gffId :: S.ByteString
             } deriving (Eq,Show)
+
+instance NFData GffLine where
+    rnf gl = (gffSeqId gl) `seq`
+            (gffSource gl) `seq`
+            (gffType gl) `seq`
+            (gffStart gl) `seq`
+            (gffEnd gl) `seq`
+            (gffScore gl) `deepseq`
+            (gffStrand gl) `seq`
+            (gffPhase gl) `seq`
+            (gffId gl) `deepseq`
+            ()
+
+instance NFData GffType where
+    rnf a = a `seq` ()
 
 
 parseGffAttributes :: S.ByteString -> [(S.ByteString, S.ByteString)]
@@ -63,7 +79,7 @@ parseGffAttributes = map (\(aid,aval) -> (aid, S8.filter (/='\"') . S.tail $ ava
                         . f -- remove white space from the end
        where f = S8.reverse . S8.dropWhile isSpace
                  
---
+
 removeLastDel :: S8.ByteString -> S8.ByteString
 removeLastDel s = case S8.last s of
     ';' -> S8.init s
@@ -89,25 +105,12 @@ trimString = trimBeg . trimEnd
 isSpace :: Char -> Bool
 isSpace = (== ' ')
 
-instance NFData GffLine where
-    rnf gl = (gffSeqId gl) `seq`
-            (gffSource gl) `seq`
-            (gffType gl) `seq`
-            (gffStart gl) `seq`
-            (gffEnd gl) `seq`
-            (gffScore gl) `deepseq`
-            (gffStrand gl) `seq`
-            (gffPhase gl) `seq`
-            (gffAttributes gl) `seq`
-            ()
 
-gffGeneId g = do
-    let attrs = (parseGffAttributes $ gffAttributes g)
-        res = lookup (S8.pack "ID") attrs
-        res' = lookup (S8.pack "gene_id") attrs
-    case res of
-        Nothing -> res'
-        _ -> res
+gffGeneId :: S8.ByteString -> S8.ByteString
+gffGeneId g = fromMaybe "unknown" (listToMaybe . catMaybes $ map (`lookup` r) ["ID", "gene_id"])
+    where 
+        r = parseGffAttributes g
+
 
 readAnnotations :: L.ByteString -> [GffLine]
 readAnnotations = readAnnotations' . L8.lines
@@ -130,7 +133,7 @@ readLine line = if length tokens == 9
                 (score tk5)
                 (strand $ L8.head tk6)
                 (phase tk7)
-                (BL.toStrict tk8)
+                (S8.copy . gffGeneId $ BL.toStrict tk8)
             else error (concat ["unexpected line in GFF: ", show line])
     where
         tokens = L8.split '\t' line
@@ -139,6 +142,7 @@ readLine line = if length tokens == 9
         score v = Just (read $ L8.unpack v)
         phase "." = -1
         phase r = read (L8.unpack r)
+
 
 parsegffType :: S.ByteString -> GffType
 parsegffType "exon" = GffExon

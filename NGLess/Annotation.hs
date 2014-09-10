@@ -19,7 +19,7 @@ import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Set as Set
 import qualified Data.Map.Strict as M
 
-import Data.Maybe (fromMaybe, fromJust)
+import Data.Maybe (fromJust)
 import Data.List (foldl')
 
 import FileManagement(readPossiblyCompressedFile)
@@ -140,14 +140,12 @@ intervals = foldl' insertg M.empty
             Just a  -> Just $ insertCount g a
 
 insertCount :: GffLine -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
-insertCount g im = IM.insertWith ((++)) (asInterval g) [GffCount (genId g) (gffType g) 0 (gffStrand g)] im
+insertCount g im = IM.insertWith ((++)) (asInterval g) [GffCount (gffId g) (gffType g) 0 (gffStrand g)] im
 
 
 asInterval :: GffLine -> IM.Interval Int
 asInterval g = IM.ClosedInterval (gffStart g) (gffEnd g)
 
-genId :: GffLine -> S8.ByteString
-genId g = fromMaybe (S8.pack "unknown") $ gffGeneId g
 
 _filterFeatures :: Maybe [String] -> GffLine -> Bool
 _filterFeatures Nothing gf = (gffType gf) == GffGene
