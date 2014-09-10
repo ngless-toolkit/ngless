@@ -24,6 +24,9 @@ import FileManagement (createDir, getFilesInDir, readPossiblyCompressedFile)
 import Data.FastQ
 import Configuration
 
+maxTempFileSize = (100*1000*1000) -- 100MB
+
+
 hashRead :: Int -> ShortRead -> Int
 hashRead k (ShortRead _ r _) = mod (hash r) k
 
@@ -67,9 +70,7 @@ put1k k r dups_ref = do
 numFiles :: FilePath -> IO Integer
 numFiles path = do
     fsize <- withFile path ReadMode hFileSize
-    tmpSize <- maxTempFileSize
-    return $ ceiling $ ((fromInteger fsize) / tmpSize  :: Double)
-
+    return $ ceiling $ ((fromInteger fsize) / maxTempFileSize  :: Double)
 
 -- Open and close file handles
 openKFileHandles :: Int -> FilePath -> IO [Handle]

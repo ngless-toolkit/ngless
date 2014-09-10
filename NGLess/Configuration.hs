@@ -10,7 +10,6 @@ module Configuration
     , outputDirectory
 
     , htmlDefaultDir
-    , maxTempFileSize
     ) where
 
 import Control.Monad (unless)
@@ -73,5 +72,3 @@ htmlDefaultDir = (</> "../share/ngless/Html") <$> getNglessRoot
 outputDirectory :: FilePath -> IO FilePath
 outputDirectory ifile = return $ replaceExtension ifile ".ngless_output/"
 
-maxTempFileSize :: Num a => IO a
-maxTempFileSize = return (100*1000*1000) -- 100MB
