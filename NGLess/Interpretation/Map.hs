@@ -27,14 +27,13 @@ import Configuration
 import Data.Sam
 import Utils.Bwa
 
-indexReference :: T.Text -> IO FilePath
-indexReference refPath = do
-    let refPath' = (T.unpack refPath)
-    hasIndex <- hasValidIndex refPath'
+ensureIndexExists :: FilePath -> IO FilePath
+ensureIndexExists refPath = do
+    hasIndex <- hasValidIndex refPath
     if hasIndex
-        then printNglessLn $ "index for " ++ refPath' ++ " already exists."
-        else createIndex refPath'
-    return refPath'
+        then printNglessLn $ "index for " ++ refPath ++ " already exists."
+        else createIndex refPath
+    return refPath
 
 
 mapToReference :: FilePath -> FilePath -> IO String
@@ -74,7 +73,7 @@ interpretMapOp r ds = do
                 then do
                     basedir  <- ensureDataPresent r'
                     return (getIndexPath basedir, Just r)
-                else (, Nothing) <$> indexReference r
+                else (, Nothing) <$> ensureIndexExists r'
 
 getSamStats :: FilePath -> IO ()
 getSamStats fname = readPossiblyCompressedFile fname >>= printSamStats . _calcSamStats
