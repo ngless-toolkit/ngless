@@ -28,6 +28,8 @@ import Data.GFF
 import Data.Sam (SamLine(..), isAligned, isPositive, cigarTLen, readAlignments)
 import Data.AnnotRes
 
+type AnnotationMap = M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
+
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
 
@@ -43,13 +45,13 @@ annotate samFP Nothing feats dDs m a s =
                 annotate' samFP (getGff basedir) feats (getIntervalQuery m) a s   -- used default GFF
             Nothing -> error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
 
-getIntervalQuery :: AnnotationIntersectionMode -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount])
+getIntervalQuery :: AnnotationIntersectionMode -> (IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount])
 getIntervalQuery IntersectUnion = union
 getIntervalQuery IntersectStrict = _intersection_strict
 getIntervalQuery IntersectNonEmpty = _intersection_non_empty
 
 
-annotate' :: FilePath -> FilePath -> Maybe [String] -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> IO FilePath
+annotate' :: FilePath -> FilePath -> Maybe [String] -> (IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> IO FilePath
 annotate' samFp gffFp feats a f s = do
     gff <- readPossiblyCompressedFile gffFp
     sam <- readPossiblyCompressedFile samFp
@@ -61,8 +63,7 @@ toGffM :: [IM.IntervalMap Int [GffCount]] -> [GffCount]
 toGffM = concat . foldl (\a b -> (++) (IM.elems b) a) []
 
 
-type AnnotationMap = M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
-compStatsAnnot ::  AnnotationMap -> L8.ByteString -> Bool -> ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> AnnotationMap
+compStatsAnnot ::  AnnotationMap -> L8.ByteString -> Bool -> (IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> AnnotationMap
 compStatsAnnot imGff sam a f s = foldl iterSam imGff $ filter isAligned . readAlignments $ sam
     where
       iterSam im y = M.map (M.alter alterCounts k) im
@@ -72,17 +73,18 @@ compStatsAnnot imGff sam a f s = foldl iterSam imGff $ filter isAligned . readAl
             k = samRName y
 
 
-modeAnnotation :: ([IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]) -> Bool -> IM.IntervalMap Int [GffCount] -> SamLine -> Bool -> IM.IntervalMap Int [GffCount]
-modeAnnotation f a im y s = countsAmbiguity a ((filterStrand s asStrand) . f $ posR) im
+modeAnnotation :: (IM.IntervalMap Int [GffCount] -> (Int,Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> IM.IntervalMap Int [GffCount] -> SamLine -> Bool -> IM.IntervalMap Int [GffCount]
+modeAnnotation f a im y s = countsAmbiguity a ((filterStrand s asStrand) . (f im) $ (sStart, sEnd)) im
   where
     sStart = samPos y
     sEnd   = sStart + (cigarTLen $ samCigar y) - 1
-    posR   = map (\k -> IM.fromList $ IM.containing im k) [sStart..sEnd]
     asStrand = if isPositive y then GffPosStrand else GffNegStrand
+
 
 filterStrand :: Bool -> GffStrand -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
 filterStrand True  s m =  IM.filter (not . null) . IM.map (filterByStrand s) $ m
 filterStrand False _ m = m
+
 
 countsAmbiguity :: Bool -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
 countsAmbiguity True toU imR = uCounts toU imR
@@ -103,15 +105,27 @@ uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust (incCount) k res) im ke
 
 --- Diferent modes
 
-union :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
-union = IM.unions
 
-_intersection_strict :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
-_intersection_strict [] = IM.empty
-_intersection_strict im = foldl (IM.intersection) (head im) im
+union :: IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]
+union im (sS, sE) = IM.fromList $ IM.intersecting im intv
+    where
+        intv = IM.ClosedInterval sS sE
 
-_intersection_non_empty :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
-_intersection_non_empty im = _intersection_strict . filter (not . IM.null) $ im
+_intersection_strict :: IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]
+_intersection_strict im (sS, sE) = intersection' im'
+    where 
+        im' = map (IM.fromList . (IM.containing im)) [sS..sE]
+
+
+_intersection_non_empty :: IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]
+_intersection_non_empty im (sS, sE) = intersection' . filter (not . IM.null) $ im'
+    where 
+        im' = map (IM.fromList . (IM.containing im)) [sS..sE]
+
+
+intersection' :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
+intersection' [] = IM.empty
+intersection' im = foldl (IM.intersection) (head im) im
 
 --------------------
 
