@@ -81,6 +81,7 @@ function_args_allowed_symbols :: FuncName -> T.Text -> [T.Text]
 function_args_allowed_symbols Fannotate "features"   = ["gene", "cds", "exon"]
 function_args_allowed_symbols Fannotate "mode"       = ["union", "intersection_strict", "intersection_non_empty"]
 function_args_allowed_symbols Fwrite "format"        = ["tsv", "csv", "bam", "sam"]
+function_args_allowed_symbols Fwrite "verbose"       = ["yes", "no"]
 function_args_allowed_symbols Fcount "counts"        = ["gene", "cds", "exon"]
 function_args_allowed_symbols _ _                    = []
 
