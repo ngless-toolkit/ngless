@@ -28,7 +28,7 @@ data SamLine = SamLine
             , samRName :: S.ByteString
             , samPos :: !Int
             , samMapq :: !Int
-            , samCigar :: S.ByteString
+            , samCigLen :: !Int
             , samRNext :: S.ByteString
             , samPNext :: !Int
             , samTLen :: !Int
@@ -87,7 +87,7 @@ readSamLine line = case L8.split '\t' line of
                 (strict tk2)
                 (readInt tk3)
                 (readInt tk4)
-                (strict tk5)
+                (cigarTLen $ strict tk5)
                 (strict tk6)
                 (readInt tk7)
                 (readInt tk8)

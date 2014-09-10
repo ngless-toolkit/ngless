@@ -25,7 +25,7 @@ import ReferenceDatabases
 import Configuration
 
 import Data.GFF
-import Data.Sam (SamLine(..), isAligned, isPositive, cigarTLen, readAlignments)
+import Data.Sam (SamLine(..), isAligned, isPositive, readAlignments)
 import Data.AnnotRes
 
 type AnnotationMap = M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
@@ -77,7 +77,7 @@ modeAnnotation :: (IM.IntervalMap Int [GffCount] -> (Int,Int) -> IM.IntervalMap 
 modeAnnotation f a im y s = countsAmbiguity a ((filterStrand s asStrand) . (f im) $ (sStart, sEnd)) im
   where
     sStart = samPos y
-    sEnd   = sStart + (cigarTLen $ samCigar y) - 1
+    sEnd   = sStart + (samCigLen y) - 1
     asStrand = if isPositive y then GffPosStrand else GffNegStrand
 
 
@@ -103,8 +103,8 @@ uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust (incCount) k res) im ke
         incCount' (GffCount gId gT !gC gS) = (GffCount gId gT (gC + 1) gS)
 
 
---- Diferent modes
 
+--- Diferent modes
 
 union :: IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]
 union im (sS, sE) = IM.fromList $ IM.intersecting im intv
