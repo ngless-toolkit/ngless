@@ -21,7 +21,7 @@ runWebServer fname nglessport = do
 
 
 
-nglessApp :: String -> ServerPart Response
+nglessApp :: FilePath -> ServerPart Response
 nglessApp ddir = msum
         [ dir "removeDS" $ queryParams "id" >>= ok . toResponse . fromJust
         , dir "serveF" $ queryParams "id" >>= serveFile (guessContentTypeM mimeTypes) . fromJust
