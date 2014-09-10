@@ -29,17 +29,14 @@ import Data.GFF
 data GffCount = GffCount
             { annotSeqId :: S.ByteString
             , annotType :: GffType
-            , annotCount :: Int
+            , annotCount :: !Int
             , annotStrand :: GffStrand
             } deriving (Eq,Show)
 
 instance NFData GffCount where
-    rnf gl = (annotSeqId gl) `seq`
-             (annotType gl) `seq`
-             (annotCount gl) `seq`
-             (annotStrand gl) `seq`
-             ()
+    rnf (GffCount si t c s) = si `seq` t `seq` c `seq` s `seq` ()
 
+    
 showGffCount :: [GffCount] -> L8.ByteString 
 showGffCount = L8.unlines . fmap (showCounts "\t")
 
