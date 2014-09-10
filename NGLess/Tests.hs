@@ -815,13 +815,11 @@ case_intersection_nonempty_normal_2 = _intersection_non_empty [imapAll, imap1] @
 case_intersection_nonempty_same     = _intersection_non_empty [imapAll, imapAll] @?= imapAll
 
 
-case_size_no_dup_normal = _sizeNoDup imapAll @?= 2
-case_size_no_dup_empty  = _sizeNoDup IM.empty @?= 0
+case_size_no_dup_normal = _allSameId imapAll @?= False
 
-case_size_no_dup_duplicate_1 = _sizeNoDup imap1Dup @?= 1
-case_size_no_dup_duplicate_2 = _sizeNoDup imap2Dup @?= 1
-case_size_no_dup_duplicate_3 = _sizeNoDup imap3Dup @?= 1
-
+case_size_no_dup_duplicate_1 = _allSameId imap1Dup @?= True
+case_size_no_dup_duplicate_2 = _allSameId imap2Dup @?= True
+case_size_no_dup_duplicate_3 = _allSameId imap3Dup @?= True
 
 
 ----- VectorOperations.hs

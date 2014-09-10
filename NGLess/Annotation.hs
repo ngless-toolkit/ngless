@@ -6,7 +6,7 @@ module Annotation
     , _intersection_strict
     , _intersection_non_empty
     , _filterFeatures
-    , _sizeNoDup
+    , _allSameId
     ) where
 
 
@@ -15,8 +15,6 @@ import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.Text as T
 
 import qualified Data.IntervalMap.Strict as IM
-
-import qualified Data.Set as Set
 import qualified Data.Map.Strict as M
 
 import Data.Maybe (fromJust)
@@ -90,9 +88,9 @@ countsAmbiguity :: Bool -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [
 countsAmbiguity True toU imR = uCounts toU imR
 countsAmbiguity False toU imR = case IM.size toU of
         0 -> imR --"no_feature"
-        _ -> case _sizeNoDup toU of
-            1 -> uCounts (IM.fromList . remAllButOneCount . IM.toList $ toU) imR -- same feature multiple times. increase that feature ONCE.
-            _ -> imR --'ambiguous'
+        _ -> case _allSameId toU of
+            True  -> uCounts (IM.fromList . remAllButOneCount . IM.toList $ toU) imR -- same feature multiple times. increase that feature ONCE.
+            False -> imR --'ambiguous'
     where
         remAllButOneCount = take 1 -- [(k1,[v1,v2,v3]), (k2,[v1,v2,v3])] -> [(K, _)] -- only for the case where all ids are equal.
 
@@ -119,11 +117,12 @@ _intersection_non_empty im = _intersection_strict . filter (not . IM.null) $ im
 
 --------------------
 
-_sizeNoDup :: IM.IntervalMap Int [GffCount] -> Int
-_sizeNoDup im = Set.size $ IM.foldl (\m v -> Set.union m (gffIds v)) Set.empty im -- 1 (same feature) or n dif features.
+_allSameId :: IM.IntervalMap Int [GffCount] -> Bool
+_allSameId im = all ((== sId) . annotSeqId) elems
     where
-        gffIds :: [GffCount] -> Set.Set S8.ByteString
-        gffIds = Set.fromList . map annotSeqId
+        sId   = annotSeqId . head $ elems
+        elems = concat . IM.elems $ im
+
 --------------------
 
 intervals :: [GffLine] -> M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
