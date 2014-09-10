@@ -86,13 +86,11 @@ filterStrand False _ m = m
 
 countsAmbiguity :: Bool -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
 countsAmbiguity True toU imR = uCounts toU imR
-countsAmbiguity False toU imR = case IM.size toU of
-        0 -> imR --"no_feature"
-        _ -> case _allSameId toU of
-            True  -> uCounts (IM.fromList . remAllButOneCount . IM.toList $ toU) imR -- same feature multiple times. increase that feature ONCE.
-            False -> imR --'ambiguous'
-    where
-        remAllButOneCount = take 1 -- [(k1,[v1,v2,v3]), (k2,[v1,v2,v3])] -> [(K, _)] -- only for the case where all ids are equal.
+countsAmbiguity False toU imR = case IM.null toU of
+        True  -> imR -- no_feature
+        False -> case _allSameId toU of
+            True  -> uCounts (IM.fromList . take 1 . IM.toList $ toU) imR -- same feature multiple times. increase that feature ONCE.
+            False -> imR -- ambiguous
 
 
 uCounts :: IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
@@ -100,7 +98,7 @@ uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust (incCount) k res) im ke
     where
         incCount []     = []
         incCount (x:rs) = incCount' x : rs
-        incCount' (GffCount gId gT gC gS) = (GffCount gId gT (gC + 1) gS)
+        incCount' (GffCount gId gT !gC gS) = (GffCount gId gT (gC + 1) gS)
 
 
 --- Diferent modes
