@@ -16,6 +16,7 @@ import Text.Parsec.Pos (newPos)
 
 import System.Directory(removeFile, removeDirectoryRecursive, createDirectoryIfMissing)
 import System.FilePath.Posix((</>))
+import System.Directory (doesFileExist)
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L

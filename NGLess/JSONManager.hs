@@ -13,11 +13,11 @@ import qualified Data.Text as T
 import Control.Applicative ((<$>))
 import Data.Aeson
 import System.FilePath.Posix
+import System.Directory
 
 import Data.Json
 import Data.FastQ
 import qualified FastQStatistics as FQ
-import FileManagement
 
 
 fProc = "var filesProcessed = "
@@ -37,10 +37,10 @@ createBasicStatsJson fileData fname enc = resJS
 insertFilesProcessedJson :: FilePath -> T.Text -> IO ()
 insertFilesProcessedJson t script = do
         let jsonPath = (</> "filesProcessed.js") $ (takeDirectory t)
-        doesFileExist jsonPath 
-          >>= \x -> case x of
-            True  -> createFilesProcessed t script >>= \v -> updateProcessedJson fProc v jsonPath 21
-            False -> filesProcessedToJson t script >>= \v -> createProcessedJson fProc (BL.concat ["[", v, "]"]) jsonPath
+        exists <- doesFileExist jsonPath
+        if exists
+            then createFilesProcessed t script >>= \v -> updateProcessedJson fProc v jsonPath 21
+            else filesProcessedToJson t script >>= \v -> createProcessedJson fProc (BL.concat ["[", v, "]"]) jsonPath
 
 
 filesProcessedToJson :: FilePath -> T.Text -> IO BL.ByteString

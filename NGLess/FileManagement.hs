@@ -8,7 +8,6 @@ module FileManagement
         setupRequiredFiles,
         generateDirId,
         setupHtmlViewer,
-        doesFileExist,
         readPossiblyCompressedFile,
         writeGZIP,
         parseFileName,
