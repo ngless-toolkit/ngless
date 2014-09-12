@@ -136,6 +136,8 @@ runInROEnvIO = runInEnv . runInROEnv
 
 -- | By necessity, this code has several unreachable corners
 unreachable err = error ("Reached code that was thought to be unreachable!\n"++err)
+nglTypeError err = error ("Unexpected type error! This should have been caught by validation!\n"++err)
+
 
 interpret :: FilePath -> T.Text -> [(Int,Expression)] -> IO ()
 interpret fname script es = do
@@ -388,13 +390,13 @@ interpretPreProcessExpr expr = interpretExpr expr
 evalUOP :: UOp -> NGLessObject -> NGLessObject
 evalUOP UOpMinus x@(NGOInteger _) = evalMinus x
 evalUOP UOpLen sr@(NGOShortRead _) = evalLen sr
-evalUOP _ _ = error "invalid unary operation. "
+evalUOP _ _ = nglTypeError "invalid unary operation. "
 
 evalLen (NGOShortRead r) = NGOInteger . toInteger $ srLength r
-evalLen err = error ("Length must receive a Read. Received a " ++ show err)
+evalLen err = nglTypeError ("Length must receive a Read. Received a " ++ show err)
 
 evalMinus (NGOInteger n) = NGOInteger (-n)
-evalMinus err = error ("Minus operator must receive a integer. Received a" ++ show err)
+evalMinus err = nglTypeError ("Minus operator must receive a integer. Received a" ++ show err)
 
 evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject
 evalIndex sr index@[Just (NGOInteger a)] = evalIndex sr $ (Just $ NGOInteger (a + 1)) : index
@@ -408,51 +410,36 @@ evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Just (
         s' = (fromIntegral s)
         e'' = e'- s'
     NGOShortRead (ShortRead rId (B.take e'' . B.drop s' $ rSeq) (B.take e'' . B.drop s' $ rQual))
-evalIndex _ _ = error "evalIndex: invalid operation"
+evalIndex _ _ = nglTypeError "evalIndex: invalid operation"
 
 evalBool (NGOBool x) = x
-evalBool _ = error "evalBool: Argument type must be NGOBool"
+evalBool _ = nglTypeError "evalBool: Argument type must be NGOBool"
 
 evalString (NGOString s) = s
-evalString o = error ("evalString: Argument type must be NGOString (received " ++ show o ++ ").")
+evalString o = nglTypeError ("evalString: Argument type must be NGOString (received " ++ show o ++ ").")
 
 evalSymbol (NGOSymbol s) = s
-evalSymbol o = error ("evalSymbol: Argument type must be NGOSymbol (received " ++ show o ++ ").")
+evalSymbol o = nglTypeError ("evalSymbol: Argument type must be NGOSymbol (received " ++ show o ++ ").")
 
 evalInteger (NGOInteger i) = i
-evalInteger o = error ("evalInteger: Argument type must be NGOInteger (got " ++ show o ++ ").")
+evalInteger o = nglTypeError ("evalInteger: Argument type must be NGOInteger (got " ++ show o ++ ").")
 
 
 -- Binary Evaluation
 evalBinary :: BOp ->  NGLessObject -> NGLessObject -> NGLessObject
-evalBinary BOpLT lexpr rexpr = lt lexpr rexpr 
-evalBinary BOpGT lexpr rexpr  = gt lexpr rexpr 
-evalBinary BOpLTE lexpr rexpr = lte lexpr rexpr
-evalBinary BOpGTE lexpr rexpr = gte lexpr rexpr
+evalBinary BOpLT (NGOInteger a) (NGOInteger b) = NGOBool (a < b)
+evalBinary BOpGT (NGOInteger a) (NGOInteger b) = NGOBool (a > b)
+evalBinary BOpLTE (NGOInteger a) (NGOInteger b) = NGOBool (a <= b)
+evalBinary BOpGTE (NGOInteger a) (NGOInteger b) = NGOBool (a >= b)
 evalBinary BOpEQ lexpr rexpr =  NGOBool $ lexpr == rexpr
 evalBinary BOpNEQ lexpr rexpr =  NGOBool $ lexpr /= rexpr
-evalBinary BOpAdd lexpr rexpr =  add lexpr rexpr
-evalBinary BOpMul lexpr rexpr =  mul lexpr rexpr 
-
-
-{- Allows for the addition of new types and operations easily if required. -}
-
-gte (NGOInteger x) (NGOInteger y) = NGOBool $ x >= y
-gte _ _ = error "BinaryOP gte: Arguments Should be of type NGOInteger" 
-gt (NGOInteger x) (NGOInteger y) = NGOBool $ x > y
-gt _ _ = error "BinaryOP lte: Arguments Should be of type NGOInteger"
-lte (NGOInteger x) (NGOInteger y) = NGOBool $ x <= y
-lte _ _ = error "BinaryOP lte: Arguments Should be of type NGOInteger"
-lt (NGOInteger x) (NGOInteger y) = NGOBool $ x < y
-lt _ _ = error "BinaryOP lt: Arguments Should be of type NGOInteger"
-add (NGOInteger x) (NGOInteger y) = NGOInteger $ x + y
-add _ _ = error "BinaryOP add: Arguments Should be of type NGOInteger" 
-mul (NGOInteger x) (NGOInteger y) = NGOInteger $ x * y
-mul _ _ = error "BinaryOP mul: Arguments Should be of type NGOInteger"
+evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = NGOInteger (a + b)
+evalBinary BOpMul (NGOInteger a) (NGOInteger b) = NGOInteger (a * b)
+evalBinary op a b = nglTypeError (concat ["evalBinary: ", show op, " ", show a, " ", show b])
 
 
 asShortRead (NGOShortRead r) = r
-asShortRead _ = error "Short read expected"
+asShortRead _ = nglTypeError "Short read expected"
 
 getScriptName = do
     -- This cannot fail as we inserted the variable ourselves
