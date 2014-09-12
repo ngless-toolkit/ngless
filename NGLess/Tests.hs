@@ -42,7 +42,6 @@ import FileManagement
 import Validation
 import CountOperation
 import Annotation
-import ValidationNotPure
 import VectorOperations
 import ProcessFastQ
 import ReferenceDatabases
@@ -71,8 +70,6 @@ main = $(defaultMainGenerator)
 -- Test Parsing Module
 parseText :: GenParser (SourcePos,Token) () a -> T.Text -> a
 parseText p t = fromRight . parse p "test" . _cleanupindents . fromRight . tokenize "test" $ t
-fromRight (Right r) = r
-fromRight (Left e) = error (concat ["Unexpected Left: ",show e])
 parseBody = map snd . parseText _nglbody
 
 case_parse_symbol = parseBody "{symbol}" @?= [ConstSymbol "symbol"]
@@ -414,117 +411,6 @@ case_invalid_fwrite_format = isError $ parsetest f_attr >>= checktypes
                   \y = map(x, reference='xpto')\n\
                   \z = annotate(y, features=[{gene}])\n\
                   \write(count(z), format='tsv')"
-
-
--- Validation non pure functions
-
-case_valid_not_pure_fp_fastq_lit = isError =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \fastq('fq')\n"
-
-case_invalid_not_pure_fp_fastq_lit = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \fastq('Makefile')\n" --File Makefile exists
-
-case_valid_not_pure_fp_fastq_const = isError =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \x = 'fq'\n\
-                 \fastq(x)\n"
-
-case_invalid_not_pure_fp_fastq_const = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \x = 'Makefile'\n\
-                 \fastq(x)\n" --File Makefile always Exists
-
-
-case_valid_not_pure_map_reference_lit = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \map(x, reference='Makefile')\n"
-
-case_invalid_not_pure_map_def_reference_lit = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \map(x, reference='sacCer3')\n"
-
-case_invalid_not_pure_map_reference_lit = isError =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \map(x, reference='fq')\n"
-
-
-case_valid_not_pure_map_reference_const = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \v = 'Makefile'\n\
-                 \map(x, reference=v)\n"
-
-case_invalid_not_pure_map_def_reference_const = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \v = 'sacCer3'\n\        
-                 \map(x, reference=v)\n"
-
-case_invalid_not_pure_map_reference_const = isError =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \v = 'fq'\n\
-                 \map(x, reference=v)\n"
-
-
-case_valid_not_pure_annotate_gff_lit = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \annotate(x, gff='Makefile')\n"
-
-case_invalid_not_pure_annotate_gff_lit = isError =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \annotate(x, gff='fq')\n"
-
-
-case_valid_not_pure_annotate_gff_const = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \v = 'Makefile'\n\
-                 \annotate(x, gff=v)\n"
-
-case_invalid_not_pure_annotate_gff_const = isError =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \v = 'fq'\n\
-                 \annotate(x, gff=v)\n"
-
-
-
-case_valid_not_pure_annotate_gff_const2 = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \v = 'fq'\n\
-                 \v = 'Makefile'\n\
-                 \annotate(x, gff=v)\n"
-
-case_invalid_not_pure_annotate_gff_const2 = isOkTypes =<< validate_io' (fromRight . parsetest $ f_attr)
-    where 
-        f_attr = "ngless '0.0'\n\
-                 \v = 'fq'\n\
-                 \v = 'fq'\n\
-                 \annotate(x, gff=v)\n"
-
-
-case_validate_not_pure_io_script_idemp = do
-    r <- validate_io script 
-    r @?= script
-  where 
-      script = fromRight . parsetest $ f_attr
-      f_attr = "ngless '0.0'\n\
-                \v = 'Makefile'\n\
-                \annotate(x, gff=v)\n"
-
 
 --- Validation pure functions
 
