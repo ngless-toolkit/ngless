@@ -68,5 +68,5 @@ htmlResourcePath :: IO FilePath
 htmlResourcePath = (</> "../share/ngless/Html") <$> getNglessRoot
 
 outputDirectory :: FilePath -> IO FilePath
-outputDirectory ifile = return $ replaceExtension ifile ".ngless_output/"
+outputDirectory ifile = return $ replaceExtension ifile ".output_ngless/"
 
