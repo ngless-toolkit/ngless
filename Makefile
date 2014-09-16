@@ -79,8 +79,18 @@ test_samples/htseq-res/htseq_cds_noStrand_union.txt:
 	cd test_samples/ && gzip -dkf *.gz
 	cd test_samples/htseq-res && ./generateHtseqFiles.sh
 
-check: ${testinputfiles}
+
+installtestdeps=dist/build/share/Html/nglessKeeper.html
+dist/build/share/Html/nglessKeeper.html: nglessconf
+
+check: ${testinputfiles} ${installtestdeps} simulateinstalldeps
 	cabal test
+
+simulateinstalldeps:
+	mkdir -p dist/build/share/$(progname)
+	cp -rf $(HTML) dist/build/share/$(progname)
+	cp -rf $(BWA_DIR) dist/build/share/$(progname)
+	cp -rf $(SAM_DIR) dist/build/share/$(progname)
 
 install:
 	mkdir -p $(exec)
