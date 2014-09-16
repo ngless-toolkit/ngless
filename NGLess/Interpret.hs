@@ -222,7 +222,8 @@ topFunction Fpreprocess expr _ _ = error ("Should be used a variable with a NGOR
 topFunction Fwrite expr args _ = do 
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
-    liftIO (writeToFile expr' args')
+    r <- getScriptName
+    liftIO (writeToFile expr' args' r)
 
 topFunction Fmap expr args _ = do
     expr' <- interpretTopValue expr

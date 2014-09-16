@@ -32,10 +32,11 @@ case_annotate_features_default = do
     compareFiles a b
   where feats = Just ["gene"]
 
+e = "testing_tmp_dir"
 
 case_annotate_gene_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion False False
-    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args
+    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args e
     compareFiles p "test_samples/htseq-res/htseq_gene_noStrand_union.txt"
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just ["gene"]
@@ -43,7 +44,7 @@ case_annotate_gene_noStrand_union = do
 
 case_annotate_exon_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion False False
-    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args
+    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args e
     compareFiles p "test_samples/htseq-res/htseq_exon_noStrand_union.txt"
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_exon_noStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just ["exon"]
@@ -51,7 +52,7 @@ case_annotate_exon_noStrand_union = do
 
 case_annotate_cds_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion False False
-    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args
+    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args e
     compareFiles p "test_samples/htseq-res/htseq_cds_noStrand_union.txt"
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_cds_noStrand_union.txt"),("verbose", NGOSymbol "no")]
         feats = Just ["CDS"]
@@ -59,7 +60,7 @@ case_annotate_cds_noStrand_union = do
 
 case_annotate_gene_noStrand_inters_strict = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectStrict False False
-    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args
+    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args e
     compareFiles p "test_samples/htseq-res/htseq_gene_noStrand_inters-strict.txt"
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-strict.txt"),("verbose", NGOSymbol "no")]
         feats = Just ["gene"]
@@ -67,7 +68,7 @@ case_annotate_gene_noStrand_inters_strict = do
 
 case_annotate_gene_noStrand_inters_non_empty = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectNonEmpty False False
-    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args
+    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args e
     compareFiles p "test_samples/htseq-res/htseq_gene_noStrand_inters-nempty.txt"
   where args = [("ofile", NGOString "test_samples/htseq-res/ngless_gene_noStrand_inters-nempty.txt"),("verbose", NGOSymbol "no")]
         feats = Just ["gene"]
@@ -75,7 +76,7 @@ case_annotate_gene_noStrand_inters_non_empty = do
 
 case_annotate_gene_yesStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectNonEmpty True True
-    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args
+    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args e
     compareFiles p "test_samples/htseq-res/htseq_gene_yesStrand_union.txt"
   where args = [("ofile", NGOString ofile),("verbose", NGOSymbol "no")]
         feats = Just ["gene"]
@@ -83,7 +84,7 @@ case_annotate_gene_yesStrand_union = do
 
 case_annotate_gene_yesStrand_union_short = do
     a <- annotate "test_samples/sample.sam" short_gff_fp feats Nothing IntersectUnion True True
-    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args
+    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args e
     compareFiles p "test_samples/htseq-res/htseq_gene_yesStrand_union_short.txt"
   where args = [("ofile", NGOString ofile),("verbose", NGOSymbol "no")]
         feats = Just ["gene"]

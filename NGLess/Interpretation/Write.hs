@@ -39,18 +39,18 @@ writeToUncFile (NGOReadSet path enc tmplate) newfp = do
 writeToUncFile obj _ = error ("writeToUncFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ show obj)
 
 
-writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO NGLessObject
-writeToFile (NGOList el) args = do
+writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> FilePath -> IO NGLessObject
+writeToFile (NGOList el) args d = do
       let templateFP = getNGOPath $ lookup "ofile" args
           newFPS' = map (T.pack . (\fname -> replace "{index}" fname templateFP) . T.unpack) indexFPs
-      res <- zipWithM (\x fp -> writeToFile x (fp' fp)) el newFPS'
+      res <- zipWithM (\x fp -> writeToFile x (fp' fp) d) el newFPS'
       return (NGOList res)
     where
         indexFPs = map (T.pack . show) [1..(length el)]
         fp' fp = M.toList $ M.insert "ofile" (NGOString fp) (M.fromList args)
 
-writeToFile el@(NGOReadSet _ _ _) args = writeToUncFile el $ getNGOPath (lookup "ofile" args)
-writeToFile el@(NGOMappedReadSet fp defGen) args = do
+writeToFile el@(NGOReadSet _ _ _) args _ = writeToUncFile el $ getNGOPath (lookup "ofile" args)
+writeToFile el@(NGOMappedReadSet fp defGen) args _ = do
     let newfp = getNGOPath (lookup "ofile" args) --
         format = fromMaybe (NGOSymbol "sam") (lookup "format" args)
     case format of
@@ -59,7 +59,7 @@ writeToFile el@(NGOMappedReadSet fp defGen) args = do
                         newfp' <- convertSamToBam fp newfp
                         return (NGOMappedReadSet newfp' defGen) --newfp will contain the bam
         _ -> error "This format should have been impossible"
-writeToFile (NGOAnnotatedSet fp) args = do
+writeToFile (NGOAnnotatedSet fp) args dst = do
     let newfp = getNGOPath $ lookup "ofile" args
         del = getDelimiter  $ lookup "format" args
     printNglessLn $ "Writing your NGOAnnotatedSet to: " ++ newfp
@@ -72,9 +72,9 @@ writeToFile (NGOAnnotatedSet fp) args = do
     where
         writeAnnotResWDel' p cont = do
             BL.writeFile p cont
-            canonicalizePath p >>= insertCountsProcessedJson
+            canonicalizePath p >>= insertCountsProcessedJson dst
             return $ NGOAnnotatedSet p
-writeToFile _ _ = error "Error: writeToFile Not implemented yet"
+writeToFile _ _ _ = error "Error: writeToFile Not implemented yet"
 
 getDelimiter :: Maybe NGLessObject -> B.ByteString
 getDelimiter x = case x of

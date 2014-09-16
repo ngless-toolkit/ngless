@@ -18,7 +18,7 @@ import Data.Json
 import Data.FastQ
 import qualified FastQStatistics as FQ
 import FileManagement
-
+import Configuration
 
 fProc = "var filesProcessed = "
 cProc = "var countsProcessed = "
@@ -47,9 +47,9 @@ filesProcessedToJson :: FilePath -> T.Text -> IO BL.ByteString
 filesProcessedToJson tName script = encode <$> createFilesProcessed tName script
 
 
-insertCountsProcessedJson :: FilePath -> IO ()
-insertCountsProcessedJson fp = do
-        let jsonPath = (</> "countsProcessed.js") $ (takeDirectory fp)
+insertCountsProcessedJson :: FilePath -> FilePath-> IO ()
+insertCountsProcessedJson dst fp = do
+        jsonPath <- outputDirectory dst >>= return . (</> "countsProcessed.js") 
         exists <- doesFileExist jsonPath
         if exists
             then updateProcessedJson cProc jsonData jsonPath 22
