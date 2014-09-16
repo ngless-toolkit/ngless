@@ -96,10 +96,16 @@ createTempDirectory dir t = do
   where
     findTempName x = do
       let dirpath = dir </> t <.> show x
-      r <- doesDirectoryExist (dirpath ++ "$beforeQC")
+      r <- anyM doesDirectoryExist [dirpath, (dirpath ++ "$beforeQC")] 
       case r of
         False  -> return dirpath
         True -> findTempName (x+1)
+
+anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+anyM _ [] = return False
+anyM f (x:xs) = do 
+        y <- f x
+        if y then return True else anyM f xs
 
 setupHtmlViewer :: FilePath -> FilePath -> IO ()
 setupHtmlViewer fname htmlP = do
