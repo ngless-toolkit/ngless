@@ -7,6 +7,7 @@ module ReferenceDatabases
     , getGff
     , ensureDataPresent
     , findDataFiles
+    , findDataFilesIn
     ) where
 
 import qualified Data.ByteString.Lazy as BL

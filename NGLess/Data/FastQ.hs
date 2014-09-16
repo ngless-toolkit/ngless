@@ -55,7 +55,7 @@ asFastQ :: FastQEncoding -> [ShortRead] -> BL.ByteString
 asFastQ enc rs = BL.fromChunks (asFastQ' rs)
     where
         asFastQ' [] = []
-        asFastQ' ((ShortRead a b c):rss) = [a, "\n", b, "\n+\n", encodeQual c, "\n"] ++ asFastQ' rss
+        asFastQ' (sr:rss) = [srHeader sr, "\n", srSequence sr, "\n+\n", encodeQual . srQualities $ sr, "\n"] ++ asFastQ' rss
         encodeQual = B.map ((+) (encodingOffset enc))
 
 

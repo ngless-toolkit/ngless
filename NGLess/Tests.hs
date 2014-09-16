@@ -24,6 +24,7 @@ import qualified Data.Text as T
 
 import Data.Aeson
 import Data.Convertible
+import Data.Maybe
 
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.IntervalMap.Interval as IM
@@ -648,6 +649,24 @@ case_read_mul_Sam_Line = readAlignments (L.unlines $ replicate 10 samLineFlat) @
 
 -- Tests with scripts (This will pass to a shell script)
 
+-- install genome User mode
+
+case_install_genome_user_mode = 
+  installData (Just User) "sacCer3" >>
+    findDataFilesIn "sacCer3" User >>= assertBool "sacCer3 should be installed at the user directory." . isJust
+  
+-- simulate install genome Root mode. it will be installed at dist/build/share/data
+
+case_install_genome_root_mode = 
+  installData Nothing "sacCer3" >>
+    findDataFilesIn "sacCer3" Root >>= assertBool "sacCer3 should be installed in global directory." . isJust
+
+-- Make sure user checked first.
+case_find_data_files = do
+  aP <- ensureDataPresent "sacCer3"
+  eP <- findDataFilesIn "sacCer3" User >>= return . fromJust
+  aP @?= eP
+
 preprocess_s = "ngless '0.0'\n\
     \input = fastq('test_samples/sample.fq')\n\
     \preprocess(input) using |read|:\n\
@@ -658,32 +677,46 @@ preprocess_s = "ngless '0.0'\n\
     \       continue\n\
     \   if len(read) <= 20:\n\
     \       discard\n\
-    \write(input, ofile='test_samples/sample.fq')\n"
+    \write(input, ofile='test_samples/res')\n"
 
+unique_s = "ngless '0.0'\n\
+    \input = fastq('test_samples/data_set_repeated.fq')\n\
+    \input = unique(input, max_copies=1)\n\
+    \write(input, ofile='test_samples/res')\n"
 
-map_s = "ngless '0.0'\n\
+map_s_def_r = "ngless '0.0'\n\
     \input = fastq('test_samples/sample.fq')\n\
     \preprocess(input) using |read|:\n\
     \    if len(read) < 20:\n\
     \        discard\n\
-    \mapped = map(input,reference='sacCer3')\n\
-    \write(mapped, ofile='test_samples/sample.sam',format={sam})\n"
+    \mapped = map(input,reference='test_samples/genome.fa.gz')\n\
+    \write(mapped, ofile='test_samples/res',format={sam})\n"
 
-case_preprocess_script = case parsetest preprocess_s >>= checktypes of
+map_s_prov_ref = "ngless '0.0'\n\
+    \input = fastq('test_samples/sample.fq')\n\
+    \preprocess(input) using |read|:\n\
+    \    if len(read) < 20:\n\
+    \        discard\n\
+    \mapped = map(input,reference='test_samples/genome.fa.gz')\n\
+    \write(mapped, ofile='test_samples/res',format={sam})\n"
+
+
+case_preprocess_script = exec_script preprocess_s (11080 :: Int) (length . L.lines)
+
+-- 54 reads -> 216 results
+case_unique_script = exec_script unique_s (216 :: Int) (length . L.lines)
+
+case_map_script_provided_ref = exec_script map_s_prov_ref (2786,148,130,0) _calcSamStats
+case_map_script_def_ref      = exec_script map_s_def_r    (2786,148,130,0) _calcSamStats
+
+
+exec_script s r f = case parsetest s >>= checktypes of
         Left err -> assertFailure (show err)
         Right expr -> do
             outputDirectory "testing" >>= createDirectoryIfMissing False
-            (interpret "test" preprocess_s) . nglBody $ expr
-            res' <- B.readFile "test_samples/sample.fq"
-            (length $ B.lines res') @?= (16 :: Int)
-
-case_map_script = case parsetest map_s >>= checktypes of
-        Left err -> assertFailure (show err)
-        Right expr -> do
-            outputDirectory "testing" >>= createDirectoryIfMissing False
-            (interpret "testing" map_s) . nglBody $ expr
-            res' <- readPossiblyCompressedFile "test_samples/sample.sam"
-            _calcSamStats res' @?= (5,0,0,0)
+            (interpret "testing" s) . nglBody $ expr
+            res' <- readPossiblyCompressedFile "test_samples/res"
+            f res' @?= r
 
 -- Test compute stats
 
@@ -941,14 +974,6 @@ case_test_setup_html_view = do
   where 
     p' = (</> "nglessKeeper.html")
 
--- MapOperations
-
--- install genome User mode
-
-case_install_genome_user_mode = do
-  r1 <- installData (Just User) "ce10"
-  p <- (</> "ce10") <$> userDataDirectory
-  r1 @?= p 
 
 
 -- ProcessFastQ
