@@ -86,6 +86,9 @@ dist/build/share/Html/nglessKeeper.html: nglessconf
 check: ${testinputfiles} ${installtestdeps} simulateinstalldeps
 	cabal test
 
+bench: ${installtestdeps} simulateinstalldeps
+	cabal bench --benchmark-options="-o report.html"
+
 simulateinstalldeps:
 	mkdir -p dist/build/share/$(progname)
 	cp -rf $(HTML) dist/build/share/$(progname)

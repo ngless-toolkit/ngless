@@ -52,7 +52,7 @@ executable ngless
 Test-Suite nglesstest
   type:         exitcode-stdio-1.0
   main-is:      Tests.hs
-  ghc-options:  -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2
+  ghc-options:  -Wall -fwarn-tabs -fhpc -fno-warn-missing-signatures -threaded -O2
   -- other-modules:
   default-extensions:  BangPatterns, OverloadedStrings
   other-extensions:    DeriveDataTypeable, TupleSections, TemplateHaskell
@@ -87,4 +87,40 @@ Test-Suite nglesstest
     vector,
     zlib
   hs-source-dirs: NGLess/
+  default-language:    Haskell2010
+
+benchmark ngless-bench
+  type:             exitcode-stdio-1.0
+  main-is:          Bench.hs
+  build-depends:    
+    aeson,
+    base,
+    bytestring,
+    cmdargs,
+    conduit >= 1.0 && < 1.1,
+    containers,
+    convertible,
+    criterion,
+    deepseq,
+    directory,
+    filepath,
+    ghc-prim,
+    happstack-server,
+    hashable,
+    http-conduit >= 2.0,
+    IntervalMap >= 0.3 && < 0.4,
+    mtl,
+    MissingH >= 1.2,
+    old-time,
+    parsec,
+    process,
+    tar,
+    text,
+    unix,
+    vector,
+    zlib
+  default-extensions:  BangPatterns, OverloadedStrings
+  other-extensions:    DeriveDataTypeable, TupleSections, TemplateHaskell
+  ghc-options:         -O2 -fmax-simplifier-iterations=10 -fdicts-cheap -fspec-constr-count=6
+  hs-source-dirs:      NGLess/
   default-language:    Haskell2010
