@@ -700,6 +700,32 @@ map_s_prov_ref = "ngless '0.0'\n\
     \mapped = map(input,reference='test_samples/genome.fa.gz')\n\
     \write(mapped, ofile='test_samples/res',format={sam})\n"
 
+annot_s_prov_gff = "ngless '0.0'\n\
+    \input = fastq('test_samples/sample.fq')\n\
+    \preprocess(input) using |read|:\n\
+    \    if len(read) < 20:\n\
+    \        discard\n\
+    \mapped = map(input,reference='test_samples/genome.fa.gz')\n\
+    \annotated = annotate(mapped, gff='test_samples/sample.gtf.gz')\n\
+    \write(annotated, ofile='test_samples/res')\n"
+
+annot_s_def_gff = "ngless '0.0'\n\
+    \input = fastq('test_samples/sample.fq')\n\
+    \preprocess(input) using |read|:\n\
+    \    if len(read) < 20:\n\
+    \        discard\n\
+    \mapped = map(input,reference='sacCer3')\n\
+    \annotated = annotate(mapped)\n\
+    \write(annotated, ofile='test_samples/res')\n"
+
+annot_s_def_gff_verb = "ngless '0.0'\n\
+    \input = fastq('test_samples/sample.fq')\n\
+    \preprocess(input) using |read|:\n\
+    \    if len(read) < 20:\n\
+    \        discard\n\
+    \mapped = map(input,reference='sacCer3')\n\
+    \annotated = annotate(mapped)\n\
+    \write(annotated, verbose={yes}, ofile='test_samples/res')\n"
 
 case_preprocess_script = exec_script preprocess_s (11080 :: Int) (length . L.lines)
 
@@ -708,6 +734,10 @@ case_unique_script = exec_script unique_s (216 :: Int) (length . L.lines)
 
 case_map_script_provided_ref = exec_script map_s_prov_ref (2786,148,130,0) _calcSamStats
 case_map_script_def_ref      = exec_script map_s_def_r    (2786,148,130,0) _calcSamStats
+
+case_annot_script_prov_gff      = exec_script annot_s_prov_gff 6252 (length . L.lines)
+case_annot_script_def_gff       = exec_script annot_s_def_gff  7126 (length . L.lines)
+case_annot_script_def_gff_verb  = exec_script annot_s_def_gff_verb  7126 (length . L.lines)
 
 
 exec_script s r f = case parsetest s >>= checktypes of
@@ -762,6 +792,7 @@ case_parse_gff_atributes_trail_del_space = GFF.parseGffAttributes "gene_id=chrI;
 case_cigar_to_length_1 = cigarTLen "18M2D19M" @?= 39
 case_cigar_to_length_2 = cigarTLen "37M" @?= 37
 case_cigar_to_length_3 = cigarTLen "3M1I3M1D5M" @?= 12
+case_cigar_to_length_4 = cigarTLen "3N1X30P1=" @?= 35
 
 --- Count operation
 
