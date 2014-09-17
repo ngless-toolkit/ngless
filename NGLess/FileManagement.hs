@@ -124,8 +124,7 @@ writeGZIP :: String -> BL.ByteString -> IO ()
 writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents 
 
 readPossiblyCompressedFile ::  FilePath -> IO BL.ByteString
-readPossiblyCompressedFile fname =
-    if ".gz" `isSuffixOf` fname
-        then GZip.decompress <$> BL.readFile fname
-        else BL.readFile fname
+readPossiblyCompressedFile fname
+    | ".gz" `isSuffixOf` fname = GZip.decompress <$> BL.readFile fname
+    | otherwise = BL.readFile fname
 
