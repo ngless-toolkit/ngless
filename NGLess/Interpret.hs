@@ -241,8 +241,7 @@ topFunction Fcount expr args _ = do
     args' <- runInROEnvIO $ interpretArguments args
     executeCount expr' args'
 
-
-topFunction _ _ _ _ = throwError "Unable to handle these functions"
+topFunction f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
 
 executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (\x -> executeCount x args) e
