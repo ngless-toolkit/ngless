@@ -10,7 +10,7 @@ Launch
 In order to visualize the script results a web server is launched with the following command.
 ::
 
-  $ ngless visualizemode <script_location.ngless_outputs>
+  $ ngless visualizemode <script_location.ngless_output>
   > Launching WebServer at: 8000
   > You can access it at: http://localhost:8000   
 
