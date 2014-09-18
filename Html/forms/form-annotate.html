@@ -41,13 +41,13 @@
 
 
 <div class="form-group">
-    <h3>Allow ambiguity</h3>
-    <p> Choose wether you allow a given read to have more than one associated feature.  </p>
+    <h3>Keep ambiguity</h3>
+    <p> Do you want to count with the ambiguous results?  </p>
     <div class="radio">
-        <label><input type="radio" ng-model="formData.annotate.ambiguity" value="allow" checked>allow</label>
+        <label><input type="radio" ng-model="formData.annotate.keep_ambiguous" value="true" checked>yes</label>
     </div>
     <div class="radio">
-        <label><input type="radio" ng-model="formData.annotate.ambiguity" value="deny">deny</label>
+        <label><input type="radio" ng-model="formData.annotate.keep_ambiguous" value="false">no</label>
     </div>
 </div>
 
@@ -56,10 +56,10 @@
     <h3> Strand Specific </h3>
     <p> The genomic feature must have the same strand as the strand of the alignment? </p>
     <div class="radio">
-        <label><input type="radio" ng-model="formData.annotate.strand" value="yes" checked>yes</label>
+        <label><input type="radio" ng-model="formData.annotate.strand" value="true" checked>yes</label>
     </div>
     <div class="radio">
-        <label><input type="radio" ng-model="formData.annotate.strand" value="no">no</label>
+        <label><input type="radio" ng-model="formData.annotate.strand" value="false">no</label>
     </div>
 </div>
 

@@ -105,6 +105,10 @@
                 $scope.formData.preprocess.push({})
             }
 
+            var getBoolVar = function (k, v) {
+                return getIntVar(k,v) //same structure
+            }
+
             var getIntVar = function (k, v) {
                 return "," + k + v
             }
@@ -143,7 +147,7 @@
             }
 
             $scope.generateScript = function () {
-                var res = [];
+                var res = ["ngless '0.0'\n"];
                 
                 var x  = "in = fastq([" + getNameFromArray($scope.formData.files) + "])"
                 res.push(x); // fastq is allways needed.
@@ -183,12 +187,12 @@
                         str += getStrVar("gff=", $scope.formData.annotate.gff);
                     }
 
-                    if($scope.formData.annotate['ambiguity']){
-                        str += getSymbolVar("ambiguity=", $scope.formData.annotate.ambiguity);
+                    if($scope.formData.annotate['keep_ambiguous']){
+                        str += getBoolVar("keep_ambiguous=", $scope.formData.annotate.keep_ambiguous);
                     }
 
                     if($scope.formData.annotate['strand']){
-                        str += getSymbolVar("strand=", $scope.formData.annotate.strand);
+                        str += getBoolVar("strand=", $scope.formData.annotate.strand);
                     }
 
                     if($scope.formData.annotate['mode']){
