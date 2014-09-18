@@ -13,11 +13,11 @@ Function to load, one or more, fastQ files. An example::
 
 Argument:
 ~~~~~~~~~
-NGOString
+String
 
 Return:
 ~~~~~~~
-NGOReadSet
+ReadSet
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
@@ -46,31 +46,31 @@ example:
 Argument:
 ~~~~~~~~~
 
-NGOReadSet
+ReadSet
 
 Return:
 ~~~~~~~
 
-NGOReadSet
+ReadSet
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 
-+---------------+--------------+------------+
-| Name          | Type         | Required   |
-+===============+==============+============+
-| max\_copies   | NGOInteger   |  no        |
-+---------------+--------------+------------+
++---------------+--------------+------------+----------------+
+| Name          | Type         | Required   | Default Value  |
++===============+==============+============+================+
+| max\_copies   | Integer      |  no        | 2              |
++---------------+--------------+------------+----------------+
 
 The optional argument **max_copies** allows to define the number of tolerated copies (default: 2).
 
-Is considered a copy: NGOShortReads with the same sequence regardless
+Is considered a copy: ShortReads with the same sequence regardless
 of quality and identifier.
 
 Preprocess
 ----------
 
-This function executes the given block for each read in the NGOReadSet.
+This function executes the given block for each read in the ReadSet.
 Unless the read is **discarded**, it is transferred (after
 transformations) to the output. The output is assigned to the same name
 as the inputs. An example:
@@ -83,12 +83,12 @@ as the inputs. An example:
 Argument:
 ~~~~~~~~~
 
-NGOReadSet
+ReadSet
 
 Return:
 ~~~~~~~
 
-NGOVoid
+Void
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
@@ -101,7 +101,7 @@ This function also performs quality control on its output.
 Map
 ---
 
-The function map, maps a NGOReadSet to reference. An example:
+The function map, maps a ReadSet to reference. An example:
 
 ::
 
@@ -110,21 +110,21 @@ The function map, maps a NGOReadSet to reference. An example:
 Argument:
 ~~~~~~~~~
 
-NGOReadSet
+ReadSet
 
 Return:
 ~~~~~~~
 
-NGOMappedReadSet
+MappedReadSet
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 
-+-------------+-------------+------------+
-| Name        | Type        | Required   |
-+=============+=============+============+
-| reference   | NGOString   | yes        |
-+-------------+-------------+------------+
++-------------+-------------+------------+----------------+ 
+| Name        | Type        | Required   | Default Value  |
++=============+=============+============+================+
+| reference   | String      | yes        | -              |
++-------------+-------------+------------+----------------+
 
 The argument **reference** can either be a path to a data set or the
 **name** of a provided data set by NGLess. The provided data sets of
@@ -149,6 +149,8 @@ NGLess are:
 +-----------+-----------------------------+-------------+
 | mm10      | mus\_musculus               | GRCm38      |
 +-----------+-----------------------------+-------------+
+| hg19      | homo\_sapiens               | GRCh38      |
++-----------+-----------------------------+-------------+
 
 The argument **reference** can either be a path to a data set or the **name** of a NGLess provided data set. Provided data sets of NGLess are:
 
@@ -156,40 +158,40 @@ The argument **reference** can either be a path to a data set or the **name** of
 Annotate
 --------
 
-Given a file with aligned sequencing reads (NGOReadSet) and a list of
+Given a file with aligned sequencing reads (ReadSet) and a list of
 genomic features (gff file), the function allows to annotate reads to
 each feature. An example:
 
 ::
 
-    annotated = annotate(mapped, strand=false, mode="union", ambiguity=false)
+    annotated = annotate(mapped, strand=false, mode={union}, keep_ambiguous=false)
 
 Argument:
 ~~~~~~~~~
 
-NGOMappedReadSet
+MappedReadSet
 
 Return:
 ~~~~~~~
 
-NGOAnnotatedSet
+AnnotatedSet
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 
-+-------------+-----------------+------------+----------------+
-| Name        | Type            | Required   | Default value  |
-+=============+=================+============+================+
-| gff         | NGOString       | yes*       |  -             |
-+-------------+-----------------+------------+----------------+
-| features    | [ NGOSymbol ]   | no         | {gene}         |
-+-------------+-----------------+------------+----------------+
-| mode        | NGOString       | no         | {union}        |
-+-------------+-----------------+------------+----------------+
-| ambiguity   | bool            | no         | true           |
-+-------------+-----------------+------------+----------------+
-| strand      | bool            | no         | false          |
-+-------------+-----------------+------------+----------------+
++-------------------+-----------------+------------+----------------+
+| Name              | Type            | Required   | Default value  |
++===================+=================+============+================+
+| gff               | String          | yes*       |  -             |
++-------------------+-----------------+------------+----------------+
+| features          | [ Symbol ]      | no         | {gene}         |
++-------------------+-----------------+------------+----------------+
+| mode              | Symbol          | no         | {union}        |
++-------------------+-----------------+------------+----------------+
+| keep\_ambiguous   | Bool            | no         | true           |
++-------------------+-----------------+------------+----------------+
+| strand            | Bool            | no         | false          |
++-------------------+-----------------+------------+----------------+
 
 
 The **gff** argument is required, unless a known reference was used for mapping.
@@ -199,18 +201,18 @@ nothing is provided, everything is considered to be significant. Possible
 symbols are **{gene}**, **{exon}**, and **{cds}**.
 
 **Mode** is a symbol which dictates how to handle reads overlapping more than
-one feature. Possible values for ``mode`` are ``union``,
-``intersection-strict`` and ``intersection-nonempty`` (default: ``union``).
+one feature. Possible values for ``mode`` are **{union}**,
+**{intersection-strict}** and **{intersection-nonempty}** (default: **{union}**).
 For each read position are obtained features that intersect it, which is known
 as sets. The different modes are:
 
--  ``union`` the union of all the sets.
+-  **{union}** the union of all the sets.
 
--  ``intersection-strict`` the intersection of all the sets.
+-  **{intersection-strict}** the intersection of all the sets.
 
--  ``intersection-nonempty`` the intersection of all non-empty sets.
+-  **{intersection-nonempty}** the intersection of all non-empty sets.
 
-The ``ambiguity`` argument is an opportunity to decide whether to annotate
+The ``keep_ambiguous`` argument is an opportunity to decide whether to annotate
 reads that overlap with more than one feature.
 
 Argument ``strand`` represents whether the data are from a strand-specific
@@ -233,23 +235,23 @@ Function that allows to filter the counts of features. Example:
 Argument:
 ~~~~~~~~~
 
-NGOAnnotatedSet
+AnnotatedSet
 
 Return:
 ~~~~~~~
 
-NGOAnnotatedSet
+AnnotatedSet
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 
-+----------+-----------------+------------+
-| Name     | Type            | Required   |
-+==========+=================+============+
-| counts   | [ NGOSymbol ]   |  no        |
-+----------+-----------------+------------+
-| min      | NGOInteger      |  no        |
-+----------+-----------------+------------+
++----------+-----------------+------------+----------------+
+| Name     | Type            | Required   | Default Value  |
++==========+=================+============+================+
+| counts   | [ Symbol ]      |  no        | -              |
++----------+-----------------+------------+----------------+
+| min      | Integer         |  no        | 0              |
++----------+-----------------+------------+----------------+
 
 The argument **counts** represents which features to keep, discarding everything else. Possible symbols are gene, exon and cds. If nothing is provided everything is considered to be important.
 
@@ -269,21 +271,21 @@ given minimum quality. Example:
 Argument:
 ~~~~~~~~~
 
-NGOShortRead
+ShortRead
 
 Return:
 ~~~~~~~
 
-NGOShortRead
+ShortRead
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 
-+-------------------------+--------------+------------+
-| Name                    | Type         | Required   |
-+=========================+==============+============+
-| min_quality             | NGOInteger   |  no        |
-+-------------------------+--------------+------------+
++-------------------------+--------------+------------+----------------+
+| Name                    | Type         | Required   | Default Value  |
++=========================+==============+============+================+
+| min_quality             | Integer      |  no        |	0              |
++-------------------------+--------------+------------+----------------+
 
 **Min_quality** parameter defines the minimum quality
 accepted for the sub-sequence (default: 0).
@@ -295,79 +297,79 @@ Write function allows to write a NGLessObject to Disk. Different Types
 of NGLessObject are manipulated in different manners.
 
 
-NGOReadSet
+ReadSet
 ~~~~~~~~~~~
 
 Argument:
 ##########
 
-NGOReadSet
+ReadSet
 
 Return:
 ##########
 
-NGOVoid
+Void
 
 Arguments by value:
 ###################
 
-+---------+-------------+------------+
-| Name    | Type        | Required   |
-+=========+=============+============+
-| ofile   | NGOString   | yes        |
-+---------+-------------+------------+
++---------+-------------+------------+----------------+
+| Name    | Type        | Required   | Default Value  |
++=========+=============+============+================+
+| ofile   | String      | yes        | -              |
++---------+-------------+------------+----------------+
 
 The argument **ofile** is a file path to where the content is written.
 
-NGOMappedReadSet
+MappedReadSet
 ~~~~~~~~~~~~~~~~~
 
 Argument:
 ##########
 
-NGOMappedReadSet
+MappedReadSet
 
 Return:
 ##########
 
-NGOVoid
+Void
 
 Arguments by value:
 ###################
 
-+----------+-------------+------------+
-| Name     | Type        | Required   |
-+==========+=============+============+
-| ofile    | NGOString   |  yes       |
-+----------+-------------+------------+
-| format   | NGOString   |  no        |
-+----------+-------------+------------+
++----------+-------------+------------+----------------+
+| Name     | Type        | Required   | Default Value  |
++==========+=============+============+================+
+| ofile    | String      |  yes       | -              |
++----------+-------------+------------+----------------+
+| format   | String      |  no        | {sam}          |
++----------+-------------+------------+----------------+
 
 **Format** can have value **{bam}** or **{sam}** (default: {sam}).
 
-NGOAnnotatedSet
+AnnotatedSet
 ~~~~~~~~~~~~~~~
 
 Argument:
 ##########
 
-NGOAnnotatedSet
+AnnotatedSet
 
 Return:
 ##########
 
-NGOVoid
+Void
 
 Arguments by value:
 ###################
 
-+----------+-------------+------------+
-| Name     | Type        | Required   |
-+==========+=============+============+
-| ofile    | NGOString   |  yes       |
-+----------+-------------+------------+
-| format   | NGOString   |  no        |
-+----------+-------------+------------+
++----------+-------------+------------+----------------+
+| Name     | Type        | Required   | Default Value  |
++==========+=============+============+================+
+| ofile    | String      |  yes       | -              |
++----------+-------------+------------+----------------+
+| format   | String      |  no        | {tsv}          |
++----------+-------------+------------+----------------+
 
 **Format** can have value **{csv}** or **{tsv}** (default: {tsv}).
 
@@ -392,7 +394,7 @@ NGLessObject
 
 Return:
 ~~~~~~~
-NGOVoid
+Void
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
