@@ -8,13 +8,16 @@ import Control.Applicative
 
 import Data.Maybe
 import Configuration
+import FileManagement
 
 
 runWebServer :: FilePath -> Int -> IO ()
 runWebServer fname nglessport = do
         putStrLn "Launching Webserver."
         putStrLn ("You can access it at: http://localhost:" ++ show nglessport)
-        ddir <- outputDirectory fname
+        ddir <- if fname == "-" 
+        			then htmlResourcePath
+    				else outputDirectory fname
         simpleHTTP serverConf $ nglessApp ddir
     where
         serverConf = nullConf { port = nglessport }
