@@ -40,26 +40,24 @@ Data types
 
 NGless supports the following basic types:
 
-- string
-- integer
-- bool
-- symbol
-- filename
-- shortread
-- shortreadset
-- mappedread
-- mappedreadset
+- String
+- Integer
+- Bool
+- Symbol
+- Filename
+- Shortread
+- Shortreadset
+- Mappedread
+- Mappedreadset
 
 In addition, it supports the composite type List of X where X is a basic type. Lists are built
 with square brackets (e.g., [1,2,3]). All elements of a list must have the same data type.
 
 String
 ~~~~~~~~~
+A string can start with either a quote **(U+0022, ")** or a single quote **(U+0027,')** or and end with the same character. They can contain any number of characters.
 
-A string can start with either **ASCII 0x22 (")** or **ASCII 0x27 (')** and end with the same character. They can
-contain any number of characters.
-
-Special sequences start with a **\\**. Standard backslashed escapes can be used as **ASCII LF** and **CR** (**\\n** 
+Special sequences start with a **\\\\**. Standard backslashed escapes can be used as **LF** and **CR** (**\\n** 
 and **\\r** respectively), quotation marks (**\\'**) or slash (**\\\\**).
 
 Integer
@@ -116,13 +114,13 @@ is required an identifier followed by an expression between brackets. (e.g, x[10
 
 To obtain a range, is required an identifier and two expressions separated by a ':' and between brackets. Example: 
 
-+----------+------------------------------------------------------+
-| x[:]     | returns from position 0 until length of variable x   |
-+----------+------------------------------------------------------+
-| x[10:]   | returns from position 10 util length of variable x   |
-+----------+------------------------------------------------------+
-| x[:10]   | returns from position 0 until 10                     |
-+----------+------------------------------------------------------+
++----------+--------------------------------------------------------+
+| x[:]     | returns from position 0 until length of variable x     |
++----------+--------------------------------------------------------+
+| x[10:]   | returns from position 10 util length of variable x     |
++----------+--------------------------------------------------------+
+| x[:10]   | returns from position 0 until 10                       |
++----------+--------------------------------------------------------+
 
 Conditional
 ------------------
