@@ -10,6 +10,7 @@ module Interpret
      evalLen,
      evalBinary,
      evalMinus,
+     executeUnique
     ) where
 
 
@@ -258,7 +259,7 @@ executeAnnotation (NGOList e) args = NGOList <$> mapM (\x -> executeAnnotation x
 executeAnnotation (NGOMappedReadSet e dDS) args = do
     let g = T.unpack . evalString <$> lookup "gff" args
         m = parseAnnotationMode $ lookup "mode" args
-        a = fromMaybe False $ evalBool <$> lookup "ambiguity" args
+        a = fromMaybe False $ evalBool <$> lookup "keep_ambiguous" args
         s = fromMaybe False $ evalBool <$> lookup "strand" args
         features = lookup "features" args
         fs = case features of
