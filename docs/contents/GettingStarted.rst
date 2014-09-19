@@ -282,19 +282,19 @@ As a result of the execution, should be returned the following:
 
 .. code-block:: bash
 
-	Total reads: 32457019
-	Total reads aligned: 31316462[96.49%]
-	Total reads Unique map: 25218844[80.53%]
-	Total reads Non-Unique map: 6097618[19.47%]
+	Total reads: 31654060
+	Total reads aligned: 28095945[88.76%]
+	Total reads Unique map: 22434229[79.85%]
+	Total reads Non-Unique map: 5661716[20.15%]
 	Total reads without enough qual: 0
 
 These are statistics of the map of the file against the human genome.
 
-All other results can be accessed through the web server by doing:
+All other results can be accessed through the web server by doing. As you might already be running a webserver from the previous execution, open a new webserver at port 8080 or close the one used before:
 
 ::
 
-	$ ngless visualizemode test
+	$ ngless visualizemode test -p 8080
 
 
 The results are in the following (sub)sections.
@@ -326,16 +326,16 @@ If you sort in descending order and select to be displayed 10 results, you shoul
 =============== =======
 Gene name       Counts 
 =============== =======
-ENSG00000210082	3229808
-ENSG00000265150	243466
-ENSG00000202198	205365
-ENSG00000269900	195698
-ENSG00000211459	185885
-ENSG00000259001	130706
-ENSG00000187608	108199
-ENSG00000126709	106971
-ENSG00000269028	104316
-ENSG00000067225	94422
+ENSG00000210082	2901346
+ENSG00000265150	182390
+ENSG00000269900	179083
+ENSG00000202198	175199
+ENSG00000211459	165836
+ENSG00000259001	116589
+ENSG00000269028	98050
+ENSG00000187608	95884
+ENSG00000126709	94874
+ENSG00000067225	82878
 =============== =======
 
 
