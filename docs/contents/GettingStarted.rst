@@ -57,7 +57,7 @@ Before creating the whole script lets start by understanding our data set. This 
 
 Using the **text editor**, type:
 
-.. code-block::
+::
 
 	ngless "0.0"
 
@@ -103,7 +103,7 @@ For the preprocess we will:
 
 Let's add the following code to the already existent code in the Text Editor.
 
-.. code-block::
+::
 	
 	preprocess(input) using |read|:
             read = read [3:] // Discard from position 0 until 3 (excluded).
@@ -119,7 +119,7 @@ Map
 
 After adding the preprocess code to the Text Editor, it's time to map against the human genome. Since the human genome is provided by default, you can simply do:
 
-.. code-block:: 
+::
 
 	/* reference genome */
 	human = 'hg19'
@@ -131,7 +131,7 @@ Annotate
 
 We are only interested in the human genes so lets annotate the map results with the only feature being genes. Since we used a genome provided by NGLess, we will also use the annotation provided by default:
 
-.. code-block:: 
+::
 	
 	/* annotation features */
 	feats = [{gene}]
@@ -143,7 +143,7 @@ Count & Write
 
 Annotation will annotate the results but won't store them. In order to count and save them you have to write the counts of the annotation to somewhere in your disk:
 
-.. code-block::
+::
 
 	/* write counts to disk */
 	counts = count(annotated)
