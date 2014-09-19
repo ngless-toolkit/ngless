@@ -135,7 +135,7 @@ We are only interested in the human genes so lets annotate the map results with 
 	
 	/* annotation features */
 	feats = [{gene}]
-	annotated = annotate(mapped, strand={no}, mode={union}, ambiguity={deny}, features=feats)
+	annotated = annotate(mapped, strand=false, mode={union}, ambiguity=false, features=feats)
 
 
 Count & Write
