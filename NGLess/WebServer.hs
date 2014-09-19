@@ -10,6 +10,7 @@ import Data.Maybe
 import Configuration
 import FileManagement
 
+import System.FilePath.Posix
 
 runWebServer :: FilePath -> Int -> IO ()
 runWebServer fname nglessport = do
@@ -27,7 +28,7 @@ runWebServer fname nglessport = do
 nglessApp :: FilePath -> ServerPart Response
 nglessApp ddir = msum
         [ dir "removeDS" $ queryParams "id" >>= ok . toResponse . fromJust
-        , dir "serveF" $ queryParams "id" >>= serveFile (guessContentTypeM mimeTypes) . fromJust
+        , dir "serveF" $ queryParams "id" >>= serveFile (guessContentTypeM mimeTypes) . ((</>) ddir) . fromJust
         , serveDirectory EnableBrowsing ["nglessKeeper.html"] ddir]
 
 queryParams param = optional $ look param

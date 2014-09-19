@@ -117,7 +117,7 @@
 
       function validateFiles (files) {
         return files.filter(function(obj) {
-          return urlExists("serveF?id=" + obj.name + '$afterQC/index.html')
+          return urlExists("serveF?id=" + obj.name.split("/").reverse()[0] + '$afterQC/index.html')
         });
       }
       
