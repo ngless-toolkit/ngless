@@ -1,5 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
 
-import Criterion.Main
 import Interpret
 import Validation
 import ValidationNotPure
@@ -10,36 +10,99 @@ import Parse
 import WebServer
 import Configuration
 import ReferenceDatabases
+import Data.FastQ
 
 import Control.Monad
 import Control.Applicative
 import Control.Concurrent
+import Criterion.Main
+
 import System.Console.CmdArgs
 import System.Directory
 
+
+import Control.Monad.Error
+import Control.Monad.Identity
+import Control.Monad.Reader
+import Control.Monad.State
+
+import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as S
 
 
-execute :: String -> T.Text -> IO ()
-execute fname text = case parsengless fname text >>= validate >>= checktypes of
-            Left err -> T.putStrLn err
-            Right expr -> (interpret fname text) . nglBody =<< validate_io expr
+scriptFName = "test.ngl"
+
+fp1 = "../sample_1.fq"
+fp2 = "../SRR867735.fastq.gz"
+refsacCer3 = ("reference", NGOString "sacCer3")
 
 
-executeScript :: FilePath -> IO ()
-executeScript fname = do
-    odir <- outputDirectory fname
+evS f = evalStateT (runErrorT f) m >>= \x -> case x of
+        Left  _ -> error ("Shouldn't have happend.")
+        Right a -> return a 
+    where 
+        nglessScript = NGOString "NOP"
+        nglessScriptFname = NGOFilename scriptFName
+        m = (0, M.insert ".scriptfname" nglessScriptFname (M.insert ".script" nglessScript M.empty))
+        
+{- 
+    pre process block
+    
+    (1) remove last bp 
+    (2) substrim
+-}
+
+block = Block [Variable "read"] expr
+expr  = Sequence [assign index, assign subs]
+
+index = IndexExpression lkup (IndexTwo Nothing (Just (BinaryOp BOpAdd (UnaryOp UOpLen lkup) (UnaryOp UOpMinus (ConstNum 1)))))
+subs  = FunctionCall Fsubstrim lkup [(Variable "min_quality",ConstNum 5)] Nothing
+
+assign= Assignment (Variable "read") 
+lkup = Lookup (Variable "read")
+
+--
+
+rs fp = NGOReadSet fp SolexaEncoding ""
+
+
+
+main = do
+    odir <- outputDirectory scriptFName
     createDirectoryIfMissing False odir
-    engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
-    case engltext of
-        Left err -> print err
-        Right ngltext -> execute fname ngltext
-
-
-
-main = defaultMain [ 
-        bench "annotation-test" (whnfIO . executeScript $ "examples/annotation.ngl")
+    let [qc1, qc2] = map (evS . executeQualityProcess)    $ map NGOString ["../sample_1.fq","../sample_1.fq"]
+        [u1, u2]   = map (\x -> evS $ executeUnique x []) $ map rs ["../sample_1.fq","../sample_1.fq"]
+        [qp1, qp2] = map (\x -> evS $ executePreprocess x [] block "") $ map rs ["../sample_1.fq","../sample_1.fq"]
+        [m1, m2]   = map (\x -> evS $ executeMap x [refsacCer3]) $ map rs ["../sample_1.fq","../sample_1.fq"]
+        [an1, an2] = map (\x -> x >>= \y -> evS $ executeAnnotation y []) [m1, m2]
+    defaultMain [ 
+        bgroup "fastqFunction"
+            [
+                bench "100M" (whnfIO qc1),
+                bench "5GB"  (whnfIO qc2)
+            ],
+        bgroup "unique"
+            [
+                bench "100MB" ( whnfIO u1 ),
+                bench "5GB"   ( whnfIO u2 )
+            ],
+        bgroup "pre-process"
+            [
+                bench "100MB" ( whnfIO qp1 ),
+                bench "5GB"   ( whnfIO qp2 )
+            ],
+        bgroup "map"
+            [
+                bench "100MB" ( whnfIO m1 ),
+                bench "5GB"   ( whnfIO m2 )
+            ],
+        bgroup "annotate"
+            [
+                bench "100MB" ( whnfIO an1 ),
+                bench "5GB"   ( whnfIO an2 )
+            ]
       ]
+

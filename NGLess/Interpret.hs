@@ -10,7 +10,11 @@ module Interpret
      evalLen,
      evalBinary,
      evalMinus,
-     executeUnique
+     executeUnique,
+     executeQualityProcess,
+     executePreprocess,
+     executeMap,
+     executeAnnotation
     ) where
 
 
@@ -201,6 +205,10 @@ maybeInterpretExpr :: (Maybe Expression) -> InterpretationROEnv (Maybe NGLessObj
 maybeInterpretExpr Nothing = return Nothing
 maybeInterpretExpr (Just e) = Just <$> interpretExpr e
 
+variableName :: Expression -> T.Text
+variableName (Lookup (Variable n)) = n
+variableName _ = error "Should have been used a Lookup variable"
+
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
 topFunction Ffastq expr _args _block = do
     expr' <- interpretTopValue expr
@@ -211,14 +219,13 @@ topFunction Funique expr args _block = do
     args' <- runInROEnvIO $ interpretArguments args
     executeUnique expr' args'
 
-topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
-    expr' <- runInROEnvIO $ interpretExpr expr
+topFunction Fpreprocess expr args (Just _block) = do
+    expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
-    res' <- executePreprocess expr' args' _block varName >>= executeQualityProcess 
-    setVariableValue varName res'
+    res' <- executePreprocess expr' args' _block v >>= executeQualityProcess 
+    setVariableValue v res'
     return res'
-
-topFunction Fpreprocess expr _ _ = error ("Should be used a variable with a NGOReadSet, but is: " ++ (show expr))
+  where v = variableName expr
 
 topFunction Fwrite expr args _ = do 
     expr' <- interpretTopValue expr
