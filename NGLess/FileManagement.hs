@@ -54,10 +54,10 @@ setupRequiredFiles info dirTemplate = do
     return destDir'
 
 -- 
-generateTempFilePath :: FilePath -> String -> IO FilePath
-generateTempFilePath dst t = do
-    (f,s) <- openTempFile dst t   
-    hClose s   
+generateTempFilePath :: FilePath -> IO FilePath
+generateTempFilePath t = do
+    (f,s) <- getTemporaryDirectory >>= \x -> openTempFile x t  
+    hClose s 
     return f
 
 --Example: "folders/sample_1.9168$afterQC" @?= ("folders/","sample_1")
@@ -66,13 +66,13 @@ parseFileName = splitFileName . fst . break ((==) '$') . fst . splitExtensions
 
 getTempFilePath :: FilePath -> IO FilePath
 getTempFilePath fp = do
-    let (dst, t) = parseFileName fp
-    generateTempFilePath dst t
+    let (_, t) = parseFileName fp
+    generateTempFilePath t
     
 getTFilePathComp :: FilePath -> IO FilePath
 getTFilePathComp fp = do
-    let (dst, t) = parseFileName fp
-    generateTempFilePath dst (t <.> "gz")
+    let (_, t) = parseFileName fp
+    generateTempFilePath (t <.> "gz")
 
 ---- generate template from path
 template :: FilePath -> FilePath
