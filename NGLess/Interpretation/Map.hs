@@ -50,7 +50,7 @@ mapToReference refIndex readSet = do
                 ) { std_out = UseHandle hout,
                     std_err = CreatePipe }
         err <- hGetContents herr
-        putStrLn $ concat ["Error in bwa: ", err]
+        printNglessLn err
         exitCode <- waitForProcess jHandle
         hClose herr
         case exitCode of
