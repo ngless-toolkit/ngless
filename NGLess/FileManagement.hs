@@ -11,7 +11,8 @@ module FileManagement
         readPossiblyCompressedFile,
         writeGZIP,
         parseFileName,
-        template
+        template,
+        removeIfExists
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -24,6 +25,7 @@ import Data.List (isSuffixOf)
 import System.FilePath.Posix
 import System.Directory
 import System.IO
+import System.IO.Error
 
 import Control.Monad
 import System.Posix.Internals (c_getpid)
@@ -135,3 +137,5 @@ readPossiblyCompressedFile fname =
         then GZip.decompress <$> BL.readFile fname
         else BL.readFile fname
 
+removeIfExists :: FilePath -> IO ()
+removeIfExists fn = removeFile fn `catchIOError` (\_ -> return ())

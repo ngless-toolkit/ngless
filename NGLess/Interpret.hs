@@ -148,14 +148,15 @@ interpret :: FilePath -> T.Text -> [(Int,Expression)] -> IO ()
 interpret fname script es = do
     let nglessScript = NGOString script 
         nglessScriptFname = NGOFilename fname
+        tmpfiles = NGOList []
     _ <- htmlResourcePath >>= setupHtmlViewer fname
-    r <- evalStateT (runErrorT (interpretIO es)) (0, Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty))
+    r <- evalStateT (runErrorT (interpretIO es)) (0, Map.insert ".tmpfiles" tmpfiles (Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty)))
     case r of
-        Right _ -> getNglessTempDir >>= removeDirectoryRecursive
+        Right _  -> return ()
         Left err -> putStrLn (show err)
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
-interpretIO [] = return ()
+interpretIO [] = cleanTmpFiles
 interpretIO ((ln,e):es) = (setlno ln >> interpretTop e >> interpretIO es)
 
 interpretTop :: Expression -> InterpretationEnvIO ()
@@ -219,12 +220,12 @@ topFunction Ffastq expr _args _block = do
 topFunction Funique expr args _block = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
-    executeUnique expr' args'
+    executeUnique expr' args' >>= addTempFP
 
 topFunction Fpreprocess expr args (Just _block) = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
-    res' <- executePreprocess expr' args' _block v >>= executeQualityProcess 
+    res' <- executePreprocess expr' args' _block v >>= addTempFP >>= executeQualityProcess 
     setVariableValue v res'
     return res'
   where v = variableName expr
@@ -238,17 +239,17 @@ topFunction Fwrite expr args _ = do
 topFunction Fmap expr args _ = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
-    executeMap expr' args'
+    executeMap expr' args' >>= addTempFP
 
 topFunction Fannotate expr args _ = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
-    executeAnnotation expr' args'
+    executeAnnotation expr' args' >>= addTempFP
 
 topFunction Fcount expr args _ = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
-    executeCount expr' args'
+    executeCount expr' args' >>= addTempFP
 
 
 topFunction _ _ _ _ = throwError "Unable to handle these functions"
@@ -470,3 +471,28 @@ getScriptName = do
     -- This cannot fail as we inserted the variable ourselves
     Just (NGOFilename fname) <- runInROEnvIO $ lookupVariable ".scriptfname"
     return fname
+
+
+addTempFP o = do
+    -- This cannot fail as we inserted the variable ourselves
+    Just (NGOList l) <- runInROEnvIO $ lookupVariable ".tmpfiles"
+    setVariableValue ".tmpfiles" $ NGOList (getNGObjName o : l)
+    return o
+
+getNGObjName :: NGLessObject -> NGLessObject
+getNGObjName (NGOReadSet x _ _)     = NGOFilename x
+getNGObjName (NGOMappedReadSet x _) = NGOFilename x
+getNGObjName (NGOAnnotatedSet x)    = NGOFilename x
+getNGObjName x = error ("Shouldn't have happened: " ++ show x)
+
+
+
+cleanTmpFiles = do
+        Just (NGOList l) <- runInROEnvIO $ lookupVariable ".tmpfiles"
+        liftIO $ mapM_ (removeIfExists . fp) l
+    where 
+        fp (NGOFilename x) = x
+        fp _ = error ("variable .tmpfiles can only contain NGOFilename.")
+
+
+
