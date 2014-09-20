@@ -35,8 +35,8 @@ import qualified Data.ByteString as S
 
 scriptFName = "test.ngl"
 
-fp1 = "../sample_1.fq"
-fp2 = "../SRR867735.fastq.gz"
+f1 = "../sample_1.fq"
+f2 = "../sample_1.fq"
 refsacCer3 = ("reference", NGOString "sacCer3")
 
 
@@ -73,10 +73,10 @@ rs fp = NGOReadSet fp SolexaEncoding ""
 main = do
     odir <- outputDirectory scriptFName
     createDirectoryIfMissing False odir
-    let [qc1, qc2] = map (evS . executeQualityProcess)    $ map NGOString ["../sample_1.fq","../sample_1.fq"]
-        [u1, u2]   = map (\x -> evS $ executeUnique x []) $ map rs ["../sample_1.fq","../sample_1.fq"]
-        [qp1, qp2] = map (\x -> evS $ executePreprocess x [] block "") $ map rs ["../sample_1.fq","../sample_1.fq"]
-        [m1, m2]   = map (\x -> evS $ executeMap x [refsacCer3]) $ map rs ["../sample_1.fq","../sample_1.fq"]
+    let [qc1, qc2] = map (evS . executeQualityProcess)    $ map NGOString [T.pack f1, T.pack f2]
+        [u1, u2]   = map (\x -> evS $ executeUnique x []) $ map rs [f1,f2]
+        [qp1, qp2] = map (\x -> evS $ executePreprocess x [] block "") $ map rs [f1,f2]
+        [m1, m2]   = map (\x -> evS $ executeMap x [refsacCer3]) $ map rs [f1,f2]
         [an1, an2] = map (\x -> x >>= \y -> evS $ executeAnnotation y []) [m1, m2]
     defaultMain [ 
         bgroup "fastqFunction"
