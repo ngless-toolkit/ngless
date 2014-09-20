@@ -4,7 +4,6 @@ module FileManagement
         getTempFilePath,
         getFilesInDir,
         getTFilePathComp,
-        getTemporaryDirectory,
         setupRequiredFiles,
         generateDirId,
         setupHtmlViewer,
@@ -56,7 +55,7 @@ setupRequiredFiles info dirTemplate = do
 -- 
 generateTempFilePath :: FilePath -> IO FilePath
 generateTempFilePath t = do
-    (f,s) <- getTemporaryDirectory >>= \x -> openTempFile x t  
+    (f,s) <- tempFilesDir >>= \x -> openTempFile x t  
     hClose s 
     return f
 
@@ -80,7 +79,7 @@ template = snd . splitFileName . fst . splitExtensions
     
 createDir :: FilePath -> IO FilePath
 createDir dst = do
-    fp <- getTemporaryDirectory >>= flip createTempDirectory (template dst)
+    fp <- tempFilesDir >>= flip createTempDirectory (template dst)
     createDirectory fp
     return fp
 

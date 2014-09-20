@@ -41,6 +41,8 @@ import Annotation
 import CountOperation
 import Configuration
 
+import System.Directory(removeDirectoryRecursive)
+
 import Interpretation.Write
 import Interpretation.Map
 import Data.FastQ
@@ -149,7 +151,7 @@ interpret fname script es = do
     _ <- htmlResourcePath >>= setupHtmlViewer fname
     r <- evalStateT (runErrorT (interpretIO es)) (0, Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty))
     case r of
-        Right _ -> return ()
+        Right _ -> getNglessTempDir >>= removeDirectoryRecursive
         Left err -> putStrLn (show err)
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
@@ -320,7 +322,8 @@ executeUnique (NGOReadSet file enc t) args = do
         uniqueCalculations' :: Int -> FilePath -> InterpretationEnvIO NGLessObject
         uniqueCalculations' numMaxOccur' d = do
             nFp <- liftIO $ 
-                readNFiles enc numMaxOccur' d >>= \x -> writeReadSet file x enc 
+                readNFiles enc numMaxOccur' d >>= \x -> writeReadSet file x enc
+            _ <- liftIO $ removeDirectoryRecursive d
             return $ NGOReadSet nFp enc t
 
 executeUnique _ _ = error "executeUnique: Should not have happened"

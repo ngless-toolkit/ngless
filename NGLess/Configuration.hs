@@ -8,6 +8,8 @@ module Configuration
     , bwaBin
     , outputDirectory
     , htmlResourcePath
+    , tempFilesDir
+    , getNglessTempDir
     ) where
 
 import Control.Monad (unless)
@@ -69,4 +71,13 @@ htmlResourcePath = (</> "../share/ngless/Html") <$> getNglessRoot
 
 outputDirectory :: FilePath -> IO FilePath
 outputDirectory ifile = return $ replaceExtension ifile ".ngless_output/"
+
+getNglessTempDir :: IO FilePath
+getNglessTempDir = getTemporaryDirectory >>= return . (</> "ngless_tmp/")
+
+tempFilesDir :: IO FilePath
+tempFilesDir = do 
+    d <- getNglessTempDir
+    createDirectoryIfMissing False d
+    return d
 
