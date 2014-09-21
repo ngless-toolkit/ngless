@@ -2,6 +2,7 @@ module FileManagement
     ( 
         createDir,
         getTempFilePath,
+        getTempFilePathExt,
         getFilesInDir,
         getTFilePathComp,
         setupRequiredFiles,
@@ -65,15 +66,18 @@ generateTempFilePath t = do
 parseFileName :: FilePath -> (FilePath, FilePath)
 parseFileName = splitFileName . fst . break ((==) '$') . fst . splitExtensions
 
+getTempFilePathExt :: FilePath -> String -> IO FilePath
+getTempFilePathExt fp ext = do
+    let (_, t) = parseFileName fp
+    generateTempFilePath (t <.> ext)
+
 getTempFilePath :: FilePath -> IO FilePath
 getTempFilePath fp = do
     let (_, t) = parseFileName fp
     generateTempFilePath t
     
 getTFilePathComp :: FilePath -> IO FilePath
-getTFilePathComp fp = do
-    let (_, t) = parseFileName fp
-    generateTempFilePath (t <.> "gz")
+getTFilePathComp fp = getTempFilePathExt fp "gz"
 
 ---- generate template from path
 template :: FilePath -> FilePath

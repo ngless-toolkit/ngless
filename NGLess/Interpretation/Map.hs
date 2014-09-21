@@ -39,8 +39,7 @@ ensureIndexExists refPath = do
 mapToReference :: FilePath -> FilePath -> IO String
 mapToReference refIndex readSet = do
     bwaPath <- bwaBin
-    newfp <- getTempFilePath readSet
-    let newfp' = newfp ++ ".sam"
+    newfp' <- getTempFilePathExt readSet ".sam"
     printNglessLn $ "write .sam file to: " ++ (show newfp')
     withFile newfp' WriteMode $ \hout -> do
         (_, _, Just herr, jHandle) <-
