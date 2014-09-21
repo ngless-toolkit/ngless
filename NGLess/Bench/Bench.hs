@@ -35,8 +35,16 @@ import qualified Data.ByteString as S
 
 scriptFName = "test.ngl"
 
-f1 = "../sample_1.fq"
-f2 = "../sample_1.fq"
+f1 = "../500MB.fq"
+f2 = "../2GB.fq"
+f3 = "../5GB.fq"
+
+s1 = "../500MB.SAM"
+s2 = "../2GB.SAM"
+s3 = "../5GB.SAM"
+
+gffHg = NGOString "../hg19.gtf.gz"
+
 refsacCer3 = ("reference", NGOString "sacCer3")
 
 
@@ -67,42 +75,56 @@ lkup = Lookup (Variable "read")
 --
 
 rs fp = NGOReadSet fp SolexaEncoding ""
+ms fp = NGOMappedReadSet fp Nothing
+
+remNGLessObj :: NGLessObject -> IO ()
+remNGLessObj (NGOReadSet x _ _)     = removeFile x
+remNGLessObj (NGOMappedReadSet x _) = removeFile x
+remNGLessObj (NGOAnnotatedSet x)    = removeFile x
+remNGLessObj x = error ("Shouldn't have happened: " ++ show x)
 
 
+execAndRmTFiles obj = obj >>= remNGLessObj >> return obj
 
 main = do
     odir <- outputDirectory scriptFName
     createDirectoryIfMissing False odir
-    let [qc1, qc2] = map (evS . executeQualityProcess)    $ map NGOString [T.pack f1, T.pack f2]
-        [u1, u2]   = map (\x -> evS $ executeUnique x []) $ map rs [f1,f2]
-        [qp1, qp2] = map (\x -> evS $ executePreprocess x [] block "") $ map rs [f1,f2]
-        [m1, m2]   = map (\x -> evS $ executeMap x [refsacCer3]) $ map rs [f1,f2]
-        [an1, an2] = map (\x -> x >>= \y -> evS $ executeAnnotation y []) [m1, m2]
+    let [qc1, qc2, qc3] = map (evS . executeQualityProcess)  $ map NGOString [T.pack f1, T.pack f2, T.pack f3]
+        [u1, u2, u3]    = map (\x -> evS $ executeUnique x [])              $ map rs [f1,f2,f3]
+        [qp1, qp2, qp3] = map (\x -> evS $ executePreprocess x [] block "") $ map rs [f1,f2,f3]
+        [m1, m2, m3]    = map (\x -> evS $ executeMap x [refsacCer3])       $ map rs [f1,f2,f3]
+        -- load sam files directly --
+        [an1, an2, an3] = map (\x -> evS $ executeAnnotation x [("gff", gffHg)]) $ map ms [s1,s2,s3]
     defaultMain [ 
-        bgroup "fastqFunction"
+        bgroup "fastq"
             [
-                bench "100M" (whnfIO qc1),
-                bench "5GB"  (whnfIO qc2)
+                bench "500MB" (whnfIO $ qc1),
+                bench "2GB"   (whnfIO $ qc2),
+                bench "5GB"   (whnfIO $ qc3)
             ],
         bgroup "unique"
             [
-                bench "100MB" ( whnfIO u1 ),
-                bench "5GB"   ( whnfIO u2 )
+                bench "500MB" ( whnfIO . execAndRmTFiles $ u1 ),
+                bench "2GB"   ( whnfIO . execAndRmTFiles $ u2 ),
+                bench "5GB"   ( whnfIO . execAndRmTFiles $ u3 )
             ],
-        bgroup "pre-process"
+        bgroup "preprocess"
             [
-                bench "100MB" ( whnfIO qp1 ),
-                bench "5GB"   ( whnfIO qp2 )
+                bench "100MB" ( whnfIO . execAndRmTFiles $ qp1 ),
+                bench "2GB"   ( whnfIO . execAndRmTFiles $ qp2 ),
+                bench "5GB"   ( whnfIO . execAndRmTFiles $ qp3 )
             ],
         bgroup "map"
             [
-                bench "100MB" ( whnfIO m1 ),
-                bench "5GB"   ( whnfIO m2 )
+                bench "100MB" ( whnfIO . execAndRmTFiles $ m1 ),
+                bench "2GB"   ( whnfIO . execAndRmTFiles $ m2 ),
+                bench "5GB"   ( whnfIO . execAndRmTFiles $ m3 )
             ],
         bgroup "annotate"
             [
-                bench "100MB" ( whnfIO an1 ),
-                bench "5GB"   ( whnfIO an2 )
+                bench "100MB" ( whnfIO . execAndRmTFiles $ an1 ),
+                bench "2GB"   ( whnfIO . execAndRmTFiles $ an2 ),
+                bench "5GB"   ( whnfIO . execAndRmTFiles $ an3 )
             ]
       ]
 
