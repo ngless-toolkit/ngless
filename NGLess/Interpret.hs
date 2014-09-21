@@ -1,8 +1,10 @@
 {- Copyright 2013-2014 NGLess Authors
  - License: MIT
  -}
+
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 module Interpret
     ( interpret,
      interpretBlock,
@@ -23,6 +25,9 @@ import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Catch
+
+import qualified Control.Exception as E
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as Map
@@ -150,14 +155,21 @@ interpret fname script es = do
         nglessScriptFname = NGOFilename fname
         tmpfiles = NGOList []
     _ <- htmlResourcePath >>= setupHtmlViewer fname
-    r <- evalStateT (runErrorT (interpretIO es)) (0, Map.insert ".tmpfiles" tmpfiles (Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty)))
+    r <- evalStateT (runErrorT $ interpretIO es) (0, Map.insert ".tmpfiles" tmpfiles 
+                                                    (Map.insert ".scriptfname" nglessScriptFname 
+                                                        (Map.insert ".script" nglessScript Map.empty)))
     case r of
         Right _  -> return ()
         Left err -> putStrLn (show err)
 
+
+handleUserInterr (E.SomeAsyncException _) = (liftIO $ putStrLn msg) >> cleanTmpFiles
+    where 
+        msg = "Cleaning temporary files..."
+
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
 interpretIO [] = cleanTmpFiles
-interpretIO ((ln,e):es) = (setlno ln >> interpretTop e >> interpretIO es)
+interpretIO ((ln,e):es) = (setlno ln >> interpretTop e >> interpretIO es) `catch` handleUserInterr
 
 interpretTop :: Expression -> InterpretationEnvIO ()
 interpretTop (Assignment (Variable var) val) = interpretTopValue val >>= setVariableValue var
