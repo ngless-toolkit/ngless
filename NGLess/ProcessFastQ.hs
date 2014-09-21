@@ -11,7 +11,6 @@ module ProcessFastQ
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 
-import System.FilePath.Posix
 import Data.Maybe
 import Control.Applicative ((<$>))
 

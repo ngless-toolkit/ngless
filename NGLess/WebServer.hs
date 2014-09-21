@@ -8,7 +8,6 @@ import Control.Applicative
 
 import Data.Maybe
 import Configuration
-import FileManagement
 
 import System.FilePath.Posix
 
@@ -17,8 +16,8 @@ runWebServer fname nglessport = do
         putStrLn "Launching Webserver."
         putStrLn ("You can access it at: http://localhost:" ++ show nglessport)
         ddir <- if fname == "-" 
-        			then htmlResourcePath
-    				else outputDirectory fname
+                    then htmlResourcePath
+                    else outputDirectory fname
         simpleHTTP serverConf $ nglessApp ddir
     where
         serverConf = nullConf { port = nglessport }
