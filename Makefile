@@ -87,7 +87,7 @@ check: ${testinputfiles} ${installtestdeps} simulateinstalldeps
 	cabal test
 
 bench: ${installtestdeps} simulateinstalldeps
-	cabal bench  --benchmark-options="-o report.html --resamples 4"
+	cabal bench  --benchmark-options="-o report.html"
 
 simulateinstalldeps:
 	mkdir -p dist/build/share/$(progname)
