@@ -17,7 +17,6 @@ import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Map.Strict as M
 
 import Data.Maybe (fromJust)
-import Data.Foldable(foldl')
 import Control.DeepSeq
 
 import FileManagement(readPossiblyCompressedFile)
