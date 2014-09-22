@@ -68,7 +68,7 @@ visualizeargs = VisualizeMode
 -- The only purpose is to aid in debugging by printing intermediate
 -- representations.
 function :: String -> String -> T.Text -> IO ()
-function "ngless" fname text = case parsengless fname text >>= validate >>= checktypes of
+function "ngless" fname text = case parsengless fname text >>= checktypes >>= validate of
             Left err -> T.putStrLn err
             Right expr -> do
                 errs <- validate_io expr
