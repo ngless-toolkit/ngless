@@ -5,7 +5,6 @@ module FileManagement
         getFilesInDir,
         getTFilePathComp,
         getTemporaryDirectory,
-        setupRequiredFiles,
         generateDirId,
         setupHtmlViewer,
         readPossiblyCompressedFile,
@@ -39,18 +38,6 @@ getFilesInDir p = do
  files <- getDirectoryContents p
  return $ map ((</>) p) (filter isNotDot files)
 
-setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
-setupRequiredFiles info dirTemplate = do
-    let destDir' = dirTemplate ++ "$" ++ info
-    htmlSourceP <- htmlResourcePath
-    createDirectory destDir'
-    copyFile (htmlSourceP </> "perBaseQualScores.css") (destDir' </> "perBaseQualScores.css")
-    copyFile (htmlSourceP </> "perBaseQualityScores.js") (destDir' </> "perBaseQualityScores.js")
-    case info of
-        "beforeQC" -> copyFile (htmlSourceP </> "beforeQC.html") (destDir' </> "index.html")
-        "afterQC" -> copyFile (htmlSourceP </> "afterQC.html") (destDir' </> "index.html")
-        err -> error ("Has to be either before or after QC. it is: " ++ (show err))
-    return destDir'
 
 -- 
 generateTempFilePath :: FilePath -> String -> IO FilePath
@@ -100,8 +87,9 @@ createTempDirectory dir t = do
         False  -> return dirpath
         True -> findTempName (x+1)
 
-setupHtmlViewer :: FilePath -> FilePath -> IO ()
-setupHtmlViewer fname htmlP = do
+setupHtmlViewer :: FilePath -> IO ()
+setupHtmlViewer fname = do
+    htmlP <- htmlResourcePath
     dst <- outputDirectory fname
     doesFileExist (p' dst) >>= \x -> case x of 
         True   -> return ()

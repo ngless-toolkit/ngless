@@ -12,6 +12,7 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 
 import System.FilePath.Posix
+import System.Directory
 import Data.Maybe
 import Control.Applicative ((<$>))
 
@@ -54,3 +55,15 @@ readFastQ enc f dst dirT = do
         p s obj  = printNglessLn $ s ++ obj
         encFromM fd = fromMaybe (guessEncoding . lc $ fd) enc
 
+setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
+setupRequiredFiles info dirTemplate = do
+    let destDir' = dirTemplate ++ "$" ++ info
+    htmlSourceP <- htmlResourcePath
+    createDirectory destDir'
+    copyFile (htmlSourceP </> "perBaseQualScores.css") (destDir' </> "perBaseQualScores.css")
+    copyFile (htmlSourceP </> "perBaseQualityScores.js") (destDir' </> "perBaseQualityScores.js")
+    case info of
+        "beforeQC" -> copyFile (htmlSourceP </> "beforeQC.html") (destDir' </> "index.html")
+        "afterQC" -> copyFile (htmlSourceP </> "afterQC.html") (destDir' </> "index.html")
+        err -> error ("Has to be either before or after QC. it is: " ++ (show err))
+    return destDir'

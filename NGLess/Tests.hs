@@ -822,7 +822,7 @@ case_json_statistics = do
     where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 case_test_setup_html_view = do
-    _ <- setupHtmlViewer "testing_tmp_dir" "Html/"  -- Make sure tmp has the required files, but use source to populate it.
+    setupHtmlViewer "testing_tmp_dir"
     dst <- outputDirectory "testing_tmp_dir"
     doesFileExist (p' dst) >>= \x -> x @?= True -- make sure keeper.html exist
   where 
