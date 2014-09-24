@@ -8,6 +8,8 @@ module Interpretation.Map
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
+import Control.Monad.Trans.Resource
+import Control.Monad.Trans (liftIO)
 
 import Numeric
 
@@ -26,6 +28,7 @@ import Configuration
 
 import Data.Sam
 import Utils.Bwa
+import Utils.Tempfile
 
 ensureIndexExists :: FilePath -> IO FilePath
 ensureIndexExists refPath = do
@@ -36,13 +39,12 @@ ensureIndexExists refPath = do
     return refPath
 
 
-mapToReference :: FilePath -> FilePath -> IO String
+mapToReference :: FilePath -> FilePath -> ResourceT IO String
 mapToReference refIndex readSet = do
-    bwaPath <- bwaBin
-    newfp <- getTempFilePath readSet
-    let newfp' = newfp ++ ".sam"
-    printNglessLn $ "write .sam file to: " ++ (show newfp')
-    withFile newfp' WriteMode $ \hout -> do
+    (rk, (newfp, hout)) <- tempfile "mappedOutput.sam"
+    liftIO $ do
+        bwaPath <- bwaBin
+        printNglessLn ("write .sam file to: " ++ show newfp)
         (_, _, Just herr, jHandle) <-
             createProcess (
                 proc bwaPath
@@ -54,21 +56,23 @@ mapToReference refIndex readSet = do
         exitCode <- waitForProcess jHandle
         hClose herr
         case exitCode of
-           ExitSuccess -> return newfp'
-           ExitFailure code -> error $ concat ["Failed mapping\nCommand line was::\n\t",
+           ExitSuccess -> return newfp
+           ExitFailure code -> do
+                    release rk
+                    error $ concat ["Failed mapping\nCommand line was::\n\t",
                                         bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '", readSet, "'\n",
                                         "Bwa error code was ", show code, "."]
 
-interpretMapOp :: T.Text -> FilePath -> IO NGLessObject
+interpretMapOp :: T.Text -> FilePath -> ResourceT IO NGLessObject
 interpretMapOp r ds = do
     (ref', defGen') <- indexReference'
     samPath' <- mapToReference ref' ds
-    getSamStats samPath'
+    liftIO $ getSamStats samPath'
     return $ NGOMappedReadSet samPath' defGen'
     where
         r' = T.unpack r
-        indexReference' :: IO (FilePath, Maybe T.Text)
-        indexReference' =
+        indexReference' :: ResourceT IO (FilePath, Maybe T.Text)
+        indexReference' = liftIO $
             if isDefaultReference (T.unpack r)
                 then do
                     basedir  <- ensureDataPresent r'

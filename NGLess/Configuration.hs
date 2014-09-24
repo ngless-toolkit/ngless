@@ -7,6 +7,7 @@ module Configuration
     , samtoolsBin
     , bwaBin
     , outputDirectory
+    , temporaryFileDirectory
     , htmlResourcePath
     ) where
 
@@ -70,3 +71,5 @@ htmlResourcePath = (</> "../share/ngless/Html") <$> getNglessRoot
 outputDirectory :: FilePath -> IO FilePath
 outputDirectory ifile = return $ replaceExtension ifile ".output_ngless/"
 
+temporaryFileDirectory :: IO FilePath
+temporaryFileDirectory = getTemporaryDirectory -- in the future this will be configurable

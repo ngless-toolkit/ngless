@@ -18,6 +18,7 @@ import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Trans.Resource
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as Map
@@ -79,7 +80,7 @@ type InterpretationEnvT m =
                 NGError
                 (StateT (Int,NGLEnv_t) m)
 -- Monad 1: IO + read-write environment
-type InterpretationEnvIO = InterpretationEnvT IO
+type InterpretationEnvIO = InterpretationEnvT (ResourceT IO)
 -- Monad 2: read-write environment
 type InterpretationEnv = InterpretationEnvT Identity
 -- Monad 3: read-only environment
@@ -145,7 +146,7 @@ interpret fname script es = do
         nglessScriptFname = NGOFilename fname
         initialState = (0, Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty))
     setupHtmlViewer fname
-    r <- evalStateT (runErrorT (interpretIO es)) initialState
+    r <- runResourceT $ evalStateT (runErrorT . interpretIO $ es) initialState
     case r of
         Right _ -> return ()
         Left err -> putStrLn (show err)
@@ -292,10 +293,13 @@ executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]"
 executeQualityProcess' enc fname info nt = liftIO $ executeQProc enc fname info nt
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeMap (NGOList e) args = return . NGOList =<< mapM (\x -> executeMap x args) e
+executeMap (NGOList es) args = do
+    res <- forM es $ \e ->
+                executeMap e args
+    return (NGOList res)
 executeMap (NGOReadSet file _enc _) args = case lookup "reference" args of 
-                Just refPath' -> liftIO $ interpretMapOp (evalString refPath') file
-                Nothing       -> error ("A reference must be suplied")
+    Just refPath' -> liftResourceT $ interpretMapOp (evalString refPath') file
+    Nothing       -> error "A reference must be suplied"
 
 executeMap _ _ = error ("Not implemented yet")
 
@@ -321,7 +325,7 @@ executeUnique _ _ = error "executeUnique: Should not have happened"
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block v = return . NGOList =<< mapM (\x -> executePreprocess x args _block v) e
-executePreprocess (NGOReadSet file enc t) args (Block ([Variable var]) expr) _ = do
+executePreprocess (NGOReadSet file enc t) args (Block [Variable var] expr) _ = do
         liftIO $printNglessLn $ "ExecutePreprocess on " ++ file
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         env <- gets snd
