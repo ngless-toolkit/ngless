@@ -150,7 +150,7 @@
       }
 
       $scope.fileAfterQCExist = function (name){
-        return urlExists("serveF?id=" + obj.name.split("/").reverse()[0]  + '$afterQC/index.html')
+        return urlExists("serveF?id=" + name.split("/").reverse()[0]  + '$afterQC/index.html')
       }
 
       $scope.getFileName = function(path){
