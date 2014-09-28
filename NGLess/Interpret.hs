@@ -246,7 +246,7 @@ topFunction Fwrite expr args _ = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
     r <- getScriptName
-    liftIO (writeToFile expr' args' r)
+    liftIO (writeToFile expr' args' r) >> return NGOVoid
 
 topFunction Fmap expr args _ = do
     expr' <- interpretTopValue expr
@@ -262,6 +262,8 @@ topFunction Fcount expr args _ = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
     executeCount expr' args' >>= addTempFP
+
+topFunction Fprint expr _ _ = interpretTopValue expr >>= liftIO . print >> return NGOVoid
 
 
 topFunction _ _ _ _ = throwError "Unable to handle these functions"
