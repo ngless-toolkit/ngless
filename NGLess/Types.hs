@@ -103,8 +103,9 @@ checkbop BOpGT  a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
 checkbop BOpGTE a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
 checkbop BOpLT  a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
 checkbop BOpLTE a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
-checkbop BOpEQ  a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
-checkbop BOpNEQ a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
+
+checkbop BOpEQ  a b = nglTypeOf a *> nglTypeOf b *> return (Just NGLBool)
+checkbop BOpNEQ a b = nglTypeOf a *> nglTypeOf b *> return (Just NGLBool)
 
 
 checkbool (ConstBool _) = return (Just NGLBool)
