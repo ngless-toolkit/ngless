@@ -54,8 +54,19 @@ inferM e = void (nglTypeOf e)
 
 inferBlock :: Maybe Block -> TypeMSt ()
 inferBlock b = case b of
-    Just (Block vars es) -> mapM_ (\(Variable v) -> envInsert v NGLRead) vars >> inferM es
+    Just (Block vars es) -> mapM_ (\(Variable v) -> envInsert v NGLRead) vars >> inferBlockM es
     Nothing -> return ()
+
+
+inferBlockM :: Expression -> TypeMSt ()
+inferBlockM (Sequence es) = inferBlockM `mapM_` es
+inferBlockM e@(Assignment _ expr) = inferBlockMFunc expr *> inferM e
+inferBlockM e = inferBlockMFunc e *> inferM e
+
+inferBlockMFunc :: Expression -> TypeMSt ()
+inferBlockMFunc (FunctionCall f _ _ _) = when (f /= Fsubstrim) $ errorInLineC
+                    ["Invalid function call. Only valid function is 'Fsubstrim' but got ", show f, "."]
+inferBlockMFunc _ = return ()
 
 envLookup :: T.Text -> TypeMSt (Maybe NGLType)
 envLookup v = Map.lookup v . snd <$> get

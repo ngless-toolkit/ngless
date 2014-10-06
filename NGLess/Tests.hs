@@ -289,6 +289,32 @@ case_invalid_fsubstrim_mq = isError $ parsetest f_attr >>= checktypes
                  \    read = read[5:]\n\
                  \    read = substrim(read, min_quality='2')\n"
 
+-- preprocess function call validation
+
+case_valid_fpreprocess_func = isError $ parsetest f_attr >>= checktypes
+    where 
+        f_attr = "ngless '0.0'\n\
+                 \x = fastq('fq')\n\
+                 \preprocess(x) using |read|:\n\
+                 \    read = read[5:]\n\
+                 \    x = substrim(read)\n"
+
+case_invalid_fpreprocess_func_1 = isError $ parsetest f_attr >>= checktypes
+    where 
+        f_attr = "ngless '0.0'\n\
+                 \x = fastq('fq')\n\
+                 \preprocess(x) using |read|:\n\
+                 \    read = read[5:]\n\
+                 \    print(read)\n"
+
+case_invalid_fpreprocess_func_2 = isError $ parsetest f_attr >>= checktypes
+    where 
+        f_attr = "ngless '0.0'\n\
+                 \x = fastq('fq')\n\
+                 \preprocess(x) using |read|:\n\
+                 \    read = read[5:]\n\
+                 \    x = print(read)\n"
+
 -- map
 
 case_invalid_fmap_ref = isError $ parsetest f_attr >>= checktypes
