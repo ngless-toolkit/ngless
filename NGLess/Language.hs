@@ -134,7 +134,20 @@ data NGLessObject =
         | NGOAnnotatedSet FilePath
         | NGOVoid
         | NGOList [NGLessObject]
-    deriving (Eq, Show, Ord)
+    deriving (Eq ,Ord)
+
+instance Show NGLessObject where
+    show (NGOString x)          = T.unpack x
+    show (NGOBool   x)          = show x
+    show (NGOInteger   x)       = show x
+    show (NGOSymbol   x)        = "{" ++ T.unpack x ++ "}"
+    show (NGOFilename   x)      = "Filename " ++ show x
+    show (NGOShortRead  x)      = "ShortRead " ++ show x
+    show (NGOReadSet   x enc _) = "ReadSet {filepath: " ++ x ++ " encoding: " ++ show enc ++ "}"
+    show (NGOMappedReadSet x _) = "MappedReadSet {filepath: " ++ x ++ "}"
+    show (NGOAnnotatedSet  x)   = "AnnotatedSet {filepath: " ++ x ++ "}"
+    show NGOVoid = "Void"
+    show (NGOList x) = unwords $ map show x 
 
 
 -- | 'Expression' is the main type for holding the AST.
