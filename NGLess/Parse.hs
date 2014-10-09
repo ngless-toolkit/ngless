@@ -165,7 +165,7 @@ _listexpr = try listexpr
 
 conditional = Condition <$> (reserved "if" *> expression <* operator ':') <*> block <*> mayelse
 mayelse = elseblock <|> (pure $ Sequence [])
-elseblock = (reserved "else" *> operator ':' *> block)
+elseblock = try (many indentation *> reserved "else" *> operator ':' *> block)
 block = do
         eol
         level <- indentation
