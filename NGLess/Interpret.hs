@@ -397,7 +397,7 @@ interpretBlock1 vs (Condition c ifT ifF) = do
     v' <- interpretBlockExpr vs c
     interpretBlock1 vs (if evalBool v' then ifT else ifF)
 interpretBlock1 vs (Sequence expr) = interpretBlock vs expr -- interpret [expr]
-interpretBlock1 vs x = error ("interpretBlock1: This should not have happened " ++ show vs ++ " " ++ show x)
+interpretBlock1 _ _ = error ("statement is NOP ")
 
 interpretBlockExpr :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv NGLessObject
 interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpretPreProcessExpr val)
