@@ -297,7 +297,7 @@ executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappe
 
 parseAnnotationMode Nothing = IntersectUnion
 parseAnnotationMode (Just (NGOSymbol "union")) = IntersectUnion
-parseAnnotationMode (Just (NGOSymbol "intersection_strict")) = IntersectUnion
+parseAnnotationMode (Just (NGOSymbol "intersection_strict")) = IntersectStrict
 parseAnnotationMode (Just (NGOSymbol "intersection_non_empty")) = IntersectNonEmpty
 parseAnnotationMode m = error (concat ["Unexpected annotation mode (", show m, "). Please submit a bug report."])
 
