@@ -61,6 +61,7 @@ inferBlock b = case b of
 inferBlockM :: Expression -> TypeMSt ()
 inferBlockM (Sequence es) = inferBlockM `mapM_` es
 inferBlockM e@(Assignment _ expr) = inferBlockMFunc expr *> inferM e
+inferBlockM e@(Condition  _ ifT ifF) = inferBlockM ifT *> inferBlockM ifF *> inferM e
 inferBlockM e = inferBlockMFunc e *> inferM e
 
 inferBlockMFunc :: Expression -> TypeMSt ()
