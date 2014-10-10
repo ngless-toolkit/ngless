@@ -75,15 +75,33 @@ case_annotate_gene_noStrand_inters_non_empty = do
 
 
 case_annotate_gene_yesStrand_union = do
-    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectNonEmpty True True
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion False True
     NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args e
     compareFiles p "test_samples/htseq-res/htseq_gene_yesStrand_union.txt"
   where args = [("ofile", NGOString ofile),("verbose", NGOSymbol "no")]
         feats = Just ["gene"]
-        ofile = "test_samples/htseq-res/htseq_gene_yesStrand_union.txt"
+        ofile = "test_samples/htseq-res/ngless_gene_yesStrand_union.txt"
+
+
+case_annotate_gene_yesStrand_nstrict = do
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectStrict False True
+    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args e
+    compareFiles p "test_samples/htseq-res/htseq_gene_yesStrand_nstrict.txt"
+  where args = [("ofile", NGOString ofile),("verbose", NGOSymbol "no")]
+        feats = Just ["gene"]
+        ofile = "test_samples/htseq-res/ngless_gene_yesStrand_nstrict.txt"
+
+case_annotate_gene_yesStrand_nempty = do
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectNonEmpty False True
+    NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args e
+    compareFiles p "test_samples/htseq-res/htseq_gene_yesStrand_nempty.txt"
+  where args = [("ofile", NGOString ofile),("verbose", NGOSymbol "no")]
+        feats = Just ["gene"]
+        ofile = "test_samples/htseq-res/ngless_gene_yesStrand_nempty.txt"
+
 
 case_annotate_gene_yesStrand_union_short = do
-    a <- annotate "test_samples/sample.sam" short_gff_fp feats Nothing IntersectUnion True True
+    a <- annotate "test_samples/sample.sam" short_gff_fp feats Nothing IntersectUnion False True
     NGOAnnotatedSet p <- writeToFile (NGOAnnotatedSet a) args e
     compareFiles p "test_samples/htseq-res/htseq_gene_yesStrand_union_short.txt"
   where args = [("ofile", NGOString ofile),("verbose", NGOSymbol "no")]

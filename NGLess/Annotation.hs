@@ -76,8 +76,9 @@ compStatsAnnot imGff sam a f s = foldl iterSam imGff sam
 
 
 modeAnnotation :: (IM.IntervalMap Int [GffCount] -> (Int,Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> IM.IntervalMap Int [GffCount] -> SamLine -> Bool -> IM.IntervalMap Int [GffCount]
-modeAnnotation f a im y s = countsAmbiguity a ((filterStrand s asStrand) . (f im) $ (sStart, sEnd)) im
+modeAnnotation f a im y s = countsAmbiguity a (f im' (sStart, sEnd)) im
   where
+    im' = filterStrand s asStrand . IM.fromList $ IM.intersecting im (IM.ClosedInterval sStart sEnd)
     sStart = samPos y
     sEnd   = sStart + (samCigLen y) - 1
     asStrand = if isPositive y then GffPosStrand else GffNegStrand

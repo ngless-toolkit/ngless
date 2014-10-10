@@ -70,7 +70,11 @@ python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s no -t gene -m 
 
 # Test strand Positive. Negative tested before
 python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s yes -t gene -m union | filterEndL 5 > htseq_gene_yesStrand_union.txt
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s yes -t gene -m intersection-nonempty | filterEndL 5 > htseq_gene_yesStrand_nempty.txt
+python -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s yes -t gene -m intersection-strict | filterEndL 5 > htseq_gene_yesStrand_nstrict.txt
+
 
 python -m HTSeq.scripts.count ../sample.sam ../short.gtf -a 0 -s yes -t gene -m union | filterEndL 5 > htseq_gene_yesStrand_union_short.txt
+
 
 exit 0
