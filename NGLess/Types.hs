@@ -154,6 +154,7 @@ checklist (Lookup (Variable v)) = do
         Just (NGList btype) -> return (Just btype)
         Just NGLRead -> return (Just NGLRead)
         e -> errorInLine $ T.concat ["List expected. Type ", T.pack . show $ e , " provided."]
+checklist e@(IndexExpression _ _) = nglTypeOf e
 checklist _ = errorInLine "List expected"
 
 -- No verification should be made for Fwrite and Fprint since it can be any NGLtype

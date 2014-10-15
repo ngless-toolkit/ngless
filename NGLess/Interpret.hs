@@ -417,7 +417,8 @@ evalUOP UOpMinus = evalMinus
 evalUOP UOpLen   = evalLen
 
 evalLen (NGOShortRead r) = NGOInteger . toInteger $ srLength r
-evalLen err = error ("Length must receive a Read. Received a " ++ show err)
+evalLen (NGOList r)      = NGOInteger . toInteger . length $ r
+evalLen err = error ("Length must receive a List or a Read. Received a " ++ show err)
 
 evalMinus (NGOInteger n) = NGOInteger (-n)
 evalMinus err = error ("Minus operator must receive a integer. Received a" ++ show err)
