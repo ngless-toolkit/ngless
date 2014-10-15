@@ -413,9 +413,8 @@ interpretPreProcessExpr (FunctionCall Fsubstrim var args _) = do
 interpretPreProcessExpr expr = interpretExpr expr
 
 evalUOP :: UOp -> NGLessObject -> NGLessObject
-evalUOP UOpMinus x@(NGOInteger _) = evalMinus x
-evalUOP UOpLen sr@(NGOShortRead _) = evalLen sr
-evalUOP _ _ = error "invalid unary operation. "
+evalUOP UOpMinus = evalMinus
+evalUOP UOpLen   = evalLen
 
 evalLen (NGOShortRead r) = NGOInteger . toInteger $ srLength r
 evalLen err = error ("Length must receive a Read. Received a " ++ show err)
@@ -424,7 +423,8 @@ evalMinus (NGOInteger n) = NGOInteger (-n)
 evalMinus err = error ("Minus operator must receive a integer. Received a" ++ show err)
 
 evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject
-evalIndex sr index@[Just (NGOInteger a)] = evalIndex sr $ (Just $ NGOInteger (a + 1)) : index
+evalIndex sr index@[Just (NGOInteger a)] = evalIndex sr $ index ++ [Just $ NGOInteger (a + 1)]
+
 evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Nothing] =
     NGOShortRead $ ShortRead rId (B.drop (fromIntegral s) rSeq) (B.drop (fromIntegral s) rQual)
 evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Nothing, Just (NGOInteger e)] =
@@ -435,6 +435,15 @@ evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Just (
         s' = (fromIntegral s)
         e'' = e'- s'
     NGOShortRead (ShortRead rId (B.take e'' . B.drop s' $ rSeq) (B.take e'' . B.drop s' $ rQual))
+
+evalIndex (NGOList x) [Just (NGOInteger s), Nothing] = NGOList $ drop (fromIntegral s) x
+evalIndex (NGOList x) [Nothing, Just (NGOInteger e)] = NGOList $ take e' x
+    where e' = fromIntegral e
+evalIndex (NGOList x) [Just (NGOInteger s), Just (NGOInteger e)] = NGOList $ take (e' - s') . drop s' $ x
+    where
+        e' = fromIntegral e
+        s' = fromIntegral s
+
 evalIndex _ _ = error "evalIndex: invalid operation"
 
 evalBool (NGOBool x) = x

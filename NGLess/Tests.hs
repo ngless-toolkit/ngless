@@ -583,9 +583,24 @@ case_good_function_attr_map_2 = isOkTypes $ parsetest good_function_attr >>= val
 -- Type Validate pre process operations
 sr i s q = NGOShortRead (ShortRead i s q)
 
+ngolist  = NGOList [NGOInteger 1, NGOInteger 2, NGOInteger 3, NGOInteger 4]
+ngoL12 = NGOList [NGOInteger 1, NGOInteger 2]
+ngoL23 = NGOList [NGOInteger 2, NGOInteger 3]
+ngoL34 = NGOList [NGOInteger 3, NGOInteger 4]
+ngoL3 = NGOList [NGOInteger 3]
+
 case_pre_process_indexation_1 = evalIndex (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 5), Nothing] @?= (sr "@IRIS" "CAA" "aaa")
 case_pre_process_indexation_2 = evalIndex (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [Nothing, Just (NGOInteger 3)] @?= (sr "@IRIS" "AGT" "aa`")
 case_pre_process_indexation_3 = evalIndex (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 2), Just (NGOInteger 5)] @?= (sr "@IRIS" "TAC" "`aa")
+
+case_pre_process_indexation_list_4 = evalIndex ngolist [Just (NGOInteger 2)] @?= ngoL3
+case_pre_process_indexation_list_1 = evalIndex ngolist [Nothing, Just (NGOInteger 2)] @?= ngoL12
+case_pre_process_indexation_list_2 = evalIndex ngolist [Just (NGOInteger 2), Nothing] @?= ngoL34
+case_pre_process_indexation_list_3 = evalIndex ngolist [Just (NGOInteger 1), Just (NGOInteger 3)] @?= ngoL23
+
+
+case_pre_process_indexation_list_over_1 = evalIndex ngolist [Just (NGOInteger 2),  Just (NGOInteger 50) ] @?= ngoL34
+case_pre_process_indexation_list_over_2 = evalIndex ngolist [Just (NGOInteger 100),Just (NGOInteger 102)] @?= (NGOList [])
 
 
 case_pre_process_length_1 = evalLen (sr "@IRIS" "AGTACCAA" "aa`aaaaa") @?= (NGOInteger 8)
