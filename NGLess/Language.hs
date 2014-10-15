@@ -25,6 +25,7 @@ module Language
 {- This module defines the internal representation the language -}
 import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as B
+import Data.List(intersperse)
 
 import Data.FastQ
 
@@ -147,7 +148,7 @@ instance Show NGLessObject where
     show (NGOMappedReadSet x _) = "MappedReadSet {filepath: " ++ x ++ "}"
     show (NGOAnnotatedSet  x)   = "AnnotatedSet {filepath: " ++ x ++ "}"
     show NGOVoid = "Void"
-    show (NGOList x) = unwords $ map show x 
+    show (NGOList x) = "[" ++ (unwords . intersperse "," $ map show x) ++ "]"
 
 
 -- | 'Expression' is the main type for holding the AST.
