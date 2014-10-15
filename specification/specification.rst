@@ -772,7 +772,7 @@ Bool. Therefore the return can either be true or false.
 Equality expressions
 --------------------
 
-This operations are only applicable to Integer values, as the previous.
+This operations are applicable to any NGLessObject. The return is a Bool. 
 
 Attribution expressions
 -----------------------
