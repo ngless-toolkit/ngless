@@ -726,12 +726,12 @@ separated by a ’:’ and between brackets. Example:
 +----------+---------------------------+------------------------------------------------------+
 | x[:]     | :math:`\u27f9`            | returns from position 0 until length of variable x   |
 +----------+---------------------------+------------------------------------------------------+
-| x[10:]   | :math:`\u27f9`            | returns from position 10 util length of variable x   |
+| x[10:]   | :math:`\u27f9`            | returns from position 10 until length of variable x   |
 +----------+---------------------------+------------------------------------------------------+
 | x[:10]   | :math:`\u27f9`            | returns from position 0 until 10                     |
 +----------+---------------------------+------------------------------------------------------+
 
-Can only be applied to ShortReads.
+Can be applied to Lists and ShortReads.
 
 Invocation
 ~~~~~~~~~~
@@ -750,7 +750,7 @@ Unary expressions
 
 The operator **(-)** returns the symmetric of it’s Integer argument.
 
-The operator **len** returns the length of a ShortRead.
+The operator **len** returns the length of a List or a ShortRead.
 
 Multiplicative expressions
 --------------------------
