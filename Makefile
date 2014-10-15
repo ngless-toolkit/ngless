@@ -174,6 +174,8 @@ $(HTML_LIBS_DIR)/Octocat.png:
 	echo $(GIT_LOGO) configured;
 
 
+DISTRO = $(shell uname)
+ARCH   = $(shell uname -m)
 
 ngless-${VERSION}.tar.gz: nglessconf
 	mkdir -p $(distdir)/share $(distdir)/bin
@@ -182,7 +184,7 @@ ngless-${VERSION}.tar.gz: nglessconf
 	cp -r $(BWA_DIR) $(distdir)/share
 	cp -r $(SAM_DIR) $(distdir)/share
 	cp -r $(HTML) $(distdir)/share
-	tar -zcvf $(distdir).tar.gz $(distdir)
+	tar -zcvf $(distdir)-$(DISTRO)-$(ARCH).tar.gz $(distdir)
 	rm -rf $(distdir)
 
 .PHONY: build clean check nglessconf distclean dist
