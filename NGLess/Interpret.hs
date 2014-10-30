@@ -308,8 +308,9 @@ executeQualityProcess (NGOReadSet fname enc nt) = executeQualityProcess' (Just e
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     r <- getScriptName
+    s <- getScript
     newTemplate <- liftIO $ generateDirId r fname' -- new template only calculated once.
-    _ <- liftIO $ insertFilesProcessedJson newTemplate (T.pack r)
+    _ <- liftIO $ insertFilesProcessedJson newTemplate s
     executeQualityProcess' Nothing fname' "beforeQC" newTemplate
 
 executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
@@ -496,6 +497,10 @@ getScriptName = do
     Just (NGOFilename fname) <- runInROEnvIO $ lookupVariable ".scriptfname"
     return fname
 
+getScript = do
+    -- This cannot fail as we inserted the variable ourselves
+    Just (NGOString script) <- runInROEnvIO $ lookupVariable ".script"
+    return script
 
 addTempFP o = do
     -- This cannot fail as we inserted the variable ourselves
