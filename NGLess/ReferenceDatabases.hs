@@ -56,7 +56,7 @@ downloadReference ref destPath = do
     baseURL <- nglessDataBaseURL
     let url = (baseURL </> ref <.> "tar.gz")
     downloadFile url destPath
-    putStrLn " Reference download completed! "
+    putStrLn "\nReference download completed! "
 
 
 -- | Make sure that reference data is present, downloading it if necessary.
