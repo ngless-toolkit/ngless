@@ -23,6 +23,7 @@
     <script>
         
         var app = angular.module('formApp', ['ngAnimate', 'ui.router']);
+        FileUploadCtrl.$inject = ['$scope']
 
         app.config(function($stateProvider, $urlRouterProvider) {
             
@@ -240,6 +241,66 @@
             }
 
         });
+
+        function FileUploadCtrl(scope) {
+            var dropbox = document.getElementById("dropbox")
+            scope.dropText = 'Drag & Drop files here...'
+
+            function dragEnterLeave(evt) {
+                evt.stopPropagation()
+                evt.preventDefault()
+                scope.$apply(function(){
+                    scope.dropText = 'Drop files here...'
+                    scope.dropClass = ''
+                })
+            }
+            dropbox.addEventListener("dragenter", dragEnterLeave, false)
+            dropbox.addEventListener("dragleave", dragEnterLeave, false)
+            dropbox.addEventListener("dragover", function(evt) {
+                evt.stopPropagation()
+                evt.preventDefault()
+                var clazz = 'not-available'
+                var ok = evt.dataTransfer && evt.dataTransfer.types && evt.dataTransfer.types.indexOf('Files') >= 0
+                scope.$apply(function(){
+                    scope.dropText = ok ? 'Drop files here...' : 'Only files are allowed!'
+                    scope.dropClass = ok ? 'over' : 'not-available'
+                })
+            }, false)
+            dropbox.addEventListener("drop", function(evt) {
+                console.log('drop evt:', JSON.parse(JSON.stringify(evt.dataTransfer)))
+                evt.stopPropagation()
+                evt.preventDefault()
+                scope.$apply(function(){
+                    scope.dropText = 'Drag & Drop files here...'
+                    scope.dropClass = ''
+                })
+                var files = evt.dataTransfer.files
+                if (files.length > 0) {
+                    scope.$apply(function(){
+                        scope.files = []
+                        for (var i = 0; i < files.length; i++) {
+                            scope.files.push(files[i])
+                        }
+                        scope.formData.files = scope.files
+                    })
+                }
+            }, false)
+            //============== DRAG & DROP =============
+
+            scope.setFiles = function(element) {
+            scope.$apply(function(scope) {
+              console.log('files:', element.files);
+                scope.files = []
+                for (var i = 0; i < element.files.length; i++) {
+                  scope.files.push(element.files[i])
+                }
+              scope.progressVisible = false
+              scope.formData.files = scope.files
+              console.log(scope.files)
+              });
+            };
+
+        }
 
     </script>
 

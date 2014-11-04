@@ -2,17 +2,26 @@
 <p> Let's start by adding your data sets. Here you can define all the data sets that will be used by the script. </p>
 
 <label>What are your FastQ file names?</label>
-<div class="form-group">
-    <ul>
-        <li ng-repeat="f in formData.files">
-          Name: <input ng-model="f.name">
-          [<a href ng-click="formData.files.splice($index, 1)">X</a>]
+<div class="form-group" ng-controller="FileUploadCtrl">
+    <label for="fileToUpload"><a onclick="document.getElementById('fileToUpload').click();" class="btn btn-success"> Add Files... </a> </label>
+    <input type="file" class="btn" ng-model-instant style="display: none;" id="fileToUpload" multiple onchange="angular.element(this).scope().setFiles(this)" />
+    <div id="dropbox" class="dropbox" ng-class="dropClass"><span>{{dropText}}</span></div>
+    <ul class="form-inline list-group">
+        <li class="list-group-item"ng-repeat="f in formData.files">
+            <div class="input-group">
+                <input class="form-control" placeholder="File Name" ng-model="f.name">             
+                <div class="input-group-addon" ng-click="formData.files.splice($index, 1)">
+                    <span class="glyphicon glyphicon-remove form-control-feedback"/>
+                </div>
+            </div>
         </li>
-        <li>
-            <a ng-click="insertFiles()"> Add file</a>
+        <li class="list-group-item">
+            <a ng-click="insertFiles()"> Add File Name </a>
         </li>
     </ul>
 </div>
+
+
 
 <div class="form-group row">
 <div class="col-xs-6 col-xs-offset-3">
@@ -23,3 +32,33 @@
     </div>
 </div>
 </div>
+
+<style type="text/css">    
+
+.percent {
+    position: absolute; width: 300px; height: 14px; z-index: 1; text-align: center; font-size: 0.8em; color: white;
+}
+.dropbox {
+    height: 3em;
+    border: 2px solid #DDD;
+    border-radius: 8px;
+    background-color: #FEFFEC;
+    text-align: center;
+    color: #BBB;
+    font-size: 2em;
+    font-family: Arial, sans-serif;
+}
+
+.dropbox span {
+    margin-top: 0.9em;
+    display: block;
+}
+
+.dropbox.not-available {
+    background-color: #F88;
+}
+.dropbox.over {
+    background-color: #bfb;
+}
+
+</style>
