@@ -2,9 +2,29 @@
 <p> This function allows to map a given data set against a reference. </p>
 <div class="form-group">
 	<h3> Reference </h3>
-    <p> The reference can either be a filepath or a dataset provided by default.</p>
-	<input type="text" name="input" ng-model="formData.map" required>
+    <p> The reference can either be a filepath or a dataset provided by default. Consult the documentation to see all available organisms.</p>
+	<input id="oname" type="text" class="form-control" name="input" ng-model="formData.map" placeholder="Organism Name..." required>
 </div>
+
+<div class="checkbox">
+    <label>
+      Choose a default organism <input id="checkBox" value="true" onclick="toggle()" type="checkbox">
+    </label>
+  </div>
+
+<div class="form-group">
+	<select ng-model="formData.map"  id="doname" class="form-control" disabled>
+	  <option value="sacCer3">sacCer3</option>
+	  <option value="ce10">ce10</option>
+	  <option value="dm3">dm3</option>
+	  <option value="canFam2">canFam2</option>
+	  <option value="rn4">rattus_norvegicus</option>
+	  <option value="bosTau4">bosTau4</option>
+	  <option value="mm10">mm10</option>
+	  <option value="hg19">hg19</option>
+	</select>
+</div>
+
 
 <div class="form-group row">
 <div class="col-xs-6 col-xs-offset-3">

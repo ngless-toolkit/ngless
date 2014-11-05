@@ -6,27 +6,42 @@
     <!-- CSS -->
     <link rel="stylesheet" href="htmllibs/bootstrap.min.css">
     <link rel="stylesheet" href="forms/style.css">
-    
+    <link rel="stylesheet" href="htmllibs/bootstrapValidator.min.css"/>
+
     <!-- JS -->
     <!-- load angular, nganimate, and ui-router -->
     <script src="htmllibs/angular.min.js"></script>
     <script src="htmllibs/angular-ui-router.min.js"></script>
     <script src="htmllibs/angular-animate.min.js"></script>
+    <script src="htmllibs/jquery-latest.min.js"></script>
+    <script src="htmllibs/bootstrapValidator.min.js"></script>
 
 </head>
 <body ng-app="formApp">
 
-    <div class="container">
+    <div id="form-start" class="container">
         <div ui-view></div>
     </div>
 
+    <script type="text/javascript">
+        function toggle () {
+            var r = $("#checkBox").is(":checked") ? true : false;
+            if(r){
+                $("#oname").prop("disabled", true);  
+                $("#doname").prop("disabled", "");
+            } else {
+                $("#oname").prop("disabled", "");  
+                $("#doname").prop("disabled", true);
+            }
+        }
+    </script>
     <script>
         
         var app = angular.module('formApp', ['ngAnimate', 'ui.router']);
         FileUploadCtrl.$inject = ['$scope']
 
         app.config(function($stateProvider, $urlRouterProvider) {
-            
+        
             $stateProvider
             
                 // route to show our basic form (/form)
@@ -38,7 +53,6 @@
                 
                 // nested states 
                 // each of these sections will have their own view
-                // url will be nested (/form/profile)
                 .state('form.load', {
                     url: '/load',
                     templateUrl: 'forms/form-load.html'
@@ -80,14 +94,19 @@
         // our controller for the form
         // =============================================================================
         app.controller('formController', function($scope) {
-            
+
+            $scope.$on('$viewContentLoaded', function () {
+                if($(".form-group")){
+                    $(".form-group").bootstrapValidator();
+                }
+            });
+
             $scope.preprocessF = [
                 {'name': 'substrim'},
                 {'name': 'indexation'},
                 {'name': 'if-length' },
                 {'name': 'if-indexation' }
             ];
-
 
             $scope.features = { cds:  false, gene: true, exon: false };
             $scope.counts = { cds:  false, gene: true, exon: false };
@@ -148,6 +167,7 @@
             }
 
             $scope.generateScript = function () {
+                
                 var res = ["ngless '0.0'\n"];
                 
                 var x  = "in = fastq([" + getNameFromArray($scope.formData.files) + "])"
@@ -161,16 +181,16 @@
                 if($scope.formData['preprocess']){
                     x  = "preprocess(in) using |read|:\n"
                     var k = $scope.formData.preprocess;
-                    if(k['left']){
+                    if(k['left'] >= 0){
                         x += "    read = read[" + k['left'] + ":]\n";
                     }
-                    if(k['right']){
+                    if(k['right'] >= 0){
                         x += "    read = read[:" + k['right'] + "]\n";
                     }
-                    if(k['subs']){
+                    if(k['subs'] >= 0){
                         x += "    read = substrim(read" + getIntVar("min_quality=", k['subs']) + ")\n";
                     }
-                    if(k['disc']){
+                    if(k['disc'] >= 0){
                         x += "    if len(read) < " + k['disc'] + ":\n        discard\n";
                     }
                     res.push(x);
