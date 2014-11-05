@@ -89,6 +89,15 @@ nglessconf - downloads and configures all ngless dependencies
 Binary
 --------
 
+A self-contained NGLess distribution is also available for:
+
+	OS X Mavericks (x86\_64): **ngless-0.0.0-Darwin-x86\_64.tar.gz**
+	
+	Linux (x86\_64): **ngless-0.0.0-Linux-x86\_64.tar.gz**
+
+In this case, NGLess executable can be used directly and it's located at **ngless-*/bin**.
+
+
 FAQ
 --------
 **During 'make' an error was reported saying : 'curses.h: No such file or directory.'. How do I fix it?**
