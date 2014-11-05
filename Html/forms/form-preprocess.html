@@ -5,25 +5,26 @@
 <div class="form-group">
   <h3> Left trim </h3>
   <p> How any positions do you wish to remove from the start? </p>
-  <input type="number" name="input" ng-model="formData.preprocess.left" min="0" required>
+  <input type="number" class="form-control" name="input" ng-model="formData.preprocess.left" min="0" max="9999" required>
 </div>
 
 <div class="form-group">
   <h3> Right trim </h3>
   <p> How any positions do you wish to remove from the end? </p>
-  <input type="number" name="input" ng-model="formData.preprocess.right" min="0" required>
+  <input type="number" class="form-control" name="input" ng-model="formData.preprocess.right" min="0" max="9999" required>
 </div>
 
 <div class="form-group">
   <h3> Substrim </h3>
   <p> How low is the value for the substirm? </p>
-  <input type="number" name="input" ng-model="formData.preprocess.subs" min="0" required>
+  <input type="number" class="form-control" name="input" ng-model="formData.preprocess.subs" min="0" max="9999" required>
 </div>
 
 <div class="form-group">
   <h3> If-Discard </h3>
   <p> Here is possible to generate a instruction to discard a read if the length is smaller than a given trashold. What's the value of the trashold? </p>
-  <input type="number" name="input" ng-model="formData.preprocess.disc" min="0" required>
+  <input type="number" class="form-control" name="input" ng-model="formData.preprocess.disc" required
+         min="0" max="9999">
 </div>
 
 
