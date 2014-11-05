@@ -505,15 +505,15 @@ getScript = do
 addTempFP o = do
     -- This cannot fail as we inserted the variable ourselves
     Just (NGOList l) <- runInROEnvIO $ lookupVariable ".tmpfiles"
-    setVariableValue ".tmpfiles" $ NGOList (getNGObjName o : l)
+    setVariableValue ".tmpfiles" $ NGOList (getNGObjName o ++ l)
     return o
 
-getNGObjName :: NGLessObject -> NGLessObject
-getNGObjName (NGOReadSet x _ _)     = NGOFilename x
-getNGObjName (NGOMappedReadSet x _) = NGOFilename x
-getNGObjName (NGOAnnotatedSet x)    = NGOFilename x
+getNGObjName :: NGLessObject -> [NGLessObject]
+getNGObjName (NGOReadSet x _ _)     = [NGOFilename x]
+getNGObjName (NGOMappedReadSet x _) = [NGOFilename x]
+getNGObjName (NGOAnnotatedSet x)    = [NGOFilename x]
+getNGObjName (NGOList x)            = concat $ map getNGObjName x
 getNGObjName x = error ("Shouldn't have happened: " ++ show x)
-
 
 
 cleanTmpFiles = do
