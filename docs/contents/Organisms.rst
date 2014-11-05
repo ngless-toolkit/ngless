@@ -20,8 +20,6 @@ The following table represents organisms provided by default:
 +-----------+-----------------------------+-------------+
 | dm3       | drosophila\_melanogaster    | BDGP5       |
 +-----------+-----------------------------+-------------+
-| `-`       | gallus\_gallus              | Galgal4     |
-+-----------+-----------------------------+-------------+
 | canFam2   | canis\_familiaris           | CanFam3.1   |
 +-----------+-----------------------------+-------------+
 | rn4       | rattus\_norvegicus          | Rnor\_5.0   |
