@@ -36,7 +36,9 @@ HTMLFILES += ng-table.css
 HTMLFILES += angular-ui-router.min.js
 HTMLFILES += angular-animate.min.js
 HTMLFILES += ace.js
-HTMLFILES += mode-python.js
+HTMLFILES += mode-c_cpp.js
+HTMLFILES += bootstrapValidator.min.css
+HTMLFILES += bootstrapValidator.min.js
 
 # Required fonts
 FONTFILES := glyphicons-halflings-regular.woff
@@ -60,7 +62,9 @@ glyphicons-halflings-regular.ttf = netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts
 angular-animate.min.js = ajax.googleapis.com/ajax/libs/angularjs/1.2.16/angular-animate.min.js
 angular-ui-router.min.js = cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.10/angular-ui-router.min.js
 ace.js = cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/ace.js
-mode-python.js = cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/mode-python.js
+mode-c_cpp.js = cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/mode-c_cpp.js
+bootstrapValidator.min.css = cdnjs.cloudflare.com/ajax/libs/jquery.bootstrapvalidator/0.5.2/css/bootstrapValidator.min.css
+bootstrapValidator.min.js = cdnjs.cloudflare.com/ajax/libs/jquery.bootstrapvalidator/0.5.2/js/bootstrapValidator.min.js
 
 GIT_LOGO := github-media-downloads.s3.amazonaws.com/Octocats.zip
 
