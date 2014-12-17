@@ -4,12 +4,11 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Interpret
-    ( interpret,
-     interpretBlock,
-     evalIndex,
-     evalLen,
-     evalBinary,
-     evalMinus,
+    ( interpret
+    , _evalIndex
+    , _evalLen
+    , _evalBinary
+    , _evalMinus
     ) where
 
 
@@ -184,12 +183,12 @@ interpretExpr (UnaryOp op v) = evalUOP op <$> interpretExpr v
 interpretExpr (BinaryOp bop v1 v2) = do
     v1' <- interpretExpr v1
     v2' <- interpretExpr v2
-    let r = evalBinary bop v1' v2'
+    let r = _evalBinary bop v1' v2'
     return r
 interpretExpr (IndexExpression expr ie) = do
     expr' <- interpretExpr expr
     ie' <- interpretIndex ie
-    let r = evalIndex expr' ie'
+    let r = _evalIndex expr' ie'
     return r
 
 interpretExpr (ListExpression e) = NGOList <$> mapM interpretExpr e
@@ -341,7 +340,7 @@ executePreprocess (NGOReadSet file enc t) args (Block [Variable var] expr) _ = d
                 _ -> do
                     let newRead = lookup var (blockValues r')
                     case newRead of
-                        Just value -> case evalInteger $ evalLen value of
+                        Just value -> case evalInteger $ _evalLen value of
                             0 -> return Nothing
                             _ -> return newRead
                         _ -> throwError "A read should have been returned."
@@ -392,29 +391,29 @@ interpretPreProcessExpr (FunctionCall Fsubstrim var args _) = do
 interpretPreProcessExpr expr = interpretExpr expr
 
 evalUOP :: UOp -> NGLessObject -> NGLessObject
-evalUOP UOpMinus x@(NGOInteger _) = evalMinus x
-evalUOP UOpLen sr@(NGOShortRead _) = evalLen sr
+evalUOP UOpMinus x@(NGOInteger _) = _evalMinus x
+evalUOP UOpLen sr@(NGOShortRead _) = _evalLen sr
 evalUOP _ _ = nglTypeError "invalid unary operation. "
 
-evalLen (NGOShortRead r) = NGOInteger . toInteger $ srLength r
-evalLen err = nglTypeError ("Length must receive a Read. Received a " ++ show err)
+_evalLen (NGOShortRead r) = NGOInteger . toInteger $ srLength r
+_evalLen err = nglTypeError ("Length must receive a Read. Received a " ++ show err)
 
-evalMinus (NGOInteger n) = NGOInteger (-n)
-evalMinus err = nglTypeError ("Minus operator must receive a integer. Received a" ++ show err)
+_evalMinus (NGOInteger n) = NGOInteger (-n)
+_evalMinus err = nglTypeError ("Minus operator must receive a integer. Received a" ++ show err)
 
-evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject
-evalIndex sr index@[Just (NGOInteger a)] = evalIndex sr $ (Just $ NGOInteger (a + 1)) : index
-evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Nothing] =
+_evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject
+_evalIndex sr index@[Just (NGOInteger a)] = _evalIndex sr $ (Just $ NGOInteger (a + 1)) : index
+_evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Nothing] =
     NGOShortRead $ ShortRead rId (B.drop (fromIntegral s) rSeq) (B.drop (fromIntegral s) rQual)
-evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Nothing, Just (NGOInteger e)] =
+_evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Nothing, Just (NGOInteger e)] =
     NGOShortRead $ ShortRead rId (B.take (fromIntegral e) rSeq) (B.take (fromIntegral e) rQual)
 
-evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Just (NGOInteger e)] = do
+_evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Just (NGOInteger e)] = do
     let e' = (fromIntegral e)
         s' = (fromIntegral s)
         e'' = e'- s'
     NGOShortRead (ShortRead rId (B.take e'' . B.drop s' $ rSeq) (B.take e'' . B.drop s' $ rQual))
-evalIndex _ _ = nglTypeError "evalIndex: invalid operation"
+_evalIndex _ _ = nglTypeError "_evalIndex: invalid operation"
 
 evalBool (NGOBool x) = x
 evalBool _ = nglTypeError "evalBool: Argument type must be NGOBool"
@@ -430,16 +429,16 @@ evalInteger o = nglTypeError ("evalInteger: Argument type must be NGOInteger (go
 
 
 -- Binary Evaluation
-evalBinary :: BOp ->  NGLessObject -> NGLessObject -> NGLessObject
-evalBinary BOpLT (NGOInteger a) (NGOInteger b) = NGOBool (a < b)
-evalBinary BOpGT (NGOInteger a) (NGOInteger b) = NGOBool (a > b)
-evalBinary BOpLTE (NGOInteger a) (NGOInteger b) = NGOBool (a <= b)
-evalBinary BOpGTE (NGOInteger a) (NGOInteger b) = NGOBool (a >= b)
-evalBinary BOpEQ lexpr rexpr =  NGOBool $ lexpr == rexpr
-evalBinary BOpNEQ lexpr rexpr =  NGOBool $ lexpr /= rexpr
-evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = NGOInteger (a + b)
-evalBinary BOpMul (NGOInteger a) (NGOInteger b) = NGOInteger (a * b)
-evalBinary op a b = nglTypeError (concat ["evalBinary: ", show op, " ", show a, " ", show b])
+_evalBinary :: BOp ->  NGLessObject -> NGLessObject -> NGLessObject
+_evalBinary BOpLT (NGOInteger a) (NGOInteger b) = NGOBool (a < b)
+_evalBinary BOpGT (NGOInteger a) (NGOInteger b) = NGOBool (a > b)
+_evalBinary BOpLTE (NGOInteger a) (NGOInteger b) = NGOBool (a <= b)
+_evalBinary BOpGTE (NGOInteger a) (NGOInteger b) = NGOBool (a >= b)
+_evalBinary BOpEQ lexpr rexpr =  NGOBool $ lexpr == rexpr
+_evalBinary BOpNEQ lexpr rexpr =  NGOBool $ lexpr /= rexpr
+_evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = NGOInteger (a + b)
+_evalBinary BOpMul (NGOInteger a) (NGOInteger b) = NGOInteger (a * b)
+_evalBinary op a b = nglTypeError (concat ["_evalBinary: ", show op, " ", show a, " ", show b])
 
 
 asShortRead (NGOShortRead r) = r
