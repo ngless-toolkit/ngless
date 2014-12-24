@@ -14,6 +14,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.Text as T
 
 import qualified Data.IntervalMap.Strict as IM
+import qualified Data.IntervalMap.Generic.Strict as IMG
 import qualified Data.Map.Strict as M
 
 import Data.Maybe (fromJust)
@@ -85,13 +86,13 @@ modeAnnotation f a im y s = countsAmbiguity a ((filterStrand s asStrand) . (f im
 
 
 filterStrand :: Bool -> GffStrand -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
-filterStrand True  s m =  IM.filter (not . null) . IM.map (filterByStrand s) $ m
+filterStrand True  s m =  IMG.filter (not . null) . IMG.map (filterByStrand s) $ m
 filterStrand False _ m = m
 
 
 countsAmbiguity :: Bool -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
 countsAmbiguity True toU imR = uCounts toU imR
-countsAmbiguity False toU imR = case IM.null toU of
+countsAmbiguity False toU imR = case IMG.null toU of
         True  -> imR -- no_feature
         False -> case _allSameId toU of
             True  -> uCounts (IM.fromList . take 1 . IM.toList $ toU) imR -- same feature multiple times. increase that feature ONCE.
@@ -121,7 +122,7 @@ _intersection_strict im (sS, sE) = intersection' im'
 
 
 _intersection_non_empty :: IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]
-_intersection_non_empty im (sS, sE) = intersection' . filter (not . IM.null) $ im'
+_intersection_non_empty im (sS, sE) = intersection' . filter (not . IMG.null) $ im'
     where 
         im' = map (IM.fromList . (IM.containing im)) [sS..sE]
 
