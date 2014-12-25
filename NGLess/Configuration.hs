@@ -8,7 +8,6 @@ module Configuration
     , bwaBin
     , outputDirectory
     , temporaryFileDirectory
-    , htmlResourcePath
     ) where
 
 import Control.Monad (unless)
@@ -64,9 +63,6 @@ samtoolsBin = do
     bin <- (</> samDirPath </> "samtools") <$> getNglessRoot
     check_executable "samtools" bin
 
-
-htmlResourcePath :: IO FilePath
-htmlResourcePath = (</> "../share/ngless/Html") <$> getNglessRoot
 
 outputDirectory :: FilePath -> IO FilePath
 outputDirectory ifile = return $ replaceExtension ifile ".output_ngless/"

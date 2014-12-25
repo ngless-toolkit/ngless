@@ -35,7 +35,9 @@ readReadSet :: FastQEncoding -> FilePath -> IO [ShortRead]
 readReadSet enc fn = (parseFastQ enc) `fmap` (readPossiblyCompressedFile fn)
 
 executeQProc :: Maybe FastQEncoding -> FilePath -> FilePath -> FilePath -> IO NGLessObject
-executeQProc enc f info dirT = setupRequiredFiles info dirT >>= \x -> readFastQ enc f x dirT
+executeQProc enc f info dirT = do
+    let x = dirT ++ "$" ++ info
+    readFastQ enc f x dirT
 
 readFastQ :: Maybe FastQEncoding -> FilePath -> FilePath -> FilePath -> IO NGLessObject
 readFastQ enc f dst dirT = do
@@ -55,15 +57,3 @@ readFastQ enc f dst dirT = do
         p s obj  = printNglessLn $ s ++ obj
         encFromM fd = fromMaybe (guessEncoding . lc $ fd) enc
 
-setupRequiredFiles :: FilePath -> FilePath -> IO FilePath
-setupRequiredFiles info dirTemplate = do
-    let destDir' = dirTemplate ++ "$" ++ info
-    htmlSourceP <- htmlResourcePath
-    createDirectory destDir'
-    copyFile (htmlSourceP </> "perBaseQualScores.css") (destDir' </> "perBaseQualScores.css")
-    copyFile (htmlSourceP </> "perBaseQualityScores.js") (destDir' </> "perBaseQualityScores.js")
-    case info of
-        "beforeQC" -> copyFile (htmlSourceP </> "beforeQC.html") (destDir' </> "index.html")
-        "afterQC" -> copyFile (htmlSourceP </> "afterQC.html") (destDir' </> "index.html")
-        err -> error ("Has to be either before or after QC. it is: " ++ (show err))
-    return destDir'

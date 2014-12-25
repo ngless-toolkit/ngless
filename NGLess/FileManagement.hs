@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module FileManagement
     ( 
         createDir,
@@ -14,6 +15,7 @@ module FileManagement
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.ByteString as BS
 
 import qualified Codec.Compression.GZip as GZip    
 
@@ -27,7 +29,8 @@ import System.IO
 import Control.Monad
 import System.Posix.Internals (c_getpid)
 
-import Configuration
+import Utils.Embed
+import Configuration (outputDirectory)
 
 isNotDot :: FilePath -> Bool
 isNotDot f = f `notElem` [".", ".."]
@@ -87,14 +90,21 @@ createTempDirectory dir t = do
         False  -> return dirpath
         True -> findTempName (x+1)
 
+nglessKeeper = $(embedFile "Html/nglessKeeper.html")
+
 setupHtmlViewer :: FilePath -> IO ()
 setupHtmlViewer fname = do
-    htmlP <- htmlResourcePath
     dst <- outputDirectory fname
-    doesFileExist (p' dst) >>= \x -> case x of 
-        True   -> return ()
-        False  -> copyDir htmlP dst
-    where p' = (</> "nglessKeeper.html")
+    let p = (dst </> "nglessKeeper.html")
+    exists <- doesFileExist p
+    unless exists $ do
+        createDirectoryIfMissing False dst
+        BS.writeFile p nglessKeeper
+        BS.writeFile (dst </> "perBaseQualScores.css") $(embedFile "Html/perBaseQualScores.css")
+        BS.writeFile (dst </> "perBaseQualScores.css") $(embedFile "Html/perBaseQualScores.css")
+        BS.writeFile (dst </> "perBaseQualityScores.js") $(embedFile "Html/perBaseQualityScores.js")
+        BS.writeFile (dst </> "beforeQC.html") $(embedFile "Html/beforeQC.html")
+        BS.writeFile (dst </> "afterQC.html") $(embedFile "Html/afterQC.html")
 
 copyDir ::  FilePath -> FilePath -> IO ()
 copyDir src dst = do

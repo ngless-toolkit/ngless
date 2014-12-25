@@ -20,7 +20,7 @@ executable ngless
   ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2
   -- other-modules:
   default-extensions:  BangPatterns, OverloadedStrings
-  other-extensions:    DeriveDataTypeable
+  other-extensions:    DeriveDataTypeable, TemplateHaskell
   build-depends:
     aeson,
     base,
@@ -43,6 +43,8 @@ executable ngless
     process,
     resourcet,
     tar,
+    template-haskell,
+    th-lift-instances,
     text,
     unix,
     vector,
@@ -80,6 +82,8 @@ Test-Suite nglesstest
     process,
     resourcet,
     tar,
+    template-haskell,
+    th-lift-instances,
     test-framework,
     test-framework-hunit,
     test-framework-quickcheck2,
