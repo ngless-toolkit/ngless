@@ -1,5 +1,5 @@
 ngless "0.0"
-input = fastq('samples/sample_1.fq')
+input = fastq('samples/sample.fq')
 input = unique(input, max_copies=2)
 preprocess(input) using |read|:
     read = read[3:]
@@ -7,5 +7,5 @@ preprocess(input) using |read|:
     if len(read) < 20:
         discard
 mapped = map(input, reference='ref.fa')
-write(input, ofile='../samples/filtered.sam', format={sam})
-write(input, ofile='../samples/filtered.bam', format={bam})
+write(input, ofile='filtered.sam', format={sam})
+write(input, ofile='filtered.bam', format={bam})

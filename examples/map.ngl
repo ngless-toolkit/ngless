@@ -1,5 +1,5 @@
 ngless "0.0"
-input = fastq('samples/sample_1.fq')
+input = fastq('samples/sample.fq')
 preprocess(input) using |read|:
     if len(read) < 20:
         discard

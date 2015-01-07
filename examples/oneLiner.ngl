@@ -1,0 +1,3 @@
+ngless "0.0"
+write(count(annotate(map(fastq('samples/sample.fq'),reference='sacCer3'), features=[{gene},{cds},{exon}], gff='samples/genes.gff'), min=10), ofile="samples/CountsResult.txt", format={tsv})
+
