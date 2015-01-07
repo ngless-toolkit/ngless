@@ -16,6 +16,8 @@ SAM_DIR = samtools-1.0
 SAM_URL = http://sourceforge.net/projects/samtools/files/samtools/1.0/samtools-1.0.tar.bz2
 SAM_TAR = samtools-1.0.tar.bz2
 
+NGLESS_DATA_DEPENDENCIES := NGLess/Dependencies/samtools_data.c NGLess/Dependencies/bwa_data.c
+
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
 HTML_FONTS_DIR = $(HTML)/fonts
@@ -68,7 +70,9 @@ reqhtmllibs = $(addprefix $(HTML_LIBS_DIR)/, $(HTMLFILES))
 reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
 reqlogo = $(HTML_LIBS_DIR)/Octocat.png
 
-all: nglessconf
+all: ngless
+
+ngless: nglessconf $(NGLESS_DATA_DEPENDENCIES)
 	cabal build
 
 dist: ngless-${VERSION}.tar.gz
@@ -98,6 +102,7 @@ cabal.sandbox.config: NGLess.cabal
 
 clean:
 	rm -rf dist
+	rm $(NGLESS_DATA_DEPENDENCIES)
 
 distclean: clean
 	if [ -d .cabal.sandobox ]; then cabal sandbox delete; fi
@@ -126,6 +131,7 @@ $(SAM_DIR):
 
 $(SAM_DIR)/samtools: $(SAM_DIR)
 	cd $(SAM_DIR) && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC"
+
 
 NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/samtools
 	xxd -i $< $@
@@ -165,9 +171,7 @@ $(HTML_LIBS_DIR)/Octocat.png:
 	rm -rf $(HTML_LIBS_DIR)/__MACOSX $(HTML_LIBS_DIR)/Octocat $(HTML_LIBS_DIR)/Octocats.zip;
 	echo $(GIT_LOGO) configured;
 
-
-
-ngless-${VERSION}.tar.gz: nglessconf
+ngless-${VERSION}.tar.gz: ngless
 	mkdir -p $(distdir)/share $(distdir)/bin
 	cabal build
 	cp dist/build/$(progname)/$(progname) $(distdir)/bin
@@ -177,4 +181,4 @@ ngless-${VERSION}.tar.gz: nglessconf
 	tar -zcvf $(distdir).tar.gz $(distdir)
 	rm -rf $(distdir)
 
-.PHONY: build clean check nglessconf distclean dist
+.PHONY: all build clean check nglessconf distclean dist
