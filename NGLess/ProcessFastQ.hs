@@ -45,6 +45,7 @@ readFastQ enc f dst dirT = do
         let enc' = encFromM fd -- when Nothing calculate encoding, else use value from Just.
         p "Generation of statistics for " dst
         let json = createBasicStatsJson  fd f enc' -- generate JSON DATA file: basicStats.js
+        createDirectoryIfMissing True dst
         BL.writeFile (dst ++ "/basicStats.js") json
         p "Simple Statistics completed for: " dst
         p "Number of base pairs: "      (show $ length (qualCounts fd)) 
