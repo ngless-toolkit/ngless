@@ -29,7 +29,7 @@ import System.IO
 import Control.Monad
 import System.Posix.Internals (c_getpid)
 
-import Utils.Embed
+import Data.FileEmbed
 import Configuration (outputDirectory)
 
 isNotDot :: FilePath -> Bool
