@@ -90,8 +90,6 @@ createTempDirectory dir t = do
         False  -> return dirpath
         True -> findTempName (x+1)
 
-nglessKeeper = $(embedFile "Html/nglessKeeper.html")
-
 setupHtmlViewer :: FilePath -> IO ()
 setupHtmlViewer fname = do
     dst <- outputDirectory fname
@@ -99,12 +97,11 @@ setupHtmlViewer fname = do
     exists <- doesFileExist p
     unless exists $ do
         createDirectoryIfMissing False dst
-        BS.writeFile p nglessKeeper
-        BS.writeFile (dst </> "perBaseQualScores.css") $(embedFile "Html/perBaseQualScores.css")
-        BS.writeFile (dst </> "perBaseQualScores.css") $(embedFile "Html/perBaseQualScores.css")
-        BS.writeFile (dst </> "perBaseQualityScores.js") $(embedFile "Html/perBaseQualityScores.js")
-        BS.writeFile (dst </> "beforeQC.html") $(embedFile "Html/beforeQC.html")
-        BS.writeFile (dst </> "afterQC.html") $(embedFile "Html/afterQC.html")
+        createDirectoryIfMissing False (dst </> "htmllibs")
+        createDirectoryIfMissing False (dst </> "fonts")
+        createDirectoryIfMissing False (dst </> "forms")
+        forM_ $(embedDir "Html") $ \(fp,bs) ->
+            BS.writeFile (dst </> fp) bs
 
 copyDir ::  FilePath -> FilePath -> IO ()
 copyDir src dst = do
