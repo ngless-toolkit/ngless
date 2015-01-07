@@ -19,6 +19,7 @@ executable ngless
   main-is: Main.hs
   ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2
   -- other-modules:
+  C-sources: NGLess/Dependencies/embedded.c
   default-extensions:  BangPatterns, OverloadedStrings
   other-extensions:    DeriveDataTypeable, TemplateHaskell
   build-depends:
@@ -57,6 +58,7 @@ Test-Suite nglesstest
   main-is:      Tests.hs
   ghc-options:  -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2
   -- other-modules:
+  C-sources: NGLess/Dependencies/embedded.c
   default-extensions:  BangPatterns, OverloadedStrings
   other-extensions:    DeriveDataTypeable, TupleSections, TemplateHaskell
   build-depends:

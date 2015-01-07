@@ -8,3 +8,7 @@
 *.hi
 Html/fonts/
 Html/htmllibs/
+
+# Generated as part of build
+NGLess/Dependencies/bwa_data.c
+NGLess/Dependencies/samtools_data.c

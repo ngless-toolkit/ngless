@@ -29,7 +29,6 @@ import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as S
 
 
-version = "0.0.0"
 data NGLess =
         DefaultMode
               { debug_mode :: String

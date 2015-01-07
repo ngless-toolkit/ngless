@@ -127,6 +127,11 @@ $(SAM_DIR):
 $(SAM_DIR)/samtools: $(SAM_DIR)
 	cd $(SAM_DIR) && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC"
 
+NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/samtools
+	xxd -i $< $@
+
+NGLess/Dependencies/bwa_data.c: $(BWA_DIR)/bwa
+	xxd -i $< $@
 
 # We cannot depend on $(HTML_LIBS_DIR) as wget sets the mtime in the past
 # and it would cause the download to happen at every make run
