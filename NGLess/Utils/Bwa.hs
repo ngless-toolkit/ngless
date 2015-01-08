@@ -1,3 +1,7 @@
+{- Copyright 2013-2015 NGLess Authors
+ - License: MIT
+ -}
+
 module Utils.Bwa
     ( hasValidIndex
     , createIndex
@@ -7,6 +11,7 @@ import System.Process
 import System.Exit
 import System.Directory
 
+import Output
 import Configuration
 
 -- | Checks whether all necessary files are present for a BWA index
@@ -25,11 +30,12 @@ hasValidIndex basepath = doAllFilesExist indexRequiredFormats
 -- | Creates bwa index on disk
 createIndex :: FilePath -> IO ()
 createIndex fafile = do
+    outputList InfoOutput ["Start BWA index creation for ", fafile]
     bwaPath <- bwaBin
     (exitCode, out, err) <-
         readProcessWithExitCode bwaPath ["index", fafile] []
-    printNglessLn err
-    printNglessLn out
+    outputList DebugOutput ["BWA-index stderr: ", err]
+    outputList DebugOutput ["BWA-index stdout: ", out]
     case exitCode of
         ExitSuccess -> return ()
         ExitFailure _err -> error err

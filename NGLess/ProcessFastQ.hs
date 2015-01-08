@@ -22,6 +22,7 @@ import Data.FastQ
 import Language
 import JSONManager
 import Configuration
+import Output
 
 writeReadSet :: FilePath -> [ShortRead] -> FastQEncoding -> IO FilePath
 writeReadSet fn rs enc = do
@@ -55,6 +56,6 @@ readFastQ enc f dst dirT = do
         p "Loaded file: " f
         return $ NGOReadSet f enc' (B.pack dirT)
     where
-        p s obj  = printNglessLn $ s ++ obj
+        p s0 s1  = outputList DebugOutput [s0, s1]
         encFromM fd = fromMaybe (guessEncoding . lc $ fd) enc
 

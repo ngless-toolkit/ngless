@@ -1,9 +1,11 @@
+{- Copyright 2013-2015 NGLess Authors
+ - License: MIT
+ -}
 module Configuration
     ( nglessDataBaseURL
     , InstallMode(..)
     , globalDataDirectory
     , userDataDirectory
-    , printNglessLn
     , samtoolsBin
     , bwaBin
     , outputDirectory
@@ -11,19 +13,21 @@ module Configuration
     , version
     ) where
 
-import Control.Monad (unless, (=<<))
+import Control.Monad (unless)
 import Control.Applicative ((<$>))
 import System.Environment (getExecutablePath)
 import System.Directory
 import System.FilePath.Posix
-import System.Console.CmdArgs.Verbosity (whenLoud)
 import qualified Data.ByteString as B
 import Data.Maybe
 
 import Dependencies.Embedded
 
 data InstallMode = User | Root deriving (Eq, Show)
+
+version :: String
 version = "0.0.0"
+
 versionStr = "0.0.0"
 
 nglessDataBaseURL :: IO FilePath
@@ -40,9 +44,6 @@ userNglessDirectory = (</> ".ngless") <$> getHomeDirectory
 
 userDataDirectory :: IO FilePath
 userDataDirectory = (</> "data") <$> userNglessDirectory
-
-printNglessLn :: String -> IO ()
-printNglessLn msg = whenLoud (putStrLn msg)
 
 getNglessRoot :: IO FilePath
 getNglessRoot = takeDirectory <$> getExecutablePath

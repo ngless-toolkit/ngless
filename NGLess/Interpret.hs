@@ -1,4 +1,4 @@
-{- Copyright 2013-2014 NGLess Authors
+{- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE BangPatterns #-}
@@ -34,7 +34,7 @@ import FileManagement
 import JSONManager
 import Annotation
 import CountOperation
-import Configuration
+import Output
 
 import Interpretation.Write
 import Interpretation.Map
@@ -147,7 +147,7 @@ interpret fname script es = do
     setupHtmlViewer fname
     r <- runResourceT $ evalStateT (runErrorT . interpretIO $ es) initialState
     case r of
-        Right _ -> return ()
+        Right _ -> output InfoOutput "Ngless finished."
         Left err -> putStrLn (show err)
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
@@ -325,7 +325,7 @@ executeUnique _ _ = error "executeUnique: Should not have happened"
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block v = return . NGOList =<< mapM (\x -> executePreprocess x args _block v) e
 executePreprocess (NGOReadSet file enc t) args (Block [Variable var] expr) _ = do
-        liftIO $printNglessLn $ "ExecutePreprocess on " ++ file
+        liftIO $ outputList DebugOutput ["Preprocess on ", file]
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         env <- gets snd
         newfp <- liftIO $ writeReadSet file (map asShortRead (execBlock env rs)) enc

@@ -1,8 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Data.AnnotRes
-    ( 
-      GffCount(..)
+    ( GffCount(..)
       , readAnnotCounts
       , writeAnnotCount
       , showGffCountDel
@@ -23,7 +22,7 @@ import System.FilePath.Posix((</>), splitFileName)
 
 import FileManagement
 
-import Configuration
+import Output
 import Data.GFF
 
 data GffCount = GffCount
@@ -69,9 +68,9 @@ writeAnnotCount :: FilePath -> [GffCount]-> IO FilePath
 writeAnnotCount fn im = do
     temp <- getTemporaryDirectory 
     newfp <- getTempFilePath (temp </> (snd . splitFileName $ fn))
-    printNglessLn $ "Writing Annotation results to:" ++ newfp
+    output DebugOutput $ "Writing Annotation results to:" ++ newfp
     L8.writeFile newfp $ showGffCount im
-    printNglessLn "Write completed"
+    output InfoOutput "Write completed"
     return newfp
 
 showUniqIdCounts :: S8.ByteString -> L8.ByteString -> L8.ByteString

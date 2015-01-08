@@ -1,5 +1,8 @@
-{-# LANGUAGE TupleSections #-}
+{- Copyright 2013-2015 NGLess Authors
+ - License: MIT
+ -}
 
+{-# LANGUAGE TupleSections #-}
 
 module Interpretation.Map
     ( interpretMapOp
@@ -25,6 +28,7 @@ import Language
 import FileManagement
 import ReferenceDatabases
 import Configuration
+import Output
 
 import Data.Sam
 import Utils.Bwa
@@ -34,7 +38,7 @@ ensureIndexExists :: FilePath -> IO FilePath
 ensureIndexExists refPath = do
     hasIndex <- hasValidIndex refPath
     if hasIndex
-        then printNglessLn $ "index for " ++ refPath ++ " already exists."
+        then output InfoOutput ("Index for " ++ refPath ++ " already exists.")
         else createIndex refPath
     return refPath
 
@@ -43,8 +47,9 @@ mapToReference :: FilePath -> FilePath -> ResourceT IO String
 mapToReference refIndex readSet = do
     (rk, (newfp, hout)) <- tempfile "mappedOutput.sam"
     liftIO $ do
+        output InfoOutput ("Starting mapping to " ++ refIndex)
         bwaPath <- bwaBin
-        printNglessLn ("write .sam file to: " ++ show newfp)
+        output DebugOutput ("write .sam file to: " ++ newfp)
         (_, _, Just herr, jHandle) <-
             createProcess (
                 proc bwaPath
@@ -52,16 +57,18 @@ mapToReference refIndex readSet = do
                 ) { std_out = UseHandle hout,
                     std_err = CreatePipe }
         err <- hGetContents herr
-        putStrLn $ concat ["Error in bwa: ", err]
+        outputList DebugOutput $ ["BWA info: ", err]
         exitCode <- waitForProcess jHandle
         hClose herr
         case exitCode of
-           ExitSuccess -> return newfp
-           ExitFailure code -> do
-                    release rk
-                    error $ concat ["Failed mapping\nCommand line was::\n\t",
-                                        bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '", readSet, "'\n",
-                                        "Bwa error code was ", show code, "."]
+            ExitSuccess -> do
+                output InfoOutput ("Done mapping to " ++ refIndex)
+                return newfp
+            ExitFailure code -> do
+                release rk
+                error $ concat ["Failed mapping\nCommand line was::\n\t",
+                                bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '", readSet, "'\n",
+                                "Bwa error code was ", show code, "."]
 
 interpretMapOp :: T.Text -> FilePath -> ResourceT IO NGLessObject
 interpretMapOp r ds = do

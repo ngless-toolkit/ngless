@@ -1,3 +1,7 @@
+{- Copyright 2013-2015 NGLess Authors
+ - License: MIT
+ -}
+
 {-# LANGUAGE OverloadedStrings #-}
 
 module Unique
@@ -22,7 +26,7 @@ import System.FilePath.Posix
 
 import FileManagement (createDir, getFilesInDir, readPossiblyCompressedFile)
 import Data.FastQ
-import Configuration
+import Output
 
 maxTempFileSize = (100*1000*1000) -- 100MB
 
@@ -39,7 +43,7 @@ writeToNFiles fname enc rs = do
         let pos = hashRead k x
         BL.hPutStr (fhs !! pos) (asFastQ enc [x])
     _ <- do
-        printNglessLn $ "Wrote N Files to: " ++ dest 
+        output DebugOutput ("Wrote N Files to: " ++ dest)
         mapM_ hClose fhs
     return dest
 

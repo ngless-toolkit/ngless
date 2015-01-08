@@ -1,4 +1,4 @@
-{- Copyright 2013-2014 NGLess Authors
+{- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE DeriveDataTypeable, OverloadedStrings #-}
@@ -16,6 +16,7 @@ import Parse
 import WebServer
 import Configuration
 import ReferenceDatabases
+import Output
 
 import Control.Monad
 import Control.Applicative
@@ -67,13 +68,16 @@ visualizeargs = VisualizeMode
 -- The only purpose is to aid in debugging by printing intermediate
 -- representations.
 function :: String -> String -> T.Text -> IO ()
-function "ngless" fname text = case parsengless fname text >>= checktypes >>= validate of
-            Left err -> T.putStrLn err
-            Right expr -> do
-                errs <- validate_io expr
-                case errs of
-                    Nothing -> interpret fname text (nglBody expr)
-                    Just errors -> T.putStrLn (T.concat errors)
+function "ngless" fname text =
+    case parsengless fname text >>= checktypes >>= validate of
+        Left err -> T.putStrLn err
+        Right expr -> do
+            output DebugOutput "Validating script..."
+            errs <- validate_io expr
+            output InfoOutput "Script OK. Starting interpretation..."
+            case errs of
+                Nothing -> interpret fname text (nglBody expr)
+                Just errors -> T.putStrLn (T.concat errors)
 
 function "ast" fname text = case parsengless fname text >>= validate of
             Left err -> T.putStrLn (T.concat ["Error in parsing: ", err])
@@ -88,14 +92,14 @@ function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 
 
 optsExec (DefaultMode dmode fname n) = do
+    setNumCapabilities n
+    odir <- outputDirectory fname
+    createDirectoryIfMissing False odir
     --Note that the input for ngless is always UTF-8.
     --Always. This means that we cannot use T.readFile
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
-    setNumCapabilities n
-    odir <- outputDirectory fname
-    createDirectoryIfMissing False odir
     engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
     case engltext of
         Left err -> print err
@@ -113,6 +117,6 @@ getModes = cmdArgsMode $ modes [ngless &= auto, installargs, visualizeargs]
     &= verbosity
     &= summary sumtext
     &= help "ngless implement the NGLess language"
-    where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013-2014"]
+    where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013-2015"]
 
 main = cmdArgsRun getModes >>= optsExec

@@ -1,3 +1,7 @@
+{- Copyright 2013-2015 NGLess Authors
+ - License: MIT
+ -}
+
 {-# LANGUAGE OverloadedStrings #-}
 
 module Interpretation.Write
@@ -21,6 +25,7 @@ import Language
 import FileManagement
 import JSONManager
 import Configuration
+import Output
 import Data.AnnotRes
 
 getNGOPath (Just (NGOFilename p)) = p
@@ -54,15 +59,16 @@ writeToFile el@(NGOMappedReadSet fp defGen) args = do
     let newfp = getNGOPath (lookup "ofile" args) --
         format = fromMaybe (NGOSymbol "sam") (lookup "format" args)
     case format of
-        (NGOSymbol "sam") -> writeToUncFile el newfp
-        (NGOSymbol "bam") -> do
+        NGOSymbol "sam" -> writeToUncFile el newfp
+        NGOSymbol "bam" -> do
                         newfp' <- convertSamToBam fp newfp
                         return (NGOMappedReadSet newfp' defGen) --newfp will contain the bam
         _ -> error "This format should have been impossible"
+
 writeToFile (NGOAnnotatedSet fp) args = do
     let newfp = getNGOPath $ lookup "ofile" args
-        del = getDelimiter  $ lookup "format" args
-    printNglessLn $ "Writing your NGOAnnotatedSet to: " ++ newfp
+        del = getDelimiter $ lookup "format" args
+    output InfoOutput $ "Writing your NGOAnnotatedSet to: " ++ newfp
     cont <- readPossiblyCompressedFile fp
     case lookup "verbose" args of
         Just (NGOSymbol "no")  -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
@@ -77,14 +83,13 @@ writeToFile (NGOAnnotatedSet fp) args = do
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
 getDelimiter :: Maybe NGLessObject -> B.ByteString
-getDelimiter x = case x of
-        (Just (NGOSymbol "csv")) -> ","
-        (Just (NGOSymbol "tsv")) -> "\t"
-        (Just err) ->  error ("Type must be NGOSymbol, but was given" ++ show err)
-        Nothing -> "\t"
+getDelimiter (Just (NGOSymbol "csv")) = ","
+getDelimiter (Just (NGOSymbol "tsv")) = "\t"
+getDelimiter Nothing = "\t"
+getDelimiter (Just v) =  error ("Type of 'format' in 'write' must be NGOSymbol, got " ++ show v)
 
 convertSamToBam samfile newfp = do
-    printNglessLn $ "Start to convert Sam to Bam. from " ++ samfile ++ " to -> " ++ newfp
+    outputList DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
     samPath <- samtoolsBin
     withFile newfp WriteMode $ \hout -> do
         (_, _, Just herr, jHandle) <- createProcess (

@@ -24,6 +24,7 @@ executable ngless
   other-extensions:    DeriveDataTypeable, TemplateHaskell
   build-depends:
     aeson,
+    ansi-terminal,
     base,
     bytestring,
     cmdargs,
@@ -47,6 +48,7 @@ executable ngless
     tar,
     template-haskell,
     text,
+    time,
     unix,
     vector,
     zlib
@@ -63,6 +65,7 @@ Test-Suite nglesstest
   other-extensions:    DeriveDataTypeable, TupleSections, TemplateHaskell
   build-depends:
     aeson,
+    ansi-terminal,
     base,
     bytestring,
     cmdargs,
@@ -91,6 +94,7 @@ Test-Suite nglesstest
     test-framework-quickcheck2,
     test-framework-th,
     text,
+    time,
     unix,
     vector,
     zlib

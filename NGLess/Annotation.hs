@@ -24,6 +24,7 @@ import Control.DeepSeq
 import FileManagement(readPossiblyCompressedFile)
 import ReferenceDatabases
 import Configuration
+import Output
 
 import Data.GFF
 import Data.Sam (SamLine(..), isAligned, isPositive, readAlignments)
@@ -36,15 +37,15 @@ data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNo
 
 annotate :: FilePath -> Maybe FilePath -> Maybe [String] -> Maybe T.Text -> AnnotationIntersectionMode -> Bool -> Bool -> IO FilePath
 annotate samFP (Just g) feats _ m a s = do
-    printNglessLn (concat ["annotate with GFF: ", g])
+    outputList InfoOutput ["annotate with GFF: ", g]
     annotate' samFP g feats (getIntervalQuery m) a s  -- ignore default GFF
-annotate samFP Nothing feats dDs m a s =
-    printNglessLn (concat ["annotate with default GFF: ", show . fromJust $ dDs]) >>
-        case dDs of
-            Just v  -> do
-                basedir <- ensureDataPresent (T.unpack v)
-                annotate' samFP (getGff basedir) feats (getIntervalQuery m) a s   -- used default GFF
-            Nothing -> error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
+annotate samFP Nothing feats dDs m a s = do
+    outputList InfoOutput ["annotate with default GFF: ", show . fromJust $ dDs]
+    case dDs of
+        Just v  -> do
+            basedir <- ensureDataPresent (T.unpack v)
+            annotate' samFP (getGff basedir) feats (getIntervalQuery m) a s   -- used default GFF
+        Nothing -> error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
 
 getIntervalQuery :: AnnotationIntersectionMode -> (IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount])
 getIntervalQuery IntersectUnion = union
