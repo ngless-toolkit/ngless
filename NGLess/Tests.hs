@@ -14,9 +14,9 @@ import Text.Parsec.Combinator (eof)
 import Text.ParserCombinators.Parsec.Prim (GenParser)
 import Text.Parsec.Pos (newPos)
 
-import System.Directory(removeFile, removeDirectoryRecursive, createDirectoryIfMissing)
+import System.Directory (removeFile, removeDirectoryRecursive, createDirectoryIfMissing)
+import System.Directory (doesFileExist, getDirectoryContents)
 import System.FilePath.Posix((</>))
-import System.Directory (doesFileExist)
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
@@ -485,17 +485,12 @@ case_uop_minus_2 = _evalMinus (NGOInteger (-10)) @?= (NGOInteger 10)
 
 --
 
-case_files_in_dir = do
-    x <- getFilesInDir "docs"
-    length x @?= 4
-
-case_template_id = template "a/B/c/d/xpto_1.fq" @?= template "a/B/c/d/xpto_1.fq"
-case_template    = template "a/B/c/d/xpto_1.fq" @?= "xpto_1"
+case_template_id = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq"
+case_template    = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= "xpto_1"
 
 case_parse_filename = parseFileName "/var/folders/sample_1.9168$afterQC" @?= ("/var/folders/","sample_1")
 
-case_temp_fp      = assertNotEqual (getTempFilePath "xpto") (getTempFilePath "xpto")
-case_temp_fp_comp = assertNotEqual (getTFilePathComp "xpto") (getTFilePathComp "xpto")
+case_temp_fp      = assertNotEqual (generateTempFilePath "/tmp" "xpto") (generateTempFilePath "/tmp" "xpto")
 
 assertNotEqual a b = do
     a' <- a 
@@ -851,9 +846,9 @@ case_read_fastQ = do
     nt <- generateDirId "testing_tmp_dir" fp
     createDirectoryIfMissing False (dstDir nt)
     _ <- readFastQ Nothing fp (dstDir nt) nt --creates files in nt
-    len <- length <$> getFilesInDir (dstDir nt)
+    len <- length <$> getDirectoryContents (dstDir nt)
     removeDirectoryRecursive $ dstDir nt -- delete test generated data.
-    len @?= 2
+    len @?= 4
   where fp = "test_samples/sample.fq"
         dstDir nt = nt ++ "$beforeQC"
 

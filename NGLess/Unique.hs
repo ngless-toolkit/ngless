@@ -12,9 +12,9 @@ module Unique
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.Map as Map
 
-import Data.Map as Map
-
+import Control.Applicative
 import Control.Monad
 import Control.Monad.ST
 
@@ -22,9 +22,10 @@ import System.IO
 import Data.STRef
 import Data.Hashable
 import System.FilePath.Posix
+import System.Directory
 
 
-import FileManagement (createDir, getFilesInDir, readPossiblyCompressedFile)
+import FileManagement (createDir, readPossiblyCompressedFile)
 import Data.FastQ
 import Output
 
@@ -49,7 +50,10 @@ writeToNFiles fname enc rs = do
 
 
 readNFiles :: FastQEncoding -> Int -> FilePath -> IO [ShortRead]
-readNFiles enc k d = getFilesInDir d >>= mapM (\x -> readUniqueFile k enc x) >>= return . concat
+readNFiles enc k d = do
+    fs <- getDirectoryContents d
+    let fs' = map (d </>) (filter (`notElem` [".", ".."]) fs)
+    concat <$> mapM (readUniqueFile k enc) fs'
 
 readUniqueFile :: Int -> FastQEncoding -> FilePath -> IO [ShortRead]
 readUniqueFile k enc fname =
@@ -81,4 +85,5 @@ openKFileHandles :: Int -> FilePath -> IO [Handle]
 openKFileHandles k dest =
     forM [0..k - 1] $ \n -> do
         openFile (dest </> show n) AppendMode
+
 

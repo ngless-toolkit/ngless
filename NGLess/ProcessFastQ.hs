@@ -26,7 +26,7 @@ import Output
 writeReadSet :: FilePath -> [ShortRead] -> FastQEncoding -> IO FilePath
 writeReadSet fn rs enc = do
     temp <- getTemporaryDirectory 
-    newfp <- getTFilePathComp (temp </> (template fn))
+    newfp <- generateTempFilePath temp (takeBaseNameNoExtensions fn <.> "fa.gz")
     writeGZIP newfp (asFastQ enc rs)
     return newfp
 

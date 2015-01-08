@@ -1,17 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 module FileManagement
-    ( 
-        createDir,
-        getTempFilePath,
-        getFilesInDir,
-        getTFilePathComp,
-        getTemporaryDirectory,
-        generateDirId,
-        setupHtmlViewer,
-        readPossiblyCompressedFile,
-        writeGZIP,
-        parseFileName,
-        template
+    ( createDir
+    , getTemporaryDirectory
+    , generateDirId
+    , generateTempFilePath
+    , setupHtmlViewer
+    , readPossiblyCompressedFile
+    , takeBaseNameNoExtensions
+    , writeGZIP
+    , parseFileName
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -32,16 +29,6 @@ import System.Posix.Internals (c_getpid)
 import Data.FileEmbed
 import Configuration (outputDirectory)
 
-isNotDot :: FilePath -> Bool
-isNotDot f = f `notElem` [".", ".."]
-
----- Files in a Directory
-getFilesInDir :: FilePath -> IO [FilePath]
-getFilesInDir p = do
- files <- getDirectoryContents p
- return $ map ((</>) p) (filter isNotDot files)
-
-
 -- 
 generateTempFilePath :: FilePath -> String -> IO FilePath
 generateTempFilePath dst t = do
@@ -51,32 +38,21 @@ generateTempFilePath dst t = do
 
 --Example: "folders/sample_1.9168$afterQC" @?= ("folders/","sample_1")
 parseFileName :: FilePath -> (FilePath, FilePath)
-parseFileName = splitFileName . fst . break ((==) '$') . fst . splitExtensions
+parseFileName = splitFileName . fst . break ((==) '$') . dropExtensions
 
-getTempFilePath :: FilePath -> IO FilePath
-getTempFilePath fp = do
-    let (dst, t) = parseFileName fp
-    generateTempFilePath dst t
-    
-getTFilePathComp :: FilePath -> IO FilePath
-getTFilePathComp fp = do
-    let (dst, t) = parseFileName fp
-    generateTempFilePath dst (t <.> "gz")
-
----- generate template from path
-template :: FilePath -> FilePath
-template = snd . splitFileName . fst . splitExtensions
+takeBaseNameNoExtensions = dropExtensions . takeBaseName
     
 createDir :: FilePath -> IO FilePath
 createDir dst = do
-    fp <- getTemporaryDirectory >>= flip createTempDirectory (template dst)
+    t <- getTemporaryDirectory
+    fp <- createTempDirectory t (takeBaseNameNoExtensions dst)
     createDirectory fp
     return fp
 
 generateDirId :: FilePath -> FilePath -> IO FilePath
 generateDirId fname dst = do
     odir <- outputDirectory fname
-    createTempDirectory odir (template dst)
+    createTempDirectory odir (takeBaseNameNoExtensions dst)
     
 createTempDirectory :: FilePath -> String -> IO FilePath
 createTempDirectory dir t = do
@@ -106,13 +82,12 @@ setupHtmlViewer fname = do
 copyDir ::  FilePath -> FilePath -> IO ()
 copyDir src dst = do
   createDirectoryIfMissing False dst
-  xs <- filter isNotDot <$> getDirectoryContents src
+  xs <- filter (`notElem` [".", ".."]) <$> getDirectoryContents src
   forM_ xs $ \n -> do
     exists <- doesDirectoryExist (src </> n)
     if exists
         then copyDir  (src </> n) (dst </> n)
         else copyFile (src </> n) (dst </> n)
-
 
 
 writeGZIP :: String -> BL.ByteString -> IO ()

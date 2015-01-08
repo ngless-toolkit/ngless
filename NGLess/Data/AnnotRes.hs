@@ -18,7 +18,7 @@ import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.Map.Strict as Map
 
 import Control.DeepSeq
-import System.FilePath.Posix((</>), splitFileName)
+import System.FilePath.Posix((</>), takeFileName)
 
 import FileManagement
 
@@ -67,7 +67,7 @@ readAnnotLine line = if length tokens == 4
 writeAnnotCount :: FilePath -> [GffCount]-> IO FilePath
 writeAnnotCount fn im = do
     temp <- getTemporaryDirectory 
-    newfp <- getTempFilePath (temp </> (snd . splitFileName $ fn))
+    newfp <- generateTempFilePath temp (takeFileName fn)
     outputLno' DebugOutput $ "Writing Annotation results to:" ++ newfp
     L8.writeFile newfp $ showGffCount im
     outputLno' InfoOutput "Write completed"
