@@ -68,9 +68,9 @@ writeAnnotCount :: FilePath -> [GffCount]-> IO FilePath
 writeAnnotCount fn im = do
     temp <- getTemporaryDirectory 
     newfp <- getTempFilePath (temp </> (snd . splitFileName $ fn))
-    output DebugOutput $ "Writing Annotation results to:" ++ newfp
+    outputLno' DebugOutput $ "Writing Annotation results to:" ++ newfp
     L8.writeFile newfp $ showGffCount im
-    output InfoOutput "Write completed"
+    outputLno' InfoOutput "Write completed"
     return newfp
 
 showUniqIdCounts :: S8.ByteString -> L8.ByteString -> L8.ByteString

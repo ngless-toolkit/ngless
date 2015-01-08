@@ -68,7 +68,7 @@ writeToFile el@(NGOMappedReadSet fp defGen) args = do
 writeToFile (NGOAnnotatedSet fp) args = do
     let newfp = getNGOPath $ lookup "ofile" args
         del = getDelimiter $ lookup "format" args
-    output InfoOutput $ "Writing your NGOAnnotatedSet to: " ++ newfp
+    outputLno' InfoOutput $ "Writing AnnotatedSet to: " ++ newfp
     cont <- readPossiblyCompressedFile fp
     case lookup "verbose" args of
         Just (NGOSymbol "no")  -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
@@ -89,7 +89,7 @@ getDelimiter Nothing = "\t"
 getDelimiter (Just v) =  error ("Type of 'format' in 'write' must be NGOSymbol, got " ++ show v)
 
 convertSamToBam samfile newfp = do
-    outputList DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
+    outputListLno' DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
     samPath <- samtoolsBin
     withFile newfp WriteMode $ \hout -> do
         (_, _, Just herr, jHandle) <- createProcess (
@@ -99,7 +99,7 @@ convertSamToBam samfile newfp = do
                std_err = CreatePipe }
         errmsg <- hGetContents herr
         exitCode <- waitForProcess jHandle
-        outputList InfoOutput ["Message from samtools: ", errmsg]
+        outputListLno' InfoOutput ["Message from samtools: ", errmsg]
         case exitCode of
            ExitSuccess -> return newfp
            ExitFailure err -> error ("Failure on converting sam to bam" ++ show err)

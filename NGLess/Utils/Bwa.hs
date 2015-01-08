@@ -30,12 +30,12 @@ hasValidIndex basepath = doAllFilesExist indexRequiredFormats
 -- | Creates bwa index on disk
 createIndex :: FilePath -> IO ()
 createIndex fafile = do
-    outputList InfoOutput ["Start BWA index creation for ", fafile]
+    outputListLno' InfoOutput ["Start BWA index creation for ", fafile]
     bwaPath <- bwaBin
     (exitCode, out, err) <-
         readProcessWithExitCode bwaPath ["index", fafile] []
-    outputList DebugOutput ["BWA-index stderr: ", err]
-    outputList DebugOutput ["BWA-index stdout: ", out]
+    outputListLno' DebugOutput ["BWA-index stderr: ", err]
+    outputListLno' DebugOutput ["BWA-index stdout: ", out]
     case exitCode of
         ExitSuccess -> return ()
         ExitFailure _err -> error err

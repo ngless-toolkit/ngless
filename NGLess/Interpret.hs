@@ -100,7 +100,9 @@ data BlockResult = BlockResult
 
 -- Set line number
 setlno :: Int -> InterpretationEnvIO ()
-setlno !n = modify $ \(_,e) -> (n,e)
+setlno !n = do
+    modify $ \(_,e) -> (n,e)
+    liftIO $ setOutputLno (Just n)
 
 lookupVariable :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
 lookupVariable !k =
@@ -147,8 +149,8 @@ interpret fname script es = do
     setupHtmlViewer fname
     r <- runResourceT $ evalStateT (runErrorT . interpretIO $ es) initialState
     case r of
-        Right _ -> output InfoOutput "Ngless finished."
-        Left err -> output ErrorOutput (show err)
+        Right _ -> outputListLno InfoOutput Nothing ["Ngless finished."]
+        Left err -> outputListLno ErrorOutput Nothing [show err]
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
 interpretIO [] = return ()
@@ -325,7 +327,7 @@ executeUnique _ _ = error "executeUnique: Should not have happened"
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block v = return . NGOList =<< mapM (\x -> executePreprocess x args _block v) e
 executePreprocess (NGOReadSet file enc t) args (Block [Variable var] expr) _ = do
-        liftIO $ outputList DebugOutput ["Preprocess on ", file]
+        liftIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         env <- gets snd
         newfp <- liftIO $ writeReadSet file (map asShortRead (execBlock env rs)) enc

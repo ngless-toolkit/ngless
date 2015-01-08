@@ -55,6 +55,6 @@ readFastQ enc f dst dirT = do
         p "Loaded file: " f
         return $ NGOReadSet f enc' (B.pack dirT)
     where
-        p s0 s1  = outputList DebugOutput [s0, s1]
+        p s0 s1  = outputListLno' DebugOutput [s0, s1]
         encFromM fd = fromMaybe (guessEncoding . lc $ fd) enc
 

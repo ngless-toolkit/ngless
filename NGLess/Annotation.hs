@@ -35,10 +35,10 @@ data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNo
 
 annotate :: FilePath -> Maybe FilePath -> Maybe [String] -> Maybe T.Text -> AnnotationIntersectionMode -> Bool -> Bool -> IO FilePath
 annotate samFP (Just g) feats _ m a s = do
-    outputList InfoOutput ["annotate with GFF: ", g]
+    outputListLno' InfoOutput ["annotate with GFF: ", g]
     annotate' samFP g feats (getIntervalQuery m) a s  -- ignore default GFF
 annotate samFP Nothing feats dDs m a s = do
-    outputList InfoOutput ["annotate with default GFF: ", show . fromJust $ dDs]
+    outputListLno' InfoOutput ["annotate with default GFF: ", show . fromJust $ dDs]
     case dDs of
         Just v  -> do
             basedir <- ensureDataPresent (T.unpack v)

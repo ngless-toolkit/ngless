@@ -72,9 +72,9 @@ function "ngless" fname text =
     case parsengless fname text >>= checktypes >>= validate of
         Left err -> T.putStrLn err
         Right expr -> do
-            output DebugOutput "Validating script..."
+            outputLno' DebugOutput "Validating script..."
             errs <- validate_io expr
-            output InfoOutput "Script OK. Starting interpretation..."
+            outputLno' InfoOutput "Script OK. Starting interpretation..."
             case errs of
                 Nothing -> interpret fname text (nglBody expr)
                 Just errors -> T.putStrLn (T.concat errors)

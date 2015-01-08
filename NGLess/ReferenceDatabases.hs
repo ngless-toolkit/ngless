@@ -55,9 +55,9 @@ downloadReference ref destPath = do
         (error "Expected reference data")
     baseURL <- nglessDataBaseURL
     let url = (baseURL </> ref <.> "tar.gz")
-    outputList InfoOutput ["Starting download from ", url]
+    outputListLno' InfoOutput ["Starting download from ", url]
     downloadFile url destPath
-    output InfoOutput "Reference download completed! "
+    outputLno' InfoOutput "Reference download completed!"
 
 
 -- | Make sure that reference data is present, downloading it if necessary.

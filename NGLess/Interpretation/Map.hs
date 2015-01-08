@@ -38,7 +38,7 @@ ensureIndexExists :: FilePath -> IO FilePath
 ensureIndexExists refPath = do
     hasIndex <- hasValidIndex refPath
     if hasIndex
-        then output InfoOutput ("Index for " ++ refPath ++ " already exists.")
+        then outputListLno' DebugOutput ["Index for ", refPath, " already exists."]
         else createIndex refPath
     return refPath
 
@@ -47,9 +47,9 @@ mapToReference :: FilePath -> FilePath -> ResourceT IO String
 mapToReference refIndex readSet = do
     (rk, (newfp, hout)) <- tempfile "mappedOutput.sam"
     liftIO $ do
-        output InfoOutput ("Starting mapping to " ++ refIndex)
+        outputListLno' InfoOutput ["Starting mapping to ", refIndex]
         bwaPath <- bwaBin
-        output DebugOutput ("write .sam file to: " ++ newfp)
+        outputListLno' DebugOutput ["Write .sam file to: ", newfp]
         (_, _, Just herr, jHandle) <-
             createProcess (
                 proc bwaPath
@@ -57,12 +57,12 @@ mapToReference refIndex readSet = do
                 ) { std_out = UseHandle hout,
                     std_err = CreatePipe }
         err <- hGetContents herr
-        outputList DebugOutput $ ["BWA info: ", err]
+        outputListLno' DebugOutput $ ["BWA info: ", err]
         exitCode <- waitForProcess jHandle
         hClose herr
         case exitCode of
             ExitSuccess -> do
-                output InfoOutput ("Done mapping to " ++ refIndex)
+                outputListLno' InfoOutput ["Done mapping to ", refIndex]
                 return newfp
             ExitFailure code -> do
                 release rk
@@ -111,7 +111,7 @@ printSamStats (total, aligned, unique, lowQ) = do
     out ["Total reads Non-Unique map: ", show $ aligned - unique, "[", showFloat' $ 100 - (calcDiv unique aligned), "%]"]
     out ["Total reads without enough qual: ", show lowQ]
   where
-    out = outputList ResultOutput
+    out = outputListLno' ResultOutput
     showFloat' num = showFFloat (Just 2) num ""
     calcDiv :: Integer -> Integer -> Double
     calcDiv a b =

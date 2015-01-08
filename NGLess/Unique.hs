@@ -43,7 +43,7 @@ writeToNFiles fname enc rs = do
         let pos = hashRead k x
         BL.hPutStr (fhs !! pos) (asFastQ enc [x])
     _ <- do
-        output DebugOutput ("Wrote N Files to: " ++ dest)
+        outputLno' DebugOutput ("Wrote N Files to: " ++ dest)
         mapM_ hClose fhs
     return dest
 
