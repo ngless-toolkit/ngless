@@ -102,7 +102,7 @@ cabal.sandbox.config: NGLess.cabal
 
 clean:
 	rm -rf dist
-	rm $(NGLESS_DATA_DEPENDENCIES)
+	rm -f $(NGLESS_DATA_DEPENDENCIES)
 
 distclean: clean
 	if [ -d .cabal.sandobox ]; then cabal sandbox delete; fi
