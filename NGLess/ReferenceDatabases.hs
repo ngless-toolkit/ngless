@@ -26,6 +26,7 @@ import Control.Applicative ((<$>))
 import Utils.Network
 import Utils.Bwa
 import Configuration
+import Output
 
 
 defaultGenomes :: [String]
@@ -54,8 +55,9 @@ downloadReference ref destPath = do
         (error "Expected reference data")
     baseURL <- nglessDataBaseURL
     let url = (baseURL </> ref <.> "tar.gz")
+    outputList InfoOutput ["Starting download from ", url]
     downloadFile url destPath
-    putStrLn " Reference download completed! "
+    output InfoOutput "Reference download completed! "
 
 
 -- | Make sure that reference data is present, downloading it if necessary.

@@ -12,9 +12,9 @@ import System.IO
 import Data.Time
 import System.Console.ANSI
 import Control.Monad
-import System.Console.CmdArgs.Verbosity (isLoud)
+import System.Console.CmdArgs.Verbosity
 
-data OutputType = DebugOutput | InfoOutput | WarningOutput | ErrorOutput
+data OutputType = DebugOutput | InfoOutput | ResultOutput | WarningOutput | ErrorOutput
     deriving (Show, Eq, Ord)
 
 outputList :: OutputType -> [String] -> IO ()
@@ -23,8 +23,8 @@ outputList ot ms = output ot (concat ms)
 output :: OutputType -> String -> IO ()
 output ot msg = do
     isTerm <- hIsTerminalDevice stdout
-    loud <- isLoud
-    when (isTerm && (loud || ot /= DebugOutput))
+    verb <- getVerbosity
+    when (isTerm && (verb == Loud || ot >= InfoOutput) && (verb /= Quiet || ot >= ResultOutput))
          (putStrLn =<< buildOutput ot msg)
 
 buildOutput ot msg = do
@@ -34,5 +34,6 @@ buildOutput ot msg = do
 
 colorFor DebugOutput = White
 colorFor InfoOutput = Blue
+colorFor ResultOutput = Black
 colorFor WarningOutput = Yellow
 colorFor ErrorOutput = Red

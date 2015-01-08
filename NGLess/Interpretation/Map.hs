@@ -105,12 +105,13 @@ _calcSamStats contents = (total, aligned, unique, lowQual)
         asInteger False = 0
 
 printSamStats (total, aligned, unique, lowQ) = do
-    putStrLn $ "Total reads: " ++ (show total)
-    putStrLn $ "Total reads aligned: " ++ (show aligned) ++ "[" ++ (showFloat' $ calcDiv aligned total) ++ "%]"
-    putStrLn $ "Total reads Unique map: " ++ (show unique) ++ "[" ++ (showFloat' $ calcDiv unique aligned) ++ "%]"
-    putStrLn $ "Total reads Non-Unique map: " ++ (show $ aligned - unique) ++ "[" ++ (showFloat' $ 100 - (calcDiv unique aligned)) ++ "%]"
-    putStrLn $ "Total reads without enough qual: " ++ (show lowQ)
+    out ["Total reads: ", show total]
+    out ["Total reads aligned: ", show aligned, "[", showFloat' $ calcDiv aligned total, "%]"]
+    out ["Total reads Unique map: ", show unique, "[", showFloat' $ calcDiv unique aligned, "%]"]
+    out ["Total reads Non-Unique map: ", show $ aligned - unique, "[", showFloat' $ 100 - (calcDiv unique aligned), "%]"]
+    out ["Total reads without enough qual: ", show lowQ]
   where
+    out = outputList ResultOutput
     showFloat' num = showFFloat (Just 2) num ""
     calcDiv :: Integer -> Integer -> Double
     calcDiv a b =

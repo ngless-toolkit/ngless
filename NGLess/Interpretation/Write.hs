@@ -97,8 +97,9 @@ convertSamToBam samfile newfp = do
                 ["view", "-bS", samfile]
             ){ std_out = UseHandle hout,
                std_err = CreatePipe }
-        hGetContents herr >>= putStrLn
+        errmsg <- hGetContents herr
         exitCode <- waitForProcess jHandle
+        outputList InfoOutput ["Message from samtools: ", errmsg]
         case exitCode of
            ExitSuccess -> return newfp
            ExitFailure err -> error ("Failure on converting sam to bam" ++ show err)

@@ -18,12 +18,10 @@ import qualified Data.IntervalMap.Generic.Strict as IMG
 import qualified Data.Map.Strict as M
 
 import Data.Maybe (fromJust)
-import Data.Foldable(foldl')
 import Control.DeepSeq
 
 import FileManagement(readPossiblyCompressedFile)
 import ReferenceDatabases
-import Configuration
 import Output
 
 import Data.GFF

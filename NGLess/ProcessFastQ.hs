@@ -21,7 +21,6 @@ import FastQStatistics
 import Data.FastQ
 import Language
 import JSONManager
-import Configuration
 import Output
 
 writeReadSet :: FilePath -> [ShortRead] -> FastQEncoding -> IO FilePath

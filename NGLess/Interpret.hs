@@ -148,7 +148,7 @@ interpret fname script es = do
     r <- runResourceT $ evalStateT (runErrorT . interpretIO $ es) initialState
     case r of
         Right _ -> output InfoOutput "Ngless finished."
-        Left err -> putStrLn (show err)
+        Left err -> output ErrorOutput (show err)
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
 interpretIO [] = return ()
