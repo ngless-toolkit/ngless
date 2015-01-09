@@ -17,6 +17,7 @@ import Text.Parsec.Pos (newPos)
 import System.Directory (removeFile, removeDirectoryRecursive, createDirectoryIfMissing)
 import System.Directory (doesFileExist, getDirectoryContents)
 import System.FilePath.Posix((</>))
+import System.Console.CmdArgs.Verbosity
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
@@ -65,8 +66,9 @@ test_FastQ = [tgroup_FastQ]
 test_Validation = [tgroup_Validation]
 test_Annotation = [tgroup_Annotation]
 
--- The main test driver is automatically generated
-main = $(defaultMainGenerator)
+-- The main test driver sets verbosity to Quiet to avoid extraneous output and
+-- then uses the automatically generated function
+main = setVerbosity Quiet >> $(defaultMainGenerator)
 
 -- Test Parsing Module
 parseText :: GenParser (SourcePos,Token) () a -> T.Text -> a
@@ -529,7 +531,7 @@ case_read_mul_Sam_Line = readAlignments (L.unlines $ replicate 10 samLineFlat) @
 
 
 preprocess_s = "ngless '0.0'\n\
-    \input = fastq('test_samples/sample.fq.gz')\n\
+    \input = fastq('test_samples/sample20.fq')\n\
     \preprocess(input) using |read|:\n\
     \   read = read[3:]\n\
     \   read = read[: len(read) ]\n\
@@ -538,32 +540,34 @@ preprocess_s = "ngless '0.0'\n\
     \       continue\n\
     \   if len(read) <= 20:\n\
     \       discard\n\
-    \write(input, ofile='test_samples/sample.fq')\n"
+    \write(input, ofile='test_samples/sample20_post.fq')\n"
 
 
 map_s = "ngless '0.0'\n\
-    \input = fastq('test_samples/sample.fq.gz')\n\
+    \input = fastq('test_samples/sample20.fq')\n\
     \preprocess(input) using |read|:\n\
     \    if len(read) < 20:\n\
     \        discard\n\
     \mapped = map(input,reference='sacCer3')\n\
-    \write(mapped, ofile='test_samples/sample.sam',format={sam})\n"
+    \write(mapped, ofile='test_samples/sample20_mapped.sam',format={sam})\n"
 
 case_preprocess_script = case parsetest preprocess_s >>= checktypes of
-        Left err -> assertFailure (show err)
-        Right expr -> do
-            outputDirectory "testing" >>= createDirectoryIfMissing False
-            (interpret "test" preprocess_s) . nglBody $ expr
-            res' <- B.readFile "test_samples/sample.fq"
-            (length $ B.lines res') @?= (16 :: Int)
+    Left err -> assertFailure (show err)
+    Right expr -> do
+        outputDirectory "testing" >>= createDirectoryIfMissing False
+        (interpret "test" preprocess_s) . nglBody $ expr
+        res' <- B.readFile "test_samples/sample20_post.fq"
+        (length $ B.lines res') @?= (16 :: Int)
+        removeFile "test_samples/sample20_post.fq"
 
 case_map_script = case parsetest map_s >>= checktypes of
-        Left err -> assertFailure (show err)
-        Right expr -> do
-            outputDirectory "testing" >>= createDirectoryIfMissing False
-            (interpret "testing" map_s) . nglBody $ expr
-            res' <- readPossiblyCompressedFile "test_samples/sample.sam"
-            _calcSamStats res' @?= (5,0,0,0)
+    Left err -> assertFailure (show err)
+    Right expr -> do
+        outputDirectory "testing" >>= createDirectoryIfMissing False
+        (interpret "testing" map_s) . nglBody $ expr
+        res' <- readPossiblyCompressedFile "test_samples/sample20_mapped.sam"
+        _calcSamStats res' @?= (5,0,0,0)
+        removeFile "test_samples/sample20_mapped.sam"
 
 -- Test compute stats
 
@@ -574,11 +578,11 @@ case_compute_stats_lc = do
 -- Parse GFF lines
 
 case_read_annotation_comp = do
-    c <- readPossiblyCompressedFile "test_samples/sample.gtf.gz" 
+    c <- readPossiblyCompressedFile "test_samples/sample.gtf.gz"
     length (GFF.readAnnotations c) @?= 98994
 
 case_read_annotation_uncomp = do
-    c <- readPossiblyCompressedFile "test_samples/sample.gtf" 
+    c <- readPossiblyCompressedFile "test_samples/sample.gtf.gz"
     length (GFF.readAnnotations c) @?= 98994
 
 
@@ -720,7 +724,7 @@ case_zero_vec = do
   v @?= V.fromList [0,0,0,0]
 
 case_calc_sam_stats = do
-  r <- _calcSamStats <$> readPossiblyCompressedFile "test_samples/sample.sam"
+  r <- _calcSamStats <$> readPossiblyCompressedFile "test_samples/sample.sam.gz"
   r @?=  (3072,1610,1554,0)
 
 --- Unique.hs
@@ -824,20 +828,19 @@ case_test_setup_html_view = do
 -- MapOperations
 
 -- install genome User mode
-
 case_install_genome_user_mode = do
-  r1 <- installData (Just User) "ce10"
-  p <- (</> "ce10") <$> userDataDirectory
+  r1 <- installData (Just User) "sacCer3"
+  p <- (</> "sacCer3") <$> userDataDirectory
   r1 @?= p 
 
 
 -- ProcessFastQ
-low_char_int = (lc . computeStats) <$> readPossiblyCompressedFile "test_samples/sample.fq"
+low_char_int = (lc . computeStats) <$> readPossiblyCompressedFile "test_samples/sample.fq.gz"
 
 case_read_and_write_fastQ = do
     enc <- guessEncoding <$> low_char_int
-    rs <- readReadSet enc "test_samples/sample.fq"
-    fp <- writeReadSet "test_samples/sample.fq" rs enc
+    rs <- readReadSet enc "test_samples/sample.fq.gz"
+    fp <- writeReadSet "test_samples/sample.fq.gz" rs enc
     newrs <- readReadSet enc fp
     newrs @?= rs
 
@@ -849,10 +852,10 @@ case_read_fastQ = do
     len <- length <$> getDirectoryContents (dstDir nt)
     removeDirectoryRecursive $ dstDir nt -- delete test generated data.
     len @?= 4
-  where fp = "test_samples/sample.fq"
+  where fp = "test_samples/sample.fq.gz"
         dstDir nt = nt ++ "$beforeQC"
 
--- "test_samples/sample.fq" has 33 as lowest char from the initial data set
+-- "test_samples/sample.fq.gz" has 33 as lowest char from the initial data set
 case_read_fastQ_store_enc = do
     nt <- generateDirId "testing_tmp_dir" fp
     createDirectoryIfMissing False $ dstDirBef nt
@@ -862,7 +865,7 @@ case_read_fastQ_store_enc = do
     removeDirectoryRecursive $ dstDirBef nt -- delete test generated data.
     removeDirectoryRecursive $ dstDirAft nt -- delete test generated data.
     eb @?= ea
-  where fp = "test_samples/sample.fq"
+  where fp = "test_samples/sample.fq.gz"
         dstDirBef = (++ "$beforeQC")
         dstDirAft = (++ "$afterQC")
 

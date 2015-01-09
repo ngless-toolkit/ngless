@@ -16,7 +16,7 @@ import Annotation
 
 tgroup_Annotation = $(testGroupGenerator)
 
-ngo_gff_fp = Just "test_samples/sample.gtf"
+ngo_gff_fp = Just "test_samples/sample.gtf.gz"
 short_gff_fp = Just "test_samples/short.gtf"
 
 compareFiles fa fb = do
@@ -27,11 +27,9 @@ compareFiles fa fb = do
 
 -- test default values
 case_annotate_features_default = do
-    a <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing Nothing IntersectUnion True False
-    b <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion True False
+    a <- annotate "test_samples/sample.sam" ngo_gff_fp Nothing          Nothing IntersectUnion True False
+    b <- annotate "test_samples/sample.sam" ngo_gff_fp (Just ["gene"])  Nothing IntersectUnion True False
     compareFiles a b
-  where feats = Just ["gene"]
-
 
 case_annotate_gene_noStrand_union = do
     a <- annotate "test_samples/sample.sam" ngo_gff_fp feats Nothing IntersectUnion False False
