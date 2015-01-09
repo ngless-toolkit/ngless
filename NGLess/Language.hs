@@ -67,7 +67,7 @@ function_opt_arg_type Fcount      (Variable "min")                  = Right NGLI
 function_opt_arg_type Fsubstrim   (Variable "min_quality")          = Right NGLInteger
 function_opt_arg_type Fwrite      (Variable "ofile")                = Right NGLString
 function_opt_arg_type Fwrite      (Variable "format")               = Right NGLSymbol
-function_opt_arg_type Fwrite      (Variable "verbose")              = Right NGLSymbol
+function_opt_arg_type Fwrite      (Variable "verbose")              = Right NGLBool
 function_opt_arg_type Ffastq       _ = Left "Fastq function does not have any argument"
 function_opt_arg_type Fpreprocess  _ = Left "Preprocess function does not have any argument"
 function_opt_arg_type e (Variable x) = Left $ T.concat ["Function " ,T.pack . show $ e ," does not have argument: ", x]
@@ -81,7 +81,6 @@ function_args_allowed_symbols :: FuncName -> T.Text -> [T.Text]
 function_args_allowed_symbols Fannotate "features"   = ["gene", "cds", "exon"]
 function_args_allowed_symbols Fannotate "mode"       = ["union", "intersection_strict", "intersection_non_empty"]
 function_args_allowed_symbols Fwrite "format"        = ["tsv", "csv", "bam", "sam"]
-function_args_allowed_symbols Fwrite "verbose"       = ["yes", "no"]
 function_args_allowed_symbols Fcount "counts"        = ["gene", "cds", "exon"]
 function_args_allowed_symbols _ _                    = []
 

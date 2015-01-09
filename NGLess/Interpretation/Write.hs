@@ -68,18 +68,16 @@ writeToFile el@(NGOMappedReadSet fp defGen) args = do
 writeToFile (NGOAnnotatedSet fp) args = do
     let newfp = getNGOPath $ lookup "ofile" args
         del = getDelimiter $ lookup "format" args
-    outputLno' InfoOutput $ "Writing AnnotatedSet to: " ++ newfp
+    outputListLno' InfoOutput ["Writing AnnotatedSet to: ", newfp]
     cont <- readPossiblyCompressedFile fp
-    case lookup "verbose" args of
-        Just (NGOSymbol "no")  -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
-        Just (NGOSymbol "yes") -> writeAnnotResWDel' newfp (showGffCountDel del . readAnnotCounts $ cont)
-        Just err -> error ("verbose received a " ++ show err ++ " but value can only be yes or no.")
-        Nothing -> writeAnnotResWDel' newfp $ showUniqIdCounts del cont
-    where
-        writeAnnotResWDel' p cont = do
-            BL.writeFile p cont
-            canonicalizePath p >>= insertCountsProcessedJson
-            return $ NGOAnnotatedSet p
+    let NGOBool verbose = fromMaybe (NGOBool False) (lookup "verbose" args)
+        cont' = if verbose
+                    then (showGffCountDel del . readAnnotCounts $ cont)
+                    else showUniqIdCounts del cont
+    BL.writeFile newfp cont'
+    canonicalizePath newfp >>= insertCountsProcessedJson
+    return $ NGOAnnotatedSet newfp
+
 writeToFile _ _ = error "Error: writeToFile Not implemented yet"
 
 getDelimiter :: Maybe NGLessObject -> B.ByteString
