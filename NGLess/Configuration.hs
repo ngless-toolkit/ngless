@@ -32,10 +32,7 @@ nglessDataBaseURL :: IO FilePath
 nglessDataBaseURL = return "http://127.0.0.1/"
 
 globalDataDirectory :: IO FilePath
-globalDataDirectory = do
-    base <- getNglessRoot
-    let dir = base </> "../share/ngless/data"
-    return dir
+globalDataDirectory = (</> "../share/ngless/data") <$> getNglessRoot
 
 userNglessDirectory :: IO FilePath
 userNglessDirectory = (</> ".ngless") <$> getHomeDirectory
