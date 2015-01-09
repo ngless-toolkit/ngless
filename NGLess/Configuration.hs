@@ -10,7 +10,7 @@ module Configuration
     , bwaBin
     , outputDirectory
     , temporaryFileDirectory
-    , version
+    , versionStr
     ) where
 
 import Control.Monad (unless)
@@ -25,9 +25,7 @@ import Dependencies.Embedded
 
 data InstallMode = User | Root deriving (Eq, Show)
 
-version :: String
-version = "0.0.0"
-
+versionStr :: String
 versionStr = "0.0.0"
 
 nglessDataBaseURL :: IO FilePath

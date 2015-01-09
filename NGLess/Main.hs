@@ -117,6 +117,6 @@ getModes = cmdArgsMode $ modes [ngless &= auto, installargs, visualizeargs]
     &= verbosity
     &= summary sumtext
     &= help "ngless implement the NGLess language"
-    where sumtext = concat ["ngless v", version, "(C) NGLess Authors 2013-2015"]
+    where sumtext = concat ["ngless v", versionStr, "(C) NGLess Authors 2013-2015"]
 
 main = cmdArgsRun getModes >>= optsExec
