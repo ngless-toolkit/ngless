@@ -1,8 +1,8 @@
 .. _Introduction:
 
-=========
+============
 Introduction
-=========
+============
 
 Motivation
 ---------------

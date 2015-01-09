@@ -10,7 +10,7 @@ Launch
 In order to visualize the script results a web server is launched with the following command.
 ::
 
-  $ ngless visualizemode
+  $ ngless visualizemode <script_location.ngless_output>
   > Launching WebServer at: 8000
   > You can access it at: http://localhost:8000   
 
@@ -22,7 +22,7 @@ If everything went correctly, you should see something like this.
 
 Visualize Runs
 -----------------
-All prior executions of NGLess can be consulted, and are organized in a drop down list fashion.
+All prior executions of NGLess, for a script, can be consulted and are organized in a drop down list fashion.
 
 .. image:: ../images/listScripts.png
 
@@ -73,7 +73,26 @@ The plot can be adjusted to show one statistic at a time, and the plot limits ad
 
 After Quality Control
 ----------------------
+The quality control, in terms of statistics, is very similar to the represented at section Before Quality Control. The main different is a correlation in the results **before vs after**.
+
+.. image:: ../images/resultAfterQC.png
+
+At the table, the column summary represents the difference in %GC, number of sequences and minimum/maximum sequence length from the before QC to after QC. Encoding can't change and for that reason remains the same.
+
+From the results can be seen that:
+
+- Decreased 0.005 in %GC.
+- 802204 sequences were removed
+- the minimum and maximum sequences decreased 30 and 3 respectively.
 
 
-Visualize results
+Visualise results
 ----------------------
+
+This option allows to visualise the results from the annotation. It's possible to filter by a given gene id and sort in ascending or descending order by the number of counts. Is also possible to create a top 10,25,50,100 by choosing one of the possible values from the menu at the bottom right.
+
+.. image:: ../images/counts.png
+
+
+Can be seen, in the previous figure, a top 10 example, named 'CountResults', where the features are only genes with the column counts sorted descending. 
+

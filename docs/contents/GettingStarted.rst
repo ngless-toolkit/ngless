@@ -9,13 +9,15 @@ NGLess provides two modes to generate scripts. One targets (programming) skilled
 To access either one of this modes you have to do:
 ::
 
-	$ ngless visualizemode
+	$ ngless visualizemode -
 
-(**Note:** If port 8000 is already in use, you can change the destiny port by using **-p X** where **X** can be any port you wish).
+**Note 1:** If port 8000 is already in use, you can change the destiny port by using **-p X** where **X** can be any port you wish.
+
+**Note 2:** Argument **-** is used as this is the first run and there isn't any ngless results yet. It is a mode to open the webserver without any data.
 
 Now you can open your browser at http://localhost:8000. This will open the NGLess web server at a given port.
 
-After the web server loads the page you should see something similar to the next image.
+After the web server loads the page, you should see something similar to the next image.
 
 .. image:: ../images/nglessKeeperEmpty.png
 
@@ -30,7 +32,7 @@ We will use the fastQ file ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR867/SRR867735/S
 Create your script
 ------------------
 
-Since the web server is opened now you can start to create your script. Start by clicking in the tab **Create Script** from the navigation menu, as in the following image:
+Since the web server is now open you can start to create your script. Start by clicking in the tab **Create Script** from the navigation menu, as in the following image:
 
 .. image:: ../images/nglessKeeperEmptyClickCreateScripts.png
 
@@ -55,7 +57,7 @@ Before creating the whole script lets start by understanding our data set. This 
 
 Using the **text editor**, type:
 
-.. code-block::
+::
 
 	ngless "0.0"
 
@@ -66,6 +68,9 @@ You can now save the script (as **test.ngl** for example) to the directory where
 ::
 
 	$ ngless test.ngl
+	$ ngless visualizemode test -p 8000
+
+**Note**: Make sure you don't have ngless already running in that port.
 
 Using the web server you can visualize key information about a data set. At 'Before QC' there will be the result of the execution.
 
@@ -98,7 +103,7 @@ For the preprocess we will:
 
 Let's add the following code to the already existent code in the Text Editor.
 
-.. code-block::
+::
 	
 	preprocess(input) using |read|:
             read = read [3:] // Discard from position 0 until 3 (excluded).
@@ -114,7 +119,7 @@ Map
 
 After adding the preprocess code to the Text Editor, it's time to map against the human genome. Since the human genome is provided by default, you can simply do:
 
-.. code-block:: 
+::
 
 	/* reference genome */
 	human = 'hg19'
@@ -126,11 +131,11 @@ Annotate
 
 We are only interested in the human genes so lets annotate the map results with the only feature being genes. Since we used a genome provided by NGLess, we will also use the annotation provided by default:
 
-.. code-block:: 
+::
 	
 	/* annotation features */
 	feats = [{gene}]
-	annotated = annotate(mapped, strand={no}, mode={union}, ambiguity={deny}, features=feats)
+	annotated = annotate(mapped, strand=false, mode={union}, ambiguity=false, features=feats)
 
 
 Count & Write
@@ -138,7 +143,7 @@ Count & Write
 
 Annotation will annotate the results but won't store them. In order to count and save them you have to write the counts of the annotation to somewhere in your disk:
 
-.. code-block::
+::
 
 	/* write counts to disk */
 	counts = count(annotated)
@@ -220,9 +225,6 @@ We are only interested in the human genes so lets annotate the map results with 
 
 .. image:: ../images/wizard8.png
 
-The mode of annotation we are interested in is the 'union':
-
-.. image:: ../images/wizard9.png
 
 **Do not allow** ambiguity when deciding a feature.
 
@@ -280,15 +282,22 @@ As a result of the execution, should be returned the following:
 
 .. code-block:: bash
 
-	Total reads: 32457019
-	Total reads aligned: 31316462[96.49%]
-	Total reads Unique map: 25218844[80.53%]
-	Total reads Non-Unique map: 6097618[19.47%]
+	Total reads: 31654060
+	Total reads aligned: 28095945[88.76%]
+	Total reads Unique map: 22434229[79.85%]
+	Total reads Non-Unique map: 5661716[20.15%]
 	Total reads without enough qual: 0
 
 These are statistics of the map of the file against the human genome.
 
-All other results can be accessed through the web server. The results are in the following (sub)sections.
+All other results can be accessed through the web server by doing. As you might already be running a webserver from the previous execution, open a new webserver at port 8080 or close the one used before:
+
+::
+
+	$ ngless visualizemode test -p 8080
+
+
+The results are in the following (sub)sections.
 
 After quality control
 ~~~~~~~~~~~~~~~~~~~~~
@@ -306,12 +315,28 @@ Counts
 
 In order to access the top gene counts, you can use the 'Visualize' tab in the navigation menu. 
 
-.. image:: ../images/resultVisualize.png
+You should be able to see a table with all results.
 
----------------------------------
----- Talk about the results -----
----------------------------------
+You should be able to see a list of all files at the column on the left. Click on the one named 'CountResults' that is representative of the annotation results of the script.
 
-You can click on the **counts column** that will allow you to sort the counts in descending order. By default are shown 20 genes at a time, but you can define the amount to either 10, 25, 50 or 100.
+By clicking on the **counts column** you will be able to sort the counts in descending order. By default are shown 20 genes at a time, but you can define the amount to either 10, 25, 50 or 100.
+
+If you sort in descending order and select to be displayed 10 results, you should be able to see the top 10 results with most counts. If everything went well they should be:
+
+=============== =======
+Gene name       Counts 
+=============== =======
+ENSG00000210082	2901346
+ENSG00000265150	182390
+ENSG00000269900	179083
+ENSG00000202198	175199
+ENSG00000211459	165836
+ENSG00000259001	116589
+ENSG00000269028	98050
+ENSG00000187608	95884
+ENSG00000126709	94874
+ENSG00000067225	82878
+=============== =======
+
 
 Also if you want to edit the file directly you can by opening the file **'CountResults.txt'** with your preferred text editor.

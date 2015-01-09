@@ -47,4 +47,4 @@ Start by download latest NGLess version from Github.::
 
 Then compite and run nglesstest by executing the following command.::
 
-    $ make test
+    $ make check

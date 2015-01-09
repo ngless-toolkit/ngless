@@ -20,8 +20,6 @@ The following table represents organisms provided by default:
 +-----------+-----------------------------+-------------+
 | dm3       | drosophila\_melanogaster    | BDGP5       |
 +-----------+-----------------------------+-------------+
-| `-`       | gallus\_gallus              | Galgal4     |
-+-----------+-----------------------------+-------------+
 | canFam2   | canis\_familiaris           | CanFam3.1   |
 +-----------+-----------------------------+-------------+
 | rn4       | rattus\_norvegicus          | Rnor\_5.0   |
@@ -30,7 +28,8 @@ The following table represents organisms provided by default:
 +-----------+-----------------------------+-------------+
 | mm10      | mus\_musculus               | GRCm38      |
 +-----------+-----------------------------+-------------+
-
+| hg19      | homo\_sapiens               | GRCh38      |
++-----------+-----------------------------+-------------+
 
 Data Set Structure
 --------------------
@@ -40,7 +39,7 @@ These archives are all created using version 75 of `Ensembl <http://www.ensembl.
 
 ::
 
- Description.tar.gz
+ Name.tar.gz
   |
   |--- Sequence
   |     |
@@ -63,11 +62,11 @@ It is possible to use the provided data sets directly on NGLess by simply typing
 If it isn't already available locally (either on user or on root mode), then the archive is 
 downloaded and the script execution is paused until the download is complete and the archive installed. 
 
-The archive is installed on **user** mode and so at **home**/.ngless/genomes.
+The archive is installed on **User** mode and so at **home**/.ngless/genomes.
 
 Manual installation
 --------------------
-Is possible to install data sets locally, before running any script. They can be installed locally in **user** mode or globally in **root** mode.
+Is possible to install data sets locally, before running any script. They can be installed locally in **User** mode or globally in **Root** mode.
 
 To install locally (organism bos taurus), is as simple as::
 
@@ -79,4 +78,4 @@ And to install globally is::
  
 When attempting to install an organism if is returned **True** it means that the organism is already installed, and there is no reason to install again. Otherwise, a progress bar is displayed to provide information on the download.
  
-Note: Can be used flag --i instead of --install-reference-data.
+**Note**: Can be used flag --i instead of --install-reference-data.
