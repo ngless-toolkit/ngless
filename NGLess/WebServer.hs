@@ -11,10 +11,9 @@ import Configuration
 
 
 runWebServer :: FilePath -> Int -> IO ()
-runWebServer fname nglessport = do
+runWebServer ddir nglessport = do
         putStrLn "Launching Webserver."
         putStrLn ("You can access it at: http://localhost:" ++ show nglessport)
-        ddir <- outputDirectory fname
         simpleHTTP serverConf $ nglessApp ddir
     where
         serverConf = nullConf { port = nglessport }

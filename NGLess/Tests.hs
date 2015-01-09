@@ -68,7 +68,11 @@ test_Annotation = [tgroup_Annotation]
 
 -- The main test driver sets verbosity to Quiet to avoid extraneous output and
 -- then uses the automatically generated function
-main = setVerbosity Quiet >> $(defaultMainGenerator)
+main = do
+    setVerbosity Quiet
+    setOutputDirectory "" "testing_directory_tmp"
+    $(defaultMainGenerator)
+    removeDirectoryRecursive "testing_directory_tmp"
 
 -- Test Parsing Module
 parseText :: GenParser (SourcePos,Token) () a -> T.Text -> a
@@ -554,7 +558,6 @@ map_s = "ngless '0.0'\n\
 case_preprocess_script = case parsetest preprocess_s >>= checktypes of
     Left err -> assertFailure (show err)
     Right expr -> do
-        outputDirectory "testing" >>= createDirectoryIfMissing False
         (interpret "test" preprocess_s) . nglBody $ expr
         res' <- B.readFile "test_samples/sample20_post.fq"
         (length $ B.lines res') @?= (16 :: Int)
@@ -563,7 +566,6 @@ case_preprocess_script = case parsetest preprocess_s >>= checktypes of
 case_map_script = case parsetest map_s >>= checktypes of
     Left err -> assertFailure (show err)
     Right expr -> do
-        outputDirectory "testing" >>= createDirectoryIfMissing False
         (interpret "testing" map_s) . nglBody $ expr
         res' <- readPossiblyCompressedFile "test_samples/sample20_mapped.sam"
         _calcSamStats res' @?= (5,0,0,0)
@@ -819,11 +821,10 @@ case_json_statistics = do
     where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
 
 case_test_setup_html_view = do
-    setupHtmlViewer "testing_tmp_dir"
-    dst <- outputDirectory "testing_tmp_dir"
-    doesFileExist (p' dst) >>= \x -> x @?= True -- make sure keeper.html exist
-  where 
-    p' = (</> "nglessKeeper.html")
+    setupHtmlViewer "testing_tmp_dir_html"
+    ex <- doesFileExist ("testing_tmp_dir_html/nglessKeeper.html")
+    assertBool "nglessKeeper should exist after setupHtmlViewer" ex
+    removeDirectoryRecursive "testing_tmp_dir_html/"
 
 -- MapOperations
 
@@ -846,7 +847,7 @@ case_read_and_write_fastQ = do
 
 -- hack: jump over copy of .html and .css
 case_read_fastQ = do
-    nt <- generateDirId "testing_tmp_dir" fp
+    nt <- generateDirId fp
     createDirectoryIfMissing False (dstDir nt)
     _ <- readFastQ Nothing fp (dstDir nt) nt --creates files in nt
     len <- length <$> getDirectoryContents (dstDir nt)
@@ -857,7 +858,7 @@ case_read_fastQ = do
 
 -- "test_samples/sample.fq.gz" has 33 as lowest char from the initial data set
 case_read_fastQ_store_enc = do
-    nt <- generateDirId "testing_tmp_dir" fp
+    nt <- generateDirId fp
     createDirectoryIfMissing False $ dstDirBef nt
     createDirectoryIfMissing False $ dstDirAft nt
     (NGOReadSet _ eb _) <- readFastQ Nothing   fp (dstDirBef nt) nt

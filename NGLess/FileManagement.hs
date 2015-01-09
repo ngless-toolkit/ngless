@@ -49,9 +49,9 @@ createDir dst = do
     createDirectory fp
     return fp
 
-generateDirId :: FilePath -> FilePath -> IO FilePath
-generateDirId fname dst = do
-    odir <- outputDirectory fname
+generateDirId :: FilePath -> IO FilePath
+generateDirId dst = do
+    odir <- outputDirectory
     createTempDirectory odir (takeBaseNameNoExtensions dst)
     
 createTempDirectory :: FilePath -> String -> IO FilePath
@@ -67,10 +67,8 @@ createTempDirectory dir t = do
         True -> findTempName (x+1)
 
 setupHtmlViewer :: FilePath -> IO ()
-setupHtmlViewer fname = do
-    dst <- outputDirectory fname
-    let p = (dst </> "nglessKeeper.html")
-    exists <- doesFileExist p
+setupHtmlViewer dst = do
+    exists <- doesFileExist (dst </> "nglessKeeper.html")
     unless exists $ do
         createDirectoryIfMissing False dst
         createDirectoryIfMissing False (dst </> "htmllibs")

@@ -9,6 +9,7 @@ module Configuration
     , samtoolsBin
     , bwaBin
     , outputDirectory
+    , setOutputDirectory
     , temporaryFileDirectory
     , versionStr
     ) where
@@ -20,6 +21,8 @@ import System.Directory
 import System.FilePath.Posix
 import qualified Data.ByteString as B
 import Data.Maybe
+import System.IO.Unsafe
+import Data.IORef
 
 import Dependencies.Embedded
 
@@ -105,8 +108,16 @@ samtoolsBin = findOrCreateBin samtoolsFname =<< samtoolsData
         samtoolsFname = ("ngless-" ++ versionStr ++ "-samtools")
 
 
-outputDirectory :: FilePath -> IO FilePath
-outputDirectory ifile = return $ replaceExtension ifile ".output_ngless/"
+outputDirectoryRef :: IORef FilePath
+{-# NOINLINE outputDirectoryRef #-}
+outputDirectoryRef = unsafePerformIO (newIORef "")
+
+setOutputDirectory :: FilePath -> FilePath -> IO ()
+setOutputDirectory fname "" = writeIORef outputDirectoryRef (fname ++ ".output_ngless")
+setOutputDirectory _ odir = writeIORef outputDirectoryRef odir
+
+outputDirectory :: IO FilePath
+outputDirectory = readIORef outputDirectoryRef
 
 temporaryFileDirectory :: IO FilePath
 temporaryFileDirectory = getTemporaryDirectory -- in the future this will be configurable

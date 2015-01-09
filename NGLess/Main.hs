@@ -35,6 +35,7 @@ data NGLess =
               { debug_mode :: String
               , input :: String
               , n_threads :: Int
+              , output_directory :: FilePath
               }
         | InstallGenMode
               { input :: String}
@@ -48,6 +49,7 @@ ngless = DefaultMode
         { debug_mode = "ngless"
         , input = "-" &= argPos 0 &= opt ("-" :: String)
         , n_threads = 1 &= name "n"
+        , output_directory = "" &= name "o"
         }
         &= details  [ "Example:" , "ngless script.ngl" ]
 
@@ -91,9 +93,10 @@ function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 
 
 
-optsExec (DefaultMode dmode fname n) = do
+optsExec (DefaultMode dmode fname n odir_opt) = do
     setNumCapabilities n
-    odir <- outputDirectory fname
+    setOutputDirectory fname odir_opt
+    odir <- outputDirectory
     createDirectoryIfMissing False odir
     --Note that the input for ngless is always UTF-8.
     --Always. This means that we cannot use T.readFile

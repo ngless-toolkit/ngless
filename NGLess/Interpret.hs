@@ -34,6 +34,7 @@ import FileManagement
 import JSONManager
 import Annotation
 import CountOperation
+import Configuration (outputDirectory)
 import Output
 
 import Interpretation.Write
@@ -146,7 +147,8 @@ interpret fname script es = do
     let nglessScript = NGOString script 
         nglessScriptFname = NGOFilename fname
         initialState = (0, Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty))
-    setupHtmlViewer fname
+    odir <- outputDirectory
+    setupHtmlViewer odir
     r <- runResourceT $ evalStateT (runErrorT . interpretIO $ es) initialState
     case r of
         Right _ -> outputListLno InfoOutput Nothing ["Ngless finished."]
@@ -286,7 +288,7 @@ executeQualityProcess (NGOReadSet fname enc nt) = executeQualityProcess' (Just e
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     r <- getScriptName
-    newTemplate <- liftIO $ generateDirId r fname' -- new template only calculated once.
+    newTemplate <- liftIO $ generateDirId fname' -- new template only calculated once.
     _ <- liftIO $ insertFilesProcessedJson newTemplate (T.pack r)
     executeQualityProcess' Nothing fname' "beforeQC" newTemplate
 
