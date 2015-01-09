@@ -94,15 +94,15 @@ gff_structure_CDS = GFF.GffLine "chrI" "unknown" GFF.GffCDS 4124 4358 Nothing GF
 gff_structure_Gene = GFF.GffLine "chrI" "unknown" GFF.GffGene 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
 
 
-gff_features_all = Just ["gene", "cds", "exon"]
-gff_features_gene = Just ["gene"]
-gff_features_cds = Just ["cds"]
+gff_features_all = [GFF.GffGene, GFF.GffCDS, GFF.GffExon]
+gff_features_gene = [GFF.GffGene]
+gff_features_cds = [GFF.GffCDS]
 
 gff_lines_ex = [gff_structure_Exon,gff_structure_CDS,gff_structure_Gene]
 
-case_filter_features_1 = filter (_filterFeatures gff_features_all) gff_lines_ex @?= gff_lines_ex
-case_filter_features_2 = filter (_filterFeatures Nothing) gff_lines_ex @?= [gff_structure_Gene]
-case_filter_features_3 = filter (_filterFeatures gff_features_gene) gff_lines_ex @?= [gff_structure_Gene]
-case_filter_features_4 = filter (_filterFeatures gff_features_cds) gff_lines_ex @?= [gff_structure_CDS]
-case_filter_features_5 = filter (_filterFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
+case_filter_features_1 = filter (_matchFeatures gff_features_all) gff_lines_ex @?= gff_lines_ex
+case_filter_features_2 = filter (_matchFeatures [GFF.GffGene]) gff_lines_ex @?= [gff_structure_Gene]
+case_filter_features_3 = filter (_matchFeatures gff_features_gene) gff_lines_ex @?= [gff_structure_Gene]
+case_filter_features_4 = filter (_matchFeatures gff_features_cds) gff_lines_ex @?= [gff_structure_CDS]
+case_filter_features_5 = filter (_matchFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
 

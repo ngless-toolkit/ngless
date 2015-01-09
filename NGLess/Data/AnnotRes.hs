@@ -18,7 +18,7 @@ import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.Map.Strict as Map
 
 import Control.DeepSeq
-import System.FilePath.Posix((</>), takeFileName)
+import System.FilePath.Posix(takeFileName)
 
 import FileManagement
 

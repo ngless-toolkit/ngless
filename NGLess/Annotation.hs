@@ -5,19 +5,19 @@ module Annotation
     , annotate
     , _intersection_strict
     , _intersection_non_empty
-    , _filterFeatures
+    , _matchFeatures
     , _allSameId
     ) where
 
 
-import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
 
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.IntervalMap.Generic.Strict as IMG
 import qualified Data.Map.Strict as M
 
-import Data.Maybe (fromJust)
+import Control.Applicative
 import Control.DeepSeq
 
 import FileManagement(readPossiblyCompressedFile)
@@ -28,22 +28,29 @@ import Data.GFF
 import Data.Sam (SamLine(..), isAligned, isPositive, readAlignments)
 import Data.AnnotRes
 
-type AnnotationMap = M.Map GffType (M.Map S8.ByteString (IM.IntervalMap Int [GffCount]))
+type AnnotationMap = M.Map GffType (M.Map B8.ByteString (IM.IntervalMap Int [GffCount]))
 
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
 
-annotate :: FilePath -> Maybe FilePath -> Maybe [String] -> Maybe T.Text -> AnnotationIntersectionMode -> Bool -> Bool -> IO FilePath
+-- |Annotates mapped reads according to a mapping
+annotate :: FilePath                            -- ^ input SAM file
+                -> Maybe FilePath               -- ^ input GFF file
+                -> Maybe [String]               -- ^ list of features
+                -> Maybe T.Text                 -- ^ reference information (if std ref was used)
+                -> AnnotationIntersectionMode   -- ^ mode
+                -> Bool                         -- ^ ambiguity
+                -> Bool                         -- ^ stranded
+                -> IO FilePath
 annotate samFP (Just g) feats _ m a s = do
-    outputListLno' InfoOutput ["annotate with GFF: ", g]
-    annotate' samFP g feats (getIntervalQuery m) a s  -- ignore default GFF
-annotate samFP Nothing feats dDs m a s = do
-    outputListLno' InfoOutput ["annotate with default GFF: ", show . fromJust $ dDs]
-    case dDs of
-        Just v  -> do
-            basedir <- ensureDataPresent (T.unpack v)
-            annotate' samFP (getGff basedir) feats (getIntervalQuery m) a s   -- used default GFF
-        Nothing -> error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
+    outputListLno' InfoOutput ["Annotate with given GFF: ", g]
+    annotate' samFP g feats (getIntervalQuery m) a s
+annotate samFP Nothing feats (Just dDs) m a s = do
+    outputListLno' InfoOutput ["Annotate with default GFF: ", show dDs]
+    basedir <- ensureDataPresent (T.unpack dDs)
+    annotate' samFP (getGff basedir) feats (getIntervalQuery m) a s   -- use default GFF
+annotate _     Nothing _ Nothing _ _ _ =
+    error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
 
 getIntervalQuery :: AnnotationIntersectionMode -> (IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount])
 getIntervalQuery IntersectUnion = union
@@ -53,11 +60,12 @@ getIntervalQuery IntersectNonEmpty = _intersection_non_empty
 
 annotate' :: FilePath -> FilePath -> Maybe [String] -> (IM.IntervalMap Int [GffCount] -> (Int,Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> IO FilePath
 annotate' samFp gffFp feats a f s = do
-        gffC <- readPossiblyCompressedFile gffFp >>= return . intervals . filter (_filterFeatures feats) . readAnnotations
-        samC <- readPossiblyCompressedFile samFp >>= return . filter isAligned . readAlignments 
+        gffC <- intervals . filterFeats . readAnnotations <$> readPossiblyCompressedFile gffFp
+        samC <- filter isAligned . readAlignments <$> readPossiblyCompressedFile samFp
         let res = calculateAnnotation gffC samC
         writeAnnotCount samFp (toGffM . concat . map (M.elems) . M.elems $ res)
     where
+        filterFeats = filter (_matchFeatures $ matchingFeatures feats)
         calculateAnnotation :: AnnotationMap -> [SamLine] -> AnnotationMap
         calculateAnnotation aMap sam = aMap `deepseq` compStatsAnnot aMap sam f a s
 
@@ -91,21 +99,18 @@ filterStrand False _ m = m
 
 countsAmbiguity :: Bool -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
 countsAmbiguity True toU imR = uCounts toU imR
-countsAmbiguity False toU imR = case IMG.null toU of
-        True  -> imR -- no_feature
-        False -> case _allSameId toU of
-            True  -> uCounts (IM.fromList . take 1 . IM.toList $ toU) imR -- same feature multiple times. increase that feature ONCE.
-            False -> imR -- ambiguous
+countsAmbiguity False toU imR
+    | IMG.null toU = imR -- no_feature
+    | not (_allSameId toU) = imR -- ambiguous
+    | otherwise = uCounts (IM.fromList . take 1 . IM.toList $ toU) imR -- same feature multiple times. increase that feature ONCE.
 
 
 uCounts :: IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
-uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust (incCount) k res) im keys
+uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust incCount k res) im keys
     where
         incCount []     = []
         incCount (x:rs) = incCount' x : rs
         incCount' (GffCount gId gT !gC gS) = (GffCount gId gT (gC + 1) gS)
-
-
 
 --- Diferent modes
 
@@ -141,7 +146,7 @@ _allSameId im = all ((== sId) . annotSeqId) elems
 --------------------
 
 intervals :: [GffLine] -> AnnotationMap
-intervals = foldl (insertg) M.empty
+intervals = foldl insertg M.empty
     where
         insertg im g = M.alter (\mF -> updateF g mF) (gffType g) im
         updateF g mF = case mF of
@@ -155,25 +160,23 @@ intervals = foldl (insertg) M.empty
 
 
 insertCount :: GffLine -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
-insertCount g im = IM.alter (insertCount') intv im
-    where 
-          insertCount' Nothing  = Just [count]
-          insertCount' (Just v) = Just $ count : v
-          count = GffCount (gffId g) (gffType g) 0 (gffStrand g)  
-          intv  = asInterval g
-
-
-asInterval :: GffLine -> IM.Interval Int
-asInterval g = IM.ClosedInterval (gffStart g) (gffEnd g)
-
-
-_filterFeatures :: Maybe [String] -> GffLine -> Bool
-_filterFeatures Nothing gf = (gffType gf) == GffGene
-_filterFeatures (Just fs) gf = any matchFeature fs
+insertCount g im = IM.alter insertCount' asInterval im
     where
-        g = gffType gf
-        matchFeature "gene" = g == GffGene
-        matchFeature "exon" = g == GffExon
-        matchFeature "cds"  = g == GffCDS
-        matchFeature "CDS"  = g == GffCDS
-        matchFeature s = (show g) == s
+        insertCount' Nothing  = Just [count]
+        insertCount' (Just v) = Just (count:v)
+        count = GffCount (gffId g) (gffType g) 0 (gffStrand g)
+        asInterval :: IM.Interval Int
+        asInterval = IM.ClosedInterval (gffStart g) (gffEnd g)
+
+matchingFeatures :: Maybe [String] -> [GffType]
+matchingFeatures Nothing = [GffGene]
+matchingFeatures (Just fs) = map toFeature fs
+    where
+        toFeature "gene" = GffGene
+        toFeature "exon" = GffExon
+        toFeature "cds"  = GffCDS
+        toFeature "CDS"  = GffCDS
+        toFeature s      = GffOther (B8.pack s)
+
+_matchFeatures :: [GffType] -> GffLine -> Bool
+_matchFeatures fs gf = any (== gffType gf) fs
