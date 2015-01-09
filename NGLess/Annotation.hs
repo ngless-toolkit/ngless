@@ -19,6 +19,7 @@ import qualified Data.Map.Strict as M
 
 import Control.Applicative
 import Control.DeepSeq
+import Data.Maybe
 
 import FileManagement(readPossiblyCompressedFile)
 import ReferenceDatabases
@@ -28,7 +29,11 @@ import Data.GFF
 import Data.Sam (SamLine(..), isAligned, isPositive, readAlignments)
 import Data.AnnotRes
 
-type AnnotationMap = M.Map GffType (M.Map B8.ByteString (IM.IntervalMap Int [GffCount]))
+type GffIMMap = IM.IntervalMap Int [GffCount]
+-- AnnotationMap maps from `GffType` to `References` (e.g., chromosomes) to positions to (features/count)
+type AnnotationMap = M.Map GffType (M.Map B8.ByteString GffIMMap)
+
+type AnnotationRule = GffIMMap -> (Int, Int) -> GffIMMap
 
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
@@ -52,60 +57,68 @@ annotate samFP Nothing feats (Just dDs) m a s = do
 annotate _     Nothing _ Nothing _ _ _ =
     error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
 
-getIntervalQuery :: AnnotationIntersectionMode -> (IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount])
+getIntervalQuery :: AnnotationIntersectionMode -> AnnotationRule
 getIntervalQuery IntersectUnion = union
 getIntervalQuery IntersectStrict = _intersection_strict
 getIntervalQuery IntersectNonEmpty = _intersection_non_empty
 
 
-annotate' :: FilePath -> FilePath -> Maybe [String] -> (IM.IntervalMap Int [GffCount] -> (Int,Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> Bool -> IO FilePath
-annotate' samFp gffFp feats a f s = do
+annotate' :: FilePath
+                -> FilePath
+                -> Maybe [String]
+                -> AnnotationRule
+                -> Bool
+                -> Bool
+                -> IO FilePath
+annotate' samFp gffFp feats f a s = do
         gffC <- intervals . filterFeats . readAnnotations <$> readPossiblyCompressedFile gffFp
         samC <- filter isAligned . readAlignments <$> readPossiblyCompressedFile samFp
         let res = calculateAnnotation gffC samC
-        writeAnnotCount samFp (toGffM . concat . map (M.elems) . M.elems $ res)
+        writeAnnotCount samFp (toGffM res)
     where
         filterFeats = filter (_matchFeatures $ matchingFeatures feats)
         calculateAnnotation :: AnnotationMap -> [SamLine] -> AnnotationMap
         calculateAnnotation aMap sam = aMap `deepseq` compStatsAnnot aMap sam f a s
 
+toGffM :: AnnotationMap -> [GffCount]
+toGffM = concat . concat . map IM.elems . concat . map (M.elems) . M.elems
 
-toGffM :: [IM.IntervalMap Int [GffCount]] -> [GffCount]
-toGffM = concat . concat . map IM.elems
-
-
-compStatsAnnot ::  AnnotationMap -> [SamLine] -> Bool -> (IM.IntervalMap Int [GffCount] -> (Int,Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> AnnotationMap
-compStatsAnnot imGff sam a f s = foldl iterSam imGff sam
+compStatsAnnot ::  AnnotationMap
+                    -> [SamLine] -- ^ input data
+                    -> AnnotationRule -- ^ annotation rule
+                    -> Bool      -- ^ whether ambiguous matches count
+                    -> Bool      -- ^ whether strand must match
+                    -> AnnotationMap
+compStatsAnnot amap sam f a s = foldl iterSam amap sam
     where
-      iterSam im y = M.map (M.alter alterCounts k) im
-        where
-            alterCounts Nothing = Nothing
-            alterCounts (Just v) = Just $ modeAnnotation f a v y s
-            k = samRName y
+        iterSam am y = M.map (M.alter alterCounts (samRName y)) am
+            where
+                alterCounts Nothing = Nothing
+                alterCounts (Just v) = Just $ annotateLine f v y a s
 
 
-modeAnnotation :: (IM.IntervalMap Int [GffCount] -> (Int,Int) -> IM.IntervalMap Int [GffCount]) -> Bool -> IM.IntervalMap Int [GffCount] -> SamLine -> Bool -> IM.IntervalMap Int [GffCount]
-modeAnnotation f a im y s = countsAmbiguity a ((filterStrand s asStrand) . (f im) $ (sStart, sEnd)) im
-  where
-    sStart = samPos y
-    sEnd   = sStart + (samCigLen y) - 1
-    asStrand = if isPositive y then GffPosStrand else GffNegStrand
+annotateLine :: AnnotationRule -> GffIMMap -> SamLine -> Bool -> Bool -> GffIMMap
+annotateLine f im y a s = uCounts matching im
+    where
+        sStart = samPos y
+        sEnd   = sStart + (samCigLen y) - 1
+        asStrand = if isPositive y then GffPosStrand else GffNegStrand
+        matching = maybeFilterAmbiguous a . maybeFilterStrand s asStrand $ f im (sStart, sEnd)
+
+maybeFilterStrand :: Bool -> GffStrand -> GffIMMap -> GffIMMap
+maybeFilterStrand True  s =  IMG.filter (not . null) . IMG.map (filterByStrand s)
+maybeFilterStrand False _ = id
 
 
-filterStrand :: Bool -> GffStrand -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
-filterStrand True  s m =  IMG.filter (not . null) . IMG.map (filterByStrand s) $ m
-filterStrand False _ m = m
+maybeFilterAmbiguous  :: Bool -> GffIMMap -> GffIMMap
+maybeFilterAmbiguous True toU = toU
+maybeFilterAmbiguous False ms
+    | IMG.null ms = IM.empty
+    | _allSameId ms = (IM.fromList . take 1 . IM.toList) ms -- same feature multiple times, count just once
+    | otherwise = IM.empty -- ambiguous: discard
 
 
-countsAmbiguity :: Bool -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
-countsAmbiguity True toU imR = uCounts toU imR
-countsAmbiguity False toU imR
-    | IMG.null toU = imR -- no_feature
-    | not (_allSameId toU) = imR -- ambiguous
-    | otherwise = uCounts (IM.fromList . take 1 . IM.toList $ toU) imR -- same feature multiple times. increase that feature ONCE.
-
-
-uCounts :: IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
+uCounts :: GffIMMap -> GffIMMap -> GffIMMap
 uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust incCount k res) im keys
     where
         incCount []     = []
@@ -114,30 +127,30 @@ uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust incCount k res) im keys
 
 --- Diferent modes
 
-union :: IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]
+union :: GffIMMap -> (Int, Int) -> GffIMMap
 union im (sS, sE) = IM.fromList $ IM.intersecting im intv
     where
         intv = IM.ClosedInterval sS sE
 
-_intersection_strict :: IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]
+_intersection_strict :: GffIMMap -> (Int, Int) -> GffIMMap
 _intersection_strict im (sS, sE) = intersection' im'
     where 
         im' = map (IM.fromList . (IM.containing im)) [sS..sE]
 
 
-_intersection_non_empty :: IM.IntervalMap Int [GffCount] -> (Int, Int) -> IM.IntervalMap Int [GffCount]
+_intersection_non_empty :: GffIMMap -> (Int, Int) -> GffIMMap
 _intersection_non_empty im (sS, sE) = intersection' . filter (not . IMG.null) $ im'
     where 
         im' = map (IM.fromList . (IM.containing im)) [sS..sE]
 
 
-intersection' :: [IM.IntervalMap Int [GffCount]] -> IM.IntervalMap Int [GffCount]
+intersection' :: [GffIMMap] -> GffIMMap
 intersection' [] = IM.empty
 intersection' im = foldl (IM.intersection) (head im) im
 
 --------------------
 
-_allSameId :: IM.IntervalMap Int [GffCount] -> Bool
+_allSameId :: GffIMMap -> Bool
 _allSameId im = all ((== sId) . annotSeqId) elems
     where
         sId   = annotSeqId . head $ elems
@@ -148,22 +161,16 @@ _allSameId im = all ((== sId) . annotSeqId) elems
 intervals :: [GffLine] -> AnnotationMap
 intervals = foldl insertg M.empty
     where
-        insertg im g = M.alter (\mF -> updateF g mF) (gffType g) im
-        updateF g mF = case mF of
-            Nothing  -> Just $ updateF' g M.empty
-            Just mF' -> Just $ updateF' g mF'
-
-        updateF' g mF = M.alter (\v -> updateChrMap g v) (gffSeqId g) mF
-        updateChrMap g v  = case v of
-            Nothing -> Just $ insertCount g IM.empty
-            Just a  -> Just $ insertCount g a
+        insertg am g = M.alter (updateF g) (gffType g) am
+        updateF g mF = Just $ M.alter (updateChrMap g) (gffSeqId g) (fromMaybe M.empty mF)
+        updateChrMap g v  = Just $ insertZeroCount g (fromMaybe IM.empty v)
 
 
-insertCount :: GffLine -> IM.IntervalMap Int [GffCount] -> IM.IntervalMap Int [GffCount]
-insertCount g im = IM.alter insertCount' asInterval im
+insertZeroCount :: GffLine -> GffIMMap -> GffIMMap
+insertZeroCount g im = IM.alter insertZeroCount' asInterval im
     where
-        insertCount' Nothing  = Just [count]
-        insertCount' (Just v) = Just (count:v)
+        insertZeroCount' Nothing  = Just [count]
+        insertZeroCount' (Just v) = Just (count:v)
         count = GffCount (gffId g) (gffType g) 0 (gffStrand g)
         asInterval :: IM.Interval Int
         asInterval = IM.ClosedInterval (gffStart g) (gffEnd g)

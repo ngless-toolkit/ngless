@@ -28,7 +28,7 @@ import qualified Data.ByteString.Lazy.Char8 as L8
 data GffType = GffExon
                 | GffGene
                 | GffCDS
-                | GffOther B.ByteString
+                | GffOther !B.ByteString
             deriving (Eq, Ord)
 
 instance Show GffType where

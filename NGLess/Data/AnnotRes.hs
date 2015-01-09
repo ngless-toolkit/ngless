@@ -92,7 +92,5 @@ updateM m g = Map.insertWith (+) (annotSeqId g) (annotCount g) m
 filterByStrand :: GffStrand -> [GffCount] -> [GffCount]
 filterByStrand s = filter filterByStrand'
   where 
-    filterByStrand' g = isUnstrand (annotStrand g) || isSameStrand s (annotStrand g)
-    isUnstrand    = (==GffUnStranded)
-    isSameStrand  = (==)
+    filterByStrand' g = (annotStrand g) `elem` [s, GffUnStranded]
 
