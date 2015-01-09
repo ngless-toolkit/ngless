@@ -9,10 +9,10 @@ import Test.Framework.Providers.HUnit
 import qualified Data.ByteString.Lazy as BL
 
 import Language
+import Interpretation.Annotation
 import Interpretation.Write
 import qualified Data.GFF as GFF
 
-import Annotation
 
 tgroup_Annotation = $(testGroupGenerator)
 

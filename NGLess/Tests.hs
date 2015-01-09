@@ -43,7 +43,7 @@ import FastQStatistics
 import FileManagement
 import Validation
 import CountOperation
-import Annotation
+import Interpretation.Annotation
 import VectorOperations
 import ProcessFastQ
 import ReferenceDatabases

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Annotation
+module Interpretation.Annotation
     ( AnnotationIntersectionMode(..)
     , annotate
     , _intersection_strict

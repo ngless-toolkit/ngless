@@ -32,11 +32,11 @@ import Substrim
 import Language
 import FileManagement
 import JSONManager
-import Annotation
 import CountOperation
 import Configuration (outputDirectory)
 import Output
 
+import Interpretation.Annotation
 import Interpretation.Write
 import Interpretation.Map
 import Data.FastQ
