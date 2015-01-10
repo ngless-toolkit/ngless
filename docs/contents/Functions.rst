@@ -7,7 +7,7 @@ Functions
 Fastq
 -----
 
-Function to load, one or more, fastQ files. An example::
+Function to load, one or more, FastQ files, for example::
 
   in = fastq('input.fq')
 
@@ -23,13 +23,17 @@ Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 none
 
+When loading a data set, quality control is carried out and statistics can be
+visualised in a graphical user interface (GUI). Simple statistics calculated
+are percentage of guanine and cytosine (%GC), encoding, number of sequences and
+minimum maximum sequence length. The more complex statistics calculated are the
+mean, median, lower quartile and upper quartile for each position of the base
+pairs.
+
+The encoding prediction is built on the lowest ASCII character of the fastQ
+file.
+
 The only compression method supported for the data sets is **gzip** (.gz).
-
-The encoding prediction is built on the lowest ASCII character of the fastQ file.
-
-When loading a data set, quality control is carried out and statistics can be visualised in a graphical user interface (GUI).
-
-Simple statistics calculated are percentage of guanine and cytosine (%GC), encoding, number of sequences and minimum maximum sequence length. The more complex statistics calculated are the mean, median, lower quartile and upper quartile for each position of the base pairs.
 
 
 Unique
@@ -37,9 +41,7 @@ Unique
 
 Function that given a set of reads, returns another which only retains a
 set number of copies of each read (if there are any duplicates). An
-example:
-
-::
+example::
 
     input = unique(input, max_copies=3)
 
@@ -62,20 +64,18 @@ Arguments by value:
 | max\_copies   | Integer      |  no        | 2              |
 +---------------+--------------+------------+----------------+
 
-The optional argument **max_copies** allows to define the number of tolerated copies (default: 2).
+The optional argument **max_copies** allows to define the number of tolerated
+copies (default: 2).
 
-Is considered a copy: ShortReads with the same sequence regardless
-of quality and identifier.
+Two short reads with the same nucleotide sequence are considered copies,
+independently of quality and identifiers.
 
 Preprocess
 ----------
 
-This function executes the given block for each read in the ReadSet.
-Unless the read is **discarded**, it is transferred (after
-transformations) to the output. The output is assigned to the same name
-as the inputs. An example:
-
-::
+This function executes the given block for each read in the ReadSet.  Unless
+the read is **discarded**, it is transferred (after transformations) to the
+output. The output is assigned to the same name as the inputs. For example::
 
     preprocess(inputs) using |read|:
         read = read[3:]
@@ -101,11 +101,9 @@ This function also performs quality control on its output.
 Map
 ---
 
-The function map, maps a ReadSet to reference. An example:
+The function map, maps a ReadSet to reference. For example::
 
-::
-
-    mapped = map(input,reference='sacCer3')
+    mapped = map(input, reference='sacCer3')
 
 Argument:
 ~~~~~~~~~
@@ -120,15 +118,14 @@ MappedReadSet
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 
-+-------------+-------------+------------+----------------+ 
++-------------+-------------+------------+----------------+
 | Name        | Type        | Required   | Default Value  |
 +=============+=============+============+================+
 | reference   | String      | yes        | -              |
 +-------------+-------------+------------+----------------+
 
-The argument **reference** can either be a path to a data set or the
-**name** of a provided data set by NGLess. The provided data sets of
-NGLess are:
+The argument ``reference`` can either be a file path to a FASTA file or the
+name of a builtin dataset. NGLess provides the following builtin datasets:
 
 +-----------+-----------------------------+-------------+
 | Name      | Description                 | Assembly    |
@@ -152,17 +149,13 @@ NGLess are:
 | hg19      | homo\_sapiens               | GRCh38      |
 +-----------+-----------------------------+-------------+
 
-The argument **reference** can either be a path to a data set or the **name** of a NGLess provided data set. Provided data sets of NGLess are:
-
 
 Annotate
 --------
 
 Given a file with aligned sequencing reads (ReadSet) and a list of
 genomic features (gff file), the function allows to annotate reads to
-each feature. An example:
-
-::
+each feature. For example::
 
     annotated = annotate(mapped, strand=false, mode={union}, keep_ambiguous=false)
 
@@ -194,23 +187,22 @@ Arguments by value:
 +-------------------+-----------------+------------+----------------+
 
 
-The **gff** argument is required, unless a known reference was used for mapping.
+The ``gff`` argument is required, unless a known reference was used for mapping.
 
-**features** represents which features to keep, discarding everything else. If
-nothing is provided, everything is considered to be significant. Possible
-symbols are **{gene}**, **{exon}**, and **{cds}**.
+**features** represents which features to keep, discarding everything else.
+Possible symbols are ``{gene}``, ``{exon}``, and ``{cds}``.
 
 **Mode** is a symbol which dictates how to handle reads overlapping more than
-one feature. Possible values for ``mode`` are **{union}**,
-**{intersection-strict}** and **{intersection-nonempty}** (default: **{union}**).
-For each read position are obtained features that intersect it, which is known
-as sets. The different modes are:
+one feature. Possible values for ``mode`` are ``{union}``,
+``{intersection-strict}``, and ``{intersection-nonempty}`` (default:
+``{union}``). For each read position are obtained features that intersect it,
+which is known as sets. The different modes are:
 
--  **{union}** the union of all the sets.
+-  ``{union}`` the union of all the sets.
 
--  **{intersection-strict}** the intersection of all the sets.
+-  ``{intersection-strict}`` the intersection of all the sets.
 
--  **{intersection-nonempty}** the intersection of all non-empty sets.
+-  ``{intersection-nonempty}`` the intersection of all non-empty sets.
 
 The ``keep_ambiguous`` argument is an opportunity to decide whether to annotate
 reads that overlap with more than one feature.
@@ -226,9 +218,7 @@ same strand as the feature.
 Count
 -----
 
-Function that allows to filter the counts of features. Example:
-
-::
+Function that allows to filter the counts of features. Example::
 
     counts = count(annotated, min=2)
 
@@ -293,20 +283,19 @@ accepted for the sub-sequence (default: 0).
 Write
 -----
 
-Write function allows to write a NGLessObject to Disk. Different Types
-of NGLessObject are manipulated in different manners.
+Writes an object to disk.
 
 
 ReadSet
-~~~~~~~~~~~
+~~~~~~~
 
 Argument:
-##########
+#########
 
 ReadSet
 
 Return:
-##########
+#######
 
 Void
 
@@ -370,18 +359,19 @@ Arguments by value:
 +----------+-------------+------------+----------------+
 | format   | String      |  no        | {tsv}          |
 +----------+-------------+------------+----------------+
+| verbose  | Bool        |  no        | false          |
++----------+-------------+------------+----------------+
 
-**Format** can have value **{csv}** or **{tsv}** (default: {tsv}).
+**Format** can have value ``{csv}`` or ``{tsv}`` (default: ``{tsv}``).
 
-If a list of **any** of the previously mentioned data types is provided, the **ofile** argument must use an **{index}** in the template name to differentiate between the files in the list. For example for a list with two elements:
+If a list of **any** of the previously mentioned data types is provided, the
+``ofile`` argument must use an **{index}** in the template name to
+differentiate between the files in the list. For example for a list with two
+elements::
 
-::
+    ofile = "result{index}.txt"
 
-    ofile = "../samples/CountsResult{index}.txt"
-
-| would result in,
-
-** “../samples/CountsResult1.txt”, “../samples/CountsResult2.txt” **
+| would result in ``result1.txt``, ``result2.txt``,...
 
 Print
 -----
