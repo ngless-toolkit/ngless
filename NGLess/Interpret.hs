@@ -246,6 +246,8 @@ topFunction Fcount expr args _ = do
     args' <- runInROEnvIO $ interpretArguments args
     executeCount expr' args'
 
+topFunction Fprint expr args Nothing = interpretTopValue expr >>= executePrint >> return NGOVoid
+
 topFunction f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
 
 executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
@@ -350,6 +352,10 @@ executePreprocess (NGOReadSet file enc t) args (Block [Variable var] expr) _ = d
                         _ -> throwError "A read should have been returned."
              
 executePreprocess a _ _ _ = error ("executePreprocess: This should have not happened." ++ show a)
+
+executePrint :: NGLessObject -> InterpretationEnvIO ()
+executePrint (NGOString s) = liftIO $ putStr (T.unpack s)
+executePrint err = throwError . NGError . T.concat $ ["Cannot print ", T.pack (show err)]
 
 interpretArguments :: [(Variable, Expression)] -> InterpretationROEnv [(T.Text, NGLessObject)]
 interpretArguments = mapM interpretArguments'
