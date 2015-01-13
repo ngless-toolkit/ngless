@@ -29,8 +29,7 @@ import FileManagement (createDir, readPossiblyCompressedFile)
 import Data.FastQ
 import Output
 
-maxTempFileSize = (100*1000*1000) -- 100MB
-
+maxTempFileSize = 100*1000*1000 -- 100MB
 
 hashRead :: Int -> ShortRead -> Int
 hashRead k (ShortRead _ r _) = mod (hash r) k
@@ -38,14 +37,13 @@ hashRead k (ShortRead _ r _) = mod (hash r) k
 writeToNFiles :: FilePath -> FastQEncoding -> [ShortRead] -> IO FilePath
 writeToNFiles fname enc rs = do
     dest <- createDir fname
-    k    <- numFiles fname >>= return . fromIntegral 
-    fhs  <- openKFileHandles k dest    
-    forM_ rs $ \x -> do
-        let pos = hashRead k x
-        BL.hPutStr (fhs !! pos) (asFastQ enc [x])
-    _ <- do
-        outputLno' DebugOutput ("Wrote N Files to: " ++ dest)
-        mapM_ hClose fhs
+    k    <- fromIntegral <$> numFiles fname
+    fhs  <- openKFileHandles k dest
+    forM_ rs $ \r -> do
+        let pos = hashRead k r
+        BL.hPutStr (fhs !! pos) (asFastQ enc [r])
+    outputLno' DebugOutput ("Wrote N Files to: " ++ dest)
+    mapM_ hClose fhs
     return dest
 
 
@@ -78,12 +76,12 @@ put1k k r dups_ref = do
 numFiles :: FilePath -> IO Integer
 numFiles path = do
     fsize <- withFile path ReadMode hFileSize
-    return $ ceiling $ ((fromInteger fsize) / maxTempFileSize  :: Double)
+    return . ceiling $ ((fromInteger fsize) / maxTempFileSize  :: Double)
 
 -- Open and close file handles
 openKFileHandles :: Int -> FilePath -> IO [Handle]
 openKFileHandles k dest =
-    forM [0..k - 1] $ \n -> do
+    forM [0..k - 1] $ \n ->
         openFile (dest </> show n) AppendMode
 
 

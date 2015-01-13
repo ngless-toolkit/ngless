@@ -105,7 +105,7 @@ upperQuartile = 0.75 :: Double
 accUntilLim :: V.Vector Int -> Int -> Int
 accUntilLim bps lim = case V.findIndex (>= lim) $ V.postscanl (+) 0 bps of
       Just v -> v
-      Nothing -> error ("ERROR: Must exist a index with a accumulated value smaller than " ++ show lim)
+      Nothing -> error ("ERROR: Must exist a index with a accumulated value larger than " ++ show lim)
 
 
 _createDataString :: [(Int, Int, Int, Int)] -> String
@@ -142,14 +142,8 @@ _calculateStatistics qCounts enc = Prelude.map statistics qCounts
 -- Calculates [('a',1), ('b',2)] = 0 + 'a' * 1 + 'b' * 2.
 -- 'a' and 'b' minus encoding.
 calcBPSum :: V.Vector Int -> Int -> Int
-calcBPSum qc es = runST $ do
-              n <- newSTRef 0
-              let s = V.length qc
-              forM_ [0..s - 1] $ \i -> do
-                  modifySTRef n ((+) $ (i - es) * (V.unsafeIndex qc i))
-              readSTRef n
+calcBPSum qs offset = V.ifoldl' (\n i q -> (n + (i - offset) * q)) 0 qs
 
---_calcPercentile :: Given a specific percentil,  calculates it's results.
 _calcPercentile bps elemTotal perc = accUntilLim bps val'
     where val' = (ceiling (fromIntegral elemTotal * perc) :: Int)
 

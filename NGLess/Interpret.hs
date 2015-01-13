@@ -1,6 +1,7 @@
 {- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Interpret
@@ -13,6 +14,7 @@ module Interpret
 
 
 import Control.Applicative
+import Control.Monad
 import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.Reader
@@ -156,16 +158,16 @@ interpret fname script es = do
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
 interpretIO [] = return ()
-interpretIO ((ln,e):es) = (setlno ln >> interpretTop e >> interpretIO es)
+interpretIO ((ln,e):es) = setlno ln >> interpretTop e >> interpretIO es
 
 interpretTop :: Expression -> InterpretationEnvIO ()
 interpretTop (Assignment (Variable var) val) = interpretTopValue val >>= setVariableValue var
 interpretTop (FunctionCall f e args b) = void $ topFunction f e args b
 interpretTop (Condition c ifTrue ifFalse) = do
-    c' <- runInROEnvIO (interpretExpr c)
-    if evalBool c'
-        then interpretTop ifTrue
-        else interpretTop ifFalse
+    NGOBool c' <- runInROEnvIO (interpretExpr c)
+    interpretTop (if c'
+        then ifTrue
+        else ifFalse)
 interpretTop (Sequence es) = forM_ es interpretTop
 interpretTop _ = throwError "Top level statement is NOP"
 
@@ -174,9 +176,7 @@ interpretTopValue (FunctionCall f e args b) = topFunction f e args b
 interpretTopValue e = runInROEnvIO (interpretExpr e)
 
 interpretExpr :: Expression -> InterpretationROEnv NGLessObject
-interpretExpr (Lookup (Variable v)) = do
-    r <- lookupVariable v
-    case r of
+interpretExpr (Lookup (Variable v)) = lookupVariable v >>= \case
         Nothing -> throwError "Variable lookup error"
         Just r' -> return r'
 interpretExpr (ConstStr t) = return (NGOString t)
@@ -198,19 +198,17 @@ interpretExpr (IndexExpression expr ie) = do
 interpretExpr (ListExpression e) = NGOList <$> mapM interpretExpr e
 interpretExpr _ = throwError "Not an expression"
 
-
 interpretIndex :: Index -> InterpretationROEnv [Maybe NGLessObject]
 interpretIndex (IndexTwo a b) = forM [a,b] maybeInterpretExpr
 interpretIndex (IndexOne a) = forM [Just a] maybeInterpretExpr
 
-maybeInterpretExpr :: (Maybe Expression) -> InterpretationROEnv (Maybe NGLessObject)
+maybeInterpretExpr :: Maybe Expression -> InterpretationROEnv (Maybe NGLessObject)
 maybeInterpretExpr Nothing = return Nothing
 maybeInterpretExpr (Just e) = Just <$> interpretExpr e
 
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
-topFunction Ffastq expr _args _block = do
-    expr' <- interpretTopValue expr
-    executeQualityProcess expr'
+topFunction Ffastq expr _args _block =
+    executeQualityProcess =<< interpretTopValue expr
 
 topFunction Funique expr args _block = do
     expr' <- interpretTopValue expr
@@ -224,7 +222,7 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     setVariableValue varName res'
     return res'
 
-topFunction Fpreprocess expr _ _ = error ("Should be used a variable with a NGOReadSet, but is: " ++ (show expr))
+topFunction Fpreprocess expr _ _ = error ("Should be used a variable with a NGOReadSet, but is: " ++ show expr)
 
 topFunction Fwrite expr args _ = do 
     expr' <- interpretTopValue expr
@@ -294,7 +292,7 @@ executeQualityProcess (NGOString fname) = do
     _ <- liftIO $ insertFilesProcessedJson newTemplate (T.pack r)
     executeQualityProcess' Nothing fname' "beforeQC" newTemplate
 
-executeQualityProcess _ = throwError("Should be passed a ConstStr or [ConstStr]")
+executeQualityProcess _ = throwError "Should be passed a ConstStr or [ConstStr]"
 executeQualityProcess' enc fname info nt = liftIO $ executeQProc enc fname info nt
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
@@ -306,23 +304,21 @@ executeMap (NGOReadSet file _enc _) args = case lookup "reference" args of
     Just refPath' -> liftResourceT $ interpretMapOp (evalString refPath') file
     Nothing       -> error "A reference must be suplied"
 
-executeMap _ _ = error ("Not implemented yet")
+executeMap _ _ = throwError "Not implemented yet"
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeUnique (NGOList e) args = return . NGOList =<< mapM (\x -> executeUnique x args) e
+executeUnique (NGOList e) args = NGOList <$> mapM (\x -> executeUnique x args) e
 executeUnique (NGOReadSet file enc t) args = do
-        d <- liftIO $ 
+        d <- liftIO $
             readReadSet enc file 
                         >>= writeToNFiles file enc
-        case lookup "max_copies" args of
-            Just v -> uniqueCalculations' (v' v) d
-            _      -> uniqueCalculations' 1 d --default
-    where 
-        v' = fromIntegral . evalInteger
-        uniqueCalculations' :: Int -> FilePath -> InterpretationEnvIO NGLessObject
-        uniqueCalculations' numMaxOccur' d = do
-            nFp <- liftIO $ 
-                readNFiles enc numMaxOccur' d >>= \x -> writeReadSet file x enc 
+        let mc = fromMaybe 1 (evalInteger <$> lookup "max_copies" args)
+        uniqueCalculations' mc d --default
+    where
+        uniqueCalculations' :: Integer -> FilePath -> InterpretationEnvIO NGLessObject
+        uniqueCalculations' numMaxOccur d = do
+            nFp <- liftIO $
+                readNFiles enc (fromIntegral numMaxOccur) d >>= \x -> writeReadSet file x enc
             return $ NGOReadSet nFp enc t
 
 executeUnique _ _ = error "executeUnique: Should not have happened"
@@ -359,7 +355,7 @@ executePrint err = throwError . NGError . T.concat $ ["Cannot print ", T.pack (s
 
 interpretArguments :: [(Variable, Expression)] -> InterpretationROEnv [(T.Text, NGLessObject)]
 interpretArguments = mapM interpretArguments'
-    where interpretArguments' ((Variable v), e) = do
+    where interpretArguments' (Variable v, e) = do
             e' <- interpretExpr e
             return (v,e')
 
@@ -374,16 +370,16 @@ interpretBlock vs (e:es) = do
 interpretBlock1 :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv BlockResult
 interpretBlock1 vs (Assignment (Variable n) val) = do
     val' <- interpretBlockExpr vs val
-    if not (n `elem` (map fst vs))
-        then error "only assignments to block variable are possible"
+    if n `notElem` (map fst vs)
+        then throwError "only assignments to block variable are possible"
         else do
             let vs' = map (\p@(a,_) -> (if a == n then (a,val') else p)) vs
             return $ BlockResult BlockOk vs'
 interpretBlock1 vs Discard = return (BlockResult BlockDiscarded vs)
 interpretBlock1 vs Continue = return (BlockResult BlockContinued vs)
 interpretBlock1 vs (Condition c ifT ifF) = do
-    v' <- interpretBlockExpr vs c
-    interpretBlock1 vs (if evalBool v' then ifT else ifF)
+    NGOBool v' <- interpretBlockExpr vs c
+    interpretBlock1 vs (if v' then ifT else ifF)
 interpretBlock1 vs (Sequence expr) = interpretBlock vs expr -- interpret [expr]
 interpretBlock1 vs x = error ("interpretBlock1: This should not have happened " ++ show vs ++ " " ++ show x)
 
@@ -419,8 +415,8 @@ _evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Nothing, Just (NGOInteger 
     NGOShortRead $ ShortRead rId (B.take (fromIntegral e) rSeq) (B.take (fromIntegral e) rQual)
 
 _evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Just (NGOInteger e)] = do
-    let e' = (fromIntegral e)
-        s' = (fromIntegral s)
+    let e' = fromIntegral e
+        s' = fromIntegral s
         e'' = e'- s'
     NGOShortRead (ShortRead rId (B.take e'' . B.drop s' $ rSeq) (B.take e'' . B.drop s' $ rQual))
 _evalIndex _ _ = nglTypeError "_evalIndex: invalid operation"

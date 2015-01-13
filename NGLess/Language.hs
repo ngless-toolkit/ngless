@@ -1,4 +1,4 @@
-{- Copyright 2013 NGLess Authors
+{- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE OverloadedStrings #-}
