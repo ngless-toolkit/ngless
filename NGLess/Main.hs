@@ -27,7 +27,7 @@ import System.Directory
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
-import qualified Data.ByteString as S
+import qualified Data.ByteString as B
 
 
 data NGLess =
@@ -36,6 +36,8 @@ data NGLess =
               , input :: String
               , n_threads :: Int
               , output_directory :: FilePath
+              , temporary_directory :: Maybe FilePath
+              , keep_temporary_files :: Bool
               }
         | InstallGenMode
               { input :: String}
@@ -50,13 +52,14 @@ ngless = DefaultMode
         , input = "-" &= argPos 0 &= opt ("-" :: String)
         , n_threads = 1 &= name "n"
         , output_directory = "" &= name "o"
+        , temporary_directory = Nothing
+        , keep_temporary_files = False
         }
         &= details  [ "Example:" , "ngless script.ngl" ]
 
 
 installargs = InstallGenMode
-        {
-            input = "Reference" &= argPos 0
+        { input = "Reference" &= argPos 0
         }
         &= name "--install-reference-data"
         &= details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
@@ -93,9 +96,11 @@ function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 
 
 
-optsExec (DefaultMode dmode fname n odir_opt) = do
+optsExec (DefaultMode dmode fname n odir_opt tdir keep) = do
     setNumCapabilities n
     setOutputDirectory fname odir_opt
+    setTemporaryDirectory tdir
+    setKeepTemporaryFiles keep
     odir <- outputDirectory
     createDirectoryIfMissing False odir
     --Note that the input for ngless is always UTF-8.
@@ -103,7 +108,7 @@ optsExec (DefaultMode dmode fname n odir_opt) = do
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
-    engltext <- T.decodeUtf8' <$> (if fname == "-" then S.getContents else S.readFile fname)
+    engltext <- T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
     case engltext of
         Left err -> print err
         Right ngltext -> function dmode fname ngltext

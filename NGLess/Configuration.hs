@@ -11,6 +11,8 @@ module Configuration
     , outputDirectory
     , setOutputDirectory
     , temporaryFileDirectory
+    , setTemporaryDirectory
+    , setKeepTemporaryFiles
     , versionStr
     ) where
 
@@ -119,5 +121,19 @@ setOutputDirectory _ odir = writeIORef outputDirectoryRef odir
 outputDirectory :: IO FilePath
 outputDirectory = readIORef outputDirectoryRef
 
+temporaryDirectoryRef :: IORef (Maybe FilePath)
+{-# NOINLINE temporaryDirectoryRef #-}
+temporaryDirectoryRef = unsafePerformIO (newIORef Nothing)
+
+setTemporaryDirectory :: Maybe FilePath -> IO ()
+setTemporaryDirectory = writeIORef temporaryDirectoryRef
+
 temporaryFileDirectory :: IO FilePath
-temporaryFileDirectory = getTemporaryDirectory -- in the future this will be configurable
+temporaryFileDirectory = do
+    tdir <- readIORef temporaryDirectoryRef
+    case tdir of
+        Just t -> return t
+        Nothing -> getTemporaryDirectory
+
+setKeepTemporaryFiles :: Bool -> IO ()
+setKeepTemporaryFiles _ = return ()
