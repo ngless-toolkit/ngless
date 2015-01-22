@@ -22,6 +22,7 @@ import Control.Monad
 import Control.Applicative
 import Control.Concurrent
 import System.Console.CmdArgs
+import System.FilePath.Posix
 import System.Directory
 
 import qualified Data.Text as T
@@ -81,7 +82,10 @@ function "ngless" fname text =
             errs <- validate_io expr
             outputLno' InfoOutput "Script OK. Starting interpretation..."
             case errs of
-                Nothing -> interpret fname text (nglBody expr)
+                Nothing -> do
+                    interpret fname text (nglBody expr)
+                    odir <- outputDirectory
+                    writeOutput (odir </> "output.js")
                 Just errors -> T.putStrLn (T.concat errors)
 
 function "ast" fname text = case parsengless fname text >>= validate of
