@@ -244,7 +244,7 @@ topFunction Fcount expr args _ = do
     args' <- runInROEnvIO $ interpretArguments args
     executeCount expr' args'
 
-topFunction Fprint expr args Nothing = interpretTopValue expr >>= executePrint >> return NGOVoid
+topFunction Fprint expr _args Nothing = interpretTopValue expr >>= executePrint >> return NGOVoid
 
 topFunction f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
 
