@@ -9,10 +9,8 @@ import Test.HUnit
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 import Control.Applicative
-import Text.Parsec (SourcePos, parse)
+import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
-import Text.ParserCombinators.Parsec.Prim (GenParser)
-import Text.Parsec.Pos (newPos)
 
 import System.Directory (removeFile, removeDirectoryRecursive, createDirectoryIfMissing)
 import System.Directory (doesFileExist, getDirectoryContents)
@@ -21,8 +19,6 @@ import System.Console.CmdArgs.Verbosity
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
-
-import qualified Data.Text as T
 
 import Data.Aeson
 import Data.Convertible
@@ -34,7 +30,6 @@ import qualified Data.Vector.Unboxed as V
 
 import Language
 import Interpret
-import Parse
 import Tokens
 import Types
 import Unique
@@ -61,10 +56,12 @@ import Tests.Utils
 import Tests.FastQ
 import Tests.Validation
 import Tests.Annotation (tgroup_Annotation)
+import Tests.Parse (tgroup_Parse)
 
 test_FastQ = [tgroup_FastQ]
 test_Validation = [tgroup_Validation]
 test_Annotation = [tgroup_Annotation]
+test_Parse      = [tgroup_Parse]
 
 -- The main test driver sets verbosity to Quiet to avoid extraneous output and
 -- then uses the automatically generated function
@@ -73,100 +70,6 @@ main = do
     setOutputDirectory "" "testing_directory_tmp"
     $(defaultMainGenerator)
     removeDirectoryRecursive "testing_directory_tmp"
-
--- Test Parsing Module
-parseText :: GenParser (SourcePos,Token) () a -> T.Text -> a
-parseText p t = fromRight . parse p "test" . _cleanupindents . fromRight . tokenize "test" $ t
-parseBody = map snd . parseText _nglbody
-
-case_parse_symbol = parseBody "{symbol}" @?= [ConstSymbol "symbol"]
-case_parse_fastq = parseBody fastqcalls @?= fastqcall
-    where
-        fastqcalls = "fastq(\"input.fq\")"
-        fastqcall  = [FunctionCall Ffastq (ConstStr "input.fq") [] Nothing]
-
-case_parse_count = parseBody countcalls @?= countcall
-    where
-        countcalls = "count(annotated, count={gene})"
-        countcall  = [FunctionCall Fcount (Lookup (Variable "annotated")) [(Variable "count",ConstSymbol "gene")] Nothing]
-
-case_parse_count_mult_counts = parseBody countcalls @?= countcall
-    where
-        countcalls = "count(annotated, count=[{gene},{cds}])"
-        countcall  = [FunctionCall Fcount (Lookup (Variable "annotated")) [(Variable "count", ListExpression [ConstSymbol "gene", ConstSymbol "cds"])] Nothing]
-
-case_parse_assignment =  parseBody "reads = \"something\"" @?=
-        [Assignment (Variable "reads") (ConstStr "something")]
-
-case_parse_sequence = parseBody seqs @?= seqr
-    where
-        seqs = "reads = 'something'\nreads = 'something'"
-        seqr = [a,a]
-        a    = Assignment (Variable "reads") (ConstStr "something")
-
-case_parse_num = parseBody nums @?= num
-    where
-        nums = "a = 0x10"
-        num  = [Assignment (Variable "a") (ConstNum 16)]
-
-case_parse_bool = parseBody bools @?= bool
-    where
-        bools = "a = true"
-        bool  = [Assignment (Variable "a") (ConstBool True)]
-
-case_parse_if_else = parseBody blocks @?= block
-    where
-        blocks = "if true:\n 0\n 1\nelse:\n 2\n"
-        block  = [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [ConstNum 2])]
-
-case_parse_if = parseBody blocks @?= block
-    where
-        blocks = "if true:\n 0\n 1\n"
-        block  = [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [])]
-
-case_parse_if_end = parseBody blocks @?= block
-    where
-        blocks = "if true:\n 0\n 1\n2\n"
-        block  = [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence []),ConstNum 2]
-
-case_parse_ngless = parsengless "test" ngs @?= Right ng
-    where
-        ngs = "ngless '0.0'\n"
-        ng  = Script "0.0" []
-
-case_parse_list = parseText _listexpr "[a,b]" @?= ListExpression [Lookup (Variable "a"), Lookup (Variable "b")]
-
-case_parse_indexexpr_11 = parseText _indexexpr "read[1:1]" @?= IndexExpression (Lookup (Variable "read")) (IndexTwo j1 j1)
-case_parse_indexexpr_10 = parseText _indexexpr "read[1:]"  @?= IndexExpression (Lookup (Variable "read")) (IndexTwo j1 Nothing)
-case_parse_indexexpr_01 = parseText _indexexpr "read[:1]"  @?= IndexExpression (Lookup (Variable "read")) (IndexTwo Nothing j1)
-case_parse_indexexpr_00 = parseText _indexexpr "read[:]"   @?= IndexExpression (Lookup (Variable "read")) (IndexTwo Nothing Nothing)
-
-case_parse_indexexprone_1 = parseText _indexexpr "read[1]" @?= IndexExpression (Lookup (Variable "read")) (IndexOne (ConstNum 1))
-case_parse_indexexprone_2 = parseText _indexexpr "read[2]" @?= IndexExpression (Lookup (Variable "read")) (IndexOne (ConstNum 2))
-case_parse_indexexprone_var = parseText _indexexpr "read[var]" @?= IndexExpression (Lookup (Variable "read")) (IndexOne (Lookup (Variable "var")))
-
-case_parse_cleanupindents_0 = tokcleanupindents [TIndent 1] @?= []
-case_parse_cleanupindents_1 = tokcleanupindents [TNewLine] @?= [TNewLine]
-case_parse_cleanupindents_2 = tokcleanupindents [TIndent 1,TNewLine] @?= [TNewLine]
-case_parse_cleanupindents_3 = tokcleanupindents [TOperator '(',TNewLine,TIndent 2,TOperator ')'] @?= [TOperator '(',TOperator ')']
-
-case_parse_cleanupindents_4 = tokcleanupindents toks @?= toks'
-    where
-        toks  = [TWord "write",TOperator '(',TWord "A",TOperator ',',TNewLine,TIndent 16,TNewLine,TIndent 16,TWord "format",TOperator '=',TExpr (ConstSymbol "csv"),TOperator ')',TNewLine]
-        toks' = [TWord "write",TOperator '(',TWord "A",TOperator ','                                        ,TWord "format",TOperator '=',TExpr (ConstSymbol "csv"),TOperator ')',TNewLine]
-case_parse_cleanupindents_4' = tokcleanupindents toks @?= toks'
-    where
-        toks  = [TOperator '(',TOperator ',',TNewLine,TIndent 16,TNewLine,TIndent 16,TOperator ')',TNewLine]
-        toks' = [TOperator '(',TOperator ','                                        ,TOperator ')',TNewLine]
-case_parse_cleanupindents_4'' = tokcleanupindents toks @?= toks'
-    where
-        toks  = [TOperator '(',TNewLine,TIndent 16,TNewLine,TIndent 16,TOperator ')',TNewLine]
-        toks' = [TOperator '('                                        ,TOperator ')',TNewLine]
-
-j1 = Just (ConstNum 1)
-tokcleanupindents = map snd . _cleanupindents . map (newPos "test" 0 0,)
-
-case_parse_kwargs = parseBody "unique(reads,maxCopies=2)\n" @?= [FunctionCall Funique (Lookup (Variable "reads")) [(Variable "maxCopies", ConstNum 2)] Nothing]
 
 -- Test Tokens module
 tokenize' fn t = map snd <$> (tokenize fn t)
