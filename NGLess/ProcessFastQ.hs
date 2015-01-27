@@ -2,14 +2,12 @@
 
 module ProcessFastQ
     (
-    readFastQ,
     readReadSet,
     writeReadSet,
     executeQProc,
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
-import qualified Data.ByteString.Char8 as B
 
 import System.FilePath.Posix
 import System.Directory
@@ -34,13 +32,12 @@ writeReadSet fn rs enc = do
 readReadSet :: FastQEncoding -> FilePath -> IO [ShortRead]
 readReadSet enc fn = (parseFastQ enc) `fmap` (readPossiblyCompressedFile fn)
 
-executeQProc :: Maybe FastQEncoding -> FilePath -> FilePath -> FilePath -> IO NGLessObject
-executeQProc enc f info dirT = do
-    let x = dirT ++ "$" ++ info
-    readFastQ enc f x dirT
-
-readFastQ :: Maybe FastQEncoding -> FilePath -> FilePath -> FilePath -> IO NGLessObject
-readFastQ enc f dst dirT = do
+-- ^ Process quality.
+executeQProc :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
+                -> FilePath         -- ^ FastQ file
+                -> FilePath         -- ^ destination for statistics
+                -> IO NGLessObject
+executeQProc enc f dst = do
         fd <- computeStats <$> readPossiblyCompressedFile f
         let enc' = encFromM fd -- when Nothing calculate encoding, else use value from Just.
         p "Generation of statistics for " dst
@@ -53,7 +50,7 @@ readFastQ enc f dst dirT = do
         p "Number of sequences: "   (show $ nSeq fd)
         printHtmlStatisticsData (qualCounts fd) enc' dst -- " " " file: perBaseQualScoresData.js
         p "Loaded file: " f
-        return $ NGOReadSet f enc' (B.pack dirT)
+        return $ NGOReadSet enc' f
     where
         p s0 s1  = outputListLno' DebugOutput [s0, s1]
         encFromM fd = fromMaybe (guessEncoding . lc $ fd) enc

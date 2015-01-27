@@ -849,7 +849,7 @@ case_read_and_write_fastQ = do
 case_read_fastQ = do
     nt <- generateDirId fp
     createDirectoryIfMissing False (dstDir nt)
-    _ <- readFastQ Nothing fp (dstDir nt) nt --creates files in nt
+    _ <- executeQProc Nothing fp (dstDir nt) --creates files in nt
     len <- length <$> getDirectoryContents (dstDir nt)
     removeDirectoryRecursive $ dstDir nt -- delete test generated data.
     len @?= 4
@@ -861,8 +861,8 @@ case_read_fastQ_store_enc = do
     nt <- generateDirId fp
     createDirectoryIfMissing False $ dstDirBef nt
     createDirectoryIfMissing False $ dstDirAft nt
-    (NGOReadSet _ eb _) <- readFastQ Nothing   fp (dstDirBef nt) nt
-    (NGOReadSet _ ea _) <- readFastQ (Just eb) fp (dstDirAft nt) nt
+    (NGOReadSet eb _) <- executeQProc Nothing   fp (dstDirBef nt)
+    (NGOReadSet ea _) <- executeQProc (Just eb) fp (dstDirAft nt)
     removeDirectoryRecursive $ dstDirBef nt -- delete test generated data.
     removeDirectoryRecursive $ dstDirAft nt -- delete test generated data.
     eb @?= ea

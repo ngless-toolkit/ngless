@@ -284,23 +284,23 @@ parseAnnotationMode m = error (concat ["Unexpected annotation mode (", show m, "
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = NGOList <$> mapM executeQualityProcess e
-executeQualityProcess (NGOReadSet fname enc nt) = executeQualityProcess' (Just enc) fname "afterQC" (B.unpack nt)
+executeQualityProcess (NGOReadSet enc fname) = executeQualityProcess' (Just enc) fname "afterQC"
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     r <- getScriptName
     newTemplate <- liftIO $ generateDirId fname' -- new template only calculated once.
     _ <- liftIO $ insertFilesProcessedJson newTemplate (T.pack r)
-    executeQualityProcess' Nothing fname' "beforeQC" newTemplate
+    executeQualityProcess' Nothing fname' "beforeQC"
 
 executeQualityProcess _ = throwError "Should be passed a ConstStr or [ConstStr]"
-executeQualityProcess' enc fname info nt = liftIO $ executeQProc enc fname info nt
+executeQualityProcess' enc fname info = liftIO $ executeQProc enc fname info
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeMap (NGOList es) args = do
     res <- forM es $ \e ->
                 executeMap e args
     return (NGOList res)
-executeMap (NGOReadSet file _enc _) args = case lookup "reference" args of 
+executeMap (NGOReadSet _enc file) args = case lookup "reference" args of
     Just refPath' -> liftResourceT $ interpretMapOp (evalString refPath') file
     Nothing       -> error "A reference must be suplied"
 
@@ -308,7 +308,7 @@ executeMap _ _ = throwError "Not implemented yet"
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeUnique (NGOList e) args = NGOList <$> mapM (\x -> executeUnique x args) e
-executeUnique (NGOReadSet file enc t) args = do
+executeUnique (NGOReadSet enc file) args = do
         d <- liftIO $
             readReadSet enc file 
                         >>= writeToNFiles file enc
@@ -319,19 +319,19 @@ executeUnique (NGOReadSet file enc t) args = do
         uniqueCalculations' numMaxOccur d = do
             nFp <- liftIO $
                 readNFiles enc (fromIntegral numMaxOccur) d >>= \x -> writeReadSet file x enc
-            return $ NGOReadSet nFp enc t
+            return $ NGOReadSet enc nFp 
 
 executeUnique _ _ = error "executeUnique: Should not have happened"
 
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block v = return . NGOList =<< mapM (\x -> executePreprocess x args _block v) e
-executePreprocess (NGOReadSet file enc t) args (Block [Variable var] expr) _ = do
+executePreprocess (NGOReadSet enc file) args (Block [Variable var] expr) _ = do
         liftIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         env <- gets snd
         newfp <- liftIO $ writeReadSet file (map asShortRead (execBlock env rs)) enc
-        return $ NGOReadSet newfp enc t
+        return $ NGOReadSet enc newfp
     where
         execBlock env = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env)
         interpretPBlock1 :: NGLessObject -> InterpretationROEnv (Maybe NGLessObject)

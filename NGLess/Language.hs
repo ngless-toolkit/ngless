@@ -24,7 +24,6 @@ module Language
 
 {- This module defines the internal representation the language -}
 import qualified Data.Text as T
-import qualified Data.ByteString.Char8 as B
 
 import Data.FastQ
 
@@ -128,7 +127,7 @@ data NGLessObject =
         | NGOSymbol T.Text
         | NGOFilename FilePath
         | NGOShortRead ShortRead
-        | NGOReadSet FilePath FastQEncoding B.ByteString -- ^ Read sets are saved on disk
+        | NGOReadSet FastQEncoding FilePath -- ^ encoding file_on_disk
         | NGOMappedReadSet FilePath (Maybe T.Text) -- ^ This is represented by a SAM file on disk + optional reference information
         | NGOAnnotatedSet FilePath
         | NGOVoid
