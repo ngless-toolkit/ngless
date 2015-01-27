@@ -112,7 +112,7 @@ distclean: clean
 	rm -f test_samples/htseq-res/*.txt
 
 uninstall:
-	rm -rf $(deps) $(exec)/ngless* $(HOME)/.ngless
+	rm -rf $(deps) $(exec)/ngless*
 
 
 #####  Setup required files
