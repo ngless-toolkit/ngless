@@ -1,4 +1,4 @@
-{- Copyright 2013 NGLess Authors
+{- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE OverloadedStrings #-}
@@ -27,14 +27,13 @@ instance Error T.Text where
 checktypes :: Script -> Either T.Text Script
 checktypes script@(Script _ exprs) = evalState (runErrorT (inferScriptM exprs >> return script)) (0,Map.empty)
 
-
 errorInLineC :: [String] -> TypeMSt ()
 errorInLineC = errorInLine . T.concat . map fromString
 
 errorInLine :: T.Text -> TypeMSt a
 errorInLine e = do
     line <- fst `fmap` get
-    throwError (T.concat ["Line ", T.pack (show line),": ", e])
+    throwError (T.concat ["Line ", T.pack (show line), ": ", e])
 
 inferScriptM :: [(Int,Expression)] -> TypeMSt ()
 inferScriptM [] = return ()
@@ -66,9 +65,8 @@ envInsert v t = modify (\(lno,m) -> (lno, Map.insert v t m))
 check_assignment :: Maybe NGLType -> Maybe NGLType -> TypeMSt ()
 check_assignment _ (Just NGLVoid) = errorInLine "Assigning void value to variable"
 check_assignment Nothing _ = return ()
-check_assignment a b = case a == b of
-        True  -> return ()
-        False -> errorInLine $ T.concat ["Assigning type ", showType b, " to a variable that has type ", showType a]
+check_assignment a b = when (a /= b)
+        (errorInLine $ T.concat ["Assigning type ", showType b, " to a variable that has type ", showType a])
     where
         showType = T.pack . show . fromJust
 
