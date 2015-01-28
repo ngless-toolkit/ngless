@@ -25,12 +25,15 @@ import System.Posix.Internals (c_getpid)
 
 import Data.FileEmbed
 import Configuration (outputDirectory, temporaryFileDirectory)
+import Output
 
 -- 
 openNGLTempFile :: FilePath -> String -> String -> IO (FilePath, Handle)
 openNGLTempFile base prefix ext = do
     tdir <- temporaryFileDirectory
-    openTempFile tdir (prefix ++ takeBaseNameNoExtensions base ++ "." ++ ext)
+    (fp,h) <- openTempFile tdir (prefix ++ takeBaseNameNoExtensions base ++ "." ++ ext)
+    outputListLno' DebugOutput ["Created & opened temporary file ", fp]
+    return (fp,h)
 
 takeBaseNameNoExtensions = dropExtensions . takeBaseName
     
