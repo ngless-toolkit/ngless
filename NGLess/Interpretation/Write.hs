@@ -37,9 +37,9 @@ writeToUncFile (NGOMappedReadSet path defGen) newfp = do
     readPossiblyCompressedFile path >>= BL.writeFile newfp
     return $ NGOMappedReadSet newfp defGen
 
-writeToUncFile (NGOReadSet enc path) newfp = do
+writeToUncFile (NGOReadSet1 enc path) newfp = do
     readPossiblyCompressedFile path >>= BL.writeFile newfp
-    return $ NGOReadSet enc newfp
+    return $ NGOReadSet1 enc newfp
 
 writeToUncFile obj _ = error ("writeToUncFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ show obj)
 
@@ -54,7 +54,7 @@ writeToFile (NGOList el) args = do
         indexFPs = map (T.pack . show) [1..(length el)]
         fp' fp = M.toList $ M.insert "ofile" (NGOString fp) (M.fromList args)
 
-writeToFile el@NGOReadSet{} args = writeToUncFile el $ getNGOPath (lookup "ofile" args)
+writeToFile el@NGOReadSet1{} args = writeToUncFile el $ getNGOPath (lookup "ofile" args)
 writeToFile el@(NGOMappedReadSet fp defGen) args = do
     let newfp = getNGOPath (lookup "ofile" args) --
         format = fromMaybe (NGOSymbol "sam") (lookup "format" args)

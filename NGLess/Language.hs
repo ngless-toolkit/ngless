@@ -141,7 +141,9 @@ data NGLessObject =
         | NGOSymbol T.Text
         | NGOFilename FilePath
         | NGOShortRead ShortRead
-        | NGOReadSet FastQEncoding FilePath -- ^ encoding file_on_disk
+        | NGOReadSet1 FastQEncoding FilePath -- ^ encoding file_on_disk
+        | NGOReadSet2 FastQEncoding FilePath FilePath -- ^ encoding file_on_disk
+        | NGOReadSet3 FastQEncoding FilePath FilePath FilePath-- ^ encoding file_on_disk
         | NGOMappedReadSet FilePath (Maybe T.Text) -- ^ This is represented by a SAM file on disk + optional reference information
         | NGOAnnotatedSet FilePath
         | NGOVoid

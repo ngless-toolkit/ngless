@@ -6,6 +6,7 @@
 
 module Interpretation.Map
     ( interpretMapOp
+    , interpretMapOp2
     , _calcSamStats
     ) where
 
@@ -43,8 +44,8 @@ ensureIndexExists refPath = do
     return refPath
 
 
-mapToReference :: FilePath -> FilePath -> ResourceT IO String
-mapToReference refIndex readSet = do
+mapToReference :: FilePath -> [FilePath] -> ResourceT IO String
+mapToReference refIndex fps = do
     (rk, (newfp, hout)) <- tempfile "mappedOutput.sam"
     liftIO $ do
         outputListLno' InfoOutput ["Starting mapping to ", refIndex]
@@ -53,11 +54,11 @@ mapToReference refIndex readSet = do
         (_, _, Just herr, jHandle) <-
             createProcess (
                 proc bwaPath
-                    ["mem","-t",(show numCapabilities), refIndex, readSet]
+                   (["mem","-t", show numCapabilities, refIndex] ++ fps)
                 ) { std_out = UseHandle hout,
                     std_err = CreatePipe }
         err <- hGetContents herr
-        outputListLno' DebugOutput $ ["BWA info: ", err]
+        outputListLno' DebugOutput ["BWA info: ", err]
         exitCode <- waitForProcess jHandle
         hClose herr
         case exitCode of
@@ -66,25 +67,29 @@ mapToReference refIndex readSet = do
                 return newfp
             ExitFailure code -> do
                 release rk
-                error $ concat ["Failed mapping\nCommand line was::\n\t",
-                                bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '", readSet, "'\n",
-                                "Bwa error code was ", show code, "."]
+                error $ concat (["Failed mapping\nCommand line was::\n\t",
+                                bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '"] ++ fps ++ ["'\n",
+                                "Bwa error code was ", show code, "."])
 
 interpretMapOp :: T.Text -> FilePath -> ResourceT IO NGLessObject
-interpretMapOp r ds = do
-    (ref', defGen') <- indexReference'
+interpretMapOp r ds = interpretMapOp' r [ds]
+interpretMapOp2 :: T.Text -> FilePath -> FilePath -> ResourceT IO NGLessObject
+interpretMapOp2 r mate1 mate2 = interpretMapOp' r [mate1, mate2]
+
+interpretMapOp' :: T.Text -> [FilePath] -> ResourceT IO NGLessObject
+interpretMapOp' r ds = do
+    (ref', defGen') <- indexReference' (T.unpack r)
     samPath' <- mapToReference ref' ds
     liftIO $ getSamStats samPath'
     return $ NGOMappedReadSet samPath' defGen'
     where
-        r' = T.unpack r
-        indexReference' :: ResourceT IO (FilePath, Maybe T.Text)
-        indexReference' = liftIO $
-            if isDefaultReference (T.unpack r)
-                then do
+        indexReference' :: FilePath -> ResourceT IO (FilePath, Maybe T.Text)
+        indexReference' r'
+            | isDefaultReference r' = liftIO $ do
                     basedir  <- ensureDataPresent r'
                     return (getIndexPath basedir, Just r)
-                else (, Nothing) <$> ensureIndexExists r'
+            | otherwise  = (, Nothing) <$> liftIO (ensureIndexExists r')
+
 
 getSamStats :: FilePath -> IO ()
 getSamStats fname = readPossiblyCompressedFile fname >>= printSamStats . _calcSamStats

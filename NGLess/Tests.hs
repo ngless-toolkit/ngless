@@ -12,8 +12,11 @@ import Control.Applicative
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
 
-import System.Directory (removeFile, removeDirectoryRecursive, createDirectoryIfMissing)
-import System.Directory (doesFileExist, getDirectoryContents)
+import System.Directory (removeFile
+                        ,removeDirectoryRecursive
+                        ,createDirectoryIfMissing
+                        ,doesFileExist
+                        ,getDirectoryContents)
 import System.FilePath.Posix((</>))
 import System.Console.CmdArgs.Verbosity
 
@@ -764,8 +767,8 @@ case_read_fastQ_store_enc = do
     nt <- generateDirId fp
     createDirectoryIfMissing False $ dstDirBef nt
     createDirectoryIfMissing False $ dstDirAft nt
-    (NGOReadSet eb _) <- executeQProc Nothing   fp (dstDirBef nt)
-    (NGOReadSet ea _) <- executeQProc (Just eb) fp (dstDirAft nt)
+    (NGOReadSet1 eb _) <- executeQProc Nothing   fp (dstDirBef nt)
+    (NGOReadSet1 ea _) <- executeQProc (Just eb) fp (dstDirAft nt)
     removeDirectoryRecursive $ dstDirBef nt -- delete test generated data.
     removeDirectoryRecursive $ dstDirAft nt -- delete test generated data.
     eb @?= ea

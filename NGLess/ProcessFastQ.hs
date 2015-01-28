@@ -50,7 +50,7 @@ executeQProc enc f dst = do
         p "Number of sequences: "   (show $ nSeq fd)
         printHtmlStatisticsData (qualCounts fd) enc' dst -- " " " file: perBaseQualScoresData.js
         p "Loaded file: " f
-        return $ NGOReadSet enc' f
+        return $ NGOReadSet1 enc' f
     where
         p s0 s1  = outputListLno' DebugOutput [s0, s1]
         encFromM fd = fromMaybe (guessEncoding . lc $ fd) enc

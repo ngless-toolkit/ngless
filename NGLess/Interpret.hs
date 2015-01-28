@@ -233,6 +233,15 @@ topFunction' Fannotate  expr args Nothing = executeAnnotation expr args
 topFunction' Fcount     expr args Nothing = executeCount expr args
 topFunction' Fprint     expr args Nothing = executePrint expr args
 
+topFunction' Fpaired mate1 args _block = do
+    let Just mate2 = lookup "second" args
+    NGOReadSet1 enc1 fp1 <- executeQualityProcess mate1
+    NGOReadSet1 enc2 fp2 <- executeQualityProcess mate2
+    when (enc1 /= enc2)
+        (throwError "Mates do not seem to have the same quality encoding!")
+    return (NGOReadSet2 enc1 fp1 fp2)
+
+
 topFunction' f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
 
 executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
@@ -271,7 +280,7 @@ parseAnnotationMode m = error (concat ["Unexpected annotation mode (", show m, "
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = NGOList <$> mapM executeQualityProcess e
-executeQualityProcess (NGOReadSet enc fname) = executeQualityProcess' (Just enc) fname "afterQC"
+executeQualityProcess (NGOReadSet1 enc fname) = executeQualityProcess' (Just enc) fname "afterQC"
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     r <- getScriptName
@@ -283,19 +292,19 @@ executeQualityProcess _ = throwError "Should be passed a ConstStr or [ConstStr]"
 executeQualityProcess' enc fname info = liftIO $ executeQProc enc fname info
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeMap (NGOList es) args = do
-    res <- forM es $ \e ->
-                executeMap e args
-    return (NGOList res)
-executeMap (NGOReadSet _enc file) args = case lookup "reference" args of
-    Just refPath' -> liftResourceT $ interpretMapOp (evalString refPath') file
+executeMap fps args = case lookup "reference" args of
     Nothing       -> error "A reference must be suplied"
-
-executeMap _ _ = throwError "Not implemented yet"
+    Just (NGOString ref) -> executeMap' fps
+        where
+            executeMap' (NGOList es) = NGOList <$> forM es executeMap'
+            executeMap' (NGOReadSet1 _enc file)    = liftResourceT $ interpretMapOp ref file
+            executeMap' (NGOReadSet2 _enc fp1 fp2) = liftResourceT $ interpretMapOp2 ref fp1 fp2
+            executeMap' _ = throwError "Not implemented yet"
+    _         -> error "map could not parse reference argument"
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeUnique (NGOList e) args = NGOList <$> mapM (\x -> executeUnique x args) e
-executeUnique (NGOReadSet enc file) args = do
+executeUnique (NGOReadSet1 enc file) args = do
         d <- liftIO $
             readReadSet enc file 
                         >>= writeToNFiles file enc
@@ -306,19 +315,19 @@ executeUnique (NGOReadSet enc file) args = do
         uniqueCalculations' numMaxOccur d = do
             nFp <- liftIO $
                 readNFiles enc (fromIntegral numMaxOccur) d >>= \x -> writeReadSet file x enc
-            return $ NGOReadSet enc nFp 
+            return $ NGOReadSet1 enc nFp
 
-executeUnique _ _ = error "executeUnique: Should not have happened"
+executeUnique expr _ = throwErrorStr ("executeUnique: Cannot handle argument " ++ show expr)
 
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block v = return . NGOList =<< mapM (\x -> executePreprocess x args _block v) e
-executePreprocess (NGOReadSet enc file) args (Block [Variable var] expr) _ = do
+executePreprocess (NGOReadSet1 enc file) args (Block [Variable var] expr) _ = do
         liftIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         env <- gets snd
         newfp <- liftIO $ writeReadSet file (map asShortRead (execBlock env rs)) enc
-        return $ NGOReadSet enc newfp
+        return $ NGOReadSet1 enc newfp
     where
         execBlock env = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env)
         interpretPBlock1 :: NGLessObject -> InterpretationROEnv (Maybe NGLessObject)
