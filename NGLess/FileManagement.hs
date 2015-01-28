@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 module FileManagement
-    ( createDir
+    ( createTempDir
     , generateDirId
     , openNGLTempFile
     , setupHtmlViewer
@@ -34,8 +34,8 @@ openNGLTempFile base prefix ext = do
 
 takeBaseNameNoExtensions = dropExtensions . takeBaseName
     
-createDir :: FilePath -> IO FilePath
-createDir dst = do
+createTempDir :: FilePath -> IO FilePath
+createTempDir dst = do
     t <- getTemporaryDirectory
     fp <- createTempDirectory t (takeBaseNameNoExtensions dst)
     createDirectory fp

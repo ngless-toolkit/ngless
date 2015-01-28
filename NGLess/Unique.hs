@@ -25,7 +25,7 @@ import System.FilePath.Posix
 import System.Directory
 
 
-import FileManagement (createDir, readPossiblyCompressedFile)
+import FileManagement (createTempDir, readPossiblyCompressedFile)
 import Data.FastQ
 import Output
 
@@ -36,7 +36,7 @@ hashRead k (ShortRead _ r _) = mod (hash r) k
 
 writeToNFiles :: FilePath -> FastQEncoding -> [ShortRead] -> IO FilePath
 writeToNFiles fname enc rs = do
-    dest <- createDir fname
+    dest <- createTempDir fname
     k    <- fromIntegral <$> numFiles fname
     fhs  <- openKFileHandles k dest
     forM_ rs $ \r -> do
