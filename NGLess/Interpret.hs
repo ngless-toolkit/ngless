@@ -213,7 +213,7 @@ topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block
 topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ interpretArguments args
-    res' <- executePreprocess expr' args' _block varName >>= executeQualityProcess 
+    res' <- executePreprocess expr' args' _block >>= executeQualityProcess
     setVariableValue varName res'
     return res'
 topFunction Fpreprocess expr _ _ = throwErrorStr ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
@@ -320,9 +320,9 @@ executeUnique (NGOReadSet1 enc file) args = do
 executeUnique expr _ = throwErrorStr ("executeUnique: Cannot handle argument " ++ show expr)
 
 
-executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> T.Text -> InterpretationEnvIO NGLessObject
-executePreprocess (NGOList e) args _block v = return . NGOList =<< mapM (\x -> executePreprocess x args _block v) e
-executePreprocess (NGOReadSet1 enc file) args (Block [Variable var] expr) _ = do
+executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
+executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
+executePreprocess (NGOReadSet1 enc file) args (Block [Variable var] expr) = do
         liftIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         env <- gets snd
@@ -342,8 +342,7 @@ executePreprocess (NGOReadSet1 enc file) args (Block [Variable var] expr) _ = do
                             0 -> return Nothing
                             _ -> return newRead
                         _ -> throwError "A read should have been returned."
-             
-executePreprocess a _ _ _ = error ("executePreprocess: This should have not happened." ++ show a)
+executePreprocess a _ _ = error ("executePreprocess: This should have not happened." ++ show a)
 
 executePrint :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
