@@ -30,10 +30,15 @@ case_parse_fastq = parseBody fastqcalls @?= fastqcall
         fastqcalls = "fastq(\"input.fq\")"
         fastqcall  = [FunctionCall Ffastq (ConstStr "input.fq") [] Nothing]
 
+case_parse_paired = parseBody fastqcalls @?= fastqcall
+    where
+        fastqcalls = "paired(\"input.fq\", \"pair.fq\")"
+        fastqcall  = [FunctionCall Fpaired (ConstStr "input.fq") [(Variable "second", ConstStr "pair.fq")] Nothing]
+
 case_parse_count = parseBody countcalls @?= countcall
     where
         countcalls = "count(annotated, count={gene})"
-        countcall  = [FunctionCall Fcount (Lookup (Variable "annotated")) [(Variable "count",ConstSymbol "gene")] Nothing]
+        countcall  = [FunctionCall Fcount (Lookup (Variable "annotated")) [(Variable "count", ConstSymbol "gene")] Nothing]
 
 case_parse_count_mult_counts = parseBody countcalls @?= countcall
     where

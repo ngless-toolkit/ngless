@@ -31,11 +31,22 @@ newtype Variable = Variable T.Text
     deriving (Eq, Show)
 
 -- | functions are hard coded here
-data FuncName = Ffastq | Funique | Fpreprocess | Fsubstrim | Fmap | Fcount | Fwrite | Fprint | Fannotate
+data FuncName =
+                Ffastq
+                | Fpaired
+                | Funique
+                | Fpreprocess
+                | Fsubstrim
+                | Fmap
+                | Fcount
+                | Fwrite
+                | Fprint
+                | Fannotate
     deriving (Eq, Show)
 
 function_argtype_return_type :: FuncName -> (NGLType, NGLType)
 function_argtype_return_type Ffastq =       (NGLReadSet,         NGLString)
+function_argtype_return_type Fpaired =      (NGLReadSet,         NGLString)
 function_argtype_return_type Funique =      (NGLReadSet,         NGLReadSet)
 function_argtype_return_type Fpreprocess =  (NGLVoid,            NGLReadSet)
 function_argtype_return_type Fsubstrim =    (NGLRead,            NGLRead)
@@ -67,6 +78,9 @@ function_opt_arg_type Fsubstrim   (Variable "min_quality")          = Right NGLI
 function_opt_arg_type Fwrite      (Variable "ofile")                = Right NGLString
 function_opt_arg_type Fwrite      (Variable "format")               = Right NGLSymbol
 function_opt_arg_type Fwrite      (Variable "verbose")              = Right NGLBool
+function_opt_arg_type Fpaired     (Variable "second")               = Right NGLString
+function_opt_arg_type Fpaired     (Variable "singles")              = Right NGLString
+function_opt_arg_type Fpaired      _ = Left "paired function does not have any argument"
 function_opt_arg_type Ffastq       _ = Left "Fastq function does not have any argument"
 function_opt_arg_type Fpreprocess  _ = Left "Preprocess function does not have any argument"
 function_opt_arg_type e (Variable x) = Left $ T.concat ["Function " ,T.pack . show $ e ," does not have argument: ", x]

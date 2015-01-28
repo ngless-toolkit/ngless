@@ -1,4 +1,4 @@
-{- Copyright 2013 NGLess Authors
+{- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE OverloadedStrings #-}
@@ -114,7 +114,7 @@ uoperator = lenop <|> unary_minus
     where
         lenop = UnaryOp UOpLen <$> (reserved "len" *> operator '(' *> expression <* operator ')')
         unary_minus = UnaryOp UOpMinus <$> (operator '-' *> base_expression)
-funccall = FunctionCall <$>
+funccall = try paired <|> FunctionCall <$>
                 (try funcname <* operator '(')
                 <*> expression
                 <*> (kwargs <* operator ')')
@@ -122,6 +122,15 @@ funccall = FunctionCall <$>
 
 funcblock = (Just <$> (Block <$> (reserved "using" *> operator '|' *> variableList <* operator '|' <* operator ':') <*> block))
     <|> pure Nothing
+
+paired = do
+    p <- word
+    case p of
+        "paired" -> FunctionCall Fpaired
+                    <$> (operator '(' *> expression <* operator ',')
+                    <*> (pairedKwArgs <* operator ')')
+                    <*> pure Nothing
+        _ -> fail "Expected 'paired'"
 
 funcname = funcname' <?> "function name"
     where
@@ -138,6 +147,9 @@ funcname = funcname' <?> "function name"
                 "print" -> pure Fprint
                 "annotate" -> pure Fannotate
                 _ -> fail "Function not found"
+
+pairedKwArgs = wrap <$> expression
+    where wrap e = [(Variable "second", e)]
 
 kwargs = many (operator ',' *> kwarg) <?> "keyword argument list"
 kwarg = kwarg' <?> "keyword argument"
