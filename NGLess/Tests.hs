@@ -400,8 +400,6 @@ case_uop_minus_2 = _evalMinus (NGOInteger (-10)) @?= (NGOInteger 10)
 case_template_id = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq"
 case_template    = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= "xpto_1"
 
-case_parse_filename = parseFileName "/var/folders/sample_1.9168$afterQC" @?= ("/var/folders/","sample_1")
-
 case_temp_fp      = assertNotEqual (generateTempFilePath "/tmp" "xpto") (generateTempFilePath "/tmp" "xpto")
 
 assertNotEqual a b = do

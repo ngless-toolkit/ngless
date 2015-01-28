@@ -8,7 +8,6 @@ module FileManagement
     , readPossiblyCompressedFile
     , takeBaseNameNoExtensions
     , writeGZIP
-    , parseFileName
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -35,10 +34,6 @@ generateTempFilePath dst t = do
     (f,s) <- openTempFile dst t   
     hClose s   
     return f
-
---Example: "folders/sample_1.9168$afterQC" @?= ("folders/","sample_1")
-parseFileName :: FilePath -> (FilePath, FilePath)
-parseFileName = splitFileName . fst . break ((==) '$') . dropExtensions
 
 takeBaseNameNoExtensions = dropExtensions . takeBaseName
     
