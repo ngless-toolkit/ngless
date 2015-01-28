@@ -1,3 +1,6 @@
+{- Copyright 2013-2015 NGLess Authors
+ - License: MIT
+ -}
 {-# LANGUAGE OverloadedStrings #-}
 
 module ProcessFastQ
@@ -8,8 +11,9 @@ module ProcessFastQ
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Codec.Compression.GZip as GZip
 
-import System.FilePath.Posix
+import System.IO
 import System.Directory
 import Data.Maybe
 import Control.Applicative ((<$>))
@@ -21,11 +25,14 @@ import Language
 import JSONManager
 import Output
 
+writeGZIP :: Handle -> BL.ByteString -> IO ()
+writeGZIP h = BL.hPut h . GZip.compress
+
 writeReadSet :: FilePath -> [ShortRead] -> FastQEncoding -> IO FilePath
 writeReadSet fn rs enc = do
-    temp <- getTemporaryDirectory 
-    newfp <- generateTempFilePath temp (takeBaseNameNoExtensions fn <.> "fa.gz")
-    writeGZIP newfp (asFastQ enc rs)
+    (newfp,h) <- openNGLTempFile fn "" "fq.gz"
+    writeGZIP h (asFastQ enc rs)
+    hClose h
     return newfp
 
 

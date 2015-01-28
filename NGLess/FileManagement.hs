@@ -1,13 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 module FileManagement
     ( createDir
-    , getTemporaryDirectory
     , generateDirId
-    , generateTempFilePath
+    , openNGLTempFile
     , setupHtmlViewer
     , readPossiblyCompressedFile
     , takeBaseNameNoExtensions
-    , writeGZIP
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -26,14 +24,13 @@ import Control.Monad
 import System.Posix.Internals (c_getpid)
 
 import Data.FileEmbed
-import Configuration (outputDirectory)
+import Configuration (outputDirectory, temporaryFileDirectory)
 
 -- 
-generateTempFilePath :: FilePath -> String -> IO FilePath
-generateTempFilePath dst t = do
-    (f,s) <- openTempFile dst t   
-    hClose s   
-    return f
+openNGLTempFile :: FilePath -> String -> String -> IO (FilePath, Handle)
+openNGLTempFile base prefix ext = do
+    tdir <- temporaryFileDirectory
+    openTempFile tdir (prefix ++ takeBaseNameNoExtensions base ++ "." ++ ext)
 
 takeBaseNameNoExtensions = dropExtensions . takeBaseName
     
@@ -82,9 +79,6 @@ copyDir src dst = do
         then copyDir  (src </> n) (dst </> n)
         else copyFile (src </> n) (dst </> n)
 
-
-writeGZIP :: String -> BL.ByteString -> IO ()
-writeGZIP fp contents = BL.writeFile fp $ GZip.compress contents 
 
 readPossiblyCompressedFile ::  FilePath -> IO BL.ByteString
 readPossiblyCompressedFile fname

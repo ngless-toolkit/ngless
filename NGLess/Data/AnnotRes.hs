@@ -17,8 +17,8 @@ import qualified Data.ByteString.Lazy.Char8 as L8
 
 import qualified Data.Map.Strict as Map
 
+import System.IO
 import Control.DeepSeq
-import System.FilePath.Posix(takeFileName)
 
 import FileManagement
 
@@ -66,10 +66,10 @@ readAnnotLine line = if length tokens == 4
 
 writeAnnotCount :: FilePath -> [GffCount]-> IO FilePath
 writeAnnotCount fn im = do
-    temp <- getTemporaryDirectory 
-    newfp <- generateTempFilePath temp (takeFileName fn)
+    (newfp,h) <- openNGLTempFile fn "counts." "txt"
     outputLno' DebugOutput $ "Writing Annotation results to:" ++ newfp
-    L8.writeFile newfp $ showGffCount im
+    L8.hPut h $ showGffCount im
+    hClose h
     outputLno' InfoOutput "Write completed"
     return newfp
 
