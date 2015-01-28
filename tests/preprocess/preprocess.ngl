@@ -1,0 +1,8 @@
+ngless '0.0'
+input = fastq('sample.fq')
+trim = 3
+preprocess(input) using |read|:
+   read = read[trim:]
+   if len(read) < 10:
+       discard
+write(input, ofile='output.fq')
