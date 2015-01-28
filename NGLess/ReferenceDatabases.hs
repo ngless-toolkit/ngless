@@ -17,7 +17,6 @@ import qualified Codec.Compression.GZip as GZip
 import System.FilePath.Posix
 import System.Directory
 import Data.Maybe
-
 import System.IO.Error
 
 import Control.Monad
@@ -27,7 +26,6 @@ import Utils.Network
 import Utils.Bwa
 import Configuration
 import Output
-
 
 defaultGenomes :: [String]
 defaultGenomes =
@@ -41,7 +39,7 @@ defaultGenomes =
                 , "sacCer3" --Saccharomyces_cerevisiae
                 ]
 isDefaultReference :: String -> Bool
-isDefaultReference name = name `elem` defaultGenomes
+isDefaultReference =  (`elem` defaultGenomes)
 
 getIndexPath :: FilePath -> FilePath
 getIndexPath = (</> "Sequence/BWAIndex/genome.fa.gz")
