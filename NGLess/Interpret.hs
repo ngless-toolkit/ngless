@@ -22,9 +22,13 @@ import Control.Monad.State
 import Control.Monad.Trans.Resource
 
 import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+
+import System.IO
+import System.Directory
 
 import Data.String
 import Data.Maybe
@@ -210,10 +214,10 @@ maybeInterpretExpr Nothing = return Nothing
 maybeInterpretExpr (Just e) = Just <$> interpretExpr e
 
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
-topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
+topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ interpretArguments args
-    res' <- executePreprocess expr' args' _block >>= executeQualityProcess
+    res' <- executePreprocess expr' args' block >>= executeQualityProcess
     setVariableValue varName res'
     return res'
 topFunction Fpreprocess expr _ _ = throwErrorStr ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
@@ -281,6 +285,19 @@ parseAnnotationMode m = error (concat ["Unexpected annotation mode (", show m, "
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = NGOList <$> mapM executeQualityProcess e
 executeQualityProcess (NGOReadSet1 enc fname) = executeQualityProcess' (Just enc) fname "afterQC"
+executeQualityProcess (NGOReadSet2 enc fp1 fp2) = do
+    NGOReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1 "afterQC"
+    NGOReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2 "afterQC"
+    when (enc1 /= enc2)
+        (throwError "Mates do not seem to have the same quality encoding!")
+    return (NGOReadSet2 enc1 fp1' fp2')
+executeQualityProcess (NGOReadSet3 enc fp1 fp2 fp3) = do
+    NGOReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1 "afterQC"
+    NGOReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2 "afterQC"
+    NGOReadSet1 enc3 fp3' <- executeQualityProcess' (Just enc) fp3 "afterQC"
+    when (enc1 /= enc2 || enc2 /= enc3)
+        (throwError "Mates do not seem to have the same quality encoding!")
+    return (NGOReadSet3 enc1 fp1' fp2' fp3')
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     r <- getScriptName
@@ -288,7 +305,7 @@ executeQualityProcess (NGOString fname) = do
     _ <- liftIO $ insertFilesProcessedJson newTemplate (T.pack r)
     executeQualityProcess' Nothing fname' "beforeQC"
 
-executeQualityProcess _ = throwError "Should be passed a ConstStr or [ConstStr]"
+executeQualityProcess v = throwErrorStr ("QC expected a string or readset. Got " ++ show v)
 executeQualityProcess' enc fname info = liftIO $ executeQProc enc fname info
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
@@ -299,7 +316,7 @@ executeMap fps args = case lookup "reference" args of
             executeMap' (NGOList es) = NGOList <$> forM es executeMap'
             executeMap' (NGOReadSet1 _enc file)    = liftResourceT $ interpretMapOp ref file
             executeMap' (NGOReadSet2 _enc fp1 fp2) = liftResourceT $ interpretMapOp2 ref fp1 fp2
-            executeMap' _ = throwError "Not implemented yet"
+            executeMap' v = throwErrorStr ("map of " ++ show v ++ " not implemented yet")
     _         -> error "map could not parse reference argument"
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
@@ -322,27 +339,59 @@ executeUnique expr _ = throwErrorStr ("executeUnique: Cannot handle argument " +
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
-executePreprocess (NGOReadSet1 enc file) args (Block [Variable var] expr) = do
+executePreprocess (NGOReadSet1 enc file) _args (Block [Variable var] block) = do
         liftIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         env <- gets snd
-        newfp <- liftIO $ writeReadSet file (map asShortRead (execBlock env rs)) enc
+        newfp <- liftIO $ writeReadSet file (execBlock env rs) enc
         return $ NGOReadSet1 enc newfp
     where
-        execBlock env = mapMaybe (\r -> runInterpret (interpretPBlock1 r) env)
-        interpretPBlock1 :: NGLessObject -> InterpretationROEnv (Maybe NGLessObject)
-        interpretPBlock1 r = do
-            r' <- interpretBlock1 ((var, r) : args) expr
-            case blockStatus r' of
-                BlockDiscarded -> return Nothing -- Discard Read.
-                _ -> do
-                    let newRead = lookup var (blockValues r')
-                    case newRead of
-                        Just value -> case evalInteger $ _evalLen value of
-                            0 -> return Nothing
-                            _ -> return newRead
-                        _ -> throwError "A read should have been returned."
+        execBlock env = mapMaybe (\r -> runInterpret (interpretPBlock1 block var r) env)
+executePreprocess (NGOReadSet2 enc fp1 fp2) args (Block [Variable var] block) = do
+        liftIO $ outputListLno' DebugOutput ["Preprocess on paired end ", fp1, "+", fp2]
+        (fp1', out1) <- liftIO $ openNGLTempFile fp1 "preprocessed.1." ".fq"
+        (fp2', out2) <- liftIO $ openNGLTempFile fp2 "preprocessed.2." ".fq"
+        (fps, hs) <- liftIO $ openNGLTempFile fp1 "preprocessed.singles." ".fq"
+        rs1 <- map NGOShortRead <$> liftIO (readReadSet enc fp1)
+        rs2 <- map NGOShortRead <$> liftIO (readReadSet enc fp2)
+        anySingle <- intercalate (out1, out2, hs) rs1 rs2 False
+        liftIO $ hClose `mapM_` [out1, out2, hs]
+        unless anySingle
+            (liftIO $ removeFile fps)
+        liftIO $ outputLno' DebugOutput "Preprocess finished"
+        return $ if anySingle
+                    then NGOReadSet3 enc fp1' fp2' fps
+                    else NGOReadSet2 enc fp1' fp2'
+    where
+        intercalate _ [] [] anySingle = return anySingle
+        intercalate hs@(out1, out2, hsingles) (r1:rs1) (r2:rs2) !anySingle = do
+            r1' <- runInROEnvIO $ interpretPBlock1 block var r1
+            r2' <- runInROEnvIO $ interpretPBlock1 block var r2
+            anySingle' <- case (r1',r2') of
+                (Nothing, Nothing) -> return anySingle
+                (Just r1'', Just r2'') -> do
+                    writeSR out1 r1''
+                    writeSR out2 r2''
+                    return anySingle
+                (Just r, Nothing) -> writeSR hsingles r >> return True
+                (Nothing, Just r) -> writeSR hsingles r >> return True
+            intercalate hs rs1 rs2 anySingle'
+        intercalate _ _ _ _ = throwError "preprocess: paired mates do not contain the same number of reads"
+
+        writeSR h sr = liftIO $ BL.hPut h (asFastQ enc [sr])
 executePreprocess a _ _ = error ("executePreprocess: This should have not happened." ++ show a)
+
+
+interpretPBlock1 :: Expression -> T.Text -> NGLessObject -> InterpretationROEnv (Maybe ShortRead)
+interpretPBlock1 block var r = do
+    r' <- interpretBlock1 [(var, r)] block
+    case blockStatus r' of
+        BlockDiscarded -> return Nothing -- Discard Read.
+        _ -> case lookup var (blockValues r') of
+                Just value@(NGOShortRead rr) -> case evalInteger $ _evalLen value of
+                    0 -> return Nothing
+                    _ -> return (Just rr)
+                _ -> throwError "A read should have been returned."
 
 executePrint :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
