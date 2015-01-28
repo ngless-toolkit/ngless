@@ -24,6 +24,7 @@ import Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 
 import Data.String
 import Data.Maybe
@@ -73,6 +74,8 @@ instance Error NGError where
 
 instance IsString NGError where
     fromString = NGError . T.pack
+
+throwErrorStr = throwError . NGError . T.pack
 
 -- A variable map
 type NGLEnv_t = Map.Map T.Text NGLessObject
@@ -207,46 +210,30 @@ maybeInterpretExpr Nothing = return Nothing
 maybeInterpretExpr (Just e) = Just <$> interpretExpr e
 
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
-topFunction Ffastq expr _args _block =
-    executeQualityProcess =<< interpretTopValue expr
-
-topFunction Funique expr args _block = do
-    expr' <- interpretTopValue expr
-    args' <- runInROEnvIO $ interpretArguments args
-    executeUnique expr' args'
-
 topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just _block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ interpretArguments args
     res' <- executePreprocess expr' args' _block varName >>= executeQualityProcess 
     setVariableValue varName res'
     return res'
-
-topFunction Fpreprocess expr _ _ = error ("Should be used a variable with a NGOReadSet, but is: " ++ show expr)
-
-topFunction Fwrite expr args _ = do 
-    expr' <- interpretTopValue expr
+topFunction Fpreprocess expr _ _ = throwErrorStr ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
+topFunction f expr args block = do
+    expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ interpretArguments args
-    liftIO (writeToFile expr' args')
+    topFunction' f expr' args' block
 
-topFunction Fmap expr args _ = do
-    expr' <- interpretTopValue expr
-    args' <- runInROEnvIO $ interpretArguments args
-    executeMap expr' args'
 
-topFunction Fannotate expr args _ = do
-    expr' <- interpretTopValue expr
-    args' <- runInROEnvIO $ interpretArguments args
-    executeAnnotation expr' args'
+topFunction' :: FuncName -> NGLessObject -> [(T.Text, NGLessObject)] -> Maybe Block -> InterpretationEnvIO NGLessObject
+topFunction' Ffastq expr _args _block = executeQualityProcess expr
 
-topFunction Fcount expr args _ = do
-    expr' <- interpretTopValue expr
-    args' <- runInROEnvIO $ interpretArguments args
-    executeCount expr' args'
+topFunction' Funique    expr args Nothing = executeUnique expr args
+topFunction' Fwrite     expr args Nothing = liftIO (writeToFile expr args)
+topFunction' Fmap       expr args Nothing = executeMap expr args
+topFunction' Fannotate  expr args Nothing = executeAnnotation expr args
+topFunction' Fcount     expr args Nothing = executeCount expr args
+topFunction' Fprint     expr args Nothing = executePrint expr args
 
-topFunction Fprint expr _args Nothing = interpretTopValue expr >>= executePrint >> return NGOVoid
-
-topFunction f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
+topFunction' f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
 
 executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (\x -> executeCount x args) e
@@ -349,9 +336,9 @@ executePreprocess (NGOReadSet enc file) args (Block [Variable var] expr) _ = do
              
 executePreprocess a _ _ _ = error ("executePreprocess: This should have not happened." ++ show a)
 
-executePrint :: NGLessObject -> InterpretationEnvIO ()
-executePrint (NGOString s) = liftIO $ putStr (T.unpack s)
-executePrint err = throwError . NGError . T.concat $ ["Cannot print ", T.pack (show err)]
+executePrint :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
+executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
+executePrint err  _ = throwErrorStr ("Cannot print " ++ show err)
 
 interpretArguments :: [(Variable, Expression)] -> InterpretationROEnv [(T.Text, NGLessObject)]
 interpretArguments = mapM interpretArguments'
