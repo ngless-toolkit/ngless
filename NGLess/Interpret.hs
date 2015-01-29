@@ -236,13 +236,20 @@ topFunction' Fannotate  expr args Nothing = executeAnnotation expr args
 topFunction' Fcount     expr args Nothing = executeCount expr args
 topFunction' Fprint     expr args Nothing = executePrint expr args
 
-topFunction' Fpaired mate1 args _block = do
+topFunction' Fpaired mate1 args Nothing = do
     let Just mate2 = lookup "second" args
+        mate3 = lookup "singles" args
     NGOReadSet1 enc1 fp1 <- executeQualityProcess mate1
     NGOReadSet1 enc2 fp2 <- executeQualityProcess mate2
     when (enc1 /= enc2)
         (throwError "Mates do not seem to have the same quality encoding!")
-    return (NGOReadSet2 enc1 fp1 fp2)
+    case mate3 of
+        Nothing -> return (NGOReadSet2 enc1 fp1 fp2)
+        Just f3 -> do
+            NGOReadSet1 enc3 fp3 <- executeQualityProcess f3
+            when (enc1 /= enc3)
+                (throwError "Mates do not seem to have the same quality encoding!")
+            return (NGOReadSet3 enc1 fp1 fp2 fp3)
 
 topFunction' f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
 
@@ -361,22 +368,38 @@ executePreprocess (NGOReadSet1 enc file) _args (Block [Variable var] block) = do
         return $ NGOReadSet1 enc newfp
     where
         execBlock env = mapMaybe (\r -> runInterpret (interpretPBlock1 block var r) env)
-executePreprocess (NGOReadSet2 enc fp1 fp2) _args (Block [Variable var] block) = do
-        liftIO $ outputListLno' DebugOutput ["Preprocess on paired end ", fp1, "+", fp2]
+executePreprocess (NGOReadSet2 enc fp1 fp2) _args block = executePreprocess (NGOReadSet3 enc fp1 fp2 "") _args block
+executePreprocess (NGOReadSet3 enc fp1 fp2 fp3) _args (Block [Variable var] block) = do
+        liftIO $ outputListLno' DebugOutput (["Preprocess on paired end ",
+                                                fp1, "+", fp2] ++ (if fp3 /= ""
+                                                                    then [" with singles ", fp3]
+                                                                    else []))
         (fp1', out1) <- liftIO $ openNGLTempFile fp1 "preprocessed.1." ".fq"
         (fp2', out2) <- liftIO $ openNGLTempFile fp2 "preprocessed.2." ".fq"
         (fps, hs) <- liftIO $ openNGLTempFile fp1 "preprocessed.singles." ".fq"
         rs1 <- map NGOShortRead <$> liftIO (readReadSet enc fp1)
         rs2 <- map NGOShortRead <$> liftIO (readReadSet enc fp2)
         anySingle <- intercalate (out1, out2, hs) rs1 rs2 False
+        rs3 <- (if fp3 /= ""
+                    then map NGOShortRead <$> liftIO (readReadSet enc fp3)
+                    else return [])
+        anySingle' <- preprocBlock hs rs3
         liftIO $ hClose `mapM_` [out1, out2, hs]
-        unless anySingle
+        unless (anySingle || anySingle')
             (liftIO $ removeFile fps)
         liftIO $ outputLno' DebugOutput "Preprocess finished"
-        return $ if anySingle
+        return $ if anySingle || anySingle'
                     then NGOReadSet3 enc fp1' fp2' fps
                     else NGOReadSet2 enc fp1' fp2'
     where
+        preprocBlock :: Handle -> [NGLessObject] -> InterpretationEnvIO Bool
+        preprocBlock hsingles rs = do
+            ps <- forM rs  (runInROEnvIO . interpretPBlock1 block var)
+            case catMaybes ps of
+                [] -> return False
+                ps' -> do
+                    forM_ ps' (liftIO . writeSR hsingles)
+                    return True
         intercalate _ [] [] anySingle = return anySingle
         intercalate hs@(out1, out2, hsingles) (r1:rs1) (r2:rs2) !anySingle = do
             r1' <- runInROEnvIO $ interpretPBlock1 block var r1
@@ -393,7 +416,7 @@ executePreprocess (NGOReadSet2 enc fp1 fp2) _args (Block [Variable var] block) =
         intercalate _ _ _ _ = throwError "preprocess: paired mates do not contain the same number of reads"
 
         writeSR h sr = liftIO $ BL.hPut h (asFastQ enc [sr])
-executePreprocess a _ _ = error ("executePreprocess: This should have not happened." ++ show a)
+executePreprocess v _ _ = error ("executePreprocess: Cannot handle this input: " ++ show v)
 
 
 interpretPBlock1 :: Expression -> T.Text -> NGLessObject -> InterpretationROEnv (Maybe ShortRead)

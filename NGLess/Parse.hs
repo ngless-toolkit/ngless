@@ -128,7 +128,7 @@ paired = do
     case p of
         "paired" -> FunctionCall Fpaired
                     <$> (operator '(' *> expression <* operator ',')
-                    <*> (pairedKwArgs <* operator ')')
+                    <*> pairedKwArgs
                     <*> pure Nothing
         _ -> fail "Expected 'paired'"
 
@@ -148,7 +148,7 @@ funcname = funcname' <?> "function name"
                 "annotate" -> pure Fannotate
                 _ -> fail "Function not found"
 
-pairedKwArgs = wrap <$> expression
+pairedKwArgs = (++) <$> (wrap <$> expression) <*> (kwargs <* operator ')')
     where wrap e = [(Variable "second", e)]
 
 kwargs = many (operator ',' *> kwarg) <?> "keyword argument list"
