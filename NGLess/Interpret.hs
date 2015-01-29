@@ -7,9 +7,8 @@
 module Interpret
     ( interpret
     , _evalIndex
-    , _evalLen
+    , _evalUnary
     , _evalBinary
-    , _evalMinus
     ) where
 
 
@@ -190,7 +189,7 @@ interpretExpr (ConstStr t) = return (NGOString t)
 interpretExpr (ConstBool b) = return (NGOBool b)
 interpretExpr (ConstSymbol s) = return (NGOSymbol s)
 interpretExpr (ConstNum n) = return (NGOInteger n)
-interpretExpr (UnaryOp op v) = evalUOP op <$> interpretExpr v
+interpretExpr (UnaryOp op v) = _evalUnary op <$> interpretExpr v
 interpretExpr (BinaryOp bop v1 v2) = do
     v1' <- interpretExpr v1
     v2' <- interpretExpr v2
@@ -425,10 +424,10 @@ interpretPBlock1 block var r = do
     case blockStatus r' of
         BlockDiscarded -> return Nothing -- Discard Read.
         _ -> case lookup var (blockValues r') of
-                Just value@(NGOShortRead rr) -> case evalInteger $ _evalLen value of
+                Just (NGOShortRead rr) -> case srLength rr of
                     0 -> return Nothing
                     _ -> return (Just rr)
-                _ -> throwError "A read should have been returned."
+                _ -> unreachable ("Expected variable "++show var++" to contain a short read.")
 
 executePrint :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
@@ -469,24 +468,17 @@ interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpr
 
 interpretPreProcessExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretPreProcessExpr (FunctionCall Fsubstrim var args _) = do
-    expr' <- interpretExpr var
+    NGOShortRead r <- interpretExpr var
     args' <- interpretArguments args
-    return . NGOShortRead $ substrim (getvalue args') (asShortRead expr')
-    where
-        getvalue els = fromIntegral . evalInteger $ fromMaybe (NGOInteger 0) (lookup "min_quality" els)
+    let mq = fromMaybe 0 $ (fromIntegral . evalInteger) <$> lookup "min_quality" args'
+    return . NGOShortRead $ substrim mq r
 
 interpretPreProcessExpr expr = interpretExpr expr
 
-evalUOP :: UOp -> NGLessObject -> NGLessObject
-evalUOP UOpMinus x@(NGOInteger _) = _evalMinus x
-evalUOP UOpLen sr@(NGOShortRead _) = _evalLen sr
-evalUOP _ _ = nglTypeError "invalid unary operation. "
-
-_evalLen (NGOShortRead r) = NGOInteger . toInteger $ srLength r
-_evalLen err = nglTypeError ("Length must receive a Read. Received a " ++ show err)
-
-_evalMinus (NGOInteger n) = NGOInteger (-n)
-_evalMinus err = nglTypeError ("Minus operator must receive a integer. Received a" ++ show err)
+_evalUnary :: UOp -> NGLessObject -> NGLessObject
+_evalUnary UOpMinus (NGOInteger n) = NGOInteger (-n)
+_evalUnary UOpLen (NGOShortRead r) = NGOInteger . toInteger $ srLength r
+_evalUnary op v = nglTypeError ("invalid unary operation ("++show op++") on value " ++ show v)
 
 _evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject
 _evalIndex sr index@[Just (NGOInteger a)] = _evalIndex sr $ (Just $ NGOInteger (a + 1)) : index
@@ -527,9 +519,6 @@ _evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = NGOInteger (a + b)
 _evalBinary BOpMul (NGOInteger a) (NGOInteger b) = NGOInteger (a * b)
 _evalBinary op a b = nglTypeError (concat ["_evalBinary: ", show op, " ", show a, " ", show b])
 
-
-asShortRead (NGOShortRead r) = r
-asShortRead _ = nglTypeError "Short read expected"
 
 getScriptName = do
     -- This cannot fail as we inserted the variable ourselves

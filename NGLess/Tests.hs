@@ -360,7 +360,7 @@ case_pre_process_indexation_2 = _evalIndex (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [N
 case_pre_process_indexation_3 = _evalIndex (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 2), Just (NGOInteger 5)] @?= (sr "@IRIS" "TAC" "`aa")
 
 
-case_pre_process_length_1 = _evalLen (sr "@IRIS" "AGTACCAA" "aa`aaaaa") @?= (NGOInteger 8)
+case_pre_process_length_1 = _evalUnary UOpLen (sr "@IRIS" "AGTACCAA" "aa`aaaaa") @?= (NGOInteger 8)
 
 case_bop_gte_1 = _evalBinary BOpGTE (NGOInteger 10) (NGOInteger 10) @?= (NGOBool True)
 case_bop_gte_2 = _evalBinary BOpGTE (NGOInteger 11) (NGOInteger 10) @?= (NGOBool True)
@@ -392,8 +392,8 @@ case_bop_mul_1 = _evalBinary BOpMul (NGOInteger 0) (NGOInteger 10) @?= (NGOInteg
 case_bop_mul_2 = _evalBinary BOpMul (NGOInteger 10) (NGOInteger 0) @?= (NGOInteger 0)
 case_bop_mul_3 = _evalBinary BOpMul (NGOInteger 10) (NGOInteger 10) @?= (NGOInteger 100)
 
-case_uop_minus_1 = _evalMinus (NGOInteger 10) @?= (NGOInteger (-10))
-case_uop_minus_2 = _evalMinus (NGOInteger (-10)) @?= (NGOInteger 10)
+case_uop_minus_1 = _evalUnary UOpMinus (NGOInteger 10) @?= (NGOInteger (-10))
+case_uop_minus_2 = _evalUnary UOpMinus (NGOInteger (-10)) @?= (NGOInteger 10)
 
 --
 
