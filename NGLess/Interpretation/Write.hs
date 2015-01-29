@@ -78,7 +78,7 @@ writeToFile (NGOAnnotatedSet fp) args = do
     canonicalizePath newfp >>= insertCountsProcessedJson
     return $ NGOAnnotatedSet newfp
 
-writeToFile _ _ = error "Error: writeToFile Not implemented yet"
+writeToFile v _ = error ("Error: writeToFile of " ++ show v ++ " not implemented yet.")
 
 getDelimiter :: Maybe NGLessObject -> B.ByteString
 getDelimiter (Just (NGOSymbol "csv")) = ","
