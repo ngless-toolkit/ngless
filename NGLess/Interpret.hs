@@ -228,8 +228,7 @@ topFunction f expr args block = do
 
 
 topFunction' :: FuncName -> NGLessObject -> [(T.Text, NGLessObject)] -> Maybe Block -> InterpretationEnvIO NGLessObject
-topFunction' Ffastq expr _args _block = executeQualityProcess expr
-
+topFunction' Ffastq     expr args Nothing = executeFastq expr args
 topFunction' Funique    expr args Nothing = executeUnique expr args
 topFunction' Fwrite     expr args Nothing = liftIO (writeToFile expr args)
 topFunction' Fmap       expr args Nothing = executeMap expr args
@@ -245,8 +244,23 @@ topFunction' Fpaired mate1 args _block = do
         (throwError "Mates do not seem to have the same quality encoding!")
     return (NGOReadSet2 enc1 fp1 fp2)
 
-
 topFunction' f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
+
+executeFastq expr args = do
+    let NGOSymbol encName = fromMaybe (NGOSymbol "auto") $ lookup "encoding" args
+        enc = case encName of
+                "auto" -> Nothing
+                "33" -> Just SangerEncoding
+                "sanger" -> Just SangerEncoding
+                "64" -> Just SolexaEncoding
+                "solexa" -> Just SolexaEncoding
+                _ -> error "impossible to reach"
+
+    case expr of
+        (NGOString fname) -> executeQualityProcess' enc (T.unpack fname) "beforeQC"
+        (NGOList fps) -> NGOList <$> sequence [executeQualityProcess' enc (T.unpack fname) "beforeQC" | NGOString fname <- fps]
+        v -> throwErrorStr ("fastq function: unexpected first argument: " ++ show v)
+
 
 executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (\x -> executeCount x args) e
@@ -273,7 +287,7 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
             Just _ -> unreachable "executeAnnotation: TYPE ERROR"
     res <- liftIO $ annotate e g fs dDS m a s
     return $ NGOAnnotatedSet res
-executeAnnotation e _ = error ("Invalid Type. Should be used NGOList or NGOMappedReadSet but type was: " ++ (show e))
+executeAnnotation e _ = throwErrorStr ("Annotation can handle MappedReadSet(s) only. Got " ++ show e)
 
 parseAnnotationMode Nothing = IntersectUnion
 parseAnnotationMode (Just (NGOSymbol "union")) = IntersectUnion
@@ -347,7 +361,7 @@ executePreprocess (NGOReadSet1 enc file) _args (Block [Variable var] block) = do
         return $ NGOReadSet1 enc newfp
     where
         execBlock env = mapMaybe (\r -> runInterpret (interpretPBlock1 block var r) env)
-executePreprocess (NGOReadSet2 enc fp1 fp2) args (Block [Variable var] block) = do
+executePreprocess (NGOReadSet2 enc fp1 fp2) _args (Block [Variable var] block) = do
         liftIO $ outputListLno' DebugOutput ["Preprocess on paired end ", fp1, "+", fp2]
         (fp1', out1) <- liftIO $ openNGLTempFile fp1 "preprocessed.1." ".fq"
         (fp2', out2) <- liftIO $ openNGLTempFile fp2 "preprocessed.2." ".fq"

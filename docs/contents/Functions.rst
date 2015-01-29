@@ -21,17 +21,30 @@ ReadSet
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
-none
++---------------+--------------+------------+----------------+
+| Name          | Type         | Required   | Default Value  |
++===============+==============+============+================+
+| encoding      | Symbol       |  no        | {auto}         |
++---------------+--------------+------------+----------------+
+
+Possible values for ``encoding`` are:
+
+- ``{sanger}`` or ``{33}`` assumes that the file is encoded using sanger
+  format. This is appropriate for newer Illumina outputs.
+- ``{solexa}`` or ``{64}`` assumes that the file is encoded with a 64 offset.
+  This is used for older Illumina/Solexa machines.
+- ``{auto}``: use auto detection
 
 When loading a data set, quality control is carried out and statistics can be
-visualised in a graphical user interface (GUI). Simple statistics calculated
-are percentage of guanine and cytosine (%GC), encoding, number of sequences and
-minimum maximum sequence length. The more complex statistics calculated are the
-mean, median, lower quartile and upper quartile for each position of the base
-pairs.
+visualised in a graphical user interface (GUI). Statistics calculated are:
 
-The encoding prediction is built on the lowest ASCII character of the fastQ
-file.
+- percentage of guanine and cytosine (%GC)
+- number of sequences
+- minimum/maximum sequence length
+- mean, median, lower quartile and upper quality quartile for each sequence
+  position
+
+If not specified, the encoding is guessed from the file.
 
 The only compression method supported for the data sets is **gzip** (.gz).
 
