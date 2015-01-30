@@ -32,6 +32,7 @@ import System.Directory
 import Data.String
 import Data.Maybe
 
+import Utils.Utils
 import Unique
 import ProcessFastQ
 import Substrim
@@ -253,7 +254,7 @@ topFunction' Fpaired mate1 args Nothing = do
 topFunction' f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
 
 executeFastq expr args = do
-    let NGOSymbol encName = fromMaybe (NGOSymbol "auto") $ lookup "encoding" args
+    let NGOSymbol encName = lookupWithDefault (NGOSymbol "auto") "encoding" args
         enc = case encName of
                 "auto" -> Nothing
                 "33" -> Just SangerEncoding
@@ -345,7 +346,7 @@ executeUnique (NGOReadSet1 enc file) args = do
         d <- liftIO $
             readReadSet enc file 
                         >>= writeToNFiles file enc
-        let mc = fromMaybe 1 (evalInteger <$> lookup "max_copies" args)
+        let NGOInteger mc = lookupWithDefault (NGOInteger 1) "max_copies" args
         uniqueCalculations' mc d --default
     where
         uniqueCalculations' :: Integer -> FilePath -> InterpretationEnvIO NGLessObject
