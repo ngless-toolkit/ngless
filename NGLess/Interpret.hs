@@ -46,6 +46,7 @@ import Output
 import Interpretation.Annotation
 import Interpretation.Write
 import Interpretation.Map
+import Interpretation.Reads
 import Data.FastQ
 
 
@@ -232,6 +233,7 @@ topFunction' Ffastq     expr args Nothing = executeFastq expr args
 topFunction' Funique    expr args Nothing = executeUnique expr args
 topFunction' Fwrite     expr args Nothing = liftIO (writeToFile expr args)
 topFunction' Fmap       expr args Nothing = executeMap expr args
+topFunction' Fas_reads  expr args Nothing = liftIO (executeReads expr args)
 topFunction' Fannotate  expr args Nothing = executeAnnotation expr args
 topFunction' Fcount     expr args Nothing = executeCount expr args
 topFunction' Fprint     expr args Nothing = executePrint expr args
@@ -286,12 +288,10 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
         m = parseAnnotationMode $ lookup "mode" args
         a = fromMaybe False $ evalBool <$> lookup "ambiguity" args
         s = fromMaybe False $ evalBool <$> lookup "strand" args
-        features = lookup "features" args
-        fs = case features of
-            Nothing -> Nothing
-            Just (NGOSymbol f) -> Just [T.unpack f]
-            Just (NGOList feats') -> Just $ (map (T.unpack . evalSymbol)) $ feats'
-            Just _ -> unreachable "executeAnnotation: TYPE ERROR"
+        fs = lookup "features" args >>= Just <$> \case
+            (NGOSymbol f) -> [T.unpack f]
+            (NGOList feats') -> map (T.unpack . evalSymbol) feats'
+            _ -> unreachable "executeAnnotation: TYPE ERROR"
     res <- liftIO $ annotate e g fs dDS m a s
     return $ NGOAnnotatedSet res
 executeAnnotation e _ = throwErrorStr ("Annotation can handle MappedReadSet(s) only. Got " ++ show e)

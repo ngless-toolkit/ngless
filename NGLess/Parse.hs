@@ -142,6 +142,7 @@ funcname = funcname' <?> "function name"
                 "preprocess" -> pure Fpreprocess
                 "map" -> pure Fmap
                 "count" -> pure Fcount
+                "as_reads" -> pure Fas_reads
                 "unique" -> pure Funique
                 "write" -> pure Fwrite
                 "print" -> pure Fprint

@@ -38,6 +38,7 @@ data FuncName =
                 | Fpreprocess
                 | Fsubstrim
                 | Fmap
+                | Fas_reads
                 | Fcount
                 | Fwrite
                 | Fprint
@@ -51,9 +52,10 @@ function_argtype_return_type Funique =      (NGLReadSet,         NGLReadSet)
 function_argtype_return_type Fpreprocess =  (NGLVoid,            NGLReadSet)
 function_argtype_return_type Fsubstrim =    (NGLRead,            NGLRead)
 function_argtype_return_type Fmap =         (NGLMappedReadSet,   NGLReadSet)
+function_argtype_return_type Fas_reads =    (NGLReadSet,         NGLMappedReadSet)
 function_argtype_return_type Fcount =       (NGLCounts,          NGLMappedReadSet)
 function_argtype_return_type Fannotate =    (NGLMappedReadSet,   NGLMappedReadSet)
-function_argtype_return_type err = error ("Function " ++ (show err) ++ " shouldn't reach this")
+function_argtype_return_type err = error ("Function " ++ show err ++ " shouldn't reach this")
 --function_argtype_return_type Fwrite =       (NGLVoid,            NGLVoid)
 --function_argtype_return_type Fprint =       (NGLVoid,            NGLVoid)
 

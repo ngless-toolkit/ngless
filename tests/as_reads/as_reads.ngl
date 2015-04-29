@@ -1,0 +1,5 @@
+ngless '0.0'
+input = fastq('sample.fq')
+mapped = map(input,reference='sacCer3')
+reads = as_reads(mapped)
+write(reads, ofile='output.fq')
