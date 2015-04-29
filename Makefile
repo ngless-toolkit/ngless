@@ -106,6 +106,7 @@ clean:
 
 distclean: clean
 	if [ -d .cabal.sandobox ]; then cabal sandbox delete; fi
+	rm -f cabal.sandbox.config
 	rm -rf $(HTML_FONTS_DIR) $(HTML_LIBS_DIR)
 	rm -rf $(BWA_DIR)
 	rm -rf $(SAM_DIR)
