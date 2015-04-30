@@ -1,4 +1,4 @@
-{- Copyright 2013-2014 NGLess Authors
+{- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE OverloadedStrings #-}
@@ -74,6 +74,8 @@ validate_pure_function (Script _ es) = check_toplevel validate_pure_function' es
                     , Fsubstrim
                     , Fmap
                     , Fcount
+                    , Fas_reads
+                    , Fselect
                     ]
 
 validate_req_function_args :: Script -> Maybe T.Text
