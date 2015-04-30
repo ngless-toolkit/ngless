@@ -1,17 +1,43 @@
 .. _Language:
 
-==============
+========
 Language
-==============
+========
+
+This is a semi-formal definition of the NGLess language.
+
+Basics
+------
+
+Tokenization follows the standard C-family rules. A word is anything that
+matches ``[A-Za-z_]``. The language is case-sensitive. All files are UTF-8.
+
+Script-style (# to EOL), C-style (/* to \*/) and C++-style (// to EOL) comments
+are all recognised.
+
+Both LF and CRLF are accepted as line endings (Unix-style LF is preferred).
+
+Strings are denoted with single or double quotes and standard backslashed
+escapes apply (\\n for newline, ...).
+
+A symbol is denoted as a token surrounded by curly braces (e.g., ``{symbol}``
+or ``{gene}``).
+
+Integers are specified as decimals ``[0-9]+`` or as hexadecimals
+``0x[0-9a-fA-F]+``.
+
+Booleans are denoted as ``true`` or ``false``.
+
 
 Version declaration
 -------------------
-The first line of an NGLess file should be a version declaration:
-::
- 
-  ngless "0.0"
 
-Future versions of ngless will increase the string value. Also serves as a magic constant for other tools.
+The first line of an NGLess file should be a version declaration::
+ 
+   ngless "0.0"
+
+Future versions of ngless will increase the string value. Also serves as a
+magic constant for other tools.
 
 Comments
 -------------------
@@ -36,7 +62,7 @@ Start with **/*** and end with ***/**. Can't be nested.
   i = 10
 
 Data types
--------------------
+----------
 
 NGless supports the following basic types:
 
@@ -50,44 +76,52 @@ NGless supports the following basic types:
 - Mappedread
 - Mappedreadset
 
-In addition, it supports the composite type List of X where X is a basic type. Lists are built
-with square brackets (e.g., [1,2,3]). All elements of a list must have the same data type.
+In addition, it supports the composite type List of X where X is a basic type.
+Lists are built with square brackets (e.g., [1,2,3]). All elements of a list
+must have the same data type.
 
 String
-~~~~~~~~~
-A string can start with either a quote **(U+0022, ")** or a single quote **(U+0027,')** or and end with the same character. They can contain any number of characters.
+~~~~~~
 
-Special sequences start with a **\\\\**. Standard backslashed escapes can be used as **LF** and **CR** (**\\n** 
-and **\\r** respectively), quotation marks (**\\'**) or slash (**\\\\**).
+A string can start with either a quote **(U+0022, ")** or a single quote
+**(U+0027,')** or and end with the same character. They can contain any number
+of characters.
+
+Special sequences start with a **\\\\**. Standard backslashed escapes can be
+used as **LF** and **CR** (**\\n** and **\\r** respectively), quotation marks
+(**\\'**) or slash (**\\\\**).
 
 Integer
 ~~~~~~~~~
-Integers are specified as decimals ``[0-9]+`` or as hexadecimals ``0x[0-9a-fA-F]+``. They are non negative, but 
-can be negative through the use of the operator ``(-)``.
+
+Integers are specified as decimals ``[0-9]+`` or as hexadecimals
+``0x[0-9a-fA-F]+``. They are non negative, but can be negative through the use
+of the operator ``(-)``.
 
 Boolean
 ~~~~~~~~~
+
 Booleans are denoted as the word \textbf{true} or \textbf{false}, with the first letter in upper or lower case.
 
 Symbol
 ~~~~~~~~~~
 A symbol is denoted as a token surrounded by curly braces (e.g.. ``{symbol}`` or ``{gene}``).
 
+Blocks are defined in multiples of 4 spaces. Tab characters are not allowed.
 
 Variables
--------------------
-NGless is a statically typed language and variables are typed. Types are automatically inferred from context.
+---------
 
-Assignment is performed with = operator:
-::
+NGless is a statically typed language and variables are typed. Types are
+automatically inferred from context.
 
- variable = value
+Assignment is performed with ``=`` operator::
 
+    variable = value
 
-Constants
-~~~~~~~~~~~~~~~~~~~
+A variable that is all upper-case is a constant and can only be assigned to
+once.
 
-A variable that is all upper-case is a constant and can only be assigned to once.
 
 
 Operators
@@ -109,10 +143,12 @@ All operators can only be applied to integers. The operators described are avail
 
 Indexation
 ~~~~~~~~~~
+
 Can be used to access only one element or a range of elements in a ShortRead. To access one element, 
 is required an identifier followed by an expression between brackets. (e.g, x[10]).
 
-To obtain a range, is required an identifier and two expressions separated by a ':' and between brackets. Example: 
+To obtain a range, is required an identifier and two expressions separated by a
+':' and between brackets. Example: 
 
 +----------+--------------------------------------------------------+
 | x[:]     | returns from position 0 until length of variable x     |
@@ -125,14 +161,14 @@ To obtain a range, is required an identifier and two expressions separated by a 
 Conditional
 ------------------
 
-If the expression, following the word **if**, is **true** then the block that follows the ':' is executed. 
-::
+If the expression, following the word **if**, is **true** then the block that
+follows the ':' is executed.  ::
 
     if true:
       val = 10 // will be executed
 
-If the expression returns **false**, is present the reserved word **else** and delimiter ':' , the else block is
-executed.
+If the expression returns **false**, is present the reserved word **else** and
+delimiter ':' , the else block is executed.
 ::
     
     if 5 > 10:
@@ -155,14 +191,15 @@ Functions have a single positional parameter, all other must be given by name:
 
   unique(reads, max_copies=2)
 
-The exception is constructs which take a block: they take a single positional parameter and a block. The block is passed using the using keyword:
-::
+The exception is constructs which take a block: they take a single positional
+parameter and a block. The block is passed using the using keyword: ::
   
   preprocess(reads) using |read|:
     block
     ...
     
-There is no possibility of defining new functions. Only the built-in functions are available.
+There is no possibility of defining new functions. Only the built-in functions
+are available.
 
 Pure functions
 ~~~~~~~~~~~~~~~~~~~~
@@ -174,13 +211,15 @@ Functions that their result must be assigned to some variable are called pure fu
 - map
 - count
 
+In the first version, there is no possibility of defining new functions. Only
+the builtin functions are available.
 
 Auto-comprehension
--------------------
+------------------
 
 A function of type ``A -> * -> B`` can be automatically used as ``[A] -> * ->
 [B]``::
 
-    in = fastq(["in1.fq", "in2.fq"])
+    in1,in2 = fastq(["in1.fq", "in2.fq"])
 
 This allows for a pipeline which runs in parallel over many input filenames.
