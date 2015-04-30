@@ -39,6 +39,7 @@ data FuncName =
                 | Fsubstrim
                 | Fmap
                 | Fas_reads
+                | Fselect
                 | Fcount
                 | Fwrite
                 | Fprint
@@ -53,6 +54,7 @@ functionArgTypeReturnType Fpreprocess =  (NGLReadSet,        NGLVoid)
 functionArgTypeReturnType Fsubstrim =    (NGLRead,           NGLRead)
 functionArgTypeReturnType Fmap =         (NGLReadSet,        NGLMappedReadSet)
 functionArgTypeReturnType Fas_reads =    (NGLMappedReadSet,  NGLReadSet)
+functionArgTypeReturnType Fselect =      (NGLMappedReadSet,  NGLMappedReadSet)
 functionArgTypeReturnType Fcount =       (NGLMappedReadSet,  NGLCounts)
 functionArgTypeReturnType Fannotate =    (NGLMappedReadSet,  NGLMappedReadSet)
 functionArgTypeReturnType err = error ("Function " ++ show err ++ " shouldn't reach this")
@@ -73,6 +75,8 @@ function_opt_arg_type Fannotate   (Variable "mode")                 = Right NGLS
 function_opt_arg_type Fannotate   (Variable "features")             = Right $ NGList NGLSymbol
 function_opt_arg_type Fannotate   (Variable "keep_ambiguous")       = Right NGLBool
 function_opt_arg_type Fannotate   (Variable "strand")               = Right NGLBool
+function_opt_arg_type Fselect     (Variable "keep_if")              = Right (NGList NGLSymbol)
+function_opt_arg_type Fselect     (Variable "drop_if")              = Right (NGList NGLSymbol)
 function_opt_arg_type Fcount      (Variable "counts")               = Right $ NGList NGLSymbol
 function_opt_arg_type Fcount      (Variable "min")                  = Right NGLInteger
 function_opt_arg_type Fsubstrim   (Variable "min_quality")          = Right NGLInteger
@@ -96,6 +100,8 @@ function_args_allowed_symbols Fannotate "features"   = ["gene", "cds", "exon"]
 function_args_allowed_symbols Fannotate "mode"       = ["union", "intersection_strict", "intersection_non_empty"]
 function_args_allowed_symbols Fwrite "format"        = ["tsv", "csv", "bam", "sam"]
 function_args_allowed_symbols Fcount "counts"        = ["gene", "cds", "exon"]
+function_args_allowed_symbols Fselect "keep_if"      = ["mapped", "unmapped"]
+function_args_allowed_symbols Fselect "drop_if"      = ["mapped", "unmapped"]
 function_args_allowed_symbols Ffastq "encoding"      = ["auto", "33", "64", "sanger", "solexa"]
 function_args_allowed_symbols _ _                    = []
 

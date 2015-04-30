@@ -162,6 +162,40 @@ name of a builtin dataset. NGLess provides the following builtin datasets:
 | hg19      | homo\_sapiens               | GRCh38      |
 +-----------+-----------------------------+-------------+
 
+select
+------
+
+`select` filters a MappedReadSet. For example::
+
+    mapped = select(mapped, keep_if=[{mapped}])
+
+Argument:
+~~~~~~~~~
+
+MappedReadSet
+
+Return:
+~~~~~~~
+
+MappedReadSet
+
+Arguments by value:
+~~~~~~~~~~~~~~~~~~~
+
++-------------+-------------+------------+----------------+
+| Name        | Type        | Required   | Default Value  |
++=============+=============+============+================+
+| keep_if     | [Symbol]    | no         | -              |
++-------------+-------------+------------+----------------+
+| drop_if     | [Symbol]    | no         | -              |
++-------------+-------------+------------+----------------+
+
+At least one of ``keep_if`` or ``drop_if`` should be passed, but not both.
+
+If ``keep_if`` is used, then reads are kept if they pass **all the conditions**.
+If ``drop_if`` they are discarded if they fail to **any condition**.
+
+
 
 Annotate
 --------

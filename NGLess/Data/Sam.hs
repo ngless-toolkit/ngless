@@ -4,6 +4,7 @@ module Data.Sam
  , SamResult(..)
  , isAligned
  , readAlignments
+ , readSamLine
  , isUnique
  , cigarTLen
  , hasQual

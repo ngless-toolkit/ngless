@@ -45,6 +45,7 @@ import Output
 
 import Interpretation.Annotation
 import Interpretation.Write
+import Interpretation.Select
 import Interpretation.Map
 import Interpretation.Reads
 import Data.FastQ
@@ -234,6 +235,7 @@ topFunction' Funique    expr args Nothing = executeUnique expr args
 topFunction' Fwrite     expr args Nothing = liftIO (writeToFile expr args)
 topFunction' Fmap       expr args Nothing = executeMap expr args
 topFunction' Fas_reads  expr args Nothing = liftIO (executeReads expr args)
+topFunction' Fselect    expr args Nothing = liftIO (executeSelect expr args)
 topFunction' Fannotate  expr args Nothing = executeAnnotation expr args
 topFunction' Fcount     expr args Nothing = executeCount expr args
 topFunction' Fprint     expr args Nothing = executePrint expr args
