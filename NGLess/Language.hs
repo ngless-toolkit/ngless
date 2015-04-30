@@ -45,26 +45,25 @@ data FuncName =
                 | Fannotate
     deriving (Eq, Show)
 
-function_argtype_return_type :: FuncName -> (NGLType, NGLType)
-function_argtype_return_type Ffastq =       (NGLReadSet,         NGLString)
-function_argtype_return_type Fpaired =      (NGLReadSet,         NGLString)
-function_argtype_return_type Funique =      (NGLReadSet,         NGLReadSet)
-function_argtype_return_type Fpreprocess =  (NGLVoid,            NGLReadSet)
-function_argtype_return_type Fsubstrim =    (NGLRead,            NGLRead)
-function_argtype_return_type Fmap =         (NGLMappedReadSet,   NGLReadSet)
-function_argtype_return_type Fas_reads =    (NGLReadSet,         NGLMappedReadSet)
-function_argtype_return_type Fcount =       (NGLCounts,          NGLMappedReadSet)
-function_argtype_return_type Fannotate =    (NGLMappedReadSet,   NGLMappedReadSet)
-function_argtype_return_type err = error ("Function " ++ show err ++ " shouldn't reach this")
---function_argtype_return_type Fwrite =       (NGLVoid,            NGLVoid)
---function_argtype_return_type Fprint =       (NGLVoid,            NGLVoid)
-
-function_return_type :: FuncName -> NGLType
-function_return_type = fst . function_argtype_return_type
+functionArgTypeReturnType :: FuncName -> (NGLType,           NGLType)
+functionArgTypeReturnType Ffastq =       (NGLString,         NGLReadSet)
+functionArgTypeReturnType Fpaired =      (NGLString,         NGLReadSet)
+functionArgTypeReturnType Funique =      (NGLReadSet,        NGLReadSet)
+functionArgTypeReturnType Fpreprocess =  (NGLReadSet,        NGLVoid)
+functionArgTypeReturnType Fsubstrim =    (NGLRead,           NGLRead)
+functionArgTypeReturnType Fmap =         (NGLReadSet,        NGLMappedReadSet)
+functionArgTypeReturnType Fas_reads =    (NGLMappedReadSet,  NGLReadSet)
+functionArgTypeReturnType Fcount =       (NGLMappedReadSet,  NGLCounts)
+functionArgTypeReturnType Fannotate =    (NGLMappedReadSet,  NGLMappedReadSet)
+functionArgTypeReturnType err = error ("Function " ++ show err ++ " shouldn't reach this")
+--functionArgTypeReturnType Fwrite =       (NGLVoid,            NGLVoid)
+--functionArgTypeReturnType Fprint =       (NGLVoid,            NGLVoid)
 
 function_arg_type :: FuncName -> NGLType
-function_arg_type = snd . function_argtype_return_type
+function_arg_type = fst . functionArgTypeReturnType
 
+function_return_type :: FuncName -> NGLType
+function_return_type = snd . functionArgTypeReturnType
 
 function_opt_arg_type :: FuncName -> Variable -> Either T.Text NGLType
 function_opt_arg_type Funique     (Variable "max_copies")           = Right NGLInteger
