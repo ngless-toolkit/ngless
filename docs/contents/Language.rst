@@ -40,26 +40,19 @@ Future versions of ngless will increase the string value. Also serves as a
 magic constant for other tools.
 
 Comments
--------------------
+--------
 
-Explicative
-~~~~~~~~~~~~
+Single line comments start with ``#`` or ``//`` and run to the end of the
+line::
 
-Start with **#** or **//** and end at the end of the line.
-::
+    i = 10 // Assign ten to variable 'i'
 
-  i = 10 // This variable is used to explain Explicative comments
+Multi-line comments start with ``/*`` and end with ``*/``. As in C, they cannot
+be nested. For example::
 
-Operational
-~~~~~~~~~~~~~
-
-Start with **/*** and end with ***/**. Can't be nested.
-::
-  
-  /*
-     This comment is used to explain operational comments.
-  */
-  i = 10
+    /* This is a very long comment
+     * It goes on and on..
+     */
 
 Data types
 ----------
@@ -83,29 +76,30 @@ must have the same data type.
 String
 ~~~~~~
 
-A string can start with either a quote **(U+0022, ")** or a single quote
-**(U+0027,')** or and end with the same character. They can contain any number
+A string can start with either a quote ``(U+0022, ")`` or a single quote
+``(U+0027,')`` or and end with the same character. They can contain any number
 of characters.
 
 Special sequences start with a **\\\\**. Standard backslashed escapes can be
-used as **LF** and **CR** (**\\n** and **\\r** respectively), quotation marks
-(**\\'**) or slash (**\\\\**).
+used as **LF** and ``CR`` (``\\n`` and ``\\r`` respectively), quotation marks
+(``\\'``) or slash (``\\\``).
 
 Integer
-~~~~~~~~~
+~~~~~~~
 
 Integers are specified as decimals ``[0-9]+`` or as hexadecimals
-``0x[0-9a-fA-F]+``. They are non negative, but can be negative through the use
-of the operator ``(-)``.
+``0x[0-9a-fA-F]+``. Use ``-`` to specify a negative number.
 
 Boolean
-~~~~~~~~~
+~~~~~~~
 
 Booleans are denoted as the word \textbf{true} or \textbf{false}, with the first letter in upper or lower case.
 
 Symbol
-~~~~~~~~~~
-A symbol is denoted as a token surrounded by curly braces (e.g.. ``{symbol}`` or ``{gene}``).
+~~~~~~
+
+A symbol is denoted as a token surrounded by curly braces (e.g.. ``{symbol}``
+or ``{gene}``).
 
 Blocks are defined in multiples of 4 spaces. Tab characters are not allowed.
 
@@ -125,24 +119,23 @@ once.
 
 
 Operators
--------------------
+---------
 
 Unary
-~~~~~~~~~~
+~~~~~
 The operator **(-)** returns the symmetric of it's integer argument.
 
 The operator **len** returns the length of a ShortRead.
 
 Binary
-~~~~~~~~~~
+~~~~~~
 
-All operators can only be applied to integers. The operators described are available:
-::
+All operators can only be applied to integers. The operators described are available::
 
   + - < > >= <= == !=
 
-Indexation
-~~~~~~~~~~
+Indexing
+~~~~~~~~
 
 Can be used to access only one element or a range of elements in a ShortRead. To access one element, 
 is required an identifier followed by an expression between brackets. (e.g, x[10]).
@@ -158,38 +151,27 @@ To obtain a range, is required an identifier and two expressions separated by a
 | x[:10]   | returns from position 0 until 10                       |
 +----------+--------------------------------------------------------+
 
-Conditional
-------------------
+Conditionals
+------------
 
-If the expression, following the word **if**, is **true** then the block that
-follows the ':' is executed.  ::
+Conditionals work as in Python. For example::
 
-    if true:
-      val = 10 // will be executed
-
-If the expression returns **false**, is present the reserved word **else** and
-delimiter ':' , the else block is executed.
-::
-    
     if 5 > 10:
        val = 10
     else:
-       val = 20 // will be execute
+       val = 20
 
-If is returned **false** and the word **else** is not present, nothing happens.
 
 Functions
--------------------
+---------
 
-Functions are called with parentheses:
-::
+Functions are called with parentheses::
   
   result = f(arg, arg1=2)
 
-Functions have a single positional parameter, all other must be given by name:
-::
+Functions have a single positional parameter, all other must be given by name::
 
-  unique(reads, max_copies=2)
+    unique(reads, max_copies=2)
 
 The exception is constructs which take a block: they take a single positional
 parameter and a block. The block is passed using the using keyword: ::
@@ -202,14 +184,19 @@ There is no possibility of defining new functions. Only the built-in functions
 are available.
 
 Pure functions
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~
 
-Functions that their result must be assigned to some variable are called pure functions. They are comprised of:
+The following functions are pure functions:
 
 - unique
 - substrim
 - map
 - count
+- as_reads
+- select
+
+The result of calling a pure function **must** be assigned to a variable or an
+error is raised.
 
 In the first version, there is no possibility of defining new functions. Only
 the builtin functions are available.
