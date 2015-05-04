@@ -97,8 +97,12 @@ install:
 nglessconf: cabal.sandbox.config $(SAM_DIR) $(BWA_DIR) $(reqhtmllibs) $(reqfonts) $(reqlogo)
 
 cabal.sandbox.config: NGLess.cabal
-	cabal sandbox init
-	cabal install --only-dependencies --force-reinstalls
+	if [ -e $@ ] ; then \
+		cabal configure; \
+	else \
+		cabal sandbox init; \
+		cabal install --only-dependencies --force-reinstalls; \
+	fi
 
 clean:
 	rm -rf dist

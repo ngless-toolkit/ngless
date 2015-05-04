@@ -13,7 +13,6 @@ import Language
 import Tokens
 import Types
 import Parse
-import WebServer
 import Configuration
 import ReferenceDatabases
 import Output
@@ -42,10 +41,6 @@ data NGLess =
               }
         | InstallGenMode
               { input :: String}
-        | VisualizeMode
-              { input :: FilePath
-              , port :: Int
-              }
            deriving (Eq, Show, Data, Typeable)
 
 ngless = DefaultMode
@@ -64,11 +59,6 @@ installargs = InstallGenMode
         }
         &= name "--install-reference-data"
         &= details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
-
-visualizeargs = VisualizeMode
-        { port = 8000
-        , input = "-" &= argPos 0
-        } &= name "--visualize"
 
 -- | function implements the debug-mode argument.
 -- The only purpose is to aid in debugging by printing intermediate
@@ -122,10 +112,9 @@ optsExec (InstallGenMode ref)
     | isDefaultReference ref = void $ installData Nothing ref
     | otherwise =
         error (concat ["Reference ", ref, " is not a known reference."])
-optsExec (VisualizeMode fname p) = runWebServer fname p
 
 getModes :: Mode (CmdArgs NGLess)
-getModes = cmdArgsMode $ modes [ngless &= auto, installargs, visualizeargs]
+getModes = cmdArgsMode $ modes [ngless &= auto, installargs]
     &= verbosity
     &= summary sumtext
     &= help "ngless implement the NGLess language"
