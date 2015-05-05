@@ -46,7 +46,7 @@ executeQProc :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
                 -> IO NGLessObject
 executeQProc enc f dst = do
         fd <- computeStats <$> readPossiblyCompressedFile f
-        let enc' = encFromM fd -- when Nothing calculate encoding, else use value from Just.
+        let enc' = fromMaybe (guessEncoding . lc $ fd) enc
         p "Generation of statistics for " dst
         let json = createBasicStatsJson  fd f enc' -- generate JSON DATA file: basicStats.js
         createDirectoryIfMissing True dst
@@ -60,5 +60,4 @@ executeQProc enc f dst = do
         return $ NGOReadSet1 enc' f
     where
         p s0 s1  = outputListLno' DebugOutput [s0, s1]
-        encFromM fd = fromMaybe (guessEncoding . lc $ fd) enc
 
