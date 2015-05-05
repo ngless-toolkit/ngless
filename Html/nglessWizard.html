@@ -5,8 +5,63 @@
 
     <!-- CSS -->
     <link rel="stylesheet" href="htmllibs/bootstrap.min.css">
-    <link rel="stylesheet" href="forms/style.css">
-    
+
+    <style>
+        body                            { padding-top:20px; }
+        pre                             { margin-bottom:20px; }
+
+        /* form styling */
+        #form-container                { margin-bottom:20px; border-radius:5px; }
+        #form-container .page-header   {
+            margin:0;
+            padding:30px;
+            border-top-left-radius:5px;
+            border-top-right-radius:5px;
+        }
+
+        /* numbered buttons */
+        #status-buttons                 {  }
+        #status-buttons a               { display:inline-block; font-size:12px; margin-right:10px; text-align:center; text-transform:uppercase; }
+        #status-buttons a:hover         { text-decoration:none; }
+        #status-buttons span            {
+            display:block;
+            height:30px;
+            margin:0 auto 10px;
+            padding-top:5px;
+            width:30px;
+            border-radius:50%;
+        }
+
+        /* active buttons */
+        #status-buttons a.active span   { background:#00BC8C; }
+
+        /* ANIMATIONS */
+        /* slide out to the left */
+        @keyframes slideOutLeft {
+            to 		{ transform: translateX(-200%); }
+        }
+        @-moz-keyframes slideOutLeft {
+            to 		{ -moz-transform: translateX(-200%); }
+        }
+        @-webkit-keyframes slideOutLeft {
+            to 		{ -webkit-transform: translateX(-200%); }
+        }
+
+        /* slide in from the right */
+        @keyframes slideInRight {
+            from 	{ transform:translateX(200%); }
+            to 		{ transform: translateX(0); }
+        }
+        @-moz-keyframes slideInRight {
+            from 	{ -moz-transform:translateX(200%); }
+            to 		{ -moz-transform: translateX(0); }
+        }
+        @-webkit-keyframes slideInRight {
+            from 	{ -webkit-transform:translateX(200%); }
+            to 		{ -webkit-transform: translateX(0); }
+        }
+    </style>
+
     <!-- JS -->
     <!-- load angular, nganimate, and ui-router -->
     <script src="htmllibs/angular.min.js"></script>
@@ -14,72 +69,344 @@
     <script src="htmllibs/angular-animate.min.js"></script>
 
 </head>
-<body ng-app="formApp">
+<body ng-app="ngless-creator">
 
     <div class="container">
         <div ui-view></div>
     </div>
 
+    <script type="text/ng-template" id="form.html">
+        <div class="row">
+        <div class="col-sm-8 col-sm-offset-2">
+
+          <div id="form-container">
+
+              <div class="page-header text-center">
+                  <h2>Let's create a script</h2>
+
+                  <!-- the links to our nested states using relative paths -->
+                  <!-- add the active class if the state matches our ui-sref -->
+                  <div id="status-buttons" class="text-center">
+                      <a ui-sref-active="active" ui-sref=".load"><span>1</span> Load </a>
+                      <a ui-sref-active="active" ui-sref=".preprocess"><span>2</span> Pre-Process </a>
+                      <a ui-sref-active="active" ui-sref=".unique"><span>3</span> Unique</a>
+                      <a ui-sref-active="active" ui-sref=".map"><span>4</span> Map</a>
+                      <a ui-sref-active="active" ui-sref=".annotate"><span>5</span> Annotate</a>
+                      <a ui-sref-active="active" ui-sref=".count"><span>6</span> Count </a>
+                      <a ui-sref-active="active" ui-sref=".write"><span>7</span> Write </a>
+                  </div>
+              </div>
+
+              <!-- use ng-submit to catch the form submission and use our Angular function -->
+              <form id="signup-form" ng-submit="processForm()">
+                  <!-- our nested state views will be injected here -->
+                  <div id="form-views" ui-view></div>
+              </form>
+
+          </div>
+
+          <!-- show the script as it is being generated -->
+
+          <pre>{{generateScript()}}</pre>
+
+        </div>
+        </div>
+
+    </script>
+
+
+    <script type="text/ng-template" id="form-load.html">
+        <h2>Load Data Set</h2>
+        <p> Let's start by adding your data sets.</p>
+
+        <label>What are your FastQ file names?</label>
+        <div class="form-group">
+            <ul>
+                <li ng-repeat="f in formData.files">
+                  Name: <input ng-model="f.name">
+                  [<a href ng-click="formData.files.splice($index, 1)">X</a>]
+                </li>
+                <li>
+                    <a ng-click="insertFiles()"> Add file</a>
+                </li>
+            </ul>
+        </div>
+
+        <div class="form-group row">
+        <div class="col-xs-6 col-xs-offset-3">
+            <div id="next" style="visibility: hidden">
+                <a ui-sref="form.preprocess" class="btn btn-block btn-info">
+                Next Section <span class="glyphicon glyphicon-circle-arrow-right"></span>
+                </a>
+            </div>
+        </div>
+        </div>
+    </script>
+
+    <script type="text/ng-template" id="form-preprocess.html">
+        <h2> Pre-process a data set. </h2>
+
+        <p>Define read trim and filter parameters</p>
+
+        <div class="form-group">
+          <h3>Left trim (hard trim)</h3>
+          <p> How any bases do you wish to remove from the start (5' end)? </p>
+          <input type="number" name="input" ng-model="formData.preprocess.left" min="0" required>
+        </div>
+
+        <div class="form-group">
+          <h3> Right trim (hard trim)</h3>
+          <p> How any positions do you wish to remove from the end (3' end)? </p>
+          <input type="number" name="input" ng-model="formData.preprocess.right" min="0" required>
+        </div>
+
+        <div class="form-group">
+          <h3> Substrim (dynamic trimming based on quality)</h3>
+          <p>Minimal quality of bases to trim </p>
+          <input type="number" name="input" ng-model="formData.preprocess.subs" min="0" required>
+        </div>
+
+        <div class="form-group">
+          <h3>Minimal length (after trimming)</h3>
+          <p>Reads shorter than this length will be discarded</p>
+          <input type="number" name="input" ng-model="formData.preprocess.disc" min="0" required>
+        </div>
+
+
+        <div class="form-group row">
+        <div class="col-xs-6 col-xs-offset-3">
+            <a ui-sref="form.unique" class="btn btn-block btn-info">
+            Next Section <span class="glyphicon glyphicon-circle-arrow-right"></span>
+            </a>
+        </div>
+        </div>
+    </script>
+
+    <script type="text/ng-template" id="form-unique.html">
+        <h2>Remove Duplicates </h2>
+
+        <p>Here you can remove duplicates from your data set. A duplicate is an exact copy of the sequence.</p>
+
+        <div class="form-group">
+            <h3> Duplicates </h3>
+            <p> Choose a value for the amount of copies allowed. The minimum value is 1.</p>
+            <label>Number</label></br>
+            <input type="number" name="input" ng-model="formData.unique" min="0" max="100" required>
+        </div>
+
+
+        <div class="form-group row">
+        <div class="col-xs-6 col-xs-offset-3">
+            <a ui-sref="form.map" class="btn btn-block btn-info">
+            Next Section <span class="glyphicon glyphicon-circle-arrow-right"></span>
+            </a>
+        </div>
+        </div>
+    </script>
+    <script type="text/ng-template" id="form-map.html">
+        <h2>Map to a sequence</h2>
+        <p> This function maps the reads against a reference.</p>
+        <div class="form-group">
+            <h3> Reference </h3>
+            <p> The reference can either be a file path (FASTA file) or a dataset provided by default.</p>
+            <input type="text" name="input" ng-model="formData.map" required>
+        </div>
+
+        <div class="form-group row">
+        <div class="col-xs-6 col-xs-offset-3">
+            <a ui-sref="form.annotate" class="btn btn-block btn-info">
+            Next Section <span class="glyphicon glyphicon-circle-arrow-right"></span>
+            </a>
+        </div>
+        </div>
+    </script>
+    <script type="text/ng-template" id="form-annotate.html">
+        <h2> Annotate </h2>
+
+        <p>This section allows to define the parameters to annotate a given data set.</p>
+
+        <div class="form-group">
+            <h3 >GFF</h3>
+            <p> Provide a valid filepath to a gff. If a default reference was used in the map, this field can be left blank. </p>
+            <input type="text" name="input" ng-model="formData.annotate.gff" required>
+        </div>
+
+        <div class="form-group">
+            <h3>Features to filter</h3>
+            <p> Choose between the possible genomic features the ones you're interested in. </p>
+            <ul ng-repeat="(c,enabled) in features">
+              <input type="checkbox" data-ng-init="formData.annotate.features=features" ng-click="formData.annotate.features=features" ng-model="features[c]" /> {{c}}
+            </ul>
+        </div>
+
+        <div class="form-group">
+            <h3>Mode of annotation</h3>
+            <p> Choose the mode of annotation that is most suitable for you data set. </p>
+            <div class="radio">
+                <label>
+                   <input type="radio" ng-model="formData.annotate.mode" value="union" checked>
+                   union
+                </label>
+            </div>
+            <div class="radio">
+                <label>
+                    <input type="radio" ng-model="formData.annotate.mode" value="intersection-strict">
+                    intersection_strict
+                </label>
+            </div>
+            <div class="radio">
+                <label>
+                    <input type="radio" ng-model="formData.annotate.mode" value="intersection_non_empty">
+                    intersection_non_empty
+                </label>
+            </div>
+        </div>
+
+
+        <div class="form-group">
+            <h3>Allow ambiguity</h3>
+            <p> Choose wether you allow a given read to have more than one associated feature.  </p>
+            <div class="radio">
+                <label><input type="radio" ng-model="formData.annotate.ambiguity" value="allow" checked>allow</label>
+            </div>
+            <div class="radio">
+                <label><input type="radio" ng-model="formData.annotate.ambiguity" value="deny">deny</label>
+            </div>
+        </div>
+
+
+        <div class="form-group">
+            <h3> Strand Specificity </h3>
+            <p> The genomic feature must have the same strand as the strand of the alignment? </p>
+            <div class="radio">
+                <label><input type="radio" ng-model="formData.annotate.strand" value="yes" checked>yes</label>
+            </div>
+            <div class="radio">
+                <label><input type="radio" ng-model="formData.annotate.strand" value="no">no</label>
+            </div>
+        </div>
+
+
+        <div class="form-group row">
+        <div class="col-xs-6 col-xs-offset-3">
+            <a ui-sref="form.count" class="btn btn-block btn-info">
+            Next Section <span class="glyphicon glyphicon-circle-arrow-right"></span>
+            </a>
+        </div>
+        </div>
+    </script>
+    <script type="text/ng-template" id="form-count.html">
+        <h2> Counts </h2>
+
+        <p>Counting generates aggregated tables from your annotated reads</p>
+
+        <div class="form-group">
+            <h3>Features to filter</h3>
+            <p> Choose between the possible genomic features the ones you're interested in for the result of the counts. </p>
+            <ul ng-repeat="(c,enabled) in counts">
+              <input type="checkbox" data-ng-init="formData.count.counts=counts" ng-click="formData.count.counts=counts" ng-model="counts[c]" /> {{c}}
+            </ul>
+        </div>
+
+        <div class="form-group">
+            <h3> Minimum value </h3>
+            <p> What's minimal count amount that you are interested to see? Leave at zero to keep all features in.</p>
+            <input type="number" name="input" ng-model="formData.count.min" min="0" required>
+        </div>
+
+        <div class="form-group row">
+        <div class="col-xs-6 col-xs-offset-3">
+            <a ui-sref="form.write" class="btn btn-block btn-info">
+            Next Section <span class="glyphicon glyphicon-circle-arrow-right"></span>
+            </a>
+        </div>
+        </div>
+    </script>
+    <script type="text/ng-template" id="form-write.html">
+        <h2> Write </h2>
+
+
+        <div class="form-group">
+            <h3>Output File Location</h3>
+            <p>Where you want to store your count results?</p>
+            <p>If you are using an array of data sets, the keyword '{index}' must be used in the filepath, for example <tt>Ouput.{index}.txt</tt>.</p>
+            <input type="text" name="input" ng-model="formData.write.ofile" required>
+        </div>
+
+        <div class="form-group row">
+        <div class="col-xs-6 col-xs-offset-3">
+            <a ui-sref="form.end" class="btn btn-block btn-info">
+            Next Section <span class="glyphicon glyphicon-circle-arrow-right"></span>
+            </a>
+        </div>
+        </div>
+    </script>
+    <script type="text/ng-template" id="form-end.html">
+        <div class="text-center">
+            <h3>Enjoy your script!</h3>
+        </div>
+    </script>
+
+
     <script>
-        
-        var app = angular.module('formApp', ['ngAnimate', 'ui.router']);
+
+        var app = angular.module('ngless-creator', ['ngAnimate', 'ui.router']);
 
         app.config(function($stateProvider, $urlRouterProvider) {
-            
             $stateProvider
-            
+
                 // route to show our basic form (/form)
                 .state('form', {
                     url: '/form',
-                    templateUrl: 'forms/form.html',
+                    templateUrl: 'form.html',
                     controller: 'formController'
                 })
-                
-                // nested states 
+
+                // nested states
                 // each of these sections will have their own view
                 // url will be nested (/form/profile)
                 .state('form.load', {
                     url: '/load',
-                    templateUrl: 'forms/form-load.html'
+                    templateUrl: 'form-load.html'
                 })
                 .state('form.preprocess', {
                     url: '/preprocess',
-                    templateUrl: 'forms/form-preprocess.html'
+                    templateUrl: 'form-preprocess.html'
                 })
                 .state('form.unique', {
                     url: '/unique',
-                    templateUrl: 'forms/form-unique.html'
+                    templateUrl: 'form-unique.html'
                 })
                 .state('form.map', {
                     url: '/map',
-                    templateUrl: 'forms/form-map.html'
+                    templateUrl: 'form-map.html'
                 })
                 .state('form.annotate', {
                     url: '/annotate',
-                    templateUrl: 'forms/form-annotate.html'
+                    templateUrl: 'form-annotate.html'
                 })
                 .state('form.count', {
                     url: '/count',
-                    templateUrl: 'forms/form-count.html'
+                    templateUrl: 'form-count.html'
                 })
                 .state('form.write', {
                     url: '/write',
-                    templateUrl: 'forms/form-write.html'
+                    templateUrl: 'form-write.html'
                 })
                 .state('form.end', {
                     url: '/end',
-                    templateUrl: 'forms/form-end.html'
+                    templateUrl: 'form-end.html'
                 });
-               
+
             // catch all route
-            // send users to the form page 
+            // send users to the form page
             $urlRouterProvider.otherwise('/form/load');
         })
 
         // our controller for the form
         // =============================================================================
         app.controller('formController', function($scope) {
-            
+
             $scope.preprocessF = [
                 {'name': 'substrim'},
                 {'name': 'indexation'},
@@ -91,11 +418,10 @@
             $scope.features = { cds:  false, gene: true, exon: false };
             $scope.counts = { cds:  false, gene: true, exon: false };
 
-            
             // we will store all of our form data in this object
             $scope.formData = {'files': []};
             $scope.auxData = {};
-            
+
             $scope.insertFiles = function() {
                 document.getElementById("next").style.visibility = "visible";
                 $scope.formData.files.push({});
@@ -108,7 +434,7 @@
             var getIntVar = function (k, v) {
                 return "," + k + v
             }
-            
+
             var getStrVar = function (k, v) {
                 return "," + k + "'" + v + "'"
             }
@@ -144,7 +470,7 @@
 
             $scope.generateScript = function () {
                 var res = [];
-                
+
                 var x  = "in = fastq([" + getNameFromArray($scope.formData.files) + "])"
                 res.push(x); // fastq is allways needed.
 
@@ -152,7 +478,7 @@
                     x  = "in = unique(in" + getIntVar("max_copies=", $scope.formData.unique) + ")";
                     res.push(x); //unique is optional
                 }
-                
+
                 if($scope.formData['preprocess']){
                     x  = "preprocess(in) using |read|:\n"
                     var k = $scope.formData.preprocess;
@@ -178,7 +504,7 @@
 
                 if($scope.formData['annotate']){
                     var str = ""
-                    
+
                     if($scope.formData.annotate['gff']){
                         str += getStrVar("gff=", $scope.formData.annotate.gff);
                     }
@@ -203,11 +529,11 @@
                     res.push(x);
 
                 } else return res.join("\n");
-                
+
 
                 if($scope.formData['count']){
                     var str = ""
-                    
+
                     if($scope.formData.count['counts']){
                         str += getSymbolArray("counts=", $scope.formData.count.counts);
                     }
@@ -222,7 +548,7 @@
 
                 if($scope.formData['write']){
                     var str = ""
-                    
+
                     if($scope.formData.write['ofile']){
                         str += getStrVar("ofile=", $scope.formData.write.ofile);
                     }
