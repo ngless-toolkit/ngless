@@ -1,28 +1,28 @@
 <h2> Pre-process a data set. </h2>
 
-<p> In this section can be created instructions to filter the data set. </p>
+<p>Define read trim and filter parameters</p>
 
 <div class="form-group">
-  <h3> Left trim </h3>
-  <p> How any positions do you wish to remove from the start? </p>
+  <h3>Left trim (hard trim)</h3>
+  <p> How any bases do you wish to remove from the start (5' end)? </p>
   <input type="number" name="input" ng-model="formData.preprocess.left" min="0" required>
 </div>
 
 <div class="form-group">
-  <h3> Right trim </h3>
-  <p> How any positions do you wish to remove from the end? </p>
+  <h3> Right trim (hard trim)</h3>
+  <p> How any positions do you wish to remove from the end (3' end)? </p>
   <input type="number" name="input" ng-model="formData.preprocess.right" min="0" required>
 </div>
 
 <div class="form-group">
-  <h3> Substrim </h3>
-  <p> How low is the value for the substirm? </p>
+  <h3> Substrim (dynamic trimming based on quality)</h3>
+  <p>Minimal quality of bases to trim </p>
   <input type="number" name="input" ng-model="formData.preprocess.subs" min="0" required>
 </div>
 
 <div class="form-group">
-  <h3> If-Discard </h3>
-  <p> Here is possible to generate a instruction to discard a read if the length is smaller than a given trashold. What's the value of the trashold? </p>
+  <h3>Minimal length (after trimming)</h3>
+  <p>Reads shorter than this length will be discarded</p>
   <input type="number" name="input" ng-model="formData.preprocess.disc" min="0" required>
 </div>
 
