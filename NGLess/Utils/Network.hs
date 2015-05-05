@@ -7,6 +7,7 @@ module Utils.Network
 import Control.Monad.Error (liftIO)
 import Data.Conduit
 import Data.Conduit.Binary (sinkFile)
+import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import qualified Data.ByteString.Char8 as B
 import qualified Network.HTTP.Conduit as HTTP
 
