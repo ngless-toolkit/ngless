@@ -109,7 +109,7 @@ clean:
 	rm -f $(NGLESS_DATA_DEPENDENCIES)
 
 distclean: clean
-	if [ -d .cabal.sandobox ]; then cabal sandbox delete; fi
+	if [ -d .cabal.sandbox ]; then cabal sandbox delete; fi
 	rm -f cabal.sandbox.config
 	rm -rf $(HTML_FONTS_DIR) $(HTML_LIBS_DIR)
 	rm -rf $(BWA_DIR)
