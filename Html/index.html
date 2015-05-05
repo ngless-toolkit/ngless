@@ -5,7 +5,7 @@
 <link href="htmllibs/bootstrap.min.css" rel="stylesheet">    
 <link href="htmllibs/bootstrap-glyphicons.css" rel="stylesheet">   
 
-<link href="nglessKeeper.css" rel="stylesheet">
+<link href="ngless.css" rel="stylesheet">
 <title>Ngless</title>
 
 <body>
@@ -36,8 +36,7 @@
 
   <div class="bs-docs-header" id="content">
       <div class="container">
-        <h1>Welcome to NGLess</h1>
-        <p>Here can be seen everything that NGLess has produced in past executions.</p>
+        <h1>NGLess Processing Results</h1>
       </div>
   </div>
 
@@ -54,7 +53,7 @@
     <div class="panel-group" id="accordion" ng-repeat="f in filesprocessed">
     <div class="panel panel-default">
   <!--      <a type="button" href="removeDS?id={{$index}}"> remove </a> -->
-        <div class="panel-heading" data-toggle="collapse" data-parent="#accordion" ng-click="togle($index)">
+        <div class="panel-heading" data-toggle="collapse" data-parent="#accordion" ng-click="toggle($index)">
             <div class="panel-title">
                   <a class="titletext"><strong>Statistics for {{getFileName(f.name)}}</strong></a>
                   <a class="timetext">{{f.time}}</a>
@@ -135,7 +134,7 @@
     function FilesProcessedCtrl($scope, $sce, FilesProcessed){
       $scope.filesprocessed = FilesProcessed;
 
-      $scope.togle = function (id){
+      $scope.toggle = function (id){
         if ($("#collapse" + id).hasClass("in")){
             $("#collapse" + id).removeClass("in");          
         } else { 
