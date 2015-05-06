@@ -1,164 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
-<script src="htmllibs/angular.min.js"></script>
-<script src="htmllibs/angular-sanitize.js"></script>
-<link href="htmllibs/bootstrap.min.css" rel="stylesheet">    
-<link href="htmllibs/bootstrap-glyphicons.css" rel="stylesheet">   
+    <script src="htmllibs/angular.min.js"></script>
+    <script src="htmllibs/angular-sanitize.js"></script>
+    <link href="htmllibs/bootstrap.min.css" rel="stylesheet">
+    <link href="htmllibs/bootstrap-glyphicons.css" rel="stylesheet">
 
-<link href="ngless.css" rel="stylesheet">
-<title>Ngless</title>
+    <link href="ngless.css" rel="stylesheet">
+    <title>Ngless</title>
 
-<body>
+    <body>
 
-  <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
-    <div class="container headTemplate">
-      <div class="navbar-header">
-        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
-          <span class="sr-only"></span>
-          <span class="icon-bar"></span>
-          <span class="icon-bar"></span>
-          <span class="icon-bar"></span>
-        </button>
-        <a class="navbar-brand" >NGLess</a>
-      </div>
-      <nav class="navbar-collapse">
-        <ul class="nav navbar-nav">
-          <li class="active"><a href="#">Home</a></li>
-          <li><a href="nglessScriptCreator.html">Create Script</a></li>
-          <li><a href="nglessKeeperbeforeQC.html">Before QC</a></li>
-          <li><a href="nglessKeeperafterQC.html">After QC</a></li>
-        </ul>
-      </div><!--/.nav-collapse -->
-    </div>
-  </nav>
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="navbar-collapse">
+                <ul class="nav navbar-nav">
+                    <li class="active"><a href="#">Home</a></li>
+                    <li><a href="nglessScriptCreator.html">Create Script</a></li>
+                    <li><a href="nglessKeeperbeforeQC.html">Before QC</a></li>
+                    <li><a href="nglessKeeperafterQC.html">After QC</a></li>
+                </ul>
+            </div><!--/.nav-collapse -->
+            </div>
+        </nav>
 
 
-  <div class="bs-docs-header" id="content">
-      <div class="container">
-        <h1>NGLess Processing Results</h1>
-      </div>
-  </div>
-
-  <div class="section-body">
-    <h1>You can collapse or expand all items!</h1>
-    <p>
-      <a id="expandAll" class="btn btn-primary btn-lg disabled" role="button">expand</a> 
-      <a id="colapseAll" class="btn btn-primary btn-lg" role="button">collapse</a>
-    </p>
-  </div>
-  
-  <div class="sec-collapse" ng-app="myApp" ng-controller="FilesProcessedCtrl">
-    <div class="container">
-    <div class="panel-group" id="accordion" ng-repeat="f in filesprocessed">
-    <div class="panel panel-default">
-  <!--      <a type="button" href="removeDS?id={{$index}}"> remove </a> -->
-        <div class="panel-heading" data-toggle="collapse" data-parent="#accordion" ng-click="toggle($index)">
-            <div class="panel-title">
-                  <a class="titletext"><strong>Statistics for {{getFileName(f.name)}}</strong></a>
-                  <a class="timetext">{{f.time}}</a>
+        <div class="bs-docs-header" id="content">
+            <div class="container">
+                <h1>NGLess Processing Results</h1>
             </div>
         </div>
-
-        <div id="collapse{{$index}}" class="panel-collapse collapse in">
-            <div class="panel-body">
-              <div class="jumbotron">
-                <h1>This is your NGLess Script</h1>
-                <p style="white-space: pre-wrap">{{f.script}}</p>
-              </div>
-              <p class="lead"> Before Quality Control</p>
-              <iframe class="frameFastQ" frameborder="0" ng-src="{{trustSrc(f.name + '$beforeQC/index.html')}}"></iframe>
-              <p class="lead"> After Quality Control</p>
-                <div ng-if="fileAfterQCExist(f.name)">
-                  <iframe class="frameFastQ" frameborder="0" ng-src="{{trustSrc(f.name + '$afterQC/index.html')}}" ></iframe>
+        <div ng-app="myApp" ng-controller="NGlessCtrl">
+            <p>Result of running script file <tt>{{output.processed.name}}</tt> at <em>{{output.processed.time}}</em>.</p>
+            <div class="container">
+                <div class="panel-body">
+                    <h2>Script</h2>
+                    <p style="white-space: pre-wrap">{{output.processed.script}}</p>
                 </div>
-                <div ng-if="!fileAfterQCExist(f.name)">
-                  <p> The function 'preprocess' was not used, Therefore no statistics are made. </p>
+            </div>
+            <div class="container">
+
+                <h3>NGLess Output</h3>
+                <style>
+                .output-info { color: #000000;}
+                .output-debug { color: #336633;}
+                .output-result { color: #663333;}
+                </style>
+
+                <p>
+                <div ng-repeat="oline in output.output">
+                    <span class="output-{{oline.otype}}"><strong>Line {{oline.lno}}</strong>: {{oline.message}}</span><br />
                 </div>
-           </div>
-        </div>
-    </div>
-    </div>
-  </div>
-  </div><!-- /.container -->
+            </div>
+        </div><!-- /.container -->
 
 
-<footer id="footer">
-      <div class="container">
-        <p>Happily designed by <a href="https://github.com/luispedro">Luis Pedro Coelho</a> and <a href="https://github.com/montoias">Paulo Monteiro</a>. <a href="https://github.com/luispedro/ngless"><img align="right" style="float:right; width:36px" src="htmllibs/Octocat.png"> </img> </a></p>
-      </div>
-</footer>
-  <!-- Bootstrap core JavaScript
-  ================================================== -->
-  <!-- Placed at the end of the document so the pages load faster -->
-  <script src="htmllibs/jquery-latest.min.js"></script>
-  <script src="htmllibs/bootstrap.min.js"></script>
-  <script src="filesProcessed.js"></script>
+        <footer id="footer">
+            <div class="container">
+                <p>Happily designed by <a href="https://github.com/luispedro">Luis Pedro Coelho</a> and <a href="https://github.com/montoias">Paulo Monteiro</a>. <a href="https://github.com/luispedro/ngless"><img align="right" style="float:right; width:36px" src="htmllibs/Octocat.png"> </img> </a></p>
+            </div>
+        </footer>
+        <!-- Bootstrap core JavaScript
+            ================================================== -->
+            <!-- Placed at the end of the document so the pages load faster -->
+            <script src="htmllibs/jquery-latest.min.js"></script>
+            <script src="htmllibs/bootstrap.min.js"></script>
+            <script src="output.js"></script>
 
-  <!-- Angular Script to load different URLs -->
-  <script>
-    function urlExists(url) {
-        var http = new XMLHttpRequest();
-        http.open('HEAD', url, false);
-        http.send();
-        return http.status != 404;
-    }
-    
-    $("#expandAll").click(function() {
-      $("#expandAll").addClass("disabled");
-      $("#colapseAll").removeClass("disabled");
-      var res = $('[id*="collapse"]')
-      for (var i=0;i<res.length;i++){
-          $("#" + res[i].id).addClass("collapse");
-          $("#" + res[i].id).addClass("in");
-      }
-    });
+            <!-- Angular Script to load different URLs -->
+            <script>
+var app = angular.module('myApp', ['ngSanitize']);
 
-    $("#colapseAll").click(function() {
-      $("#colapseAll").addClass("disabled");
-      $("#expandAll").removeClass("disabled");
-      var res = $('[id*="collapse"]')
-      for (var i=0;i<res.length;i++){
-          $("#" + res[i].id).addClass("collapse");        
-          $("#" + res[i].id).removeClass("in");
-      }
+app.factory('NGLessOutput', function() {
+    return output;
+});
 
-    });
+function NGlessCtrl($scope, $sce, NGLessOutput){
+    $scope.output = output;
+}
 
-    var app = angular.module('myApp', ['ngSanitize']);
+            </script>
 
-    app.factory('FilesProcessed', function() {
-      return filesProcessed;
-    });
-
-    function FilesProcessedCtrl($scope, $sce, FilesProcessed){
-      $scope.filesprocessed = FilesProcessed;
-
-      $scope.toggle = function (id){
-        if ($("#collapse" + id).hasClass("in")){
-            $("#collapse" + id).removeClass("in");          
-        } else { 
-          $("#collapse" + id).addClass("in");
-        }
-      }
-
-      $scope.fileAfterQCExist = function (name){
-        return urlExists("serveF?id=" + name + '$afterQC/index.html')
-      }
-
-      $scope.getFileName = function(path){
-         var pos = path.split("/").length;
-             fileName = path.split("/")[pos - 1];
-         return fileName.split('.')[0];    
-      }
-      $scope.trustSrc = function(src) {
-        var p = src.split("/");
-        var path = p.splice(p.length - 2, p.length).join("/");
-
-        return $sce.trustAsResourceUrl(path);
-      }
-    }
-
-  </script>
-
-</body>
+    </body>
 </html>
