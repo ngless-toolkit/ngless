@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+    <script src="htmllibs/angular.min.js"></script>
+    <script src="htmllibs/angular-sanitize.js"></script>
+    <script src="htmllibs/d3.min.js"> </script>
+    <script src="htmllibs/nv.d3.js"></script>
+
+    <link href="htmllibs/bootstrap.min.css" rel="stylesheet">
+    <link href="htmllibs/bootstrap-glyphicons.css" rel="stylesheet">
+
+
+    <link href="ngless.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="perBaseQualScores.css" media="screen" />
+
+    <title>FastQ Quality Statistics</title>
+    <script src="output.js"></script>
+
+    <body>
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="navbar-collapse">
+                <ul class="nav navbar-nav">
+                    <li><a href="#">Home</a></li>
+                    <li><a href="nglessScriptCreator.html">Create Script</a></li>
+                </ul>
+            </div><!--/.nav-collapse -->
+            </div>
+        </nav>
+        <div ng-app="fqStatsApp">
+            <div ng-controller="FQInfoCtrl">
+                <div id="table" align="center">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th> </th>
+                                <th ng-repeat="fq in fqStats">{{fq.fileName}}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td> %GC: </td>
+                                <td ng-repeat="fq in fqStats">{{fq.gcContent}}</td>
+                            </tr>
+                            <tr>
+                                <td> Encoding: </td>
+                                <td ng-repeat="fq in fqStats">{{fq.encoding}}</td>
+                            </tr>
+                            <tr>
+                                <td> Number of Sequences: </td>
+                                <td ng-repeat="fq in fqStats">{{fq.numSeqs}}</td>
+                            </tr>
+                            <tr>
+                                <td> Sequence length:  </td>
+                                <td ng-repeat="fq in fqStats">{{fq.seqLength[0]}}--{{fq.seqLength[1]}}</td>
+                            </tr>
+                            <tr>
+                                <td>Plot below</td>
+                                <td ng-repeat="fq in fqStats"><button ng-click="doPlot($index);">Plot</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="offsetDiv">
+                    <div class='with-3d-shadow with-transitions'>
+                        <svg id="qualityPlot"></svg>
+                    </div>
+                </div>
+
+                <script>
+                function convertData (data) {
+                    var newData = [],
+                    shapes = ['triangle-up', 'triangle-down'],
+                    tag = ['mean', 'median', 'lowerQuartile', 'upperQuartile'];
+
+                    for (var i = 0; i < tag.length; i++) {
+                        newData.push({
+                            key: tag[i],
+                            values: []
+                        });
+
+                        for (var j = 0; j < data.length; j++) {
+                            newData[i].values.push({
+                                x: j,
+                                y: data[j][tag[i]],
+                                shape: shapes[i % 2]
+                            });
+                        }
+                    }
+                    return newData;
+                }
+                var chart = nv.models.scatterChart()
+                        .showDistX(true)
+                        .showDistY(true)
+                        .useVoronoi(false)
+                        .color(d3.scale.category10().range())
+                        .transitionDuration(300)
+                        ;
+
+                chart.xAxis.tickFormat(d3.format('1'));
+                chart.yAxis.tickFormat(d3.format('.02f'));
+                chart.tooltipContent(function(key) {
+                    return '<h4>' + key + '</h4>';
+                });
+
+
+                nv.utils.windowResize(chart.update);
+
+                chart.dispatch.on('stateChange', function(e) { ('New State:', JSON.stringify(e)); });
+
+                var app = angular.module('fqStatsApp', []);
+                app.factory('fqStats', function() {
+                    return output.fqStats;
+                });
+
+                function FQInfoCtrl($scope, fqStats){
+                    $scope.fqStats = fqStats;
+                    $scope.doPlot = function (index) {
+                        d3.select('#qualityPlot')
+                            .datum(convertData(fqStats[index].perBaseQ))
+                            .call(chart);
+                    }
+                }
+
+                </script>
+
+            </div>
+        </div>
+
+
+    </body>
+</html>
