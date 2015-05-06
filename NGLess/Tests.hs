@@ -23,7 +23,6 @@ import System.Console.CmdArgs.Verbosity
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
 
-import Data.Aeson
 import Data.Convertible
 
 import qualified Data.IntervalMap.Strict as IM
@@ -406,11 +405,6 @@ assertNotEqual a b = do
     mapM_ removeFile [a', b'] -- a' and b' creates a file, this line removes it.
     assertBool "a' and b' should be different" (a' /= b')
 
--- Json Operations
-
-case_basicInfoJson = basicInfoToJson "x1" 1.0 "x2" 2 (3,4) @?= (encode $ BasicInfo "x1" 1.0 "x2" 2 (3,4))
-
-
 -- should be the same
 case_createFileProcessed = do
     x <- createFilesProcessed "test" "script"
@@ -702,29 +696,23 @@ case_calc_perc_uq = _calcPercentile bps eT upperQuartile @?= 5
 case_calc_statistics_negative = do
     s <- computeStats <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
     head (stats' s) @?= (-4,-4,-4,-4)
-  where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
+  where stats' s = _calculateStatistics s (guessEncoding . lc $ s)
 
 -- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
 case_calc_statistics_low_positive = do
     s <- computeStats <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
     last (stats' s) @?= (1,1,1,1)
-  where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
+  where stats' s = _calculateStatistics s (guessEncoding . lc $ s)
 
 
 case_calc_statistics_normal = do
     s <- computeStats <$> readPossiblyCompressedFile "test_samples/data_set_repeated.fq"
     head (stats' s) @?= (25,33,31,33)
-  where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
-
-case_json_statistics = do
-        s <- computeStats <$> readPossiblyCompressedFile "test_samples/sample_small.fq"
-        r <- readFile "test_samples/res_json_statistics.txt"
-        _createDataString (stats' s) @?= r
-    where stats' s = _calculateStatistics (qualCounts s) (guessEncoding . lc $ s)
+  where stats' s = _calculateStatistics s (guessEncoding . lc $ s)
 
 case_test_setup_html_view = do
     setupHtmlViewer "testing_tmp_dir_html"
-    ex <- doesFileExist ("testing_tmp_dir_html/nglessKeeper.html")
+    ex <- doesFileExist "testing_tmp_dir_html/nglessKeeper.html"
     assertBool "nglessKeeper should exist after setupHtmlViewer" ex
     removeDirectoryRecursive "testing_tmp_dir_html/"
 
