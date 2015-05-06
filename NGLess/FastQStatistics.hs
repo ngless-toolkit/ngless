@@ -5,7 +5,7 @@ module FastQStatistics
     , gcFraction
     , computeStats
     , _calcPercentile
-    , _calculateStatistics
+    , calculateStatistics
     , percentile50
     , lowerQuartile
     , upperQuartile
@@ -104,8 +104,8 @@ accUntilLim bps lim = case V.findIndex (>= lim) $ V.postscanl (+) 0 bps of
       Nothing -> error ("ERROR: Must exist a index with a accumulated value larger than " ++ show lim)
 
 
-_calculateStatistics :: Result -> FastQEncoding -> [(Int, Int, Int, Int)]
-_calculateStatistics Result{qualCounts=qCounts} enc = Prelude.map statistics qCounts
+calculateStatistics :: Result -> FastQEncoding -> [(Int, Int, Int, Int)]
+calculateStatistics Result{qualCounts=qCounts} enc = Prelude.map statistics qCounts
     where
         encOffset = encodingOffset enc
         statistics :: V.Vector Int -> (Int, Int, Int, Int)

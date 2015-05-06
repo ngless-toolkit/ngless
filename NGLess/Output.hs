@@ -13,20 +13,19 @@ module Output
     , writeOutput
     ) where
 
-import Text.Printf
+import Text.Printf (printf)
 import System.IO
-import System.IO.Unsafe
+import System.IO.Unsafe (unsafePerformIO)
 import Data.Maybe
 import Data.IORef
 import Data.Aeson
 import Data.Aeson.TH (deriveToJSON, defaultOptions)
-import Data.Time
+import Data.Time (getZonedTime)
 import System.Console.ANSI
 import Control.Applicative
 import Control.Monad
-import System.Console.CmdArgs.Verbosity
+import System.Console.CmdArgs.Verbosity (getVerbosity, Verbosity(..))
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BL8
 
 
 import Data.FastQ (FastQEncoding(..), encodingName)
@@ -113,7 +112,7 @@ colorFor ErrorOutput = Red
 
 
 encodeBPStats :: FQ.Result -> FastQEncoding -> [BPosInfo]
-encodeBPStats res enc = map encode1 (FQ._calculateStatistics res enc)
+encodeBPStats res enc = map encode1 (FQ.calculateStatistics res enc)
     where encode1 (mean, median, lq, uq) = BPosInfo mean median lq uq
 
 outputFQStatistics :: FilePath -> FQ.Result -> FastQEncoding -> IO ()

@@ -38,7 +38,7 @@ import ProcessFastQ
 import Substrim
 import Language
 import FileManagement
-import CountOperation
+import CountOperation (countAnnotatedSet)
 import Configuration (outputDirectory)
 import Output
 
@@ -276,7 +276,7 @@ executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO 
 executeCount (NGOList e) args = NGOList <$> mapM (\x -> executeCount x args) e
 executeCount (NGOAnnotatedSet p) args = do
     let c = lookup "counts" args
-        m = fromMaybe (NGOInteger 0) $ lookup "min" args
+        NGOInteger m = lookupWithDefault (NGOInteger 0) "min" args
     res <- liftIO $ countAnnotatedSet p c m
     return $ NGOAnnotatedSet res
 
@@ -322,7 +322,6 @@ executeQualityProcess (NGOReadSet3 enc fp1 fp2 fp3) = do
     return (NGOReadSet3 enc1 fp1' fp2' fp3')
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
-    r <- getScriptName
     executeQualityProcess' Nothing fname' "beforeQC"
 
 executeQualityProcess v = throwErrorStr ("QC expected a string or readset. Got " ++ show v)

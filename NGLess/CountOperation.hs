@@ -1,10 +1,10 @@
 module CountOperation
-    (
-      countAnnotatedSet
-      , filterAnnot
+    ( countAnnotatedSet
+    , _filterAnnot
     ) where
 
-import qualified Data.Text as T
+import Control.Applicative ((<$>))
+import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Lazy.Char8 as L8
 
 import Language
@@ -13,32 +13,28 @@ import FileManagement (readPossiblyCompressedFile)
 import Data.GFF
 import Data.AnnotRes
 
-countAnnotatedSet :: FilePath -> Maybe NGLessObject -> NGLessObject -> IO FilePath
-countAnnotatedSet p f m = do
+countAnnotatedSet :: FilePath -> Maybe NGLessObject -> Integer -> IO FilePath
+countAnnotatedSet p fs m = do
     fc <- readPossiblyCompressedFile p
-    writeAnnotCount p $ filterAnnot fc f m
+    writeAnnotCount p $ _filterAnnot fc fs m
 
-filterAnnot :: L8.ByteString -> Maybe NGLessObject -> NGLessObject -> [GffCount]
-filterAnnot fc f m = filter filterAnnot' $ readAnnotCounts fc
+_filterAnnot :: L8.ByteString -> Maybe NGLessObject -> Integer -> [GffCount]
+_filterAnnot fc fs minval = filter _filterAnnot' $ readAnnotCounts fc
     where
-      filterAnnot' c = (isMinAmount m c) && (filterCounts f c)
+        _filterAnnot' c = hasMinCount c && filterCounts fs' c
+        hasMinCount :: GffCount ->  Bool
+        hasMinCount = (>= minval) . toInteger . annotCount
 
+        filterCounts Nothing _ = True
+        filterCounts (Just allowed) c = annotType c `elem` allowed
 
---- Quite similar to the filterFeatures in GFF but access different field name.
-filterCounts :: Maybe NGLessObject -> GffCount -> Bool
-filterCounts feats annotL = maybe True (fFeat annotL) feats
-  where
-        fFeat g (NGOList f) = foldl (||) False (map (filterCounts' g) f)
-        fFeat _ err = error("Type should be NGOList but received: " ++ show err)
+        fs' = extract <$> fs
+        extract (NGOList s) = map extract1 s
+        extract e = error ("type checker should have caught this (filterAnnot.extract receieved '" ++ show e)
 
-filterCounts' :: GffCount -> NGLessObject -> Bool
-filterCounts' g (NGOSymbol "gene") = (==GffGene) . annotType $ g
-filterCounts' g (NGOSymbol "exon") = (==GffExon) . annotType $ g
-filterCounts' g (NGOSymbol "cds" ) = (==GffCDS) . annotType  $ g
-filterCounts' g (NGOSymbol "CDS" ) = (==GffCDS) . annotType  $ g
-filterCounts' g (NGOSymbol s) = (show . annotType $ g) == (T.unpack s)
-filterCounts' _ err = error ("Type should be NGOList but received: " ++ show err)
-
-isMinAmount :: NGLessObject -> GffCount ->  Bool
-isMinAmount (NGOInteger l) g = (toInteger $ annotCount g) >= l
-isMinAmount err _ = error ("Type should be NGOInteger but received: " ++ show err)
+        extract1 (NGOSymbol "gene") = GffGene
+        extract1 (NGOSymbol "exon") = GffExon
+        extract1 (NGOSymbol "cds" ) = GffCDS
+        extract1 (NGOSymbol "CDS" ) = GffCDS
+        extract1 (NGOSymbol s)      = GffOther (T.encodeUtf8 s)
+        extract1 e = error ("type checker should have caught this (filterAnnot.extract receieved '" ++ show e)

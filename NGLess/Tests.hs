@@ -529,25 +529,25 @@ annot_features_cds_exon = Just (NGOList  [ NGOSymbol "exon", NGOSymbol "cds" ])
 annot_features_all =  Just (NGOList  [ NGOSymbol "gene", NGOSymbol "cds", NGOSymbol "exon" ])
 
 
-case_annot_count_none = filterAnnot ds_annot_counts Nothing (NGOInteger 0) @?= readAnnotCounts ds_annot_counts
-case_annot_count_all = filterAnnot ds_annot_counts annot_features_all (NGOInteger 0) @?= readAnnotCounts ds_annot_counts
+case_annot_count_none = _filterAnnot ds_annot_counts Nothing 0 @?= readAnnotCounts ds_annot_counts
+case_annot_count_all = _filterAnnot ds_annot_counts annot_features_all 0 @?= readAnnotCounts ds_annot_counts
 
 -- simple case. Filter all but one element
-case_annot_count_gene = filterAnnot ds_annot_counts annot_features_gene (NGOInteger 0) @?= readAnnotCounts ds_annot_gene
-case_annot_count_cds = filterAnnot ds_annot_counts annot_features_cds (NGOInteger 0) @?= readAnnotCounts ds_annot_cds
-case_annot_count_exon = filterAnnot ds_annot_counts annot_features_exon (NGOInteger 0) @?= readAnnotCounts ds_annot_exon
+case_annot_count_gene = _filterAnnot ds_annot_counts annot_features_gene 0 @?= readAnnotCounts ds_annot_gene
+case_annot_count_cds = _filterAnnot ds_annot_counts annot_features_cds 0 @?= readAnnotCounts ds_annot_cds
+case_annot_count_exon = _filterAnnot ds_annot_counts annot_features_exon 0 @?= readAnnotCounts ds_annot_exon
 
 -- empty case
-case_annot_count_other_empty = filterAnnot ds_annot_counts (Just (NGOList  [ NGOSymbol "other" ])) (NGOInteger 0) @?= []
+case_annot_count_other_empty = _filterAnnot ds_annot_counts (Just (NGOList  [ NGOSymbol "other" ])) 0 @?= []
 
 -- Filter all but one element
-case_annot_count_gene_cds = filterAnnot ds_annot_counts annot_features_gene_cds (NGOInteger 0) @?= (readAnnotCounts $ L.concat [ds_annot_gene, ds_annot_cds])
-case_annot_count_cds_exon = filterAnnot ds_annot_counts annot_features_cds_exon (NGOInteger 0) @?= (readAnnotCounts $ L.concat [ds_annot_cds, ds_annot_exon])
+case_annot_count_gene_cds = _filterAnnot ds_annot_counts annot_features_gene_cds 0 @?= (readAnnotCounts $ L.concat [ds_annot_gene, ds_annot_cds])
+case_annot_count_cds_exon = _filterAnnot ds_annot_counts annot_features_cds_exon 0 @?= (readAnnotCounts $ L.concat [ds_annot_cds, ds_annot_exon])
 
 
 -- Min value of occurrences to count operation
-case_annot_count_lim_no_feat = filterAnnot ds_annot_counts Nothing (NGOInteger 30) @?= []
-case_annot_count_lim_feat = filterAnnot ds_annot_counts annot_features_all (NGOInteger 30) @?= []
+case_annot_count_lim_no_feat = _filterAnnot ds_annot_counts Nothing 30 @?= []
+case_annot_count_lim_feat = _filterAnnot ds_annot_counts annot_features_all 30 @?= []
 
 
 -- interval mode 
@@ -630,11 +630,11 @@ case_calc_sam_stats = do
 --File "test_samples/data_set_repeated.fq" has 216 reads in which 54 are unique. 
 
 case_num_files_1 = do
-  n <- numFiles "test_samples/data_set_repeated.fq" 
+  n <- _numFiles "test_samples/data_set_repeated.fq"
   n @?= 1
 
 case_num_files_2 = do -- github rejects files with more than 100MB
-  n <- numFiles "test_samples/sample.sam" 
+  n <- _numFiles "test_samples/sample.sam"
   n @?= 1
 
 case_unique_1_read = do
@@ -696,19 +696,19 @@ case_calc_perc_uq = _calcPercentile bps eT upperQuartile @?= 5
 case_calc_statistics_negative = do
     s <- computeStats <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
     head (stats' s) @?= (-4,-4,-4,-4)
-  where stats' s = _calculateStatistics s (guessEncoding . lc $ s)
+  where stats' s = calculateStatistics s (guessEncoding . lc $ s)
 
 -- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
 case_calc_statistics_low_positive = do
     s <- computeStats <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
     last (stats' s) @?= (1,1,1,1)
-  where stats' s = _calculateStatistics s (guessEncoding . lc $ s)
+  where stats' s = calculateStatistics s (guessEncoding . lc $ s)
 
 
 case_calc_statistics_normal = do
     s <- computeStats <$> readPossiblyCompressedFile "test_samples/data_set_repeated.fq"
     head (stats' s) @?= (25,33,31,33)
-  where stats' s = _calculateStatistics s (guessEncoding . lc $ s)
+  where stats' s = calculateStatistics s (guessEncoding . lc $ s)
 
 case_test_setup_html_view = do
     setupHtmlViewer "testing_tmp_dir_html"

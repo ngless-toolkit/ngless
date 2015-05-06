@@ -16,6 +16,7 @@ import Control.Monad (void)
 import Text.Parsec.Text ()
 import Text.Parsec.Combinator
 import Text.Parsec
+
 import Language
 
 -- | Token datatype

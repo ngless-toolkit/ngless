@@ -35,7 +35,7 @@ writeReadSet fn rs enc = do
 
 
 readReadSet :: FastQEncoding -> FilePath -> IO [ShortRead]
-readReadSet enc fn = (parseFastQ enc) `fmap` (readPossiblyCompressedFile fn)
+readReadSet enc fn = parseFastQ enc <$> readPossiblyCompressedFile fn
 
 -- ^ Process quality.
 executeQProc :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
@@ -45,8 +45,8 @@ executeQProc :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
 executeQProc enc f dst = do
         fd <- computeStats <$> readPossiblyCompressedFile f
         let enc' = fromMaybe (guessEncoding . lc $ fd) enc
-        p "Generation of statistics for " dst
         outputFQStatistics f fd enc'
+        p "Generation of statistics for " dst
         p "Simple Statistics completed for: " dst
         p "Number of base pairs: "      (show $ length (qualCounts fd)) 
         p "Encoding is: "               (show enc')

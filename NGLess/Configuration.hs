@@ -23,7 +23,7 @@ import System.Directory
 import System.FilePath.Posix
 import qualified Data.ByteString as B
 import Data.Maybe
-import System.IO.Unsafe
+import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
 
 import Dependencies.Embedded

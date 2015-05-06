@@ -8,7 +8,7 @@ module Unique
     ( readNFiles
     , readUniqueFile
     , writeToNFiles
-    , numFiles
+    , _numFiles
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -37,7 +37,7 @@ hashRead k (ShortRead _ r _) = mod (hash r) k
 writeToNFiles :: FilePath -> FastQEncoding -> [ShortRead] -> IO FilePath
 writeToNFiles fname enc rs = do
     dest <- createTempDir fname
-    k    <- fromIntegral <$> numFiles fname
+    k    <- fromIntegral <$> _numFiles fname
     fhs  <- openKFileHandles k dest
     forM_ rs $ \r -> do
         let pos = hashRead k r
@@ -60,7 +60,8 @@ readUniqueFile k enc fname =
 getk :: Int -> [ShortRead] -> [ShortRead]
 getk k rs = runST $ do
     dups_ref <- newSTRef Map.empty
-    mapM_ (\x -> put1k k x dups_ref) rs
+    forM_ rs $ \r ->
+         put1k k r dups_ref
     res <- readSTRef dups_ref
     return $ Map.fold (\(_,a) b -> a ++ b) [] res
 
@@ -73,8 +74,8 @@ put1k k r dups_ref = do
         Nothing -> writeSTRef dups_ref (Map.insert index (1,[r]) mdups)
         Just (a,b) -> when (a /= k) (writeSTRef dups_ref (Map.insert index ((a + 1), r : b) mdups))
 
-numFiles :: FilePath -> IO Integer
-numFiles path = do
+_numFiles :: FilePath -> IO Integer
+_numFiles path = do
     fsize <- withFile path ReadMode hFileSize
     return . ceiling $ ((fromInteger fsize) / maxTempFileSize  :: Double)
 
