@@ -21,10 +21,12 @@ import Data.IORef
 import Data.Aeson
 import Data.Aeson.TH (deriveToJSON, defaultOptions)
 import Data.Time (getZonedTime)
+import System.Time (getClockTime)
 import System.Console.ANSI
 import Control.Applicative
 import Control.Monad
 import System.Console.CmdArgs.Verbosity (getVerbosity, Verbosity(..))
+import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
 
 
@@ -125,12 +127,29 @@ outputFQStatistics fname stats enc = do
         binfo   = FQInfo fname gc' enc' nSeq' sSize' st
     modifyIORef savedFQOutput (binfo:)
 
-writeOutput :: FilePath -> IO ()
-writeOutput fname = do
+
+data FilesProcessed = FilesProcessed String String T.Text deriving (Show, Eq)
+instance ToJSON FilesProcessed where
+   toJSON (FilesProcessed a b c) = object [ "name" .= a,
+                                            "time" .= b,
+                                            "script" .=c ]
+
+createFilesProcessed :: FilePath -> T.Text -> IO FilesProcessed
+createFilesProcessed template script = do
+    t <- getClockTime
+    return $ FilesProcessed template (show t) script
+
+writeOutput :: FilePath -> FilePath -> T.Text -> IO ()
+writeOutput fname scriptName script = do
     fullOutput <- reverse <$> readIORef savedOutput
     fqStats <- reverse <$> readIORef savedFQOutput
-    BL.writeFile fname (encode $ object
-                    [ "output" .= fullOutput
-                    , "fqStats" .= fqStats
-                    ])
+    processed <- createFilesProcessed scriptName script
+    BL.writeFile fname (BL.concat
+                    ["var output = "
+                    , encode $ object
+                        [ "output" .= fullOutput
+                        , "processed" .= processed
+                        , "fqStats" .= fqStats
+                        ]
+                    ,";\n"])
 

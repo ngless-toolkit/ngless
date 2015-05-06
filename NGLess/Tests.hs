@@ -50,7 +50,6 @@ import Interpretation.Map
 
 import Data.FastQ
 import Data.Sam
-import Data.Json
 import Data.AnnotRes
 import qualified Data.GFF as GFF
 
@@ -404,12 +403,6 @@ assertNotEqual a b = do
     b' <- b
     mapM_ removeFile [a', b'] -- a' and b' creates a file, this line removes it.
     assertBool "a' and b' should be different" (a' /= b')
-
--- should be the same
-case_createFileProcessed = do
-    x <- createFilesProcessed "test" "script"
-    y <- createFilesProcessed "test" "script"
-    x @?= y
 
 -- Sam operations
 

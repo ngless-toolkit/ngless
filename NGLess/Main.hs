@@ -75,7 +75,7 @@ function "ngless" fname text =
                 Nothing -> do
                     interpret fname text (nglBody expr)
                     odir <- outputDirectory
-                    writeOutput (odir </> "output.js")
+                    writeOutput (odir </> "output.js") fname text
                 Just errors -> T.putStrLn (T.concat errors)
 
 function "ast" fname text = case parsengless fname text >>= validate of
