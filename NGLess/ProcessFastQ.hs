@@ -14,7 +14,6 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Codec.Compression.GZip as GZip
 
 import System.IO
-import System.Directory
 import Data.Maybe
 import Control.Applicative ((<$>))
 
@@ -22,7 +21,6 @@ import FileManagement
 import FastQStatistics
 import Data.FastQ
 import Language
-import JSONManager
 import Output
 
 writeGZIP :: Handle -> BL.ByteString -> IO ()
@@ -48,14 +46,11 @@ executeQProc enc f dst = do
         fd <- computeStats <$> readPossiblyCompressedFile f
         let enc' = fromMaybe (guessEncoding . lc $ fd) enc
         p "Generation of statistics for " dst
-        let json = createBasicStatsJson  fd f enc' -- generate JSON DATA file: basicStats.js
-        createDirectoryIfMissing True dst
-        BL.writeFile (dst ++ "/basicStats.js") json
+        outputFQStatistics f fd enc'
         p "Simple Statistics completed for: " dst
         p "Number of base pairs: "      (show $ length (qualCounts fd)) 
         p "Encoding is: "               (show enc')
         p "Number of sequences: "   (show $ nSeq fd)
-        printHtmlStatisticsData (qualCounts fd) enc' dst -- " " " file: perBaseQualScoresData.js
         p "Loaded file: " f
         return $ NGOReadSet1 enc' f
     where

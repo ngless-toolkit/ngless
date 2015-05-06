@@ -15,7 +15,6 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 import qualified Data.Map as M
-import System.Directory (canonicalizePath)
 import System.Process
 import System.Exit
 import System.IO
@@ -25,7 +24,6 @@ import Data.Maybe
 
 import Language
 import FileManagement
-import JSONManager
 import Configuration
 import Output
 import Data.AnnotRes
@@ -100,10 +98,9 @@ writeToFile (NGOAnnotatedSet fp) args = do
     cont <- readPossiblyCompressedFile fp
     let NGOBool verbose = fromMaybe (NGOBool False) (lookup "verbose" args)
         cont' = if verbose
-                    then (showGffCountDel del . readAnnotCounts $ cont)
+                    then showGffCountDel del . readAnnotCounts $ cont
                     else showUniqIdCounts del cont
     BL.writeFile newfp cont'
-    canonicalizePath newfp >>= insertCountsProcessedJson
     return $ NGOAnnotatedSet newfp
 
 writeToFile v _ = error ("Error: writeToFile of " ++ show v ++ " not implemented yet.")

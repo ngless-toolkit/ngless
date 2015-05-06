@@ -4,13 +4,11 @@ module FastQStatistics
     ( Result(..)
     , gcFraction
     , computeStats
-    , printHtmlStatisticsData
     , _calcPercentile
     , _calculateStatistics
     , percentile50
     , lowerQuartile
     , upperQuartile
-    , _createDataString
     ) where
 
 import Control.Monad
@@ -20,8 +18,6 @@ import qualified Data.Vector.Unboxed as V
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Vector.Unboxed.Mutable as VM
-
-import System.FilePath.Posix
 
 import Data.STRef
 import Data.Char
@@ -108,26 +104,8 @@ accUntilLim bps lim = case V.findIndex (>= lim) $ V.postscanl (+) 0 bps of
       Nothing -> error ("ERROR: Must exist a index with a accumulated value larger than " ++ show lim)
 
 
-_createDataString :: [(Int, Int, Int, Int)] -> String
-_createDataString stats = createDataString' stats "data = [\n" (1 :: Int)
-    where createDataString' [] content _ = (content ++ "]\n")
-          createDataString' (eachBp:xs) content bp = createDataString' xs (concatData eachBp content bp) (bp + 1)
-          concatData (mean, median, lq, uq) content bp =
-            content ++ "{ \"bp\" :" ++ show bp ++
-            ", \"mean\" :" ++ show mean ++
-            ", \"median\" :" ++ show median ++
-            ", \"Lower Quartile\" :" ++ show lq ++
-            ", \"Upper Quartile\" :" ++ show uq ++
-             "},\n"
-
-
-printHtmlStatisticsData qCounts enc destDir = writeFile (destDir </> dataFileName) (_createDataString statisticsData')
-    where
-        statisticsData' = _calculateStatistics qCounts enc
-        dataFileName = "perbaseQualScoresData.js"
-
-_calculateStatistics :: [V.Vector Int] -> FastQEncoding -> [(Int, Int, Int, Int)]
-_calculateStatistics qCounts enc = Prelude.map statistics qCounts
+_calculateStatistics :: Result -> FastQEncoding -> [(Int, Int, Int, Int)]
+_calculateStatistics Result{qualCounts=qCounts} enc = Prelude.map statistics qCounts
     where
         encOffset = encodingOffset enc
         statistics :: V.Vector Int -> (Int, Int, Int, Int)

@@ -38,7 +38,6 @@ import ProcessFastQ
 import Substrim
 import Language
 import FileManagement
-import JSONManager
 import CountOperation
 import Configuration (outputDirectory)
 import Output
@@ -324,8 +323,6 @@ executeQualityProcess (NGOReadSet3 enc fp1 fp2 fp3) = do
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     r <- getScriptName
-    newTemplate <- liftIO $ generateDirId fname' -- new template only calculated once.
-    _ <- liftIO $ insertFilesProcessedJson newTemplate (T.pack r)
     executeQualityProcess' Nothing fname' "beforeQC"
 
 executeQualityProcess v = throwErrorStr ("QC expected a string or readset. Got " ++ show v)
