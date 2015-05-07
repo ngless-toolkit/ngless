@@ -56,14 +56,14 @@ createTempDirectory dir t = do
   where
     findTempName x = do
       let dirpath = dir </> t <.> show x
-      r <- doesDirectoryExist (dirpath ++ "$beforeQC")
-      case r of
-        False  -> return dirpath
-        True -> findTempName (x+1)
+      r <- doesDirectoryExist (dirpath ++ "$temp")
+      if r
+          then findTempName (x + 1)
+          else return dirpath
 
 setupHtmlViewer :: FilePath -> IO ()
 setupHtmlViewer dst = do
-    exists <- doesFileExist (dst </> "nglessKeeper.html")
+    exists <- doesFileExist (dst </> "index.html")
     unless exists $ do
         createDirectoryIfMissing False dst
         createDirectoryIfMissing False (dst </> "htmllibs")

@@ -705,8 +705,8 @@ case_calc_statistics_normal = do
 
 case_test_setup_html_view = do
     setupHtmlViewer "testing_tmp_dir_html"
-    ex <- doesFileExist "testing_tmp_dir_html/nglessKeeper.html"
-    assertBool "nglessKeeper should exist after setupHtmlViewer" ex
+    ex <- doesFileExist "testing_tmp_dir_html/index.html"
+    assertBool "index.html should be present after setupHtmlViewer" ex
     removeDirectoryRecursive "testing_tmp_dir_html/"
 
 -- MapOperations
@@ -727,17 +727,6 @@ case_read_and_write_fastQ = do
     fp <- writeReadSet "test_samples/sample.fq.gz" rs enc
     newrs <- readReadSet enc fp
     newrs @?= rs
-
--- hack: jump over copy of .html and .css
-case_read_fastQ = do
-    nt <- generateDirId fp
-    createDirectoryIfMissing False (dstDir nt)
-    _ <- executeQProc Nothing fp (dstDir nt) --creates files in nt
-    len <- length <$> getDirectoryContents (dstDir nt)
-    removeDirectoryRecursive $ dstDir nt -- delete test generated data.
-    len @?= 4
-  where fp = "test_samples/sample.fq.gz"
-        dstDir nt = nt ++ "$beforeQC"
 
 -- "test_samples/sample.fq.gz" has 33 as lowest char from the initial data set
 case_read_fastQ_store_enc = do
