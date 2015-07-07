@@ -4,6 +4,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Interpret
     ( interpret
     , _evalIndex
@@ -80,6 +81,7 @@ instance Error NGError where
 instance IsString NGError where
     fromString = NGError . T.pack
 
+throwErrorStr :: (MonadError NGError m) => String -> m a
 throwErrorStr = throwError . NGError . T.pack
 
 -- A variable map
@@ -203,7 +205,7 @@ interpretExpr (IndexExpression expr ie) = do
     let r = _evalIndex expr' ie'
     return r
 interpretExpr (ListExpression e) = NGOList <$> mapM interpretExpr e
-interpretExpr not_expr = throwError . NGError . T.pack $ ("Expected an expression, received " ++ show not_expr)
+interpretExpr not_expr = throwErrorStr ("Expected an expression, received " ++ show not_expr)
 
 interpretIndex :: Index -> InterpretationROEnv [Maybe NGLessObject]
 interpretIndex (IndexTwo a b) = forM [a,b] maybeInterpretExpr
