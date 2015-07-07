@@ -202,7 +202,6 @@ interpretExpr (IndexExpression expr ie) = do
     ie' <- interpretIndex ie
     let r = _evalIndex expr' ie'
     return r
-
 interpretExpr (ListExpression e) = NGOList <$> mapM interpretExpr e
 interpretExpr not_expr = throwError . NGError . T.pack $ ("Expected an expression, received " ++ show not_expr)
 
@@ -223,7 +222,7 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just block) = do
     return res'
 topFunction Fpreprocess expr _ _ = throwErrorStr ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
 topFunction f expr args block = do
-    expr' <- runInROEnvIO $ interpretExpr expr
+    expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
     topFunction' f expr' args' block
 
