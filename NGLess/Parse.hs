@@ -140,6 +140,7 @@ funcname = funcname' <?> "function name"
             fname <- word
             case fname of
                 "fastq" -> pure Ffastq
+                "samfile" -> pure Fsamfile
                 "substrim" -> pure Fsubstrim
                 "preprocess" -> pure Fpreprocess
                 "map" -> pure Fmap

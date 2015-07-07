@@ -48,6 +48,19 @@ If not specified, the encoding is guessed from the file.
 
 The only compression method supported for the data sets is **gzip** (.gz).
 
+samfile
+-------
+
+Loads a SAM file::
+
+    s = samfile('input.sam')
+
+This function takes no keyword arguments
+
+Returns
+~~~~~~~
+
+MappedReadSet
 
 Unique
 ------

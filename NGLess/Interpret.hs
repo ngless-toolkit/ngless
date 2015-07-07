@@ -229,6 +229,7 @@ topFunction f expr args block = do
 
 topFunction' :: FuncName -> NGLessObject -> [(T.Text, NGLessObject)] -> Maybe Block -> InterpretationEnvIO NGLessObject
 topFunction' Ffastq     expr args Nothing = executeFastq expr args
+topFunction' Fsamfile   expr args Nothing = executeSamfile expr args
 topFunction' Funique    expr args Nothing = executeUnique expr args
 topFunction' Fwrite     expr args Nothing = liftIO (writeToFile expr args)
 topFunction' Fmap       expr args Nothing = executeMap expr args
@@ -270,6 +271,12 @@ executeFastq expr args = do
         (NGOList fps) -> NGOList <$> sequence [executeQualityProcess' enc (T.unpack fname) "beforeQC" | NGOString fname <- fps]
         v -> throwErrorStr ("fastq function: unexpected first argument: " ++ show v)
 
+executeSamfile expr [] = do
+    case expr of
+        (NGOString fname) -> return $ NGOMappedReadSet (T.unpack fname) Nothing
+        (NGOList sams) -> NGOList <$> sequence [executeSamfile s [] | s <- sams]
+        v -> throwErrorStr ("samfile function: unexpected first argument: " ++ show v)
+executeSamfile _ args = throwErrorStr ("samfile does not take any arguments, got " ++ show args)
 
 executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (\x -> executeCount x args) e

@@ -33,6 +33,7 @@ newtype Variable = Variable T.Text
 -- | functions are hard coded here
 data FuncName =
                 Ffastq
+                | Fsamfile
                 | Fpaired
                 | Funique
                 | Fpreprocess
@@ -48,6 +49,7 @@ data FuncName =
 
 functionArgTypeReturnType :: FuncName -> (NGLType,           NGLType)
 functionArgTypeReturnType Ffastq =       (NGLString,         NGLReadSet)
+functionArgTypeReturnType Fsamfile =     (NGLString,         NGLMappedReadSet)
 functionArgTypeReturnType Fpaired =      (NGLString,         NGLReadSet)
 functionArgTypeReturnType Funique =      (NGLReadSet,        NGLReadSet)
 functionArgTypeReturnType Fpreprocess =  (NGLReadSet,        NGLVoid)
