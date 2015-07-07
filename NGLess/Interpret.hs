@@ -204,7 +204,7 @@ interpretExpr (IndexExpression expr ie) = do
     return r
 
 interpretExpr (ListExpression e) = NGOList <$> mapM interpretExpr e
-interpretExpr _ = throwError "Not an expression"
+interpretExpr not_expr = throwError . NGError . T.pack $ ("Expected an expression, received " ++ show not_expr)
 
 interpretIndex :: Index -> InterpretationROEnv [Maybe NGLessObject]
 interpretIndex (IndexTwo a b) = forM [a,b] maybeInterpretExpr
