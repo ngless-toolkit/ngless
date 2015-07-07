@@ -181,7 +181,7 @@ data Expression =
 
 -- | Script is a version declaration followed by a series of expressions
 data Script = Script
-        { nglVersion :: T.Text
+        { nglVersion :: Maybe T.Text -- ^ optional if -e option is used
         , nglBody :: [(Int,Expression)] -- ^ (line number, expression)
         } deriving (Eq,Show)
 

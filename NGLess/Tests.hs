@@ -117,8 +117,8 @@ case_substrim_empty_quals = subtrimPos "" '\DC4' @?= (0,0)
 -- Test Types
 isOkTypes = isOk "Type error on good code"
 
-case_bad_type_fastq = isError $ checktypes (Script "0.0" [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
-case_good_type_fastq = isOkTypes $ checktypes (Script "0.0" [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
+case_bad_type_fastq = isError $ checktypes (Script (Just "0.0") [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
+case_good_type_fastq = isOkTypes $ checktypes (Script (Just "0.0") [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
 
 case_type_complete = isOkTypes $ (parsetest complete) >>= checktypes
 
@@ -161,7 +161,7 @@ case_indent_empty_line = isOkTypes $ parsetest indent_empty_line >>= checktypes
 
 case_invalid_func_fastq = isError $ checktypes f_expr
     where 
-        f_expr = Script "0.0" [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [(Variable "xpto", (ConstNum 10))] Nothing)]
+        f_expr = Script (Just "0.0") [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [(Variable "xpto", (ConstNum 10))] Nothing)]
 
 -- unique
 

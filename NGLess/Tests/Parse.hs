@@ -79,10 +79,10 @@ case_parse_if_end = parseBody blocks @?= block
         blocks = "if true:\n 0\n 1\n2\n"
         block  = [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence []),ConstNum 2]
 
-case_parse_ngless = parsengless "test" ngs @?= Right ng
+case_parse_ngless = parsengless "test" True ngs @?= Right ng
     where
         ngs = "ngless '0.0'\n"
-        ng  = Script "0.0" []
+        ng  = Script (Just "0.0") []
 
 case_parse_list = parseText _listexpr "[a,b]" @?= ListExpression [Lookup (Variable "a"), Lookup (Variable "b")]
 

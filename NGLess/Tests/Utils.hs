@@ -13,7 +13,7 @@ isError (Left _) = return ()
 isOk m (Left _) = assertFailure m
 isOk _ (Right _) = return ()
 
-parsetest = parsengless "test"
+parsetest = parsengless "test" True
 
 fromRight (Right r) = r
 fromRight (Left e) = error (concat ["Unexpected Left: ",show e])

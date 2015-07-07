@@ -17,6 +17,7 @@ import Configuration
 import ReferenceDatabases
 import Output
 
+import Data.Maybe
 import Control.Monad
 import Control.Applicative
 import Control.Concurrent
@@ -34,6 +35,7 @@ data NGLess =
         DefaultMode
               { debug_mode :: String
               , input :: String
+              , script :: Maybe String
               , n_threads :: Int
               , output_directory :: FilePath
               , temporary_directory :: Maybe FilePath
@@ -46,6 +48,7 @@ data NGLess =
 ngless = DefaultMode
         { debug_mode = "ngless"
         , input = "-" &= argPos 0 &= opt ("-" :: String)
+        , script = Nothing &= name "e"
         , n_threads = 1 &= name "n"
         , output_directory = "" &= name "o"
         , temporary_directory = Nothing
@@ -63,9 +66,9 @@ installargs = InstallGenMode
 -- | function implements the debug-mode argument.
 -- The only purpose is to aid in debugging by printing intermediate
 -- representations.
-function :: String -> String -> T.Text -> IO ()
-function "ngless" fname text =
-    case parsengless fname text >>= checktypes >>= validate of
+function :: String -> String -> Bool -> T.Text -> IO ()
+function "ngless" fname reqversion text =
+    case parsengless fname reqversion text >>= checktypes >>= validate of
         Left err -> T.putStrLn err
         Right expr -> do
             outputLno' DebugOutput "Validating script..."
@@ -78,23 +81,24 @@ function "ngless" fname text =
                     writeOutput (odir </> "output.js") fname text
                 Just errors -> T.putStrLn (T.concat errors)
 
-function "ast" fname text = case parsengless fname text >>= validate of
+function "ast" fname reqversion text = case parsengless fname reqversion text >>= validate of
             Left err -> T.putStrLn (T.concat ["Error in parsing: ", err])
             Right expr -> print . nglBody $ expr
 
-function "tokens" fname text = case tokenize fname text of
+function "tokens" fname _reqversion text = case tokenize fname text of
             Left err -> T.putStrLn err
             Right toks -> print . map snd $ toks
 
-function emode _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
+function emode _ _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 
 
 
-optsExec (DefaultMode dmode fname n odir_opt tdir keep) = do
-    setNumCapabilities n
-    setOutputDirectory fname odir_opt
-    setTemporaryDirectory tdir
-    setKeepTemporaryFiles keep
+optsExec opts@DefaultMode{} = do
+    let fname = input opts
+    setNumCapabilities (n_threads opts)
+    setOutputDirectory fname (output_directory opts)
+    setTemporaryDirectory (temporary_directory opts)
+    setKeepTemporaryFiles (keep_temporary_files opts)
     odir <- outputDirectory
     createDirectoryIfMissing False odir
     --Note that the input for ngless is always UTF-8.
@@ -102,10 +106,12 @@ optsExec (DefaultMode dmode fname n odir_opt tdir keep) = do
     --which is locale aware.
     --We also assume that the text file is quite small and, therefore, loading
     --it in to memory is not resource intensive.
-    engltext <- T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
+    engltext <- case script opts of
+        Just s -> return . Right . T.pack $ s
+        _ -> T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
     case engltext of
         Left err -> print err
-        Right ngltext -> function dmode fname ngltext
+        Right ngltext -> function (debug_mode opts) fname (isNothing $ script opts) ngltext
 
 -- if user uses the flag -i he will install a Reference Genome to all users
 optsExec (InstallGenMode ref)

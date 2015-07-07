@@ -26,13 +26,14 @@ import Text.Parsec.Pos
 -- Because the scripts are expected to be small, we can expect to load them
 -- whole into memory (with a strict 'Text') before parsing
 parsengless :: String -- ^ input filename (for error messages)
+            -> Bool -- ^ whether the version statement is mandatory
             -> T.Text -- ^ input data
             -> Either T.Text Script -- ^ either error message or parsed 'Script'
-parsengless inputname input =
-        tokenize inputname input >>= parsetoks inputname
+parsengless inputname reqversion input =
+        tokenize inputname input >>= parsetoks inputname reqversion
 
-parsetoks :: String -> [(SourcePos,Token)] -> Either T.Text Script
-parsetoks inputname toks = case parse nglparser inputname (_cleanupindents toks) of
+parsetoks :: String -> Bool -> [(SourcePos,Token)] -> Either T.Text Script
+parsetoks inputname reqversion toks = case parse (nglparser reqversion) inputname (_cleanupindents toks) of
             Right val -> Right val
             Left err -> Left (T.pack . show $ err)
 
@@ -62,7 +63,8 @@ _cleanupindents = _cleanupindents' []
 
 type Parser = GenParser (SourcePos,Token) ()
 
-nglparser = Script <$> ngless_version <*> (many eol *> _nglbody)
+nglparser False = Script <$> optionMaybe ngless_version <*> (many eol *> _nglbody)
+nglparser True = Script <$> (Just <$> ngless_version) <*> (many eol *> _nglbody)
 _nglbody = (eof *> pure []) <|> (many1 lno_expression <* eof)
 lno_expression = (,) <$> linenr <*> expression
     where linenr = sourceLine `fmap` getPosition

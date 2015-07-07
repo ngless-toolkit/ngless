@@ -1,6 +1,7 @@
 {- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Validation
@@ -47,8 +48,9 @@ symbols_list = ["gene", "cds", "exon"]
 
 
 validate_version :: Script -> Maybe T.Text
-validate_version (Script "0.0" _ ) =  Nothing
-validate_version (Script version _) = Just (T.concat ["Version ", version, " is not supported (only version 0.0 is available)."])
+validate_version sc = nglVersion sc >>= \case
+    "0.0" -> Nothing
+    version -> Just (T.concat ["Version ", version, " is not supported (only version 0.0 is available)."])
 
 validate_types :: Script -> Maybe T.Text
 validate_types (Script _ es) = check_toplevel validate_types' es
