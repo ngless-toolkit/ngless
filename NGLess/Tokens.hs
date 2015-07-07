@@ -1,4 +1,4 @@
-{- Copyright 2013 NGLess Authors
+{- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE OverloadedStrings #-}
@@ -56,7 +56,10 @@ ngltoken = comment
         <|> taberror
         <|> _eol
 
-_eol = ((char '\r' *> char '\n') <|> char '\n') *> pure TNewLine
+_eol = _semicolon <|> _real_eol
+
+_real_eol = ((char '\r' *> char '\n') <|> char '\n') *> pure TNewLine
+_semicolon = char ';' *> skipMany (char ' ') *> pure TNewLine
 
 try_string s = try (string s)
 

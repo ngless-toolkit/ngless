@@ -17,6 +17,12 @@ are all recognised.
 
 Both LF and CRLF are accepted as line endings (Unix-style LF is preferred).
 
+A semicolon (;) can be used as an alternative to a new line. Any spaces (and
+only space characters) following a semi-colon are ignored. *This feature is
+intended for inline scripts at the command line (passed with the ``-e``
+option), its use for scripts is heavily discouraged and may trigger an error in
+the future.*
+
 Strings are denoted with single or double quotes and standard backslashed
 escapes apply (\\n for newline, ...).
 
