@@ -37,7 +37,7 @@ data NGLess =
               , input :: String
               , script :: Maybe String
               , n_threads :: Int
-              , output_directory :: FilePath
+              , output_directory :: Maybe FilePath
               , temporary_directory :: Maybe FilePath
               , keep_temporary_files :: Bool
               }
@@ -50,7 +50,7 @@ ngless = DefaultMode
         , input = "-" &= argPos 0 &= opt ("-" :: String)
         , script = Nothing &= name "e"
         , n_threads = 1 &= name "n"
-        , output_directory = "" &= name "o"
+        , output_directory = Nothing &= name "o"
         , temporary_directory = Nothing
         , keep_temporary_files = False
         }
@@ -96,7 +96,10 @@ function emode _ _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 optsExec opts@DefaultMode{} = do
     let fname = input opts
     setNumCapabilities (n_threads opts)
-    setOutputDirectory fname (output_directory opts)
+    case (output_directory opts, fname) of
+        (Nothing,"") -> setOutputDirectory "STDIN.output_ngless"
+        (Nothing,_) -> setOutputDirectory (fname ++ ".output_ngless")
+        (Just odir, _) -> setOutputDirectory odir
     setTemporaryDirectory (temporary_directory opts)
     setKeepTemporaryFiles (keep_temporary_files opts)
     odir <- outputDirectory

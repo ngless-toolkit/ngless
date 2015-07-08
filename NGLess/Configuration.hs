@@ -114,9 +114,8 @@ outputDirectoryRef :: IORef FilePath
 {-# NOINLINE outputDirectoryRef #-}
 outputDirectoryRef = unsafePerformIO (newIORef "")
 
-setOutputDirectory :: FilePath -> FilePath -> IO ()
-setOutputDirectory fname "" = writeIORef outputDirectoryRef (fname ++ ".output_ngless")
-setOutputDirectory _ odir = writeIORef outputDirectoryRef odir
+setOutputDirectory :: FilePath -> IO ()
+setOutputDirectory = writeIORef outputDirectoryRef
 
 outputDirectory :: IO FilePath
 outputDirectory = readIORef outputDirectoryRef

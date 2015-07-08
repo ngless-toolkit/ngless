@@ -68,7 +68,7 @@ test_Parse      = [tgroup_Parse]
 -- then uses the automatically generated function
 main = do
     setVerbosity Quiet
-    setOutputDirectory "" "testing_directory_tmp"
+    setOutputDirectory "testing_directory_tmp"
     $(defaultMainGenerator)
     removeDirectoryRecursive "testing_directory_tmp"
 
