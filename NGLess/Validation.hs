@@ -26,6 +26,7 @@ validate expr = case errors of
             ,validate_pure_function
             ,validate_req_function_args -- check for the existence of required arguments in functions.
             ,validate_val_function_args 
+            ,validate_STDIN_only_used_once
             ]
 
 {- Each checking function has the type
@@ -103,6 +104,31 @@ validate_val_function_args (Script _ es) = check_toplevel validate_val_function_
         validate_val_function_args' _ = Nothing
 
 
+
+validate_STDIN_only_used_once :: Script -> Maybe T.Text
+validate_STDIN_only_used_once (Script _ code) = check_use Nothing code
+    where
+        check_use _ [] = Nothing
+        check_use ub@(Just p) ((lno,e):es)
+            | stdin_used e = Just . T.pack . concat $ ["Error on line ", show lno, " STDIN can only be used once in the script (previously used on line ", show p, ")"]
+            | otherwise = check_use ub es
+        check_use Nothing ((lno,e):es) = check_use (if stdin_used e then Just lno else Nothing) es
+        stdin_used (BuiltinConstant (Variable "STDIN")) = True
+        stdin_used (ListExpression es) = stdin_used `any` es
+        stdin_used (UnaryOp _ e) = stdin_used e
+        stdin_used (BinaryOp _ a b) = stdin_used a || stdin_used b
+        stdin_used (Condition a b c) = stdin_used a || stdin_used b || stdin_used c
+        stdin_used (IndexExpression a ix) = stdin_used a || stdin_used_ix ix
+        stdin_used (Assignment _ e) = stdin_used e
+        stdin_used (FunctionCall _ e args b) = stdin_used e || stdin_used `any` [e' | (_,e') <- args] || stdin_used_block b
+        stdin_used (Sequence es) = stdin_used `any` es
+        stdin_used _ = False
+        stdin_used_ix (IndexOne a) = stdin_used a
+        stdin_used_ix (IndexTwo a b) = stdin_used_maybe a || stdin_used_maybe b
+        stdin_used_maybe (Just e) = stdin_used e
+        stdin_used_maybe Nothing = False
+        stdin_used_block (Just (Block _ e)) = stdin_used e
+        stdin_used_block _ = False
 
 check_symbol_val_in_arg :: FuncName -> [(Variable, Expression)]-> Maybe T.Text
 check_symbol_val_in_arg f args = errors_from_list $ map check1 args

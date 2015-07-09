@@ -20,6 +20,7 @@ module Language
     , function_args_allowed_symbols
     , function_return_type
     , function_arg_type
+    , typeOfConstant
     ) where
 
 {- This module defines the internal representation the language -}
@@ -107,6 +108,11 @@ function_args_allowed_symbols Fselect "drop_if"      = ["mapped", "unmapped"]
 function_args_allowed_symbols Ffastq "encoding"      = ["auto", "33", "64", "sanger", "solexa"]
 function_args_allowed_symbols _ _                    = []
 
+typeOfConstant :: T.Text -> Maybe NGLType
+typeOfConstant "STDIN"        = Just NGLString
+typeOfConstant "STDOUT"       = Just NGLString
+typeOfConstant _              = Nothing
+
 -- | unary operators
 data UOp = UOpLen | UOpMinus
     deriving (Eq, Show)
@@ -169,6 +175,7 @@ data Expression =
         | ConstNum Integer -- ^ integer
         | ConstBool Bool -- ^ true/false
         | ConstSymbol T.Text -- ^ a symbol
+        | BuiltinConstant Variable -- ^ built-in constant
         | ListExpression [Expression] -- ^ a list
         | Continue -- ^ continue
         | Discard -- ^ discard

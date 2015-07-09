@@ -24,6 +24,7 @@ data Token =
         TExpr Expression -- ^ These are Const* type of expressions
         | TBop BOp -- ^ Binary operators
         | TReserved T.Text -- ^ Reserved keywords
+        | TConstant T.Text -- ^ Builtin constant
         | TWord T.Text -- ^ Any other word (function name, variable, &c)
         | TOperator Char -- ^ A single character operator (',', '[', ...)
         | TNewLine -- ^ A new line
@@ -95,6 +96,7 @@ word = try $ do
         "False" -> pure (TExpr $ ConstBool False)
         _
             | k `elem` reservedwords -> TReserved <$> k'
+            | k `elem` constants -> TExpr . BuiltinConstant . Variable <$> k'
             | otherwise -> TWord <$> k'
 
 reservedwords = 
@@ -105,6 +107,11 @@ reservedwords =
         ,"discard"
         ,"continue"
         ,"using"
+        ]
+
+constants =
+        ["STDIN"
+        ,"STDOUT"
         ]
 
 variableStr = (:) <$> (char '_' <|> letter) <*> many (char '_' <|> alphaNum)

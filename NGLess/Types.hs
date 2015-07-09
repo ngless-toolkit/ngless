@@ -73,6 +73,7 @@ check_assignment a b = when (a /= b)
 nglTypeOf :: Expression -> TypeMSt (Maybe NGLType)
 nglTypeOf (FunctionCall f arg args b) = inferBlock b *> checkfuncargs f args *> checkfunccall f arg
 nglTypeOf (Lookup (Variable v)) = envLookup v
+nglTypeOf (BuiltinConstant (Variable v)) = return (typeOfConstant v)
 nglTypeOf (ConstStr _) = return (Just NGLString)
 nglTypeOf (ConstNum _) = return (Just NGLInteger)
 nglTypeOf (ConstBool _) = return (Just NGLBool)

@@ -189,6 +189,9 @@ interpretExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretExpr (Lookup (Variable v)) = lookupVariable v >>= \case
         Nothing -> throwError "Variable lookup error"
         Just r' -> return r'
+interpretExpr (BuiltinConstant (Variable "STDIN")) = return (NGOString "/dev/stdin")
+interpretExpr (BuiltinConstant (Variable "STDOUT")) = return (NGOString "/dev/stdout")
+interpretExpr (BuiltinConstant (Variable v)) = throwErrorStr ("Unknown builtin constant '" ++ show v ++ "': it should not have been accepted.")
 interpretExpr (ConstStr t) = return (NGOString t)
 interpretExpr (ConstBool b) = return (NGOBool b)
 interpretExpr (ConstSymbol s) = return (NGOSymbol s)
