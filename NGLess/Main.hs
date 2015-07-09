@@ -36,6 +36,7 @@ data NGLess =
               { debug_mode :: String
               , input :: String
               , script :: Maybe String
+              , print_last :: Bool
               , n_threads :: Int
               , output_directory :: Maybe FilePath
               , temporary_directory :: Maybe FilePath
@@ -49,6 +50,7 @@ ngless = DefaultMode
         { debug_mode = "ngless"
         , input = "-" &= argPos 0 &= opt ("-" :: String)
         , script = Nothing &= name "e"
+        , print_last = False &= name "p"
         , n_threads = 1 &= name "n"
         , output_directory = Nothing &= name "o"
         , temporary_directory = Nothing
@@ -63,40 +65,32 @@ installargs = InstallGenMode
         &= name "--install-reference-data"
         &= details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
 
--- | function implements the debug-mode argument.
+-- | outputDebug implements the debug-mode argument.
 -- The only purpose is to aid in debugging by printing intermediate
 -- representations.
-function :: String -> String -> Bool -> T.Text -> IO ()
-function "ngless" fname reqversion text =
-    case parsengless fname reqversion text >>= checktypes >>= validate of
-        Left err -> T.putStrLn err
-        Right sc -> do
-            when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
-                whenNormal (setVerbosity Quiet)
-            outputLno' DebugOutput "Validating script..."
-            errs <- validate_io sc
-            outputLno' InfoOutput "Script OK. Starting interpretation..."
-            case errs of
-                Nothing -> do
-                    interpret fname text (nglBody sc)
-                    odir <- outputDirectory
-                    writeOutput (odir </> "output.js") fname text
-                Just errors -> T.putStrLn (T.concat errors)
-
-function "ast" fname reqversion text = case parsengless fname reqversion text >>= validate of
+outputDebug :: String -> String -> Bool -> T.Text -> IO ()
+outputDebug "ast" fname reqversion text = case parsengless fname reqversion text >>= validate of
             Left err -> T.putStrLn (T.concat ["Error in parsing: ", err])
             Right sc -> print . nglBody $ sc
 
-function "tokens" fname _reqversion text = case tokenize fname text of
+outputDebug "tokens" fname _reqversion text = case tokenize fname text of
             Left err -> T.putStrLn err
             Right toks -> print . map snd $ toks
 
-function emode _ _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
+outputDebug emode _ _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
 
 
+wrapPrint (Script v sc) = Script v (wrap sc)
+    where
+        wrap [] = []
+        wrap [e] = [addPrint e]
+        wrap (e:es) = e:wrap es
+        addPrint (lno,e) = (lno,FunctionCall Fwrite e [(Variable "ofile", BuiltinConstant (Variable "STDOUT"))] Nothing)
 
+optsExec :: NGLess -> IO ()
 optsExec opts@DefaultMode{} = do
     let fname = input opts
+    let reqversion = isNothing $ script opts
     setNumCapabilities (n_threads opts)
     case (output_directory opts, fname) of
         (Nothing,"") -> setOutputDirectory "STDIN.output_ngless"
@@ -114,9 +108,28 @@ optsExec opts@DefaultMode{} = do
     engltext <- case script opts of
         Just s -> return . Right . T.pack $ s
         _ -> T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
+    
     case engltext of
         Left err -> print err
-        Right ngltext -> function (debug_mode opts) fname (isNothing $ script opts) ngltext
+        Right ngltext 
+            | debug_mode opts `elem` ["ast", "tokens"] ->
+                outputDebug (debug_mode opts) fname reqversion ngltext
+            |otherwise -> do
+                let maybe_add_print = Right . (if print_last opts then wrapPrint else id)
+                case parsengless fname reqversion ngltext >>= maybe_add_print >>= checktypes >>= validate of
+                    Left err -> T.putStrLn err
+                    Right sc -> do
+                        when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
+                            whenNormal (setVerbosity Quiet)
+                        outputLno' DebugOutput "Validating script..."
+                        errs <- validate_io sc
+                        case errs of
+                            Nothing -> do
+                                outputLno' InfoOutput "Script OK. Starting interpretation..."
+                                interpret fname ngltext (nglBody sc)
+                                writeOutput (odir </> "output.js") fname ngltext
+                            Just errors -> T.putStrLn (T.concat errors)
+
 
 -- if user uses the flag -i he will install a Reference Genome to all users
 optsExec (InstallGenMode ref)
