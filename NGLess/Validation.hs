@@ -6,6 +6,7 @@
 
 module Validation
     ( validate
+    , uses_STDOUT
     ) where
 
 import Language
@@ -113,22 +114,29 @@ validate_STDIN_only_used_once (Script _ code) = check_use Nothing code
             | stdin_used e = Just . T.pack . concat $ ["Error on line ", show lno, " STDIN can only be used once in the script (previously used on line ", show p, ")"]
             | otherwise = check_use ub es
         check_use Nothing ((lno,e):es) = check_use (if stdin_used e then Just lno else Nothing) es
-        stdin_used (BuiltinConstant (Variable "STDIN")) = True
-        stdin_used (ListExpression es) = stdin_used `any` es
-        stdin_used (UnaryOp _ e) = stdin_used e
-        stdin_used (BinaryOp _ a b) = stdin_used a || stdin_used b
-        stdin_used (Condition a b c) = stdin_used a || stdin_used b || stdin_used c
-        stdin_used (IndexExpression a ix) = stdin_used a || stdin_used_ix ix
-        stdin_used (Assignment _ e) = stdin_used e
-        stdin_used (FunctionCall _ e args b) = stdin_used e || stdin_used `any` [e' | (_,e') <- args] || stdin_used_block b
-        stdin_used (Sequence es) = stdin_used `any` es
-        stdin_used _ = False
-        stdin_used_ix (IndexOne a) = stdin_used a
-        stdin_used_ix (IndexTwo a b) = stdin_used_maybe a || stdin_used_maybe b
-        stdin_used_maybe (Just e) = stdin_used e
-        stdin_used_maybe Nothing = False
-        stdin_used_block (Just (Block _ e)) = stdin_used e
-        stdin_used_block _ = False
+        stdin_used = constant_used "STDIN"
+
+
+constant_used :: T.Text -> Expression -> Bool
+constant_used k (BuiltinConstant (Variable k')) = k == k'
+constant_used k (ListExpression es) = constant_used k `any` es
+constant_used k (UnaryOp _ e) = constant_used k e
+constant_used k (BinaryOp _ a b) = constant_used k a || constant_used k b
+constant_used k (Condition a b c) = constant_used k a || constant_used k b || constant_used k c
+constant_used k (IndexExpression a ix) = constant_used k a || constant_used_ix k ix
+constant_used k (Assignment _ e) = constant_used k e
+constant_used k (FunctionCall _ e args b) = constant_used k e || constant_used k `any` [e' | (_,e') <- args] || constant_used_block k b
+constant_used k (Sequence es) = constant_used k `any` es
+constant_used _ _ = False
+constant_used_ix k (IndexOne a) = constant_used k a
+constant_used_ix k (IndexTwo a b) = constant_used_maybe k a || constant_used_maybe k b
+constant_used_maybe k (Just e) = constant_used k e
+constant_used_maybe _ Nothing = False
+constant_used_block k (Just (Block _ e)) = constant_used k e
+constant_used_block _ _ = False
+
+uses_STDOUT :: Expression -> Bool
+uses_STDOUT = constant_used "STDOUT"
 
 check_symbol_val_in_arg :: FuncName -> [(Variable, Expression)]-> Maybe T.Text
 check_symbol_val_in_arg f args = errors_from_list $ map check1 args

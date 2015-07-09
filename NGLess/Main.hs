@@ -70,20 +70,22 @@ function :: String -> String -> Bool -> T.Text -> IO ()
 function "ngless" fname reqversion text =
     case parsengless fname reqversion text >>= checktypes >>= validate of
         Left err -> T.putStrLn err
-        Right expr -> do
+        Right sc -> do
+            when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
+                whenNormal (setVerbosity Quiet)
             outputLno' DebugOutput "Validating script..."
-            errs <- validate_io expr
+            errs <- validate_io sc
             outputLno' InfoOutput "Script OK. Starting interpretation..."
             case errs of
                 Nothing -> do
-                    interpret fname text (nglBody expr)
+                    interpret fname text (nglBody sc)
                     odir <- outputDirectory
                     writeOutput (odir </> "output.js") fname text
                 Just errors -> T.putStrLn (T.concat errors)
 
 function "ast" fname reqversion text = case parsengless fname reqversion text >>= validate of
             Left err -> T.putStrLn (T.concat ["Error in parsing: ", err])
-            Right expr -> print . nglBody $ expr
+            Right sc -> print . nglBody $ sc
 
 function "tokens" fname _reqversion text = case tokenize fname text of
             Left err -> T.putStrLn err
