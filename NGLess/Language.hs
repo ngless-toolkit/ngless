@@ -189,7 +189,7 @@ data Expression =
     deriving (Eq)
 
 instance Show Expression where
-    show (Lookup (Variable v)) = "Lookup '"++show v++"'"
+    show (Lookup (Variable v)) = "Lookup '"++T.unpack v++"'"
     show (ConstStr t) = show t
     show (ConstNum n) = show n
     show (ConstBool b) = show b
@@ -204,11 +204,14 @@ instance Show Expression where
     show (Condition c a b) = "if ["++show c ++"] then {"++show a++"} else {"++show b++"}"
     show (IndexExpression a ix) = show a ++ "[" ++ show ix ++ "]"
     show (Assignment (Variable v) a) = T.unpack v++" = "++show a
-    show (FunctionCall fname a args block) = show fname ++ "(" ++ show a ++ "; " ++ show args ++ ")"
+    show (FunctionCall fname a args block) = show fname ++ "(" ++ show a ++ showArgs args ++ ")"
                                     ++ (case block of
                                         Nothing -> ""
                                         Just b -> "using {"++show b ++ "}")
     show (Sequence e) = "Sequence " ++ show e
+
+showArgs [] = ""
+showArgs ((Variable v, e):args) = "; "++T.unpack v++"="++show e++showArgs args
 
 -- | Script is a version declaration followed by a series of expressions
 data Script = Script

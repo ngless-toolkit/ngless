@@ -124,7 +124,8 @@ optsExec opts@DefaultMode{} = do
     let parsed = parsengless fname reqversion ngltext >>= maybe_add_print >>= checktypes >>= validate
     sc <- rightOrDie parsed
     when (debug_mode opts == "ast") $ do
-        print (nglBody sc)
+        forM_ (nglBody sc) $ \(lno,e) ->
+            putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)
         exitSuccess
 
     when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
