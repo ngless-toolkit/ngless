@@ -10,7 +10,6 @@ import Interpret
 import Validation
 import ValidationNotPure
 import Language
-import Tokens
 import Types
 import Parse
 import Configuration
@@ -24,11 +23,12 @@ import Control.Concurrent
 import System.Console.CmdArgs
 import System.FilePath.Posix
 import System.Directory
-import System.IO (stderr)
+import System.IO (stderr, hPutStrLn)
+import System.Console.ANSI
 import System.Exit (exitSuccess, exitFailure)
 
+
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as B
 
@@ -39,6 +39,7 @@ data NGLess =
               , input :: String
               , script :: Maybe String
               , print_last :: Bool
+              , trace_flag :: Bool
               , n_threads :: Int
               , output_directory :: Maybe FilePath
               , temporary_directory :: Maybe FilePath
@@ -52,6 +53,7 @@ ngless = DefaultMode
         { debug_mode = "ngless"
         , input = "-" &= argPos 0 &= opt ("-" :: String)
         , script = Nothing &= name "e"
+        , trace_flag = False &= name "trace"
         , print_last = False &= name "p"
         , n_threads = 1 &= name "n"
         , output_directory = Nothing &= name "o"
@@ -67,33 +69,33 @@ installargs = InstallGenMode
         &= name "--install-reference-data"
         &= details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
 
--- | outputDebug implements the debug-mode argument.
--- The only purpose is to aid in debugging by printing intermediate
--- representations.
-outputDebug :: String -> String -> Bool -> T.Text -> IO ()
-outputDebug "ast" fname reqversion text = case parsengless fname reqversion text >>= validate of
-            Left err -> T.putStrLn (T.concat ["Error in parsing: ", err])
-            Right sc -> print . nglBody $ sc
 
-outputDebug "tokens" fname _reqversion text = case tokenize fname text of
-            Left err -> T.putStrLn err
-            Right toks -> print . map snd $ toks
-
-outputDebug emode _ _ _ = putStrLn (concat ["Debug mode '", emode, "' not known"])
-
-
-wrapPrint (Script v sc) = Script v (wrap sc)
+wrapPrint (Script v sc) = wrap sc >>= Right . Script v
     where
-        wrap [] = []
-        wrap [e] = [addPrint e]
-        wrap (e:es) = e:wrap es
-        addPrint (lno,e) = (lno,FunctionCall Fwrite e [(Variable "ofile", BuiltinConstant (Variable "STDOUT"))] Nothing)
+        wrap [] = Right []
+        wrap [(lno,e)]
+            | wrapable e = Right [(lno,addPrint e)]
+            | otherwise = Left "Cannot add write() statement at the end of script (the script cannot terminate with a print/write call)"
+        wrap (e:es) = wrap es >>= Right . (e:)
+        addPrint e = FunctionCall Fwrite e [(Variable "ofile", BuiltinConstant (Variable "STDOUT"))] Nothing
+
+        wrapable (FunctionCall f _ _ _)
+            | f `elem` [Fprint, Fwrite] = False
+        wrapable _ = True
 
 rightOrDie :: (Show e) => Either e a -> IO a
-rightOrDie (Left err) = do -- in base >= 4.8, this is the function `die`
-    T.hPutStrLn stderr (T.pack . show $ err)
-    exitFailure
+rightOrDie (Left err) = fatalError (show err)
 rightOrDie (Right v) = return v
+
+fatalError :: String -> IO b
+fatalError err = do
+    let st = setSGRCode [SetColor Foreground Dull Red]
+    hPutStrLn stderr (st ++ "FATAL ERROR: "++err)
+    exitFailure
+
+whenStrictlyNormal act = do
+    v <- getVerbosity
+    when (v == Normal) act
 
 optsExec :: NGLess -> IO ()
 optsExec opts@DefaultMode{} = do
@@ -106,6 +108,7 @@ optsExec opts@DefaultMode{} = do
         (Just odir, _) -> setOutputDirectory odir
     setTemporaryDirectory (temporary_directory opts)
     setKeepTemporaryFiles (keep_temporary_files opts)
+    setTraceFlag (trace_flag opts)
     odir <- outputDirectory
     createDirectoryIfMissing False odir
     --Note that the input for ngless is always UTF-8.
@@ -117,14 +120,15 @@ optsExec opts@DefaultMode{} = do
         Just s -> return . Right . T.pack $ s
         _ -> T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
     ngltext <- rightOrDie engltext
-    when (debug_mode opts `elem` ["ast", "tokens"]) $ do
-        outputDebug (debug_mode opts) fname reqversion ngltext
-        exitSuccess
-    let maybe_add_print = Right . (if print_last opts then wrapPrint else id)
+    let maybe_add_print = (if print_last opts then wrapPrint else Right)
     let parsed = parsengless fname reqversion ngltext >>= maybe_add_print >>= checktypes >>= validate
     sc <- rightOrDie parsed
+    when (debug_mode opts == "ast") $ do
+        print (nglBody sc)
+        exitSuccess
+
     when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
-        whenNormal (setVerbosity Quiet)
+        whenStrictlyNormal (setVerbosity Quiet)
     outputLno' DebugOutput "Validating script..."
     errs <- validate_io sc
     when (isJust errs) $

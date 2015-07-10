@@ -100,11 +100,14 @@ outputLno' !ot m = outputListLno' ot [m]
 shouldPrint :: Bool -> OutputType -> Verbosity -> IO Bool
 shouldPrint isT ot v = do
     traceSet <- traceFlag
-    return $ if traceSet
-        then True
-        else shouldPrint' isT ot v
-shouldPrint' isTerm TraceOutput _ = isTerm
-shouldPrint' isTerm ot verb = isTerm && (verb == Loud || ot >= InfoOutput) && (verb /= Quiet || ot >= ResultOutput)
+    return $ traceSet || shouldPrint' isT ot v
+
+shouldPrint' _ TraceOutput _ = False
+shouldPrint' _      _ Loud = True
+shouldPrint' False ot Quiet = (ot == ErrorOutput)
+shouldPrint' False ot Normal = (ot > InfoOutput)
+shouldPrint' True  ot Quiet = (ot >= WarningOutput)
+shouldPrint' True  ot Normal = (ot >= InfoOutput)
 
 output :: OutputType -> Int -> String -> IO ()
 output !ot !lno !msg = do
@@ -115,7 +118,9 @@ output !ot !lno !msg = do
     sp <- shouldPrint isTerm ot verb
     when sp $ do
         let st = setSGRCode [SetColor Foreground Dull (colorFor ot)]
-        putStrLn $ printf "%s[%s]: Line %s: %s" st (show t) (show lno) msg
+            rst = setSGRCode [Reset]
+
+        putStrLn $ printf "%s[%s]: Line %s: %s%s" st (show t) (show lno) msg rst
 
 colorFor :: OutputType -> Color
 colorFor TraceOutput = White
