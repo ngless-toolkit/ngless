@@ -32,11 +32,13 @@ import qualified Data.ByteString.Lazy as BL
 
 import Data.FastQ (FastQEncoding(..), encodingName)
 import qualified FastQStatistics as FQ
+import Configuration
 
-data OutputType = DebugOutput | InfoOutput | ResultOutput | WarningOutput | ErrorOutput
+data OutputType = TraceOutput | DebugOutput | InfoOutput | ResultOutput | WarningOutput | ErrorOutput
     deriving (Eq, Ord)
 
 instance Show OutputType where
+    show TraceOutput = "trace"
     show DebugOutput = "debug"
     show InfoOutput = "info"
     show ResultOutput = "result"
@@ -95,17 +97,28 @@ outputListLno' !ot ms = do
 outputLno' :: OutputType -> String -> IO ()
 outputLno' !ot m = outputListLno' ot [m]
 
+shouldPrint :: Bool -> OutputType -> Verbosity -> IO Bool
+shouldPrint isT ot v = do
+    traceSet <- traceFlag
+    return $ if traceSet
+        then True
+        else shouldPrint' isT ot v
+shouldPrint' isTerm TraceOutput _ = isTerm
+shouldPrint' isTerm ot verb = isTerm && (verb == Loud || ot >= InfoOutput) && (verb /= Quiet || ot >= ResultOutput)
+
 output :: OutputType -> Int -> String -> IO ()
 output !ot !lno !msg = do
     isTerm <- hIsTerminalDevice stdout
     verb <- getVerbosity
     t <- getZonedTime
     modifyIORef savedOutput (OutputLine lno ot msg:)
-    when (isTerm && (verb == Loud || ot >= InfoOutput) && (verb /= Quiet || ot >= ResultOutput)) $ do
+    sp <- shouldPrint isTerm ot verb
+    when sp $ do
         let st = setSGRCode [SetColor Foreground Dull (colorFor ot)]
         putStrLn $ printf "%s[%s]: Line %s: %s" st (show t) (show lno) msg
 
 colorFor :: OutputType -> Color
+colorFor TraceOutput = White
 colorFor DebugOutput = White
 colorFor InfoOutput = Blue
 colorFor ResultOutput = Black

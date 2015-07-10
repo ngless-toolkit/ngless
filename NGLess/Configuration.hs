@@ -13,6 +13,8 @@ module Configuration
     , temporaryFileDirectory
     , setTemporaryDirectory
     , setKeepTemporaryFiles
+    , setTraceFlag
+    , traceFlag
     , versionStr
     ) where
 
@@ -136,3 +138,14 @@ temporaryFileDirectory = do
 
 setKeepTemporaryFiles :: Bool -> IO ()
 setKeepTemporaryFiles _ = return ()
+
+traceRef :: IORef Bool
+{-# NOINLINE traceRef #-}
+traceRef = unsafePerformIO (newIORef False)
+
+setTraceFlag :: Bool -> IO ()
+setTraceFlag = writeIORef traceRef
+
+traceFlag :: IO Bool
+traceFlag = readIORef traceRef
+

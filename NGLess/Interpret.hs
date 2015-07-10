@@ -154,6 +154,10 @@ unreachable err = error ("Reached code that was thought to be unreachable!\n"++e
 nglTypeError err = error ("Unexpected type error! This should have been caught by validation!\n"++err)
 
 
+traceExpr m e = do
+    liftIO $ outputListLno' TraceOutput ["Interpreting [", m , "]: ", show e]
+    return e
+
 interpret :: FilePath -> T.Text -> [(Int,Expression)] -> IO ()
 interpret fname script es = do
     let nglessScript = NGOString script 
@@ -168,10 +172,10 @@ interpret fname script es = do
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
 interpretIO [] = return ()
-interpretIO ((ln,e):es) = setlno ln >> interpretTop e >> interpretIO es
+interpretIO ((ln,e):es) = setlno ln >> traceExpr "interpretIO" e >> interpretTop e >> interpretIO es
 
 interpretTop :: Expression -> InterpretationEnvIO ()
-interpretTop (Assignment (Variable var) val) = interpretTopValue val >>= setVariableValue var
+interpretTop (Assignment (Variable var) val) = traceExpr "assignment" val >> interpretTopValue val >>= setVariableValue var
 interpretTop (FunctionCall f e args b) = void $ topFunction f e args b
 interpretTop (Condition c ifTrue ifFalse) = do
     NGOBool c' <- runInROEnvIO (interpretExpr c)
@@ -236,7 +240,7 @@ topFunction' :: FuncName -> NGLessObject -> [(T.Text, NGLessObject)] -> Maybe Bl
 topFunction' Ffastq     expr args Nothing = executeFastq expr args
 topFunction' Fsamfile   expr args Nothing = executeSamfile expr args
 topFunction' Funique    expr args Nothing = executeUnique expr args
-topFunction' Fwrite     expr args Nothing = liftIO (writeToFile expr args)
+topFunction' Fwrite     expr args Nothing = traceExpr "write" expr >> liftIO (writeToFile expr args)
 topFunction' Fmap       expr args Nothing = executeMap expr args
 topFunction' Fas_reads  expr args Nothing = liftIO (executeReads expr args)
 topFunction' Fselect    expr args Nothing = liftIO (executeSelect expr args)
@@ -262,6 +266,7 @@ topFunction' Fpaired mate1 args Nothing = do
 topFunction' f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
 
 executeFastq expr args = do
+    traceExpr "fastq" expr
     let NGOSymbol encName = lookupWithDefault (NGOSymbol "auto") "encoding" args
         enc = case encName of
                 "auto" -> Nothing
@@ -277,6 +282,7 @@ executeFastq expr args = do
         v -> throwErrorStr ("fastq function: unexpected first argument: " ++ show v)
 
 executeSamfile expr [] = do
+    traceExpr "samfile" expr
     case expr of
         (NGOString fname) -> return $ NGOMappedReadSet (T.unpack fname) Nothing
         (NGOList sams) -> NGOList <$> sequence [executeSamfile s [] | s <- sams]
