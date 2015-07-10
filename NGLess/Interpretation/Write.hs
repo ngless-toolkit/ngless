@@ -14,7 +14,6 @@ import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
-import qualified Data.Map as M
 import System.Process
 import System.Exit
 import System.IO
@@ -59,13 +58,11 @@ writeToUncFile obj _ = error ("writeToUncFile: Should have received a NGOReadSet
 
 writeToFile :: NGLessObject -> [(T.Text, NGLessObject)] -> IO NGLessObject
 writeToFile (NGOList el) args = do
-      let templateFP = getNGOPath $ lookup "ofile" args
-          newFPS' = map (T.pack . (\fname -> replace "{index}" fname templateFP) . T.unpack) indexFPs
-      res <- zipWithM (\x fp -> writeToFile x (fp' fp)) el newFPS'
-      return (NGOList res)
-    where
-        indexFPs = map (T.pack . show) [1..(length el)]
-        fp' fp = M.toList $ M.insert "ofile" (NGOString fp) (M.fromList args)
+    let args' = filter (\(a,_) -> (a /= "ofile")) args
+        templateFP = getNGOPath $ lookup "ofile" args
+        fps = map ((\fname -> replace "{index}" fname templateFP) . show) [1..length el]
+    res <- zipWithM (\e fp -> writeToFile e (("ofile", NGOFilename fp):args')) el fps
+    return (NGOList res)
 
 writeToFile el@NGOReadSet1{} args = writeToUncFile el $ getNGOPath (lookup "ofile" args)
 writeToFile (NGOReadSet2 enc r1 r2) args = do
