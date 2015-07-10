@@ -60,9 +60,8 @@ functionArgTypeReturnType Fas_reads =    (NGLMappedReadSet,  NGLReadSet)
 functionArgTypeReturnType Fselect =      (NGLMappedReadSet,  NGLMappedReadSet)
 functionArgTypeReturnType Fcount =       (NGLMappedReadSet,  NGLCounts)
 functionArgTypeReturnType Fannotate =    (NGLMappedReadSet,  NGLMappedReadSet)
-functionArgTypeReturnType err = error ("Function " ++ show err ++ " shouldn't reach this")
---functionArgTypeReturnType Fwrite =       (NGLVoid,            NGLVoid)
---functionArgTypeReturnType Fprint =       (NGLVoid,            NGLVoid)
+functionArgTypeReturnType Fwrite =       (NGLAny,            NGLVoid)
+functionArgTypeReturnType Fprint =       (NGLAny,            NGLVoid)
 
 function_arg_type :: FuncName -> NGLType
 function_arg_type = fst . functionArgTypeReturnType
@@ -147,6 +146,7 @@ data NGLType =
         | NGLMappedReadSet
         | NGLCounts
         | NGLVoid
+        | NGLAny
         | NGList NGLType
     deriving (Eq, Show)
 
