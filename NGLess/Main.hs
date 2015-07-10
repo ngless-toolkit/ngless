@@ -24,6 +24,8 @@ import Control.Concurrent
 import System.Console.CmdArgs
 import System.FilePath.Posix
 import System.Directory
+import System.IO (stderr)
+import System.Exit (exitSuccess, exitFailure)
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -87,6 +89,12 @@ wrapPrint (Script v sc) = Script v (wrap sc)
         wrap (e:es) = e:wrap es
         addPrint (lno,e) = (lno,FunctionCall Fwrite e [(Variable "ofile", BuiltinConstant (Variable "STDOUT"))] Nothing)
 
+rightOrDie :: (Show e) => Either e a -> IO a
+rightOrDie (Left err) = do -- in base >= 4.8, this is the function `die`
+    T.hPutStrLn stderr (T.pack . show $ err)
+    exitFailure
+rightOrDie (Right v) = return v
+
 optsExec :: NGLess -> IO ()
 optsExec opts@DefaultMode{} = do
     let fname = input opts
@@ -108,27 +116,22 @@ optsExec opts@DefaultMode{} = do
     engltext <- case script opts of
         Just s -> return . Right . T.pack $ s
         _ -> T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
-    
-    case engltext of
-        Left err -> print err
-        Right ngltext 
-            | debug_mode opts `elem` ["ast", "tokens"] ->
-                outputDebug (debug_mode opts) fname reqversion ngltext
-            |otherwise -> do
-                let maybe_add_print = Right . (if print_last opts then wrapPrint else id)
-                case parsengless fname reqversion ngltext >>= maybe_add_print >>= checktypes >>= validate of
-                    Left err -> T.putStrLn err
-                    Right sc -> do
-                        when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
-                            whenNormal (setVerbosity Quiet)
-                        outputLno' DebugOutput "Validating script..."
-                        errs <- validate_io sc
-                        case errs of
-                            Nothing -> do
-                                outputLno' InfoOutput "Script OK. Starting interpretation..."
-                                interpret fname ngltext (nglBody sc)
-                                writeOutput (odir </> "output.js") fname ngltext
-                            Just errors -> T.putStrLn (T.concat errors)
+    ngltext <- rightOrDie engltext
+    when (debug_mode opts `elem` ["ast", "tokens"]) $ do
+        outputDebug (debug_mode opts) fname reqversion ngltext
+        exitSuccess
+    let maybe_add_print = Right . (if print_last opts then wrapPrint else id)
+    let parsed = parsengless fname reqversion ngltext >>= maybe_add_print >>= checktypes >>= validate
+    sc <- rightOrDie parsed
+    when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
+        whenNormal (setVerbosity Quiet)
+    outputLno' DebugOutput "Validating script..."
+    errs <- validate_io sc
+    when (isJust errs) $
+        rightOrDie (Left . fromJust $ errs)
+    outputLno' InfoOutput "Script OK. Starting interpretation..."
+    interpret fname ngltext (nglBody sc)
+    writeOutput (odir </> "output.js") fname ngltext
 
 
 -- if user uses the flag -i he will install a Reference Genome to all users
