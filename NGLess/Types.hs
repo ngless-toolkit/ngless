@@ -11,7 +11,7 @@ import qualified Data.Text as T
 import qualified Data.Map as Map
 import Data.Maybe
 import Control.Monad.State
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Applicative
 import Data.String
 
@@ -19,13 +19,11 @@ import Language
 
 
 type TypeMap = Map.Map T.Text NGLType
-type TypeMSt b = ErrorT T.Text (State (Int,TypeMap)) b
-instance Error T.Text where
-    strMsg = T.pack
+type TypeMSt b = ExceptT T.Text (State (Int,TypeMap)) b
 
 -- | checktypes will either return an error message or pass through the script
 checktypes :: Script -> Either T.Text Script
-checktypes script@(Script _ exprs) = evalState (runErrorT (inferScriptM exprs >> return script)) (0,Map.empty)
+checktypes script@(Script _ exprs) = evalState (runExceptT (inferScriptM exprs >> return script)) (0,Map.empty)
 
 errorInLineC :: [String] -> TypeMSt ()
 errorInLineC = errorInLine . T.concat . map fromString

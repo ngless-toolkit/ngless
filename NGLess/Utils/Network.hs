@@ -4,7 +4,7 @@ module Utils.Network
     ( downloadFile
     ) where
 
-import Control.Monad.Error (liftIO)
+import Control.Monad.IO.Class (liftIO)
 import Data.Conduit
 import Data.Conduit.Binary (sinkFile)
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)

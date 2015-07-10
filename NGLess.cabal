@@ -49,6 +49,7 @@ executable ngless
     template-haskell,
     text,
     time,
+    transformers == 0.4.*,
     unix,
     vector,
     zlib == 0.6.*
@@ -99,6 +100,7 @@ Test-Suite nglesstest
     test-framework-th,
     text,
     time,
+    transformers == 0.4.*,
     unix,
     vector,
     zlib == 0.6.*
