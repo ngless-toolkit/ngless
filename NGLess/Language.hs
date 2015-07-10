@@ -186,7 +186,29 @@ data Expression =
         | Assignment Variable Expression -- ^ var = expr
         | FunctionCall FuncName Expression [(Variable, Expression)] (Maybe Block)
         | Sequence [Expression]
-    deriving (Eq, Show)
+    deriving (Eq)
+
+instance Show Expression where
+    show (Lookup (Variable v)) = "Lookup '"++show v++"'"
+    show (ConstStr t) = show t
+    show (ConstNum n) = show n
+    show (ConstBool b) = show b
+    show (ConstSymbol t) = "{"++T.unpack t++"}"
+    show (BuiltinConstant (Variable v)) = T.unpack v
+    show (ListExpression e) = show e
+    show Continue = "continue"
+    show Discard = "discard"
+    show (UnaryOp UOpLen a) = "len("++show a++")"
+    show (UnaryOp op a) = show op ++ " " ++ show a
+    show (BinaryOp op a b) = show a ++ show op ++ show b
+    show (Condition c a b) = "if ["++show c ++"] then {"++show a++"} else {"++show b++"}"
+    show (IndexExpression a ix) = show a ++ "[" ++ show ix ++ "]"
+    show (Assignment (Variable v) a) = T.unpack v++" = "++show a
+    show (FunctionCall fname a args block) = show fname ++ "(" ++ show a ++ "; " ++ show args ++ ")"
+                                    ++ (case block of
+                                        Nothing -> ""
+                                        Just b -> "using {"++show b ++ "}")
+    show (Sequence e) = "Sequence " ++ show e
 
 -- | Script is a version declaration followed by a series of expressions
 data Script = Script
