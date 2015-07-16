@@ -16,7 +16,7 @@ import System.Directory (removeFile
                         ,removeDirectoryRecursive
                         ,createDirectoryIfMissing
                         ,doesFileExist
-                        ,getDirectoryContents)
+                        )
 import System.FilePath.Posix((</>))
 import System.Console.CmdArgs.Verbosity
 
