@@ -38,5 +38,6 @@ into it.
 
 ## Authors
 
-Luis Pedro Coelho
-Paulo Monteiro
+- [Luis Pedro Coelho](http://luispedro.org) [coelho@embl.de](mailto:coelho@embl.de) [@luispedrocoelho](https://twitter.com/luispedrocoelho)
+- Paulo Monteiro
+- [Ana Teresa Freitas](http://web.tecnico.ulisboa.pt/ana.freitas/)
