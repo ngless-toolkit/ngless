@@ -6,6 +6,7 @@
 
 module Utils.Debug
     ( tracex
+    , trace
     ) where
 
 
