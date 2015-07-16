@@ -3,6 +3,10 @@
 This is a domain-specific language for NGS (next-generation sequencing data)
 processing.
 
+**Note**: This is *pre-release* software, currently available as a preview
+only. Please [get in touch](mailto:coelho@embl.de) if you want to use it in
+your work.
+
 ## Example
 
     ngless "0.0"
@@ -32,3 +36,7 @@ into it.
 
 
 
+## Authors
+
+Luis Pedro Coelho
+Paulo Monteiro
