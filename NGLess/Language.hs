@@ -46,7 +46,22 @@ data FuncName =
                 | Fwrite
                 | Fprint
                 | Fannotate
-    deriving (Eq, Show)
+    deriving (Eq)
+
+instance Show FuncName where
+    show Ffastq = "fastq"
+    show Fsamfile = "samfile"
+    show Fpaired = "paired"
+    show Funique = "unique"
+    show Fpreprocess = "preprocess"
+    show Fsubstrim = "substrim"
+    show Fmap = "map"
+    show Fas_reads = "as_reads"
+    show Fselect = "select"
+    show Fcount = "count"
+    show Fwrite = "write"
+    show Fprint = "print"
+    show Fannotate = "annotate"
 
 functionArgTypeReturnType :: FuncName -> (NGLType,           NGLType)
 functionArgTypeReturnType Ffastq =       (NGLString,         NGLReadSet)

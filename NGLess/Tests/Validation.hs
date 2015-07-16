@@ -10,6 +10,7 @@ import Test.HUnit
 import Tests.Utils
 import Validation
 import ValidationNotPure
+import Control.Monad
 
 tgroup_Validation = $(testGroupGenerator)
 
@@ -27,8 +28,15 @@ validate_io_Ok script = do
 validate_io_Error script = do
     err <- validate_io (fromRight . parsetest $ script)
     case err of
-        Nothing -> assertFailure (concat ["Should have detected an error on the script", show script])
+        Nothing -> assertFailure (concat ["ValidateIO should have detected an error on the script ", show script])
         Just _ -> return ()
+
+validate_Error script =
+    when (isRight $ parsetest script >>= validate) $
+        assertFailure (concat ["Validate (pure) should have detected an error on the script ", show script])
+
+isRight (Right _) = True
+isRight (Left _) = False
 
 case_fastq_inexistence_file = validate_io_Error s
     where s = "ngless '0.0'\n\
@@ -104,3 +112,6 @@ case_valid_not_pure_annotate_gff_const2 = validate_io_Ok s
         \v = 'Makefile'\n\
         \annotate(x, gff=v)\n"
 
+case_validate_internal_call = validate_Error
+    "ngless '0.0'\n\
+    \write(select(samfile('f.sam'), keep_if=[{matched}]), ofile=STDOUT)\n"

@@ -12,7 +12,9 @@ module Validation
 import Language
 
 import Data.Maybe
+import Data.Foldable (asum)
 import qualified Data.Text as T
+import Control.Applicative
 
 
 validate :: Script -> Either T.Text Script
@@ -98,7 +100,7 @@ has_required_args f args = errors_from_list $ map has1 (function_required_args f
                 else Just (T.concat ["Function ", T.pack . show $ f, " requires argument ", a, "."])
 
 validate_val_function_args :: Script -> Maybe T.Text
-validate_val_function_args (Script _ es) = check_toplevel validate_val_function_args' es
+validate_val_function_args (Script _ es) = check_toplevel (check_recursive validate_val_function_args') es
     where
         validate_val_function_args' (Assignment  _ fc) = validate_val_function_args' fc
         validate_val_function_args' (FunctionCall f _ args _) = check_symbol_val_in_arg f args
@@ -142,10 +144,14 @@ check_symbol_val_in_arg :: FuncName -> [(Variable, Expression)]-> Maybe T.Text
 check_symbol_val_in_arg f args = errors_from_list $ map check1 args
     where
         allowed = function_args_allowed_symbols f
+        allowedStr v = T.concat ["[", showA (allowed v), "]"]
+        showA [] = ""
+        showA [e] = T.concat ["{", e, "}"]
+        showA (e:es) = T.concat ["{", e, "}, ", showA es]
         check1 (Variable v, expr) = case expr of
             ConstSymbol s       -> if s `elem` (allowed v)
                                     then Nothing
-                                    else Just (T.concat ["Argument: `", v, "` expects one of ", T.pack . show $ allowed v, " but got `", s, "`"])
+                                    else Just (T.concat ["Argument: `", v, "` (for function ", T.pack (show f), ") expects one of ", allowedStr v, " but got {", s, "}"])
             ListExpression es   -> errors_from_list $ map (\e -> check1 (Variable v, e)) es
             _                   -> Nothing
 
@@ -154,6 +160,28 @@ check_toplevel _ [] = Nothing
 check_toplevel f ((lno,e):es) = case f e of
         Nothing -> check_toplevel f es
         Just m -> Just (T.concat ["Line ", T.pack (show lno), ": ", m])
+
+
+check_recursive :: (Expression -> Maybe T.Text) -> Expression -> Maybe T.Text
+check_recursive f e = f e <|> check_recursive' f e
+
+check_recursive' :: (Expression -> Maybe T.Text) -> Expression -> Maybe T.Text
+check_recursive' f (ListExpression es) = asum $ check_recursive f `map` es
+check_recursive' f (UnaryOp _ e) = check_recursive f e
+check_recursive' f (BinaryOp _ e e') = check_recursive f e <|> check_recursive f e'
+check_recursive' f (Condition cond ifT ifF) = check_recursive f cond <|> check_recursive f ifT <|> check_recursive f ifF
+check_recursive' f (IndexExpression e ix) = check_recursive f e <|> check_recursive_index f ix
+check_recursive' f (Assignment _ v) = check_recursive f v
+check_recursive' f (FunctionCall _ marg args block) =
+    check_recursive f marg <|> check_recursive f (ListExpression [e | (_,e) <- args]) <|> check_recursive_block f block
+check_recursive' f (Sequence es) = asum $ check_recursive f `map` es
+check_recursive' _ _ = Nothing
+
+check_recursive_index f (IndexOne e) = check_recursive f e
+check_recursive_index f (IndexTwo st e) = (st >>= check_recursive f) <|> (e >>= check_recursive f)
+check_recursive_block f (Just (Block _ e)) = check_recursive f e
+check_recursive_block _ Nothing = Nothing
+
 
 errors_from_list :: [Maybe T.Text] -> Maybe T.Text
 errors_from_list = listToMaybe . catMaybes 
