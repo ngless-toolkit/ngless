@@ -78,6 +78,7 @@ expression = expression' <* (many eol)
                     <|> (reserved "continue" *> pure Continue)
                     <|> assignment
                     <|> funccall
+                    <|> method_call
                     <|> innerexpression
 
 innerexpression = binoperator
@@ -153,6 +154,15 @@ funcname = funcname' <?> "function name"
                 "annotate" -> pure Fannotate
                 _ -> fail "Function not found"
 
+methodName = methodName' <?> "method name"
+    where
+        methodName' = do
+            mname <- word
+            case mname of
+                "flag" -> pure Mflag
+                "score" -> pure Mscore
+                _ -> fail "Method name not found"
+
 pairedKwArgs = (++) <$> (wrap <$> expression) <*> (kwargs <* operator ')')
     where wrap e = [(Variable "second", e)]
 
@@ -169,6 +179,13 @@ binoperator = try $ do
     bop <- binop
     b <- expression
     return $ BinaryOp bop a b
+
+method_call = try $ do
+    self <- base_expression <* operator '.'
+    met <- methodName <* operator '('
+    a <- optionMaybe expression
+    kws <- kwargs <* operator ')'
+    return (MethodCall met self a kws)
 
 _indexexpr = try (IndexExpression <$> base_expression <*> indexing)
     where

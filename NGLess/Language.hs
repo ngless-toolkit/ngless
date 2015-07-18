@@ -12,6 +12,7 @@ module Language
     , Index(..)
     , Block(..)
     , FuncName(..)
+    , MethodName(..)
     , NGLType(..)
     , Script(..)
     , NGLessObject(..)
@@ -20,6 +21,10 @@ module Language
     , function_args_allowed_symbols
     , function_return_type
     , function_arg_type
+    , methodSelfType
+    , methodArgType
+    , methodReturnType
+    , methodKwargType
     , typeOfConstant
     ) where
 
@@ -62,6 +67,11 @@ instance Show FuncName where
     show Fwrite = "write"
     show Fprint = "print"
     show Fannotate = "annotate"
+
+data MethodName =
+        Mflag
+        | Mscore
+    deriving (Eq, Show)
 
 functionArgTypeReturnType :: FuncName -> (NGLType,           NGLType)
 functionArgTypeReturnType Ffastq =       (NGLString,         NGLReadSet)
@@ -121,6 +131,23 @@ function_args_allowed_symbols Fselect "keep_if"      = ["mapped", "unmapped"]
 function_args_allowed_symbols Fselect "drop_if"      = ["mapped", "unmapped"]
 function_args_allowed_symbols Ffastq "encoding"      = ["auto", "33", "64", "sanger", "solexa"]
 function_args_allowed_symbols _ _                    = []
+
+
+methodArgTypeReturnType :: MethodName -> ((NGLType, Maybe NGLType), NGLType)
+methodArgTypeReturnType Mflag = ((NGLMappedRead, Just NGLSymbol), NGLBool)
+methodArgTypeReturnType Mscore = ((NGLMappedRead, Just NGLSymbol), NGLInteger)
+
+methodSelfType :: MethodName -> NGLType
+methodSelfType = fst . fst . methodArgTypeReturnType
+
+methodArgType :: MethodName -> (Maybe NGLType)
+methodArgType = snd . fst. methodArgTypeReturnType
+
+methodReturnType :: MethodName -> NGLType
+methodReturnType = snd . methodArgTypeReturnType
+
+methodKwargType :: MethodName -> Variable -> NGLType
+methodKwargType _ _ = NGLVoid
 
 typeOfConstant :: T.Text -> Maybe NGLType
 typeOfConstant "STDIN"        = Just NGLString
@@ -200,6 +227,7 @@ data Expression =
         | IndexExpression Expression Index -- ^ expr [ index ]
         | Assignment Variable Expression -- ^ var = expr
         | FunctionCall FuncName Expression [(Variable, Expression)] (Maybe Block)
+        | MethodCall MethodName Expression (Maybe Expression) [(Variable, Expression)] -- ^ expr.method(expre)
         | Sequence [Expression]
     deriving (Eq)
 
@@ -223,6 +251,7 @@ instance Show Expression where
                                     ++ (case block of
                                         Nothing -> ""
                                         Just b -> "using {"++show b ++ "}")
+    show (MethodCall mname self a args) = "(" ++ show self ++ ")." ++ show mname ++ "( " ++ show a ++ showArgs args ++ " )"
     show (Sequence e) = "Sequence " ++ show e
 
 showArgs [] = ""

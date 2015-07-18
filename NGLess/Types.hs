@@ -1,7 +1,7 @@
 {- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Types
     ( checktypes
@@ -25,7 +25,7 @@ type TypeMSt b = ExceptT T.Text (State (Int,TypeMap)) b
 checktypes :: Script -> Either T.Text Script
 checktypes script@(Script _ exprs) = evalState (runExceptT (inferScriptM exprs >> return script)) (0,Map.empty)
 
-errorInLineC :: [String] -> TypeMSt ()
+errorInLineC :: [String] -> TypeMSt a
 errorInLineC = errorInLine . T.concat . map fromString
 
 errorInLine :: T.Text -> TypeMSt a
@@ -49,10 +49,16 @@ inferM (Assignment (Variable v) expr) = do
 inferM (Condition c te fe) = checkbool c >> inferM te >> inferM fe
 inferM e = void (nglTypeOf e)
 
-inferBlock :: Maybe Block -> TypeMSt ()
-inferBlock b = case b of
-    Just (Block vars es) -> mapM_ (\(Variable v) -> envInsert v NGLRead) vars >> inferM es
-    Nothing -> return ()
+inferBlock :: FuncName -> Maybe Block -> TypeMSt ()
+inferBlock _ Nothing = return ()
+inferBlock f (Just (Block vars es)) = do
+        forM_ vars $ \(Variable v) ->
+            envInsert v (blockArgOf f)
+        inferM es
+    where
+        blockArgOf Fpreprocess = NGLRead
+        blockArgOf Fselect = NGLMappedRead
+        blockArgOf f = error ("This function '" ++ show f ++ "' does not accept blocks")
 
 envLookup :: T.Text -> TypeMSt (Maybe NGLType)
 envLookup v = Map.lookup v . snd <$> get
@@ -69,7 +75,8 @@ check_assignment a b = when (a /= b)
         showType = T.pack . show . fromJust
 
 nglTypeOf :: Expression -> TypeMSt (Maybe NGLType)
-nglTypeOf (FunctionCall f arg args b) = inferBlock b *> checkfuncargs f args *> checkfunccall f arg
+nglTypeOf (FunctionCall f arg args b) = inferBlock f b *> checkfuncargs f args *> checkfunccall f arg
+nglTypeOf (MethodCall m self arg args) = checkmethodargs m args *> checkmethodcall m self arg
 nglTypeOf (Lookup (Variable v)) = envLookup v
 nglTypeOf (BuiltinConstant (Variable v)) = return (typeOfConstant v)
 nglTypeOf (ConstStr _) = return (Just NGLString)
@@ -171,6 +178,37 @@ checkfuncarg f (v, e) = do
     where
         checkargtype t t' = when (t /= t') (errorInLineC
                             ["Bad argument type in ", show f ,", variable " , show v,". expects ", show t', " got ", show t, "."])
+
+requireType :: Expression -> TypeMSt NGLType
+requireType e = nglTypeOf e >>= \case
+    Nothing -> errorInLineC ["Could not infer required type of expression (", show e, ")"]
+    Just t -> return t
+
+checkmethodcall :: MethodName -> Expression -> (Maybe Expression) -> TypeMSt (Maybe NGLType)
+checkmethodcall m self arg = do
+    stype <- requireType self
+    let reqSelfType = methodSelfType m
+    when (stype /= reqSelfType) (errorInLineC
+        ["Wrong type for method ", show m, ". This method is defined for type ", show reqSelfType,
+         ", but expression (", show self, ") has type ", show stype])
+    argType <- maybe (return Nothing) nglTypeOf arg
+    let reqArgType = methodArgType m
+    case (argType,reqArgType) of
+        (Nothing, _) -> return ()
+        (Just _, Nothing) -> errorInLineC ["Method ", show m, " does not take any unnamed argument"]
+        (Just t, Just t') -> when (t /= t') (errorInLineC
+                        ["Method ", show m, " expects type ", show t', " got ", show t])
+    return . Just . methodReturnType $ m
+
+checkmethodargs :: MethodName -> [(Variable, Expression)] -> TypeMSt ()
+checkmethodargs m args = forM_ args check1arg
+    where
+        check1arg (v, e) = do
+            actualType <- requireType e
+            let reqType = methodKwargType m v
+            when (actualType /= reqType) (errorInLineC
+                    ["Bad argument type for argument ", show v, " in method call ", show m, ". ",
+                     "Expected ", show reqType, " got ", show actualType])
 
 
 checkfuncarg' f v = case function_opt_arg_type f v of
