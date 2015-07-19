@@ -35,7 +35,7 @@ data SamLine = SamLine
             , samTLen :: !Int
             , samSeq :: S.ByteString
             , samQual :: S.ByteString
-            } deriving (Eq, Show)
+            } deriving (Eq, Show, Ord)
 
 
 instance NFData SamLine where

@@ -23,6 +23,7 @@ import Control.Monad.Trans.Resource
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -42,6 +43,7 @@ import FileManagement
 import CountOperation (countAnnotatedSet)
 import Configuration (outputDirectory)
 import Output
+import Data.Sam
 
 import Interpretation.Annotation
 import Interpretation.Write
@@ -143,7 +145,7 @@ runInROEnv action = do
 
 runInterpret :: InterpretationROEnv a -> NGLEnv_t -> a
 runInterpret action env = case runReaderT (runErrorT action) env of
-        Identity (Left _) -> error "Error in interpretation"
+        Identity (Left err) -> error ("Error in interpretation" ++ show err)
         Identity (Right v) -> v
 
 runInROEnvIO :: InterpretationROEnv a -> InterpretationEnvIO a
@@ -262,6 +264,7 @@ topFunction' Fpaired mate1 args Nothing = do
             when (enc1 /= enc3)
                 (throwError "Mates do not seem to have the same quality encoding!")
             return (NGOReadSet3 enc1 fp1 fp2 fp3)
+topFunction' Fselect expr args (Just b) = executeSelectWBlock expr args b
 
 topFunction' f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
 
@@ -448,6 +451,26 @@ interpretPBlock1 block var r = do
 executePrint :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
 executePrint err  _ = throwErrorStr ("Cannot print " ++ show err)
+
+executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
+executeSelectWBlock (NGOMappedReadSet fname ref) [] (Block [Variable var] body) = do
+    liftIO $ outputListLno' TraceOutput ["Executing blocked select on file ", fname]
+    env <- gets snd
+    let oname = fname ++ ".selected"
+    liftIO $ withFile fname ReadMode $ \iraw -> do
+        withFile oname WriteMode $ \oraw -> do
+            ilines <- BL8.lines <$> BL.hGetContents iraw
+            forM_ ilines $ \line -> do
+                if "@" `BL.isPrefixOf` line -- The whole header is copied verbatim to the output
+                    then BL8.hPutStrLn oraw line
+                    else do
+                        let mr = NGOMappedRead (readSamLine line)
+                        let mr' = runInterpret (interpretBlock1 [(var, mr)] body) env
+                        when (blockStatus mr' `elem` [BlockContinued, BlockOk]) $
+                            BL8.hPutStrLn oraw line
+    return (NGOMappedReadSet oname ref)
+executeSelectWBlock _ _ _ = error ("Uninterpretable case, should have been flagged as error before")
+
 
 interpretArguments :: [(Variable, Expression)] -> InterpretationROEnv [(T.Text, NGLessObject)]
 interpretArguments = mapM interpretArguments'

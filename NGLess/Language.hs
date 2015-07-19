@@ -32,6 +32,7 @@ module Language
 import qualified Data.Text as T
 
 import Data.FastQ
+import Data.Sam
 
 newtype Variable = Variable T.Text
     deriving (Eq, Show)
@@ -203,6 +204,7 @@ data NGLessObject =
         | NGOReadSet2 FastQEncoding FilePath FilePath -- ^ encoding file_on_disk
         | NGOReadSet3 FastQEncoding FilePath FilePath FilePath-- ^ encoding file_on_disk
         | NGOMappedReadSet FilePath (Maybe T.Text) -- ^ This is represented by a SAM file on disk + optional reference information
+        | NGOMappedRead SamLine
         | NGOAnnotatedSet FilePath
         | NGOVoid
         | NGOList [NGLessObject]
