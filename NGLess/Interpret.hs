@@ -214,6 +214,11 @@ interpretExpr (IndexExpression expr ie) = do
     let r = _evalIndex expr' ie'
     return r
 interpretExpr (ListExpression e) = NGOList <$> mapM interpretExpr e
+interpretExpr (MethodCall met self arg args) = do
+    self' <- interpretExpr self
+    arg' <- maybeInterpretExpr arg
+    args' <- interpretArguments args
+    executeMethod met self' arg' args'
 interpretExpr not_expr = throwErrorStr ("Expected an expression, received " ++ show not_expr)
 
 interpretIndex :: Index -> InterpretationROEnv [Maybe NGLessObject]
@@ -435,6 +440,16 @@ executePreprocess (NGOReadSet3 enc fp1 fp2 fp3) _args (Block [Variable var] bloc
 
         writeSR h sr = liftIO $ BL.hPut h (asFastQ enc [sr])
 executePreprocess v _ _ = error ("executePreprocess: Cannot handle this input: " ++ show v)
+
+executeMethod :: MethodName -> NGLessObject -> Maybe NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationROEnv NGLessObject
+executeMethod Mflag (NGOMappedRead samline) (Just (NGOSymbol flag)) [] = case getFlag flag of
+        Left err -> throwError err
+        Right f -> return (NGOBool $ f samline)
+    where
+        getFlag "mapped" = Right isAligned
+        getFlag "unmapped" = Right $ not . isAligned
+        getFlag ferror = Left . NGError $ T.concat ["Flag ", T.pack (show ferror), " is unknown for method flag"]
+executeMethod m self arg kwargs = error ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 
 interpretPBlock1 :: Expression -> T.Text -> NGLessObject -> InterpretationROEnv (Maybe ShortRead)
