@@ -57,7 +57,7 @@ ngless = DefaultMode
         , print_last = False &= name "p"
         , n_threads = 1 &= name "n"
         , output_directory = Nothing &= name "o"
-        , temporary_directory = Nothing
+        , temporary_directory = Nothing &= name "t"
         , keep_temporary_files = False
         }
         &= details  [ "Example:" , "ngless script.ngl" ]
