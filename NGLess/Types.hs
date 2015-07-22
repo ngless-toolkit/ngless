@@ -53,12 +53,13 @@ inferBlock :: FuncName -> Maybe Block -> TypeMSt ()
 inferBlock _ Nothing = return ()
 inferBlock f (Just (Block vars es)) = do
         forM_ vars $ \(Variable v) ->
-            envInsert v (blockArgOf f)
+            envInsert v blockArg
         inferM es
     where
-        blockArgOf Fpreprocess = NGLRead
-        blockArgOf Fselect = NGLMappedRead
-        blockArgOf f = error ("This function '" ++ show f ++ "' does not accept blocks")
+        blockArg = case f of
+            Fpreprocess -> NGLRead
+            Fselect -> NGLMappedRead
+            _ -> error ("This function '" ++ show f ++ "' does not accept blocks")
 
 envLookup :: T.Text -> TypeMSt (Maybe NGLType)
 envLookup v = Map.lookup v . snd <$> get
