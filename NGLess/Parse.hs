@@ -77,18 +77,18 @@ expression = expression' <* (many eol)
                     <|> (reserved "discard" *> pure Discard)
                     <|> (reserved "continue" *> pure Continue)
                     <|> assignment
-                    <|> funccall
-                    <|> method_call
                     <|> innerexpression
 
-innerexpression = binoperator
-                    <|> _listexpr
+innerexpression = binoperation_or_just_left
+left_expression =  uoperator
+                    <|> method_call
                     <|> _indexexpr
                     <|> base_expression
 
 base_expression = pexpression
+                    <|> funccall
+                    <|> _listexpr
                     <|> rawexpr
-                    <|> uoperator
                     <|> (Lookup <$> variable)
 
 pexpression = operator '(' *> expression <* operator ')'
@@ -113,13 +113,14 @@ indentation = (tokf $ \t -> case t of { TIndent i -> Just i; _ -> Nothing }) <?>
 eol = (tokf $ \t -> case t of { TNewLine -> Just (); _ -> Nothing }) <?> "end of line"
 binop = (tokf $ \t -> case t of { TBop b -> Just b; _ -> Nothing }) <?> "binary operator"
 
-uoperator = lenop <|> unary_minus
+uoperator = lenop <|> unary_minus <|> not_expr
     where
         lenop = UnaryOp UOpLen <$> (reserved "len" *> operator '(' *> expression <* operator ')')
         unary_minus = UnaryOp UOpMinus <$> (operator '-' *> base_expression)
+        not_expr = UnaryOp UOpNot <$> (reserved "not" *> innerexpression)
 funccall = try paired <|> FunctionCall <$>
                 (try funcname <* operator '(')
-                <*> expression
+                <*> innerexpression
                 <*> (kwargs <* operator ')')
                 <*> funcblock
 
@@ -130,7 +131,7 @@ paired = do
     p <- word
     case p of
         "paired" -> FunctionCall Fpaired
-                    <$> (operator '(' *> expression <* operator ',')
+                    <$> (operator '(' *> innerexpression <* operator ',')
                     <*> pairedKwArgs
                     <*> pure Nothing
         _ -> fail "Expected 'paired'"
@@ -174,11 +175,12 @@ assignment = try assignment'
     where assignment' =
             Assignment <$> (Variable <$> word) <*> (operator '=' *> expression)
 
-binoperator = try $ do
-    a <- base_expression
-    bop <- binop
-    b <- expression
-    return $ BinaryOp bop a b
+binoperation_or_just_left = try $ do
+    left <- left_expression
+    (try $ do {
+        bop <- binop;
+        right <- innerexpression;
+        return $ BinaryOp bop left right}) <|> return left
 
 method_call = try $ do
     self <- base_expression <* operator '.'
@@ -197,7 +199,7 @@ _listexpr = try listexpr
     where
         listexpr = (operator '[') *> (ListExpression <$> (innerexpression `sepEndBy` (operator ','))) <* (operator ']')
 
-conditional = Condition <$> (reserved "if" *> expression <* operator ':') <*> block <*> mayelse
+conditional = Condition <$> (reserved "if" *> innerexpression <* operator ':') <*> block <*> mayelse
 mayelse = elseblock <|> (pure $ Sequence [])
 elseblock = (reserved "else" *> operator ':' *> block)
 block = do

@@ -99,7 +99,8 @@ Integers are specified as decimals ``[0-9]+`` or as hexadecimals
 Boolean
 ~~~~~~~
 
-Booleans are denoted as the word \textbf{true} or \textbf{false}, with the first letter in upper or lower case.
+The two boolean constants are ``True`` and ``False`` (which can also be written
+``true`` or ``false``).
 
 Symbol
 ~~~~~~
@@ -129,9 +130,11 @@ Operators
 
 Unary
 ~~~~~
-The operator **(-)** returns the symmetric of it's integer argument.
+The operator **(-)** returns the symmetric of its integer argument.
 
 The operator **len** returns the length of a ShortRead.
+
+The operator ``not`` negates its boolean argument
 
 Binary
 ~~~~~~

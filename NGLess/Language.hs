@@ -156,7 +156,7 @@ typeOfConstant "STDOUT"       = Just NGLString
 typeOfConstant _              = Nothing
 
 -- | unary operators
-data UOp = UOpLen | UOpMinus
+data UOp = UOpLen | UOpMinus | UOpNot
     deriving (Eq, Show)
 
 -- | binary operators

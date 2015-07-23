@@ -484,7 +484,7 @@ executeSelectWBlock (NGOMappedReadSet fname ref) [] (Block [Variable var] body) 
                         when (blockStatus mr' `elem` [BlockContinued, BlockOk]) $
                             BL8.hPutStrLn oraw line
     return (NGOMappedReadSet oname ref)
-executeSelectWBlock _ _ _ = error ("Uninterpretable case, should have been flagged as error before")
+executeSelectWBlock _ _ _ = unreachable ("Select with block")
 
 
 interpretArguments :: [(Variable, Expression)] -> InterpretationROEnv [(T.Text, NGLessObject)]
@@ -532,6 +532,7 @@ interpretPreProcessExpr expr = interpretExpr expr
 _evalUnary :: UOp -> NGLessObject -> NGLessObject
 _evalUnary UOpMinus (NGOInteger n) = NGOInteger (-n)
 _evalUnary UOpLen (NGOShortRead r) = NGOInteger . toInteger $ srLength r
+_evalUnary UOpNot (NGOBool v) = NGOBool (not v)
 _evalUnary op v = nglTypeError ("invalid unary operation ("++show op++") on value " ++ show v)
 
 _evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject

@@ -100,6 +100,7 @@ nglTypeOf (Sequence _es) = error "unexpected nglTypeOf(Sequence)"
 
 checkuop UOpLen e = checklist e *> return (Just NGLInteger)
 checkuop UOpMinus e = checkinteger e
+checkuop UOpNot e = checkbool e
 
 checkbop BOpAdd a b = checkinteger a *> checkinteger b
 checkbop BOpMul a b = checkinteger a *> checkinteger b 
@@ -116,7 +117,7 @@ checkbool (ConstBool _) = return (Just NGLBool)
 checkbool expr = do
     t <- nglTypeOf expr
     if t /= Just NGLBool
-        then  errorInLine "Expected boolean."
+        then  errorInLineC ["Expected boolean expression, got ", show t, " for expression ", show expr]
         else return t
 
 checkinteger (ConstNum _) = return (Just NGLInteger)

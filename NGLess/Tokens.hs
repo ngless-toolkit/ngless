@@ -106,6 +106,7 @@ reservedwords =
         ,"len"
         ,"discard"
         ,"continue"
+        ,"not"
         ,"using"
         ]
 
