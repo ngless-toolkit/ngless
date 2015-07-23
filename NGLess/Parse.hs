@@ -1,7 +1,7 @@
 {- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase #-}
 
 module Parse
     ( parsengless
@@ -35,7 +35,7 @@ parsengless inputname reqversion input =
 parsetoks :: String -> Bool -> [(SourcePos,Token)] -> Either T.Text Script
 parsetoks inputname reqversion toks = case parse (nglparser reqversion) inputname (_cleanupindents toks) of
             Right val -> Right val
-            Left err -> Left (T.pack . show $ err)
+            Left err -> Left . T.pack . show $ err
 
 -- | '_cleanupindents' removes spaces that do not follow new lines as well as
 -- any spaces that are between brackets (round or square).
@@ -96,22 +96,22 @@ pexpression = operator '(' *> expression <* operator ')'
 tokf ::  (Token -> Maybe a) -> Parser a
 tokf f = token (show .snd) fst (f . snd)
 
-rawexpr = tokf $ \t -> case t of
+rawexpr = tokf $ \case
     TExpr e -> Just e
     _ -> Nothing
-string = (tokf $ \t -> case t of { TExpr (ConstStr n) -> Just n; _ -> Nothing }) <?> "String"
+string = (tokf $ \case { TExpr (ConstStr n) -> Just n; _ -> Nothing }) <?> "String"
 
 operator op = (tokf $ \t -> case t of { TOperator op' | op == op' -> Just t; _ -> Nothing }) <?> (concat ["operator ", [op]])
 
-word = tokf $ \t -> case t of
+word = tokf $ \case
     TWord w -> Just w
     _ -> Nothing
 
-reserved r = (tokf $ \t -> case t of { TReserved r' | r == r' -> Just r; _ -> Nothing }) <?> (concat [T.unpack r, " (reserved word)"])
+reserved r = (tokf $ \case { TReserved r' | r == r' -> Just r; _ -> Nothing }) <?> (concat [T.unpack r, " (reserved word)"])
 
-indentation = (tokf $ \t -> case t of { TIndent i -> Just i; _ -> Nothing }) <?> "indentation"
-eol = (tokf $ \t -> case t of { TNewLine -> Just (); _ -> Nothing }) <?> "end of line"
-binop = (tokf $ \t -> case t of { TBop b -> Just b; _ -> Nothing }) <?> "binary operator"
+indentation = (tokf $ \case { TIndent i -> Just i; _ -> Nothing }) <?> "indentation"
+eol = (tokf $ \case { TNewLine -> Just (); _ -> Nothing }) <?> "end of line"
+binop = (tokf $ \case { TBop b -> Just b; _ -> Nothing }) <?> "binary operator"
 
 uoperator = lenop <|> unary_minus <|> not_expr
     where
@@ -169,11 +169,11 @@ pairedKwArgs = (++) <$> (wrap <$> expression) <*> (kwargs <* operator ')')
 
 kwargs = many (operator ',' *> kwarg) <?> "keyword argument list"
 kwarg = kwarg' <?> "keyword argument"
-    where kwarg' = (,) <$> (Variable <$> word <* operator '=') <*> expression
+    where kwarg' = (,) <$> (variable <* operator '=') <*> expression
 
 assignment = try assignment'
     where assignment' =
-            Assignment <$> (Variable <$> word) <*> (operator '=' *> expression)
+            Assignment <$> variable <*> (operator '=' *> expression)
 
 binoperation_or_just_left = try $ do
     left <- left_expression
@@ -192,8 +192,8 @@ method_call = try $ do
 _indexexpr = try (IndexExpression <$> base_expression <*> indexing)
     where
         indexing = try (IndexTwo <$> (operator '[' *> may_int <* operator ':') <*> (may_int <* operator ']'))
-                    <|> (IndexOne <$> (operator '[' *> expression <* operator ']'))
-        may_int = (Just <$> expression) <|> (pure Nothing)
+                    <|> (IndexOne <$> (operator '[' *> innerexpression <* operator ']'))
+        may_int = optionMaybe innerexpression
 
 _listexpr = try listexpr
     where
