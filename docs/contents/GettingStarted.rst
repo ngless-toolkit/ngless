@@ -4,35 +4,26 @@
 Getting Started
 ===============
 
-NGLess provides two modes to generate scripts. One targets (programming) skilled users as every single character of the code as to be typed and the other approach uses a wizard to generate the script. 
+Example
+-------
 
-To access either one of this modes you have to do:
-::
+This example will use data from a real experiment stored at EMBL-EBI. The data
+can be accessed at http://www.ebi.ac.uk/ena/data/view/SRP023199 and represent
+**HeLa cells**. The idea is to preprocess the data set, map it against the
+human genome and count the reads that overlap with known genes.
 
-	$ ngless visualizemode -
-
-**Note 1:** If port 8000 is already in use, you can change the destiny port by using **-p X** where **X** can be any port you wish.
-
-**Note 2:** Argument **-** is used as this is the first run and there isn't any ngless results yet. It is a mode to open the webserver without any data.
-
-Now you can open your browser at http://localhost:8000. This will open the NGLess web server at a given port.
-
-After the web server loads the page, you should see something similar to the next image.
-
-.. image:: ../images/nglessKeeperEmpty.png
-
-Example Description
--------------------
-
-This example will use data from a real experiment stored at EMBL-EBI. The data can be accessed at http://www.ebi.ac.uk/ena/data/view/SRP023199 and represent **HeLa cells**. The idea is to preprocess the data set, map it against the human genome and count the reads that overlap with known genes.
-
-We will use the fastQ file ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR867/SRR867735/SRR867735.fastq.gz that can be accessed in the table, on column **Sample accession**, with value SAMN02179475.
+We will use the fastQ file
+ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR867/SRR867735/SRR867735.fastq.gz that can
+be accessed in the table, on column **Sample accession**, with value
+SAMN02179475.
 
 
 Create your script
 ------------------
 
-Since the web server is now open you can start to create your script. Start by clicking in the tab **Create Script** from the navigation menu, as in the following image:
+Since the web server is now open you can start to create your script. Start by
+clicking in the tab **Create Script** from the navigation menu, as in the
+following image:
 
 .. image:: ../images/nglessKeeperEmptyClickCreateScripts.png
 
@@ -40,7 +31,9 @@ After clicking, a page as the following should be displayed.
 
 .. image:: ../images/createScript.png
 
-As you can see, there are two ways to create your scripts. At the left there is a text editor that allows to edit and create your scripts and at the right is a wizard that generates a script with little to no effort.
+As you can see, there are two ways to create your scripts. At the left there is
+a text editor that allows to edit and create your scripts and at the right is a
+wizard that generates a script with little to no effort.
 
 .. image:: ../images/createScriptDivision.png
 
@@ -53,7 +46,8 @@ Text Editor
 Load fastQ file
 ~~~~~~~~~~~~~~~
 
-Before creating the whole script lets start by understanding our data set. This first step will allow you to perform quality control. 
+Before creating the whole script lets start by understanding our data set. This
+first step will allow you to perform quality control.
 
 Using the **text editor**, type:
 
@@ -64,15 +58,14 @@ Using the **text editor**, type:
 	/* load the data set */
 	input = fastq('SRR867735.fastq.gz')
 
-You can now save the script (as **test.ngl** for example) to the directory where the file 'SRR867735.fastq.gz' is and run ngless.
-::
+You can now save the script (as **test.ngl** for example) to the directory
+where the file ``SRR867735.fastq.gz`` is and run ngless::
 
 	$ ngless test.ngl
-	$ ngless visualizemode test -p 8000
 
-**Note**: Make sure you don't have ngless already running in that port.
-
-Using the web server you can visualize key information about a data set. At 'Before QC' there will be the result of the execution.
+Using a web browser, you can open the file ``test.output_ngless/index.html`` to
+see information about a data set and the ngless job. At 'Before QC' there will
+be the result of the execution.
 
 .. image:: ../images/resultBeforeQC.png
 
@@ -91,7 +84,7 @@ Also, by analyzing the plot we can see that the first 3 base pairs, on average, 
 Feel free to explore all the available statistics.
 
 Preprocess
-~~~~~~~~~~~~~~
+~~~~~~~~~~
 
 For the preprocess we will:
 
@@ -99,7 +92,7 @@ For the preprocess we will:
 
 	- Substrim with a minimum quality of **15**.
 
-	- Discard if the length of a read is **smaller than 20**. 
+	- Discard if the length of a read is **smaller than 20**.
 
 Let's add the following code to the already existent code in the Text Editor.
 
@@ -115,7 +108,7 @@ Let's add the following code to the already existent code in the Text Editor.
 This will generate quality control that will be detailed at the execute section.
 
 Map
-~~~~~~~~~~~~~~
+~~~
 
 After adding the preprocess code to the Text Editor, it's time to map against the human genome. Since the human genome is provided by default, you can simply do:
 
@@ -127,12 +120,12 @@ After adding the preprocess code to the Text Editor, it's time to map against th
 
 
 Annotate
-~~~~~~~~~~~~~~
+~~~~~~~~
 
-We are only interested in the human genes so lets annotate the map results with the only feature being genes. Since we used a genome provided by NGLess, we will also use the annotation provided by default:
+We are only interested in the human genes so lets annotate the map results with
+the only feature being genes. Since we used a genome provided by NGLess, we
+will also use the annotation provided by default::
 
-::
-	
 	/* annotation features */
 	feats = [{gene}]
 	annotated = annotate(mapped, strand=false, mode={union}, ambiguity=false, features=feats)
@@ -185,9 +178,9 @@ At the preprocess we are going to:
 
 	b) Substrim with a minimum quality of **15**.
 
-	c) Discard if the length of a read is **smaller than 20**. 
+	c) Discard if the length of a read is **smaller than 20**.
 
-To do a), since we want to remove the first 3 base pairs, we need to make a left trim of 3. You can see at the bottom the script changing while making the modifications. 
+To do a), since we want to remove the first 3 base pairs, we need to make a left trim of 3. You can see at the bottom the script changing while making the modifications.
 
 .. image:: ../images/wizard3.png
 
@@ -308,12 +301,15 @@ It can be visualized at the tab 'After QC' as shown next:
 
 .. image :: ../images/resultAfterQC.png
 
-As can be seen the quality has increased and the minimum quality is now 34. Also, the minimum and maximum ([min,max]) sequence decreased from [50,50] to [20,47] which implies a decrease in both the sequence length minimum and maximum, 30 and 3 respectively. 
+As can be seen the quality has increased and the minimum quality is now 34.
+Also, the minimum and maximum ([min,max]) sequence decreased from [50,50] to
+[20,47] which implies a decrease in both the sequence length minimum and
+maximum, 30 and 3 respectively.
 
 Counts
 ~~~~~~~~~~~~~~~~~~~~
 
-In order to access the top gene counts, you can use the 'Visualize' tab in the navigation menu. 
+In order to access the top gene counts, you can use the 'Visualize' tab in the navigation menu.
 
 You should be able to see a table with all results.
 
@@ -324,7 +320,7 @@ By clicking on the **counts column** you will be able to sort the counts in desc
 If you sort in descending order and select to be displayed 10 results, you should be able to see the top 10 results with most counts. If everything went well they should be:
 
 =============== =======
-Gene name       Counts 
+Gene name       Counts
 =============== =======
 ENSG00000210082	2901346
 ENSG00000265150	182390
@@ -339,4 +335,6 @@ ENSG00000067225	82878
 =============== =======
 
 
-Also if you want to edit the file directly you can by opening the file **'CountResults.txt'** with your preferred text editor.
+Also if you want to edit the file directly you can by opening the file
+**'CountResults.txt'** with your preferred text editor.
+

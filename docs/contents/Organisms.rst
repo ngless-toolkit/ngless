@@ -1,19 +1,25 @@
 .. _Organisms:
 
-Organisms
-=============
+Available Reference Genomes
+===========================
+
+NGLess provides builtin support for the most widely used model organisms
+(human, mouse, yeast, C. elegans, ...; see the full table below). To facilitate 
 
 Genome references available
 ---------------------------
 
-NGLess provides archives containing data sets of organisms. Is also provided gene annotations that provide information 
-about protein-coding and non-coding genes, splice variants, cDNA and protein sequences, non-coding RNAs.
+NGLess provides archives containing data sets of organisms. Is also provided
+gene annotations that provide information about protein-coding and non-coding
+genes, splice variants, cDNA and protein sequences, non-coding RNAs.
 
 The following table represents organisms provided by default:
 
 +-----------+-----------------------------+-------------+
 | Name      | Description                 | Assembly    |
 +===========+=============================+=============+
+| hg19      | homo\_sapiens               | GRCh38      |
++-----------+-----------------------------+-------------+
 | sacCer3   | saccharomyces\_cerevisiae   | R64-1-1     |
 +-----------+-----------------------------+-------------+
 | ce10      | caenorhabditis\_elegans     | WBcel235    |
@@ -28,14 +34,44 @@ The following table represents organisms provided by default:
 +-----------+-----------------------------+-------------+
 | mm10      | mus\_musculus               | GRCm38      |
 +-----------+-----------------------------+-------------+
-| hg19      | homo\_sapiens               | GRCh38      |
-+-----------+-----------------------------+-------------+
 
-Data Set Structure
+These archives are all created using version 75 of `Ensembl
+<http://www.ensembl.org/>`__.
+
+Automatic installation
+----------------------
+
+The builtin datasets are downloaded the first time they are used. They are
+downloaded to the user home directory and stored in **home**/.ngless/genomes.
+
+Manual installation
 --------------------
-The archives provided by NGLess contain BWA index files, the genome reference file and a gene annotation file.
 
-These archives are all created using version 75 of `Ensembl <http://www.ensembl.org/>`_.
+Is possible to install data sets locally, before running any script. They can
+be installed in **User** mode or in **Root** mode.
+
+To install locally (organism bos taurus), use the following command::
+
+  $ ngless --install-reference-data bosTau4
+
+If you install as a super-user, then the dataset will be available for all
+users::
+
+  $ sudo ngless --install-reference-data bosTau4
+ 
+When attempting to install an organism if is returned **True** it means that
+the organism is already installed, and there is no reason to install again.
+Otherwise, a progress bar is displayed to provide information on the download.
+ 
+Data Set Structure
+-------------------
+
+This section provides the technical details necessary if you wish to build your
+own reference for others to use automatically. For most users, it will likely
+be easier to directly specify the references in the ngless script.
+
+The archives provided by NGLess contain BWA index files, the genome reference
+file and a gene annotation file.
 
 ::
 
@@ -54,28 +90,6 @@ These archives are all created using version 75 of `Ensembl <http://www.ensembl.
   |--- Annotation
         |-- annot.gtf.gz
 
-The basename of Description.tar.gz (Description) will have the description name of the respective organism (i.e, Mus_musculus.tar.gz). 
+The basename of Description.tar.gz (Description) will have the description name
+of the respective organism (i.e, Mus_musculus.tar.gz). 
 
-Automatic installation
-----------------------
-It is possible to use the provided data sets directly on NGLess by simply typing its name. 
-If it isn't already available locally (either on user or on root mode), then the archive is 
-downloaded and the script execution is paused until the download is complete and the archive installed. 
-
-The archive is installed on **User** mode and so at **home**/.ngless/genomes.
-
-Manual installation
---------------------
-Is possible to install data sets locally, before running any script. They can be installed locally in **User** mode or globally in **Root** mode.
-
-To install locally (organism bos taurus), is as simple as::
-
-  $ ngless --install-reference-data bosTau4
-
-And to install globally is::
-
-  $ sudo ngless --install-reference-data bosTau4
- 
-When attempting to install an organism if is returned **True** it means that the organism is already installed, and there is no reason to install again. Otherwise, a progress bar is displayed to provide information on the download.
- 
-**Note**: Can be used flag --i instead of --install-reference-data.

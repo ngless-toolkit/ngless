@@ -16,5 +16,3 @@ Welcome to ngless's documentation!
    Visualization
    Language
    Functions
-   Documents
-   Tests
