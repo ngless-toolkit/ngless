@@ -20,6 +20,10 @@ import qualified Data.Text as T
 import Text.ParserCombinators.Parsec.Prim hiding (Parser)
 import Text.Parsec.Combinator
 import Text.Parsec.Pos
+import Text.Parsec.Error
+
+sliceList :: Int -> Int -> [a] -> [a]
+sliceList st e = take (e - st) . drop st
 
 -- | main function of this module
 --
@@ -29,13 +33,38 @@ parsengless :: String -- ^ input filename (for error messages)
             -> Bool -- ^ whether the version statement is mandatory
             -> T.Text -- ^ input data
             -> Either T.Text Script -- ^ either error message or parsed 'Script'
-parsengless inputname reqversion input =
-        tokenize inputname input >>= parsetoks inputname reqversion
+parsengless inputname reqversion input = tokenize inputname input >>= parsetoks input inputname reqversion
 
-parsetoks :: String -> Bool -> [(SourcePos,Token)] -> Either T.Text Script
-parsetoks inputname reqversion toks = case parse (nglparser reqversion) inputname (_cleanupindents toks) of
+parsetoks :: T.Text -> String -> Bool -> [(SourcePos,Token)] -> Either T.Text Script
+parsetoks input inputname reqversion toks = case parse (nglparser reqversion) inputname (_cleanupindents toks) of
             Right val -> Right val
-            Left err -> Left . T.pack . show $ err
+            Left err -> Left $ buildErrorMessage input err
+
+
+buildErrorMessage :: T.Text -> ParseError -> T.Text
+buildErrorMessage input err = T.concat $ ["Parsing error on file '", T.pack fname, "' on line ", T.pack . show $ line, " (column ", T.pack . show $ col, ")\n\n"]
+                    ++ preLines 3
+                    ++ ["\n", indicatorLine]
+                    ++ postLines 2
+                    ++ ["\n\n", T.pack . show $ err, "\n"]
+    where
+        pos = errorPos err
+        fname = sourceName pos
+        line = sourceLine pos
+        col = sourceColumn pos
+        sourceLines = T.lines input
+        preLines :: Int -> [T.Text]
+        preLines n = withNLTAB $ sliceList (max 0 (line - n)) (line + 1) sourceLines
+        postLines n = withNLTAB $ sliceList (line + 1) (line + 1 + n) sourceLines
+        withNLTAB [] = []
+        withNLTAB (ell:ls) = ("\n\t":ell:withNLTAB ls)
+        indicatorLine = T.pack (['-' | _ <- [1..col+8]] ++ "^")
+        showMessage (SysUnExpect m) = T.concat ["\tSystem unexpected ", T.pack m, "\n"]
+        showMessage (UnExpect m) = T.concat ["\tUnexpected ", T.pack m, "\n"]
+        showMessage (Expect m) = T.concat ["\tExpected ", T.pack m, "\n"]
+        showMessage (Message m) = T.concat ["\t", T.pack m, "\n"]
+
+
 
 -- | '_cleanupindents' removes spaces that do not follow new lines as well as
 -- any spaces that are between brackets (round or square).

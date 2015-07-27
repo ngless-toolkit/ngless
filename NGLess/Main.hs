@@ -83,8 +83,8 @@ wrapPrint (Script v sc) = wrap sc >>= Right . Script v
             | f `elem` [Fprint, Fwrite] = False
         wrapable _ = True
 
-rightOrDie :: (Show e) => Either e a -> IO a
-rightOrDie (Left err) = fatalError (show err)
+rightOrDie :: Either T.Text a -> IO a
+rightOrDie (Left err) = fatalError (T.unpack err)
 rightOrDie (Right v) = return v
 
 fatalError :: String -> IO b
@@ -119,7 +119,7 @@ optsExec opts@DefaultMode{} = do
     engltext <- case script opts of
         Just s -> return . Right . T.pack $ s
         _ -> T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
-    ngltext <- rightOrDie engltext
+    ngltext <- rightOrDie (case engltext of { Right e -> Right e ; Left b -> Left . T.pack . show $ b })
     let maybe_add_print = (if print_last opts then wrapPrint else Right)
     let parsed = parsengless fname reqversion ngltext >>= maybe_add_print >>= checktypes >>= validate
     sc <- rightOrDie parsed
@@ -133,7 +133,7 @@ optsExec opts@DefaultMode{} = do
     outputLno' DebugOutput "Validating script..."
     errs <- validate_io sc
     when (isJust errs) $
-        rightOrDie (Left . fromJust $ errs)
+        rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs)
     outputLno' InfoOutput "Script OK. Starting interpretation..."
     interpret fname ngltext (nglBody sc)
     writeOutput (odir </> "output.js") fname ngltext
