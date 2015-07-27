@@ -15,7 +15,7 @@ module Interpret
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Error
+import Control.Monad.Except
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
@@ -77,9 +77,6 @@ import Data.FastQ
 data NGError = NGError !T.Text
         deriving (Show, Eq)
 
-instance Error NGError where
-    strMsg = NGError . T.pack
-
 instance IsString NGError where
     fromString = NGError . T.pack
 
@@ -90,7 +87,7 @@ throwErrorStr = throwError . NGError . T.pack
 type NGLEnv_t = Map.Map T.Text NGLessObject
 
 type InterpretationEnvT m =
-            ErrorT
+            ExceptT
                 NGError
                 (StateT (Int,NGLEnv_t) m)
 -- Monad 1: IO + read-write environment
@@ -99,7 +96,7 @@ type InterpretationEnvIO = InterpretationEnvT (ResourceT IO)
 type InterpretationEnv = InterpretationEnvT Identity
 -- Monad 3: read-only environment
 type InterpretationROEnv =
-            ErrorT
+            ExceptT
                 NGError
                 (Reader NGLEnv_t)
 
@@ -129,7 +126,7 @@ setVariableValue !k !v = modify $ \(n,e) -> (n, Map.insert k v e)
 runInEnv :: InterpretationEnv a -> InterpretationEnvIO a
 runInEnv action = do
     env <- gets id
-    let Identity (mv,env') = runStateT (runErrorT action) env
+    let Identity (mv,env') = runStateT (runExceptT action) env
     put env'
     case mv of
         Left e -> throwError e
@@ -138,13 +135,13 @@ runInEnv action = do
 runInROEnv :: InterpretationROEnv a -> InterpretationEnv a
 runInROEnv action = do
     (_,env) <- gets id
-    let Identity mv = runReaderT (runErrorT action) env
+    let Identity mv = runReaderT (runExceptT action) env
     case mv of
         Left e -> throwError e
         Right v -> return v
 
 runInterpret :: InterpretationROEnv a -> NGLEnv_t -> a
-runInterpret action env = case runReaderT (runErrorT action) env of
+runInterpret action env = case runReaderT (runExceptT action) env of
         Identity (Left err) -> error ("Error in interpretation" ++ show err)
         Identity (Right v) -> v
 
@@ -166,7 +163,7 @@ interpret fname script es = do
         initialState = (0, Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty))
     odir <- outputDirectory
     setupHtmlViewer odir
-    r <- runResourceT $ evalStateT (runErrorT . interpretIO $ es) initialState
+    r <- runResourceT $ evalStateT (runExceptT . interpretIO $ es) initialState
     case r of
         Right _ -> outputListLno InfoOutput Nothing ["Ngless finished."]
         Left err -> outputListLno ErrorOutput Nothing [show err]
