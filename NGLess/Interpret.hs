@@ -156,9 +156,8 @@ unreachable err = error ("Reached code that was thought to be unreachable!\n"++e
 nglTypeError err = error ("Unexpected type error! This should have been caught by validation!\n"++err)
 
 
-traceExpr m e = do
+traceExpr m e =
     liftIO $ outputListLno' TraceOutput ["Interpreting [", m , "]: ", show e]
-    return e
 
 interpret :: FilePath -> T.Text -> [(Int,Expression)] -> IO ()
 interpret fname script es = do
