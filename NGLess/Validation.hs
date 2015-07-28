@@ -52,7 +52,7 @@ symbols_list = ["gene", "cds", "exon"]
 
 
 validate_version :: Script -> Maybe T.Text
-validate_version sc = nglVersion sc >>= \case
+validate_version sc = nglVersion  <$> nglHeader sc >>= \case
     "0.0" -> Nothing
     version -> Just (T.concat ["Version ", version, " is not supported (only version 0.0 is available)."])
 

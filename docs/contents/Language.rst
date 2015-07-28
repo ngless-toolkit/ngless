@@ -34,7 +34,6 @@ Integers are specified as decimals ``[0-9]+`` or as hexadecimals
 
 Booleans are denoted as ``true`` or ``false``.
 
-
 Version declaration
 -------------------
 
@@ -44,6 +43,19 @@ The first line of an NGLess file should be a version declaration::
 
 Future versions of ngless will increase the string value. Also serves as a
 magic constant for other tools.
+
+Module Import Statments
+-----------------------
+
+Following the version statement, it is possible to add module import
+statements, for example::
+
+    import "batch" version "1.0"
+
+This statement specifies that the ``batch`` module, version ``1.0`` should be used in
+this script. Module versions are independent of ngless versions.
+
+Use statements are not legal except as the first block.
 
 Comments
 --------

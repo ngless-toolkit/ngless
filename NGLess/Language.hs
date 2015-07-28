@@ -14,6 +14,8 @@ module Language
     , FuncName(..)
     , MethodName(..)
     , NGLType(..)
+    , Header(..)
+    , ModInfo(..)
     , Script(..)
     , NGLessObject(..)
     , function_opt_arg_type
@@ -259,9 +261,19 @@ instance Show Expression where
 showArgs [] = ""
 showArgs ((Variable v, e):args) = "; "++T.unpack v++"="++show e++showArgs args
 
+data ModInfo = ModInfo
+    { modName :: !T.Text
+    , modVersion :: !T.Text
+    } deriving (Eq, Show)
+
+data Header = Header
+    { nglVersion :: T.Text
+    , nglModules :: [ModInfo]
+    } deriving (Eq, Show)
+
 -- | Script is a version declaration followed by a series of expressions
 data Script = Script
-        { nglVersion :: Maybe T.Text -- ^ optional if -e option is used
-        , nglBody :: [(Int,Expression)] -- ^ (line number, expression)
-        } deriving (Eq,Show)
+    { nglHeader :: Maybe Header -- ^ optional if -e option is used
+    , nglBody :: [(Int,Expression)] -- ^ (line number, expression)
+    } deriving (Eq,Show)
 

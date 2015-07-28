@@ -82,7 +82,12 @@ case_parse_if_end = parseBody blocks @?= block
 case_parse_ngless = parsengless "test" True ngs @?= Right ng
     where
         ngs = "ngless '0.0'\n"
-        ng  = Script (Just "0.0") []
+        ng  = Script (Just $ Header "0.0" []) []
+
+case_parse_import = parsengless "test" True ngs @?= Right ng
+    where
+        ngs = "ngless '0.0'\nimport 'testing' version '3.2-x'\n"
+        ng  = Script (Just $ Header "0.0" [ModInfo "testing" "3.2-x"]) []
 
 case_parse_list = parseText _listexpr "[a,b]" @?= ListExpression [Lookup (Variable "a"), Lookup (Variable "b")]
 

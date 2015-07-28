@@ -92,8 +92,8 @@ _cleanupindents = _cleanupindents' []
 
 type Parser = GenParser (SourcePos,Token) ()
 
-nglparser False = Script <$> optionMaybe ngless_version <*> (many eol *> _nglbody)
-nglparser True = Script <$> (Just <$> ngless_version) <*> (many eol *> _nglbody)
+nglparser False = Script <$> optionMaybe ngless_header <*> (many eol *> _nglbody)
+nglparser True = Script <$> (Just <$> ngless_header) <*> (many eol *> _nglbody)
 _nglbody = (eof *> pure []) <|> (many1 lno_expression <* eof)
 lno_expression = (,) <$> linenr <*> expression
     where linenr = sourceLine `fmap` getPosition
@@ -136,6 +136,9 @@ word = tokf $ \case
     TWord w -> Just w
     _ -> Nothing
 
+match_word w = (tokf $ \case
+    TWord w' | w == w' -> Just w
+    _ -> Nothing) <?> ("word "++T.unpack w)
 reserved r = (tokf $ \case { TReserved r' | r == r' -> Just r; _ -> Nothing }) <?> (concat [T.unpack r, " (reserved word)"])
 
 indentation = (tokf $ \case { TIndent i -> Just i; _ -> Nothing }) <?> "indentation"
@@ -245,6 +248,9 @@ block = do
 variableList = sepBy1 variable (operator ',') <?> "variable list"
 variable = Variable <$> word <?> "variable"
 
+ngless_header = Header <$> ngless_version <*> many import_mod
 ngless_version = ngless_version' <?> "ngless version declararion"
     where ngless_version' = reserved "ngless" *> (string <?> "ngless version string") <* eol
+
+import_mod = ModInfo <$> (reserved "import" *> (string <?> "module name")) <*> (match_word "version" *> (string <?> "module version")) <* eol
 

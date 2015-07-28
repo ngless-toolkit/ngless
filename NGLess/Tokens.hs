@@ -107,6 +107,7 @@ reservedwords =
         ,"discard"
         ,"continue"
         ,"not"
+        ,"import"
         ,"using"
         ]
 
