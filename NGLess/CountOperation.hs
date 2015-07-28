@@ -9,7 +9,7 @@ import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Lazy.Char8 as L8
 
 import Language
-import FileManagement (readPossiblyCompressedFile)
+import Utils.Utils (readPossiblyCompressedFile)
 
 import Data.GFF
 import NGLess

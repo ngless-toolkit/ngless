@@ -33,7 +33,6 @@ import System.Directory
 import Data.Maybe
 
 import Utils.Utils
-import Unique
 import ProcessFastQ
 import Substrim
 import Language
@@ -43,18 +42,19 @@ import Configuration (outputDirectory)
 import Output
 import NGLess
 import Data.Sam
+import Data.FastQ
 
 import Interpretation.Annotation
 import Interpretation.Write
 import Interpretation.Select
 import Interpretation.Map
 import Interpretation.Reads
-import Data.FastQ
+import Unique
 
 
 {- Interpretation is done inside 3 Monads
  -  1. InterpretationEnvIO
- -      This is the IO Monad with a variable environment
+ -      This is the NGLessIO monad with a variable environment on top
  -  2. InterpretationEnv
  -      This is the read-write variable environment
  -  3. InterpretationROEnv
@@ -235,7 +235,7 @@ topFunction f expr args block = do
 topFunction' :: FuncName -> NGLessObject -> [(T.Text, NGLessObject)] -> Maybe Block -> InterpretationEnvIO NGLessObject
 topFunction' Ffastq     expr args Nothing = executeFastq expr args
 topFunction' Fsamfile   expr args Nothing = executeSamfile expr args
-topFunction' Funique    expr args Nothing = executeUnique expr args
+topFunction' Funique    expr args Nothing = runNGLessIO (executeUnique expr args)
 topFunction' Fwrite     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
 topFunction' Fmap       expr args Nothing = executeMap expr args
 topFunction' Fas_reads  expr args Nothing = runNGLessIO (executeReads expr args)
@@ -351,22 +351,6 @@ executeMap fps args = case lookup "reference" args of
             executeMap' (NGOReadSet2 _enc fp1 fp2) = runNGLessIO $ interpretMapOp2 ref fp1 fp2
             executeMap' v = throwErrorStr ("map of " ++ show v ++ " not implemented yet")
     _         -> error "map could not parse reference argument"
-
-executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeUnique (NGOList e) args = NGOList <$> mapM (\x -> executeUnique x args) e
-executeUnique (NGOReadSet1 enc file) args = do
-        rs <- liftIO $ readReadSet enc file
-        d <- runNGLessIO (writeToNFiles file enc rs)
-        let NGOInteger mc = lookupWithDefault (NGOInteger 1) "max_copies" args
-        uniqueCalculations' mc d --default
-    where
-        uniqueCalculations' :: Integer -> FilePath -> InterpretationEnvIO NGLessObject
-        uniqueCalculations' numMaxOccur d = do
-            fs <- liftIO $ readNFiles enc (fromIntegral numMaxOccur) d
-            nFp <- runNGLessIO $ writeReadSet file fs enc
-            return $ NGOReadSet1 enc nFp
-
-executeUnique expr _ = throwErrorStr ("executeUnique: Cannot handle argument " ++ show expr)
 
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject

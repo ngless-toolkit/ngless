@@ -5,7 +5,6 @@
 
 module ProcessFastQ
     (
-    readReadSet,
     writeReadSet,
     executeQProc,
     ) where
@@ -23,6 +22,7 @@ import FastQStatistics
 import Data.FastQ
 import Language
 import Output
+import Utils.Utils
 import NGLess
 
 writeGZIP :: Handle -> BL.ByteString -> IO ()
@@ -35,10 +35,6 @@ writeReadSet fn rs enc = do
         writeGZIP h (asFastQ enc rs)
         hClose h
     return newfp
-
-
-readReadSet :: FastQEncoding -> FilePath -> IO [ShortRead]
-readReadSet enc fn = parseFastQ enc <$> readPossiblyCompressedFile fn
 
 -- ^ Process quality.
 executeQProc :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)

@@ -7,13 +7,17 @@ module Data.FastQ
     , guessEncoding
     , encodingOffset
     , encodingName
+    , readReadSet
     , parseFastQ
     , asFastQ
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString as B
+import Control.Applicative ((<$>))
 import Data.Word
+
+import Utils.Utils
 
 data ShortRead = ShortRead
         { srHeader :: !B.ByteString
@@ -45,7 +49,7 @@ parseFastQ enc contents = parse' . map BL.toStrict . BL.lines $ contents
     where
         parse' [] = []
         parse' (lid:lseq:_:lqs:xs) = (createRead lid lseq lqs) : parse' xs
-        parse' xs = error (concat ["Number of lines is not multiple of 4! EOF:" ++ show xs])
+        parse' xs = error ("Number of lines is not multiple of 4! EOF:" ++ show xs)
         createRead rid rseq rqs = ShortRead rid rseq (decodeQual rqs)
         offset = encodingOffset enc
         decodeQual = B.map sub
@@ -58,4 +62,6 @@ asFastQ enc rs = BL.fromChunks (asFastQ' rs)
         asFastQ' ((ShortRead a b c):rss) = [a, "\n", b, "\n+\n", encodeQual c, "\n"] ++ asFastQ' rss
         encodeQual = B.map ((+) (encodingOffset enc))
 
+readReadSet :: FastQEncoding -> FilePath -> IO [ShortRead]
+readReadSet enc fn = parseFastQ enc <$> readPossiblyCompressedFile fn
 

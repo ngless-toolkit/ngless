@@ -23,11 +23,11 @@ import Data.List (isInfixOf)
 import Data.Maybe
 
 import Language
-import FileManagement
 import Configuration
 import NGLess
 import Output
 import Data.AnnotRes
+import Utils.Utils (readPossiblyCompressedFile)
 
 removeEnd :: String -> String -> String
 removeEnd base suffix = take (length base - length suffix) base

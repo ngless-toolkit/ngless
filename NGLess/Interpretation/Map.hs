@@ -34,6 +34,7 @@ import NGLess
 
 import Data.Sam
 import Utils.Bwa
+import Utils.Utils (readPossiblyCompressedFile)
 
 ensureIndexExists :: FilePath -> NGLessIO FilePath
 ensureIndexExists refPath = do

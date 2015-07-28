@@ -7,7 +7,6 @@ module NGLess
     ) where
 
 import qualified Data.Text as T
-import Control.Applicative ((<$>))
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Resource
 import Data.String

@@ -22,7 +22,7 @@ import Control.DeepSeq
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 
-import FileManagement(readPossiblyCompressedFile)
+import Utils.Utils (readPossiblyCompressedFile)
 import ReferenceDatabases
 import Output
 

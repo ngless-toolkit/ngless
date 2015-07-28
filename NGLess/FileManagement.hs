@@ -5,20 +5,12 @@ module FileManagement
     , openNGLTempFile
     , openNGLTempFile'
     , setupHtmlViewer
-    , readPossiblyCompressedFile
     , takeBaseNameNoExtensions
     ) where
 
-import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString as BS
-
-import qualified Codec.Compression.GZip as GZip    
-
 import Control.Applicative ((<$>))
-import Data.List (isSuffixOf)
-
 import System.FilePath.Posix
-
 import Control.Monad
 import System.Posix.Internals (c_getpid)
 
@@ -102,10 +94,4 @@ copyDir src dst = do
     if exists
         then copyDir  (src </> n) (dst </> n)
         else copyFile (src </> n) (dst </> n)
-
-
-readPossiblyCompressedFile ::  FilePath -> IO BL.ByteString
-readPossiblyCompressedFile fname
-    | ".gz" `isSuffixOf` fname = GZip.decompress <$> BL.readFile fname
-    | otherwise = BL.readFile fname
 
