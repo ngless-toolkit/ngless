@@ -59,11 +59,6 @@ buildErrorMessage input err = T.concat $ ["Parsing error on file '", T.pack fnam
         withNLTAB [] = []
         withNLTAB (ell:ls) = ("\n\t":ell:withNLTAB ls)
         indicatorLine = T.pack (['-' | _ <- [1..col+8]] ++ "^")
-        showMessage (SysUnExpect m) = T.concat ["\tSystem unexpected ", T.pack m, "\n"]
-        showMessage (UnExpect m) = T.concat ["\tUnexpected ", T.pack m, "\n"]
-        showMessage (Expect m) = T.concat ["\tExpected ", T.pack m, "\n"]
-        showMessage (Message m) = T.concat ["\t", T.pack m, "\n"]
-
 
 
 -- | '_cleanupindents' removes spaces that do not follow new lines as well as
