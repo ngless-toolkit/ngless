@@ -37,7 +37,6 @@ import ProcessFastQ
 import Substrim
 import Language
 import FileManagement
-import CountOperation (countAnnotatedSet)
 import Configuration (outputDirectory)
 import Output
 import NGLess
@@ -49,6 +48,7 @@ import Interpretation.Write
 import Interpretation.Select
 import Interpretation.Map
 import Interpretation.Reads
+import Interpretation.Count
 import Unique
 
 
@@ -241,7 +241,7 @@ topFunction' Fmap       expr args Nothing = executeMap expr args
 topFunction' Fas_reads  expr args Nothing = runNGLessIO (executeReads expr args)
 topFunction' Fselect    expr args Nothing = runNGLessIO (executeSelect expr args)
 topFunction' Fannotate  expr args Nothing = executeAnnotation expr args
-topFunction' Fcount     expr args Nothing = executeCount expr args
+topFunction' Fcount     expr args Nothing = runNGLessIO (executeCount expr args)
 topFunction' Fprint     expr args Nothing = executePrint expr args
 
 topFunction' Fpaired mate1 args Nothing = do
@@ -285,16 +285,6 @@ executeSamfile expr [] = do
         (NGOList sams) -> NGOList <$> sequence [executeSamfile s [] | s <- sams]
         v -> throwErrorStr ("samfile function: unexpected first argument: " ++ show v)
 executeSamfile _ args = throwErrorStr ("samfile does not take any arguments, got " ++ show args)
-
-executeCount :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeCount (NGOList e) args = NGOList <$> mapM (\x -> executeCount x args) e
-executeCount (NGOAnnotatedSet p) args = do
-    let c = lookup "counts" args
-        NGOInteger m = lookupWithDefault (NGOInteger 0) "min" args
-    res <- runNGLessIO $ countAnnotatedSet p c m
-    return $ NGOAnnotatedSet res
-
-executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
 executeAnnotation :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeAnnotation (NGOList e) args = NGOList <$> mapM (\x -> executeAnnotation x args) e

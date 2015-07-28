@@ -39,8 +39,8 @@ import Substrim
 import FastQStatistics
 import FileManagement
 import Validation
-import CountOperation
 import Interpretation.Annotation
+import Interpretation.Count
 import VectorOperations
 import ProcessFastQ
 import ReferenceDatabases

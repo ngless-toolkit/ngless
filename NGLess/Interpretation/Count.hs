@@ -1,5 +1,5 @@
-module CountOperation
-    ( countAnnotatedSet
+module Interpretation.Count
+    ( executeCount
     , _filterAnnot
     ) where
 
@@ -9,11 +9,19 @@ import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Lazy.Char8 as L8
 
 import Language
-import Utils.Utils (readPossiblyCompressedFile)
 
 import Data.GFF
 import NGLess
 import Data.AnnotRes
+import Utils.Utils
+
+executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
+executeCount (NGOAnnotatedSet p) args = do
+    let c = lookup "counts" args
+        NGOInteger m = lookupWithDefault (NGOInteger 0) "min" args
+    NGOAnnotatedSet <$> countAnnotatedSet p c m
+executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
 countAnnotatedSet :: FilePath -> Maybe NGLessObject -> Integer -> NGLessIO FilePath
 countAnnotatedSet p fs m = do
