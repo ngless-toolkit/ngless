@@ -15,9 +15,11 @@ import Parse
 import Configuration
 import ReferenceDatabases
 import Output
+import NGLess
 
 import Data.Maybe
 import Control.Monad
+import Control.Monad.IO.Class (liftIO)
 import Control.Applicative
 import Control.Concurrent
 import System.Console.CmdArgs
@@ -27,6 +29,8 @@ import System.IO (stderr, hPutStrLn)
 import System.Console.ANSI
 import System.Exit (exitSuccess, exitFailure)
 
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.Resource
 
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -97,6 +101,9 @@ whenStrictlyNormal act = do
     v <- getVerbosity
     when (v == Normal) act
 
+runNGLessIO :: NGLessIO a -> IO (Either NGError a)
+runNGLessIO = runResourceT . runExceptT
+
 optsExec :: NGLess -> IO ()
 optsExec opts@DefaultMode{} = do
     let fname = input opts
@@ -109,13 +116,6 @@ optsExec opts@DefaultMode{} = do
     setTemporaryDirectory (temporary_directory opts)
     setKeepTemporaryFiles (keep_temporary_files opts)
     setTraceFlag (trace_flag opts)
-    odir <- outputDirectory
-    createDirectoryIfMissing False odir
-    --Note that the input for ngless is always UTF-8.
-    --Always. This means that we cannot use T.readFile
-    --which is locale aware.
-    --We also assume that the text file is quite small and, therefore, loading
-    --it in to memory is not resource intensive.
     engltext <- case script opts of
         Just s -> return . Right . T.pack $ s
         _ -> T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
@@ -130,18 +130,33 @@ optsExec opts@DefaultMode{} = do
 
     when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
         whenStrictlyNormal (setVerbosity Quiet)
-    outputLno' DebugOutput "Validating script..."
-    errs <- validate_io sc
-    when (isJust errs) $
-        rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs)
-    outputLno' InfoOutput "Script OK. Starting interpretation..."
-    interpret fname ngltext (nglBody sc)
-    writeOutput (odir </> "output.js") fname ngltext
+    Right odir <- runNGLessIO outputDirectory
+    createDirectoryIfMissing False odir
+    err <- runNGLessIO $ do
+        --Note that the input for ngless is always UTF-8.
+        --Always. This means that we cannot use T.readFile
+        --which is locale aware.
+        --We also assume that the text file is quite small and, therefore, loading
+        --it in to memory is not resource intensive.
+        outputLno' DebugOutput "Validating script..."
+        errs <- liftIO (validate_io sc)
+        when (isJust errs) $
+            liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
+        outputLno' InfoOutput "Script OK. Starting interpretation..."
+        interpret fname ngltext (nglBody sc)
+    case err of
+        Left m -> do
+            putStrLn "FATAL ERROR"
+            putStrLn (show m)
+            exitFailure
+        _ -> do
+            writeOutput (odir </> "output.js") fname ngltext
+            exitSuccess
 
 
 -- if user uses the flag -i he will install a Reference Genome to all users
 optsExec (InstallGenMode ref)
-    | isDefaultReference ref = void $ installData Nothing ref
+    | isDefaultReference ref = void . runNGLessIO $ installData Nothing ref
     | otherwise =
         error (concat ["Reference ", ref, " is not a known reference."])
 

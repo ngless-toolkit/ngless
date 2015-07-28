@@ -3,6 +3,7 @@ module FileManagement
     ( createTempDir
     , generateDirId
     , openNGLTempFile
+    , openNGLTempFile'
     , setupHtmlViewer
     , readPossiblyCompressedFile
     , takeBaseNameNoExtensions
@@ -17,23 +18,43 @@ import Control.Applicative ((<$>))
 import Data.List (isSuffixOf)
 
 import System.FilePath.Posix
-import System.Directory
-import System.IO
 
 import Control.Monad
 import System.Posix.Internals (c_getpid)
 
-import Data.FileEmbed
-import Configuration (outputDirectory, temporaryFileDirectory)
+import Data.FileEmbed (embedDir)
 import Output
+import System.Directory
+import System.IO
+import System.IO.Error
+import Control.Exception
+import Control.Monad.Trans.Resource
+import Control.Monad.IO.Class (liftIO)
+
+import Configuration (temporaryFileDirectory, outputDirectory)
+import NGLess
 
 -- 
-openNGLTempFile :: FilePath -> String -> String -> IO (FilePath, Handle)
-openNGLTempFile base prefix ext = do
+openNGLTempFile' :: FilePath -> String -> String -> NGLessIO (ReleaseKey, (FilePath, Handle))
+openNGLTempFile' base prefix ext = do
     tdir <- temporaryFileDirectory
-    (fp,h) <- openTempFile tdir (prefix ++ takeBaseNameNoExtensions base ++ "." ++ ext)
+    (key,(fp,h)) <- allocate
+                (openTempFile tdir (prefix ++ takeBaseNameNoExtensions base ++ "." ++ ext))
+                deleteTempFile
     outputListLno' DebugOutput ["Created & opened temporary file ", fp]
-    return (fp,h)
+    return (key,(fp,h))
+
+openNGLTempFile :: FilePath -> String -> String -> NGLessIO (FilePath, Handle)
+openNGLTempFile base pre ext = snd <$> openNGLTempFile' base pre ext
+
+removeFileIfExists fp = removeFile fp `catch` ignoreDoesNotExistError
+    where
+        ignoreDoesNotExistError e
+                | isDoesNotExistError e = return ()
+                | otherwise = throwIO e
+deleteTempFile (fp, h) = do
+    hClose h
+    removeFileIfExists fp
 
 takeBaseNameNoExtensions = dropExtensions . takeBaseName
     
@@ -44,10 +65,10 @@ createTempDir dst = do
     createDirectory fp
     return fp
 
-generateDirId :: FilePath -> IO FilePath
+generateDirId :: FilePath -> NGLessIO FilePath
 generateDirId dst = do
     odir <- outputDirectory
-    createTempDirectory odir (takeBaseNameNoExtensions dst)
+    liftIO $ createTempDirectory odir (takeBaseNameNoExtensions dst)
     
 createTempDirectory :: FilePath -> String -> IO FilePath
 createTempDirectory dir t = do

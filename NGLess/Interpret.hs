@@ -30,8 +30,6 @@ import qualified Data.Text.IO as T
 
 import System.IO
 import System.Directory
-
-import Data.String
 import Data.Maybe
 
 import Utils.Utils
@@ -43,6 +41,7 @@ import FileManagement
 import CountOperation (countAnnotatedSet)
 import Configuration (outputDirectory)
 import Output
+import NGLess
 import Data.Sam
 
 import Interpretation.Annotation
@@ -73,13 +72,6 @@ import Data.FastQ
  -
  -}
 
--- For now just a string, but should become more descriptive later
-data NGError = NGError !T.Text
-        deriving (Show, Eq)
-
-instance IsString NGError where
-    fromString = NGError . T.pack
-
 throwErrorStr :: (MonadError NGError m) => String -> m a
 throwErrorStr = throwError . NGError . T.pack
 
@@ -87,18 +79,13 @@ throwErrorStr = throwError . NGError . T.pack
 type NGLEnv_t = Map.Map T.Text NGLessObject
 
 type InterpretationEnvT m =
-            ExceptT
-                NGError
                 (StateT (Int,NGLEnv_t) m)
 -- Monad 1: IO + read-write environment
-type InterpretationEnvIO = InterpretationEnvT (ResourceT IO)
+type InterpretationEnvIO = InterpretationEnvT NGLessIO
 -- Monad 2: read-write environment
-type InterpretationEnv = InterpretationEnvT Identity
+type InterpretationEnv = InterpretationEnvT (ExceptT NGError Identity)
 -- Monad 3: read-only environment
-type InterpretationROEnv =
-            ExceptT
-                NGError
-                (Reader NGLEnv_t)
+type InterpretationROEnv = ExceptT NGError (Reader NGLEnv_t)
 
 {- The result of a block is a status indicating why the block finished
  - and the value of all block variables.
@@ -124,13 +111,14 @@ setVariableValue :: T.Text -> NGLessObject -> InterpretationEnvIO ()
 setVariableValue !k !v = modify $ \(n,e) -> (n, Map.insert k v e)
 
 runInEnv :: InterpretationEnv a -> InterpretationEnvIO a
-runInEnv action = do
+runInEnv act = do
     env <- gets id
-    let Identity (mv,env') = runStateT (runExceptT action) env
-    put env'
-    case mv of
+    let Identity r = runExceptT (runStateT act env)
+    case r of
         Left e -> throwError e
-        Right v -> return v
+        Right (v, env') -> do
+            put env'
+            return v
 
 runInROEnv :: InterpretationROEnv a -> InterpretationEnv a
 runInROEnv action = do
@@ -148,25 +136,30 @@ runInterpret action env = case runReaderT (runExceptT action) env of
 runInROEnvIO :: InterpretationROEnv a -> InterpretationEnvIO a
 runInROEnvIO = runInEnv . runInROEnv
 
+runNGLessIO :: NGLessIO a -> InterpretationEnvIO a
+runNGLessIO act = do
+    r <- liftResourceT (runExceptT act)
+    case r of
+        Right val -> return val
+        Left err -> throwError err
+
 -- | By necessity, this code has several unreachable corners
 unreachable err = error ("Reached code that was thought to be unreachable!\n"++err)
 nglTypeError err = error ("Unexpected type error! This should have been caught by validation!\n"++err)
 
 
 traceExpr m e =
-    liftIO $ outputListLno' TraceOutput ["Interpreting [", m , "]: ", show e]
+    runNGLessIO $ outputListLno' TraceOutput ["Interpreting [", m , "]: ", show e]
 
-interpret :: FilePath -> T.Text -> [(Int,Expression)] -> IO ()
+interpret :: FilePath -> T.Text -> [(Int,Expression)] -> NGLessIO ()
 interpret fname script es = do
     let nglessScript = NGOString script 
         nglessScriptFname = NGOFilename fname
         initialState = (0, Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty))
     odir <- outputDirectory
-    setupHtmlViewer odir
-    r <- runResourceT $ evalStateT (runExceptT . interpretIO $ es) initialState
-    case r of
-        Right _ -> outputListLno InfoOutput Nothing ["Ngless finished."]
-        Left err -> outputListLno ErrorOutput Nothing [show err]
+    liftIO $ setupHtmlViewer odir
+    evalStateT (interpretIO $ es) initialState
+    outputListLno InfoOutput Nothing ["Ngless finished."]
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
 interpretIO [] = return ()
@@ -243,10 +236,10 @@ topFunction' :: FuncName -> NGLessObject -> [(T.Text, NGLessObject)] -> Maybe Bl
 topFunction' Ffastq     expr args Nothing = executeFastq expr args
 topFunction' Fsamfile   expr args Nothing = executeSamfile expr args
 topFunction' Funique    expr args Nothing = executeUnique expr args
-topFunction' Fwrite     expr args Nothing = traceExpr "write" expr >> liftIO (writeToFile expr args)
+topFunction' Fwrite     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
 topFunction' Fmap       expr args Nothing = executeMap expr args
-topFunction' Fas_reads  expr args Nothing = liftIO (executeReads expr args)
-topFunction' Fselect    expr args Nothing = liftIO (executeSelect expr args)
+topFunction' Fas_reads  expr args Nothing = runNGLessIO (executeReads expr args)
+topFunction' Fselect    expr args Nothing = runNGLessIO (executeSelect expr args)
 topFunction' Fannotate  expr args Nothing = executeAnnotation expr args
 topFunction' Fcount     expr args Nothing = executeCount expr args
 topFunction' Fprint     expr args Nothing = executePrint expr args
@@ -298,7 +291,7 @@ executeCount (NGOList e) args = NGOList <$> mapM (\x -> executeCount x args) e
 executeCount (NGOAnnotatedSet p) args = do
     let c = lookup "counts" args
         NGOInteger m = lookupWithDefault (NGOInteger 0) "min" args
-    res <- liftIO $ countAnnotatedSet p c m
+    res <- runNGLessIO $ countAnnotatedSet p c m
     return $ NGOAnnotatedSet res
 
 executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
@@ -314,7 +307,7 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
             (NGOSymbol f) -> [T.unpack f]
             (NGOList feats') -> map (T.unpack . evalSymbol) feats'
             _ -> unreachable "executeAnnotation: TYPE ERROR"
-    res <- liftIO $ annotate e g fs dDS m a s
+    res <- runNGLessIO $ annotate e g fs dDS m a s
     return $ NGOAnnotatedSet res
 executeAnnotation e _ = throwErrorStr ("Annotation can handle MappedReadSet(s) only. Got " ++ show e)
 
@@ -346,7 +339,7 @@ executeQualityProcess (NGOString fname) = do
     executeQualityProcess' Nothing fname' "beforeQC"
 
 executeQualityProcess v = throwErrorStr ("QC expected a string or readset. Got " ++ show v)
-executeQualityProcess' enc fname info = liftIO $ executeQProc enc fname info
+executeQualityProcess' enc fname info = runNGLessIO $ executeQProc enc fname info
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeMap fps args = case lookup "reference" args of
@@ -354,24 +347,23 @@ executeMap fps args = case lookup "reference" args of
     Just (NGOString ref) -> executeMap' fps
         where
             executeMap' (NGOList es) = NGOList <$> forM es executeMap'
-            executeMap' (NGOReadSet1 _enc file)    = liftResourceT $ interpretMapOp ref file
-            executeMap' (NGOReadSet2 _enc fp1 fp2) = liftResourceT $ interpretMapOp2 ref fp1 fp2
+            executeMap' (NGOReadSet1 _enc file)    = runNGLessIO $ interpretMapOp ref file
+            executeMap' (NGOReadSet2 _enc fp1 fp2) = runNGLessIO $ interpretMapOp2 ref fp1 fp2
             executeMap' v = throwErrorStr ("map of " ++ show v ++ " not implemented yet")
     _         -> error "map could not parse reference argument"
 
 executeUnique :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeUnique (NGOList e) args = NGOList <$> mapM (\x -> executeUnique x args) e
 executeUnique (NGOReadSet1 enc file) args = do
-        d <- liftIO $
-            readReadSet enc file 
-                        >>= writeToNFiles file enc
+        rs <- liftIO $ readReadSet enc file
+        d <- runNGLessIO (writeToNFiles file enc rs)
         let NGOInteger mc = lookupWithDefault (NGOInteger 1) "max_copies" args
         uniqueCalculations' mc d --default
     where
         uniqueCalculations' :: Integer -> FilePath -> InterpretationEnvIO NGLessObject
         uniqueCalculations' numMaxOccur d = do
-            nFp <- liftIO $
-                readNFiles enc (fromIntegral numMaxOccur) d >>= \x -> writeReadSet file x enc
+            fs <- liftIO $ readNFiles enc (fromIntegral numMaxOccur) d
+            nFp <- runNGLessIO $ writeReadSet file fs enc
             return $ NGOReadSet1 enc nFp
 
 executeUnique expr _ = throwErrorStr ("executeUnique: Cannot handle argument " ++ show expr)
@@ -380,22 +372,22 @@ executeUnique expr _ = throwErrorStr ("executeUnique: Cannot handle argument " +
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
 executePreprocess (NGOReadSet1 enc file) _args (Block [Variable var] block) = do
-        liftIO $ outputListLno' DebugOutput ["Preprocess on ", file]
+        runNGLessIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         env <- gets snd
-        newfp <- liftIO $ writeReadSet file (execBlock env rs) enc
+        newfp <- runNGLessIO $ writeReadSet file (execBlock env rs) enc
         return $ NGOReadSet1 enc newfp
     where
         execBlock env = mapMaybe (\r -> runInterpret (interpretPBlock1 block var r) env)
 executePreprocess (NGOReadSet2 enc fp1 fp2) _args block = executePreprocess (NGOReadSet3 enc fp1 fp2 "") _args block
 executePreprocess (NGOReadSet3 enc fp1 fp2 fp3) _args (Block [Variable var] block) = do
-        liftIO $ outputListLno' DebugOutput (["Preprocess on paired end ",
+        runNGLessIO $ outputListLno' DebugOutput (["Preprocess on paired end ",
                                                 fp1, "+", fp2] ++ (if fp3 /= ""
                                                                     then [" with singles ", fp3]
                                                                     else []))
-        (fp1', out1) <- liftIO $ openNGLTempFile fp1 "preprocessed.1." ".fq"
-        (fp2', out2) <- liftIO $ openNGLTempFile fp2 "preprocessed.2." ".fq"
-        (fps, hs) <- liftIO $ openNGLTempFile fp1 "preprocessed.singles." ".fq"
+        (fp1', out1) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.1." ".fq"
+        (fp2', out2) <- runNGLessIO $ openNGLTempFile fp2 "preprocessed.2." ".fq"
+        (fps, hs) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.singles." ".fq"
         rs1 <- map NGOShortRead <$> liftIO (readReadSet enc fp1)
         rs2 <- map NGOShortRead <$> liftIO (readReadSet enc fp2)
         anySingle <- intercalate (out1, out2, hs) rs1 rs2 False
@@ -406,7 +398,7 @@ executePreprocess (NGOReadSet3 enc fp1 fp2 fp3) _args (Block [Variable var] bloc
         liftIO $ hClose `mapM_` [out1, out2, hs]
         unless (anySingle || anySingle')
             (liftIO $ removeFile fps)
-        liftIO $ outputLno' DebugOutput "Preprocess finished"
+        runNGLessIO $ outputLno' DebugOutput "Preprocess finished"
         return $ if anySingle || anySingle'
                     then NGOReadSet3 enc fp1' fp2' fps
                     else NGOReadSet2 enc fp1' fp2'
@@ -465,7 +457,7 @@ executePrint err  _ = throwErrorStr ("Cannot print " ++ show err)
 
 executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executeSelectWBlock (NGOMappedReadSet fname ref) [] (Block [Variable var] body) = do
-    liftIO $ outputListLno' TraceOutput ["Executing blocked select on file ", fname]
+    runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", fname]
     env <- gets snd
     let oname = fname ++ ".selected"
     liftIO $ withFile fname ReadMode $ \iraw -> do
@@ -570,8 +562,3 @@ _evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = NGOInteger (a + b)
 _evalBinary BOpMul (NGOInteger a) (NGOInteger b) = NGOInteger (a * b)
 _evalBinary op a b = nglTypeError (concat ["_evalBinary: ", show op, " ", show a, " ", show b])
 
-
-getScriptName = do
-    -- This cannot fail as we inserted the variable ourselves
-    Just (NGOFilename fname) <- runInROEnvIO $ lookupVariable ".scriptfname"
-    return fname

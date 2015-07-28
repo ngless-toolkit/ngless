@@ -8,6 +8,7 @@ import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
+import Control.Monad.IO.Class (liftIO)
 import Control.Applicative
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
@@ -45,6 +46,7 @@ import VectorOperations
 import ProcessFastQ
 import ReferenceDatabases
 import Configuration
+import NGLess
 
 import Interpretation.Map
 
@@ -447,7 +449,7 @@ map_s = "ngless '0.0'\n\
 case_preprocess_script = case parsetest preprocess_s >>= checktypes of
     Left err -> assertFailure (show err)
     Right expr -> do
-        (interpret "test" preprocess_s) . nglBody $ expr
+        testNGLessIO $ (interpret "test" preprocess_s) . nglBody $ expr
         res' <- B.readFile "test_samples/sample20_post.fq"
         (length $ B.lines res') @?= (16 :: Int)
         removeFile "test_samples/sample20_post.fq"
@@ -455,7 +457,7 @@ case_preprocess_script = case parsetest preprocess_s >>= checktypes of
 case_map_script = case parsetest map_s >>= checktypes of
     Left err -> assertFailure (show err)
     Right expr -> do
-        (interpret "testing" map_s) . nglBody $ expr
+        testNGLessIO $ (interpret "testing" map_s) . nglBody $ expr
         res' <- readPossiblyCompressedFile "test_samples/sample20_mapped.sam"
         _calcSamStats res' @?= (5,0,0,0)
         removeFile "test_samples/sample20_mapped.sam"
@@ -632,7 +634,7 @@ case_num_files_2 = do -- github rejects files with more than 100MB
 
 case_unique_1_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
-    p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
+    p <- testNGLessIO $ writeToNFiles "test_samples/data_set_repeated.fq" enc c
     ds <- readNFiles enc 1  p
     removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
     length ds @?=  54
@@ -640,7 +642,7 @@ case_unique_1_read = do
 
 case_unique_2_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
-    p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
+    p <- testNGLessIO $ writeToNFiles "test_samples/data_set_repeated.fq" enc c
     ds <- readNFiles enc 2 p 
     removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
     length ds @?=  (2 * 54)
@@ -648,7 +650,7 @@ case_unique_2_read = do
 
 case_unique_3_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
-    p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
+    p <- testNGLessIO $ writeToNFiles "test_samples/data_set_repeated.fq" enc c
     ds <- readNFiles enc 3 p 
     removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
     length ds @?=  (3 * 54)
@@ -656,7 +658,7 @@ case_unique_3_read = do
 
 case_unique_4_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
-    p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
+    p <- testNGLessIO $ writeToNFiles "test_samples/data_set_repeated.fq" enc c
     ds <- readNFiles enc 4 p 
     removeDirectoryRecursive p -- need to do this by hand to emulate normal execution.     
     length ds @?=  (4 * 54)
@@ -664,7 +666,7 @@ case_unique_4_read = do
 
 case_unique_5_read = do
     c <- readReadSet enc "test_samples/data_set_repeated.fq" 
-    p <- writeToNFiles "test_samples/data_set_repeated.fq" enc c
+    p <- testNGLessIO $ writeToNFiles "test_samples/data_set_repeated.fq" enc c
     ds <- readNFiles enc 5 p 
     removeDirectoryRecursive p -- need to do this by hand to emulate normal execution.     
     length ds @?=  (4 * 54)
@@ -712,10 +714,10 @@ case_test_setup_html_view = do
 -- MapOperations
 
 -- install genome User mode
-case_install_genome_user_mode = do
+case_install_genome_user_mode = testNGLessIO $ do
   r1 <- installData (Just User) "sacCer3"
   p <- (</> "sacCer3") <$> userDataDirectory
-  r1 @?= p 
+  liftIO (r1 @?= p)
 
 
 -- ProcessFastQ
@@ -724,17 +726,18 @@ low_char_int = (lc . computeStats) <$> readPossiblyCompressedFile "test_samples/
 case_read_and_write_fastQ = do
     enc <- guessEncoding <$> low_char_int
     rs <- readReadSet enc "test_samples/sample.fq.gz"
-    fp <- writeReadSet "test_samples/sample.fq.gz" rs enc
-    newrs <- readReadSet enc fp
-    newrs @?= rs
+    testNGLessIO $ do
+        fp <- writeReadSet "test_samples/sample.fq.gz" rs enc
+        newrs <- liftIO $ readReadSet enc fp
+        liftIO $ newrs @?= rs
 
 -- "test_samples/sample.fq.gz" has 33 as lowest char from the initial data set
 case_read_fastQ_store_enc = do
-    nt <- generateDirId fp
+    nt <- testNGLessIO $ generateDirId fp
     createDirectoryIfMissing False $ dstDirBef nt
     createDirectoryIfMissing False $ dstDirAft nt
-    (NGOReadSet1 eb _) <- executeQProc Nothing   fp (dstDirBef nt)
-    (NGOReadSet1 ea _) <- executeQProc (Just eb) fp (dstDirAft nt)
+    (NGOReadSet1 eb _) <- testNGLessIO $ executeQProc Nothing   fp (dstDirBef nt)
+    (NGOReadSet1 ea _) <- testNGLessIO $ executeQProc (Just eb) fp (dstDirAft nt)
     removeDirectoryRecursive $ dstDirBef nt -- delete test generated data.
     removeDirectoryRecursive $ dstDirAft nt -- delete test generated data.
     eb @?= ea

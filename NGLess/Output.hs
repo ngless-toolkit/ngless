@@ -25,6 +25,7 @@ import System.Time (getClockTime)
 import System.Console.ANSI
 import Control.Applicative
 import Control.Monad
+import Control.Monad.IO.Class (liftIO)
 import System.Console.CmdArgs.Verbosity (getVerbosity, Verbosity(..))
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
@@ -33,6 +34,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.FastQ (FastQEncoding(..), encodingName)
 import qualified FastQStatistics as FQ
 import Configuration
+import NGLess
 
 data OutputType = TraceOutput | DebugOutput | InfoOutput | ResultOutput | WarningOutput | ErrorOutput
     deriving (Eq, Ord)
@@ -86,18 +88,18 @@ savedFQOutput = unsafePerformIO (newIORef [])
 setOutputLno :: Maybe Int -> IO ()
 setOutputLno = writeIORef curLine
 
-outputListLno :: OutputType -> Maybe Int -> [String] -> IO ()
+outputListLno :: OutputType -> Maybe Int -> [String] -> NGLessIO ()
 outputListLno ot lno ms = output ot (fromMaybe 0 lno) (concat ms)
 
-outputListLno' :: OutputType -> [String] -> IO ()
+outputListLno' :: OutputType -> [String] -> NGLessIO ()
 outputListLno' !ot ms = do
-    lno <- readIORef curLine
+    lno <- liftIO $ readIORef curLine
     outputListLno ot lno ms
 
-outputLno' :: OutputType -> String -> IO ()
+outputLno' :: OutputType -> String -> NGLessIO ()
 outputLno' !ot m = outputListLno' ot [m]
 
-shouldPrint :: Bool -> OutputType -> Verbosity -> IO Bool
+shouldPrint :: Bool -> OutputType -> Verbosity -> NGLessIO Bool
 shouldPrint isT ot v = do
     traceSet <- traceFlag
     return $ traceSet || shouldPrint' isT ot v
@@ -109,18 +111,18 @@ shouldPrint' False ot Normal = (ot > InfoOutput)
 shouldPrint' True  ot Quiet = (ot >= WarningOutput)
 shouldPrint' True  ot Normal = (ot >= InfoOutput)
 
-output :: OutputType -> Int -> String -> IO ()
+output :: OutputType -> Int -> String -> NGLessIO ()
 output !ot !lno !msg = do
-    isTerm <- hIsTerminalDevice stdout
-    verb <- getVerbosity
-    t <- getZonedTime
-    modifyIORef savedOutput (OutputLine lno ot msg:)
+    isTerm <- liftIO $ hIsTerminalDevice stdout
+    verb <- liftIO getVerbosity
+    t <- liftIO getZonedTime
+    liftIO $ modifyIORef savedOutput (OutputLine lno ot msg:)
     sp <- shouldPrint isTerm ot verb
     when sp $ do
         let st = setSGRCode [SetColor Foreground Dull (colorFor ot)]
             rst = setSGRCode [Reset]
 
-        putStrLn $ printf "%s[%s]: Line %s: %s%s" st (show t) (show lno) msg rst
+        liftIO . putStrLn $ printf "%s[%s]: Line %s: %s%s" st (show t) (show lno) msg rst
 
 colorFor :: OutputType -> Color
 colorFor TraceOutput = White

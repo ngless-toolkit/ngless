@@ -12,12 +12,14 @@ module Interpretation.Select
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Text as T
 import Control.Monad
+import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<$>))
 import System.IO
 import Utils.Utils
 
 import Language
 import FileManagement
+import NGLess
 
 import Data.Sam
 
@@ -45,14 +47,16 @@ _matchConditions _ _ = error "Either `keep_if` or `drop_if` must be empty"
 _match1 samline SelectMapped = isAligned samline
 _match1 samline SelectUnmapped = not $ isAligned samline
 
+executeSelect :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSelect (NGOMappedReadSet fpsam ref) args = do
     let conditions = _parseConditions args
     (oname,ohand) <- openNGLTempFile fpsam "selected_" "sam"
-    samcontents <- BL.lines <$> BL.readFile fpsam
-    forM_ samcontents $ \line ->
-        when (BL.take 1 line == "@" ||
-            _matchConditions conditions (readSamLine line))
-                (BL.hPut ohand line >> BL.hPut ohand "\n")
-    hClose ohand
-    return (NGOMappedReadSet oname ref)
+    liftIO $ do
+        samcontents <- BL.lines <$> BL.readFile fpsam
+        forM_ samcontents $ \line ->
+            when (BL.take 1 line == "@" ||
+                _matchConditions conditions (readSamLine line))
+                    (BL.hPut ohand line >> BL.hPut ohand "\n")
+        hClose ohand
+        return (NGOMappedReadSet oname ref)
 executeSelect o _ = error ("NGLESS type checking error (Select received " ++ show o ++ ")")

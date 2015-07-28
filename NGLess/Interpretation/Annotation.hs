@@ -19,6 +19,7 @@ import qualified Data.Map.Strict as M
 
 import Control.Applicative
 import Control.DeepSeq
+import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 
 import FileManagement(readPossiblyCompressedFile)
@@ -28,6 +29,7 @@ import Output
 import Data.GFF
 import Data.Sam (SamLine(..), isAligned, isPositive, readAlignments)
 import Data.AnnotRes
+import NGLess
 
 type GffIMMap = IM.IntervalMap Int [GffCount]
 -- AnnotationMap maps from `GffType` to `References` (e.g., chromosomes) to positions to (features/count)
@@ -46,7 +48,7 @@ annotate :: FilePath                            -- ^ input SAM file
                 -> AnnotationIntersectionMode   -- ^ mode
                 -> Bool                         -- ^ ambiguity
                 -> Bool                         -- ^ stranded
-                -> IO FilePath
+                -> NGLessIO FilePath
 annotate samFP (Just g) feats _ m a s = do
     outputListLno' InfoOutput ["Annotate with given GFF: ", g]
     annotate' samFP g feats (getIntervalQuery m) a s
@@ -69,10 +71,10 @@ annotate' :: FilePath
                 -> AnnotationRule
                 -> Bool
                 -> Bool
-                -> IO FilePath
+                -> NGLessIO FilePath
 annotate' samFp gffFp feats f a s = do
-        gffC <- intervals . filterFeats . readAnnotations <$> readPossiblyCompressedFile gffFp
-        samC <- filter isAligned . readAlignments <$> readPossiblyCompressedFile samFp
+        gffC <- liftIO $ intervals . filterFeats . readAnnotations <$> readPossiblyCompressedFile gffFp
+        samC <- liftIO $ filter isAligned . readAlignments <$> readPossiblyCompressedFile samFp
         let res = calculateAnnotation gffC samC
         writeAnnotCount samFp (toGffM res)
     where

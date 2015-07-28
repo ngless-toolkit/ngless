@@ -6,7 +6,6 @@
 
 module Unique
     ( readNFiles
-    , readUniqueFile
     , writeToNFiles
     , _numFiles
     ) where
@@ -17,6 +16,7 @@ import qualified Data.Map as Map
 import Control.Applicative
 import Control.Monad
 import Control.Monad.ST
+import Control.Monad.IO.Class (liftIO)
 
 import System.IO
 import Data.STRef
@@ -27,6 +27,7 @@ import System.Directory
 
 import FileManagement (createTempDir, readPossiblyCompressedFile)
 import Data.FastQ
+import NGLess
 import Output
 
 maxTempFileSize = 100*1000*1000 -- 100MB
@@ -34,18 +35,19 @@ maxTempFileSize = 100*1000*1000 -- 100MB
 hashRead :: Int -> ShortRead -> Int
 hashRead k (ShortRead _ r _) = mod (hash r) k
 
-writeToNFiles :: FilePath -> FastQEncoding -> [ShortRead] -> IO FilePath
+writeToNFiles :: FilePath -> FastQEncoding -> [ShortRead] -> NGLessIO FilePath
 writeToNFiles fname enc rs = do
-    dest <- createTempDir fname
-    k    <- fromIntegral <$> _numFiles fname
-    fhs  <- openKFileHandles k dest
-    forM_ rs $ \r -> do
-        let pos = hashRead k r
-        BL.hPutStr (fhs !! pos) (asFastQ enc [r])
-    outputLno' DebugOutput ("Wrote N Files to: " ++ dest)
-    mapM_ hClose fhs
-    return dest
-
+    dest' <- liftIO $ do
+        dest <- createTempDir fname
+        k    <- fromIntegral <$> _numFiles fname
+        fhs  <- openKFileHandles k dest
+        forM_ rs $ \r -> do
+            let pos = hashRead k r
+            BL.hPutStr (fhs !! pos) (asFastQ enc [r])
+        mapM_ hClose fhs
+        return dest
+    outputLno' DebugOutput ("Wrote N Files to: " ++ dest')
+    return dest'
 
 readNFiles :: FastQEncoding -> Int -> FilePath -> IO [ShortRead]
 readNFiles enc k d = do

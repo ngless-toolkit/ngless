@@ -13,7 +13,6 @@ module Interpretation.Map
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import Control.Monad.Trans.Resource
-import Control.Monad.Trans (liftIO)
 
 import Numeric
 
@@ -24,18 +23,19 @@ import System.Exit
 import System.IO
 
 import Control.Applicative ((<$>))
+import Control.Monad.IO.Class (liftIO)
 
 import Language
 import FileManagement
 import ReferenceDatabases
 import Configuration
 import Output
+import NGLess
 
 import Data.Sam
 import Utils.Bwa
-import Utils.Tempfile
 
-ensureIndexExists :: FilePath -> IO FilePath
+ensureIndexExists :: FilePath -> NGLessIO FilePath
 ensureIndexExists refPath = do
     hasIndex <- hasValidIndex refPath
     if hasIndex
@@ -44,13 +44,13 @@ ensureIndexExists refPath = do
     return refPath
 
 
-mapToReference :: FilePath -> [FilePath] -> ResourceT IO String
+mapToReference :: FilePath -> [FilePath] -> NGLessIO String
 mapToReference refIndex fps = do
-    (rk, (newfp, hout)) <- tempfile "mappedOutput.sam"
-    liftIO $ do
-        outputListLno' InfoOutput ["Starting mapping to ", refIndex]
-        bwaPath <- bwaBin
-        outputListLno' DebugOutput ["Write .sam file to: ", newfp]
+    (rk, (newfp, hout)) <- openNGLTempFile' refIndex "mapped_" ".sam"
+    outputListLno' InfoOutput ["Starting mapping to ", refIndex]
+    outputListLno' DebugOutput ["Write .sam file to: ", newfp]
+    bwaPath <- bwaBin
+    (err, exitCode) <- liftIO $ do
         (_, _, Just herr, jHandle) <-
             createProcess (
                 proc bwaPath
@@ -58,41 +58,42 @@ mapToReference refIndex fps = do
                 ) { std_out = UseHandle hout,
                     std_err = CreatePipe }
         err <- hGetContents herr
-        outputListLno' DebugOutput ["BWA info: ", err]
         exitCode <- waitForProcess jHandle
         hClose herr
-        case exitCode of
-            ExitSuccess -> do
-                outputListLno' InfoOutput ["Done mapping to ", refIndex]
-                return newfp
-            ExitFailure code -> do
-                release rk
-                error $ concat (["Failed mapping\nCommand line was::\n\t",
-                                bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '"] ++ fps ++ ["'\n",
-                                "Bwa error code was ", show code, "."])
+        return (err, exitCode)
+    outputListLno' DebugOutput ["BWA info: ", err]
+    case exitCode of
+        ExitSuccess -> do
+            outputListLno' InfoOutput ["Done mapping to ", refIndex]
+            return newfp
+        ExitFailure code -> do
+            release rk
+            error $ concat (["Failed mapping\nCommand line was::\n\t",
+                            bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '"] ++ fps ++ ["'\n",
+                            "Bwa error code was ", show code, "."])
 
-interpretMapOp :: T.Text -> FilePath -> ResourceT IO NGLessObject
+interpretMapOp :: T.Text -> FilePath -> NGLessIO NGLessObject
 interpretMapOp r ds = interpretMapOp' r [ds]
-interpretMapOp2 :: T.Text -> FilePath -> FilePath -> ResourceT IO NGLessObject
+interpretMapOp2 :: T.Text -> FilePath -> FilePath -> NGLessIO NGLessObject
 interpretMapOp2 r mate1 mate2 = interpretMapOp' r [mate1, mate2]
 
-interpretMapOp' :: T.Text -> [FilePath] -> ResourceT IO NGLessObject
+interpretMapOp' :: T.Text -> [FilePath] -> NGLessIO NGLessObject
 interpretMapOp' r ds = do
     (ref', defGen') <- indexReference' (T.unpack r)
     samPath' <- mapToReference ref' ds
-    liftIO $ getSamStats samPath'
+    getSamStats samPath'
     return $ NGOMappedReadSet samPath' defGen'
     where
-        indexReference' :: FilePath -> ResourceT IO (FilePath, Maybe T.Text)
+        indexReference' :: FilePath -> NGLessIO (FilePath, Maybe T.Text)
         indexReference' r'
-            | isDefaultReference r' = liftIO $ do
+            | isDefaultReference r' = do
                     basedir  <- ensureDataPresent r'
                     return (getIndexPath basedir, Just r)
-            | otherwise  = (, Nothing) <$> liftIO (ensureIndexExists r')
+            | otherwise  = (, Nothing) <$> ensureIndexExists r'
 
 
-getSamStats :: FilePath -> IO ()
-getSamStats fname = readPossiblyCompressedFile fname >>= printSamStats . _calcSamStats
+getSamStats :: FilePath -> NGLessIO ()
+getSamStats fname = liftIO (readPossiblyCompressedFile fname) >>= printSamStats . _calcSamStats
 
 data P4 = P4 !Integer !Integer !Integer !Integer
 

@@ -19,10 +19,12 @@ import qualified Data.Map.Strict as Map
 
 import System.IO
 import Control.DeepSeq
+import Control.Monad.IO.Class (liftIO)
 
 import FileManagement
 
 import Output
+import NGLess
 import Data.GFF
 
 data GffCount = GffCount
@@ -64,12 +66,13 @@ readAnnotLine line = if length tokens == 4
         tokens = L8.split '\t' line
         [tk0,tk1,tk2,tk3] = tokens
 
-writeAnnotCount :: FilePath -> [GffCount]-> IO FilePath
+writeAnnotCount :: FilePath -> [GffCount]-> NGLessIO FilePath
 writeAnnotCount fn im = do
     (newfp,h) <- openNGLTempFile fn "counts." "txt"
     outputLno' DebugOutput $ "Writing Annotation results to:" ++ newfp
-    L8.hPut h $ showGffCount im
-    hClose h
+    liftIO $ do
+        L8.hPut h $ showGffCount im
+        hClose h
     outputLno' InfoOutput "Write completed"
     return newfp
 

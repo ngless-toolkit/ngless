@@ -4,6 +4,7 @@ module CountOperation
     ) where
 
 import Control.Applicative ((<$>))
+import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString.Lazy.Char8 as L8
 
@@ -11,11 +12,12 @@ import Language
 import FileManagement (readPossiblyCompressedFile)
 
 import Data.GFF
+import NGLess
 import Data.AnnotRes
 
-countAnnotatedSet :: FilePath -> Maybe NGLessObject -> Integer -> IO FilePath
+countAnnotatedSet :: FilePath -> Maybe NGLessObject -> Integer -> NGLessIO FilePath
 countAnnotatedSet p fs m = do
-    fc <- readPossiblyCompressedFile p
+    fc <- liftIO $ readPossiblyCompressedFile p
     writeAnnotCount p $ _filterAnnot fc fs m
 
 _filterAnnot :: L8.ByteString -> Maybe NGLessObject -> Integer -> [GffCount]

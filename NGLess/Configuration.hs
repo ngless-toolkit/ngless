@@ -19,6 +19,7 @@ module Configuration
     ) where
 
 import Control.Monad (unless)
+import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<$>))
 import System.Environment (getExecutablePath)
 import System.Directory
@@ -28,6 +29,7 @@ import Data.Maybe
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
 
+import NGLess
 import Dependencies.Embedded
 
 data InstallMode = User | Root deriving (Eq, Show)
@@ -35,20 +37,20 @@ data InstallMode = User | Root deriving (Eq, Show)
 versionStr :: String
 versionStr = "0.0.0"
 
-nglessDataBaseURL :: IO FilePath
+nglessDataBaseURL :: NGLessIO FilePath
 nglessDataBaseURL = return "http://127.0.0.1/"
 
-globalDataDirectory :: IO FilePath
+globalDataDirectory :: NGLessIO FilePath
 globalDataDirectory = (</> "../share/ngless/data") <$> getNglessRoot
 
-userNglessDirectory :: IO FilePath
-userNglessDirectory = (</> ".ngless") <$> getHomeDirectory
+userNglessDirectory :: NGLessIO FilePath
+userNglessDirectory = (</> ".ngless") <$> (liftIO getHomeDirectory)
 
-userDataDirectory :: IO FilePath
+userDataDirectory :: NGLessIO FilePath
 userDataDirectory = (</> "data") <$> userNglessDirectory
 
-getNglessRoot :: IO FilePath
-getNglessRoot = takeDirectory <$> getExecutablePath
+getNglessRoot :: NGLessIO FilePath
+getNglessRoot = takeDirectory <$> (liftIO getExecutablePath)
 
 check_executable :: String -> FilePath -> IO FilePath
 check_executable name bin = do
@@ -67,47 +69,48 @@ canExecute bin = do
         else return False
 
 
-binPath :: InstallMode -> IO FilePath
+binPath :: InstallMode -> NGLessIO FilePath
 binPath Root = (</> "bin") <$> getNglessRoot
 binPath User = (</> "bin") <$> userNglessDirectory
 
-findBin :: FilePath -> IO (Maybe FilePath)
+findBin :: FilePath -> NGLessIO (Maybe FilePath)
 findBin fname = do
     rootPath <- (</> fname) <$> binPath Root
-    rootex <- canExecute rootPath
+    rootex <- liftIO $ canExecute rootPath
     if rootex then
         return (Just rootPath)
     else do
         userpath <- (</> fname) <$> binPath User
-        userer <- canExecute userpath
-        if userer
+        userex <- liftIO $ canExecute userpath
+        if userex
             then return (Just userpath)
             else return Nothing
 
-writeBin :: FilePath -> B.ByteString -> IO FilePath
+writeBin :: FilePath -> B.ByteString -> NGLessIO FilePath
 writeBin fname bindata = do
     userBinPath <- binPath User
-    createDirectoryIfMissing True userBinPath
-    let fname' = userBinPath </> fname
-    B.writeFile fname' bindata
-    p <- getPermissions fname'
-    setPermissions fname' (setOwnerExecutable True p)
-    return fname'
+    liftIO $ do
+        createDirectoryIfMissing True userBinPath
+        let fname' = userBinPath </> fname
+        B.writeFile fname' bindata
+        p <- getPermissions fname'
+        setPermissions fname' (setOwnerExecutable True p)
+        return fname'
 
-findOrCreateBin :: FilePath -> B.ByteString -> IO FilePath
+findOrCreateBin :: FilePath -> B.ByteString -> NGLessIO FilePath
 findOrCreateBin fname bindata = do
     path <- findBin fname
     if isJust path
         then return (fromJust path)
         else writeBin fname bindata
 
-bwaBin :: IO FilePath
-bwaBin = findOrCreateBin bwaFname =<< bwaData
+bwaBin :: NGLessIO FilePath
+bwaBin = findOrCreateBin bwaFname =<< liftIO bwaData
     where
         bwaFname = ("ngless-" ++ versionStr ++ "-bwa")
 
-samtoolsBin :: IO FilePath
-samtoolsBin = findOrCreateBin samtoolsFname =<< samtoolsData
+samtoolsBin :: NGLessIO FilePath
+samtoolsBin = findOrCreateBin samtoolsFname =<< liftIO samtoolsData
     where
         samtoolsFname = ("ngless-" ++ versionStr ++ "-samtools")
 
@@ -119,8 +122,8 @@ outputDirectoryRef = unsafePerformIO (newIORef "")
 setOutputDirectory :: FilePath -> IO ()
 setOutputDirectory = writeIORef outputDirectoryRef
 
-outputDirectory :: IO FilePath
-outputDirectory = readIORef outputDirectoryRef
+outputDirectory :: NGLessIO FilePath
+outputDirectory = liftIO $ readIORef outputDirectoryRef
 
 temporaryDirectoryRef :: IORef (Maybe FilePath)
 {-# NOINLINE temporaryDirectoryRef #-}
@@ -129,8 +132,8 @@ temporaryDirectoryRef = unsafePerformIO (newIORef Nothing)
 setTemporaryDirectory :: Maybe FilePath -> IO ()
 setTemporaryDirectory = writeIORef temporaryDirectoryRef
 
-temporaryFileDirectory :: IO FilePath
-temporaryFileDirectory = do
+temporaryFileDirectory :: NGLessIO FilePath
+temporaryFileDirectory = liftIO $ do
     tdir <- readIORef temporaryDirectoryRef
     case tdir of
         Just t -> return t
@@ -146,6 +149,6 @@ traceRef = unsafePerformIO (newIORef False)
 setTraceFlag :: Bool -> IO ()
 setTraceFlag = writeIORef traceRef
 
-traceFlag :: IO Bool
-traceFlag = readIORef traceRef
+traceFlag :: NGLessIO Bool
+traceFlag = liftIO $ readIORef traceRef
 
