@@ -51,11 +51,12 @@ mapToReference refIndex fps = do
     outputListLno' InfoOutput ["Starting mapping to ", refIndex]
     outputListLno' DebugOutput ["Write .sam file to: ", newfp]
     bwaPath <- bwaBin
+    let cmdargs =  ["mem","-t", show numCapabilities, refIndex] ++ fps
+    outputListLno' TraceOutput (["Calling binary ", bwaPath, " with args: "] ++ cmdargs)
     (err, exitCode) <- liftIO $ do
         (_, _, Just herr, jHandle) <-
             createProcess (
-                proc bwaPath
-                   (["mem","-t", show numCapabilities, refIndex] ++ fps)
+                proc bwaPath cmdargs
                 ) { std_out = UseHandle hout,
                     std_err = CreatePipe }
         err <- hGetContents herr
@@ -69,7 +70,7 @@ mapToReference refIndex fps = do
             return newfp
         ExitFailure code -> do
             release rk
-            error $ concat (["Failed mapping\nCommand line was::\n\t",
+            throwSystemError $ concat (["Failed mapping\nCommand line was::\n\t",
                             bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '"] ++ fps ++ ["'\n",
                             "Bwa error code was ", show code, "."])
 

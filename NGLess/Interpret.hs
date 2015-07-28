@@ -23,10 +23,13 @@ import Control.Monad.Trans.Resource
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit.Zlib as C
+import qualified Data.Conduit.Binary as CB
+import Data.Conduit (($=), ($$), (=$=))
 
 import System.IO
 import System.Directory
@@ -72,8 +75,6 @@ import Unique
  -
  -}
 
-throwErrorStr :: (MonadError NGError m) => String -> m a
-throwErrorStr = throwError . NGError . T.pack
 
 -- A variable map
 type NGLEnv_t = Map.Map T.Text NGLessObject
@@ -128,13 +129,12 @@ runInROEnv action = do
         Left e -> throwError e
         Right v -> return v
 
-runInterpret :: InterpretationROEnv a -> NGLEnv_t -> a
-runInterpret action env = case runReaderT (runExceptT action) env of
-        Identity (Left err) -> error ("Error in interpretation" ++ show err)
-        Identity (Right v) -> v
-
 runInROEnvIO :: InterpretationROEnv a -> InterpretationEnvIO a
 runInROEnvIO = runInEnv . runInROEnv
+
+runEitherInROEnv :: Either NGError a -> InterpretationROEnv a
+runEitherInROEnv (Right v) = return v
+runEitherInROEnv (Left err) = throwError err
 
 runNGLessIO :: NGLessIO a -> InterpretationEnvIO a
 runNGLessIO act = do
@@ -144,8 +144,10 @@ runNGLessIO act = do
         Left err -> throwError err
 
 -- | By necessity, this code has several unreachable corners
-unreachable err = error ("Reached code that was thought to be unreachable!\n"++err)
-nglTypeError err = error ("Unexpected type error! This should have been caught by validation!\n"++err)
+
+unreachable :: ( MonadError NGError m) => String -> m a
+unreachable err = throwShouldNotOccurr ("Reached code that was thought to be unreachable!\n"++err)
+nglTypeError err = throwShouldNotOccurr ("Unexpected type error! This should have been caught by validation!\n"++err)
 
 
 traceExpr m e =
@@ -174,7 +176,7 @@ interpretTop (Condition c ifTrue ifFalse) = do
         then ifTrue
         else ifFalse)
 interpretTop (Sequence es) = forM_ es interpretTop
-interpretTop _ = throwError "Top level statement is NOP"
+interpretTop _ = throwShouldNotOccurr ("Top level statement is NOP" :: String)
 
 interpretTopValue :: Expression -> InterpretationEnvIO NGLessObject
 interpretTopValue (FunctionCall f e args b) = topFunction f e args b
@@ -182,33 +184,33 @@ interpretTopValue e = runInROEnvIO (interpretExpr e)
 
 interpretExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretExpr (Lookup (Variable v)) = lookupVariable v >>= \case
-        Nothing -> throwError "Variable lookup error"
+        Nothing -> throwScriptError ("Variable lookup error" :: String)
         Just r' -> return r'
 interpretExpr (BuiltinConstant (Variable "STDIN")) = return (NGOString "/dev/stdin")
 interpretExpr (BuiltinConstant (Variable "STDOUT")) = return (NGOString "/dev/stdout")
-interpretExpr (BuiltinConstant (Variable v)) = throwErrorStr ("Unknown builtin constant '" ++ show v ++ "': it should not have been accepted.")
+interpretExpr (BuiltinConstant (Variable v)) = throwShouldNotOccurr ("Unknown builtin constant '" ++ show v ++ "': it should not have been accepted.")
 interpretExpr (ConstStr t) = return (NGOString t)
 interpretExpr (ConstBool b) = return (NGOBool b)
 interpretExpr (ConstSymbol s) = return (NGOSymbol s)
 interpretExpr (ConstNum n) = return (NGOInteger n)
-interpretExpr (UnaryOp op v) = _evalUnary op <$> interpretExpr v
+interpretExpr (UnaryOp op v) = do
+    v' <- interpretExpr v
+    runEitherInROEnv (_evalUnary op v')
 interpretExpr (BinaryOp bop v1 v2) = do
     v1' <- interpretExpr v1
     v2' <- interpretExpr v2
-    let r = _evalBinary bop v1' v2'
-    return r
+    runEitherInROEnv (_evalBinary bop v1' v2')
 interpretExpr (IndexExpression expr ie) = do
     expr' <- interpretExpr expr
     ie' <- interpretIndex ie
-    let r = _evalIndex expr' ie'
-    return r
+    runEitherInROEnv (_evalIndex expr' ie')
 interpretExpr (ListExpression e) = NGOList <$> mapM interpretExpr e
 interpretExpr (MethodCall met self arg args) = do
     self' <- interpretExpr self
     arg' <- maybeInterpretExpr arg
     args' <- interpretArguments args
     executeMethod met self' arg' args'
-interpretExpr not_expr = throwErrorStr ("Expected an expression, received " ++ show not_expr)
+interpretExpr not_expr = throwShouldNotOccurr ("Expected an expression, received " ++ show not_expr)
 
 interpretIndex :: Index -> InterpretationROEnv [Maybe NGLessObject]
 interpretIndex (IndexTwo a b) = forM [a,b] maybeInterpretExpr
@@ -225,14 +227,13 @@ topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just block) = do
     res' <- executePreprocess expr' args' block >>= executeQualityProcess
     setVariableValue varName res'
     return res'
-topFunction Fpreprocess expr _ _ = throwErrorStr ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
+topFunction Fpreprocess expr _ _ = throwShouldNotOccurr ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
 topFunction f expr args block = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
     topFunction' f expr' args' block
 
-
-topFunction' :: FuncName -> NGLessObject -> [(T.Text, NGLessObject)] -> Maybe Block -> InterpretationEnvIO NGLessObject
+topFunction' :: FuncName -> NGLessObject -> KwArgsValues -> Maybe Block -> InterpretationEnvIO NGLessObject
 topFunction' Ffastq     expr args Nothing = executeFastq expr args
 topFunction' Fsamfile   expr args Nothing = executeSamfile expr args
 topFunction' Funique    expr args Nothing = runNGLessIO (executeUnique expr args)
@@ -240,7 +241,7 @@ topFunction' Fwrite     expr args Nothing = traceExpr "write" expr >> runNGLessI
 topFunction' Fmap       expr args Nothing = executeMap expr args
 topFunction' Fas_reads  expr args Nothing = runNGLessIO (executeReads expr args)
 topFunction' Fselect    expr args Nothing = runNGLessIO (executeSelect expr args)
-topFunction' Fannotate  expr args Nothing = executeAnnotation expr args
+topFunction' Fannotate  expr args Nothing = runNGLessIO (executeAnnotation expr args)
 topFunction' Fcount     expr args Nothing = runNGLessIO (executeCount expr args)
 topFunction' Fprint     expr args Nothing = executePrint expr args
 
@@ -249,63 +250,40 @@ topFunction' Fpaired mate1 args Nothing = do
         mate3 = lookup "singles" args
     NGOReadSet1 enc1 fp1 <- executeQualityProcess mate1
     NGOReadSet1 enc2 fp2 <- executeQualityProcess mate2
-    when (enc1 /= enc2)
-        (throwError "Mates do not seem to have the same quality encoding!")
+    when (enc1 /= enc2) $
+        throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
     case mate3 of
         Nothing -> return (NGOReadSet2 enc1 fp1 fp2)
         Just f3 -> do
             NGOReadSet1 enc3 fp3 <- executeQualityProcess f3
-            when (enc1 /= enc3)
-                (throwError "Mates do not seem to have the same quality encoding!")
+            when (enc1 /= enc3) $
+                throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
             return (NGOReadSet3 enc1 fp1 fp2 fp3)
 topFunction' Fselect expr args (Just b) = executeSelectWBlock expr args b
-
-topFunction' f _ _ _ = throwError . NGError . T.concat $ ["Interpretation of ", T.pack (show f), " is not implemented"]
+topFunction' f _ _ _ = throwShouldNotOccurr . concat $ ["Interpretation of ", (show f), " is not implemented"]
 
 executeFastq expr args = do
     traceExpr "fastq" expr
     let NGOSymbol encName = lookupWithDefault (NGOSymbol "auto") "encoding" args
-        enc = case encName of
-                "auto" -> Nothing
-                "33" -> Just SangerEncoding
-                "sanger" -> Just SangerEncoding
-                "64" -> Just SolexaEncoding
-                "solexa" -> Just SolexaEncoding
-                _ -> error "impossible to reach"
-
+    enc <- case encName of
+            "auto" -> return Nothing
+            "33" -> return $ Just SangerEncoding
+            "sanger" -> return $ Just SangerEncoding
+            "64" -> return $ Just SolexaEncoding
+            "solexa" -> return $ Just SolexaEncoding
+            _ -> unreachable "impossible to reach"
     case expr of
         (NGOString fname) -> executeQualityProcess' enc (T.unpack fname) "beforeQC"
         (NGOList fps) -> NGOList <$> sequence [executeQualityProcess' enc (T.unpack fname) "beforeQC" | NGOString fname <- fps]
-        v -> throwErrorStr ("fastq function: unexpected first argument: " ++ show v)
+        v -> unreachable ("fastq function: unexpected first argument: " ++ show v)
 
 executeSamfile expr [] = do
     traceExpr "samfile" expr
     case expr of
         (NGOString fname) -> return $ NGOMappedReadSet (T.unpack fname) Nothing
         (NGOList sams) -> NGOList <$> sequence [executeSamfile s [] | s <- sams]
-        v -> throwErrorStr ("samfile function: unexpected first argument: " ++ show v)
-executeSamfile _ args = throwErrorStr ("samfile does not take any arguments, got " ++ show args)
-
-executeAnnotation :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeAnnotation (NGOList e) args = NGOList <$> mapM (\x -> executeAnnotation x args) e
-executeAnnotation (NGOMappedReadSet e dDS) args = do
-    let g = T.unpack . evalString <$> lookup "gff" args
-        m = parseAnnotationMode $ lookup "mode" args
-        a = fromMaybe False $ evalBool <$> lookup "ambiguity" args
-        s = fromMaybe False $ evalBool <$> lookup "strand" args
-        fs = lookup "features" args >>= Just <$> \case
-            (NGOSymbol f) -> [T.unpack f]
-            (NGOList feats') -> map (T.unpack . evalSymbol) feats'
-            _ -> unreachable "executeAnnotation: TYPE ERROR"
-    res <- runNGLessIO $ annotate e g fs dDS m a s
-    return $ NGOAnnotatedSet res
-executeAnnotation e _ = throwErrorStr ("Annotation can handle MappedReadSet(s) only. Got " ++ show e)
-
-parseAnnotationMode Nothing = IntersectUnion
-parseAnnotationMode (Just (NGOSymbol "union")) = IntersectUnion
-parseAnnotationMode (Just (NGOSymbol "intersection_strict")) = IntersectUnion
-parseAnnotationMode (Just (NGOSymbol "intersection_non_empty")) = IntersectNonEmpty
-parseAnnotationMode m = error (concat ["Unexpected annotation mode (", show m, "). Please submit a bug report."])
+        v -> unreachable ("samfile function: unexpected first argument: " ++ show v)
+executeSamfile _ args = unreachable ("samfile does not take any arguments, got " ++ show args)
 
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
@@ -314,33 +292,33 @@ executeQualityProcess (NGOReadSet1 enc fname) = executeQualityProcess' (Just enc
 executeQualityProcess (NGOReadSet2 enc fp1 fp2) = do
     NGOReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1 "afterQC"
     NGOReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2 "afterQC"
-    when (enc1 /= enc2)
-        (throwError "Mates do not seem to have the same quality encoding!")
+    when (enc1 /= enc2) $
+        throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ")")
     return (NGOReadSet2 enc1 fp1' fp2')
 executeQualityProcess (NGOReadSet3 enc fp1 fp2 fp3) = do
     NGOReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1 "afterQC"
     NGOReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2 "afterQC"
     NGOReadSet1 enc3 fp3' <- executeQualityProcess' (Just enc) fp3 "afterQC"
-    when (enc1 /= enc2 || enc2 /= enc3)
-        (throwError "Mates do not seem to have the same quality encoding!")
+    when (enc1 /= enc2 || enc2 /= enc3) $
+        throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ", third one is " ++ show enc3 ++")")
     return (NGOReadSet3 enc1 fp1' fp2' fp3')
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
     executeQualityProcess' Nothing fname' "beforeQC"
 
-executeQualityProcess v = throwErrorStr ("QC expected a string or readset. Got " ++ show v)
+executeQualityProcess v = nglTypeError ("QC expected a string or readset. Got " ++ show v)
 executeQualityProcess' enc fname info = runNGLessIO $ executeQProc enc fname info
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeMap fps args = case lookup "reference" args of
-    Nothing       -> error "A reference must be suplied"
+    Nothing  -> throwScriptError ("A reference must be suplied" ::String)
     Just (NGOString ref) -> executeMap' fps
         where
             executeMap' (NGOList es) = NGOList <$> forM es executeMap'
             executeMap' (NGOReadSet1 _enc file)    = runNGLessIO $ interpretMapOp ref file
             executeMap' (NGOReadSet2 _enc fp1 fp2) = runNGLessIO $ interpretMapOp2 ref fp1 fp2
-            executeMap' v = throwErrorStr ("map of " ++ show v ++ " not implemented yet")
-    _         -> error "map could not parse reference argument"
+            executeMap' v = throwShouldNotOccurr ("map of " ++ show v ++ " not implemented yet")
+    _         -> unreachable "map could not parse reference argument"
 
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
@@ -348,11 +326,19 @@ executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePrepr
 executePreprocess (NGOReadSet1 enc file) _args (Block [Variable var] block) = do
         runNGLessIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
-        env <- gets snd
-        newfp <- runNGLessIO $ writeReadSet file (execBlock env rs) enc
+        (newfp, h) <- runNGLessIO $ openNGLTempFile file "preprocessed_" "fq.gz"
+        C.yieldMany rs
+                $= C.mapM transformInterpret
+                =$= C.filter isJust
+                =$= C.map (toStrict . asFastQ enc . (:[]) . fromJust)
+                =$= C.gzip
+                $$ C.sinkHandle h
+        liftIO (hClose h)
         return $ NGOReadSet1 enc newfp
     where
-        execBlock env = mapMaybe (\r -> runInterpret (interpretPBlock1 block var r) env)
+        toStrict = B.concat . BL.toChunks
+        transformInterpret :: NGLessObject -> InterpretationEnvIO (Maybe ShortRead)
+        transformInterpret r = runInROEnvIO $ interpretPBlock1 block var r
 executePreprocess (NGOReadSet2 enc fp1 fp2) _args block = executePreprocess (NGOReadSet3 enc fp1 fp2 "") _args block
 executePreprocess (NGOReadSet3 enc fp1 fp2 fp3) _args (Block [Variable var] block) = do
         runNGLessIO $ outputListLno' DebugOutput (["Preprocess on paired end ",
@@ -398,10 +384,10 @@ executePreprocess (NGOReadSet3 enc fp1 fp2 fp3) _args (Block [Variable var] bloc
                 (Just r, Nothing) -> writeSR hsingles r >> return True
                 (Nothing, Just r) -> writeSR hsingles r >> return True
             intercalate hs rs1 rs2 anySingle'
-        intercalate _ _ _ _ = throwError "preprocess: paired mates do not contain the same number of reads"
+        intercalate _ _ _ _ = throwDataError ("preprocess: paired mates do not contain the same number of reads" :: String)
 
         writeSR h sr = liftIO $ BL.hPut h (asFastQ enc [sr])
-executePreprocess v _ _ = error ("executePreprocess: Cannot handle this input: " ++ show v)
+executePreprocess v _ _ = unreachable ("executePreprocess: Cannot handle this input: " ++ show v)
 
 executeMethod :: MethodName -> NGLessObject -> Maybe NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationROEnv NGLessObject
 executeMethod Mflag (NGOMappedRead samline) (Just (NGOSymbol flag)) [] = case getFlag flag of
@@ -410,7 +396,7 @@ executeMethod Mflag (NGOMappedRead samline) (Just (NGOSymbol flag)) [] = case ge
     where
         getFlag "mapped" = Right isAligned
         getFlag "unmapped" = Right $ not . isAligned
-        getFlag ferror = Left . NGError $ T.concat ["Flag ", T.pack (show ferror), " is unknown for method flag"]
+        getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
 executeMethod m self arg kwargs = error ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 
@@ -423,29 +409,29 @@ interpretPBlock1 block var r = do
                 Just (NGOShortRead rr) -> case srLength rr of
                     0 -> return Nothing
                     _ -> return (Just rr)
-                _ -> unreachable ("Expected variable "++show var++" to contain a short read.")
+                _ -> nglTypeError ("Expected variable "++show var++" to contain a short read.")
 
 executePrint :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
-executePrint err  _ = throwErrorStr ("Cannot print " ++ show err)
+executePrint err  _ = throwScriptError ("Cannot print " ++ show err)
 
 executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executeSelectWBlock (NGOMappedReadSet fname ref) [] (Block [Variable var] body) = do
-    runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", fname]
-    env <- gets snd
-    let oname = fname ++ ".selected"
-    liftIO $ withFile fname ReadMode $ \iraw -> do
-        withFile oname WriteMode $ \oraw -> do
-            ilines <- BL8.lines <$> BL.hGetContents iraw
-            forM_ ilines $ \line -> do
-                if "@" `BL.isPrefixOf` line -- The whole header is copied verbatim to the output
-                    then BL8.hPutStrLn oraw line
-                    else do
-                        let mr = NGOMappedRead (readSamLine line)
-                        let mr' = runInterpret (interpretBlock1 [(var, mr)] body) env
-                        when (blockStatus mr' `elem` [BlockContinued, BlockOk]) $
-                            BL8.hPutStrLn oraw line
-    return (NGOMappedReadSet oname ref)
+        runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", fname]
+        let oname = fname ++ ".selected"
+        C.sourceFile fname
+            $= CB.lines
+            =$= C.filterM filterLine
+            =$= C.unlinesAscii
+            $$ C.sinkFile oname
+        return (NGOMappedReadSet oname ref)
+    where
+        filterLine line
+            | "@" `B.isPrefixOf` line = return True -- The whole header is copied verbatim to the output
+            | otherwise = do
+                    let mr = NGOMappedRead (readSamLine . BL.fromChunks $ [line])
+                    mr' <- runInROEnvIO (interpretBlock1 [(var, mr)] body)
+                    return (blockStatus mr' `elem` [BlockContinued, BlockOk])
 executeSelectWBlock _ _ _ = unreachable ("Select with block")
 
 
@@ -467,7 +453,7 @@ interpretBlock1 :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv
 interpretBlock1 vs (Assignment (Variable n) val) = do
     val' <- interpretBlockExpr vs val
     if n `notElem` (map fst vs)
-        then throwError "only assignments to block variable are possible"
+        then throwShouldNotOccurr ("only assignments to block variable are possible [assigning to '"++show n++"']")
         else do
             let vs' = map (\p@(a,_) -> (if a == n then (a,val') else p)) vs
             return $ BlockResult BlockOk vs'
@@ -477,7 +463,7 @@ interpretBlock1 vs (Condition c ifT ifF) = do
     NGOBool v' <- interpretBlockExpr vs c
     interpretBlock1 vs (if v' then ifT else ifF)
 interpretBlock1 vs (Sequence expr) = interpretBlock vs expr -- interpret [expr]
-interpretBlock1 vs x = error ("interpretBlock1: This should not have happened " ++ show vs ++ " " ++ show x)
+interpretBlock1 vs x = unreachable ("interpretBlock1: This should not have happened " ++ show vs ++ " " ++ show x)
 
 interpretBlockExpr :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv NGLessObject
 interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpretPreProcessExpr val)
@@ -486,53 +472,46 @@ interpretPreProcessExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretPreProcessExpr (FunctionCall Fsubstrim var args _) = do
     NGOShortRead r <- interpretExpr var
     args' <- interpretArguments args
-    let mq = fromMaybe 0 $ (fromIntegral . evalInteger) <$> lookup "min_quality" args'
-    return . NGOShortRead $ substrim mq r
+    let mq = lookupWithDefault (NGOInteger 0) "min_quality" args'
+    mq' <- getInt mq
+    return . NGOShortRead $ substrim mq' r
 
 interpretPreProcessExpr expr = interpretExpr expr
 
-_evalUnary :: UOp -> NGLessObject -> NGLessObject
-_evalUnary UOpMinus (NGOInteger n) = NGOInteger (-n)
-_evalUnary UOpLen (NGOShortRead r) = NGOInteger . toInteger $ srLength r
-_evalUnary UOpNot (NGOBool v) = NGOBool (not v)
+getInt (NGOInteger i) = return (fromInteger i)
+getInt o = nglTypeError ("getInt: Argument type must be NGOInteger (got " ++ show o ++ ").")
+
+
+_evalUnary :: UOp -> NGLessObject -> Either NGError NGLessObject
+_evalUnary UOpMinus (NGOInteger n) = return $ NGOInteger (-n)
+_evalUnary UOpLen (NGOShortRead r) = return $ NGOInteger . toInteger $ srLength r
+_evalUnary UOpNot (NGOBool v) = return $ NGOBool (not v)
 _evalUnary op v = nglTypeError ("invalid unary operation ("++show op++") on value " ++ show v)
 
-_evalIndex :: NGLessObject -> [Maybe NGLessObject] -> NGLessObject
+_evalIndex :: NGLessObject -> [Maybe NGLessObject] -> Either NGError NGLessObject
 _evalIndex sr index@[Just (NGOInteger a)] = _evalIndex sr $ (Just $ NGOInteger (a + 1)) : index
 _evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Nothing] =
-    NGOShortRead $ ShortRead rId (B.drop (fromIntegral s) rSeq) (B.drop (fromIntegral s) rQual)
+    return . NGOShortRead $ ShortRead rId (B.drop (fromIntegral s) rSeq) (B.drop (fromIntegral s) rQual)
 _evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Nothing, Just (NGOInteger e)] =
-    NGOShortRead $ ShortRead rId (B.take (fromIntegral e) rSeq) (B.take (fromIntegral e) rQual)
+    return . NGOShortRead $ ShortRead rId (B.take (fromIntegral e) rSeq) (B.take (fromIntegral e) rQual)
 
 _evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Just (NGOInteger e)] = do
     let e' = fromIntegral e
         s' = fromIntegral s
         e'' = e'- s'
-    NGOShortRead (ShortRead rId (B.take e'' . B.drop s' $ rSeq) (B.take e'' . B.drop s' $ rQual))
-_evalIndex _ _ = nglTypeError "_evalIndex: invalid operation"
-
-evalBool (NGOBool x) = x
-evalBool _ = nglTypeError "evalBool: Argument type must be NGOBool"
-
-evalString (NGOString s) = s
-evalString o = nglTypeError ("evalString: Argument type must be NGOString (received " ++ show o ++ ").")
-
-evalSymbol (NGOSymbol s) = s
-evalSymbol o = nglTypeError ("evalSymbol: Argument type must be NGOSymbol (received " ++ show o ++ ").")
-
-evalInteger (NGOInteger i) = i
-evalInteger o = nglTypeError ("evalInteger: Argument type must be NGOInteger (got " ++ show o ++ ").")
+    return $ NGOShortRead (ShortRead rId (B.take e'' . B.drop s' $ rSeq) (B.take e'' . B.drop s' $ rQual))
+_evalIndex _ _ = nglTypeError ("_evalIndex: invalid operation" :: String)
 
 
 -- Binary Evaluation
-_evalBinary :: BOp ->  NGLessObject -> NGLessObject -> NGLessObject
-_evalBinary BOpLT (NGOInteger a) (NGOInteger b) = NGOBool (a < b)
-_evalBinary BOpGT (NGOInteger a) (NGOInteger b) = NGOBool (a > b)
-_evalBinary BOpLTE (NGOInteger a) (NGOInteger b) = NGOBool (a <= b)
-_evalBinary BOpGTE (NGOInteger a) (NGOInteger b) = NGOBool (a >= b)
-_evalBinary BOpEQ lexpr rexpr =  NGOBool $ lexpr == rexpr
-_evalBinary BOpNEQ lexpr rexpr =  NGOBool $ lexpr /= rexpr
-_evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = NGOInteger (a + b)
-_evalBinary BOpMul (NGOInteger a) (NGOInteger b) = NGOInteger (a * b)
-_evalBinary op a b = nglTypeError (concat ["_evalBinary: ", show op, " ", show a, " ", show b])
+_evalBinary :: BOp ->  NGLessObject -> NGLessObject -> Either NGError NGLessObject
+_evalBinary BOpLT (NGOInteger a) (NGOInteger b) = Right $ NGOBool (a < b)
+_evalBinary BOpGT (NGOInteger a) (NGOInteger b) = Right $ NGOBool (a > b)
+_evalBinary BOpLTE (NGOInteger a) (NGOInteger b) = Right $ NGOBool (a <= b)
+_evalBinary BOpGTE (NGOInteger a) (NGOInteger b) = Right $ NGOBool (a >= b)
+_evalBinary BOpEQ lexpr rexpr = Right . NGOBool $ lexpr == rexpr
+_evalBinary BOpNEQ lexpr rexpr = Right . NGOBool $ lexpr /= rexpr
+_evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a + b)
+_evalBinary BOpMul (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a * b)
+_evalBinary op a b = throwScriptError (concat ["_evalBinary: ", show op, " ", show a, " ", show b])
 

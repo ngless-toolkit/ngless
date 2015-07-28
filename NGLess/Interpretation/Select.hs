@@ -6,11 +6,9 @@
 
 module Interpretation.Select
     ( executeSelect
-    , _parseConditions
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
-import qualified Data.Text as T
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<$>))
@@ -26,30 +24,35 @@ import Data.Sam
 data SelectCondition = SelectMapped | SelectUnmapped
     deriving (Eq, Show)
 
-_parseConditions :: [(T.Text, NGLessObject)] -> ([SelectCondition], [SelectCondition])
-_parseConditions args =
-    let asSC (NGOSymbol "mapped") = SelectMapped
-        asSC (NGOSymbol "unmapped") = SelectUnmapped
-        asSC c = error ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
-        NGOList keep_if = lookupWithDefault (NGOList []) "keep_if" args
-        NGOList drop_if = lookupWithDefault (NGOList []) "drop_if" args
-        keep_if' = map asSC keep_if
-        drop_if' = map asSC drop_if
-    in (keep_if', drop_if')
+data MatchCondition = KeepIf [SelectCondition] | DropIf [SelectCondition]
+    deriving (Eq, Show)
 
-_matchConditions :: ([SelectCondition], [SelectCondition]) -> SamLine -> Bool
-_matchConditions ([], []) _  = True
-_matchConditions ([], drop_if) samline = none (_match1 samline) drop_if
+_parseConditions :: KwArgsValues -> NGLessIO MatchCondition
+_parseConditions args = do
+        let NGOList keep_if = lookupWithDefault (NGOList []) "keep_if" args
+            NGOList drop_if = lookupWithDefault (NGOList []) "drop_if" args
+        keep_if' <- mapM asSC keep_if
+        drop_if' <- mapM asSC drop_if
+        case (keep_if', drop_if') of
+            (cs, []) -> return (KeepIf cs)
+            ([], cs) -> return (DropIf cs)
+            (_, _) -> throwScriptError ("To select, you cannot use both keep_if and drop_if" :: String)
+    where
+        asSC (NGOSymbol "mapped") = return SelectMapped
+        asSC (NGOSymbol "unmapped") = return SelectUnmapped
+        asSC c = throwShouldNotOccurr ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
+
+_matchConditions :: MatchCondition -> SamLine -> Bool
+_matchConditions (DropIf drop_if) samline = none (_match1 samline) drop_if
     where none f = not . any f
-_matchConditions (keep_if, []) samline = all (_match1 samline) keep_if
-_matchConditions _ _ = error "Either `keep_if` or `drop_if` must be empty"
+_matchConditions (KeepIf keep_if) samline = all (_match1 samline) keep_if
 
 _match1 samline SelectMapped = isAligned samline
 _match1 samline SelectUnmapped = not $ isAligned samline
 
 executeSelect :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSelect (NGOMappedReadSet fpsam ref) args = do
-    let conditions = _parseConditions args
+    conditions <- _parseConditions args
     (oname,ohand) <- openNGLTempFile fpsam "selected_" "sam"
     liftIO $ do
         samcontents <- BL.lines <$> BL.readFile fpsam
@@ -59,4 +62,5 @@ executeSelect (NGOMappedReadSet fpsam ref) args = do
                     (BL.hPut ohand line >> BL.hPut ohand "\n")
         hClose ohand
         return (NGOMappedReadSet oname ref)
-executeSelect o _ = error ("NGLESS type checking error (Select received " ++ show o ++ ")")
+executeSelect o _ = throwShouldNotOccurr ("NGLESS type checking error (Select received " ++ show o ++ ")")
+

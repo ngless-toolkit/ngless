@@ -1,7 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase #-}
 
 module Interpretation.Annotation
     ( AnnotationIntersectionMode(..)
+    , executeAnnotation
     , annotate
     , _intersection_strict
     , _intersection_non_empty
@@ -22,14 +23,15 @@ import Control.DeepSeq
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 
-import Utils.Utils (readPossiblyCompressedFile)
 import ReferenceDatabases
 import Output
 
 import Data.GFF
 import Data.Sam (SamLine(..), isAligned, isPositive, readAlignments)
 import Data.AnnotRes
+import Language
 import NGLess
+import Utils.Utils
 
 type GffIMMap = IM.IntervalMap Int [GffCount]
 -- AnnotationMap maps from `GffType` to `References` (e.g., chromosomes) to positions to (features/count)
@@ -39,6 +41,33 @@ type AnnotationRule = GffIMMap -> (Int, Int) -> GffIMMap
 
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
+
+
+
+executeAnnotation :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeAnnotation (NGOList e) args = NGOList <$> mapM (`executeAnnotation` args) e
+executeAnnotation (NGOMappedReadSet e dDS) args = do
+    ambiguity <- getBoolArg False "ambiguity" args
+    strand_specific <- getBoolArg False "strand" args
+    fs <- case lookup "features" args of
+        Nothing -> return Nothing
+        Just (NGOSymbol f) -> return . Just $ [T.unpack f]
+        Just (NGOList feats') -> Just <$> mapM evalSymbol feats'
+        _ -> throwShouldNotOccurr ("executeAnnotation: TYPE ERROR" :: String)
+    m <- parseAnnotationMode args
+    g <- evalMaybeString $ lookup "gff" args
+    res <- annotate e g fs dDS m ambiguity strand_specific
+    return $ NGOAnnotatedSet res
+executeAnnotation e _ = throwShouldNotOccurr ("Annotation can handle MappedReadSet(s) only. Got " ++ show e)
+
+
+parseAnnotationMode args = case lookupWithDefault (NGOSymbol "union") "mode" args of
+    (NGOSymbol "union") -> return  IntersectUnion
+    (NGOSymbol "intersection_strict") -> return IntersectUnion
+    (NGOSymbol "intersection_non_empty") -> return  IntersectNonEmpty
+    m -> throwScriptError (concat ["Unexpected annotation mode (", show m, ")."])
+
+
 
 -- |Annotates mapped reads according to a mapping
 annotate :: FilePath                            -- ^ input SAM file
@@ -57,7 +86,7 @@ annotate samFP Nothing feats (Just dDs) m a s = do
     basedir <- ensureDataPresent (T.unpack dDs)
     annotate' samFP (getGff basedir) feats (getIntervalQuery m) a s   -- use default GFF
 annotate _     Nothing _ Nothing _ _ _ =
-    error("A gff must be provided by using the argument 'gff'") -- not default ds and no gff passed as arg
+    throwShouldNotOccurr ("A gff must be provided by using the argument 'gff'" :: T.Text) -- not default ds and no gff passed as arg
 
 getIntervalQuery :: AnnotationIntersectionMode -> AnnotationRule
 getIntervalQuery IntersectUnion = union
@@ -188,4 +217,16 @@ matchingFeatures (Just fs) = map toFeature fs
         toFeature s      = GffOther (B8.pack s)
 
 _matchFeatures :: [GffType] -> GffLine -> Bool
-_matchFeatures fs gf = any (== gffType gf) fs
+_matchFeatures fs gf = gffType gf `elem` fs
+
+getBoolArg def k args = case lookupWithDefault (NGOBool def) k args of
+    (NGOBool v) -> return v
+    other -> throwShouldNotOccurr . T.concat $ ["Expected boolean argument in function annotate ('", k, "') got ", T.pack . show $ other]
+
+evalMaybeString Nothing = return Nothing
+evalMaybeString (Just (NGOString s)) = return (Just $ T.unpack s)
+evalMaybeString o = throwShouldNotOccurr ("evalString: Argument type must be NGOString (received " ++ show o ++ ").")
+
+evalSymbol (NGOSymbol s) = return (T.unpack s)
+evalSymbol o = throwShouldNotOccurr ("evalSymbol: Argument type must be NGOSymbol (received " ++ show o ++ ").")
+

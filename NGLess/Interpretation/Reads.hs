@@ -24,7 +24,7 @@ executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeReads (NGOMappedReadSet fpsam _) _ = do
     fp <- samToFastQ fpsam
     return (NGOReadSet1 SangerEncoding fp)
-executeReads _ _ = error "NGLESS type checking error"
+executeReads arg _ = throwShouldNotOccurr ("executeReads called with argument: " ++ show arg)
 
 samToFastQ :: FilePath -> NGLessIO FilePath
 samToFastQ fpsam = do

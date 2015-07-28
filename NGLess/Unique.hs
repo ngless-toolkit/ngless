@@ -12,11 +12,9 @@ module Unique
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
-import qualified Data.Text as T
 
 import Control.Applicative ((<$>))
 import Control.Monad
-import Control.Monad.Except
 import Control.Monad.ST (runST)
 import Control.Monad.IO.Class (liftIO)
 
@@ -53,7 +51,7 @@ executeUnique (NGOReadSet1 enc file) args = do
             fs <- liftIO $ _readNFiles enc (fromIntegral numMaxOccur) d
             nFp <- writeReadSet file fs enc
             return $ NGOReadSet1 enc nFp
-executeUnique expr _ = throwError . NGError . T.pack $ "executeUnique: Cannot handle argument " ++ show expr
+executeUnique expr _ = throwShouldNotOccurr ("executeUnique: Cannot handle argument " ++ show expr)
 
 hashRead :: Int -> ShortRead -> Int
 hashRead k (ShortRead _ r _) = mod (hash r) k

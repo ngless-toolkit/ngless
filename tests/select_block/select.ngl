@@ -1,0 +1,16 @@
+ngless '0.0'
+input = fastq('sample.fq')
+mapped = map(input,reference='sacCer3')
+write(mapped, ofile='output.sam')
+
+mapped_plus = select(mapped) using |mread|:
+    if not mread.flag({mapped}):
+        discard
+reads_plus = as_reads(mapped_plus)
+write(reads_plus, ofile='output.plus.fq')
+
+mapped = select(mapped) using |mread|:
+    if mread.flag({mapped}):
+        discard
+reads = as_reads(mapped)
+write(reads, ofile='output.neg.fq')
