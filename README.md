@@ -12,8 +12,6 @@ your work.
     ngless "0.0"
     input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
     preprocess(input) using |read|:
-        if read in contanminants:
-            discard
         read = read[5:]
         read = substrim(read, min_quality=26)
         if len(read) < 31:
