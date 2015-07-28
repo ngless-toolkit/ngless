@@ -153,8 +153,7 @@ funccall = try paired <|> FunctionCall <$>
                 <*> (kwargs <* operator ')')
                 <*> funcblock
 
-funcblock = (Just <$> (Block <$> (reserved "using" *> operator '|' *> variableList <* operator '|' <* operator ':') <*> block))
-    <|> pure Nothing
+funcblock = optionMaybe (Block <$> (reserved "using" *> operator '|' *> variableList <* operator '|' <* operator ':') <*> block)
 
 paired = do
     p <- word
