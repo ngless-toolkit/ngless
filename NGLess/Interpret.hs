@@ -28,8 +28,11 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Zlib as C
+import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
-import Data.Conduit (($=), ($$), (=$=))
+import Data.Conduit (($=), ($$), (=$=), (=$))
+import Data.Conduit.Async ((=$=&), ($$&), ($=&))
+import qualified Data.Vector as V
 
 import System.IO
 import System.Directory
@@ -55,17 +58,18 @@ import Interpretation.Count
 import Unique
 
 
-{- Interpretation is done inside 3 Monads
+{- Interpretation is done inside 3 and a half monads
  -  1. InterpretationEnvIO
  -      This is the NGLessIO monad with a variable environment on top
  -  2. InterpretationEnv
  -      This is the read-write variable environment
  -  3. InterpretationROEnv
  -      This is a read-only variable environment.
+ -  3½. Either NGError
+ -      Pure functions are in the 'Either NGError' monad
  - 
  - Monad (1) is a superset of (2) which is a superset of (3). runInEnv and
  - friends switch between the monads.
- -
  -
  - For blocks, we have a special system where block-variables are read-write,
  - but others are read-only.
@@ -327,12 +331,17 @@ executePreprocess (NGOReadSet1 enc file) _args (Block [Variable var] block) = do
         runNGLessIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         (newfp, h) <- runNGLessIO $ openNGLTempFile file "preprocessed_" "fq.gz"
-        C.yieldMany rs
-                $= C.mapM transformInterpret
-                =$= C.filter isJust
-                =$= C.map (toStrict . asFastQ enc . (:[]) . fromJust)
-                =$= C.gzip
-                $$ C.sinkHandle h
+        (C.yieldMany rs $= C.conduitVector 1000)
+                =$=& (
+                    (C.concat :: C.Conduit (V.Vector NGLessObject) InterpretationEnvIO NGLessObject)
+                    =$= C.mapM transformInterpret
+                    =$= C.filter isJust
+                    =$= C.map (toStrict . asFastQ enc . (:[]) . fromJust)
+                    =$= C.conduitVector 4000
+                    )
+                $$& (
+                    (C.concat :: C.Conduit (V.Vector B.ByteString) InterpretationEnvIO B.ByteString)
+                    =$= C.gzip =$ C.sinkHandle h)
         liftIO (hClose h)
         return $ NGOReadSet1 enc newfp
     where
