@@ -41,19 +41,20 @@ newtype Variable = Variable T.Text
 
 -- | functions are hard coded here
 data FuncName =
-                Ffastq
-                | Fsamfile
-                | Fpaired
-                | Funique
-                | Fpreprocess
-                | Fsubstrim
-                | Fmap
-                | Fas_reads
-                | Fselect
-                | Fcount
-                | Fwrite
-                | Fprint
-                | Fannotate
+        Ffastq
+        | Fsamfile
+        | Fpaired
+        | Funique
+        | Fpreprocess
+        | Fsubstrim
+        | Fmap
+        | Fas_reads
+        | Fselect
+        | Fcount
+        | Fwrite
+        | Fprint
+        | Fannotate
+        | Fother !T.Text
     deriving (Eq)
 
 instance Show FuncName where
@@ -70,6 +71,7 @@ instance Show FuncName where
     show Fwrite = "write"
     show Fprint = "print"
     show Fannotate = "annotate"
+    show (Fother fn) = T.unpack fn
 
 data MethodName =
         Mflag

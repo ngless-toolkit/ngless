@@ -110,7 +110,7 @@ left_expression =  uoperator
                     <|> base_expression
 
 base_expression = pexpression
-                    <|> funccall
+                    <|> (funccall <?> "function call")
                     <|> _listexpr
                     <|> rawexpr
                     <|> (Lookup <$> variable)
@@ -146,21 +146,18 @@ uoperator = lenop <|> unary_minus <|> not_expr
         unary_minus = UnaryOp UOpMinus <$> (operator '-' *> base_expression)
         not_expr = UnaryOp UOpNot <$> (reserved "not" *> innerexpression)
 funccall = try paired <|> FunctionCall <$>
-                (try funcname <* operator '(')
+                try (funcname <* operator '(')
                 <*> innerexpression
                 <*> (kwargs <* operator ')')
                 <*> funcblock
 
 funcblock = optionMaybe (Block <$> (reserved "using" *> operator '|' *> variableList <* operator '|' <* operator ':') <*> block)
 
-paired = do
-    p <- word
-    case p of
-        "paired" -> FunctionCall Fpaired
-                    <$> (operator '(' *> innerexpression <* operator ',')
-                    <*> pairedKwArgs
-                    <*> pure Nothing
-        _ -> fail "Expected 'paired'"
+paired = FunctionCall
+            <$> (match_word "paired" *> pure Fpaired)
+            <*> (operator '(' *> innerexpression <* operator ',')
+            <*> pairedKwArgs
+            <*> pure Nothing
 
 funcname = funcname' <?> "function name"
     where
@@ -179,7 +176,7 @@ funcname = funcname' <?> "function name"
                 "write" -> pure Fwrite
                 "print" -> pure Fprint
                 "annotate" -> pure Fannotate
-                _ -> fail "Function not found"
+                _ -> pure (Fother fname)
 
 methodName = methodName' <?> "method name"
     where
