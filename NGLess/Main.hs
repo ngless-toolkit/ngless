@@ -74,6 +74,8 @@ installargs = InstallGenMode
         &= details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
 
 
+-- | wrapPrint transforms the script by transforming the last expression <expr>
+-- into write(<expr>, ofile=STDOUT)
 wrapPrint (Script v sc) = wrap sc >>= Right . Script v
     where
         wrap [] = Right []
