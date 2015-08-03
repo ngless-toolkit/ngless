@@ -9,20 +9,22 @@ module Validation
     , uses_STDOUT
     ) where
 
-import Language
-
 import Data.Maybe
 import Data.Foldable (asum)
 import qualified Data.Text as T
 import Control.Applicative
+import Data.List
 
+import Language
+import Modules
+import Functions
 
-validate :: Script -> Either T.Text Script
-validate expr = case errors of
+validate :: [Module] -> Script -> Either T.Text Script
+validate mods expr = case errors of
         [] -> Right expr
         _ -> Left (T.concat errors)
     where
-        errors = catMaybes (map ($expr) checks)
+        errors = catMaybes (map (\f -> f mods expr) checks)
         checks =
             [validate_types
             ,validate_version
@@ -51,13 +53,13 @@ symbols_list :: [T.Text]
 symbols_list = ["gene", "cds", "exon"]
 
 
-validate_version :: Script -> Maybe T.Text
-validate_version sc = nglVersion  <$> nglHeader sc >>= \case
+validate_version :: [Module] -> Script -> Maybe T.Text
+validate_version _ sc = nglVersion  <$> nglHeader sc >>= \case
     "0.0" -> Nothing
     version -> Just (T.concat ["Version ", version, " is not supported (only version 0.0 is available)."])
 
-validate_types :: Script -> Maybe T.Text
-validate_types (Script _ es) = check_toplevel validate_types' es
+validate_types :: [Module] -> Script -> Maybe T.Text
+validate_types _ (Script _ es) = check_toplevel validate_types' es
     where validate_types' (Assignment _ e@(ConstSymbol _)) = validate_symbol symbols e
           validate_types' (Assignment _ (ListExpression e@[ConstSymbol _])) = errors_from_list $ map (validate_symbol symbols_list) e
           validate_types' _ = Nothing
@@ -70,7 +72,7 @@ validate_symbol _ _ = Nothing
 
 
 -- | check whether results of calling pure functions are use
-validate_pure_function (Script _ es) = check_toplevel validate_pure_function' es
+validate_pure_function _ (Script _ es) = check_toplevel validate_pure_function' es
     where
         validate_pure_function' (FunctionCall f _ _ _)
             | f `elem` pureFunctions = Just (T.concat ["Result of call function ", T.pack . show $ f, " should be assigned to something."])
@@ -80,36 +82,40 @@ validate_pure_function (Script _ es) = check_toplevel validate_pure_function' es
                     , Fsubstrim
                     , Fmap
                     , Fcount
-                    , Fas_reads
                     , Fselect
+                    , Fother "as_reads"
                     ]
+findFunction :: [Module] -> FuncName -> Maybe Function
+findFunction mods fn = find ((==fn) . funcName) $ builtinFunctions ++ concat (modFunctions <$> mods)
 
-validate_req_function_args :: Script -> Maybe T.Text
-validate_req_function_args (Script _ es) = check_toplevel validate_req_function_args' es
+validate_req_function_args :: [Module] -> Script -> Maybe T.Text
+validate_req_function_args mods (Script _ es) = check_toplevel validate_req_function_args' es
     where
         validate_req_function_args' (Assignment  _ fc) = validate_req_function_args' fc
-        validate_req_function_args' (FunctionCall f _ args _) = has_required_args f args
+        validate_req_function_args' (FunctionCall f _ args _) = has_required_args mods f args
         validate_req_function_args' _ = Nothing
 
-has_required_args :: FuncName -> [(Variable, Expression)] -> Maybe T.Text
-has_required_args f args = errors_from_list $ map has1 (function_required_args f)
+has_required_args :: [Module] -> FuncName -> [(Variable, Expression)] -> Maybe T.Text
+has_required_args mods f args = case findFunction mods f of
+        Nothing -> Just (T.concat ["Function ", T.pack . show $ f, " not found."])
+        Just finfo -> errors_from_list $ map has1 (funcKwArgs finfo)
     where
         used = map (\(Variable k, _) -> k) args
-        has1 a = if a `elem` used
+        has1 ainfo = if not (argRequired ainfo) || (argName ainfo) `elem` used
                 then Nothing
-                else Just (T.concat ["Function ", T.pack . show $ f, " requires argument ", a, "."])
+                else Just (T.concat ["Function ", T.pack . show $ f, " requires argument ", argName ainfo, "."])
 
-validate_val_function_args :: Script -> Maybe T.Text
-validate_val_function_args (Script _ es) = check_toplevel (check_recursive validate_val_function_args') es
+validate_val_function_args :: [Module] -> Script -> Maybe T.Text
+validate_val_function_args mods (Script _ es) = check_toplevel (check_recursive validate_val_function_args') es
     where
         validate_val_function_args' (Assignment  _ fc) = validate_val_function_args' fc
-        validate_val_function_args' (FunctionCall f _ args _) = check_symbol_val_in_arg f args
+        validate_val_function_args' (FunctionCall f _ args _) = check_symbol_val_in_arg mods f args
         validate_val_function_args' _ = Nothing
 
 
 
-validate_STDIN_only_used_once :: Script -> Maybe T.Text
-validate_STDIN_only_used_once (Script _ code) = check_use Nothing code
+validate_STDIN_only_used_once :: [Module] -> Script -> Maybe T.Text
+validate_STDIN_only_used_once _ (Script _ code) = check_use Nothing code
     where
         check_use _ [] = Nothing
         check_use ub@(Just p) ((lno,e):es)
@@ -140,19 +146,25 @@ constant_used_block _ _ = False
 uses_STDOUT :: Expression -> Bool
 uses_STDOUT = constant_used "STDOUT"
 
-check_symbol_val_in_arg :: FuncName -> [(Variable, Expression)]-> Maybe T.Text
-check_symbol_val_in_arg f args = errors_from_list $ map check1 args
+check_symbol_val_in_arg :: [Module] -> FuncName -> [(Variable, Expression)]-> Maybe T.Text
+check_symbol_val_in_arg mods f args = case findFunction mods f of
+        Nothing -> Just (T.concat ["Function '", T.pack . show $ f, "' not found"])
+        Just finfo -> errors_from_list $ map (check1 finfo) args
     where
-        allowed = function_args_allowed_symbols f
-        allowedStr v = T.concat ["[", showA (allowed v), "]"]
+        allowed :: Function -> T.Text -> [T.Text]
+        allowed finfo v = case argAllowedSymbols =<< find ((==v) . argName) (funcKwArgs finfo) of
+            Just ss -> ss
+            Nothing -> []
+
+        allowedStr finfo v = T.concat ["[", showA (allowed finfo v), "]"]
         showA [] = ""
         showA [e] = T.concat ["{", e, "}"]
         showA (e:es) = T.concat ["{", e, "}, ", showA es]
-        check1 (Variable v, expr) = case expr of
-            ConstSymbol s       -> if s `elem` (allowed v)
+        check1 finfo (Variable v, expr) = case expr of
+            ConstSymbol s       -> if s `elem` (allowed finfo v)
                                     then Nothing
-                                    else Just (T.concat ["Argument: `", v, "` (for function ", T.pack (show f), ") expects one of ", allowedStr v, " but got {", s, "}"])
-            ListExpression es   -> errors_from_list $ map (\e -> check1 (Variable v, e)) es
+                                    else Just (T.concat ["Argument: `", v, "` (for function ", T.pack (show f), ") expects one of ", allowedStr finfo v, " but got {", s, "}"])
+            ListExpression es   -> errors_from_list $ map (\e -> check1 finfo (Variable v, e)) es
             _                   -> Nothing
 
 check_toplevel :: (Expression -> Maybe T.Text) -> [(Int, Expression)] -> Maybe T.Text
@@ -184,4 +196,6 @@ check_recursive_block _ Nothing = Nothing
 
 
 errors_from_list :: [Maybe T.Text] -> Maybe T.Text
-errors_from_list = listToMaybe . catMaybes 
+errors_from_list errs = case catMaybes errs of
+    [] -> Nothing
+    errs' -> Just (T.concat errs')

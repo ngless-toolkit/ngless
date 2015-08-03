@@ -10,28 +10,46 @@ module Types
 import qualified Data.Text as T
 import qualified Data.Map as Map
 import Data.Maybe
-import Control.Monad.State
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.State.Strict
+import Control.Monad.Trans.Maybe
+import Control.Monad.Reader
+import Control.Monad.Writer
 import Control.Applicative
 import Data.String
+import Data.List (find)
 
+import Modules
 import Language
+import Functions
 
 
 type TypeMap = Map.Map T.Text NGLType
-type TypeMSt b = ExceptT T.Text (State (Int,TypeMap)) b
+type TypeMSt b = StateT (Int, TypeMap) (MaybeT (ReaderT [Module] (Writer [T.Text]))) b
 
 -- | checktypes will either return an error message or pass through the script
-checktypes :: Script -> Either T.Text Script
-checktypes script@(Script _ exprs) = evalState (runExceptT (inferScriptM exprs >> return script)) (0,Map.empty)
+checktypes :: [Module] -> Script -> Either T.Text Script
+checktypes mods script@(Script _ exprs) = let w = runMaybeT (runStateT (inferScriptM exprs) (0,Map.empty)) in
+    case runWriter (runReaderT w mods) of
+        (Nothing, errs) -> Left (T.concat errs)
+        (Just ((),_), []) -> Right script
+        (Just _,  errs) -> Left (T.concat errs)
 
-errorInLineC :: [String] -> TypeMSt a
+errorInLineC :: [String] -> TypeMSt ()
 errorInLineC = errorInLine . T.concat . map fromString
 
-errorInLine :: T.Text -> TypeMSt a
+errorInLine :: T.Text -> TypeMSt ()
 errorInLine e = do
-    line <- fst `fmap` get
-    throwError (T.concat ["Line ", T.pack (show line), ": ", e])
+    (line,_) <- get
+    tell [T.concat ["Error in type-checking (line ", T.pack (show line), "): ", e]]
+
+-- | There are two types of errors: errors which can potentially be recovered
+-- from (mostly by pretending that the type was what was expected and
+-- continuing): these get accumulated until the end of parsing. Some errors,
+-- however, trigger an immediate abort by calling 'cannotContinue'
+cannotContinue :: TypeMSt a
+cannotContinue = lift (MaybeT (return Nothing))
+
 
 inferScriptM :: [(Int,Expression)] -> TypeMSt ()
 inferScriptM [] = return ()
@@ -117,15 +135,17 @@ checkbool (ConstBool _) = return (Just NGLBool)
 checkbool expr = do
     t <- nglTypeOf expr
     if t /= Just NGLBool
-        then  errorInLineC ["Expected boolean expression, got ", show t, " for expression ", show expr]
+        then do
+            errorInLineC ["Expected boolean expression, got ", show t, " for expression ", show expr]
+            return (Just NGLBool)
         else return t
 
 checkinteger (ConstNum _) = return (Just NGLInteger)
 checkinteger expr = do
     t <- nglTypeOf expr
-    if t /= Just NGLInteger
-        then errorInLine "Expected integer"
-        else return t
+    when (t /= Just NGLInteger) $
+        errorInLine "Expected integer"
+    return (Just NGLInteger)
 
 checkindex expr index = checkindex' index *> checklist expr
     where
@@ -146,18 +166,36 @@ checklist (Lookup (Variable v)) = do
     case vtype of
         Just (NGList btype) -> return (Just btype)
         Just NGLRead -> return (Just NGLRead)
-        e -> errorInLine $ T.concat ["List expected. Type ", T.pack . show $ e , " provided."]
-checklist _ = errorInLine "List expected"
+        e -> do
+            errorInLine $ T.concat ["List expected. Type ", T.pack . show $ e , " provided."]
+            return (Just NGLVoid)
+checklist _ = errorInLine "List expected" >> return (Just NGLVoid)
+
+allFunctions = (builtinFunctions ++) <$> moduleFunctions
+moduleFunctions = concat . map modFunctions <$> ask
+
+funcInfo fn = do
+    fs <- allFunctions
+    let matched = filter ((==fn) . funcName) fs
+    case matched of
+        [fi] -> return fi
+        [] -> do
+            errorInLineC ["Unknown function '", show fn, "'"]
+            cannotContinue
+        _ -> do
+            errorInLineC ["Too many matches for function '", show fn, "'"]
+            cannotContinue
 
 checkfunccall :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
 checkfunccall f arg = do
         targ <- nglTypeOf arg
-        let etype = function_arg_type f
-            rtype = function_return_type f
+        Function _ (Just etype) rtype _ _ <- funcInfo f
         case targ of
             Just (NGList t) -> checkfunctype etype t *> return (Just (NGList rtype))
             Just t -> checkfunctype etype t *> return (Just rtype)
-            Nothing -> errorInLine "Could not infer type of argument"
+            Nothing -> do
+                errorInLine "Could not infer type of argument"
+                cannotContinue
     where
         checkfunctype NGLAny NGLVoid = errorInLineC
                                     ["Function '", show f, "' can take any type, but the input is of illegal type Void."]
@@ -168,34 +206,39 @@ checkfunccall f arg = do
                 | otherwise = return ()
 
 checkfuncargs :: FuncName -> [(Variable, Expression)] -> TypeMSt ()
-checkfuncargs f args = mapM_ (checkfuncarg f) args
+checkfuncargs f args = do
+    Function _ _ _ argInfo _ <- funcInfo f
+    mapM_ (checkfuncarg f argInfo) args
 
-checkfuncarg :: FuncName -> (Variable, Expression) -> TypeMSt ()
-checkfuncarg f (v, e) = do
+
+checkfuncarg :: FuncName -> [ArgInformation] -> (Variable, Expression) -> TypeMSt ()
+checkfuncarg f arginfo (Variable v, e) = do
     eType <- nglTypeOf e
-    arg_type <- checkfuncarg' f v
-    case eType of
-        Just x  -> checkargtype x arg_type *> return ()
-        Nothing -> errorInLine "Could not infer type of argument"
-    where
-        checkargtype t t' = when (t /= t') (errorInLineC
-                            ["Bad argument type in ", show f ,", variable " , show v,". expects ", show t', " got ", show t, "."])
+    let ainfo = find ((==v) . argName) arginfo
+    case (ainfo,eType) of
+        (Nothing, _) -> errorInLineC ["Bad argument '", T.unpack v, "' for function '", show f, "'"]
+        (_, Nothing) -> errorInLine "Could not infer type of argument"
+        (Just ainfo', Just t') -> when (argType ainfo' /= t') $
+                    (errorInLineC
+                            ["Bad argument type in ", show f ,", variable " , show v,". expects ", show t', " got ", show . argType $ ainfo', "."])
 
-requireType :: Expression -> TypeMSt NGLType
-requireType e = nglTypeOf e >>= \case
-    Nothing -> errorInLineC ["Could not infer required type of expression (", show e, ")"]
+requireType :: NGLType -> Expression -> TypeMSt NGLType
+requireType def_t e = nglTypeOf e >>= \case
+    Nothing -> do
+        errorInLineC ["Could not infer required type of expression (", show e, ")"]
+        return def_t
     Just t -> return t
 
 checkmethodcall :: MethodName -> Expression -> (Maybe Expression) -> TypeMSt (Maybe NGLType)
 checkmethodcall m self arg = do
-    stype <- requireType self
     let reqSelfType = methodSelfType m
+    stype <- requireType reqSelfType self
     when (stype /= reqSelfType) (errorInLineC
         ["Wrong type for method ", show m, ". This method is defined for type ", show reqSelfType,
          ", but expression (", show self, ") has type ", show stype])
-    argType <- maybe (return Nothing) nglTypeOf arg
+    actualType <- maybe (return Nothing) nglTypeOf arg
     let reqArgType = methodArgType m
-    case (argType,reqArgType) of
+    case (actualType, reqArgType) of
         (Nothing, _) -> return ()
         (Just _, Nothing) -> errorInLineC ["Method ", show m, " does not take any unnamed argument"]
         (Just t, Just t') -> when (t /= t') (errorInLineC
@@ -206,15 +249,11 @@ checkmethodargs :: MethodName -> [(Variable, Expression)] -> TypeMSt ()
 checkmethodargs m args = forM_ args check1arg
     where
         check1arg (v, e) = do
-            actualType <- requireType e
             let reqType = methodKwargType m v
+            actualType <- requireType reqType e
             when (actualType /= reqType) (errorInLineC
                     ["Bad argument type for argument ", show v, " in method call ", show m, ". ",
                      "Expected ", show reqType, " got ", show actualType])
 
-
-checkfuncarg' f v = case function_opt_arg_type f v of
-    Left  err -> errorInLine err
-    Right e   -> return e
 
 

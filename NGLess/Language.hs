@@ -18,11 +18,6 @@ module Language
     , ModInfo(..)
     , Script(..)
     , NGLessObject(..)
-    , function_opt_arg_type
-    , function_required_args
-    , function_args_allowed_symbols
-    , function_return_type
-    , function_arg_type
     , methodSelfType
     , methodArgType
     , methodReturnType
@@ -48,7 +43,6 @@ data FuncName =
         | Fpreprocess
         | Fsubstrim
         | Fmap
-        | Fas_reads
         | Fselect
         | Fcount
         | Fwrite
@@ -65,7 +59,6 @@ instance Show FuncName where
     show Fpreprocess = "preprocess"
     show Fsubstrim = "substrim"
     show Fmap = "map"
-    show Fas_reads = "as_reads"
     show Fselect = "select"
     show Fcount = "count"
     show Fwrite = "write"
@@ -77,65 +70,6 @@ data MethodName =
         Mflag
         | Mscore
     deriving (Eq, Show)
-
-functionArgTypeReturnType :: FuncName -> (NGLType,           NGLType)
-functionArgTypeReturnType Ffastq =       (NGLString,         NGLReadSet)
-functionArgTypeReturnType Fsamfile =     (NGLString,         NGLMappedReadSet)
-functionArgTypeReturnType Fpaired =      (NGLString,         NGLReadSet)
-functionArgTypeReturnType Funique =      (NGLReadSet,        NGLReadSet)
-functionArgTypeReturnType Fpreprocess =  (NGLReadSet,        NGLVoid)
-functionArgTypeReturnType Fsubstrim =    (NGLRead,           NGLRead)
-functionArgTypeReturnType Fmap =         (NGLReadSet,        NGLMappedReadSet)
-functionArgTypeReturnType Fas_reads =    (NGLMappedReadSet,  NGLReadSet)
-functionArgTypeReturnType Fselect =      (NGLMappedReadSet,  NGLMappedReadSet)
-functionArgTypeReturnType Fcount =       (NGLMappedReadSet,  NGLCounts)
-functionArgTypeReturnType Fannotate =    (NGLMappedReadSet,  NGLMappedReadSet)
-functionArgTypeReturnType Fwrite =       (NGLAny,            NGLVoid)
-functionArgTypeReturnType Fprint =       (NGLAny,            NGLVoid)
-
-function_arg_type :: FuncName -> NGLType
-function_arg_type = fst . functionArgTypeReturnType
-
-function_return_type :: FuncName -> NGLType
-function_return_type = snd . functionArgTypeReturnType
-
-function_opt_arg_type :: FuncName -> Variable -> Either T.Text NGLType
-function_opt_arg_type Funique     (Variable "max_copies")           = Right NGLInteger
-function_opt_arg_type Fmap        (Variable "reference")            = Right NGLString
-function_opt_arg_type Fannotate   (Variable "gff")                  = Right NGLString
-function_opt_arg_type Fannotate   (Variable "mode")                 = Right NGLSymbol
-function_opt_arg_type Fannotate   (Variable "features")             = Right $ NGList NGLSymbol
-function_opt_arg_type Fannotate   (Variable "keep_ambiguous")       = Right NGLBool
-function_opt_arg_type Fannotate   (Variable "strand")               = Right NGLBool
-function_opt_arg_type Fselect     (Variable "keep_if")              = Right (NGList NGLSymbol)
-function_opt_arg_type Fselect     (Variable "drop_if")              = Right (NGList NGLSymbol)
-function_opt_arg_type Fcount      (Variable "counts")               = Right $ NGList NGLSymbol
-function_opt_arg_type Fcount      (Variable "min")                  = Right NGLInteger
-function_opt_arg_type Fsubstrim   (Variable "min_quality")          = Right NGLInteger
-function_opt_arg_type Fwrite      (Variable "ofile")                = Right NGLString
-function_opt_arg_type Fwrite      (Variable "format")               = Right NGLSymbol
-function_opt_arg_type Fwrite      (Variable "verbose")              = Right NGLBool
-function_opt_arg_type Ffastq      (Variable "encoding")             = Right NGLSymbol
-function_opt_arg_type Fpaired     (Variable "second")               = Right NGLString
-function_opt_arg_type Fpaired     (Variable "singles")              = Right NGLString
-function_opt_arg_type Fpaired      _ = Left "paired function does not have any argument"
-function_opt_arg_type Fpreprocess  _ = Left "Preprocess function does not have any argument"
-function_opt_arg_type e (Variable x) = Left $ T.concat ["Function " ,T.pack . show $ e ," does not have argument: ", x]
-
-function_required_args :: FuncName -> [T.Text]
-function_required_args Fmap         = ["reference"]
-function_required_args Fwrite       = ["ofile"]
-function_required_args _            = []
-
-function_args_allowed_symbols :: FuncName -> T.Text -> [T.Text]
-function_args_allowed_symbols Fannotate "features"   = ["gene", "cds", "exon"]
-function_args_allowed_symbols Fannotate "mode"       = ["union", "intersection_strict", "intersection_non_empty"]
-function_args_allowed_symbols Fwrite "format"        = ["tsv", "csv", "bam", "sam"]
-function_args_allowed_symbols Fcount "counts"        = ["gene", "cds", "exon"]
-function_args_allowed_symbols Fselect "keep_if"      = ["mapped", "unmapped"]
-function_args_allowed_symbols Fselect "drop_if"      = ["mapped", "unmapped"]
-function_args_allowed_symbols Ffastq "encoding"      = ["auto", "33", "64", "sanger", "solexa"]
-function_args_allowed_symbols _ _                    = []
 
 
 methodArgTypeReturnType :: MethodName -> ((NGLType, Maybe NGLType), NGLType)

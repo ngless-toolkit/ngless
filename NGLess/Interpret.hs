@@ -31,7 +31,7 @@ import qualified Data.Conduit.Zlib as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit (($=), ($$), (=$=), (=$))
-import Data.Conduit.Async ((=$=&), ($$&), ($=&))
+import Data.Conduit.Async ((=$=&), ($$&))
 import qualified Data.Vector as V
 
 import System.IO
@@ -45,6 +45,7 @@ import Language
 import FileManagement
 import Configuration (outputDirectory)
 import Output
+import Modules
 import NGLess
 import Data.Sam
 import Data.FastQ
@@ -53,7 +54,6 @@ import Interpretation.Annotation
 import Interpretation.Write
 import Interpretation.Select
 import Interpretation.Map
-import Interpretation.Reads
 import Interpretation.Count
 import Unique
 
@@ -83,8 +83,13 @@ import Unique
 -- A variable map
 type NGLEnv_t = Map.Map T.Text NGLessObject
 
+data NGLInterpretEnv = NGLInterpretEnv
+    { ieModules :: [Module]
+    , ieVariableEnv :: NGLEnv_t
+    }
+
 type InterpretationEnvT m =
-                (StateT (Int,NGLEnv_t) m)
+                (StateT NGLInterpretEnv m)
 -- Monad 1: IO + read-write environment
 type InterpretationEnvIO = InterpretationEnvT NGLessIO
 -- Monad 2: read-write environment
@@ -104,16 +109,28 @@ data BlockResult = BlockResult
 
 -- Set line number
 setlno :: Int -> InterpretationEnvIO ()
-setlno !n = do
-    modify $ \(_,e) -> (n,e)
-    liftIO $ setOutputLno (Just n)
+setlno !n = liftIO $ setOutputLno (Just n)
 
 lookupVariable :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
 lookupVariable !k =
-    Map.lookup k `fmap` ask
+    Map.lookup k <$> ask
 
 setVariableValue :: T.Text -> NGLessObject -> InterpretationEnvIO ()
-setVariableValue !k !v = modify $ \(n,e) -> (n, Map.insert k v e)
+setVariableValue !k !v = modify $ \(NGLInterpretEnv mods e) -> (NGLInterpretEnv mods (Map.insert k v e))
+
+getName (Fother fname) = fname
+getName f = T.pack $ show f
+
+findFunction :: FuncName -> InterpretationEnvIO (NGLessObject -> KwArgsValues -> NGLessIO NGLessObject)
+findFunction fname = do
+        mods <- gets ieModules
+        case filter hasF mods of
+            [m] -> return $ (runFunction m) (getName fname)
+            [] -> throwShouldNotOccurr $ T.concat ["Function '", getName fname, "' not found (not builtin and not in any loaded module)"]
+            ms -> throwShouldNotOccurr $ T.concat (["Function '", T.pack $ show fname, "' found in multiple modules! ("] ++ [T.concat [modname, ":"] | modname <- modName . modInfo <$> ms])
+    where
+        hasF m = (fname `elem` (funcName `fmap` modFunctions m))
+
 
 runInEnv :: InterpretationEnv a -> InterpretationEnvIO a
 runInEnv act = do
@@ -127,7 +144,7 @@ runInEnv act = do
 
 runInROEnv :: InterpretationROEnv a -> InterpretationEnv a
 runInROEnv action = do
-    (_,env) <- gets id
+    env <- gets ieVariableEnv
     let Identity mv = runReaderT (runExceptT action) env
     case mv of
         Left e -> throwError e
@@ -157,11 +174,12 @@ nglTypeError err = throwShouldNotOccurr ("Unexpected type error! This should hav
 traceExpr m e =
     runNGLessIO $ outputListLno' TraceOutput ["Interpreting [", m , "]: ", show e]
 
-interpret :: FilePath -> T.Text -> [(Int,Expression)] -> NGLessIO ()
-interpret fname script es = do
+interpret :: FilePath -> T.Text -> [Module] -> [(Int,Expression)] -> NGLessIO ()
+interpret fname script modules es = do
     let nglessScript = NGOString script 
         nglessScriptFname = NGOFilename fname
-        initialState = (0, Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty))
+        initialVarEnv = Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty)
+        initialState = NGLInterpretEnv modules initialVarEnv
     odir <- outputDirectory
     liftIO $ setupHtmlViewer odir
     evalStateT (interpretIO $ es) initialState
@@ -243,7 +261,6 @@ topFunction' Fsamfile   expr args Nothing = executeSamfile expr args
 topFunction' Funique    expr args Nothing = runNGLessIO (executeUnique expr args)
 topFunction' Fwrite     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
 topFunction' Fmap       expr args Nothing = executeMap expr args
-topFunction' Fas_reads  expr args Nothing = runNGLessIO (executeReads expr args)
 topFunction' Fselect    expr args Nothing = runNGLessIO (executeSelect expr args)
 topFunction' Fannotate  expr args Nothing = runNGLessIO (executeAnnotation expr args)
 topFunction' Fcount     expr args Nothing = runNGLessIO (executeCount expr args)
@@ -264,6 +281,11 @@ topFunction' Fpaired mate1 args Nothing = do
                 throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
             return (NGOReadSet3 enc1 fp1 fp2 fp3)
 topFunction' Fselect expr args (Just b) = executeSelectWBlock expr args b
+topFunction' fname@(Fother fname') expr args Nothing = do
+    traceExpr ("executing module function: '"++T.unpack fname'++"'") expr
+    execF <- findFunction fname
+    runNGLessIO (execF expr args)
+
 topFunction' f _ _ _ = throwShouldNotOccurr . concat $ ["Interpretation of ", (show f), " is not implemented"]
 
 executeFastq expr args = do

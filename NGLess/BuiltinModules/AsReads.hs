@@ -2,10 +2,11 @@
  - License: MIT
  -}
 
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections, OverloadedStrings #-}
 
-module Interpretation.Reads
+module BuiltinModules.AsReads
     ( executeReads
+    , loadModule
     ) where
 
 import qualified Data.ByteString.Lazy as BL
@@ -18,6 +19,7 @@ import FileManagement
 
 import Data.Sam
 import Data.FastQ
+import Modules
 import NGLess
 
 executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -34,6 +36,23 @@ samToFastQ fpsam = do
         BL.hPut ohand (BL.concat fq)
         hClose ohand
         return oname
-    
+
 asFQ :: SamLine -> BL.ByteString
 asFQ SamLine{samQName=qname, samSeq=short, samQual=qs} = BL.fromChunks ["@", qname, "\n", short, "\n+\n", qs, "\n"]
+
+as_reads_Function = Function
+    { funcName = Fother "as_reads"
+    , funcArgType = Just NGLMappedReadSet
+    , funcRetType = NGLReadSet
+    , funcKwArgs = []
+    , funcAllowsAutoComprehension = True
+    }
+
+--loadModule :: NGLessIO Module
+loadModule _ = return $ Module
+    { modInfo = ModInfo "builtin.as_reads" "0.0"
+    , modConstants = []
+    , modFunctions = [as_reads_Function]
+    , runFunction = const executeReads
+    }
+

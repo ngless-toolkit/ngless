@@ -24,6 +24,7 @@ import System.Console.CmdArgs.Verbosity
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
+import qualified Data.Text as T
 
 import Data.Convertible
 
@@ -39,7 +40,6 @@ import Types
 import Substrim
 import FastQStatistics
 import FileManagement
-import Validation
 import Interpretation.Annotation
 import Interpretation.Count
 import VectorOperations
@@ -119,12 +119,13 @@ case_substrim_normal_exec =  subtrimPos "\n\v\f{zo\n\v\NUL" '\DC4' @?= (3,3)
 case_substrim_empty_quals = subtrimPos "" '\DC4' @?= (0,0)
 
 -- Test Types
-isOkTypes = isOk "Type error on good code"
+isOkTypes (Right _) = return ()
+isOkTypes (Left err) = assertFailure ("Type error on good code (error was '"++T.unpack err++"'")
 
-case_bad_type_fastq = isError $ checktypes (Script Nothing [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
-case_good_type_fastq = isOkTypes $ checktypes (Script Nothing [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
+case_bad_type_fastq = isError $ checktypes [] (Script Nothing [(0,FunctionCall Ffastq (ConstNum 3) [] Nothing)])
+case_good_type_fastq = isOkTypes $ checktypes [] (Script Nothing [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [] Nothing)])
 
-case_type_complete = isOkTypes $ (parsetest complete) >>= checktypes
+case_type_complete = isOkTypes $ (parsetest complete) >>= checktypes []
 
 complete = "ngless '0.0'\n\
     \reads = fastq('input1.fq')\n\
@@ -150,7 +151,7 @@ indent_space  = "ngless '0.0'\n\
     \    read = read[5:]\n\
     \    \n"
 
-case_indent_empty_line = isOkTypes $ parsetest indent_empty_line >>= checktypes
+case_indent_empty_line = isOkTypes $ parsetest indent_empty_line >>= checktypes []
     where indent_empty_line  = "ngless '0.0'\n\
             \reads = fastq('input1.fq')\n\
             \preprocess(reads) using |read|:\n\
@@ -163,19 +164,19 @@ case_indent_empty_line = isOkTypes $ parsetest indent_empty_line >>= checktypes
 
 -- fastq
 
-case_invalid_func_fastq = isError $ checktypes f_expr
+case_invalid_func_fastq = isError $ checktypes [] f_expr
     where 
         f_expr = Script Nothing [(0,FunctionCall Ffastq (ConstStr "fastq.fq") [(Variable "xpto", (ConstNum 10))] Nothing)]
 
 -- unique
 
-case_valid_funique_mc = isOkTypes $ parsetest f_attr >>= checktypes
+case_valid_funique_mc = isOkTypes $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
                   \unique(x, max_copies=10)\n"
 
-case_invalid_funique_mc = isError $ parsetest f_attr >>= checktypes
+case_invalid_funique_mc = isError $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
@@ -184,7 +185,7 @@ case_invalid_funique_mc = isError $ parsetest f_attr >>= checktypes
 
 -- substrim
 
-case_valid_fsubstrim_mq = isOkTypes $ parsetest f_attr >>= checktypes
+case_valid_fsubstrim_mq = isOkTypes $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                  \x = fastq('fq')\n\
@@ -192,7 +193,7 @@ case_valid_fsubstrim_mq = isOkTypes $ parsetest f_attr >>= checktypes
                  \    read = read[5:]\n\
                  \    read = substrim(read, min_quality=2)\n"
 
-case_invalid_fsubstrim_mq = isError $ parsetest f_attr >>= checktypes
+case_invalid_fsubstrim_mq = isError $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                  \x = fastq('fq')\n\
@@ -202,56 +203,56 @@ case_invalid_fsubstrim_mq = isError $ parsetest f_attr >>= checktypes
 
 -- map
 
-case_invalid_fmap_ref = isError $ parsetest f_attr >>= checktypes
+case_invalid_fmap_ref = isError $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
                   \map(x, reference=10)\n"
 
 
-case_valid_fmap_ref = isOkTypes $ parsetest f_attr >>= checktypes
+case_valid_fmap_ref = isOkTypes $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
                   \map(x, reference='xpto')\n"
 
 -- annotate
-case_valid_fannot_gff = isOkTypes $ parsetest f_attr >>= checktypes
+case_valid_fannot_gff = isOkTypes $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
                   \y = map(x, reference='xpto')\n\
                   \annotate(y, gff='xpto')"
 
-case_invalid_fannot_gff = isError $ parsetest f_attr >>= checktypes
+case_invalid_fannot_gff = isError $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
                   \y = map(x, reference='xpto')\n\
                   \annotate(y, gff={xpto})"
 
-case_valid_fannot_mode = isOkTypes $ parsetest f_attr >>= checktypes
+case_valid_fannot_mode = isOkTypes $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
                   \y = map(x, reference='xpto')\n\
                   \annotate(y, mode={union})"
 
-case_invalid_fannot_mode = isError $ parsetest f_attr >>= checktypes
+case_invalid_fannot_mode = isError $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
                   \y = map(x, reference='xpto')\n\
                   \annotate(y, mode='union')"
 
-case_valid_fannot_features = isOkTypes $ parsetest f_attr >>= checktypes
+case_valid_fannot_features = isOkTypes $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
                   \y = map(x, reference='xpto')\n\
                   \annotate(y, features=[{gene}])"
 
-case_invalid_fannot_features = isError $ parsetest f_attr >>= checktypes
+case_invalid_fannot_features = isError $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
@@ -259,7 +260,7 @@ case_invalid_fannot_features = isError $ parsetest f_attr >>= checktypes
                   \annotate(y, features='gene')"
 
 -- count
-case_valid_fcount_min = isOkTypes $ parsetest f_attr >>= checktypes
+case_valid_fcount_min = isOkTypes $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
@@ -267,7 +268,7 @@ case_valid_fcount_min = isOkTypes $ parsetest f_attr >>= checktypes
                   \z = annotate(y, features=[{gene}])\n\
                   \k = count(z, min=10)"
 
-case_invalid_fcount_min = isError $ parsetest f_attr >>= checktypes
+case_invalid_fcount_min = isError $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
@@ -276,7 +277,7 @@ case_invalid_fcount_min = isError $ parsetest f_attr >>= checktypes
                   \k = count(z, min='10')"
 
 
-case_valid_fcount_counts = isOkTypes $ parsetest f_attr >>= checktypes
+case_valid_fcount_counts = isOkTypes $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
@@ -284,7 +285,7 @@ case_valid_fcount_counts = isOkTypes $ parsetest f_attr >>= checktypes
                   \z = annotate(y, features=[{gene}])\n\
                   \k = count(z, counts=[{gene}])"
 
-case_invalid_fcount_counts = isError $ parsetest f_attr >>= checktypes
+case_invalid_fcount_counts = isError $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
@@ -294,7 +295,7 @@ case_invalid_fcount_counts = isError $ parsetest f_attr >>= checktypes
 
 -- write
 
-case_valid_fwrite_ofile = isOkTypes $ parsetest f_attr >>= checktypes
+case_valid_fwrite_ofile = isOkTypes $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
@@ -302,7 +303,7 @@ case_valid_fwrite_ofile = isOkTypes $ parsetest f_attr >>= checktypes
                   \z = annotate(y, features=[{gene}])\n\
                   \write(count(z), ofile='10')"
 
-case_invalid_fwrite_ofile = isError $ parsetest f_attr >>= checktypes
+case_invalid_fwrite_ofile = isError $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
@@ -311,7 +312,7 @@ case_invalid_fwrite_ofile = isError $ parsetest f_attr >>= checktypes
                   \write(count(z), ofile=10)"
 
 
-case_valid_fwrite_format = isOkTypes $ parsetest f_attr >>= checktypes
+case_valid_fwrite_format = isOkTypes $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
@@ -319,40 +320,13 @@ case_valid_fwrite_format = isOkTypes $ parsetest f_attr >>= checktypes
                   \z = annotate(y, features=[{gene}])\n\
                   \write(count(z), format={tsv})"
 
-case_invalid_fwrite_format = isError $ parsetest f_attr >>= checktypes
+case_invalid_fwrite_format = isError $ parsetest f_attr >>= checktypes []
     where 
         f_attr = "ngless '0.0'\n\
                   \x = fastq('fq')\n\
                   \y = map(x, reference='xpto')\n\
                   \z = annotate(y, features=[{gene}])\n\
                   \write(count(z), format='tsv')"
-
---- Validation pure functions
-
-case_bad_function_attr_count = isError $ parsetest function_attr >>= validate
-    where function_attr = "ngless '0.0'\n\
-            \count(annotated, count={gene})\n"
-
-case_good_function_attr_count_1 = isOkTypes $ parsetest good_function_attr >>= validate
-    where good_function_attr = "ngless '0.0'\n\
-            \write(count(annotated, counts=[{gene}]),ofile='gene_counts.csv',format={csv})"
-
-case_good_function_attr_count_2 = isOkTypes $ parsetest good_function_attr >>= validate
-    where good_function_attr = "ngless '0.0'\n\
-            \counts = count(annotated, counts=[{gene}])"
-
-case_bad_function_attr_map = isError $ parsetest function_attr >>= validate
-    where function_attr = "ngless '0.0'\n\
-            \map(input,reference='sacCer3')\n"
-
-case_good_function_attr_map_1 = isOkTypes $ parsetest good_function_attr >>= validate
-    where good_function_attr = "ngless '0.0'\n\
-            \write(map(input,reference='sacCer3'),ofile='result.sam',format={sam})"
-
-case_good_function_attr_map_2 = isOkTypes $ parsetest good_function_attr >>= validate
-    where good_function_attr = "ngless '0.0'\n\
-            \counts = map(input,reference='sacCer3')"
-
 
 -- Type Validate pre process operations
 sr i s q = NGOShortRead (ShortRead i s q)
@@ -451,18 +425,18 @@ map_s = "ngless '0.0'\n\
     \mapped = map(input,reference='sacCer3')\n\
     \write(mapped, ofile='test_samples/sample20_mapped.sam',format={sam})\n"
 
-case_preprocess_script = case parsetest preprocess_s >>= checktypes of
+case_preprocess_script = case parsetest preprocess_s >>= checktypes [] of
     Left err -> assertFailure (show err)
     Right expr -> do
-        testNGLessIO $ (interpret "test" preprocess_s) . nglBody $ expr
+        testNGLessIO $ (interpret "test" preprocess_s []) . nglBody $ expr
         res' <- B.readFile "test_samples/sample20_post.fq"
         (length $ B.lines res') @?= (16 :: Int)
         removeFile "test_samples/sample20_post.fq"
 
-case_map_script = case parsetest map_s >>= checktypes of
+case_map_script = case parsetest map_s >>= checktypes [] of
     Left err -> assertFailure (show err)
     Right expr -> do
-        testNGLessIO $ (interpret "testing" map_s) . nglBody $ expr
+        testNGLessIO $ (interpret "testing" map_s []) . nglBody $ expr
         res' <- readPossiblyCompressedFile "test_samples/sample20_mapped.sam"
         _calcSamStats res' @?= (5,0,0,0)
         removeFile "test_samples/sample20_mapped.sam"

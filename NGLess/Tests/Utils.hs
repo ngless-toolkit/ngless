@@ -1,18 +1,28 @@
 module Tests.Utils
     ( isError
+    , isErrorMsg
     , isOk
     , parsetest
     , fromRight
     ) where
 import Test.HUnit
+import qualified Data.Text as T
+
+import Language
 import Parse
 
-isError (Right _) = assertFailure "error not caught"
-isError (Left _) = return ()
+isError :: Either a b -> Assertion
+isError = isErrorMsg "Error not caught"
 
+isErrorMsg :: String -> Either a b -> Assertion
+isErrorMsg m (Right _) = assertFailure m
+isErrorMsg _ (Left _) = return ()
+
+isOk :: String -> Either a b -> Assertion
 isOk m (Left _) = assertFailure m
 isOk _ (Right _) = return ()
 
+parsetest :: T.Text -> Either T.Text Script
 parsetest = parsengless "test" True
 
 fromRight (Right r) = r

@@ -6,17 +6,6 @@ module Main
     ( main
     ) where
 
-import Interpret
-import Validation
-import ValidationNotPure
-import Language
-import Types
-import Parse
-import Configuration
-import ReferenceDatabases
-import Output
-import NGLess
-
 import Data.Maybe
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
@@ -36,6 +25,18 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as B
 
+import Interpret
+import Validation
+import ValidationNotPure
+import Language
+import Types
+import Parse
+import Configuration
+import ReferenceDatabases
+import Output
+import NGLess
+
+import qualified BuiltinModules.AsReads as ModAsReads
 
 data NGLess =
         DefaultMode
@@ -106,6 +107,11 @@ whenStrictlyNormal act = do
 runNGLessIO :: NGLessIO a -> IO (Either NGError a)
 runNGLessIO = runResourceT . runExceptT
 
+-- loadModules :: [ModInfo] -> m [Module]
+loadModules _  = do
+    mA <- ModAsReads.loadModule ("" :: T.Text)
+    return [mA]
+
 optsExec :: NGLess -> IO ()
 optsExec opts@DefaultMode{} = do
     let fname = input opts
@@ -123,13 +129,14 @@ optsExec opts@DefaultMode{} = do
         _ -> T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
     ngltext <- rightOrDie (case engltext of { Right e -> Right e ; Left b -> Left . T.pack . show $ b })
     let maybe_add_print = (if print_last opts then wrapPrint else Right)
-    let parsed = parsengless fname reqversion ngltext >>= maybe_add_print >>= checktypes >>= validate
-    sc <- rightOrDie parsed
+    let parsed = parsengless fname reqversion ngltext >>= maybe_add_print
+    sc' <- rightOrDie parsed
     when (debug_mode opts == "ast") $ do
-        forM_ (nglBody sc) $ \(lno,e) ->
+        forM_ (nglBody sc') $ \(lno,e) ->
             putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)
         exitSuccess
-
+    modules <- loadModules sc'
+    sc <- rightOrDie $ checktypes modules sc' >>= validate modules
     when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
         whenStrictlyNormal (setVerbosity Quiet)
     Right odir <- runNGLessIO outputDirectory
@@ -145,7 +152,7 @@ optsExec opts@DefaultMode{} = do
         when (isJust errs) $
             liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
         outputLno' InfoOutput "Script OK. Starting interpretation..."
-        interpret fname ngltext (nglBody sc)
+        interpret fname ngltext modules (nglBody sc)
     case err of
         Left m -> do
             putStrLn "FATAL ERROR"

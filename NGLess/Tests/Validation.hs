@@ -6,6 +6,7 @@ module Tests.Validation
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.HUnit
+import qualified Data.Text as T
 
 import Tests.Utils
 import Validation
@@ -14,10 +15,42 @@ import Control.Monad
 
 tgroup_Validation = $(testGroupGenerator)
 
-case_mismatched_argument = isError $ (validate =<< parsetest "ngless '0.0'\n\
-            \input = fastq('input.fq')\n\
-            \mapped = map(input, reference='hg19')\n\
-            \ann = annotate(mapped, mode={deny})")
+-- Pure Validation
+
+isValidateOk ftext = case parsetest ftext >>= validate [] of
+    Right _ -> return ()
+    Left err -> assertFailure ("Validation should have passed for script "++T.unpack ftext++"; instead picked up error: '"++T.unpack err++"'")
+isValidateError ftext = isErrorMsg ("Validation should have picked error for script '"++T.unpack ftext++"'") (parsetest ftext >>= validate [])
+
+case_bad_function_attr_count = isValidateError
+    "ngless '0.0'\n\
+    \count(annotated, count={gene})\n"
+
+case_good_function_attr_count_1 = isValidateOk
+    "ngless '0.0'\n\
+    \write(count(annotated, counts=[{gene}]),ofile='gene_counts.csv',format={csv})"
+
+case_good_function_attr_count_2 = isValidateOk
+    "ngless '0.0'\n\
+    \counts = count(annotated, counts=[{gene}])"
+
+case_map_not_assigned = isValidateError
+    "ngless '0.0'\n\
+    \map(input,reference='sacCer3')\n"
+
+case_good_function_attr_map_1 = isValidateOk
+    "ngless '0.0'\n\
+    \write(map(input,reference='sacCer3'),ofile='result.sam',format={sam})"
+
+case_good_function_attr_map_2 = isValidateOk
+    "ngless '0.0'\n\
+    \counts = map(input,reference='sacCer3')"
+
+case_mismatched_argument = isValidateError
+    "ngless '0.0'\n\
+    \input = fastq('input.fq')\n\
+    \mapped = map(input, reference='hg19')\n\
+    \ann = annotate(mapped, mode={deny}"
 
 validate_io_Ok script = do
     err <- validate_io (fromRight . parsetest $ script)
@@ -32,7 +65,7 @@ validate_io_Error script = do
         Just _ -> return ()
 
 validate_Error script =
-    when (isRight $ parsetest script >>= validate) $
+    when (isRight $ parsetest script >>= validate []) $
         assertFailure (concat ["Validate (pure) should have detected an error on the script ", show script])
 
 isRight (Right _) = True
