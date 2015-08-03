@@ -15,8 +15,8 @@ builtinFunctions =
     ,Function (FuncName "substrim") (Just NGLRead) NGLRead substrimArgs False
     ,Function (FuncName "map") (Just NGLReadSet) NGLMappedReadSet mapArgs False
     ,Function (FuncName "select") (Just NGLMappedReadSet) NGLMappedReadSet selectArgs False
-    ,Function (FuncName "count") (Just NGLMappedReadSet) NGLCounts countArgs False
-    ,Function (FuncName "annotate") (Just NGLMappedReadSet) NGLMappedReadSet annotateArgs False
+    ,Function (FuncName "count") (Just NGLAnnotatedSet) NGLCounts countArgs False
+    ,Function (FuncName "annotate") (Just NGLMappedReadSet) NGLAnnotatedSet annotateArgs False
     ,Function (FuncName "write") (Just NGLAny) NGLVoid writeArgs False
     ,Function (FuncName "print") (Just NGLAny) NGLVoid [] False
     ]

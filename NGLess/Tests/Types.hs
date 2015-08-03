@@ -178,6 +178,13 @@ case_invalid_fwrite_ofile = isErrorText
     \write(count(z), ofile=10)"
 
 
+case_count_on_mapped = isErrorText
+    "ngless '0.0'\n\
+    \input = fastq('fq')\n\
+    \mapped = map(input, reference='hg19')\n\
+    \counted = count(mapped)\n\
+    \write(counted, format={tsv})"
+
 case_valid_fwrite_format = isOkTypesText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
