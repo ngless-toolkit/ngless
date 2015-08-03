@@ -118,8 +118,7 @@ lookupVariable !k =
 setVariableValue :: T.Text -> NGLessObject -> InterpretationEnvIO ()
 setVariableValue !k !v = modify $ \(NGLInterpretEnv mods e) -> (NGLInterpretEnv mods (Map.insert k v e))
 
-getName (Fother fname) = fname
-getName f = T.pack $ show f
+getName (FuncName f) = f
 
 findFunction :: FuncName -> InterpretationEnvIO (NGLessObject -> KwArgsValues -> NGLessIO NGLessObject)
 findFunction fname = do
@@ -243,30 +242,30 @@ maybeInterpretExpr Nothing = return Nothing
 maybeInterpretExpr (Just e) = Just <$> interpretExpr e
 
 topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
-topFunction Fpreprocess expr@(Lookup (Variable varName)) args (Just block) = do
+topFunction (FuncName "preprocess") expr@(Lookup (Variable varName)) args (Just block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ interpretArguments args
     res' <- executePreprocess expr' args' block >>= executeQualityProcess
     setVariableValue varName res'
     return res'
-topFunction Fpreprocess expr _ _ = throwShouldNotOccurr ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
+topFunction (FuncName "preprocess") expr _ _ = throwShouldNotOccurr ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
 topFunction f expr args block = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
     topFunction' f expr' args' block
 
 topFunction' :: FuncName -> NGLessObject -> KwArgsValues -> Maybe Block -> InterpretationEnvIO NGLessObject
-topFunction' Ffastq     expr args Nothing = executeFastq expr args
-topFunction' Fsamfile   expr args Nothing = executeSamfile expr args
-topFunction' Funique    expr args Nothing = runNGLessIO (executeUnique expr args)
-topFunction' Fwrite     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
-topFunction' Fmap       expr args Nothing = executeMap expr args
-topFunction' Fselect    expr args Nothing = runNGLessIO (executeSelect expr args)
-topFunction' Fannotate  expr args Nothing = runNGLessIO (executeAnnotation expr args)
-topFunction' Fcount     expr args Nothing = runNGLessIO (executeCount expr args)
-topFunction' Fprint     expr args Nothing = executePrint expr args
+topFunction' (FuncName "fastq")     expr args Nothing = executeFastq expr args
+topFunction' (FuncName "samfile")   expr args Nothing = executeSamfile expr args
+topFunction' (FuncName "unique")    expr args Nothing = runNGLessIO (executeUnique expr args)
+topFunction' (FuncName "write")     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
+topFunction' (FuncName "map")       expr args Nothing = executeMap expr args
+topFunction' (FuncName "select")    expr args Nothing = runNGLessIO (executeSelect expr args)
+topFunction' (FuncName "annotate")  expr args Nothing = runNGLessIO (executeAnnotation expr args)
+topFunction' (FuncName "count")     expr args Nothing = runNGLessIO (executeCount expr args)
+topFunction' (FuncName "print")     expr args Nothing = executePrint expr args
 
-topFunction' Fpaired mate1 args Nothing = do
+topFunction' (FuncName "paired") mate1 args Nothing = do
     let Just mate2 = lookup "second" args
         mate3 = lookup "singles" args
     NGOReadSet1 enc1 fp1 <- executeQualityProcess mate1
@@ -280,8 +279,8 @@ topFunction' Fpaired mate1 args Nothing = do
             when (enc1 /= enc3) $
                 throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
             return (NGOReadSet3 enc1 fp1 fp2 fp3)
-topFunction' Fselect expr args (Just b) = executeSelectWBlock expr args b
-topFunction' fname@(Fother fname') expr args Nothing = do
+topFunction' (FuncName "select") expr args (Just b) = executeSelectWBlock expr args b
+topFunction' fname@(FuncName fname') expr args Nothing = do
     traceExpr ("executing module function: '"++T.unpack fname'++"'") expr
     execF <- findFunction fname
     runNGLessIO (execF expr args)
@@ -500,7 +499,7 @@ interpretBlockExpr :: [(T.Text, NGLessObject)] -> Expression -> InterpretationRO
 interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpretPreProcessExpr val)
 
 interpretPreProcessExpr :: Expression -> InterpretationROEnv NGLessObject
-interpretPreProcessExpr (FunctionCall Fsubstrim var args _) = do
+interpretPreProcessExpr (FunctionCall (FuncName "substrim") var args _) = do
     NGOShortRead r <- interpretExpr var
     args' <- interpretArguments args
     let mq = lookupWithDefault (NGOInteger 0) "min_quality" args'

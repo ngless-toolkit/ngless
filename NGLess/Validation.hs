@@ -77,13 +77,13 @@ validate_pure_function _ (Script _ es) = check_toplevel validate_pure_function' 
         validate_pure_function' (FunctionCall f _ _ _)
             | f `elem` pureFunctions = Just (T.concat ["Result of call function ", T.pack . show $ f, " should be assigned to something."])
         validate_pure_function' _ = Nothing
-        pureFunctions =
-                    [ Funique
-                    , Fsubstrim
-                    , Fmap
-                    , Fcount
-                    , Fselect
-                    , Fother "as_reads"
+        pureFunctions = map FuncName
+                    [ "unique"
+                    , "substrim"
+                    , "map"
+                    , "count"
+                    , "select"
+                    , "as_reads"
                     ]
 findFunction :: [Module] -> FuncName -> Maybe Function
 findFunction mods fn = find ((==fn) . funcName) $ builtinFunctions ++ concat (modFunctions <$> mods)

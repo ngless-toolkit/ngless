@@ -34,37 +34,11 @@ import Data.Sam
 newtype Variable = Variable T.Text
     deriving (Eq, Show)
 
--- | functions are hard coded here
-data FuncName =
-        Ffastq
-        | Fsamfile
-        | Fpaired
-        | Funique
-        | Fpreprocess
-        | Fsubstrim
-        | Fmap
-        | Fselect
-        | Fcount
-        | Fwrite
-        | Fprint
-        | Fannotate
-        | Fother !T.Text
+newtype FuncName = FuncName T.Text
     deriving (Eq)
 
 instance Show FuncName where
-    show Ffastq = "fastq"
-    show Fsamfile = "samfile"
-    show Fpaired = "paired"
-    show Funique = "unique"
-    show Fpreprocess = "preprocess"
-    show Fsubstrim = "substrim"
-    show Fmap = "map"
-    show Fselect = "select"
-    show Fcount = "count"
-    show Fwrite = "write"
-    show Fprint = "print"
-    show Fannotate = "annotate"
-    show (Fother fn) = T.unpack fn
+    show (FuncName f) = T.unpack f
 
 data MethodName =
         Mflag

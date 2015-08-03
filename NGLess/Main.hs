@@ -84,10 +84,10 @@ wrapPrint (Script v sc) = wrap sc >>= Right . Script v
             | wrapable e = Right [(lno,addPrint e)]
             | otherwise = Left "Cannot add write() statement at the end of script (the script cannot terminate with a print/write call)"
         wrap (e:es) = wrap es >>= Right . (e:)
-        addPrint e = FunctionCall Fwrite e [(Variable "ofile", BuiltinConstant (Variable "STDOUT"))] Nothing
+        addPrint e = FunctionCall (FuncName "write") e [(Variable "ofile", BuiltinConstant (Variable "STDOUT"))] Nothing
 
-        wrapable (FunctionCall f _ _ _)
-            | f `elem` [Fprint, Fwrite] = False
+        wrapable (FunctionCall (FuncName f) _ _ _)
+            | f `elem` ["print", "write"] = False
         wrapable _ = True
 
 rightOrDie :: Either T.Text a -> IO a

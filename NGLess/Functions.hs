@@ -7,18 +7,18 @@ import Modules
 import Language
 
 builtinFunctions =
-    [Function Ffastq (Just NGLString) NGLReadSet fastqArgs False
-    ,Function Fsamfile (Just NGLString) NGLMappedReadSet samfileArgs False
-    ,Function Fpaired (Just NGLString) NGLReadSet pairedArgs False
-    ,Function Funique (Just NGLReadSet) NGLReadSet uniqueArgs False
-    ,Function Fpreprocess (Just NGLReadSet) NGLVoid preprocessArgs False
-    ,Function Fsubstrim (Just NGLRead) NGLRead substrimArgs False
-    ,Function Fmap (Just NGLReadSet) NGLMappedReadSet mapArgs False
-    ,Function Fselect (Just NGLMappedReadSet) NGLMappedReadSet selectArgs False
-    ,Function Fcount (Just NGLMappedReadSet) NGLCounts countArgs False
-    ,Function Fannotate (Just NGLMappedReadSet) NGLMappedReadSet annotateArgs False
-    ,Function Fwrite (Just NGLAny) NGLVoid writeArgs False
-    ,Function Fprint (Just NGLAny) NGLVoid [] False
+    [Function (FuncName "fastq") (Just NGLString) NGLReadSet fastqArgs False
+    ,Function (FuncName "samfile") (Just NGLString) NGLMappedReadSet samfileArgs False
+    ,Function (FuncName "paired") (Just NGLString) NGLReadSet pairedArgs False
+    ,Function (FuncName "unique") (Just NGLReadSet) NGLReadSet uniqueArgs False
+    ,Function (FuncName "preprocess") (Just NGLReadSet) NGLVoid preprocessArgs False
+    ,Function (FuncName "substrim") (Just NGLRead) NGLRead substrimArgs False
+    ,Function (FuncName "map") (Just NGLReadSet) NGLMappedReadSet mapArgs False
+    ,Function (FuncName "select") (Just NGLMappedReadSet) NGLMappedReadSet selectArgs False
+    ,Function (FuncName "count") (Just NGLMappedReadSet) NGLCounts countArgs False
+    ,Function (FuncName "annotate") (Just NGLMappedReadSet) NGLMappedReadSet annotateArgs False
+    ,Function (FuncName "write") (Just NGLAny) NGLVoid writeArgs False
+    ,Function (FuncName "print") (Just NGLAny) NGLVoid [] False
     ]
 
 annotateArgs =

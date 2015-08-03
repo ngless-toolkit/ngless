@@ -28,22 +28,22 @@ case_parse_symbol = parseBody "{symbol}" @?= [ConstSymbol "symbol"]
 case_parse_fastq = parseBody fastqcalls @?= fastqcall
     where
         fastqcalls = "fastq(\"input.fq\")"
-        fastqcall  = [FunctionCall Ffastq (ConstStr "input.fq") [] Nothing]
+        fastqcall  = [FunctionCall (FuncName "fastq") (ConstStr "input.fq") [] Nothing]
 
 case_parse_paired = parseBody fastqcalls @?= fastqcall
     where
         fastqcalls = "paired(\"input.fq\", \"pair.fq\")"
-        fastqcall  = [FunctionCall Fpaired (ConstStr "input.fq") [(Variable "second", ConstStr "pair.fq")] Nothing]
+        fastqcall  = [FunctionCall (FuncName "paired") (ConstStr "input.fq") [(Variable "second", ConstStr "pair.fq")] Nothing]
 
 case_parse_count = parseBody countcalls @?= countcall
     where
         countcalls = "count(annotated, count={gene})"
-        countcall  = [FunctionCall Fcount (Lookup (Variable "annotated")) [(Variable "count", ConstSymbol "gene")] Nothing]
+        countcall  = [FunctionCall (FuncName "count") (Lookup (Variable "annotated")) [(Variable "count", ConstSymbol "gene")] Nothing]
 
 case_parse_count_mult_counts = parseBody countcalls @?= countcall
     where
         countcalls = "count(annotated, count=[{gene},{cds}])"
-        countcall  = [FunctionCall Fcount (Lookup (Variable "annotated")) [(Variable "count", ListExpression [ConstSymbol "gene", ConstSymbol "cds"])] Nothing]
+        countcall  = [FunctionCall (FuncName "count") (Lookup (Variable "annotated")) [(Variable "count", ListExpression [ConstSymbol "gene", ConstSymbol "cds"])] Nothing]
 
 case_parse_assignment =  parseBody "reads = \"something\"" @?=
         [Assignment (Variable "reads") (ConstStr "something")]
@@ -121,5 +121,5 @@ case_parse_cleanupindents_4'' = tokcleanupindents toks @?= toks'
 j1 = Just (ConstNum 1)
 tokcleanupindents = map snd . _cleanupindents . map (newPos "test" 0 0,)
 
-case_parse_kwargs = parseBody "unique(reads,maxCopies=2)\n" @?= [FunctionCall Funique (Lookup (Variable "reads")) [(Variable "maxCopies", ConstNum 2)] Nothing]
+case_parse_kwargs = parseBody "unique(reads,maxCopies=2)\n" @?= [FunctionCall (FuncName "unique") (Lookup (Variable "reads")) [(Variable "maxCopies", ConstNum 2)] Nothing]
 

@@ -30,16 +30,16 @@ validate_io expr = do
 validate_files :: Script -> IO (Maybe T.Text)
 validate_files (Script _ es) = check_toplevel validate_files' es
     where
-        validate_files' (FunctionCall Ffastq (ConstStr x) _ _) = check_can_read_file x
-        validate_files' (FunctionCall Ffastq (Lookup   x) _ _) = validateVar check_can_read_file x es
-        validate_files' (FunctionCall Fannotate _ args _) = validateArg check_can_read_file "gff" args es
+        validate_files' (FunctionCall (FuncName "fastq") (ConstStr x) _ _) = check_can_read_file x
+        validate_files' (FunctionCall (FuncName "fastq") (Lookup   x) _ _) = validateVar check_can_read_file x es
+        validate_files' (FunctionCall (FuncName "annotate") _ args _) = validateArg check_can_read_file "gff" args es
         validate_files' (Assignment _ e) = validate_files' e
         validate_files' _ = return Nothing
  
 validate_def_genomes :: Script -> IO (Maybe T.Text)
 validate_def_genomes (Script _ es) = check_toplevel validate_def_genomes' es
     where
-        validate_def_genomes' (FunctionCall Fmap _ args _) = validateArg check_reference "reference" args es -- fromJust can be used, since reference is always required and already validated.
+        validate_def_genomes' (FunctionCall (FuncName "map") _ args _) = validateArg check_reference "reference" args es -- fromJust can be used, since reference is always required and already validated.
         validate_def_genomes' (Assignment _ e) = validate_def_genomes' e
         validate_def_genomes' _ = return Nothing
 

@@ -41,7 +41,7 @@ asFQ :: SamLine -> BL.ByteString
 asFQ SamLine{samQName=qname, samSeq=short, samQual=qs} = BL.fromChunks ["@", qname, "\n", short, "\n+\n", qs, "\n"]
 
 as_reads_Function = Function
-    { funcName = Fother "as_reads"
+    { funcName = FuncName "as_reads"
     , funcArgType = Just NGLMappedReadSet
     , funcRetType = NGLReadSet
     , funcKwArgs = []

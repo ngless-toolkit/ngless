@@ -154,28 +154,12 @@ funccall = try paired <|> FunctionCall <$>
 funcblock = optionMaybe (Block <$> (reserved "using" *> operator '|' *> variableList <* operator '|' <* operator ':') <*> block)
 
 paired = FunctionCall
-            <$> (match_word "paired" *> pure Fpaired)
+            <$> (match_word "paired" *> pure (FuncName "paired"))
             <*> (operator '(' *> innerexpression <* operator ',')
             <*> pairedKwArgs
             <*> pure Nothing
 
-funcname = funcname' <?> "function name"
-    where
-        funcname' = do
-            fname <- word
-            case fname of
-                "fastq" -> pure Ffastq
-                "samfile" -> pure Fsamfile
-                "substrim" -> pure Fsubstrim
-                "preprocess" -> pure Fpreprocess
-                "map" -> pure Fmap
-                "count" -> pure Fcount
-                "select" -> pure Fselect
-                "unique" -> pure Funique
-                "write" -> pure Fwrite
-                "print" -> pure Fprint
-                "annotate" -> pure Fannotate
-                _ -> pure (Fother fname)
+funcname = FuncName <$> word <?> "function name"
 
 methodName = methodName' <?> "method name"
     where
