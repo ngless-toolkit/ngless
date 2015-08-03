@@ -74,10 +74,10 @@ validate_symbol _ _ = Nothing
 -- | check whether results of calling pure functions are use
 validate_pure_function _ (Script _ es) = check_toplevel validate_pure_function' es
     where
-        validate_pure_function' (FunctionCall f _ _ _)
-            | f `elem` pureFunctions = Just (T.concat ["Result of call function ", T.pack . show $ f, " should be assigned to something."])
+        validate_pure_function' (FunctionCall (FuncName f) _ _ _)
+            | f `elem` pureFunctions = Just (T.concat ["Result of calling function ",  f, " should be assigned to something (this function has no effect otherwise)."])
         validate_pure_function' _ = Nothing
-        pureFunctions = map FuncName
+        pureFunctions =
                     [ "unique"
                     , "substrim"
                     , "map"
