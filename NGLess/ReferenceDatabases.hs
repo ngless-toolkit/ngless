@@ -3,6 +3,7 @@
 module ReferenceDatabases
     ( isDefaultReference
     , installData
+    , createReferencePack
     , getIndexPath
     , getGff
     , ensureDataPresent
@@ -17,13 +18,14 @@ import qualified Codec.Compression.GZip as GZip
 import System.FilePath.Posix
 import System.Directory
 import System.IO.Error
+import FileManagement (createTempDir)
 
 import Control.Monad
 import Control.Applicative ((<$>), (<|>))
 import Control.Monad.IO.Class (liftIO)
 
 import Utils.Network
-import Utils.Bwa
+import Utils.Bwa as Bwa
 import Configuration
 import Output
 import NGLess
@@ -46,6 +48,30 @@ getIndexPath :: FilePath -> FilePath
 getIndexPath = (</> "Sequence/BWAIndex/genome.fa.gz")
 getGff :: FilePath -> FilePath
 getGff = (</> "Annotation/annot.gtf.gz")
+
+
+createReferencePack :: FilePath -> FilePath -> FilePath -> NGLessIO ()
+createReferencePack oname genome gtf = do
+    tmpdir <- liftIO $ createTempDir "ngless_ref_creator_"
+    outputListLno' DebugOutput ["Working with temporary directory: ", tmpdir]
+    liftIO $ do
+        createDirectoryIfMissing True (tmpdir ++ "/Sequences/BWAIndex/")
+        createDirectoryIfMissing True (tmpdir ++ "/Annotation/")
+        downloadFile genome (tmpdir ++ "/Sequences/BWAIndex/genome.fa.gz")
+        downloadFile gtf (tmpdir ++ "/Annotation/annotation.gft.gz")
+    Bwa.createIndex (tmpdir ++ "/Sequences/BWAIndex/genome.fa.gz")
+    let filelist =
+            ["Sequences/BWAIndex/genome.fa.gz"
+            ,"Sequences/BWAIndex/genome.fa.amb"
+            ,"Sequences/BWAIndex/genome.fa.ann"
+            ,"Sequences/BWAIndex/genome.fa.bwt"
+            ,"Sequences/BWAIndex/genome.fa.pac"
+            ,"Sequences/BWAIndex/genome.fa.sa"
+            ,"Annotation/annotation.gtf.gz"
+            ]
+    liftIO $ do
+        Tar.create oname tmpdir filelist
+        removeDirectoryRecursive tmpdir
 
 
 downloadReference :: String -> FilePath -> NGLessIO ()

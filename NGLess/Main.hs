@@ -54,6 +54,11 @@ data NGLess =
               }
         | InstallGenMode
               { input :: String}
+        | CreateReferencePackMode
+              { oname :: FilePath
+              , genome_url :: String
+              , gtf_url :: String
+              }
            deriving (Eq, Show, Data, Typeable)
 
 ngless = DefaultMode
@@ -75,6 +80,13 @@ installargs = InstallGenMode
         }
         &= name "--install-reference-data"
         &= details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
+
+createref = CreateReferencePackMode
+        { oname = "" &= argPos 0
+        , genome_url = "" &= name "g"
+        , gtf_url = "" &= name "a"
+        } &= name "--create-reference-pack"
+        &= details ["Example:", "ngless --create-reference-pack ref.tar.gz -g http://...genome.fa.gz -a http://...gtf.fa.gz"]
 
 
 -- | wrapPrint transforms the script by transforming the last expression <expr>
@@ -171,8 +183,13 @@ optsExec (InstallGenMode ref)
     | otherwise =
         error (concat ["Reference ", ref, " is not a known reference."])
 
+optsExec (CreateReferencePackMode ofile gen gtf) = runNGLessIO "creating reference package" $ do
+        outputLno' InfoOutput "Starting packaging (will download and index genomes)..."
+        createReferencePack ofile gen gtf
+
+
 getModes :: Mode (CmdArgs NGLess)
-getModes = cmdArgsMode $ modes [ngless &= auto, installargs]
+getModes = cmdArgsMode $ modes [ngless &= auto, installargs, createref]
     &= verbosity
     &= summary sumtext
     &= help "ngless implement the NGLess language"

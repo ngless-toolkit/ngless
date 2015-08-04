@@ -15,6 +15,7 @@ import Utils.ProgressBar
 
 downloadFile :: String -> FilePath -> IO ()
 downloadFile url destPath = do
+    putStrLn ("Downloading "++url)
     req <- HTTP.parseUrl url
     manager <- HTTP.newManager HTTP.conduitManagerSettings
     runResourceT $ do
