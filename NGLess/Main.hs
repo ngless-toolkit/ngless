@@ -35,6 +35,7 @@ import Configuration
 import ReferenceDatabases
 import Output
 import NGLess
+import StandardModules.NGLStdlib
 
 import qualified BuiltinModules.AsReads as ModAsReads
 
@@ -108,9 +109,10 @@ runNGLessIO :: NGLessIO a -> IO (Either NGError a)
 runNGLessIO = runResourceT . runExceptT
 
 -- loadModules :: [ModInfo] -> m [Module]
-loadModules _  = do
+loadModules mods  = do
     mA <- ModAsReads.loadModule ("" :: T.Text)
-    return [mA]
+    imported <- loadStdlibModules mods
+    return (mA:imported)
 
 optsExec :: NGLess -> IO ()
 optsExec opts@DefaultMode{} = do
@@ -135,7 +137,7 @@ optsExec opts@DefaultMode{} = do
         forM_ (nglBody sc') $ \(lno,e) ->
             putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)
         exitSuccess
-    modules <- loadModules sc'
+    modules <- loadModules (fromMaybe [] (nglHeader sc' >>= Just . nglModules))
     sc <- rightOrDie $ checktypes modules sc' >>= validate modules
     when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
         whenStrictlyNormal (setVerbosity Quiet)

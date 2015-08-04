@@ -95,7 +95,7 @@ type InterpretationEnvIO = InterpretationEnvT NGLessIO
 -- Monad 2: read-write environment
 type InterpretationEnv = InterpretationEnvT (ExceptT NGError Identity)
 -- Monad 3: read-only environment
-type InterpretationROEnv = ExceptT NGError (Reader NGLEnv_t)
+type InterpretationROEnv = ExceptT NGError (Reader NGLInterpretEnv)
 
 {- The result of a block is a status indicating why the block finished
  - and the value of all block variables.
@@ -112,8 +112,19 @@ setlno :: Int -> InterpretationEnvIO ()
 setlno !n = liftIO $ setOutputLno (Just n)
 
 lookupVariable :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
-lookupVariable !k =
-    Map.lookup k <$> ask
+lookupVariable !k = (liftM2 (<|>))
+    (lookupConstant k)
+    (Map.lookup k . ieVariableEnv <$> ask)
+
+lookupConstant :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
+lookupConstant !k = do
+    constants <- concat . map modConstants . ieModules <$> ask
+    case filter ((==k) . fst) constants of
+        [] -> return Nothing
+        [(_,v)] -> return (Just v)
+        _ -> throwShouldNotOccurr $ T.concat ["Multiple hits found for constant ", k]
+
+
 
 setVariableValue :: T.Text -> NGLessObject -> InterpretationEnvIO ()
 setVariableValue !k !v = modify $ \(NGLInterpretEnv mods e) -> (NGLInterpretEnv mods (Map.insert k v e))
@@ -143,7 +154,7 @@ runInEnv act = do
 
 runInROEnv :: InterpretationROEnv a -> InterpretationEnv a
 runInROEnv action = do
-    env <- gets ieVariableEnv
+    env <- gets id
     let Identity mv = runReaderT (runExceptT action) env
     case mv of
         Left e -> throwError e
@@ -496,7 +507,7 @@ interpretBlock1 vs (Sequence expr) = interpretBlock vs expr -- interpret [expr]
 interpretBlock1 vs x = unreachable ("interpretBlock1: This should not have happened " ++ show vs ++ " " ++ show x)
 
 interpretBlockExpr :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv NGLessObject
-interpretBlockExpr vs val = local (\e -> Map.union e (Map.fromList vs)) (interpretPreProcessExpr val)
+interpretBlockExpr vs val = local (\(NGLInterpretEnv mods e) -> (NGLInterpretEnv mods (Map.union e (Map.fromList vs)))) (interpretPreProcessExpr val)
 
 interpretPreProcessExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretPreProcessExpr (FunctionCall (FuncName "substrim") var args _) = do

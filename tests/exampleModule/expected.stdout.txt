@@ -1,0 +1,5 @@
+Called example function 'example'
+First argument is NGOReadSet1 SolexaEncoding "sample.fq"
+Keyword arguments are []
+This function does nothing except print this information
+Hello

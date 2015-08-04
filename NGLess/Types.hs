@@ -80,7 +80,17 @@ inferBlock (FuncName f) (Just (Block vars es)) = do
             _ -> error ("This function '" ++ show f ++ "' does not accept blocks")
 
 envLookup :: T.Text -> TypeMSt (Maybe NGLType)
-envLookup v = Map.lookup v . snd <$> get
+envLookup v = (liftM2 (<|>)) (constantLookup v) (Map.lookup v . snd <$> get)
+
+constantLookup :: T.Text -> TypeMSt (Maybe NGLType)
+constantLookup v = do
+    moduleBuiltins <- concat . map modConstants <$> ask
+    case filter ((==v) . fst) moduleBuiltins of
+        [] -> return Nothing
+        [(_,r)] -> return $ typeOfObject r
+        _ -> do
+            errorInLineC ["Multiple matches for constant: ", T.unpack v]
+            cannotContinue
 
 envInsert :: T.Text -> NGLType -> TypeMSt ()
 envInsert v t = modify (\(lno,m) -> (lno, Map.insert v t m))
@@ -115,6 +125,25 @@ nglTypeOf (BinaryOp bop a b) = checkbop bop a b
 nglTypeOf (IndexExpression expr index) = checkindex expr index
 nglTypeOf Condition{}    = error "unexpected nglTypeOf(Condition)"
 nglTypeOf (Sequence _es) = error "unexpected nglTypeOf(Sequence)"
+
+
+typeOfObject :: NGLessObject -> Maybe NGLType
+typeOfObject (NGOString _) = Just NGLString
+typeOfObject (NGOBool _) = Just NGLBool
+typeOfObject (NGOInteger _) = Just NGLInteger
+typeOfObject (NGOSymbol _) = Just NGLSymbol
+typeOfObject (NGOFilename _) = Just NGLFilename
+typeOfObject (NGOShortRead _) = Just NGLRead
+typeOfObject NGOReadSet1{} = Just NGLReadSet
+typeOfObject NGOReadSet2{} = Just NGLReadSet
+typeOfObject NGOReadSet3{} = Just NGLReadSet
+typeOfObject NGOMappedReadSet{} = Just NGLMappedReadSet
+typeOfObject NGOMappedRead{} = Just NGLMappedRead
+typeOfObject NGOAnnotatedSet{} = Just NGLAnnotatedSet
+typeOfObject NGOVoid = Just NGLVoid
+typeOfObject (NGOList []) = Nothing
+typeOfObject (NGOList (v:_)) = NGList <$> typeOfObject v
+
 
 checkuop UOpLen e = checklist e *> return (Just NGLInteger)
 checkuop UOpMinus e = checkinteger e
@@ -194,7 +223,7 @@ checkfunccall f arg = do
             Just (NGList t) -> checkfunctype etype t *> return (Just (NGList rtype))
             Just t -> checkfunctype etype t *> return (Just rtype)
             Nothing -> do
-                errorInLine "Could not infer type of argument"
+                errorInLineC ["While checking types for function ", show $ f, "Could not infer type of argument (saw :", show $ arg, ")"]
                 cannotContinue
     where
         checkfunctype NGLAny NGLVoid = errorInLineC

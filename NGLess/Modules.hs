@@ -6,6 +6,7 @@ module Modules
     ( ArgInformation(..)
     , Function(..)
     , Module(..)
+    , ModInfo(..) -- re-export
     ) where
 
 import qualified Data.Text as T

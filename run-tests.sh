@@ -9,7 +9,7 @@ for testdir in tests/*; do
         echo "Running $testdir"
         cd $testdir
         mkdir -p temp
-        ../../dist/build/ngless/ngless -t temp *.ngl
+        ../../dist/build/ngless/ngless --quiet -t temp *.ngl > output.stdout.txt
         rm -rf temp
         for f in expected.*; do
             diff -u $f output${f#expected}

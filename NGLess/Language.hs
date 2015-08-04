@@ -99,6 +99,7 @@ data NGLType =
         | NGLReadSet
         | NGLMappedRead
         | NGLMappedReadSet
+        | NGLAnnotatedSet
         | NGLCounts
         | NGLVoid
         | NGLAny
