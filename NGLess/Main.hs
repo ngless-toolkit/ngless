@@ -1,7 +1,7 @@
 {- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE DeriveDataTypeable, OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable, OverloadedStrings, LambdaCase #-}
 module Main
     ( main
     ) where
@@ -35,6 +35,7 @@ import Configuration
 import ReferenceDatabases
 import Output
 import NGLess
+import Modules
 import StandardModules.NGLStdlib
 
 import qualified BuiltinModules.AsReads as ModAsReads
@@ -105,10 +106,15 @@ whenStrictlyNormal act = do
     v <- getVerbosity
     when (v == Normal) act
 
-runNGLessIO :: NGLessIO a -> IO (Either NGError a)
-runNGLessIO = runResourceT . runExceptT
+runNGLessIO :: String -> NGLessIO a -> IO a
+runNGLessIO context act = runResourceT (runExceptT act) >>= \case
+        Left m -> do
+            putStrLn ("Error occurred: "++context)
+            print m
+            exitFailure
+        Right v -> return v
 
--- loadModules :: [ModInfo] -> m [Module]
+loadModules :: [ModInfo] -> NGLessIO [Module]
 loadModules mods  = do
     mA <- ModAsReads.loadModule ("" :: T.Text)
     imported <- loadStdlibModules mods
@@ -137,13 +143,13 @@ optsExec opts@DefaultMode{} = do
         forM_ (nglBody sc') $ \(lno,e) ->
             putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)
         exitSuccess
-    modules <- loadModules (fromMaybe [] (nglHeader sc' >>= Just . nglModules))
+    modules <- runNGLessIO "loading modules" $ loadModules (fromMaybe [] (nglHeader sc' >>= Just . nglModules))
     sc <- rightOrDie $ checktypes modules sc' >>= validate modules
     when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
         whenStrictlyNormal (setVerbosity Quiet)
-    Right odir <- runNGLessIO outputDirectory
+    odir <- runNGLessIO "cannot fail" outputDirectory
     createDirectoryIfMissing False odir
-    err <- runNGLessIO $ do
+    runNGLessIO "running script" $ do
         --Note that the input for ngless is always UTF-8.
         --Always. This means that we cannot use T.readFile
         --which is locale aware.
@@ -155,19 +161,13 @@ optsExec opts@DefaultMode{} = do
             liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
         outputLno' InfoOutput "Script OK. Starting interpretation..."
         interpret fname ngltext modules (nglBody sc)
-    case err of
-        Left m -> do
-            putStrLn "FATAL ERROR"
-            putStrLn (show m)
-            exitFailure
-        _ -> do
-            writeOutput (odir </> "output.js") fname ngltext
-            exitSuccess
+    writeOutput (odir </> "output.js") fname ngltext
+    exitSuccess
 
 
 -- if user uses the flag -i he will install a Reference Genome to all users
 optsExec (InstallGenMode ref)
-    | isDefaultReference ref = void . runNGLessIO $ installData Nothing ref
+    | isDefaultReference ref = void . runNGLessIO "installing data" $ installData Nothing ref
     | otherwise =
         error (concat ["Reference ", ref, " is not a known reference."])
 

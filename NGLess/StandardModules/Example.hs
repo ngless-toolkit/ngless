@@ -33,7 +33,7 @@ exampleFunction = Function
     , funcAllowsAutoComprehension = True
     }
 
---loadModule :: NGLessIO Module
+loadModule :: T.Text -> NGLessIO Module
 loadModule _ = return Module
     { modInfo = ModInfo "stdlib.example" "0.0"
     , modConstants =

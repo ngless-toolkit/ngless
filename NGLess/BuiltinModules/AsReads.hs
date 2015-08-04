@@ -10,6 +10,7 @@ module BuiltinModules.AsReads
     ) where
 
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Text as T
 import Control.Applicative ((<$>))
 import Control.Monad.IO.Class (liftIO)
 import System.IO
@@ -48,8 +49,8 @@ as_reads_Function = Function
     , funcAllowsAutoComprehension = True
     }
 
---loadModule :: NGLessIO Module
-loadModule _ = return $ Module
+loadModule :: T.Text -> NGLessIO Module
+loadModule _ = return Module
     { modInfo = ModInfo "builtin.as_reads" "0.0"
     , modConstants = []
     , modFunctions = [as_reads_Function]
