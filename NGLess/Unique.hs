@@ -58,17 +58,16 @@ hashRead k (ShortRead _ r _) = mod (hash r) k
 
 _writeToNFiles :: FilePath -> FastQEncoding -> [ShortRead] -> NGLessIO FilePath
 _writeToNFiles fname enc rs = do
-    dest' <- liftIO $ do
-        dest <- createTempDir fname
+    (_,dest) <- createTempDir fname
+    liftIO $ do
         k    <- fromIntegral <$> _numFiles fname
         fhs  <- openKFileHandles k dest
         forM_ rs $ \r -> do
             let pos = hashRead k r
             BL.hPutStr (fhs ! pos) (asFastQ enc [r])
         V.mapM_ hClose fhs
-        return dest
-    outputLno' DebugOutput ("Wrote N Files to: " ++ dest')
-    return dest'
+    outputLno' DebugOutput ("Wrote N Files to: " ++ dest)
+    return dest
 
 _readNFiles :: FastQEncoding -> Int -> FilePath -> IO [ShortRead]
 _readNFiles enc k d = do

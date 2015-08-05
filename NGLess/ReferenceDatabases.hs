@@ -23,6 +23,7 @@ import FileManagement (createTempDir)
 import Control.Monad
 import Control.Applicative ((<$>), (<|>))
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Resource(release)
 
 import Utils.Network
 import Utils.Bwa as Bwa
@@ -52,7 +53,7 @@ getGff = (</> "Annotation/annot.gtf.gz")
 
 createReferencePack :: FilePath -> FilePath -> FilePath -> NGLessIO ()
 createReferencePack oname genome gtf = do
-    tmpdir <- liftIO $ createTempDir "ngless_ref_creator_"
+    (rk,tmpdir) <- createTempDir "ngless_ref_creator_"
     outputListLno' DebugOutput ["Working with temporary directory: ", tmpdir]
     liftIO $ do
         createDirectoryIfMissing True (tmpdir ++ "/Sequences/BWAIndex/")
@@ -62,24 +63,23 @@ createReferencePack oname genome gtf = do
     Bwa.createIndex (tmpdir ++ "/Sequences/BWAIndex/genome.fa.gz")
     let filelist =
             ["Sequences/BWAIndex/genome.fa.gz"
-            ,"Sequences/BWAIndex/genome.fa.amb"
-            ,"Sequences/BWAIndex/genome.fa.ann"
-            ,"Sequences/BWAIndex/genome.fa.bwt"
-            ,"Sequences/BWAIndex/genome.fa.pac"
-            ,"Sequences/BWAIndex/genome.fa.sa"
+            ,"Sequences/BWAIndex/genome.fa.gz.amb"
+            ,"Sequences/BWAIndex/genome.fa.gz.ann"
+            ,"Sequences/BWAIndex/genome.fa.gz.bwt"
+            ,"Sequences/BWAIndex/genome.fa.gz.pac"
+            ,"Sequences/BWAIndex/genome.fa.gz.sa"
             ,"Annotation/annotation.gtf.gz"
             ]
-    liftIO $ do
-        Tar.create oname tmpdir filelist
-        removeDirectoryRecursive tmpdir
+    liftIO $ Tar.create oname tmpdir filelist
+    release rk
 
 
 downloadReference :: String -> FilePath -> NGLessIO ()
 downloadReference ref destPath = do
     unless (isDefaultReference ref)
-        (error "Expected reference data")
+        (throwScriptError ("Expected reference data, got "++ref))
     baseURL <- nglessDataBaseURL
-    let url = (baseURL </> ref <.> "tar.gz")
+    let url = baseURL </> ref <.> "tar.gz"
     outputListLno' InfoOutput ["Starting download from ", url]
     liftIO $ downloadFile url destPath
     outputLno' InfoOutput "Reference download completed!"

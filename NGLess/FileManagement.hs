@@ -50,12 +50,15 @@ deleteTempFile (fp, h) = do
 
 takeBaseNameNoExtensions = dropExtensions . takeBaseName
     
-createTempDir :: FilePath -> IO FilePath
+createTempDir :: FilePath -> NGLessIO (ReleaseKey,FilePath)
 createTempDir dst = do
-    t <- getTemporaryDirectory
-    fp <- createTempDirectory t (takeBaseNameNoExtensions dst)
-    createDirectory fp
-    return fp
+    t <- liftIO getTemporaryDirectory
+    allocate
+        (do
+            fp <- createTempDirectory t (takeBaseNameNoExtensions dst)
+            createDirectory fp
+            return fp)
+        removeDirectoryRecursive
 
 generateDirId :: FilePath -> NGLessIO FilePath
 generateDirId dst = do

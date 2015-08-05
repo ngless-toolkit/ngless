@@ -225,14 +225,6 @@ preprocess_s = "ngless '0.0'\n\
     \write(input, ofile='test_samples/sample20_post.fq')\n"
 
 
-map_s = "ngless '0.0'\n\
-    \input = fastq('test_samples/sample20.fq')\n\
-    \preprocess(input) using |read|:\n\
-    \    if len(read) < 20:\n\
-    \        discard\n\
-    \mapped = map(input,reference='sacCer3')\n\
-    \write(mapped, ofile='test_samples/sample20_mapped.sam',format={sam})\n"
-
 case_preprocess_script = case parsetest preprocess_s >>= checktypes [] of
     Left err -> assertFailure (show err)
     Right expr -> do
@@ -248,6 +240,15 @@ case_map_script = case parsetest map_s >>= checktypes [] of
         res' <- readPossiblyCompressedFile "test_samples/sample20_mapped.sam"
         _calcSamStats res' @?= (5,0,0,0)
         removeFile "test_samples/sample20_mapped.sam"
+
+map_s = "ngless '0.0'\n\
+    \input = fastq('test_samples/sample20.fq')\n\
+    \preprocess(input) using |read|:\n\
+    \    if len(read) < 20:\n\
+    \        discard\n\
+    \mapped = map(input,reference='sacCer3')\n\
+    \write(mapped, ofile='test_samples/sample20_mapped.sam',format={sam})\n"
+
 
 -- Test compute stats
 
@@ -419,45 +420,24 @@ case_num_files_2 = do -- github rejects files with more than 100MB
   n <- _numFiles "test_samples/sample.sam"
   n @?= 1
 
-case_unique_1_read = do
-    c <- readReadSet enc "test_samples/data_set_repeated.fq" 
-    p <- testNGLessIO $ _writeToNFiles "test_samples/data_set_repeated.fq" enc c
-    ds <- _readNFiles enc 1  p
-    removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
-    length ds @?=  54
-  where enc = SolexaEncoding
 
-case_unique_2_read = do
-    c <- readReadSet enc "test_samples/data_set_repeated.fq" 
-    p <- testNGLessIO $ _writeToNFiles "test_samples/data_set_repeated.fq" enc c
-    ds <- _readNFiles enc 2 p
-    removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
-    length ds @?=  (2 * 54)
-  where enc = SolexaEncoding
+make_unique_test n = let enc = SolexaEncoding in do
+    c <- readReadSet enc "test_samples/data_set_repeated.fq"
+    ds <- testNGLessIO $ do
+        p <- _writeToNFiles "test_samples/data_set_repeated.fq" enc c
+        liftIO $ _readNFiles enc n p
+    length ds @?=  (n * 54)
 
-case_unique_3_read = do
-    c <- readReadSet enc "test_samples/data_set_repeated.fq" 
-    p <- testNGLessIO $ _writeToNFiles "test_samples/data_set_repeated.fq" enc c
-    ds <- _readNFiles enc 3 p
-    removeDirectoryRecursive p -- need to do this by hand to emulate normal execution. 
-    length ds @?=  (3 * 54)
-  where enc = SolexaEncoding
+case_unique_1_read = make_unique_test 1
+case_unique_2_read = make_unique_test 2
+case_unique_3_read = make_unique_test 3
 
-case_unique_4_read = do
-    c <- readReadSet enc "test_samples/data_set_repeated.fq" 
-    p <- testNGLessIO $ _writeToNFiles "test_samples/data_set_repeated.fq" enc c
-    ds <- _readNFiles enc 4 p
-    removeDirectoryRecursive p -- need to do this by hand to emulate normal execution.     
-    length ds @?=  (4 * 54)
-  where enc = SolexaEncoding
-
-case_unique_5_read = do
-    c <- readReadSet enc "test_samples/data_set_repeated.fq" 
-    p <- testNGLessIO $ _writeToNFiles "test_samples/data_set_repeated.fq" enc c
-    ds <- _readNFiles enc 5 p
-    removeDirectoryRecursive p -- need to do this by hand to emulate normal execution.     
-    length ds @?=  (4 * 54)
-  where enc = SolexaEncoding
+case_unique_5 = let enc = SolexaEncoding in do
+    c <- readReadSet enc "test_samples/data_set_repeated.fq"
+    ds <- testNGLessIO $ do
+        p <- _writeToNFiles "test_samples/data_set_repeated.fq" enc c
+        liftIO $ _readNFiles enc 5 p
+    length ds @?=  (4 * 54) -- there are only 4 copies!
 
 -- PerBaseQualityScores 
 
