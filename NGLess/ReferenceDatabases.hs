@@ -14,7 +14,6 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 
-
 import System.FilePath.Posix
 import System.Directory
 import System.IO.Error
@@ -56,18 +55,18 @@ createReferencePack oname genome gtf = do
     (rk,tmpdir) <- createTempDir "ngless_ref_creator_"
     outputListLno' DebugOutput ["Working with temporary directory: ", tmpdir]
     liftIO $ do
-        createDirectoryIfMissing True (tmpdir ++ "/Sequences/BWAIndex/")
+        createDirectoryIfMissing True (tmpdir ++ "/Sequence/BWAIndex/")
         createDirectoryIfMissing True (tmpdir ++ "/Annotation/")
-        downloadFile genome (tmpdir ++ "/Sequences/BWAIndex/genome.fa.gz")
-        downloadFile gtf (tmpdir ++ "/Annotation/annotation.gft.gz")
-    Bwa.createIndex (tmpdir ++ "/Sequences/BWAIndex/genome.fa.gz")
+        downloadFile genome (getIndexPath tmpdir)
+        downloadFile gtf (getGff tmpdir)
+    Bwa.createIndex (tmpdir ++ "/Sequence/BWAIndex/genome.fa.gz")
     let filelist =
-            ["Sequences/BWAIndex/genome.fa.gz"
-            ,"Sequences/BWAIndex/genome.fa.gz.amb"
-            ,"Sequences/BWAIndex/genome.fa.gz.ann"
-            ,"Sequences/BWAIndex/genome.fa.gz.bwt"
-            ,"Sequences/BWAIndex/genome.fa.gz.pac"
-            ,"Sequences/BWAIndex/genome.fa.gz.sa"
+            ["Sequence/BWAIndex/genome.fa.gz"
+            ,"Sequence/BWAIndex/genome.fa.gz.amb"
+            ,"Sequence/BWAIndex/genome.fa.gz.ann"
+            ,"Sequence/BWAIndex/genome.fa.gz.bwt"
+            ,"Sequence/BWAIndex/genome.fa.gz.pac"
+            ,"Sequence/BWAIndex/genome.fa.gz.sa"
             ,"Annotation/annotation.gtf.gz"
             ]
     liftIO $ Tar.create oname tmpdir filelist
@@ -136,6 +135,7 @@ findDataFilesIn ref mode = do
                     else userDataDirectory
     let refdir = basedir </> ref
     hasIndex <- hasValidIndex (getIndexPath refdir)
+    outputListLno' TraceOutput ["Looked for ", ref, " in directory ", refdir, if hasIndex then " (and found it)" else " (and did not find it)"]
     return (if hasIndex
                 then Just refdir
                 else Nothing)
