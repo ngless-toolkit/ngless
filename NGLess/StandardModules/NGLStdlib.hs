@@ -18,5 +18,5 @@ loadStdlibModules = mapM loadModules1
 
 loadModules1 (ModInfo "example" version) = Example.loadModule version
 loadModules1 (ModInfo "batch" version) = Batch.loadModule version
-loadModules1 (ModInfo modname _) = error ("Could not load module " ++show modname)
+loadModules1 (ModInfo modname _) = throwScriptError ("Could not load module " ++show modname)
 

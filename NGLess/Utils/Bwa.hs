@@ -40,5 +40,5 @@ createIndex fafile = do
     outputListLno' DebugOutput ["BWA-index stdout: ", out]
     case exitCode of
         ExitSuccess -> return ()
-        ExitFailure _err -> error err
+        ExitFailure _err -> throwSystemError err
 

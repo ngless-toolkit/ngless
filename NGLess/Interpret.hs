@@ -438,7 +438,7 @@ executeMethod Mflag (NGOMappedRead samline) (Just (NGOSymbol flag)) [] = case ge
         getFlag "mapped" = Right isAligned
         getFlag "unmapped" = Right $ not . isAligned
         getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
-executeMethod m self arg kwargs = error ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
+executeMethod m self arg kwargs = throwShouldNotOccurr ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 
 interpretPBlock1 :: Expression -> T.Text -> NGLessObject -> InterpretationROEnv (Maybe ShortRead)
