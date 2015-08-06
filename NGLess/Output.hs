@@ -21,6 +21,8 @@ import Data.IORef
 import Data.Aeson
 import Data.Aeson.TH (deriveToJSON, defaultOptions)
 import Data.Time (getZonedTime)
+import Data.Time.Format (formatTime)
+import System.Locale (defaultTimeLocale)
 import System.Console.ANSI
 import Control.Applicative
 import Control.Monad
@@ -114,14 +116,22 @@ output :: OutputType -> Int -> String -> NGLessIO ()
 output !ot !lno !msg = do
     isTerm <- liftIO $ hIsTerminalDevice stdout
     verb <- liftIO getVerbosity
-    t <- liftIO getZonedTime
-    liftIO $ modifyIORef savedOutput (OutputLine lno ot msg:)
     sp <- shouldPrint isTerm ot verb
-    when sp $ do
-        let st = setSGRCode [SetColor Foreground Dull (colorFor ot)]
-            rst = setSGRCode [Reset]
-
-        liftIO . putStrLn $ printf "%s[%s]: Line %s: %s%s" st (show t) (show lno) msg rst
+    liftIO $ do
+        t <- getZonedTime
+        modifyIORef savedOutput (OutputLine lno ot msg:)
+        when sp $ do
+            let st = if isTerm
+                        then setSGRCode [SetColor Foreground Dull (colorFor ot)]
+                        else ""
+                rst = if isTerm
+                        then setSGRCode [Reset]
+                        else ""
+                tstr = formatTime defaultTimeLocale "%a %d-%m-%Y %R" t
+                lineStr = if lno > 0
+                                then printf " Line %s" (show lno)
+                                else "" :: String
+            putStrLn $ printf "%s[%s]%s: %s%s" st tstr lineStr msg rst
 
 colorFor :: OutputType -> Color
 colorFor TraceOutput = White

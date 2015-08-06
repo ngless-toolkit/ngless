@@ -52,6 +52,8 @@ executable ngless
     template-haskell,
     text == 1.2.*,
     time == 1.4.*,
+    -- needed until we can update time to 1.5
+    old-locale == 1.0.*,
     transformers == 0.4.*,
     unix == 2.7.*,
     -- aeson (v0.9.0.1) requires vector 0.10
@@ -107,6 +109,8 @@ Test-Suite nglesstest
     test-framework-th,
     text == 1.2.*,
     time == 1.4.*,
+    -- needed until we can update time to 1.5
+    old-locale == 1.0.*,
     transformers == 0.4.*,
     unix == 2.7.*,
     -- aeson (v0.9.0.1) requires vector 0.10
