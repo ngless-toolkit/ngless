@@ -21,7 +21,6 @@ import Data.IORef
 import Data.Aeson
 import Data.Aeson.TH (deriveToJSON, defaultOptions)
 import Data.Time (getZonedTime)
-import System.Time (getClockTime)
 import System.Console.ANSI
 import Control.Applicative
 import Control.Monad
@@ -156,7 +155,7 @@ instance ToJSON FilesProcessed where
 
 createFilesProcessed :: FilePath -> T.Text -> IO FilesProcessed
 createFilesProcessed template script = do
-    t <- getClockTime
+    t <- getZonedTime
     return $ FilesProcessed template (show t) script
 
 writeOutput :: FilePath -> FilePath -> T.Text -> IO ()
