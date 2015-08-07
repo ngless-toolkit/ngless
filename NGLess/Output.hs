@@ -100,23 +100,20 @@ outputListLno' !ot ms = do
 outputLno' :: OutputType -> String -> NGLessIO ()
 outputLno' !ot m = outputListLno' ot [m]
 
-shouldPrint :: Bool -> OutputType -> Verbosity -> NGLessIO Bool
-shouldPrint isT ot v = do
-    traceSet <- traceFlag
-    return $ traceSet || shouldPrint' isT ot v
-
-shouldPrint' _ TraceOutput _ = False
-shouldPrint' _      _ Loud = True
-shouldPrint' False ot Quiet = (ot == ErrorOutput)
-shouldPrint' False ot Normal = (ot > InfoOutput)
-shouldPrint' True  ot Quiet = (ot >= WarningOutput)
-shouldPrint' True  ot Normal = (ot >= InfoOutput)
+shouldPrint :: Bool -> OutputType -> Verbosity -> Bool
+shouldPrint _ TraceOutput _ = False
+shouldPrint _      _ Loud = True
+shouldPrint False ot Quiet = ot == ErrorOutput
+shouldPrint False ot Normal = ot > InfoOutput
+shouldPrint True  ot Quiet = ot >= WarningOutput
+shouldPrint True  ot Normal = ot >= InfoOutput
 
 output :: OutputType -> Int -> String -> NGLessIO ()
 output !ot !lno !msg = do
     isTerm <- liftIO $ hIsTerminalDevice stdout
     verb <- liftIO getVerbosity
-    sp <- shouldPrint isTerm ot verb
+    traceSet <- traceFlag
+    let sp = traceSet || shouldPrint isTerm ot verb
     liftIO $ do
         t <- getZonedTime
         modifyIORef savedOutput (OutputLine lno ot msg:)
@@ -127,7 +124,10 @@ output !ot !lno !msg = do
                 rst = if isTerm
                         then setSGRCode [Reset]
                         else ""
-                tstr = formatTime defaultTimeLocale "%a %d-%m-%Y %R" t
+                tformat = if traceSet -- when trace is set, output seconds
+                                then "%a %d-%m-%Y %T"
+                                else "%a %d-%m-%Y %R"
+                tstr = formatTime defaultTimeLocale tformat t
                 lineStr = if lno > 0
                                 then printf " Line %s" (show lno)
                                 else "" :: String
