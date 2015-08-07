@@ -26,10 +26,13 @@ import Control.Monad.IO.Class (liftIO)
 import Configuration (temporaryFileDirectory, outputDirectory)
 import NGLess
 
--- 
+-- | open a temporary file
+-- This respects the preferences of the user (using the correct temporary
+-- directory and deleting the file when necessary)
 openNGLTempFile' :: FilePath -> String -> String -> NGLessIO (ReleaseKey, (FilePath, Handle))
 openNGLTempFile' base prefix ext = do
     tdir <- temporaryFileDirectory
+    liftIO $ createDirectoryIfMissing True tdir
     (key,(fp,h)) <- allocate
                 (openTempFile tdir (prefix ++ takeBaseNameNoExtensions base ++ "." ++ ext))
                 deleteTempFile
@@ -49,7 +52,7 @@ deleteTempFile (fp, h) = do
     removeFileIfExists fp
 
 takeBaseNameNoExtensions = dropExtensions . takeBaseName
-    
+
 createTempDir :: FilePath -> NGLessIO (ReleaseKey,FilePath)
 createTempDir dst = do
     t <- liftIO getTemporaryDirectory
@@ -64,7 +67,7 @@ generateDirId :: FilePath -> NGLessIO FilePath
 generateDirId dst = do
     odir <- outputDirectory
     liftIO $ createTempDirectory odir (takeBaseNameNoExtensions dst)
-    
+
 createTempDirectory :: FilePath -> String -> IO FilePath
 createTempDirectory dir t = do
   pid <- c_getpid
