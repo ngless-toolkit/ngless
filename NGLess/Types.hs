@@ -69,17 +69,17 @@ inferM e = void (nglTypeOf e)
 
 inferBlock :: FuncName -> Maybe Block -> TypeMSt ()
 inferBlock _ Nothing = return ()
-inferBlock (FuncName f) (Just (Block vars es))
-    | f `notElem` ["preprocess", "select"] = do
+inferBlock (FuncName f) (Just (Block vars es)) = case f of
+        "preprocess" -> inferBlock' NGLRead
+        "select" -> inferBlock' NGLMappedRead
+        _ -> do
             errorInLineC ["This function '", T.unpack f, "' does not accept blocks"]
             void $ cannotContinue
-    | otherwise = do
-        forM_ vars $ \(Variable v) ->
-            envInsert v (case f of
-                "preprocess" -> NGLRead
-                "select" -> NGLMappedRead
-                )
-        inferM es
+    where
+        inferBlock' btype = do
+            forM_ vars $ \(Variable v) ->
+                envInsert v btype
+            inferM es
 
 envLookup :: T.Text -> TypeMSt (Maybe NGLType)
 envLookup v = (liftM2 (<|>)) (constantLookup v) (Map.lookup v . snd <$> get)
