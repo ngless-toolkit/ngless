@@ -43,5 +43,6 @@ loadModule _ = return Module
             ]
     , modFunctions = [exampleFunction]
     , runFunction = execute
+    , validateFunction = const (return [])
     }
 

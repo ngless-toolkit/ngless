@@ -55,5 +55,6 @@ loadModule _ = return Module
     , modConstants = []
     , modFunctions = [as_reads_Function]
     , runFunction = const executeReads
+    , validateFunction = const (return [])
     }
 

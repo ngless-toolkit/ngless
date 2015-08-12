@@ -54,4 +54,5 @@ loadModule _ = liftIO $ do
                 ]
         , modFunctions = []
         , runFunction = \_ _ _ -> return NGOVoid
+        , validateFunction = const (return [])
         }

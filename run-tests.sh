@@ -1,6 +1,6 @@
 #!/bin/bash
 
-make check
+make check || exit 1
 
 basedir=$PWD
 ok="yes"
