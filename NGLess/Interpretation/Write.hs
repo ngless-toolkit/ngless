@@ -102,8 +102,8 @@ executeWrite (NGOAnnotatedSet fp) args = do
     del <- getDelimiter $ lookupWithDefault (NGOSymbol "tsv") "format" args
     outputListLno' InfoOutput ["Writing AnnotatedSet to: ", newfp]
     cont <- liftIO $ readPossiblyCompressedFile fp
-    let NGOBool verbose = fromMaybe (NGOBool False) (lookup "verbose" args)
-        cont' = if verbose
+    verbose <- boolOrTypeError "verbose arg in 'write'" $ lookupWithDefault (NGOBool False) "verbose" args
+    let cont' = if verbose
                     then showGffCountDel del . readAnnotCounts $ cont
                     else showUniqIdCounts del cont
     liftIO $ BL.writeFile newfp cont'

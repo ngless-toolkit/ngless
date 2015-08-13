@@ -203,7 +203,7 @@ interpretTop :: Expression -> InterpretationEnvIO ()
 interpretTop (Assignment (Variable var) val) = traceExpr "assignment" val >> interpretTopValue val >>= setVariableValue var
 interpretTop (FunctionCall f e args b) = void $ topFunction f e args b
 interpretTop (Condition c ifTrue ifFalse) = do
-    NGOBool c' <- runInROEnvIO (interpretExpr c)
+    c' <- runInROEnvIO (interpretExpr c >>= boolOrTypeError "interpreting if condition")
     interpretTop (if c'
         then ifTrue
         else ifFalse)

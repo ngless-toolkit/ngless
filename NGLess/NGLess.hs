@@ -8,6 +8,7 @@ module NGLess
     , throwSystemError
     , throwGenericError
     , KwArgsValues
+    , boolOrTypeError
     , testNGLessIO
     ) where
 
@@ -59,4 +60,9 @@ throwSystemError = throwError . SystemError . asText
 -- | Generic error: any error message
 throwGenericError :: (StringLike s, MonadError NGError m) => s -> m a
 throwGenericError = throwError . GenericError . asText
+
+
+boolOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m Bool
+boolOrTypeError _ (NGOBool b) = return b
+boolOrTypeError context val = throwScriptError (T.concat ["Expected a boolean (received ", T.pack . show $ val, ") in context '", asText context, "'"])
 

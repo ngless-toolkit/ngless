@@ -219,9 +219,8 @@ matchingFeatures (Just fs) = map toFeature fs
 _matchFeatures :: [GffType] -> GffLine -> Bool
 _matchFeatures fs gf = gffType gf `elem` fs
 
-getBoolArg def k args = case lookupWithDefault (NGOBool def) k args of
-    (NGOBool v) -> return v
-    other -> throwShouldNotOccurr . T.concat $ ["Expected boolean argument in function annotate ('", k, "') got ", T.pack . show $ other]
+getBoolArg :: Bool -> T.Text -> KwArgsValues -> NGLessIO Bool
+getBoolArg def k args = boolOrTypeError ("Argument '"++T.unpack k++"' for function 'annotate'") $ lookupWithDefault (NGOBool def) k args
 
 evalMaybeString Nothing = return Nothing
 evalMaybeString (Just (NGOString s)) = return (Just $ T.unpack s)
