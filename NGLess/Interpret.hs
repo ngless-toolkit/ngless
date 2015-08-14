@@ -122,7 +122,7 @@ lookupConstant !k = do
     case filter ((==k) . fst) constants of
         [] -> return Nothing
         [(_,v)] -> return (Just v)
-        _ -> throwShouldNotOccurr $ T.concat ["Multiple hits found for constant ", k]
+        _ -> throwShouldNotOccur $ T.concat ["Multiple hits found for constant ", k]
 
 
 
@@ -136,8 +136,8 @@ findFunction fname = do
         mods <- gets ieModules
         case filter hasF mods of
             [m] -> return $ (runFunction m) (getName fname)
-            [] -> throwShouldNotOccurr $ T.concat ["Function '", getName fname, "' not found (not builtin and not in any loaded module)"]
-            ms -> throwShouldNotOccurr $ T.concat (["Function '", T.pack $ show fname, "' found in multiple modules! ("] ++ [T.concat [modname, ":"] | modname <- modName . modInfo <$> ms])
+            [] -> throwShouldNotOccur $ T.concat ["Function '", getName fname, "' not found (not builtin and not in any loaded module)"]
+            ms -> throwShouldNotOccur $ T.concat (["Function '", T.pack $ show fname, "' found in multiple modules! ("] ++ [T.concat [modname, ":"] | modname <- modName . modInfo <$> ms])
     where
         hasF m = (fname `elem` (funcName `fmap` modFunctions m))
 
@@ -177,8 +177,8 @@ runNGLessIO act = do
 -- | By necessity, this code has several unreachable corners
 
 unreachable :: ( MonadError NGError m) => String -> m a
-unreachable err = throwShouldNotOccurr ("Reached code that was thought to be unreachable!\n"++err)
-nglTypeError err = throwShouldNotOccurr ("Unexpected type error! This should have been caught by validation!\n"++err)
+unreachable err = throwShouldNotOccur ("Reached code that was thought to be unreachable!\n"++err)
+nglTypeError err = throwShouldNotOccur ("Unexpected type error! This should have been caught by validation!\n"++err)
 
 
 traceExpr m e =
@@ -208,7 +208,7 @@ interpretTop (Condition c ifTrue ifFalse) = do
         then ifTrue
         else ifFalse)
 interpretTop (Sequence es) = forM_ es interpretTop
-interpretTop _ = throwShouldNotOccurr ("Top level statement is NOP" :: String)
+interpretTop _ = throwShouldNotOccur ("Top level statement is NOP" :: String)
 
 interpretTopValue :: Expression -> InterpretationEnvIO NGLessObject
 interpretTopValue (FunctionCall f e args b) = topFunction f e args b
@@ -220,7 +220,7 @@ interpretExpr (Lookup (Variable v)) = lookupVariable v >>= \case
         Just r' -> return r'
 interpretExpr (BuiltinConstant (Variable "STDIN")) = return (NGOString "/dev/stdin")
 interpretExpr (BuiltinConstant (Variable "STDOUT")) = return (NGOString "/dev/stdout")
-interpretExpr (BuiltinConstant (Variable v)) = throwShouldNotOccurr ("Unknown builtin constant '" ++ show v ++ "': it should not have been accepted.")
+interpretExpr (BuiltinConstant (Variable v)) = throwShouldNotOccur ("Unknown builtin constant '" ++ show v ++ "': it should not have been accepted.")
 interpretExpr (ConstStr t) = return (NGOString t)
 interpretExpr (ConstBool b) = return (NGOBool b)
 interpretExpr (ConstSymbol s) = return (NGOSymbol s)
@@ -242,7 +242,7 @@ interpretExpr (MethodCall met self arg args) = do
     arg' <- maybeInterpretExpr arg
     args' <- interpretArguments args
     executeMethod met self' arg' args'
-interpretExpr not_expr = throwShouldNotOccurr ("Expected an expression, received " ++ show not_expr)
+interpretExpr not_expr = throwShouldNotOccur ("Expected an expression, received " ++ show not_expr)
 
 interpretIndex :: Index -> InterpretationROEnv [Maybe NGLessObject]
 interpretIndex (IndexTwo a b) = forM [a,b] maybeInterpretExpr
@@ -259,7 +259,7 @@ topFunction (FuncName "preprocess") expr@(Lookup (Variable varName)) args (Just 
     res' <- executePreprocess expr' args' block >>= executeQualityProcess
     setVariableValue varName res'
     return res'
-topFunction (FuncName "preprocess") expr _ _ = throwShouldNotOccurr ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
+topFunction (FuncName "preprocess") expr _ _ = throwShouldNotOccur ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
 topFunction f expr args block = do
     expr' <- interpretTopValue expr
     args' <- runInROEnvIO $ interpretArguments args
@@ -296,7 +296,7 @@ topFunction' fname@(FuncName fname') expr args Nothing = do
     execF <- findFunction fname
     runNGLessIO (execF expr args)
 
-topFunction' f _ _ _ = throwShouldNotOccurr . concat $ ["Interpretation of ", (show f), " is not implemented"]
+topFunction' f _ _ _ = throwShouldNotOccur . concat $ ["Interpretation of ", (show f), " is not implemented"]
 
 executeFastq expr args = do
     traceExpr "fastq" expr
@@ -353,7 +353,7 @@ executeMap fps args = case lookup "reference" args of
             executeMap' (NGOList es) = NGOList <$> forM es executeMap'
             executeMap' (NGOReadSet1 _enc file)    = runNGLessIO $ interpretMapOp ref file
             executeMap' (NGOReadSet2 _enc fp1 fp2) = runNGLessIO $ interpretMapOp2 ref fp1 fp2
-            executeMap' v = throwShouldNotOccurr ("map of " ++ show v ++ " not implemented yet")
+            executeMap' v = throwShouldNotOccur ("map of " ++ show v ++ " not implemented yet")
     _         -> unreachable "map could not parse reference argument"
 
 
@@ -438,7 +438,7 @@ executeMethod Mflag (NGOMappedRead samline) (Just (NGOSymbol flag)) [] = case ge
         getFlag "mapped" = Right isAligned
         getFlag "unmapped" = Right $ not . isAligned
         getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
-executeMethod m self arg kwargs = throwShouldNotOccurr ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
+executeMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 
 interpretPBlock1 :: Expression -> T.Text -> NGLessObject -> InterpretationROEnv (Maybe ShortRead)
@@ -494,7 +494,7 @@ interpretBlock1 :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv
 interpretBlock1 vs (Assignment (Variable n) val) = do
     val' <- interpretBlockExpr vs val
     if n `notElem` (map fst vs)
-        then throwShouldNotOccurr ("only assignments to block variable are possible [assigning to '"++show n++"']")
+        then throwShouldNotOccur ("only assignments to block variable are possible [assigning to '"++show n++"']")
         else do
             let vs' = map (\p@(a,_) -> (if a == n then (a,val') else p)) vs
             return $ BlockResult BlockOk vs'

@@ -43,7 +43,7 @@ getOFile :: KwArgsValues -> NGLessIO FilePath
 getOFile args = case lookup "ofile" args of
     Just (NGOFilename p) -> return p
     Just (NGOString p) -> return $ T.unpack p
-    _ -> throwShouldNotOccurr ("getOFile cannot decode file path" :: String)
+    _ -> throwShouldNotOccur ("getOFile cannot decode file path" :: String)
 
 writeToUncFile :: NGLessObject -> FilePath -> NGLessIO NGLessObject
 writeToUncFile (NGOMappedReadSet path defGen) newfp = liftIO $ do
@@ -54,7 +54,7 @@ writeToUncFile (NGOReadSet1 enc path) newfp = liftIO $ do
     readPossiblyCompressedFile path >>= BL.writeFile newfp
     return $ NGOReadSet1 enc newfp
 
-writeToUncFile obj _ = throwShouldNotOccurr ("writeToUncFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ show obj)
+writeToUncFile obj _ = throwShouldNotOccur ("writeToUncFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ show obj)
 
 
 executeWrite :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
@@ -95,7 +95,7 @@ executeWrite el@(NGOMappedReadSet fp defGen) args = do
                         newfp' <- convertSamToBam fp newfp
                         return (NGOMappedReadSet newfp' defGen) --newfp will contain the bam
         NGOSymbol s -> throwScriptError (T.concat ["write does not accept format {", s, "} with input type ", T.pack . show $ el])
-        _ -> throwShouldNotOccurr ("Type checking fail: format argument is not a symbol for write()" :: String)
+        _ -> throwShouldNotOccur ("Type checking fail: format argument is not a symbol for write()" :: String)
 
 executeWrite (NGOAnnotatedSet fp) args = do
     newfp <- getOFile args
@@ -109,13 +109,13 @@ executeWrite (NGOAnnotatedSet fp) args = do
     liftIO $ BL.writeFile newfp cont'
     return $ NGOAnnotatedSet newfp
 
-executeWrite v _ = throwShouldNotOccurr ("Error: executeWrite of " ++ show v ++ " not implemented yet.")
+executeWrite v _ = throwShouldNotOccur ("Error: executeWrite of " ++ show v ++ " not implemented yet.")
 
 getDelimiter :: NGLessObject -> NGLessIO B.ByteString
 getDelimiter (NGOSymbol "csv") = return ","
 getDelimiter (NGOSymbol "tsv") = return "\t"
 getDelimiter (NGOSymbol f) = throwScriptError ("Invalid format in write: {"++T.unpack f++"}")
-getDelimiter v =  throwShouldNotOccurr ("Type of 'format' in 'write' must be NGOSymbol, got " ++ show v)
+getDelimiter v =  throwShouldNotOccur ("Type of 'format' in 'write' must be NGOSymbol, got " ++ show v)
 
 convertSamToBam samfile newfp = do
     outputListLno' DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]

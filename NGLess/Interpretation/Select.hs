@@ -40,7 +40,7 @@ _parseConditions args = do
     where
         asSC (NGOSymbol "mapped") = return SelectMapped
         asSC (NGOSymbol "unmapped") = return SelectUnmapped
-        asSC c = throwShouldNotOccurr ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
+        asSC c = throwShouldNotOccur ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
 
 _matchConditions :: MatchCondition -> SamLine -> Bool
 _matchConditions (DropIf drop_if) samline = none (_match1 samline) drop_if
@@ -62,5 +62,5 @@ executeSelect (NGOMappedReadSet fpsam ref) args = do
                     (BL.hPut ohand line >> BL.hPut ohand "\n")
         hClose ohand
         return (NGOMappedReadSet oname ref)
-executeSelect o _ = throwShouldNotOccurr ("NGLESS type checking error (Select received " ++ show o ++ ")")
+executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 

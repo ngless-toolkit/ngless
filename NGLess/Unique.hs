@@ -51,7 +51,7 @@ executeUnique (NGOReadSet1 enc file) args = do
             fs <- liftIO $ _readNFiles enc (fromIntegral numMaxOccur) d
             nFp <- writeReadSet file fs enc
             return $ NGOReadSet1 enc nFp
-executeUnique expr _ = throwShouldNotOccurr ("executeUnique: Cannot handle argument " ++ show expr)
+executeUnique expr _ = throwShouldNotOccur ("executeUnique: Cannot handle argument " ++ show expr)
 
 hashRead :: Int -> ShortRead -> Int
 hashRead k (ShortRead _ r _) = mod (hash r) k

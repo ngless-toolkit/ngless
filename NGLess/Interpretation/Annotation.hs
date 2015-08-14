@@ -53,12 +53,12 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
         Nothing -> return Nothing
         Just (NGOSymbol f) -> return . Just $ [T.unpack f]
         Just (NGOList feats') -> Just <$> mapM evalSymbol feats'
-        _ -> throwShouldNotOccurr ("executeAnnotation: TYPE ERROR" :: String)
+        _ -> throwShouldNotOccur ("executeAnnotation: TYPE ERROR" :: String)
     m <- parseAnnotationMode args
     g <- evalMaybeString $ lookup "gff" args
     res <- annotate e g fs dDS m ambiguity strand_specific
     return $ NGOAnnotatedSet res
-executeAnnotation e _ = throwShouldNotOccurr ("Annotation can handle MappedReadSet(s) only. Got " ++ show e)
+executeAnnotation e _ = throwShouldNotOccur ("Annotation can handle MappedReadSet(s) only. Got " ++ show e)
 
 
 parseAnnotationMode args = case lookupWithDefault (NGOSymbol "union") "mode" args of
@@ -86,7 +86,7 @@ annotate samFP Nothing feats (Just dDs) m a s = do
     basedir <- ensureDataPresent (T.unpack dDs)
     annotate' samFP (getGff basedir) feats (getIntervalQuery m) a s   -- use default GFF
 annotate _     Nothing _ Nothing _ _ _ =
-    throwShouldNotOccurr ("A gff must be provided by using the argument 'gff'" :: T.Text) -- not default ds and no gff passed as arg
+    throwShouldNotOccur ("A gff must be provided by using the argument 'gff'" :: T.Text) -- not default ds and no gff passed as arg
 
 getIntervalQuery :: AnnotationIntersectionMode -> AnnotationRule
 getIntervalQuery IntersectUnion = union
@@ -224,8 +224,8 @@ getBoolArg def k args = boolOrTypeError ("Argument '"++T.unpack k++"' for functi
 
 evalMaybeString Nothing = return Nothing
 evalMaybeString (Just (NGOString s)) = return (Just $ T.unpack s)
-evalMaybeString o = throwShouldNotOccurr ("evalString: Argument type must be NGOString (received " ++ show o ++ ").")
+evalMaybeString o = throwShouldNotOccur ("evalString: Argument type must be NGOString (received " ++ show o ++ ").")
 
 evalSymbol (NGOSymbol s) = return (T.unpack s)
-evalSymbol o = throwShouldNotOccurr ("evalSymbol: Argument type must be NGOSymbol (received " ++ show o ++ ").")
+evalSymbol o = throwShouldNotOccur ("evalSymbol: Argument type must be NGOSymbol (received " ++ show o ++ ").")
 

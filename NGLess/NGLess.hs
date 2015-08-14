@@ -2,7 +2,7 @@
 module NGLess
     ( NGLessIO
     , NGError(..)
-    , throwShouldNotOccurr
+    , throwShouldNotOccur
     , throwScriptError
     , throwDataError
     , throwSystemError
@@ -22,7 +22,7 @@ import Language
 import Utils.StringLike
 
 -- | An error in evaluating an ngless script
--- Normally, it's easier to use the function interface of 'throwShouldNotOccurr' and friends
+-- Normally, it's easier to use the function interface of 'throwShouldNotOccur' and friends
 data NGError =
     ShouldNotOccur !T.Text -- ^ bug in ngless
     | ScriptError !T.Text -- ^ bug in user script
@@ -43,8 +43,8 @@ testNGLessIO act = do
         showError (Left e) = error (show e)
 
 -- | Internal bug: user is requested to submit a bug report
-throwShouldNotOccurr :: (StringLike s, MonadError NGError m) => s -> m a
-throwShouldNotOccurr = throwError . ShouldNotOccur . asText
+throwShouldNotOccur :: (StringLike s, MonadError NGError m) => s -> m a
+throwShouldNotOccur = throwError . ShouldNotOccur . asText
 
 -- | Script error: user can fix error by re-writing the script
 throwScriptError :: (StringLike s, MonadError NGError m) => s -> m a
