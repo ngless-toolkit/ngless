@@ -9,6 +9,7 @@ module NGLess
     , throwGenericError
     , KwArgsValues
     , boolOrTypeError
+    , symbolOrTypeError
     , testNGLessIO
     ) where
 
@@ -66,3 +67,7 @@ boolOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m Bool
 boolOrTypeError _ (NGOBool b) = return b
 boolOrTypeError context val = throwScriptError (T.concat ["Expected a boolean (received ", T.pack . show $ val, ") in context '", asText context, "'"])
 
+-- | If argument is a NGOBool, then unwraps it; else it raises a type error
+symbolOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m T.Text
+symbolOrTypeError _ (NGOSymbol s) = return s
+symbolOrTypeError context val = throwScriptError (T.concat ["Expected a symbol (received ", T.pack . show $ val, ") in context '", asText context, "'"])
