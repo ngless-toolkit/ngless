@@ -30,7 +30,7 @@ validate mods expr = case errors of
             ,validate_version
             ,validate_pure_function
             ,validate_req_function_args -- check for the existence of required arguments in functions.
-            ,validate_val_function_args 
+            ,validate_symbol_in_args
             ,validate_STDIN_only_used_once
             ]
 
@@ -105,12 +105,12 @@ has_required_args mods f args = case findFunction mods f of
                 then Nothing
                 else Just (T.concat ["Function ", T.pack . show $ f, " requires argument ", argName ainfo, "."])
 
-validate_val_function_args :: [Module] -> Script -> Maybe T.Text
-validate_val_function_args mods (Script _ es) = check_toplevel (check_recursive validate_val_function_args') es
+validate_symbol_in_args :: [Module] -> Script -> Maybe T.Text
+validate_symbol_in_args mods (Script _ es) = check_toplevel (check_recursive validate_symbol_in_args') es
     where
-        validate_val_function_args' (Assignment  _ fc) = validate_val_function_args' fc
-        validate_val_function_args' (FunctionCall f _ args _) = check_symbol_val_in_arg mods f args
-        validate_val_function_args' _ = Nothing
+        validate_symbol_in_args' (Assignment  _ fc) = validate_symbol_in_args' fc
+        validate_symbol_in_args' (FunctionCall f _ args _) = check_symbol_val_in_arg mods f args
+        validate_symbol_in_args' _ = Nothing
 
 
 
