@@ -228,7 +228,7 @@ preprocess_s = "ngless '0.0'\n\
 case_preprocess_script = case parsetest preprocess_s >>= checktypes [] of
     Left err -> assertFailure (show err)
     Right expr -> do
-        testNGLessIO $ (interpret "test" preprocess_s []) . nglBody $ expr
+        testNGLessIO $ (interpret []) . nglBody $ expr
         res' <- B.readFile "test_samples/sample20_post.fq"
         (length $ B.lines res') @?= (16 :: Int)
         removeFile "test_samples/sample20_post.fq"
@@ -236,7 +236,7 @@ case_preprocess_script = case parsetest preprocess_s >>= checktypes [] of
 case_map_script = case parsetest map_s >>= checktypes [] of
     Left err -> assertFailure (show err)
     Right expr -> do
-        testNGLessIO $ (interpret "testing" map_s []) . nglBody $ expr
+        testNGLessIO $ (interpret []) . nglBody $ expr
         res' <- readPossiblyCompressedFile "test_samples/sample20_mapped.sam"
         _calcSamStats res' @?= (5,0,0,0)
         removeFile "test_samples/sample20_mapped.sam"

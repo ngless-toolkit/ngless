@@ -172,7 +172,7 @@ optsExec opts@DefaultMode{} = do
         when (isJust errs) $
             liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
         outputLno' InfoOutput "Script OK. Starting interpretation..."
-        interpret fname ngltext modules (nglBody sc)
+        interpret modules (nglBody sc)
     writeOutput (odir </> "output.js") fname ngltext
     exitSuccess
 

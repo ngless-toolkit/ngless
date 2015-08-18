@@ -180,24 +180,21 @@ unreachable :: ( MonadError NGError m) => String -> m a
 unreachable err = throwShouldNotOccur ("Reached code that was thought to be unreachable!\n"++err)
 nglTypeError err = throwShouldNotOccur ("Unexpected type error! This should have been caught by validation!\n"++err)
 
-
 traceExpr m e =
     runNGLessIO $ outputListLno' TraceOutput ["Interpreting [", m , "]: ", show e]
 
-interpret :: FilePath -> T.Text -> [Module] -> [(Int,Expression)] -> NGLessIO ()
-interpret fname script modules es = do
-    let nglessScript = NGOString script 
-        nglessScriptFname = NGOFilename fname
-        initialVarEnv = Map.insert ".scriptfname" nglessScriptFname (Map.insert ".script" nglessScript Map.empty)
-        initialState = NGLInterpretEnv modules initialVarEnv
+interpret :: [Module] -> [(Int,Expression)] -> NGLessIO ()
+interpret modules es = do
     odir <- outputDirectory
     liftIO $ setupHtmlViewer odir
-    evalStateT (interpretIO $ es) initialState
+    evalStateT (interpretIO $ es) (NGLInterpretEnv modules Map.empty)
     outputListLno InfoOutput Nothing ["Ngless finished."]
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
-interpretIO [] = return ()
-interpretIO ((ln,e):es) = setlno ln >> traceExpr "interpretIO" e >> interpretTop e >> interpretIO es
+interpretIO es = forM_ es $ \(ln,e) -> do
+    setlno ln
+    traceExpr "interpretIO" e
+    interpretTop e
 
 interpretTop :: Expression -> InterpretationEnvIO ()
 interpretTop (Assignment (Variable var) val) = traceExpr "assignment" val >> interpretTopValue val >>= setVariableValue var
