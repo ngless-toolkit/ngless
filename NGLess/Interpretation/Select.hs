@@ -13,12 +13,13 @@ import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<$>))
 import System.IO
-import Utils.Utils
+import qualified Data.Text as T
 
 import Language
 import FileManagement
 import NGLess
 
+import Utils.Utils
 import Data.Sam
 
 data SelectCondition = SelectMapped | SelectUnmapped
@@ -53,7 +54,10 @@ _match1 samline SelectUnmapped = not $ isAligned samline
 executeSelect :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSelect (NGOMappedReadSet fpsam ref) args = do
     conditions <- _parseConditions args
-    (oname,ohand) <- openNGLTempFile fpsam "selected_" "sam"
+    (oname,ohand) <- case lookup "__oname" args of
+        Just (NGOString fname) -> let fname' = T.unpack fname in
+                                    (fname',) <$> liftIO (openBinaryFile fname' WriteMode)
+        Nothing -> openNGLTempFile fpsam "selected_" "sam"
     liftIO $ do
         samcontents <- BL.lines <$> BL.readFile fpsam
         forM_ samcontents $ \line ->

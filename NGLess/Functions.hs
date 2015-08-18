@@ -43,6 +43,7 @@ countArgs =
 selectArgs =
     [ArgInformation "keep_if" False (NGList NGLSymbol) (Just ["mapped", "unmapped"])
     ,ArgInformation "drop_if" False (NGList NGLSymbol) (Just ["mapped", "unmapped"])
+    ,ArgInformation "__oname" False NGLString Nothing
     ]
 
 fastqArgs =
@@ -62,6 +63,7 @@ preprocessArgs =
 
 mapArgs =
     [ArgInformation "reference" True NGLString Nothing
+    ,ArgInformation "__oname" False NGLString Nothing
     ]
 
 substrimArgs =
