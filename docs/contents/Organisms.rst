@@ -4,7 +4,9 @@ Available Reference Genomes
 ===========================
 
 NGLess provides builtin support for the most widely used model organisms
-(human, mouse, yeast, C. elegans, ...; see the full table below). To facilitate 
+(human, mouse, yeast, C. elegans, ...; see the full table below). This makes it
+easier to use the tool when using these organisms as some knowledge is already
+built in.
 
 Genome references available
 ---------------------------
@@ -58,11 +60,11 @@ If you install as a super-user, then the dataset will be available for all
 users::
 
   $ sudo ngless --install-reference-data bosTau4
- 
+
 When attempting to install an organism if is returned **True** it means that
 the organism is already installed, and there is no reason to install again.
 Otherwise, a progress bar is displayed to provide information on the download.
- 
+
 Data Set Structure
 -------------------
 
@@ -91,5 +93,5 @@ file and a gene annotation file.
         |-- annot.gtf.gz
 
 The basename of Description.tar.gz (Description) will have the description name
-of the respective organism (i.e, Mus_musculus.tar.gz). 
+of the respective organism (i.e, Mus_musculus.tar.gz).
 
