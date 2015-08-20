@@ -73,7 +73,7 @@ test_Types      = [tgroup_Types]
 -- then uses the automatically generated function
 main = do
     setVerbosity Quiet
-    setOutputDirectory "testing_directory_tmp"
+    setupTestConfiguration
     $(defaultMainGenerator)
     removeDirectoryRecursive "testing_directory_tmp"
 

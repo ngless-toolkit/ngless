@@ -4,21 +4,19 @@
 module Configuration
     ( nglessDataBaseURL
     , InstallMode(..)
+    , initConfiguration
+    , setupTestConfiguration
     , globalDataDirectory
     , userDataDirectory
     , samtoolsBin
     , bwaBin
     , outputDirectory
-    , setOutputDirectory
     , temporaryFileDirectory
-    , setTemporaryDirectory
-    , setKeepTemporaryFiles
-    , setTraceFlag
     , traceFlag
     , versionStr
     ) where
 
-import Control.Monad (unless)
+import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<$>))
 import System.Environment (getExecutablePath)
@@ -31,26 +29,108 @@ import Data.IORef
 
 import NGLess
 import Dependencies.Embedded
+import CmdArgs
 
 data InstallMode = User | Root deriving (Eq, Show)
+
+data NGLessConfiguration = NGLessConfiguration
+    { nConfDownloadBaseURL :: FilePath
+    , nConfGlobalDataDirectory :: FilePath
+    , nConfUserDirectory :: FilePath
+    , nConfTemporaryDirectory :: FilePath
+    , nConfKeepTemporaryFiles :: Bool
+    , nConfTrace :: Bool
+    , nConfOutputDirectory :: FilePath
+    , nConfColor :: ColorSetting
+    } deriving (Eq, Show)
+
+
+guessConfiguration :: IO NGLessConfiguration
+guessConfiguration = do
+    tmp <- getTemporaryDirectory
+    nglessBinDirectory <- takeDirectory <$> getExecutablePath
+    defaultUserNglessDirectory <- (</> ".ngless") <$> getHomeDirectory
+    return NGLessConfiguration
+        { nConfDownloadBaseURL = "http://127.0.0.1/"
+        , nConfGlobalDataDirectory = nglessBinDirectory </> "../share/ngless/data"
+        , nConfUserDirectory = defaultUserNglessDirectory
+        , nConfTemporaryDirectory = tmp
+        , nConfKeepTemporaryFiles = False
+        , nConfTrace = False
+        , nConfOutputDirectory = ""
+        , nConfColor = AutoColor
+        }
+
+
+updateConfiguration :: NGLessConfiguration -> FilePath -> IO NGLessConfiguration
+updateConfiguration config cfile = error "Not implemented yet"
+
+setupTestConfiguration :: IO ()
+setupTestConfiguration = do
+    config <- guessConfiguration
+    writeIORef nglConfigurationRef $ config { nConfTemporaryDirectory = "testing_tmp_dir", nConfKeepTemporaryFiles = True }
+
+initConfiguration :: NGLess -> IO ()
+initConfiguration opts = do
+    config <- guessConfiguration
+    config' <- foldM updateConfiguration config (case opts of
+        DefaultMode{config_files = Just cs} -> cs
+        _ -> [])
+    writeIORef nglConfigurationRef (updateConfigurationOpts opts config')
+
+updateConfigurationOpts opts@DefaultMode{} config =
+    let fname = input opts
+        trace = fromMaybe
+                    (nConfTrace config)
+                    (trace_flag opts)
+        ktemp = fromMaybe
+                    (nConfKeepTemporaryFiles config)
+                    (keep_temporary_files opts)
+        tmpdir = fromMaybe
+                    (nConfTemporaryDirectory config)
+                    (temporary_directory opts)
+        odir = case (output_directory opts, fname) of
+            (Nothing, "-") -> "STDIN.output_ngless"
+            (Nothing, _) -> fname ++ ".output_ngless"
+            (Just odir', _) -> odir'
+    in config
+            { nConfTrace = trace
+            , nConfKeepTemporaryFiles = ktemp
+            , nConfOutputDirectory = odir
+            , nConfTemporaryDirectory = tmpdir
+            }
+
+updateConfigurationOpts _ config = config
+
+nglConfigurationRef :: IORef NGLessConfiguration
+{-# NOINLINE nglConfigurationRef #-}
+nglConfigurationRef = unsafePerformIO (newIORef (error "not yet"))
+
+nglConfiguration :: NGLessIO NGLessConfiguration
+nglConfiguration = liftIO $ readIORef nglConfigurationRef
+
+outputDirectory :: NGLessIO FilePath
+outputDirectory = nConfOutputDirectory <$> nglConfiguration
+
+temporaryFileDirectory :: NGLessIO FilePath
+temporaryFileDirectory = nConfTemporaryDirectory <$> nglConfiguration
+
+traceFlag :: NGLessIO Bool
+traceFlag = nConfTrace <$> nglConfiguration
 
 versionStr :: String
 versionStr = "0.0.0"
 
 nglessDataBaseURL :: NGLessIO FilePath
-nglessDataBaseURL = return "http://127.0.0.1/"
-
+nglessDataBaseURL = nConfDownloadBaseURL <$> nglConfiguration
 globalDataDirectory :: NGLessIO FilePath
-globalDataDirectory = (</> "../share/ngless/data") <$> getNglessRoot
+globalDataDirectory = nConfGlobalDataDirectory <$> nglConfiguration
 
 userNglessDirectory :: NGLessIO FilePath
-userNglessDirectory = (</> ".ngless") <$> (liftIO getHomeDirectory)
+userNglessDirectory = nConfUserDirectory <$> nglConfiguration
 
 userDataDirectory :: NGLessIO FilePath
 userDataDirectory = (</> "data") <$> userNglessDirectory
-
-getNglessRoot :: NGLessIO FilePath
-getNglessRoot = takeDirectory <$> (liftIO getExecutablePath)
 
 check_executable :: String -> FilePath -> IO FilePath
 check_executable name bin = do
@@ -70,7 +150,9 @@ canExecute bin = do
 
 
 binPath :: InstallMode -> NGLessIO FilePath
-binPath Root = (</> "bin") <$> getNglessRoot
+binPath Root = do
+    nglessBinDirectory <- takeDirectory <$> liftIO getExecutablePath
+    return (nglessBinDirectory </> "../share/bin")
 binPath User = (</> "bin") <$> userNglessDirectory
 
 findBin :: FilePath -> NGLessIO (Maybe FilePath)
@@ -82,9 +164,9 @@ findBin fname = do
     else do
         userpath <- (</> fname) <$> binPath User
         userex <- liftIO $ canExecute userpath
-        if userex
-            then return (Just userpath)
-            else return Nothing
+        return $ if userex
+            then Just userpath
+            else Nothing
 
 writeBin :: FilePath -> B.ByteString -> NGLessIO FilePath
 writeBin fname bindata = do
@@ -100,55 +182,15 @@ writeBin fname bindata = do
 findOrCreateBin :: FilePath -> B.ByteString -> NGLessIO FilePath
 findOrCreateBin fname bindata = do
     path <- findBin fname
-    if isJust path
-        then return (fromJust path)
-        else writeBin fname bindata
+    maybe (writeBin fname bindata) return path
 
 bwaBin :: NGLessIO FilePath
 bwaBin = findOrCreateBin bwaFname =<< liftIO bwaData
     where
-        bwaFname = ("ngless-" ++ versionStr ++ "-bwa")
+        bwaFname = "ngless-" ++ versionStr ++ "-bwa"
 
 samtoolsBin :: NGLessIO FilePath
 samtoolsBin = findOrCreateBin samtoolsFname =<< liftIO samtoolsData
     where
-        samtoolsFname = ("ngless-" ++ versionStr ++ "-samtools")
-
-
-outputDirectoryRef :: IORef FilePath
-{-# NOINLINE outputDirectoryRef #-}
-outputDirectoryRef = unsafePerformIO (newIORef "")
-
-setOutputDirectory :: FilePath -> IO ()
-setOutputDirectory = writeIORef outputDirectoryRef
-
-outputDirectory :: NGLessIO FilePath
-outputDirectory = liftIO $ readIORef outputDirectoryRef
-
-temporaryDirectoryRef :: IORef (Maybe FilePath)
-{-# NOINLINE temporaryDirectoryRef #-}
-temporaryDirectoryRef = unsafePerformIO (newIORef Nothing)
-
-setTemporaryDirectory :: Maybe FilePath -> IO ()
-setTemporaryDirectory = writeIORef temporaryDirectoryRef
-
-temporaryFileDirectory :: NGLessIO FilePath
-temporaryFileDirectory = liftIO $ do
-    tdir <- readIORef temporaryDirectoryRef
-    case tdir of
-        Just t -> return t
-        Nothing -> getTemporaryDirectory
-
-setKeepTemporaryFiles :: Bool -> IO ()
-setKeepTemporaryFiles _ = return ()
-
-traceRef :: IORef Bool
-{-# NOINLINE traceRef #-}
-traceRef = unsafePerformIO (newIORef False)
-
-setTraceFlag :: Bool -> IO ()
-setTraceFlag = writeIORef traceRef
-
-traceFlag :: NGLessIO Bool
-traceFlag = liftIO $ readIORef traceRef
+        samtoolsFname = "ngless-" ++ versionStr ++ "-samtools"
 

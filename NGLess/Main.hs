@@ -36,58 +36,10 @@ import ReferenceDatabases
 import Output
 import NGLess
 import Modules
+import CmdArgs
 import StandardModules.NGLStdlib
 
 import qualified BuiltinModules.AsReads as ModAsReads
-
-data NGLess =
-        DefaultMode
-              { debug_mode :: String
-              , input :: String
-              , script :: Maybe String
-              , print_last :: Bool
-              , trace_flag :: Bool
-              , n_threads :: Int
-              , output_directory :: Maybe FilePath
-              , temporary_directory :: Maybe FilePath
-              , keep_temporary_files :: Bool
-              }
-        | InstallGenMode
-              { input :: String}
-        | CreateReferencePackMode
-              { oname :: FilePath
-              , genome_url :: String
-              , gtf_url :: String
-              }
-           deriving (Eq, Show, Data, Typeable)
-
-ngless = DefaultMode
-        { debug_mode = "ngless"
-        , input = "-" &= argPos 0 &= opt ("-" :: String)
-        , script = Nothing &= name "e"
-        , trace_flag = False &= name "trace"
-        , print_last = False &= name "p"
-        , n_threads = 1 &= name "n"
-        , output_directory = Nothing &= name "o"
-        , temporary_directory = Nothing &= name "t"
-        , keep_temporary_files = False
-        }
-        &= details  [ "Example:" , "ngless script.ngl" ]
-
-
-installargs = InstallGenMode
-        { input = "Reference" &= argPos 0
-        }
-        &= name "--install-reference-data"
-        &= details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
-
-createref = CreateReferencePackMode
-        { oname = "" &= argPos 0
-        , genome_url = "" &= name "g"
-        , gtf_url = "" &= name "a"
-        } &= name "--create-reference-pack"
-        &= details ["Example:", "ngless --create-reference-pack ref.tar.gz -g http://...genome.fa.gz -a http://...gtf.fa.gz"]
-
 
 -- | wrapPrint transforms the script by transforming the last expression <expr>
 -- into write(<expr>, ofile=STDOUT)
@@ -111,7 +63,8 @@ rightOrDie (Right v) = return v
 fatalError :: String -> IO b
 fatalError err = do
     let st = setSGRCode [SetColor Foreground Dull Red]
-    hPutStrLn stderr (st ++ "FATAL ERROR: "++err)
+    hPutStrLn stderr (st ++ err)
+    hPutStrLn stderr "Exiting after fatal error..."
     exitFailure
 
 whenStrictlyNormal act = do
@@ -136,14 +89,8 @@ optsExec :: NGLess -> IO ()
 optsExec opts@DefaultMode{} = do
     let fname = input opts
     let reqversion = isNothing $ script opts
-    setNumCapabilities (n_threads opts)
-    case (output_directory opts, fname) of
-        (Nothing,"") -> setOutputDirectory "STDIN.output_ngless"
-        (Nothing,_) -> setOutputDirectory (fname ++ ".output_ngless")
-        (Just odir, _) -> setOutputDirectory odir
-    setTemporaryDirectory (temporary_directory opts)
-    setKeepTemporaryFiles (keep_temporary_files opts)
-    setTraceFlag (trace_flag opts)
+    setNumCapabilities (nThreads opts)
+    initConfiguration opts
     engltext <- case script opts of
         Just s -> return . Right . T.pack $ s
         _ -> T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
@@ -178,18 +125,17 @@ optsExec opts@DefaultMode{} = do
 
 
 -- if user uses the flag -i he will install a Reference Genome to all users
-optsExec (InstallGenMode ref)
+optsExec (InstallGenMode ref _)
     | isDefaultReference ref = void . runNGLessIO "installing data" $ installData Nothing ref
     | otherwise =
         error (concat ["Reference ", ref, " is not a known reference."])
 
-optsExec (CreateReferencePackMode ofile gen gtf) = runNGLessIO "creating reference package" $ do
+optsExec (CreateReferencePackMode ofile gen gtf _) = runNGLessIO "creating reference package" $ do
         outputLno' InfoOutput "Starting packaging (will download and index genomes)..."
         createReferencePack ofile gen gtf
 
-
 getModes :: Mode (CmdArgs NGLess)
-getModes = cmdArgsMode $ modes [ngless &= auto, installargs, createref]
+getModes = cmdArgsMode $ modes [nglessArgs &= auto, installArgs, createRefArgs]
     &= verbosity
     &= summary sumtext
     &= help "ngless implement the NGLess language"
