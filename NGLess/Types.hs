@@ -247,7 +247,9 @@ checkfuncarg f arginfo (Variable v, e) = do
     eType <- nglTypeOf e
     let ainfo = find ((==v) . argName) arginfo
     case (ainfo,eType) of
-        (Nothing, _) -> errorInLineC ["Bad argument '", T.unpack v, "' for function '", show f, "'"]
+        (Nothing, _) -> errorInLineC $
+                                    ["Bad argument '", T.unpack v, "' for function '", show f, "'.\nThis function takes the following arguments:\n"]++
+                                    (map ((\aname -> ("\t"++aname++"\n")) . T.unpack . argName) arginfo)
         (_, Nothing) -> errorInLine "Could not infer type of argument"
         (Just ainfo', Just t') -> when (argType ainfo' /= t') $
                     (errorInLineC
