@@ -1,0 +1,28 @@
+version: '0.0.0'
+name: 'Test tool'
+command:
+    nglName: "testing"
+    arg0: '/bin/echo'
+    arg1:
+        filetype: "fq1"
+        can_gzip: true
+    additional:
+        -
+            atype: 'flag'
+            name: 'verbose'
+            def: true
+        -
+            atype: 'option'
+            name: 'testing'
+            allowed:
+                - 'one'
+                - 'two'
+                - 'three'
+
+check:
+    check_cmd: '/bin/echo'
+    check_args:
+        - "one"
+        - "two"
+
+
