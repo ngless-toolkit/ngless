@@ -1,9 +1,13 @@
 #!/bin/bash
 
-make check || exit 1
+ok="yes"
+make check
+if test $? -ne "0"; then
+   echo "ERROR IN 'make check'"
+   ok=no
+fi
 
 basedir=$PWD
-ok="yes"
 for testdir in tests/*; do
     if test -d $testdir; then
         echo "Running $testdir"
