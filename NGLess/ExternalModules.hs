@@ -15,6 +15,7 @@ import Control.Applicative
 import Control.Monad
 import Data.Maybe
 import System.Process
+import System.IO
 import System.Exit
 import System.Directory
 import System.FilePath.Posix
@@ -94,19 +95,36 @@ instance FromJSON Command where
 
 data ExternalModule = ExternalModule
     { emInfo :: ModInfo
+    , modulePath :: FilePath
     , command :: Command
     , validate_cmd :: FilePath
     , validate_args :: [String]
     } deriving (Eq, Show)
 
-instance FromJSON ExternalModule where
+data ExternalModuleRep = ExternalModuleRep
+    { emInfoRep :: ModInfo
+    , commandRep :: Command
+    , validate_cmdRep :: FilePath
+    , validate_argsRep :: [String]
+    } deriving (Eq, Show)
+
+instance FromJSON ExternalModuleRep where
     parseJSON = withObject "module" $ \o -> do
         checkO <- o .: "check"
-        ExternalModule
+        ExternalModuleRep
             <$> (ModInfo <$> o .: "name" <*> o .: "version")
             <*> o .: "command"
             <*> checkO .: "check_cmd"
             <*> ((fromMaybe []) <$> checkO .:? "check_args")
+
+addPathToRep mpath ExternalModuleRep{..} = ExternalModule
+    { emInfo = emInfoRep
+    , modulePath = mpath
+    , command = commandRep
+    , validate_cmd = validate_cmdRep
+    , validate_args = validate_argsRep
+    }
+
 
 asFunction Command{..} = Function (FuncName nglName) (Just $ asNGLType arg1) (fromMaybe NGLVoid $ asNGLType <$> ret) (map asArgInfo additional) False
 
@@ -122,14 +140,15 @@ asArgInfo (CommandFlag name _) = ArgInformation name False NGLBool Nothing
 asArgInfo (CommandOption name _ allowed) = ArgInformation name False NGLSymbol (Just allowed)
 asArgInfo (CommandInteger name _) = ArgInformation name False NGLInteger Nothing
 
-executeCommand :: Command -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeCommand cmd input args = do
+executeCommand :: FilePath -> Command -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeCommand basedir cmd input args = do
     paths <- asfilePaths input
     args' <- argsArguments cmd args
     let cmdline = (paths ++ args')
+        process = (proc (arg0 cmd) cmdline) { cwd = Just basedir }
     outputListLno' TraceOutput ("executing command: ":arg0 cmd:cmdline)
     (exitCode, out, err) <- liftIO $
-        readProcessWithExitCode (arg0 cmd) cmdline ""
+        readCreateProcessWithExitCode process ""
     outputListLno' TraceOutput ["Processing results: (STDOUT=", out, ", STDERR=", err,")"]
     return NGOVoid
 
@@ -162,7 +181,7 @@ asInternalModule em@ExternalModule{..} = do
         { modInfo = emInfo
         , modConstants = []
         , modFunctions = [asFunction command]
-        , runFunction = const (executeCommand command)
+        , runFunction = const (executeCommand modulePath command)
         , validateFunction = const (return [])
         }
 
@@ -170,14 +189,18 @@ validateModule :: ExternalModule -> NGLessIO ()
 validateModule  ExternalModule{..} = do
     outputListLno' TraceOutput ("Running module validation for module ":show emInfo:" ":validate_cmd:" ":validate_args)
     (exitCode, out, err) <- liftIO $
-        readProcessWithExitCode validate_cmd validate_args ""
+        readCreateProcessWithExitCode (proc validate_cmd validate_args) { cwd = Just modulePath } ""
     case (exitCode,out,err) of
         (ExitSuccess, "", "") -> return ()
         (ExitSuccess, msg, "") -> outputListLno' TraceOutput ["Module OK. information: ", msg]
         (ExitSuccess, mout, merr) -> outputListLno' TraceOutput ["Module OK. information: ", mout, ". Warning: ", merr]
         (ExitFailure code, _,_) -> do
             outputListLno' WarningOutput ["Module loading failed for module ", show emInfo]
-            throwSystemError .concat $ ["Error loading module ", show emInfo, "\n\tstdout='", out, "'\n\tstderr='", err, "'"]
+            throwSystemError .concat $ ["Error loading module ", show emInfo, "\n",
+                    "When running the validation command (", validate_cmd, " with arguments ", show validate_args, ")\n",
+                    "\texit code = ", show code,"\n",
+                    "\tstdout='", out, "'\n",
+                    "\tstderr='", err, "'"]
 
 
 findLoad :: T.Text -> NGLessIO ExternalModule
@@ -189,11 +212,12 @@ findLoad modname = do
 
 findLoad' :: T.Text -> IO (Either String ExternalModule)
 findLoad' m = do
-    let modfile = "Modules" </> T.unpack m <.> "ngm" </> "module" <.> "yaml"
+    let modpath = "Modules" </> T.unpack m <.> "ngm"
+        modfile = modpath </> "module" <.> "yaml"
     exist <- doesFileExist modfile
     if not exist
         then return $ Left ("Could not find module file at "++modfile)
-        else decodeEither <$> B.readFile modfile
+        else fmap (addPathToRep modpath) . decodeEither <$> B.readFile modfile
 
 loadModule :: T.Text -> T.Text -> NGLessIO Module
 loadModule m _ = asInternalModule =<< findLoad m

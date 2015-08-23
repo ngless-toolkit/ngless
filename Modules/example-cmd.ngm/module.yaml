@@ -1,4 +1,4 @@
-version: '0.0.0'
+version: '1.0.0'
 name: 'Test tool'
 command:
     nglName: "testing"
@@ -20,7 +20,7 @@ command:
                 - 'three'
 
 check:
-    check_cmd: '/bin/echo'
+    check_cmd: '/bin/true'
     check_args:
         - "one"
         - "two"
