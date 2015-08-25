@@ -85,6 +85,13 @@ loadModules mods  = do
     imported <- loadStdlibModules mods
     return (mA:imported)
 
+printHeader :: IO ()
+printHeader = putStr
+    ("NGLess v"++versionStr++" (C) NGLess authors\n"++
+    "\n"++
+    "http://luispedro.github.io/ngless\n"++
+    "\n")
+
 optsExec :: NGLess -> IO ()
 optsExec opts@DefaultMode{} = do
     let fname = input opts
@@ -108,6 +115,7 @@ optsExec opts@DefaultMode{} = do
         whenStrictlyNormal (setVerbosity Quiet)
     odir <- runNGLessIO "cannot fail" outputDirectory
     createDirectoryIfMissing False odir
+    unless (no_header opts) printHeader
     runNGLessIO "running script" $ do
         --Note that the input for ngless is always UTF-8.
         --Always. This means that we cannot use T.readFile

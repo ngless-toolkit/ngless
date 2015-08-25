@@ -31,6 +31,7 @@ data NGLess =
               , keep_temporary_files :: Maybe Bool
               , config_files :: Maybe [FilePath]
               , color :: ColorSetting
+              , no_header :: Bool
               }
         | InstallGenMode
               { input :: String
@@ -56,6 +57,7 @@ nglessArgs = DefaultMode
         , keep_temporary_files = Nothing
         , config_files = Nothing &= name "conf"
         , color = enum [AutoColor &= help "auto color", NoColor &= help "no color", ForceColor &= name "color"]
+        , no_header = False &= name "no-header" &= help "Do not print version header"
         }
         &= details  [ "Example:" , "ngless script.ngl" ]
 
