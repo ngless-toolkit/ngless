@@ -1,9 +1,12 @@
 {- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
+{-# LANGUAGE RecordWildCards #-}
 module Configuration
-    ( nglessDataBaseURL
+    ( NGLessConfiguration(..)
     , InstallMode(..)
+    , nglConfiguration
+    , nglessDataBaseURL
     , initConfiguration
     , setupTestConfiguration
     , globalDataDirectory
@@ -42,6 +45,7 @@ data NGLessConfiguration = NGLessConfiguration
     , nConfTrace :: Bool
     , nConfOutputDirectory :: FilePath
     , nConfColor :: ColorSetting
+    , nConfPrintHeader :: Bool
     } deriving (Eq, Show)
 
 
@@ -59,11 +63,12 @@ guessConfiguration = do
         , nConfTrace = False
         , nConfOutputDirectory = ""
         , nConfColor = AutoColor
+        , nConfPrintHeader = True
         }
 
 
 updateConfiguration :: NGLessConfiguration -> FilePath -> IO NGLessConfiguration
-updateConfiguration config cfile = error "Not implemented yet"
+updateConfiguration config cfile = error "Reading a config file is not implemented yet"
 
 setupTestConfiguration :: IO ()
 setupTestConfiguration = do
@@ -78,26 +83,26 @@ initConfiguration opts = do
         _ -> [])
     writeIORef nglConfigurationRef (updateConfigurationOpts opts config')
 
-updateConfigurationOpts opts@DefaultMode{} config =
-    let fname = input opts
-        trace = fromMaybe
+updateConfigurationOpts opts@DefaultMode{..} config =
+    let trace = fromMaybe
                     (nConfTrace config)
-                    (trace_flag opts)
+                    trace_flag
         ktemp = fromMaybe
                     (nConfKeepTemporaryFiles config)
-                    (keep_temporary_files opts)
+                    keep_temporary_files
         tmpdir = fromMaybe
                     (nConfTemporaryDirectory config)
-                    (temporary_directory opts)
-        odir = case (output_directory opts, fname) of
+                    temporary_directory
+        odir = case (output_directory, input) of
             (Nothing, "-") -> "STDIN.output_ngless"
-            (Nothing, _) -> fname ++ ".output_ngless"
+            (Nothing, _) -> input ++ ".output_ngless"
             (Just odir', _) -> odir'
     in config
             { nConfTrace = trace
             , nConfKeepTemporaryFiles = ktemp
             , nConfOutputDirectory = odir
             , nConfTemporaryDirectory = tmpdir
+            , nConfPrintHeader = (nConfPrintHeader config) && not no_header
             }
 
 updateConfigurationOpts _ config = config

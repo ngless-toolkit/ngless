@@ -115,13 +115,15 @@ optsExec opts@DefaultMode{} = do
         whenStrictlyNormal (setVerbosity Quiet)
     odir <- runNGLessIO "cannot fail" outputDirectory
     createDirectoryIfMissing False odir
-    unless (no_header opts) printHeader
     runNGLessIO "running script" $ do
         --Note that the input for ngless is always UTF-8.
         --Always. This means that we cannot use T.readFile
         --which is locale aware.
         --We also assume that the text file is quite small and, therefore, loading
         --it in to memory is not resource intensive.
+        shouldPrintHeader <- nConfPrintHeader <$> nglConfiguration
+        when shouldPrintHeader $
+            liftIO printHeader
         outputLno' DebugOutput "Validating script..."
         errs <- liftIO (validate_io sc)
         when (isJust errs) $
