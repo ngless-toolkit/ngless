@@ -113,15 +113,20 @@ output !ot !lno !msg = do
     isTerm <- liftIO $ hIsTerminalDevice stdout
     verb <- liftIO getVerbosity
     traceSet <- traceFlag
+    colorOpt <- nConfColor <$> nglConfiguration
     let sp = traceSet || shouldPrint isTerm ot verb
+        doColor = case colorOpt of
+            ForceColor -> True
+            NoColor -> False
+            AutoColor -> isTerm
     liftIO $ do
         t <- getZonedTime
         modifyIORef savedOutput (OutputLine lno ot msg:)
         when sp $ do
-            let st = if isTerm
+            let st = if doColor
                         then setSGRCode [SetColor Foreground Dull (colorFor ot)]
                         else ""
-                rst = if isTerm
+                rst = if doColor
                         then setSGRCode [Reset]
                         else ""
                 tformat = if traceSet -- when trace is set, output seconds

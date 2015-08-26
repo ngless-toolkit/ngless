@@ -5,6 +5,7 @@
 module Configuration
     ( NGLessConfiguration(..)
     , InstallMode(..)
+    , ColorSetting(..)
     , nglConfiguration
     , nglessDataBaseURL
     , initConfiguration
@@ -103,6 +104,7 @@ updateConfigurationOpts opts@DefaultMode{..} config =
             , nConfOutputDirectory = odir
             , nConfTemporaryDirectory = tmpdir
             , nConfPrintHeader = (nConfPrintHeader config) && not no_header
+            , nConfColor = fromMaybe (nConfColor config) color
             }
 
 updateConfigurationOpts _ config = config
