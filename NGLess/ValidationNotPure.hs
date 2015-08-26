@@ -6,7 +6,7 @@ module ValidationNotPure
     ( validate_io
     ) where
 
-import System.Directory 
+import System.Directory
 import Data.Maybe
 
 import qualified Data.Text as T
@@ -30,12 +30,16 @@ validate_io expr = do
 validate_files :: Script -> IO (Maybe T.Text)
 validate_files (Script _ es) = check_toplevel validate_files' es
     where
-        validate_files' (FunctionCall (FuncName "fastq") (ConstStr x) _ _) = check_can_read_file x
-        validate_files' (FunctionCall (FuncName "fastq") (Lookup   x) _ _) = validateVar check_can_read_file x es
+        validate_files' (FunctionCall (FuncName "fastq") f _ _) = check f
+        validate_files' (FunctionCall (FuncName "paired") f args _) = check f >> check (fromJust $ lookup (Variable "second") args)
         validate_files' (FunctionCall (FuncName "annotate") _ args _) = validateArg check_can_read_file "gff" args es
         validate_files' (Assignment _ e) = validate_files' e
         validate_files' _ = return Nothing
- 
+
+        check (ConstStr fname) = check_can_read_file fname
+        check (Lookup var) = validateVar check_can_read_file var es
+        check _ = return Nothing
+
 validate_def_genomes :: Script -> IO (Maybe T.Text)
 validate_def_genomes (Script _ es) = check_toplevel validate_def_genomes' es
     where
