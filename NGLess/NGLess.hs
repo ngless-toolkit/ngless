@@ -23,12 +23,15 @@ import Utils.StringLike
 
 -- | An error in evaluating an ngless script
 -- Normally, it's easier to use the function interface of 'throwShouldNotOccur' and friends
-data NGError =
-    ShouldNotOccur !T.Text -- ^ bug in ngless
-    | ScriptError !T.Text -- ^ bug in user script
-    | DataError !T.Text -- ^ bad input
-    | SystemError !T.Text -- ^ system/IO issue
-    | GenericError !T.Text -- ^ arbitrary error message
+data NGErrorType =
+    ShouldNotOccur -- ^ bug in ngless
+    | ScriptError -- ^ bug in user script
+    | DataError -- ^ bad input
+    | SystemError -- ^ system/IO issue
+    | GenericError -- ^ arbitrary error message
+    deriving (Show, Eq)
+
+data NGError = NGError !NGErrorType !T.Text
         deriving (Show, Eq)
 
 type NGLessIO = ExceptT NGError (ResourceT IO)
@@ -44,23 +47,23 @@ testNGLessIO act = do
 
 -- | Internal bug: user is requested to submit a bug report
 throwShouldNotOccur :: (StringLike s, MonadError NGError m) => s -> m a
-throwShouldNotOccur = throwError . ShouldNotOccur . asText
+throwShouldNotOccur = throwError . NGError ShouldNotOccur . asText
 
 -- | Script error: user can fix error by re-writing the script
 throwScriptError :: (StringLike s, MonadError NGError m) => s -> m a
-throwScriptError = throwError . ScriptError . asText
+throwScriptError = throwError . NGError ScriptError . asText
 
 -- | Data error: problem with input data
 throwDataError :: (StringLike s, MonadError NGError m) => s -> m a
-throwDataError = throwError . DataError . asText
+throwDataError = throwError . NGError DataError . asText
 
 -- | System error: issues such as *subcommand failed* or *out of disk*
 throwSystemError :: (StringLike s, MonadError NGError m) => s -> m a
-throwSystemError = throwError . SystemError . asText
+throwSystemError = throwError . NGError SystemError . asText
 
 -- | Generic error: any error message
 throwGenericError :: (StringLike s, MonadError NGError m) => s -> m a
-throwGenericError = throwError . GenericError . asText
+throwGenericError = throwError . NGError GenericError . asText
 
 
 boolOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m Bool
