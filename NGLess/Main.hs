@@ -27,7 +27,7 @@ import qualified Data.ByteString as B
 
 import Interpret
 import Validation
-import ValidationNotPure
+import ValidationIO
 import Language
 import Types
 import Parse
@@ -125,7 +125,7 @@ optsExec opts@DefaultMode{} = do
         when shouldPrintHeader $
             liftIO printHeader
         outputLno' DebugOutput "Validating script..."
-        errs <- liftIO (validate_io sc)
+        errs <- validateIO sc
         when (isJust errs) $
             liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
         outputLno' InfoOutput "Script OK. Starting interpretation..."
