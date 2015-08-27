@@ -30,6 +30,7 @@ import qualified Data.ByteString as B
 import Data.Maybe
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
+import qualified Data.Configurator as CF
 
 import NGLess
 import Dependencies.Embedded
@@ -67,9 +68,29 @@ guessConfiguration = do
         , nConfPrintHeader = True
         }
 
+updateConfiguration :: NGLessConfiguration -> [FilePath] -> IO NGLessConfiguration
+updateConfiguration config [] = return config
+updateConfiguration NGLessConfiguration{..} cfiles = do
+    cp <- CF.load (map CF.Required cfiles)
+    nConfDownloadBaseURL' <- CF.lookupDefault nConfDownloadBaseURL cp "download-url"
+    nConfGlobalDataDirectory' <- CF.lookupDefault nConfGlobalDataDirectory cp "global-data-directory"
+    nConfUserDirectory' <- CF.lookupDefault nConfUserDirectory cp "user-directory"
+    nConfTemporaryDirectory' <- CF.lookupDefault nConfTemporaryDirectory cp "temporary-directory"
+    nConfKeepTemporaryFiles' <- CF.lookupDefault nConfKeepTemporaryFiles cp "keep-temporary-files"
+    nConfColor' <- CF.lookupDefault AutoColor cp "color"
+    nConfPrintHeader' <- CF.lookupDefault nConfPrintHeader cp "print-header"
+    return NGLessConfiguration
+        { nConfDownloadBaseURL = nConfDownloadBaseURL'
+        , nConfGlobalDataDirectory = nConfGlobalDataDirectory'
+        , nConfUserDirectory = nConfUserDirectory'
+        , nConfTemporaryDirectory = nConfTemporaryDirectory'
+        , nConfKeepTemporaryFiles = nConfKeepTemporaryFiles'
+        , nConfTrace = nConfTrace
+        , nConfOutputDirectory = nConfOutputDirectory
+        , nConfColor = nConfColor'
+        , nConfPrintHeader = nConfPrintHeader'
+        }
 
-updateConfiguration :: NGLessConfiguration -> FilePath -> IO NGLessConfiguration
-updateConfiguration config cfile = error "Reading a config file is not implemented yet"
 
 setupTestConfiguration :: IO ()
 setupTestConfiguration = do
@@ -79,12 +100,12 @@ setupTestConfiguration = do
 initConfiguration :: NGLess -> IO ()
 initConfiguration opts = do
     config <- guessConfiguration
-    config' <- foldM updateConfiguration config (case opts of
+    config' <- updateConfiguration config (case opts of
         DefaultMode{config_files = Just cs} -> cs
         _ -> [])
     writeIORef nglConfigurationRef (updateConfigurationOpts opts config')
 
-updateConfigurationOpts opts@DefaultMode{..} config =
+updateConfigurationOpts DefaultMode{..} config =
     let trace = fromMaybe
                     (nConfTrace config)
                     trace_flag
@@ -106,7 +127,6 @@ updateConfigurationOpts opts@DefaultMode{..} config =
             , nConfPrintHeader = (nConfPrintHeader config) && not no_header
             , nConfColor = fromMaybe (nConfColor config) color
             }
-
 updateConfigurationOpts _ config = config
 
 nglConfigurationRef :: IORef NGLessConfiguration

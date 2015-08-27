@@ -145,11 +145,11 @@ optsExec (CreateReferencePackMode ofile gen gtf _) = runNGLessIO "creating refer
         createReferencePack ofile gen gtf
 
 getModes :: Mode (CmdArgs NGLess)
-getModes = cmdArgsMode $ modes [nglessArgs &= auto, installArgs, createRefArgs]
-    &= verbosity
-    &= summary sumtext
-    &= help "ngless implement the NGLess language"
-    &= helpArg [name "h"]
+getModes = cmdArgsMode_ $ nglessModes
+    += verbosity
+    += summary sumtext
+    += help "ngless implement the NGLess language"
+    += helpArg [name "h"]
     where sumtext = concat ["ngless v", versionStr, "(C) NGLess Authors 2013-2015"]
 
 main = cmdArgsRun getModes >>= optsExec

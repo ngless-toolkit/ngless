@@ -28,6 +28,7 @@ executable ngless
     conduit >= 1.2 && < 1.3,
     conduit-extra >= 1.1 && < 1.2,
     conduit-combinators == 1.0.*,
+    configurator == 0.3.*,
     containers == 0.5.*,
     convertible == 1.1.*,
     -- HUnit (v 1.2.5) required deepseq 1.3
@@ -80,6 +81,7 @@ Test-Suite nglesstest
     conduit >= 1.2 && < 1.3,
     conduit-extra >= 1.1 && < 1.2,
     conduit-combinators == 1.0.*,
+    configurator == 0.3.*,
     containers == 0.5.*,
     convertible == 1.1.*,
     -- HUnit (v 1.2.5) required deepseq 1.3

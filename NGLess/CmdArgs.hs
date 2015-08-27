@@ -5,9 +5,7 @@
 module CmdArgs
     ( ColorSetting(..)
     , NGLess(..)
-    , nglessArgs
-    , installArgs
-    , createRefArgs
+    , nglessModes
     ) where
 
 {-| This is a separate module so that Main & Configuration
@@ -16,8 +14,17 @@ module CmdArgs
  -}
 
 import System.Console.CmdArgs
+import qualified Data.Configurator.Types as CF
 
-data ColorSetting = AutoColor | NoColor | ForceColor deriving (Eq, Data, Typeable, Show)
+data ColorSetting = AutoColor | NoColor | ForceColor
+    deriving (Eq, Data, Typeable, Show)
+
+instance CF.Configured ColorSetting where
+    convert (CF.String "auto") = Just AutoColor
+    convert (CF.String "force") = Just ForceColor
+    convert (CF.String "none") = Just NoColor
+    convert other = Nothing
+
 data NGLess =
         DefaultMode
               { debug_mode :: String
@@ -45,35 +52,46 @@ data NGLess =
               }
            deriving (Eq, Show, Data, Typeable)
 
-nglessArgs = DefaultMode
-        { debug_mode = "ngless"
-        , input = "-" &= argPos 0 &= opt ("-" :: String)
-        , script = Nothing &= name "e"
-        , trace_flag = Nothing &= name "trace"
-        , print_last = False &= name "p"
-        , nThreads = 1 &= name "n"
-        , output_directory = Nothing &= name "o"
-        , temporary_directory = Nothing &= name "t"
-        , keep_temporary_files = Nothing
-        , config_files = Nothing &= name "conf"
-        , color = Just $ enum [AutoColor &= help "auto color", NoColor &= help "no color" &= name "no-color", ForceColor &= name "color"]
-        , no_header = False &= name "no-header" &= help "Do not print version header"
-        }
-        &= details  [ "Example:" , "ngless script.ngl" ]
 
-installArgs = InstallGenMode
-        { input = "Reference" &= argPos 0
-        , color = Just $ enum [AutoColor &= help "auto color", NoColor &= help "no color" &= name "no-color", ForceColor &= name "color"]
-        }
-        &= name "--install-reference-data"
-        &= details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
+color_setting :: Annotate Ann
+color_setting =
+        enum_ color [atom (Nothing :: Maybe ColorSetting) += help "auto color"
+            ,atom (Just AutoColor) += help "auto color" += name "auto"
+            ,atom (Just NoColor) += help "no color" += name "no-color"
+            ,atom (Just ForceColor) += help "force color (even if output is not a terminal)" += name "color"
+            ]
 
-createRefArgs = CreateReferencePackMode
-        { oname = "" &= argPos 0
-        , genome_url = "" &= name "g"
-        , gtf_url = "" &= name "a"
-        , color = Just $ enum [AutoColor &= help "auto color", NoColor &= help "no color" &= name "no-color", ForceColor &= name "color"]
-        } &= name "--create-reference-pack"
-        &= details ["Example:", "ngless --create-reference-pack ref.tar.gz -g http://...genome.fa.gz -a http://...gtf.fa.gz"]
+nglessArgs = record DefaultMode{}
+        [ debug_mode := "ngless"
+        , input := "-" += argPos 0 += opt ("-" :: String)
+        , script := Nothing += name "e"
+        , trace_flag := Nothing += name "trace"
+        , print_last := False += name "p"
+        , nThreads := 1 += name "n"
+        , output_directory := Nothing += name "o"
+        , temporary_directory := Nothing += name "t"
+        , keep_temporary_files := Nothing
+        , config_files := Nothing += name "conf"
+        , color_setting
+        , no_header := False += name "no-header" += help "Do not print version header"
+        ]
+        += details ["Example:" , "ngless script.ngl"]
+
+installArgs = record InstallGenMode{}
+        [ input := "Reference" += argPos 0
+        , color_setting
+        ]
+        += name "--install-reference-data"
+        += details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
+
+createRefArgs = record CreateReferencePackMode{}
+        [ oname := "" += argPos 0
+        , genome_url := "" += name "g"
+        , gtf_url := "" += name "a"
+        , color_setting
+        ]
+        += name "--create-reference-pack"
+        += details ["Example:", "ngless --create-reference-pack ref.tar.gz -g http://...genome.fa.gz -a http://...gtf.fa.gz"]
 
 
+nglessModes = modes_ [nglessArgs += auto, installArgs, createRefArgs]
