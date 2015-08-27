@@ -69,9 +69,15 @@ guessConfiguration = do
         }
 
 updateConfiguration :: NGLessConfiguration -> [FilePath] -> IO NGLessConfiguration
-updateConfiguration config [] = return config
 updateConfiguration NGLessConfiguration{..} cfiles = do
-    cp <- CF.load (map CF.Required cfiles)
+    defaultUserConfig1 <- (</> ".local/config/ngless.conf") <$> getHomeDirectory
+    defaultUserConfig2 <- (</> ".ngless.conf") <$> getHomeDirectory
+    let configFiles =
+                    [CF.Optional defaultUserConfig1
+                    ,CF.Optional defaultUserConfig2
+                    ,CF.Optional "/etc/ngless.conf"
+                    ] ++ (map CF.Required cfiles)
+    cp <- CF.load configFiles
     nConfDownloadBaseURL' <- CF.lookupDefault nConfDownloadBaseURL cp "download-url"
     nConfGlobalDataDirectory' <- CF.lookupDefault nConfGlobalDataDirectory cp "global-data-directory"
     nConfUserDirectory' <- CF.lookupDefault nConfUserDirectory cp "user-directory"
