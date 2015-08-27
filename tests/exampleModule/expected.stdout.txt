@@ -1,3 +1,7 @@
+NGLess v0.0.0 (C) NGLess authors
+
+http://luispedro.github.io/ngless
+
 Called example function 'example'
 First argument is NGOReadSet1 SolexaEncoding "sample.fq"
 Keyword arguments are []
