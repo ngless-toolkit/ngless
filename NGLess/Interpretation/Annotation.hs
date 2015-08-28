@@ -2,8 +2,10 @@
 
 module Interpretation.Annotation
     ( AnnotationIntersectionMode(..)
+    , AnnotationOpts(..)
     , executeAnnotation
-    , annotate
+    , _annotate
+    , _annotationRule
     , _intersection_strict
     , _intersection_non_empty
     , _matchFeatures
@@ -42,6 +44,13 @@ type AnnotationRule = GffIMMap -> (Int, Int) -> GffIMMap
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
 
+data AnnotationOpts =
+    AnnotationOpts
+    { optFeatures :: [GffType] -- ^ list of features to condider
+    , optIntersectMode :: AnnotationRule
+    , optStrandSpecific :: !Bool
+    , optKeepAmbiguous :: !Bool
+    }
 
 
 executeAnnotation :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -50,91 +59,80 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
     ambiguity <- getBoolArg False "ambiguity" args
     strand_specific <- getBoolArg False "strand" args
     fs <- case lookup "features" args of
-        Nothing -> return Nothing
-        Just (NGOSymbol f) -> return . Just $ [T.unpack f]
-        Just (NGOList feats') -> Just <$> mapM evalSymbol feats'
+        Nothing -> return ["gene"]
+        Just (NGOSymbol f) -> return [f]
+        Just (NGOList feats') -> mapM (symbolOrTypeError "annotation features argument") feats'
         _ -> throwShouldNotOccur ("executeAnnotation: TYPE ERROR" :: String)
-    m <- parseAnnotationMode args
+    m <- _annotationRule <$> parseAnnotationMode args
     g <- evalMaybeString $ lookup "gff" args
-    res <- annotate e g fs dDS m ambiguity strand_specific
-    return $ NGOAnnotatedSet res
+    gff <- whichAnnotationFile g dDS
+    NGOAnnotatedSet <$> _annotate e gff AnnotationOpts
+                { optFeatures = map matchingFeature fs
+                , optIntersectMode = m
+                , optStrandSpecific = strand_specific
+                , optKeepAmbiguous = ambiguity
+                }
 executeAnnotation e _ = throwShouldNotOccur ("Annotation can handle MappedReadSet(s) only. Got " ++ show e)
 
-
+parseAnnotationMode :: KwArgsValues -> NGLessIO AnnotationIntersectionMode
 parseAnnotationMode args = case lookupWithDefault (NGOSymbol "union") "mode" args of
     (NGOSymbol "union") -> return  IntersectUnion
     (NGOSymbol "intersection_strict") -> return IntersectUnion
     (NGOSymbol "intersection_non_empty") -> return  IntersectNonEmpty
     m -> throwScriptError (concat ["Unexpected annotation mode (", show m, ")."])
 
-
-
--- |Annotates mapped reads according to a mapping
-annotate :: FilePath                            -- ^ input SAM file
-                -> Maybe FilePath               -- ^ input GFF file
-                -> Maybe [String]               -- ^ list of features
-                -> Maybe T.Text                 -- ^ reference information (if std ref was used)
-                -> AnnotationIntersectionMode   -- ^ mode
-                -> Bool                         -- ^ ambiguity
-                -> Bool                         -- ^ stranded
-                -> NGLessIO FilePath
-annotate samFP (Just g) feats _ m a s = do
+whichAnnotationFile :: Maybe FilePath -- ^ explicitly passed GFF file
+                -> Maybe T.Text -- ^ Reference
+                -> NGLessIO FilePath -- ^ GFF to use
+whichAnnotationFile (Just g) _ = do
     outputListLno' InfoOutput ["Annotate with given GFF: ", g]
-    annotate' samFP g feats (getIntervalQuery m) a s
-annotate samFP Nothing feats (Just dDs) m a s = do
+    return g
+whichAnnotationFile Nothing (Just dDs) = do
     outputListLno' InfoOutput ["Annotate with default GFF: ", show dDs]
     basedir <- ensureDataPresent (T.unpack dDs)
-    annotate' samFP (getGff basedir) feats (getIntervalQuery m) a s   -- use default GFF
-annotate _     Nothing _ Nothing _ _ _ =
+    return (getGff basedir) -- use default GFF
+whichAnnotationFile Nothing Nothing =
     throwShouldNotOccur ("A gff must be provided by using the argument 'gff'" :: T.Text) -- not default ds and no gff passed as arg
 
-getIntervalQuery :: AnnotationIntersectionMode -> AnnotationRule
-getIntervalQuery IntersectUnion = union
-getIntervalQuery IntersectStrict = _intersection_strict
-getIntervalQuery IntersectNonEmpty = _intersection_non_empty
+_annotationRule :: AnnotationIntersectionMode -> AnnotationRule
+_annotationRule IntersectUnion = union
+_annotationRule IntersectStrict = _intersection_strict
+_annotationRule IntersectNonEmpty = _intersection_non_empty
 
 
-annotate' :: FilePath
-                -> FilePath
-                -> Maybe [String]
-                -> AnnotationRule
-                -> Bool
-                -> Bool
-                -> NGLessIO FilePath
-annotate' samFp gffFp feats f a s = do
+_annotate :: FilePath -> FilePath -> AnnotationOpts -> NGLessIO FilePath
+_annotate samFp gffFp opts = do
         gffC <- liftIO $ intervals . filterFeats . readAnnotations <$> readPossiblyCompressedFile gffFp
         samC <- liftIO $ filter isAligned . readAlignments <$> readPossiblyCompressedFile samFp
         let res = calculateAnnotation gffC samC
         writeAnnotCount samFp (toGffM res)
     where
-        filterFeats = filter (_matchFeatures $ matchingFeatures feats)
+        filterFeats = filter (_matchFeatures $ optFeatures opts)
         calculateAnnotation :: AnnotationMap -> [SamLine] -> AnnotationMap
-        calculateAnnotation aMap sam = aMap `deepseq` compStatsAnnot aMap sam f a s
+        calculateAnnotation aMap sam = aMap `deepseq` compStatsAnnot aMap sam opts
 
 toGffM :: AnnotationMap -> [GffCount]
 toGffM = concat . concat . map IM.elems . concat . map (M.elems) . M.elems
 
 compStatsAnnot ::  AnnotationMap
                     -> [SamLine] -- ^ input data
-                    -> AnnotationRule -- ^ annotation rule
-                    -> Bool      -- ^ whether ambiguous matches count
-                    -> Bool      -- ^ whether strand must match
+                    -> AnnotationOpts
                     -> AnnotationMap
-compStatsAnnot amap sam f a s = foldl iterSam amap sam
+compStatsAnnot amap sam opts = foldl iterSam amap sam
     where
-        iterSam am y = M.map (M.alter alterCounts (samRName y)) am
+        iterSam am samline = M.map (M.alter alterCounts (samRName samline)) am
             where
                 alterCounts Nothing = Nothing
-                alterCounts (Just v) = Just $ annotateLine f v y a s
+                alterCounts (Just v) = Just $ annotateLine v samline opts
 
-
-annotateLine :: AnnotationRule -> GffIMMap -> SamLine -> Bool -> Bool -> GffIMMap
-annotateLine f im y a s = uCounts matching im
+annotateLine :: GffIMMap -> SamLine -> AnnotationOpts -> GffIMMap
+annotateLine im samline opts = uCounts matching im
     where
-        sStart = samPos y
-        sEnd   = sStart + (samCigLen y) - 1
-        asStrand = if isPositive y then GffPosStrand else GffNegStrand
-        matching = maybeFilterAmbiguous a . maybeFilterStrand s asStrand $ f im (sStart, sEnd)
+        sStart = samPos samline
+        sEnd   = sStart + (samCigLen samline) - 1
+        asStrand = if isPositive samline then GffPosStrand else GffNegStrand
+        matching = maybeFilterAmbiguous (optKeepAmbiguous opts) .
+                        maybeFilterStrand (optStrandSpecific opts) asStrand $ (optIntersectMode opts) im (sStart, sEnd)
 
 maybeFilterStrand :: Bool -> GffStrand -> GffIMMap -> GffIMMap
 maybeFilterStrand True  s =  IMG.filter (not . null) . IMG.map (filterByStrand s)
@@ -160,34 +158,27 @@ uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust incCount k res) im keys
 
 union :: GffIMMap -> (Int, Int) -> GffIMMap
 union im (sS, sE) = IM.fromList $ IM.intersecting im intv
-    where
-        intv = IM.ClosedInterval sS sE
+    where intv = IM.ClosedInterval sS sE
 
 _intersection_strict :: GffIMMap -> (Int, Int) -> GffIMMap
 _intersection_strict im (sS, sE) = intersection' im'
-    where 
-        im' = map (IM.fromList . (IM.containing im)) [sS..sE]
+    where im' = map (IM.fromList . (IM.containing im)) [sS..sE]
 
 
 _intersection_non_empty :: GffIMMap -> (Int, Int) -> GffIMMap
 _intersection_non_empty im (sS, sE) = intersection' . filter (not . IMG.null) $ im'
-    where 
-        im' = map (IM.fromList . (IM.containing im)) [sS..sE]
+    where im' = map (IM.fromList . (IM.containing im)) [sS..sE]
 
 
 intersection' :: [GffIMMap] -> GffIMMap
 intersection' [] = IM.empty
 intersection' im = foldl (IM.intersection) (head im) im
 
---------------------
-
 _allSameId :: GffIMMap -> Bool
 _allSameId im = all ((== sId) . annotSeqId) elems
     where
         sId   = annotSeqId . head $ elems
         elems = concat . IM.elems $ im
-
---------------------
 
 intervals :: [GffLine] -> AnnotationMap
 intervals = foldl insertg M.empty
@@ -206,15 +197,12 @@ insertZeroCount g im = IM.alter insertZeroCount' asInterval im
         asInterval :: IM.Interval Int
         asInterval = IM.ClosedInterval (gffStart g) (gffEnd g)
 
-matchingFeatures :: Maybe [String] -> [GffType]
-matchingFeatures Nothing = [GffGene]
-matchingFeatures (Just fs) = map toFeature fs
-    where
-        toFeature "gene" = GffGene
-        toFeature "exon" = GffExon
-        toFeature "cds"  = GffCDS
-        toFeature "CDS"  = GffCDS
-        toFeature s      = GffOther (B8.pack s)
+matchingFeature :: T.Text -> GffType
+matchingFeature "gene" = GffGene
+matchingFeature "exon" = GffExon
+matchingFeature "cds"  = GffCDS
+matchingFeature "CDS"  = GffCDS
+matchingFeature s      = GffOther (B8.pack . T.unpack $ s)
 
 _matchFeatures :: [GffType] -> GffLine -> Bool
 _matchFeatures fs gf = gffType gf `elem` fs
@@ -226,6 +214,4 @@ evalMaybeString Nothing = return Nothing
 evalMaybeString (Just (NGOString s)) = return (Just $ T.unpack s)
 evalMaybeString o = throwShouldNotOccur ("evalString: Argument type must be NGOString (received " ++ show o ++ ").")
 
-evalSymbol (NGOSymbol s) = return (T.unpack s)
-evalSymbol o = throwShouldNotOccur ("evalSymbol: Argument type must be NGOSymbol (received " ++ show o ++ ").")
 
