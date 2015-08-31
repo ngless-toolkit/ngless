@@ -1,5 +1,7 @@
 #!/bin/bash
 
+shopt -s nullglob
+
 ok="yes"
 make check
 if test $? -ne "0"; then
@@ -13,8 +15,19 @@ for testdir in tests/*; do
         echo "Running $testdir"
         cd $testdir
         mkdir -p temp
-        ../../dist/build/ngless/ngless --quiet -t temp *.ngl > output.stdout.txt
-        rm -rf temp
+        ../../dist/build/ngless/ngless --quiet -t temp *.ngl > output.stdout.txt 2>output.stderr.txt
+        ngless_exit=$?
+        if [[ $testdir == tests/error-* ]] ; then
+            if test $ngless_exit -eq "0"; then
+                echo "Expected error message in test"
+                ok=no
+            fi
+        else
+            if test $ngless_exit -ne "0"; then
+                echo "Error exit in test"
+                ok=no
+            fi
+        fi
         for f in expected.*; do
             diff -u $f output${f#expected}
             if test $? -ne "0"; then
@@ -22,6 +35,7 @@ for testdir in tests/*; do
                ok=no
             fi
         done
+        rm -rf temp
         rm -rf *.output_ngless
         cd $basedir
     fi

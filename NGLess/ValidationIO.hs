@@ -1,12 +1,14 @@
-{- Copyright 2013-2014 NGLess Authors
+{- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
 
+{-# LANGUAGE OverloadedStrings #-}
 module ValidationIO
     ( validateIO
     ) where
 
 import System.Directory
+import System.FilePath.Posix (takeDirectory)
 import Data.Maybe
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad
@@ -25,8 +27,10 @@ validateIO expr = do
             errors -> return (Just errors)
     where
         checks =
-            [validate_files,
-             validate_def_genomes]
+            [validate_files
+            ,validate_write_output
+            ,validate_def_genomes
+            ]
 
 
 -- | check that necessary files exist
@@ -34,7 +38,7 @@ validate_files :: Script -> NGLessIO [T.Text]
 validate_files (Script _ es) = check_toplevel validate_files' es
     where
         validate_files' (FunctionCall (FuncName "fastq") f _ _) = check f
-        validate_files' (FunctionCall (FuncName "paired") f args _) = (++) <$> check f <*> check (fromJust $ lookup (Variable "second") args)
+        validate_files' (FunctionCall (FuncName "paired") f args _) = (++) <$> check f <*> validateArg check_can_read_file "second" args es
         validate_files' (FunctionCall (FuncName "annotate") _ args _) = validateArg check_can_read_file "gff" args es
         validate_files' (Assignment _ e) = validate_files' e
         validate_files' _ = return []
@@ -110,5 +114,19 @@ check_reference v
             else [T.concat ["Value of argument reference ", v, " is neither a filepath or a default genome."]]
     where v' = T.unpack v
 
+validate_write_output (Script _ es) = check_toplevel validate_write es
+    where
+        validate_write (FunctionCall (FuncName "write") f args _) = validateArg check_can_write_dir "ofile" args es
+        validate_write _ = return []
 
-
+check_can_write_dir :: T.Text -> NGLessIO [T.Text]
+check_can_write_dir ofile = liftIO $ do
+    let dirname = takeDirectory (T.unpack ofile)
+    exists <- doesDirectoryExist dirname
+    if not exists
+        then return [T.concat ["write call to file ", ofile, ", but directory ", T.pack dirname, " does not exist."]]
+        else do
+            canWrite <- writable <$> getPermissions dirname
+            return $ if not canWrite
+                then [T.concat ["write call to file ", ofile, ", but directory ", T.pack dirname, " is not writable."]]
+                else []
