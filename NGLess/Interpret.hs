@@ -39,7 +39,6 @@ import System.Directory
 import Data.Maybe
 
 import Utils.Utils
-import ProcessFastQ
 import Substrim
 import Language
 import FileManagement
@@ -51,10 +50,11 @@ import Data.Sam
 import Data.FastQ
 
 import Interpretation.Annotation
-import Interpretation.Write
-import Interpretation.Select
-import Interpretation.Map
 import Interpretation.Count
+import Interpretation.FastQ
+import Interpretation.Map
+import Interpretation.Select
+import Interpretation.Write
 import Unique
 
 
@@ -295,6 +295,7 @@ topFunction' fname@(FuncName fname') expr args Nothing = do
 
 topFunction' f _ _ _ = throwShouldNotOccur . concat $ ["Interpretation of ", (show f), " is not implemented"]
 
+executeFastq :: NGLessObject -> KwArgsValues -> InterpretationEnvIO NGLessObject
 executeFastq expr args = do
     traceExpr "fastq" expr
     let NGOSymbol encName = lookupWithDefault (NGOSymbol "auto") "encoding" args

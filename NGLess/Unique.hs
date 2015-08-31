@@ -25,8 +25,8 @@ import System.Directory
 import qualified Data.Vector as V
 
 import FileManagement (createTempDir)
+import Interpretation.FastQ (writeTempFastQ)
 import Data.FastQ
-import ProcessFastQ
 import NGLess
 import Language
 import Utils.Utils
@@ -49,7 +49,7 @@ executeUnique (NGOReadSet1 enc file) args = do
         uniqueCalculations' :: Integer -> FilePath -> NGLessIO NGLessObject
         uniqueCalculations' numMaxOccur d = do
             fs <- liftIO $ _readNFiles enc (fromIntegral numMaxOccur) d
-            nFp <- writeReadSet file fs enc
+            nFp <- writeTempFastQ file fs enc
             return $ NGOReadSet1 enc nFp
 executeUnique expr _ = throwShouldNotOccur ("executeUnique: Cannot handle argument " ++ show expr)
 

@@ -33,7 +33,7 @@ import qualified Data.ByteString.Lazy as BL
 
 
 import Data.FastQ (FastQEncoding(..), encodingName)
-import qualified FastQStatistics as FQ
+import qualified Data.FastQStatistics as FQ
 import Configuration
 import NGLess
 

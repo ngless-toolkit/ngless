@@ -37,12 +37,12 @@ import Interpret
 import Tokens
 import Types
 import Substrim
-import FastQStatistics
 import FileManagement
 import Interpretation.Annotation
 import Interpretation.Count
 import VectorOperations
-import ProcessFastQ
+import Data.FastQStatistics
+import Interpretation.FastQ
 import ReferenceDatabases
 import Configuration
 import NGLess
@@ -254,7 +254,7 @@ map_s = "ngless '0.0'\n\
 
 case_compute_stats_lc = do
     contents <- readPossiblyCompressedFile "test_samples/sample_small.fq"
-    (convert . lc $ computeStats contents) @?= ']'
+    (convert . lc $ statsFromFastQ contents) @?= ']'
 
 -- Parse GFF lines
 
@@ -441,34 +441,34 @@ case_unique_5 = let enc = SolexaEncoding in do
 
 -- PerBaseQualityScores 
 
-case_calc_perc_med = _calcPercentile bps eT percentile50 @?= 4
+case_calc_perc_med = _calcPercentile bps eT 0.5 @?= 4
     where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
           eT  = V.sum bps -- 21 -> mul: 0,5  +- 11 in arr = 13 index 4
 
-case_calc_perc_lq = _calcPercentile bps eT lowerQuartile @?= 2
+case_calc_perc_lq = _calcPercentile bps eT 0.25 @?= 2
     where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
           eT  = V.sum bps -- 21 -> mul: 0,25 -> 6 in arr = 6 index 2
 
-case_calc_perc_uq = _calcPercentile bps eT upperQuartile @?= 5
+case_calc_perc_uq = _calcPercentile bps eT 0.75 @?= 5
     where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
           eT  = V.sum bps -- 8 -> mul: 0,75 -> 16 in arr = 18 index 5
 
 
 -- negative tests quality on value 60 char ';'. Value will be 60 - 64 which is -4
 case_calc_statistics_negative = do
-    s <- computeStats <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
+    s <- statsFromFastQ <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
     head (stats' s) @?= (-4,-4,-4,-4)
   where stats' s = calculateStatistics s (guessEncoding . lc $ s)
 
 -- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
 case_calc_statistics_low_positive = do
-    s <- computeStats <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
+    s <- statsFromFastQ <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
     last (stats' s) @?= (1,1,1,1)
   where stats' s = calculateStatistics s (guessEncoding . lc $ s)
 
 
 case_calc_statistics_normal = do
-    s <- computeStats <$> readPossiblyCompressedFile "test_samples/data_set_repeated.fq"
+    s <- statsFromFastQ <$> readPossiblyCompressedFile "test_samples/data_set_repeated.fq"
     head (stats' s) @?= (25,33,31,33)
   where stats' s = calculateStatistics s (guessEncoding . lc $ s)
 
@@ -488,13 +488,13 @@ case_install_genome_user_mode = testNGLessIO $ do
 
 
 -- ProcessFastQ
-low_char_int = (lc . computeStats) <$> readPossiblyCompressedFile "test_samples/sample.fq.gz"
+low_char_int = (lc . statsFromFastQ) <$> readPossiblyCompressedFile "test_samples/sample.fq.gz"
 
 case_read_and_write_fastQ = do
     enc <- guessEncoding <$> low_char_int
     rs <- readReadSet enc "test_samples/sample.fq.gz"
     testNGLessIO $ do
-        fp <- writeReadSet "test_samples/sample.fq.gz" rs enc
+        fp <- writeTempFastQ "test_samples/sample.fq.gz" rs enc
         newrs <- liftIO $ readReadSet enc fp
         liftIO $ newrs @?= rs
 

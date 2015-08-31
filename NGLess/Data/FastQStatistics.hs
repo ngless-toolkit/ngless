@@ -1,14 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module FastQStatistics
+module Data.FastQStatistics
     ( Result(..)
     , gcFraction
-    , computeStats
-    , _calcPercentile
+    , statsFromFastQ
     , calculateStatistics
-    , percentile50
-    , lowerQuartile
-    , upperQuartile
+    , _calcPercentile
     ) where
 
 import Control.Monad
@@ -37,11 +34,11 @@ data Result =  Result
 -- strict tuple
 data P4 = P4 !Int !Int !Int !Int
 
-computeStats :: BL.ByteString -> Result
-computeStats = computeStats' . fastqParse
+statsFromFastQ :: BL.ByteString -> Result
+statsFromFastQ = statsFromFastQ' . fastqParse
 
 gcFraction :: Result -> Double
-gcFraction res = (gcCount / allBpCount)
+gcFraction res = gcCount / allBpCount
     where
         (bpA,bpC,bpG,bpT) = bpCounts res
         gcCount = fromIntegral $ bpC + bpG
@@ -51,21 +48,21 @@ fastqParse :: BL.ByteString -> [(B.ByteString, B.ByteString)]
 fastqParse = fastqParse' . BL.lines
     where
         fastqParse' [] = []
-        fastqParse' (_:s:_:q:ls) = ((toStrict s, toStrict q):fastqParse' ls)
+        fastqParse' (_:s:_:q:ls) = (toStrict s, toStrict q):fastqParse' ls
         fastqParse' _ = error "fastqParse (statistics module): malformed file (nr of lines not a multiple of 4)"
         toStrict = B.concat . BL.toChunks
 
 
-computeStats' :: [(B.ByteString, B.ByteString)] -> Result
-computeStats' seqs = runST $ do
+statsFromFastQ' :: [(B.ByteString, B.ByteString)] -> Result
+statsFromFastQ' seqs = runST $ do
     charCounts <- zeroVec 256
     qualCountsT <- newSTRef []
     P4 n lcT minSeq maxSeq <- foldM (update charCounts qualCountsT) (P4 0 256 (maxBound :: Int) 0) seqs
     qualCountsT' <- readSTRef qualCountsT >>= mapM V.freeze
-    aCount <- getV charCounts 'a'
-    cCount <- getV charCounts 'c'
-    gCount <- getV charCounts 'g'
-    tCount <- getV charCounts 't'
+    aCount <- getNoCaseV charCounts 'a'
+    cCount <- getNoCaseV charCounts 'c'
+    gCount <- getNoCaseV charCounts 'g'
+    tCount <- getNoCaseV charCounts 't'
     return (Result (aCount, cCount, gCount, tCount) (fromIntegral lcT) qualCountsT' n (minSeq, maxSeq))
 
 update charCounts qualCountsT (P4 n lcT minSeq maxSeq) (bps,qs) = do
@@ -83,18 +80,11 @@ update charCounts qualCountsT (P4 n lcT minSeq maxSeq) (bps,qs) = do
         unsafeIncrement qv qi
     return $! P4 (n + 1) (min qsM lcT) (min minSeq len) (max maxSeq len)
 
-
-getV c p = do
+getNoCaseV c p = do
     lower <- VM.read c (ord p)
     upper <- VM.read c (ord . toUpper $ p)
     return (lower + upper)
 
-
---constants
-percentile50 = 0.5 :: Double
-lowerQuartile = 0.25 :: Double
-upperQuartile = 0.75 :: Double
---
 
 -- accUntilLim :: given lim, each position of the array is added until lim.
 -- Is returned the elem of the array in that position.
@@ -110,18 +100,20 @@ calculateStatistics Result{qualCounts=qCounts} enc = Prelude.map statistics qCou
         encOffset = encodingOffset enc
         statistics :: V.Vector Int -> (Int, Int, Int, Int)
         statistics bps = (bpSum `div` elemTotal
-                                , _calcPercentile' percentile50
-                                , _calcPercentile' lowerQuartile
-                                , _calcPercentile' upperQuartile)
+                                , _calcPercentile' 0.50
+                                , _calcPercentile' 0.25
+                                , _calcPercentile' 0.75)
             where bpSum = calcBPSum bps encOffset
                   elemTotal = V.sum bps
-                  _calcPercentile' p = (_calcPercentile bps elemTotal p) - encOffset
+                  _calcPercentile' :: Double -> Int
+                  _calcPercentile' p = _calcPercentile bps elemTotal p - encOffset
 
 -- Calculates [('a',1), ('b',2)] = 0 + 'a' * 1 + 'b' * 2.
 -- 'a' and 'b' minus encoding.
 calcBPSum :: V.Vector Int -> Int -> Int
 calcBPSum qs offset = V.ifoldl' (\n i q -> (n + (i - offset) * q)) 0 qs
 
+_calcPercentile :: V.Vector Int -> Int -> Double -> Int
 _calcPercentile bps elemTotal perc = accUntilLim bps val'
-    where val' = (ceiling (fromIntegral elemTotal * perc) :: Int)
+    where val' = ceiling (fromIntegral elemTotal * perc)
 
