@@ -23,7 +23,7 @@ import Control.Exception
 import Control.Monad.Trans.Resource
 import Control.Monad.IO.Class (liftIO)
 
-import Configuration (temporaryFileDirectory, outputDirectory)
+import Configuration (temporaryFileDirectory, outputDirectory, nConfKeepTemporaryFiles, nglConfiguration)
 import NGLess
 
 -- | open a temporary file
@@ -33,9 +33,13 @@ openNGLTempFile' :: FilePath -> String -> String -> NGLessIO (ReleaseKey, (FileP
 openNGLTempFile' base prefix ext = do
     tdir <- temporaryFileDirectory
     liftIO $ createDirectoryIfMissing True tdir
+    keepTempFiles <- nConfKeepTemporaryFiles <$> nglConfiguration
+    let cleanupAction = if not keepTempFiles
+                then deleteTempFile
+                else hClose . snd
     (key,(fp,h)) <- allocate
                 (openTempFile tdir (prefix ++ takeBaseNameNoExtensions base ++ "." ++ ext))
-                deleteTempFile
+                cleanupAction
     outputListLno' DebugOutput ["Created & opened temporary file ", fp]
     return (key,(fp,h))
 
