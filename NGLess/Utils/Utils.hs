@@ -7,10 +7,12 @@
 module Utils.Utils
     ( lookupWithDefault
     , readPossiblyCompressedFile
+    , hWriteGZIP
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Codec.Compression.GZip as GZip
+import System.IO
 
 import Control.Applicative ((<$>))
 
@@ -25,3 +27,6 @@ readPossiblyCompressedFile fname
     | ".gz" `isSuffixOf` fname = GZip.decompress <$> BL.readFile fname
     | otherwise = BL.readFile fname
 
+
+hWriteGZIP :: Handle -> BL.ByteString -> IO ()
+hWriteGZIP h = BL.hPut h . GZip.compress

@@ -8,9 +8,6 @@ module Interpretation.FastQ
     , writeTempFastQ
     ) where
 
-import qualified Data.ByteString.Lazy.Char8 as BL
-import qualified Codec.Compression.GZip as GZip
-
 import System.IO
 import Data.Maybe
 import Control.Applicative ((<$>))
@@ -24,14 +21,11 @@ import Output
 import Utils.Utils
 import NGLess
 
-writeGZIP :: Handle -> BL.ByteString -> IO ()
-writeGZIP h = BL.hPut h . GZip.compress
-
 writeTempFastQ :: FilePath -> [ShortRead] -> FastQEncoding -> NGLessIO FilePath
 writeTempFastQ fn rs enc = do
     (newfp,h) <- openNGLTempFile fn "" "fq.gz"
     liftIO $ do
-        writeGZIP h (asFastQ enc rs)
+        hWriteGZIP h (asFastQ enc rs)
         hClose h
     return newfp
 
