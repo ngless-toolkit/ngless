@@ -12,7 +12,10 @@ module Interpretation.Map
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
+import Control.Monad
 import Control.Monad.Trans.Resource
+import Control.Concurrent
+import Control.Exception (evaluate)
 
 import Numeric
 
@@ -60,6 +63,11 @@ mapToReference refIndex fps = do
                 ) { std_out = UseHandle hout,
                     std_err = CreatePipe }
         err <- hGetContents herr
+        -- In a separate thread, consume all the error input
+        -- the same pattern is used in the implementation of
+        -- readProcessWithErrorCode (which cannot be used here as we which to
+        -- use `hout` for stdout)
+        void . forkIO $ evaluate (length err) >> return ()
         exitCode <- waitForProcess jHandle
         hClose herr
         return (err, exitCode)
