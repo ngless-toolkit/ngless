@@ -126,7 +126,7 @@ $(BWA_DIR):
 	rm $(BWA_TAR)
 
 $(BWA_DIR)/ngless-bwa-static: $(BWA_DIR)
-	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static" && cp bwa ngless-bwa-static
+	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static" && cp -p bwa ngless-bwa-static
 
 $(SAM_DIR):
 	wget $(SAM_URL)
@@ -140,11 +140,8 @@ $(SAM_DIR)/samtools: $(SAM_DIR)
 NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/samtools
 	xxd -i $< $@
 
-NGLess/Dependencies/bwa_data.c: $(BWA_DIR)/bwa
+NGLess/Dependencies/bwa_data.c: $(BWA_DIR)/ngless-bwa-static
 	xxd -i $< $@
-
-$(BWA_DIR)/bwa:
-	cd $(BWA_DIR) && $(MAKE)
 
 # We cannot depend on $(HTML_LIBS_DIR) as wget sets the mtime in the past
 # and it would cause the download to happen at every make run
