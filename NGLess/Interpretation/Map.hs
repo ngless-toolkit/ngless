@@ -98,7 +98,7 @@ interpretMapOp' r ds = do
         indexReference' r'
             | isDefaultReference r' = do
                     basedir  <- ensureDataPresent r'
-                    return (getIndexPath basedir, Just r)
+                    return (buildGenomePath basedir, Just r)
             | otherwise  = (, Nothing) <$> ensureIndexExists r'
 
 

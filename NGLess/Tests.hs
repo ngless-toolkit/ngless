@@ -512,5 +512,3 @@ case_read_fastQ_store_enc = do
         dstDirBef = (++ "$beforeQC")
         dstDirAft = (++ "$afterQC")
 
-case_get_gff = getGff "path_to_gff" @?= "path_to_gff/Annotation/annot.gtf.gz"
-

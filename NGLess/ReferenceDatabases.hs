@@ -2,11 +2,11 @@
 
 module ReferenceDatabases
     ( isDefaultReference
-    , installData
+    , buildGenomePath
+    , buildGFFPath
     , createReferencePack
-    , getIndexPath
-    , getGff
     , ensureDataPresent
+    , installData
     , findDataFiles
     ) where
 
@@ -44,10 +44,13 @@ defaultGenomes =
 isDefaultReference :: String -> Bool
 isDefaultReference =  (`elem` defaultGenomes)
 
-getIndexPath :: FilePath -> FilePath
-getIndexPath = (</> "Sequence/BWAIndex/genome.fa.gz")
-getGff :: FilePath -> FilePath
-getGff = (</> "Annotation/annot.gtf.gz")
+genomePATH = "Sequence/BWAIndex/genome.fa.gz"
+gffPATH = "Annotation/annotation.gtf.gz"
+
+buildGenomePath :: FilePath -> FilePath
+buildGenomePath = (</> genomePATH)
+buildGFFPath :: FilePath -> FilePath
+buildGFFPath = (</> gffPATH)
 
 
 createReferencePack :: FilePath -> FilePath -> FilePath -> NGLessIO ()
@@ -57,18 +60,15 @@ createReferencePack oname genome gtf = do
     liftIO $ do
         createDirectoryIfMissing True (tmpdir ++ "/Sequence/BWAIndex/")
         createDirectoryIfMissing True (tmpdir ++ "/Annotation/")
-        downloadFile genome (getIndexPath tmpdir)
-        downloadFile gtf (getGff tmpdir)
-    Bwa.createIndex (tmpdir ++ "/Sequence/BWAIndex/genome.fa.gz")
-    let filelist =
-            ["Sequence/BWAIndex/genome.fa.gz"
-            ,"Sequence/BWAIndex/genome.fa.gz.amb"
-            ,"Sequence/BWAIndex/genome.fa.gz.ann"
-            ,"Sequence/BWAIndex/genome.fa.gz.bwt"
-            ,"Sequence/BWAIndex/genome.fa.gz.pac"
-            ,"Sequence/BWAIndex/genome.fa.gz.sa"
-            ,"Annotation/annotation.gtf.gz"
-            ]
+        downloadFile genome (buildGenomePath tmpdir)
+        downloadFile gtf (buildGFFPath tmpdir)
+    Bwa.createIndex (buildGenomePath tmpdir)
+    let filelist = gffPATH:[genomePATH ++ ext | ext <- [""
+                                        ,".amb"
+                                        ,".ann"
+                                        ,".bwt"
+                                        ,".pac"
+                                        ,".sa"]]
     liftIO $ Tar.create oname tmpdir filelist
     release rk
 
@@ -134,7 +134,7 @@ findDataFilesIn ref mode = do
                     then globalDataDirectory
                     else userDataDirectory
     let refdir = basedir </> ref
-    hasIndex <- hasValidIndex (getIndexPath refdir)
+    hasIndex <- hasValidIndex (buildGenomePath refdir)
     outputListLno' TraceOutput ["Looked for ", ref, " in directory ", refdir, if hasIndex then " (and found it)" else " (and did not find it)"]
     return (if hasIndex
                 then Just refdir

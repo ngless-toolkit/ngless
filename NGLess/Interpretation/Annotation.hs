@@ -90,7 +90,7 @@ whichAnnotationFile (Just g) _ = do
 whichAnnotationFile Nothing (Just dDs) = do
     outputListLno' InfoOutput ["Annotate with default GFF: ", show dDs]
     basedir <- ensureDataPresent (T.unpack dDs)
-    return (getGff basedir) -- use default GFF
+    return (buildGFFPath basedir) -- use default GFF
 whichAnnotationFile Nothing Nothing =
     throwShouldNotOccur ("A gff must be provided by using the argument 'gff'" :: T.Text) -- not default ds and no gff passed as arg
 
