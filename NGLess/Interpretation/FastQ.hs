@@ -5,17 +5,25 @@
 
 module Interpretation.FastQ
     ( executeQProc
+    , optionalSubsample
     , writeTempFastQ
     ) where
 
 import System.IO
+import Data.List
 import Data.Maybe
 import Control.Applicative ((<$>))
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit as C
+import qualified Data.Conduit.Zlib as C
+import qualified Data.Conduit.Binary as CB
+import Data.Conduit (($=), ($$), (=$=), (=$))
 
 import FileManagement
 import Data.FastQStatistics
 import Data.FastQ
+import Configuration
 import Language
 import Output
 import Utils.Utils
@@ -29,21 +37,52 @@ writeTempFastQ fn rs enc = do
         hClose h
     return newfp
 
+drop100 = loop (0 :: Int)
+    where
+        loop 400 = loop 0
+        loop n
+            | n < 4 = do
+                mline <- C.await
+                case mline of
+                    Just line -> C.yield line >> loop (n+1)
+                    Nothing -> return ()
+            | otherwise = C.await >> loop (n+1)
+
+uncompressC f
+    | ".gz" `isSuffixOf` f = C.ungzip
+    | otherwise = C.awaitForever C.yield
+
+optionalSubsample :: FilePath -> NGLessIO FilePath
+optionalSubsample f = do
+    subsampleActive <- nConfSubsample <$> nglConfiguration
+    if not subsampleActive
+        then return f
+        else do
+            outputListLno' TraceOutput ["Subsampling file ", f]
+            (newfp,h) <- openNGLTempFile f "" "fq.gz"
+            C.sourceFile f
+                $= uncompressC f
+                =$= CB.lines
+                =$= drop100
+                =$= C.unlinesAscii
+                =$= C.gzip
+                $$ CB.sinkHandle h
+            liftIO $ hClose h
+            outputListLno' TraceOutput ["Finished subsampling (temp sampled file is ", newfp, ")"]
+            return newfp
+
 -- ^ Process quality.
 executeQProc :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
                 -> FilePath         -- ^ FastQ file
-                -> FilePath         -- ^ destination for statistics
                 -> NGLessIO NGLessObject
-executeQProc enc f dst = do
+executeQProc enc f = do
         fd <- liftIO $ statsFromFastQ <$> readPossiblyCompressedFile f
         let enc' = fromMaybe (guessEncoding . lc $ fd) enc
         liftIO $ outputFQStatistics f fd enc'
-        p "Generation of statistics for " dst
-        p "Simple Statistics completed for: " dst
+        p "Simple Statistics completed for: " f
         p "Number of base pairs: "      (show $ length (qualCounts fd))
         p "Encoding is: "               (show enc')
         p "Number of sequences: "   (show $ nSeq fd)
-        p "Loaded file: " f
         return $ NGOReadSet1 enc' f
     where
         p s0 s1  = outputListLno' DebugOutput [s0, s1]

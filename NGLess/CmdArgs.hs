@@ -23,7 +23,7 @@ instance CF.Configured ColorSetting where
     convert (CF.String "auto") = Just AutoColor
     convert (CF.String "force") = Just ForceColor
     convert (CF.String "none") = Just NoColor
-    convert other = Nothing
+    convert _ = Nothing
 
 data NGLess =
         DefaultMode
@@ -39,6 +39,7 @@ data NGLess =
               , config_files :: Maybe [FilePath]
               , color :: Maybe ColorSetting
               , no_header :: Bool
+              , subsampleMode :: Bool
               }
         | InstallGenMode
               { input :: String
@@ -74,6 +75,7 @@ nglessArgs = record DefaultMode{}
         , config_files := Nothing += name "conf"
         , color_setting
         , no_header := False += name "no-header" += help "Do not print version header"
+        , subsampleMode := False += name "subsample" += help "Turn on sub-sampling"
         ]
         += details ["Example:" , "ngless script.ngl"]
 

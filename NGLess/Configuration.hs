@@ -48,6 +48,7 @@ data NGLessConfiguration = NGLessConfiguration
     , nConfOutputDirectory :: FilePath
     , nConfColor :: ColorSetting
     , nConfPrintHeader :: Bool
+    , nConfSubsample :: Bool
     } deriving (Eq, Show)
 
 
@@ -66,6 +67,7 @@ guessConfiguration = do
         , nConfOutputDirectory = ""
         , nConfColor = AutoColor
         , nConfPrintHeader = True
+        , nConfSubsample = False
         }
 
 updateConfiguration :: NGLessConfiguration -> [FilePath] -> IO NGLessConfiguration
@@ -130,8 +132,9 @@ updateConfigurationOpts DefaultMode{..} config =
             , nConfKeepTemporaryFiles = ktemp
             , nConfOutputDirectory = odir
             , nConfTemporaryDirectory = tmpdir
-            , nConfPrintHeader = (nConfPrintHeader config) && not no_header
+            , nConfPrintHeader = nConfPrintHeader config && not no_header
             , nConfColor = fromMaybe (nConfColor config) color
+            , nConfSubsample = subsampleMode
             }
 updateConfigurationOpts _ config = config
 

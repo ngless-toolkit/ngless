@@ -276,14 +276,15 @@ topFunction' (FuncName "print")     expr args Nothing = executePrint expr args
 topFunction' (FuncName "paired") mate1 args Nothing = do
     let Just mate2 = lookup "second" args
         mate3 = lookup "singles" args
-    NGOReadSet1 enc1 fp1 <- executeQualityProcess mate1
-    NGOReadSet1 enc2 fp2 <- executeQualityProcess mate2
+    traceExpr "paired" [mate1, mate2]
+    NGOReadSet1 enc1 fp1 <- executeQualityProcess =<< optionalSubsample' mate1
+    NGOReadSet1 enc2 fp2 <- executeQualityProcess =<< optionalSubsample' mate2
     when (enc1 /= enc2) $
         throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
     case mate3 of
         Nothing -> return (NGOReadSet2 enc1 fp1 fp2)
         Just f3 -> do
-            NGOReadSet1 enc3 fp3 <- executeQualityProcess f3
+            NGOReadSet1 enc3 fp3 <- executeQualityProcess =<< optionalSubsample' f3
             when (enc1 /= enc3) $
                 throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
             return (NGOReadSet3 enc1 fp1 fp2 fp3)
@@ -307,8 +308,10 @@ executeFastq expr args = do
             "solexa" -> return $ Just SolexaEncoding
             _ -> unreachable "impossible to reach"
     case expr of
-        (NGOString fname) -> executeQualityProcess' enc (T.unpack fname) "beforeQC"
-        (NGOList fps) -> NGOList <$> sequence [executeQualityProcess' enc (T.unpack fname) "beforeQC" | NGOString fname <- fps]
+        (NGOString fname) -> do
+            let fp = T.unpack fname
+            executeQualityProcess' enc =<< runNGLessIO (optionalSubsample fp)
+        (NGOList fps) -> NGOList <$> sequence [executeQualityProcess' enc (T.unpack fname) | NGOString fname <- fps]
         v -> unreachable ("fastq function: unexpected first argument: " ++ show v)
 
 executeSamfile expr [] = do
@@ -319,29 +322,31 @@ executeSamfile expr [] = do
         v -> unreachable ("samfile function: unexpected first argument: " ++ show v)
 executeSamfile _ args = unreachable ("samfile does not take any arguments, got " ++ show args)
 
+optionalSubsample' (NGOString f) = NGOString . T.pack <$> runNGLessIO (optionalSubsample $ T.unpack f)
+optionalSubsample' _ = throwShouldNotOccur ("This case should not occurr" :: T.Text)
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = NGOList <$> mapM executeQualityProcess e
-executeQualityProcess (NGOReadSet1 enc fname) = executeQualityProcess' (Just enc) fname "afterQC"
+executeQualityProcess (NGOReadSet1 enc fname) = executeQualityProcess' (Just enc) fname
 executeQualityProcess (NGOReadSet2 enc fp1 fp2) = do
-    NGOReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1 "afterQC"
-    NGOReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2 "afterQC"
+    NGOReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1
+    NGOReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2
     when (enc1 /= enc2) $
         throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ")")
     return (NGOReadSet2 enc1 fp1' fp2')
 executeQualityProcess (NGOReadSet3 enc fp1 fp2 fp3) = do
-    NGOReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1 "afterQC"
-    NGOReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2 "afterQC"
-    NGOReadSet1 enc3 fp3' <- executeQualityProcess' (Just enc) fp3 "afterQC"
+    NGOReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1
+    NGOReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2
+    NGOReadSet1 enc3 fp3' <- executeQualityProcess' (Just enc) fp3
     when (enc1 /= enc2 || enc2 /= enc3) $
         throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ", third one is " ++ show enc3 ++")")
     return (NGOReadSet3 enc1 fp1' fp2' fp3')
 executeQualityProcess (NGOString fname) = do
     let fname' = T.unpack fname
-    executeQualityProcess' Nothing fname' "beforeQC"
+    executeQualityProcess' Nothing fname'
 
 executeQualityProcess v = nglTypeError ("QC expected a string or readset. Got " ++ show v)
-executeQualityProcess' enc fname info = runNGLessIO $ executeQProc enc fname info
+executeQualityProcess' enc fname = runNGLessIO $ executeQProc enc fname
 
 executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executeMap fps args = case lookup "reference" args of

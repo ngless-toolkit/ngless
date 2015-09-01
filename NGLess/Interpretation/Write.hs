@@ -10,6 +10,7 @@ module Interpretation.Write
     ) where
 
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -40,10 +41,13 @@ _formatFQOname base insert
     | otherwise = throwScriptError ("Cannot handle " ++ base)
 
 getOFile :: KwArgsValues -> NGLessIO FilePath
-getOFile args = case lookup "ofile" args of
-    Just (NGOFilename p) -> return p
-    Just (NGOString p) -> return $ T.unpack p
-    _ -> throwShouldNotOccur ("getOFile cannot decode file path" :: String)
+getOFile args = do
+    sub <- nConfSubsample <$> nglConfiguration
+    let subpostfix = if sub then ".subsampled" else ""
+    case lookup "ofile" args of
+        Just (NGOFilename p) -> return (p ++ subpostfix)
+        Just (NGOString p) -> return (T.unpack p ++ subpostfix)
+        _ -> throwShouldNotOccur ("getOFile cannot decode file path" :: String)
 
 writeToUncFile :: NGLessObject -> FilePath -> NGLessIO NGLessObject
 writeToUncFile (NGOMappedReadSet path defGen) newfp = liftIO $ do

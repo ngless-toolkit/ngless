@@ -503,8 +503,8 @@ case_read_fastQ_store_enc = do
     nt <- testNGLessIO $ generateDirId fp
     createDirectoryIfMissing False $ dstDirBef nt
     createDirectoryIfMissing False $ dstDirAft nt
-    (NGOReadSet1 eb _) <- testNGLessIO $ executeQProc Nothing   fp (dstDirBef nt)
-    (NGOReadSet1 ea _) <- testNGLessIO $ executeQProc (Just eb) fp (dstDirAft nt)
+    (NGOReadSet1 eb _) <- testNGLessIO $ executeQProc Nothing   fp
+    (NGOReadSet1 ea _) <- testNGLessIO $ executeQProc (Just eb) fp
     removeDirectoryRecursive $ dstDirBef nt -- delete test generated data.
     removeDirectoryRecursive $ dstDirAft nt -- delete test generated data.
     eb @?= ea

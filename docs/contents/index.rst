@@ -9,10 +9,11 @@ Welcome to ngless's documentation!
 .. toctree::
    :maxdepth: 2
 
-   Introduction
+   introduction
    Installation
    GettingStarted
    Organisms
    Visualization
    Language
    Functions
+   advanced
