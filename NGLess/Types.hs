@@ -142,6 +142,7 @@ typeOfObject NGOReadSet3{} = Just NGLReadSet
 typeOfObject NGOMappedReadSet{} = Just NGLMappedReadSet
 typeOfObject NGOMappedRead{} = Just NGLMappedRead
 typeOfObject NGOAnnotatedSet{} = Just NGLAnnotatedSet
+typeOfObject NGOCounts{} = Just NGLCounts
 typeOfObject NGOVoid = Just NGLVoid
 typeOfObject (NGOList []) = Nothing
 typeOfObject (NGOList (v:_)) = NGList <$> typeOfObject v

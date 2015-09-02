@@ -6,27 +6,38 @@ module Interpretation.Count
 import Control.Applicative ((<$>))
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text.Encoding as T
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as L8
 
 import Language
 
 import Data.GFF
 import NGLess
+import FileManagement
 import Data.AnnotRes
 import Utils.Utils
 
 executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
-executeCount (NGOAnnotatedSet p) args = do
+executeCount (NGOAnnotatedSet annot_fp) args = do
     let c = lookup "counts" args
         NGOInteger m = lookupWithDefault (NGOInteger 0) "min" args
-    NGOAnnotatedSet <$> countAnnotatedSet p c m
+        del = "\t"
+    finter <- countAnnotatedSet annot_fp c m
+    cont <- liftIO $ BL.readFile finter
+    verbose <- boolOrTypeError "verbose arg in 'write'" $ lookupWithDefault (NGOBool False) "verbose" args
+    let cont' = if verbose
+                    then showGffCountDel del . readAnnotCounts $ cont
+                    else showUniqIdCounts del cont
+    (newfp,h) <- openNGLTempFile annot_fp "counts." "tsv"
+    liftIO $ BL.hPut h cont'
+    return $ NGOCounts newfp
 executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
 countAnnotatedSet :: FilePath -> Maybe NGLessObject -> Integer -> NGLessIO FilePath
-countAnnotatedSet p fs m = do
-    fc <- liftIO $ readPossiblyCompressedFile p
-    writeAnnotCount p $ _filterAnnot fc fs m
+countAnnotatedSet annot_fp fs m = do
+    fc <- liftIO $ readPossiblyCompressedFile annot_fp
+    writeAnnotCount annot_fp $ _filterAnnot fc fs m
 
 _filterAnnot :: L8.ByteString -> Maybe NGLessObject -> Integer -> [GffCount]
 _filterAnnot fc fs minval = filter _filterAnnot' $ readAnnotCounts fc

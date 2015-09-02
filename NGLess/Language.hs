@@ -119,6 +119,7 @@ data NGLessObject =
         | NGOMappedReadSet FilePath (Maybe T.Text) -- ^ This is represented by a SAM file on disk + optional reference information
         | NGOMappedRead SamLine
         | NGOAnnotatedSet FilePath
+        | NGOCounts FilePath
         | NGOVoid
         | NGOList [NGLessObject]
     deriving (Eq, Show, Ord)
