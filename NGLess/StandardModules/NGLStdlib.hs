@@ -17,8 +17,14 @@ import NGLess
 loadStdlibModules :: [ModInfo] -> NGLessIO [Module]
 loadStdlibModules = mapM loadModules1
 
+externalModules =
+        ["example-cmd"
+        ,"motus"
+        ]
+
 loadModules1 (ModInfo "example" version) = Example.loadModule version
 loadModules1 (ModInfo "batch" version) = Batch.loadModule version
-loadModules1 (ModInfo "example-cmd" version) = Ext.loadModule "example-cmd" version
+loadModules1 (ModInfo mname version)
+    | mname `elem` externalModules = Ext.loadModule mname version
 loadModules1 (ModInfo modname _) = throwScriptError ("Could not load module " ++show modname)
 
