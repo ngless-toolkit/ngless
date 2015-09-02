@@ -16,4 +16,5 @@ Welcome to ngless's documentation!
    Visualization
    Language
    Functions
+   faq
    advanced
