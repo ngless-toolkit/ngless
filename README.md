@@ -32,10 +32,15 @@ Cabal version 1.18 or higher is necessary.
 Running `make` should build a sandbox and download/install all dependencies
 into it.
 
+## More information
 
+- [Full documentation](http://ngless.readthedocs.org/en/latest/)
+- [Frequently Asked Questions (FAQ)](http://ngless.readthedocs.org/en/latest/faq.html)
+- [ngless webpage](http://luispedro.github.io/ngless/)
 
 ## Authors
 
-- [Luis Pedro Coelho](http://luispedro.org) [coelho@embl.de](mailto:coelho@embl.de) [@luispedrocoelho](https://twitter.com/luispedrocoelho)
+- [Luis Pedro Coelho](http://luispedro.org) (email: [coelho@embl.de](mailto:coelho@embl.de)) (on twitter: [@luispedrocoelho](https://twitter.com/luispedrocoelho))
 - Paulo Monteiro
 - [Ana Teresa Freitas](http://web.tecnico.ulisboa.pt/ana.freitas/)
+
