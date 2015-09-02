@@ -1,0 +1,18 @@
+version: '0.0.0'
+name: 'motus'
+command:
+    nglName: "testing"
+    arg0: 'run-python.sh'
+    arg1:
+        filetype: "tsv"
+        can_gzip: true
+    additional:
+        -
+            atype: 'filename'
+            name: 'ofile'
+            required: true
+
+check:
+    check_cmd: 'run-python.sh'
+
+
