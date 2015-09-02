@@ -32,6 +32,7 @@ data CommandArgument =
         CommandFlag T.Text Bool
         | CommandOption T.Text (Maybe T.Text) [T.Text]
         | CommandInteger T.Text (Maybe Integer)
+        | CommandString T.Text (Maybe T.Text) !Bool
     deriving (Eq, Show)
 
 instance FromJSON CommandArgument where
@@ -49,9 +50,21 @@ instance FromJSON CommandArgument where
             "int" -> do
                 def <- o .:? "def"
                 return (CommandInteger name def)
+            "str" -> do
+                def <- o .:? "def"
+                required <- o .: "required"
+                return (CommandString name def required)
             _ -> fail ("unknown argument type "++atype)
 
-data FileTypeBase = FastqFileSingle | FastqFilePair | FastqFileTriplet | SamFile | BamFile | SamOrBamFile deriving (Eq,Show)
+data FileTypeBase =
+    FastqFileSingle
+    | FastqFilePair
+    | FastqFileTriplet
+    | SamFile
+    | BamFile
+    | SamOrBamFile
+    | TSVFile
+    deriving (Eq,Show)
 
 instance FromJSON FileTypeBase where
     parseJSON = withText "filetypebase" $ \case
@@ -61,6 +74,7 @@ instance FromJSON FileTypeBase where
         "sam" -> return SamFile
         "bam" -> return BamFile
         "sam_or_bam" -> return SamOrBamFile
+        "tsv" -> return TSVFile
         ft -> fail ("unknown file type '"++T.unpack ft++"'")
 
 data FileType = FileType
@@ -135,16 +149,19 @@ asNGLType' FastqFileTriplet = NGLReadSet
 asNGLType' SamFile = NGLMappedReadSet
 asNGLType' BamFile = NGLMappedReadSet
 asNGLType' SamOrBamFile = NGLMappedReadSet
+asNGLType' TSVFile = NGLCounts
 
 asArgInfo (CommandFlag name _) = ArgInformation name False NGLBool Nothing
 asArgInfo (CommandOption name _ allowed) = ArgInformation name False NGLSymbol (Just allowed)
 asArgInfo (CommandInteger name _) = ArgInformation name False NGLInteger Nothing
+asArgInfo (CommandString name _ req) = ArgInformation name req NGLString Nothing
 
 executeCommand :: FilePath -> Command -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCommand basedir cmd input args = do
     paths <- asfilePaths input
+    paths' <- liftIO $ mapM canonicalizePath paths
     args' <- argsArguments cmd args
-    let cmdline = (paths ++ args')
+    let cmdline = (paths' ++ args')
         process = (proc (arg0 cmd) cmdline) { cwd = Just basedir }
     outputListLno' TraceOutput ("executing command: ":arg0 cmd:cmdline)
     (exitCode, out, err) <- liftIO $
@@ -155,7 +172,8 @@ executeCommand basedir cmd input args = do
 asfilePaths (NGOReadSet1 _ fp) = return [fp]
 asfilePaths (NGOReadSet2 _ fp1 fp2) = return [fp1, fp2]
 asfilePaths (NGOReadSet3 _ fp1 fp2 fp3) = return [fp1, fp2, fp3]
-asfilePaths _ = throwShouldNotOccur ("cannot use this type" :: T.Text)
+asfilePaths (NGOCounts fp) = return [fp]
+asfilePaths invalid = throwShouldNotOccur ("AsFile path got "++show invalid)
 
 argsArguments cmd args = catMaybes <$> forM (additional cmd) a1
     where
@@ -172,7 +190,9 @@ argsArguments cmd args = catMaybes <$> forM (additional cmd) a1
                 Nothing -> return Nothing
                 Just (NGOInteger v) -> return . Just $ "--"++T.unpack name++"="++show v
                 _ -> throwShouldNotOccur ("in command module, int expected" :: T.Text)
-
+        a1 (CommandString name def req) = case lookup name args <|> (NGOString <$> def) of
+                Just (NGOString v) -> return . Just $ "--"++T.unpack name++"="++T.unpack v
+                _ -> throwShouldNotOccur ("in command module, string expected" :: T.Text)
 
 asInternalModule :: ExternalModule -> NGLessIO Module
 asInternalModule em@ExternalModule{..} = do
