@@ -140,7 +140,7 @@ updateConfigurationOpts _ config = config
 
 nglConfigurationRef :: IORef NGLessConfiguration
 {-# NOINLINE nglConfigurationRef #-}
-nglConfigurationRef = unsafePerformIO (newIORef (error "not yet"))
+nglConfigurationRef = unsafePerformIO (newIORef (error "Configuration not yet set"))
 
 nglConfiguration :: NGLessIO NGLessConfiguration
 nglConfiguration = liftIO $ readIORef nglConfigurationRef
