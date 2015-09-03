@@ -1,5 +1,7 @@
 # NGLess: NGS Processing with Less Work
 
+[![Join the chat at https://gitter.im/luispedro/ngless](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/luispedro/ngless?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 This is a domain-specific language for NGS (next-generation sequencing data)
 processing.
 
