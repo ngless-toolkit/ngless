@@ -20,6 +20,8 @@ tgroup_Annotation = $(testGroupGenerator)
 
 ngo_gff_fp = "test_samples/sample.gtf.gz"
 short_gff_fp = "test_samples/short.gtf"
+very_short_sam_fp = "test_samples/very_short.sam"
+very_short_gff_fp = "test_samples/very_short.gtf"
 
 compareFiles fa fb = liftIO $ do
     ca <- BL.readFile fa
@@ -64,11 +66,32 @@ case_annotate_gene_noStrand_inters_non_empty = testNGLessIO $ do
 
 
 case_annotate_gene_yesStrand_union = testNGLessIO $ do
-    a <- _annotate "test_samples/sample.sam" ngo_gff_fp $ AnnotationOpts gff_features_gene (_annotationRule IntersectNonEmpty) True True
+    a <- _annotate "test_samples/sample.sam" ngo_gff_fp $ AnnotationOpts gff_features_gene (_annotationRule IntersectUnion) True True
     NGOAnnotatedSet p <- executeWrite (NGOAnnotatedSet a) args
     compareFiles p "test_samples/htseq-res/htseq_gene_yesStrand_union.txt"
   where args = [("ofile", NGOString ofile),("verbose", NGOBool False)]
-        ofile = "test_samples/htseq-res/htseq_gene_yesStrand_union.txt"
+        ofile = "test_samples/htseq-res/ngless_gene_yesStrand_union.txt"
+
+case_annotate_gene_yesStrand_nempty = testNGLessIO $ do
+    a <- _annotate "test_samples/sample.sam" ngo_gff_fp $ AnnotationOpts gff_features_gene (_annotationRule IntersectNonEmpty) True True
+    NGOAnnotatedSet p <- executeWrite (NGOAnnotatedSet a) args
+    compareFiles p "test_samples/htseq-res/htseq_gene_yesStrand_nempty.txt"
+  where args = [("ofile", NGOString ofile),("verbose", NGOBool False)]
+        ofile = "test_samples/htseq-res/ngless_gene_yesStrand_nempty.txt"
+
+case_annotate_gene_yesStrand_union_very_short = testNGLessIO $ do
+    a <- _annotate very_short_sam_fp very_short_gff_fp $ AnnotationOpts gff_features_gene (_annotationRule IntersectUnion) True True
+    NGOAnnotatedSet p <- executeWrite (NGOAnnotatedSet a) args
+    compareFiles p "test_samples/htseq-res/htseq_gene_yesStrand_union_very_short.txt"
+  where args = [("ofile", NGOString ofile),("verbose", NGOBool False)]
+        ofile = "test_samples/htseq-res/ngless_gene_yesStrand_union.txt"
+
+case_annotate_gene_yesStrand_nempty_very_short = testNGLessIO $ do
+    a <- _annotate very_short_sam_fp very_short_gff_fp $ AnnotationOpts gff_features_gene (_annotationRule IntersectNonEmpty) True True
+    NGOAnnotatedSet p <- executeWrite (NGOAnnotatedSet a) args
+    compareFiles p "test_samples/htseq-res/htseq_gene_yesStrand_nempty_very_short.txt"
+  where args = [("ofile", NGOString ofile),("verbose", NGOBool False)]
+        ofile = "test_samples/htseq-res/ngless_gene_yesStrand_union.txt"
 
 case_annotate_gene_yesStrand_union_short = testNGLessIO $ do
     a <- _annotate "test_samples/sample.sam" short_gff_fp $ AnnotationOpts gff_features_gene (_annotationRule IntersectUnion) True True

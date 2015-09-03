@@ -6,6 +6,9 @@
 /htseq_gene_noStrand_union.txt
 /htseq_gene_yesStrand_union.txt
 /htseq_gene_yesStrand_union_short.txt
+/htseq_gene_yesStrand_nempty.txt
+/htseq_gene_yesStrand_nempty_very_short.txt
+/htseq_gene_yesStrand_union_very_short.txt
 
 /ngless_cds_noStrand_union.txt
 /ngless_exon_noStrand_union.txt
