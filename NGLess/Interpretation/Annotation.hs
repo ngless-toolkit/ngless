@@ -7,12 +7,13 @@ module Interpretation.Annotation
     , _annotate
     , _annotationRule
     , _intersection_strict
-    , _intersection_non_empty
     , _matchFeatures
     , _allSameId
     ) where
 
 
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
 
@@ -21,25 +22,26 @@ import qualified Data.IntervalMap.Generic.Strict as IMG
 import qualified Data.Map.Strict as M
 
 import Control.Applicative
-import Control.DeepSeq
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
-
+import System.IO
 import ReferenceDatabases
 import Output
 
 import Data.GFF
 import Data.Sam (SamLine(..), isAligned, isPositive, readAlignments)
-import Data.AnnotRes
 import Language
+import FileManagement
 import NGLess
 import Utils.Utils
+import Data.Annotation
 
-type GffIMMap = IM.IntervalMap Int [GffCount]
+type AnnotationInfo = (GffStrand, B.ByteString)
+type GffIMMap = IM.IntervalMap Int [AnnotationInfo]
 -- AnnotationMap maps from `GffType` to `References` (e.g., chromosomes) to positions to (features/count)
 type AnnotationMap = M.Map GffType (M.Map B8.ByteString GffIMMap)
 
-type AnnotationRule = GffIMMap -> (Int, Int) -> GffIMMap
+type AnnotationRule = GffIMMap -> GffStrand -> (Int, Int) -> [AnnotationInfo]
 
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
@@ -66,7 +68,7 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
     m <- _annotationRule <$> parseAnnotationMode args
     g <- evalMaybeString $ lookup "gff" args
     gff <- whichAnnotationFile g dDS
-    NGOAnnotatedSet <$> _annotate e gff AnnotationOpts
+    uncurry NGOAnnotatedSet <$> _annotate e gff AnnotationOpts
                 { optFeatures = map matchingFeature fs
                 , optIntersectMode = m
                 , optStrandSpecific = strand_specific
@@ -78,7 +80,7 @@ parseAnnotationMode :: KwArgsValues -> NGLessIO AnnotationIntersectionMode
 parseAnnotationMode args = case lookupWithDefault (NGOSymbol "union") "mode" args of
     (NGOSymbol "union") -> return  IntersectUnion
     (NGOSymbol "intersection_strict") -> return IntersectUnion
-    (NGOSymbol "intersection_non_empty") -> return  IntersectNonEmpty
+    (NGOSymbol "intersection_non_empty") -> return IntersectNonEmpty
     m -> throwScriptError (concat ["Unexpected annotation mode (", show m, ")."])
 
 whichAnnotationFile :: Maybe FilePath -- ^ explicitly passed GFF file
@@ -99,101 +101,105 @@ _annotationRule IntersectUnion = union
 _annotationRule IntersectStrict = _intersection_strict
 _annotationRule IntersectNonEmpty = _intersection_non_empty
 
-
-_annotate :: FilePath -> FilePath -> AnnotationOpts -> NGLessIO FilePath
+_annotate :: FilePath -> FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
 _annotate samFp gffFp opts = do
-        gffC <- liftIO $ intervals . filterFeats . readAnnotations <$> readPossiblyCompressedFile gffFp
-        samC <- liftIO $ filter isAligned . readAlignments <$> readPossiblyCompressedFile samFp
-        let res = calculateAnnotation gffC samC
-        writeAnnotCount samFp (toGffM res)
+        (newfp, h) <- openNGLTempFile samFp "annotated." "tsv"
+        (newfp_headers, h_headers) <- openNGLTempFile samFp "annotation_headers." "txt"
+        liftIO $ do
+            amap <- intervals .  filterFeats .  readAnnotations <$> readPossiblyCompressedFile gffFp
+            samC <- filter isAligned . readAlignments <$> readPossiblyCompressedFile samFp
+            BL.hPut h . BL.concat $ concatMap (map encodeAR . annotateSamLine opts amap) samC
+            hClose h
+
+            BL.hPut h_headers . BL.concat $ asHeaders amap
+            hClose h_headers
+
+            return (newfp, newfp_headers)
     where
         filterFeats = filter (_matchFeatures $ optFeatures opts)
-        calculateAnnotation :: AnnotationMap -> [SamLine] -> AnnotationMap
-        calculateAnnotation aMap sam = aMap `deepseq` compStatsAnnot aMap sam opts
 
-toGffM :: AnnotationMap -> [GffCount]
-toGffM = concat . concat . map IM.elems . concat . map (M.elems) . M.elems
 
-compStatsAnnot ::  AnnotationMap
-                    -> [SamLine] -- ^ input data
-                    -> AnnotationOpts
-                    -> AnnotationMap
-compStatsAnnot amap sam opts = foldl iterSam amap sam
+asHeaders :: AnnotationMap -> [BL.ByteString]
+asHeaders amap = map asHeaders' (M.assocs amap)
     where
-        iterSam am samline = M.map (M.alter alterCounts (samRName samline)) am
-            where
-                alterCounts Nothing = Nothing
-                alterCounts (Just v) = Just $ annotateLine v samline opts
 
-annotateLine :: GffIMMap -> SamLine -> AnnotationOpts -> GffIMMap
-annotateLine im samline opts = uCounts matching im
+        asHeaders' :: (GffType, M.Map B8.ByteString GffIMMap) -> BL.ByteString
+        asHeaders' (k,innermap) = BL.concat $ map (asHeaders'' k . snd) (M.assocs innermap)
+
+        asHeaders'' :: GffType -> GffIMMap -> BL.ByteString
+        asHeaders'' k im = BL.concat $ map (asHeaders''' k . snd) (IM.toAscList im)
+
+        asHeaders''' :: GffType -> [AnnotationInfo] -> BL.ByteString
+        asHeaders''' k vs = BL.concat [BL.fromChunks [B8.pack . show $ k, "\t", snd v, "\n"] | v <- vs]
+
+annotateSamLine :: AnnotationOpts -> AnnotationMap -> SamLine -> [AnnotatedRead]
+annotateSamLine opts amap samline = concatMap annotateSamLine' (M.assocs amap)
     where
+        rname = samRName samline
         sStart = samPos samline
-        sEnd   = sStart + (samCigLen samline) - 1
-        asStrand = if isPositive samline then GffPosStrand else GffNegStrand
-        matching = maybeFilterAmbiguous (optKeepAmbiguous opts) .
-                        maybeFilterStrand (optStrandSpecific opts) asStrand $ (optIntersectMode opts) im (sStart, sEnd)
+        sEnd   = sStart + samCigLen samline - 1
+        asStrand :: GffStrand
+        asStrand = if optStrandSpecific opts
+                        then if isPositive samline then GffPosStrand else GffNegStrand
+                        else GffUnStranded
+        annotateSamLine' (gtype,innermap) = case M.lookup rname innermap of
+            Nothing -> []
+            Just im -> map (buildAR gtype) . maybeFilterAmbiguous (optKeepAmbiguous opts)
+                        $ (optIntersectMode opts) im asStrand (sStart, sEnd)
+        buildAR gtype (_,name) = AnnotatedRead (samQName samline) name gtype asStrand
 
-maybeFilterStrand :: Bool -> GffStrand -> GffIMMap -> GffIMMap
-maybeFilterStrand True  s =  IMG.filter (not . null) . IMG.map (filterByStrand s)
-maybeFilterStrand False _ = id
 
+matchStrand :: GffStrand -> GffStrand -> Bool
+matchStrand GffUnStranded _ = True
+matchStrand _ GffUnStranded = True
+matchStrand a b = a == b
 
-maybeFilterAmbiguous  :: Bool -> GffIMMap -> GffIMMap
+maybeFilterAmbiguous  :: Bool -> [AnnotationInfo] -> [AnnotationInfo]
+maybeFilterAmbiguous _ [] = []
 maybeFilterAmbiguous True toU = toU
 maybeFilterAmbiguous False ms
-    | IMG.null ms = IM.empty
-    | _allSameId ms = (IM.fromList . take 1 . IM.toList) ms -- same feature multiple times, count just once
-    | otherwise = IM.empty -- ambiguous: discard
+    | _allSameId ms = [head ms]
+    | otherwise = [] -- ambiguous: discard
 
+filterStrand :: GffStrand -> [(IM.Interval Int, [AnnotationInfo])] -> [(IM.Interval Int, [AnnotationInfo])]
+filterStrand strand im = filter (not . null . snd) $ map (\(k,vs) ->
+    (k, filter (matchStrand strand . fst) vs)) im
 
-uCounts :: GffIMMap -> GffIMMap -> GffIMMap
-uCounts keys im = IM.foldlWithKey (\res k _ -> IM.adjust incCount k res) im keys
-    where
-        incCount []     = []
-        incCount (x:rs) = incCount' x : rs
-        incCount' (GffCount gId gT !gC gS) = (GffCount gId gT (gC + 1) gS)
-
---- Diferent modes
-
-union :: GffIMMap -> (Int, Int) -> GffIMMap
-union im (sS, sE) = IM.fromList $ IM.intersecting im intv
+union :: AnnotationRule
+union im strand (sS, sE) =  concatMap snd . (filterStrand strand) $ IM.intersecting im intv
     where intv = IM.ClosedInterval sS sE
 
-_intersection_strict :: GffIMMap -> (Int, Int) -> GffIMMap
-_intersection_strict im (sS, sE) = intersection' im'
-    where im' = map (IM.fromList . (IM.containing im)) [sS..sE]
+_intersection_strict :: AnnotationRule
+_intersection_strict im strand (sS, sE) = intersection' im'
+    where im' = map (IM.fromList . filterStrand strand . (IM.containing im)) [sS..sE]
 
-
-_intersection_non_empty :: GffIMMap -> (Int, Int) -> GffIMMap
-_intersection_non_empty im (sS, sE) = intersection' . filter (not . IMG.null) $ im'
-    where im' = map (IM.fromList . (IM.containing im)) [sS..sE]
-
-
-intersection' :: [GffIMMap] -> GffIMMap
-intersection' [] = IM.empty
-intersection' im = foldl (IM.intersection) (head im) im
-
-_allSameId :: GffIMMap -> Bool
-_allSameId im = all ((== sId) . annotSeqId) elems
+_intersection_non_empty :: AnnotationRule
+_intersection_non_empty im strand (sS, sE) = intersection' im'
     where
-        sId   = annotSeqId . head $ elems
-        elems = concat . IM.elems $ im
+        im' = map IM.fromList . filter (not . null) .  map (filterStrand strand . IM.containing subim) $ [sS..sE]
+        subim = IM.fromList $ IM.intersecting im intv
+        intv = IM.ClosedInterval sS sE
+
+intersection' :: [GffIMMap] -> [AnnotationInfo]
+intersection' [] = []
+intersection' im = concat . IM.elems $ foldl1 IM.intersection im
+
+_allSameId :: [AnnotationInfo] -> Bool
+_allSameId (ai:ais) = all ((==snd ai) . snd) ais
 
 intervals :: [GffLine] -> AnnotationMap
 intervals = foldl insertg M.empty
     where
         insertg am g = M.alter (updateF g) (gffType g) am
         updateF g mF = Just $ M.alter (updateChrMap g) (gffSeqId g) (fromMaybe M.empty mF)
-        updateChrMap g v  = Just $ insertZeroCount g (fromMaybe IM.empty v)
+        updateChrMap g v  = Just $ insertGffLine g (fromMaybe IM.empty v)
 
-
-insertZeroCount :: GffLine -> GffIMMap -> GffIMMap
-insertZeroCount g im = IM.alter insertZeroCount' asInterval im
+insertGffLine :: GffLine -> GffIMMap -> GffIMMap
+insertGffLine g = IM.alter insertGffLine' asInterval
     where
-        insertZeroCount' Nothing  = Just [count]
-        insertZeroCount' (Just v) = Just (count:v)
-        count = GffCount (gffId g) (gffType g) 0 (gffStrand g)
+        insertGffLine' Nothing  = Just [annot]
+        insertGffLine' (Just vs) = Just (annot:vs)
+        annot = (gffStrand g, gffId g)
         asInterval :: IM.Interval Int
         asInterval = IM.ClosedInterval (gffStart g) (gffEnd g)
 

@@ -37,8 +37,16 @@ instance Show GffType where
     show GffCDS  = "CDS"
     show (GffOther b) = B.unpack b
 
+instance Read GffType where
+    readsPrec _ = r
+        where
+            r "exon" = [(GffExon, "")]
+            r "gene" = [(GffGene, "")]
+            r "CDS" = [(GffCDS, "")]
+            r other = [(GffOther (S8.pack other), "")]
+
 data GffStrand = GffPosStrand | GffNegStrand | GffUnknownStrand | GffUnStranded
-            deriving (Eq, Show, Enum)
+            deriving (Eq, Show, Read, Enum)
 
 
 data GffLine = GffLine

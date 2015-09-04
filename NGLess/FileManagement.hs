@@ -6,6 +6,7 @@ module FileManagement
     , openNGLTempFile'
     , setupHtmlViewer
     , takeBaseNameNoExtensions
+    , nglMaybeCopyFile
     ) where
 
 import qualified Data.ByteString as BS
@@ -105,3 +106,8 @@ copyDir src dst = do
         then copyDir  (src </> n) (dst </> n)
         else copyFile (src </> n) (dst </> n)
 
+
+nglMaybeCopyFile :: FilePath -> FilePath -> NGLessIO ()
+nglMaybeCopyFile old new
+    | new == old = return()
+    | otherwise = liftIO (copyFile old new)

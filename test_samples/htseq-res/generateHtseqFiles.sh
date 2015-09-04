@@ -76,10 +76,12 @@ $PYTHON -m HTSeq.scripts.count ../sample.sam ../sample.gtf -a 0 -s yes -t gene -
 
 $PYTHON -m HTSeq.scripts.count ../sample.sam ../short.gtf -a 0 -s yes -t gene -m union | filterEndL 5 > htseq_gene_yesStrand_union_short.txt
 
-# Very short test (regression test)
+# Very short tests (regression tests)
 $PYTHON -m HTSeq.scripts.count ../very_short.sam ../very_short.gtf -a 0 -s yes -t gene -m union | filterEndL 5 > htseq_gene_yesStrand_union_very_short.txt
+
 $PYTHON -m HTSeq.scripts.count ../very_short.sam ../very_short.gtf -a 0 -s yes -t gene -m intersection-nonempty | filterEndL 5 > htseq_gene_yesStrand_nempty_very_short.txt
+$PYTHON -m HTSeq.scripts.count ../very_short.sam ../very_short.gtf -a 0 -s no -t gene -m intersection-nonempty | filterEndL 5 > htseq_gene_noStrand_nempty_very_short.txt
 
-
+$PYTHON -m HTSeq.scripts.count ../nonempty_diff.sam ../nonempty_diff.gtf -a 0 -s no -t gene -m intersection-nonempty | filterEndL 5 > htseq_gene_noStrand_inters-nempty_diff.txt
 
 exit 0

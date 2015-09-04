@@ -24,10 +24,10 @@ import Data.List (isInfixOf)
 import Data.Maybe
 
 import Language
+import FileManagement
 import Configuration
 import NGLess
 import Output
-import Data.AnnotRes
 import Utils.Utils
 
 removeEnd :: String -> String -> String
@@ -101,17 +101,17 @@ executeWrite el@(NGOMappedReadSet fp defGen) args = do
         NGOSymbol s -> throwScriptError (T.concat ["write does not accept format {", s, "} with input type ", T.pack . show $ el])
         _ -> throwShouldNotOccur ("Type checking fail: format argument is not a symbol for write()" :: String)
 
-executeWrite (NGOAnnotatedSet fp) args = do
+executeWrite (NGOAnnotatedSet fp headers) args = do
     newfp <- getOFile args
-    del <- getDelimiter $ lookupWithDefault (NGOSymbol "tsv") "format" args
     outputListLno' InfoOutput ["Writing AnnotatedSet to: ", newfp]
-    cont <- liftIO $ readPossiblyCompressedFile fp
-    verbose <- boolOrTypeError "verbose arg in 'write'" $ lookupWithDefault (NGOBool False) "verbose" args
-    let cont' = if verbose
-                    then showGffCountDel del . readAnnotCounts $ cont
-                    else showUniqIdCounts del cont
-    liftIO $ BL.writeFile newfp cont'
-    return $ NGOAnnotatedSet newfp
+    nglMaybeCopyFile fp newfp
+    return $ NGOAnnotatedSet newfp headers
+
+executeWrite (NGOCounts fp) args = do
+    newfp <- getOFile args
+    outputListLno' InfoOutput ["Writing counts to: ", newfp]
+    nglMaybeCopyFile fp newfp
+    return $ NGOCounts newfp
 
 executeWrite v _ = throwShouldNotOccur ("Error: executeWrite of " ++ show v ++ " not implemented yet.")
 

@@ -18,7 +18,6 @@ import System.Directory (removeFile
                         ,createDirectoryIfMissing
                         ,doesFileExist
                         )
-import System.FilePath.Posix((</>))
 import System.Console.CmdArgs.Verbosity
 
 import qualified Data.ByteString.Char8 as B
@@ -26,9 +25,6 @@ import qualified Data.ByteString.Lazy.Char8 as L
 
 
 import Data.Convertible
-
-import qualified Data.IntervalMap.Strict as IM
-import qualified Data.IntervalMap.Interval as IM
 
 import qualified Data.Vector.Unboxed as V
 
@@ -38,12 +34,9 @@ import Tokens
 import Types
 import Substrim
 import FileManagement
-import Interpretation.Annotation
-import Interpretation.Count
 import VectorOperations
 import Data.FastQStatistics
 import Interpretation.FastQ
-import ReferenceDatabases
 import Configuration
 import NGLess
 
@@ -52,7 +45,6 @@ import Unique
 
 import Data.FastQ
 import Data.Sam
-import Data.AnnotRes
 import Utils.Utils
 import qualified Data.GFF as GFF
 
@@ -295,110 +287,6 @@ case_cigar_to_length_1 = cigarTLen "18M2D19M" @?= 39
 case_cigar_to_length_2 = cigarTLen "37M" @?= 37
 case_cigar_to_length_3 = cigarTLen "3M1I3M1D5M" @?= 12
 
---- Count operation
-
-ds_annot_gene = "x\tgene\t10\t+\n"
-ds_annot_cds = "x\tCDS\t11\t+\n"
-ds_annot_exon = "x\texon\t12\t+\n"
-ds_annot_counts = L.concat [ds_annot_gene, ds_annot_cds, ds_annot_exon]
-
-annot_features_gene = Just (NGOList  [ NGOSymbol "gene" ])
-annot_features_cds =  Just (NGOList  [ NGOSymbol "cds"  ])
-annot_features_exon = Just (NGOList  [ NGOSymbol "exon" ])
-
-annot_features_gene_cds = Just (NGOList  [ NGOSymbol "gene", NGOSymbol "cds" ])
-annot_features_cds_exon = Just (NGOList  [ NGOSymbol "exon", NGOSymbol "cds" ])
-
-annot_features_all =  Just (NGOList  [ NGOSymbol "gene", NGOSymbol "cds", NGOSymbol "exon" ])
-
-
-case_annot_count_none = _filterAnnot ds_annot_counts Nothing 0 @?= readAnnotCounts ds_annot_counts
-case_annot_count_all = _filterAnnot ds_annot_counts annot_features_all 0 @?= readAnnotCounts ds_annot_counts
-
--- simple case. Filter all but one element
-case_annot_count_gene = _filterAnnot ds_annot_counts annot_features_gene 0 @?= readAnnotCounts ds_annot_gene
-case_annot_count_cds = _filterAnnot ds_annot_counts annot_features_cds 0 @?= readAnnotCounts ds_annot_cds
-case_annot_count_exon = _filterAnnot ds_annot_counts annot_features_exon 0 @?= readAnnotCounts ds_annot_exon
-
--- empty case
-case_annot_count_other_empty = _filterAnnot ds_annot_counts (Just (NGOList  [ NGOSymbol "other" ])) 0 @?= []
-
--- Filter all but one element
-case_annot_count_gene_cds = _filterAnnot ds_annot_counts annot_features_gene_cds 0 @?= (readAnnotCounts $ L.concat [ds_annot_gene, ds_annot_cds])
-case_annot_count_cds_exon = _filterAnnot ds_annot_counts annot_features_cds_exon 0 @?= (readAnnotCounts $ L.concat [ds_annot_cds, ds_annot_exon])
-
-
--- Min value of occurrences to count operation
-case_annot_count_lim_no_feat = _filterAnnot ds_annot_counts Nothing 30 @?= []
-case_annot_count_lim_feat = _filterAnnot ds_annot_counts annot_features_all 30 @?= []
-
-
--- interval mode 
---case_annot_interval_none = getIntervalQuery Nothing == IM.intersecting
-case_interval_map_subsumes_1 = IM.subsumes (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 3 6) @?= False
-case_interval_map_subsumes_2 = IM.subsumes (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 3 5) @?= True
-case_interval_map_subsumes_4 = IM.subsumes (IM.ClosedInterval (3 :: Integer) 5) (IM.ClosedInterval 1 500) @?= False
-case_interval_map_subsumes_3 = IM.subsumes (IM.ClosedInterval (1 :: Integer) 500) (IM.ClosedInterval 3 5) @?= True
-
-
-case_interval_map_overlaps_1 = IM.overlaps  (IM.ClosedInterval (1 :: Integer) 5) (IM.ClosedInterval 6 7) @?= False
-case_interval_map_overlaps_2 = IM.overlaps  (IM.ClosedInterval (3 :: Integer) 6) (IM.ClosedInterval 1 5) @?= True
-case_interval_map_overlaps_3 = IM.overlaps  (IM.ClosedInterval (300 :: Integer) 400) (IM.ClosedInterval 200 300) @?= True
-
-
-
-k1 = (IM.ClosedInterval 10 20, readAnnotCounts "x\tgene\t10\t+\n")
-k2 = (IM.ClosedInterval 1 5,   readAnnotCounts "y\tgene\t10\t+\n")
-k3 = (IM.ClosedInterval 30 30, readAnnotCounts "x\tgene\t20\t+\n")
-k4 = (IM.ClosedInterval 2 20, readAnnotCounts "x\tgene\t20\t+\n")
-
-
-imap1   = IM.fromList [k1]
-imap2   = IM.fromList [k2]
-imap4   = IM.fromList [k4]
-imap12  = IM.fromList [k1, k2]
-imap14  = IM.fromList [k1, k4]
-imapAll = IM.fromList [k1, k2, k4]
-
-imap1Dup   = IM.fromList [k2, k2] -- same pair
-imap2Dup   = IM.fromList [k1, k3] -- same pair
-imap3Dup   = IM.fromList [k1, k3, k1] -- same id
-
-
---
--- k1           ----------
--- k2 -----
--- k4   ------------------
-
--- intersection_strict
-case_intersection_strict_empty       = _intersection_strict IM.empty (1,10)  @?= IM.empty
-case_intersection_strict_one_empty_1 = _intersection_strict imap12  (1,20)  @?= IM.empty
-case_intersection_strict_one_empty_2 = _intersection_strict imap12  (15,21) @?= IM.empty
-
-case_intersection_strict_dif      = _intersection_strict imap12 (4,11)  @?= IM.empty
-case_intersection_strict_normal_1 = _intersection_strict imap12 (12,15) @?= imap1
-case_intersection_strict_normal_2 = _intersection_strict imap12 (15,20) @?= imap1
-case_intersection_strict_same     = _intersection_strict imapAll (12, 18) @?= imap14
-
-
--- intersection_non_empty
-case_intersection_nonempty_empty   = _intersection_non_empty IM.empty (0,10)  @?= IM.empty
-case_intersection_nonempty_empty_1 = _intersection_non_empty imap1    (15,20) @?= imap1
-case_intersection_nonempty_empty_2 = _intersection_non_empty imap12   (2,7)   @?= imap2
-
-case_intersection_nonempty_dif      = _intersection_non_empty imap12 (0,20) @?= IM.empty
-case_intersection_nonempty_normal_1 = _intersection_non_empty imap14 (7,15) @?= imap4
-case_intersection_nonempty_same     = _intersection_non_empty imap14 (12,15) @?= imap14
-
-
-
-case_size_no_dup_normal = _allSameId imapAll @?= False
-
-case_size_no_dup_duplicate_1 = _allSameId imap1Dup @?= True
-case_size_no_dup_duplicate_2 = _allSameId imap2Dup @?= True
-case_size_no_dup_duplicate_3 = _allSameId imap3Dup @?= True
-
-
 ----- VectorOperations.hs
 case_zero_vec = do
   v <- zeroVec 4 >>= V.freeze
@@ -410,7 +298,7 @@ case_calc_sam_stats = do
 
 --- Unique.hs
 
---File "test_samples/data_set_repeated.fq" has 216 reads in which 54 are unique. 
+--File "test_samples/data_set_repeated.fq" has 216 reads in which 54 are unique.
 
 case_num_files_1 = do
   n <- _numFiles "test_samples/data_set_repeated.fq"
@@ -479,13 +367,6 @@ case_test_setup_html_view = do
     removeDirectoryRecursive "testing_tmp_dir_html/"
 
 -- MapOperations
-
--- install genome User mode
-case_install_genome_user_mode = testNGLessIO $ do
-  r1 <- installData (Just User) "sacCer3"
-  p <- (</> "sacCer3") <$> userDataDirectory
-  liftIO (r1 @?= p)
-
 
 -- ProcessFastQ
 low_char_int = (lc . statsFromFastQ) <$> readPossiblyCompressedFile "test_samples/sample.fq.gz"

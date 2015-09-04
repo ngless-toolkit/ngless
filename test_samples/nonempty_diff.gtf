@@ -1,0 +1,2 @@
+X	protein_coding	gene	1	1000	.	+	.	gene_id "WBGene00010199"; gene_name "bet-2"; gene_source "ensembl"; gene_biotype "protein_coding";
+X	ncRNA	gene	500	800	.	+	.	gene_id "WBGene00200937"; gene_name "F57C7.13"; gene_source "ensembl"; gene_biotype "ncRNA";

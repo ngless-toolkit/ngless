@@ -9,13 +9,5 @@
 /htseq_gene_yesStrand_nempty.txt
 /htseq_gene_yesStrand_nempty_very_short.txt
 /htseq_gene_yesStrand_union_very_short.txt
-
-/ngless_cds_noStrand_union.txt
-/ngless_exon_noStrand_union.txt
-/ngless_gene_noStrand_inters-nempty.txt
-/ngless_gene_noStrand_inters-strict.txt
-/ngless_gene_noStrand_union.txt
-/ngless_gene_yesStrand_union.txt
-/ngless_gene_yesStrand_nempty.txt
-/ngless_gene_yesStrand_nstrict.txt
-/ngless_gene_yesStrand_union_short.txt
+/htseq_gene_noStrand_inters-nempty_diff.txt
+/htseq_gene_noStrand_nempty_very_short.txt
