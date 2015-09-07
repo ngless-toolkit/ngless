@@ -22,7 +22,7 @@ import NGLess
 import Utils.Utils
 import Data.Sam
 
-data SelectCondition = SelectMapped | SelectUnmapped
+data SelectCondition = SelectMapped | SelectUnmapped | SelectUnique
     deriving (Eq, Show)
 
 data MatchCondition = KeepIf [SelectCondition] | DropIf [SelectCondition]
@@ -41,6 +41,7 @@ _parseConditions args = do
     where
         asSC (NGOSymbol "mapped") = return SelectMapped
         asSC (NGOSymbol "unmapped") = return SelectUnmapped
+        asSC (NGOSymbol "unique") = return SelectUnique
         asSC c = throwShouldNotOccur ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
 
 _matchConditions :: MatchCondition -> SamLine -> Bool
@@ -50,6 +51,7 @@ _matchConditions (KeepIf keep_if) samline = all (_match1 samline) keep_if
 
 _match1 samline SelectMapped = isAligned samline
 _match1 samline SelectUnmapped = not $ isAligned samline
+_match1 samline SelectUnique = isUnique samline
 
 executeSelect :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSelect (NGOMappedReadSet fpsam ref) args = do
@@ -58,6 +60,7 @@ executeSelect (NGOMappedReadSet fpsam ref) args = do
         Just (NGOString fname) -> let fname' = T.unpack fname in
                                     (fname',) <$> liftIO (openBinaryFile fname' WriteMode)
         Nothing -> openNGLTempFile fpsam "selected_" "sam"
+        _ -> throwShouldNotOccur ("Non-string argument in __oname variable" :: T.Text)
     liftIO $ do
         samcontents <- BL.lines <$> BL.readFile fpsam
         forM_ samcontents $ \line ->
