@@ -92,7 +92,7 @@ printHeader = putStr
     "http://luispedro.github.io/ngless\n"++
     "\n")
 
-optsExec :: NGLess -> IO ()
+optsExec :: NGLessModes -> IO ()
 optsExec opts@DefaultMode{} = do
     let fname = input opts
     let reqversion = isNothing $ script opts
@@ -144,7 +144,7 @@ optsExec (CreateReferencePackMode ofile gen gtf _) = runNGLessIO "creating refer
         outputLno' InfoOutput "Starting packaging (will download and index genomes)..."
         createReferencePack ofile gen gtf
 
-getModes :: Mode (CmdArgs NGLess)
+getModes :: Mode (CmdArgs NGLessModes)
 getModes = cmdArgsMode_ $ nglessModes
     += verbosity
     += summary sumtext

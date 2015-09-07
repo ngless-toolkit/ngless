@@ -105,7 +105,7 @@ setupTestConfiguration = do
     config <- guessConfiguration
     writeIORef nglConfigurationRef $ config { nConfTemporaryDirectory = "testing_tmp_dir", nConfKeepTemporaryFiles = True }
 
-initConfiguration :: NGLess -> IO ()
+initConfiguration :: NGLessModes -> IO ()
 initConfiguration opts = do
     config <- guessConfiguration
     config' <- updateConfiguration config (case opts of

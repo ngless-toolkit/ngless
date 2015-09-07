@@ -174,6 +174,11 @@ runNGLessIO act = do
         Right val -> return val
         Left err -> throwError err
 
+runNGLess :: NGLess a -> InterpretationROEnv a
+runNGLess act = case act of
+    Right val -> return val
+    Left err -> throwError err
+
 -- | By necessity, this code has several unreachable corners
 
 unreachable :: ( MonadError NGError m) => String -> m a
@@ -434,13 +439,7 @@ executePreprocess (NGOReadSet3 enc fp1 fp2 fp3) _args (Block [Variable var] bloc
 executePreprocess v _ _ = unreachable ("executePreprocess: Cannot handle this input: " ++ show v)
 
 executeMethod :: MethodName -> NGLessObject -> Maybe NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationROEnv NGLessObject
-executeMethod Mflag (NGOMappedRead samline) (Just (NGOSymbol flag)) [] = case getFlag flag of
-        Left err -> throwError err
-        Right f -> return (NGOBool $ f samline)
-    where
-        getFlag "mapped" = Right isAligned
-        getFlag "unmapped" = Right $ not . isAligned
-        getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
+executeMethod method (NGOMappedRead samline) arg kwargs = runNGLess (executeMappedReadMethod method samline arg kwargs)
 executeMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 

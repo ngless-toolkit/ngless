@@ -4,7 +4,7 @@
  -}
 module CmdArgs
     ( ColorSetting(..)
-    , NGLess(..)
+    , NGLessModes(..)
     , nglessModes
     ) where
 
@@ -25,7 +25,7 @@ instance CF.Configured ColorSetting where
     convert (CF.String "none") = Just NoColor
     convert _ = Nothing
 
-data NGLess =
+data NGLessModes =
         DefaultMode
               { debug_mode :: String
               , input :: String

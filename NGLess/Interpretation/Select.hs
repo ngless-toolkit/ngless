@@ -6,6 +6,7 @@
 
 module Interpretation.Select
     ( executeSelect
+    , executeMappedReadMethod
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -71,3 +72,12 @@ executeSelect (NGOMappedReadSet fpsam ref) args = do
         return (NGOMappedReadSet oname ref)
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
+executeMappedReadMethod :: MethodName -> SamLine -> Maybe NGLessObject -> KwArgsValues -> NGLess NGLessObject
+executeMappedReadMethod Mflag samline (Just (NGOSymbol flag)) [] = do
+        f <- getFlag flag
+        return (NGOBool $ f samline)
+    where
+        getFlag "mapped" = return isAligned
+        getFlag "unmapped" = return (not . isAligned)
+        getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
+executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")

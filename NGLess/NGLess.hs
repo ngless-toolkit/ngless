@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 module NGLess
     ( NGLessIO
+    , NGLess
     , NGError(..)
     , throwShouldNotOccur
     , throwScriptError
@@ -35,6 +36,8 @@ data NGError = NGError !NGErrorType !T.Text
         deriving (Show, Eq)
 
 type NGLessIO = ExceptT NGError (ResourceT IO)
+type NGLess = Either NGError
+
 type KwArgsValues = [(T.Text, NGLessObject)]
 
 testNGLessIO :: NGLessIO a -> IO a
