@@ -68,7 +68,7 @@ nglessArgs = record DefaultMode{}
         , script := Nothing += name "e"
         , trace_flag := Nothing += name "trace"
         , print_last := False += name "p"
-        , nThreads := 1 += name "n"
+        , nThreads := 1 += name "n" += name "j"
         , output_directory := Nothing += name "o"
         , temporary_directory := Nothing += name "t"
         , keep_temporary_files := Nothing
