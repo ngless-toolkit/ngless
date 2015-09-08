@@ -55,7 +55,7 @@ mapToReference refIndex fps = do
     outputListLno' DebugOutput ["Write .sam file to: ", newfp]
     bwaPath <- bwaBin
     let cmdargs =  ["mem","-t", show numCapabilities, refIndex] ++ fps
-    outputListLno' TraceOutput (["Calling binary ", bwaPath, " with args: "] ++ cmdargs)
+    outputListLno' TraceOutput ["Calling binary ", bwaPath, " with args: ", unwords cmdargs]
     (err, exitCode) <- liftIO $ do
         (_, _, Just herr, jHandle) <-
             createProcess (
