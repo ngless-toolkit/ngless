@@ -2,39 +2,42 @@ module Data.Sam
     (
  SamLine(..)
  , SamResult(..)
- , isAligned
+ , samLength
  , readAlignments
  , readSamLine
+ , isAligned
  , isUnique
- , cigarTLen
- , hasQual
  , isPositive
  , isNegative
+ , hasQual
+ , matchIdentity
 ) where
 
 
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as L8
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
 
 import Data.Bits (testBit)
+import Data.Maybe
 
 import Control.DeepSeq
 
 
 data SamLine = SamLine
-            { samQName :: S.ByteString
+            { samQName :: !S.ByteString
             , samFlag :: !Int
-            , samRName :: S.ByteString
+            , samRName :: !S.ByteString
             , samPos :: !Int
             , samMapq :: !Int
-            , samCigLen :: !Int
-            , samRNext :: S.ByteString
+            , samCigar :: !S.ByteString
+            , samRNext :: !S.ByteString
             , samPNext :: !Int
             , samTLen :: !Int
-            , samSeq :: S.ByteString
-            , samQual :: S.ByteString
+            , samSeq :: !S.ByteString
+            , samQual :: !S.ByteString
             } deriving (Eq, Show, Ord)
 
 
@@ -43,6 +46,8 @@ instance NFData SamLine where
 
 
 data SamResult = Total | Aligned | Unique | LowQual deriving (Enum)
+
+samLength = B8.length . samSeq
 
 -- log 2 of N
 -- 4 -> 2
@@ -88,7 +93,7 @@ readSamLine line = case L8.split '\t' line of
                 (strict tk2)
                 (readInt tk3)
                 (readInt tk4)
-                (cigarTLen $ strict tk5)
+                (strict tk5)
                 (strict tk6)
                 (readInt tk7)
                 (readInt tk8)
@@ -100,11 +105,7 @@ strict :: L.ByteString -> S.ByteString
 strict = S.concat . L.toChunks
 
 
--- Discard 'I' since it does not represent anything in size.
-cigarTLen :: S.ByteString -> Int
-cigarTLen c = calcLen c [] 0
-
-{-- 
+{--
 Op     Description
 M alignment match (can be a sequence match or mismatch).
 I insertion to the reference
@@ -117,19 +118,20 @@ P padding (silent deletion from padded reference).
 X sequence mismatch.
 --}
 
-calcLen s _ acc | S8.null s = acc
-calcLen s val acc = case S8.head s of
-        'M' -> calc' $ (read val) + acc
-        'D' -> calc' $ (read val) + acc
-        'N' -> calc' $ (read val) + acc
-        'X' -> calc' $ (read val) + acc
-        'P' -> calc' $ (read val) + acc
-        '=' -> calc' $ (read val) + acc
-        'H' -> calc' acc -- ignore
-        'S' -> calc' acc
-        'I' -> calc' acc
-        _  -> calcLen sRest (val ++ [S8.head s]) acc 
-   where
-      calc' = calcLen sRest []
-      sRest = S8.tail s
+numberMismatches cigar
+    | B8.null cigar = 0
+    | otherwise = n' + numberMismatches rest
+        where
+            n' = if code `elem` "DHX" then n else 0
+            code = S8.head code_rest
+            rest = S8.tail code_rest
+            (n,code_rest) = fromMaybe
+                        (error ("could not parse cigar '"++S8.unpack cigar ++"'"))
+                        (S8.readInt cigar)
 
+matchIdentity :: SamLine -> Double
+matchIdentity samline = toDouble (len - errors) / toDouble len
+    where
+        len = samLength samline
+        toDouble = fromInteger . toInteger
+        errors = numberMismatches (samCigar samline)

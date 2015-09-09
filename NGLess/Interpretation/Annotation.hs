@@ -29,7 +29,7 @@ import ReferenceDatabases
 import Output
 
 import Data.GFF
-import Data.Sam (SamLine(..), isAligned, isPositive, readAlignments)
+import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readAlignments)
 import Language
 import FileManagement
 import NGLess
@@ -137,7 +137,7 @@ annotateSamLine opts amap samline = concatMap annotateSamLine' (M.assocs amap)
     where
         rname = samRName samline
         sStart = samPos samline
-        sEnd   = sStart + samCigLen samline - 1
+        sEnd   = sStart + samLength samline - 1
         asStrand :: GffStrand
         asStrand = if optStrandSpecific opts
                         then if isPositive samline then GffPosStrand else GffNegStrand

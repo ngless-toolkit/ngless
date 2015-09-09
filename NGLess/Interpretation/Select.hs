@@ -80,4 +80,9 @@ executeMappedReadMethod Mflag samline (Just (NGOSymbol flag)) [] = do
         getFlag "mapped" = return isAligned
         getFlag "unmapped" = return (not . isAligned)
         getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
+executeMappedReadMethod Mscore samline (Just (NGOSymbol scoref)) [] = case scoref of
+    "identity_pc" -> do
+        let identity = matchIdentity samline
+        return . NGOInteger . round $ 100 * identity
+    _ -> throwScriptError ("Unknown score function '"++T.unpack scoref++"'")
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
