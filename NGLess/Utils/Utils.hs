@@ -6,6 +6,7 @@
 
 module Utils.Utils
     ( lookupWithDefault
+    , uniq
     , readPossiblyCompressedFile
     , hWriteGZIP
     ) where
@@ -16,11 +17,14 @@ import System.IO
 
 import Control.Applicative ((<$>))
 
-import Data.List (isSuffixOf)
+import Data.List (isSuffixOf, group)
 import Data.Maybe (fromMaybe)
 
 lookupWithDefault :: Eq b => a -> b -> [(b,a)] -> a
 lookupWithDefault def key values = fromMaybe def $ lookup key values
+
+uniq :: Eq a => [a] -> [a]
+uniq = map head . group
 
 readPossiblyCompressedFile ::  FilePath -> IO BL.ByteString
 readPossiblyCompressedFile fname

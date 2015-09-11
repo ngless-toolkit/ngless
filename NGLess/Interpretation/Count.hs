@@ -27,12 +27,6 @@ import Data.GFF
 import Utils.Debug
 import Utils.Utils
 
-uniq [] = []
-uniq [a] = [a]
-uniq (a:b:rs)
-    | a /= b = a:uniq (b:rs)
-    | otherwise = uniq (b:rs)
-
 executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
 executeCount (NGOAnnotatedSet annot_fp headers_fp) args = do
