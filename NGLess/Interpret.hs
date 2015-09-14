@@ -193,7 +193,7 @@ interpret modules es = do
     odir <- outputDirectory
     liftIO $ setupHtmlViewer odir
     evalStateT (interpretIO $ es) (NGLInterpretEnv modules Map.empty)
-    outputListLno InfoOutput Nothing ["Ngless finished."]
+    outputListLno InfoOutput Nothing ["Interpretation finished."]
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
 interpretIO es = forM_ es $ \(ln,e) -> do
