@@ -95,14 +95,15 @@ distributeMM indices n current fractionResult = V.create $ do
     let Just current' = current
     ncounts <- VM.replicate n (0.0 :: Double)
     forM_ indices $ \case
-        [v] -> unsafeIncrement' ncounts v (1.0)
+        [v] -> unsafeIncrement' ncounts v 1.0
         vs -> when (isJust current) $ do
             let cs = map (V.unsafeIndex current') vs
                 cs_sum = sum cs
+                n_cs = convert (length cs)
                 adjust :: Double -> Double
                 adjust = if cs_sum > 0.0
-                            then (\v -> v / cs_sum)
-                            else const  (1.0 / convert (length cs))
+                            then (\c -> c / cs_sum)
+                            else const  (1.0 / n_cs)
             forM_ (zip vs cs) $ \(v,c) -> do
                 unsafeIncrement' ncounts v (adjust c)
     when fractionResult $
