@@ -12,10 +12,7 @@ import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Unboxed.Mutable as VM
 
 
-zeroVec n = do
-    vec <- VM.unsafeNew n
-    VM.set vec (0 :: Int)
-    return vec
+zeroVec n = VM.replicate n (0 :: Int)
 
 unsafeIncrement :: (Num a, PrimMonad m, VM.Unbox a) => VM.MVector (PrimState m) a -> Int -> m ()
 unsafeIncrement v i = unsafeIncrement' v i 1
