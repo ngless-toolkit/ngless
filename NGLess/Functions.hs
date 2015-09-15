@@ -38,6 +38,7 @@ writeArgs =
 countArgs =
     [ArgInformation "counts" False (NGList NGLSymbol) (Just ["gene", "cds", "exon"])
     ,ArgInformation "min" False NGLInteger Nothing
+    ,ArgInformation "multiple" False NGLSymbol (Just ["dist1", "1overN"])
     ]
 
 selectArgs =

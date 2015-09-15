@@ -21,7 +21,7 @@ import Data.Char
 import Data.Word
 
 import Data.FastQ
-import VectorOperations(zeroVec, unsafeIncrement)
+import Utils.Vector (zeroVec, unsafeIncrement)
 
 data Result =  Result
                 { bpCounts :: (Int, Int, Int, Int)

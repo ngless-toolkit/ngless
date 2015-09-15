@@ -64,7 +64,8 @@ _semicolon = char ';' *> skipMany (char ' ') *> pure TNewLine
 
 try_string s = try (string s)
 
-symbol = (char '{')  *> (TExpr . ConstSymbol . T.pack <$> variableStr) <* (char '}')
+symbol = char '{'  *> (TExpr . ConstSymbol . T.pack <$> many1 (char '_' <|> alphaNum)) <* char '}'
+
 tstring = tstring' '\'' <|> tstring' '"'
     where tstring' term = char term *> (TExpr . ConstStr <$> strtext term) <* char term
 strtext term = T.pack <$> many (escapedchar <|> noneOf [term])
@@ -99,7 +100,7 @@ word = try $ do
             | k `elem` constants -> TExpr . BuiltinConstant . Variable <$> k'
             | otherwise -> TWord <$> k'
 
-reservedwords = 
+reservedwords =
         ["if"
         ,"else"
         ,"ngless"
