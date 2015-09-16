@@ -34,7 +34,6 @@ import Tokens
 import Types
 import Substrim
 import FileManagement
-import VectorOperations
 import Data.FastQStatistics
 import Interpretation.FastQ
 import Configuration
@@ -46,6 +45,7 @@ import Unique
 import Data.FastQ
 import Data.Sam
 import Utils.Utils
+import Utils.Vector
 import qualified Data.GFF as GFF
 
 import Tests.Utils
@@ -179,16 +179,22 @@ case_uop_minus_2 = _evalUnary UOpMinus (NGOInteger (-10)) @?= Right (NGOInteger 
 case_template_id = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq"
 case_template    = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= "xpto_1"
 
-assertNotEqual a b = do
-    a' <- a 
-    b' <- b
-    mapM_ removeFile [a', b'] -- a' and b' creates a file, this line removes it.
-    assertBool "a' and b' should be different" (a' /= b')
-
 -- Sam operations
 
 samLineFlat = "IRIS:7:3:1046:1723#0\t4\t*\t0\t0\t37M\t*\t0\t0\tAAAAAAAAAAAAAAAAAAAAAAA\taaaaaaaaaaaaaaaaaa`aa`^\tAS:i:0  XS:i:0"
-samLine = SamLine {samQName = "IRIS:7:3:1046:1723#0", samFlag = 4, samRName = "*", samPos = 0, samMapq = 0, samCigLen = 37, samRNext = "*", samPNext = 0, samTLen = 0, samSeq = "AAAAAAAAAAAAAAAAAAAAAAA", samQual = "aaaaaaaaaaaaaaaaaa`aa`^"}   
+samLine = SamLine
+            { samQName = "IRIS:7:3:1046:1723#0"
+            , samFlag = 4
+            , samRName = "*"
+            , samPos = 0
+            , samMapq = 0
+            , samCigar = "37M"
+            , samRNext = "*"
+            , samPNext = 0
+            , samTLen = 0
+            , samSeq = "AAAAAAAAAAAAAAAAAAAAAAA"
+            , samQual = "aaaaaaaaaaaaaaaaaa`aa`^"
+            }
 
 case_isAligned_sam = isAligned (samLine {samFlag = 16}) @? "Should be aligned"
 case_isAligned_raw = isAligned (head . readAlignments $ r) @? "Should be aligned"
@@ -282,10 +288,6 @@ case_parse_gff_atributes_normal_2 = GFF.parseGffAttributes "gene_id=chrI;dbxref=
 case_parse_gff_atributes_trail_del = GFF.parseGffAttributes "gene_id=chrI;dbxref=NCBI:NC_001133;Name=chrI;" @?= [("gene_id","chrI"),("dbxref","NCBI:NC_001133"),("Name","chrI")]
 case_parse_gff_atributes_trail_del_space = GFF.parseGffAttributes "gene_id=chrI;dbxref=NCBI:NC_001133;Name=chrI; " @?= [("gene_id","chrI"),("dbxref","NCBI:NC_001133"),("Name","chrI")]
 
-
-case_cigar_to_length_1 = cigarTLen "18M2D19M" @?= 39
-case_cigar_to_length_2 = cigarTLen "37M" @?= 37
-case_cigar_to_length_3 = cigarTLen "3M1I3M1D5M" @?= 12
 
 ----- VectorOperations.hs
 case_zero_vec = do
