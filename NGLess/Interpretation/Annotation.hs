@@ -20,6 +20,7 @@ import qualified Data.Text as T
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.IntervalMap.Generic.Strict as IMG
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 
 import Control.Applicative
 import Control.Monad.IO.Class (liftIO)
@@ -111,7 +112,7 @@ _annotate samFp gffFp opts = do
             BL.hPut h . BL.concat $ concatMap (map encodeAR . annotateSamLine opts amap) samC
             hClose h
 
-            BL.hPut h_headers . BL.concat $ asHeaders amap
+            BL.hPut h_headers . BL.fromChunks $ asHeaders amap
             hClose h_headers
 
             return (newfp, newfp_headers)
@@ -119,18 +120,18 @@ _annotate samFp gffFp opts = do
         filterFeats = filter (_matchFeatures $ optFeatures opts)
 
 
-asHeaders :: AnnotationMap -> [BL.ByteString]
-asHeaders amap = map asHeaders' (M.assocs amap)
+asHeaders :: AnnotationMap -> [B.ByteString]
+asHeaders amap = S.toList . S.fromList $ concatMap asHeaders' (M.assocs amap)
     where
 
-        asHeaders' :: (GffType, M.Map B8.ByteString GffIMMap) -> BL.ByteString
-        asHeaders' (k,innermap) = BL.concat $ map (asHeaders'' k . snd) (M.assocs innermap)
+        asHeaders' :: (GffType, M.Map B8.ByteString GffIMMap) -> [B.ByteString]
+        asHeaders' (k,innermap) = concatMap (asHeaders'' k . snd) (M.assocs innermap)
 
-        asHeaders'' :: GffType -> GffIMMap -> BL.ByteString
-        asHeaders'' k im = BL.concat $ map (asHeaders''' k . snd) (IM.toAscList im)
+        asHeaders'' :: GffType -> GffIMMap -> [B.ByteString]
+        asHeaders'' k im = concatMap (asHeaders''' k . snd) (IM.toAscList im)
 
-        asHeaders''' :: GffType -> [AnnotationInfo] -> BL.ByteString
-        asHeaders''' k vs = BL.concat [BL.fromChunks [B8.pack . show $ k, "\t", snd v, "\n"] | v <- vs]
+        asHeaders''' :: GffType -> [AnnotationInfo] -> [B.ByteString]
+        asHeaders''' k vs = [B.concat [B8.pack . show $ k, "\t", snd v, "\n"] | v <- vs]
 
 annotateSamLine :: AnnotationOpts -> AnnotationMap -> SamLine -> [AnnotatedRead]
 annotateSamLine opts amap samline = concatMap annotateSamLine' (M.assocs amap)
