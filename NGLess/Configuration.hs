@@ -132,7 +132,7 @@ updateConfigurationOpts DefaultMode{..} config =
             , nConfKeepTemporaryFiles = ktemp
             , nConfOutputDirectory = odir
             , nConfTemporaryDirectory = tmpdir
-            , nConfPrintHeader = nConfPrintHeader config && not no_header
+            , nConfPrintHeader = nConfPrintHeader config && not no_header && not print_last
             , nConfColor = fromMaybe (nConfColor config) color
             , nConfSubsample = subsampleMode
             }
