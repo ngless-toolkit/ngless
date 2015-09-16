@@ -3,6 +3,12 @@
 shopt -s nullglob
 
 ok="yes"
+
+make
+if test $? -ne "0"; then
+   echo "ERROR IN 'make'"
+   ok=no
+fi
 make check
 if test $? -ne "0"; then
    echo "ERROR IN 'make check'"
