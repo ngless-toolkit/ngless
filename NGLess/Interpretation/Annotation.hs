@@ -18,7 +18,6 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
 
 import qualified Data.IntervalMap.Strict as IM
-import qualified Data.IntervalMap.Generic.Strict as IMG
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
