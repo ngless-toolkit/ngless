@@ -34,12 +34,13 @@ import Data.GFF
 import Utils.Vector
 import Utils.Utils
 
-data MMMethod = MM1OverN | MMDist1
+data MMMethod = MMCountAll | MM1OverN | MMDist1
     deriving (Eq, Show)
 
 
 methodFor "1overN" = return MM1OverN
 methodFor "dist1" = return MMDist1
+methodFor "all1" = return MMCountAll
 methodFor other = throwShouldNotOccur (T.concat ["Unexpected multiple method ", other])
 
 executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -61,6 +62,10 @@ executeCount (NGOAnnotatedSet annot_fp headers_fp) args = do
     just_idxs <- asIndices index annotated
 
     result <- case method of
+        MMCountAll -> do
+            outputListLno' TraceOutput ["Counts (all 1 method)..."]
+            return $ all1 just_idxs n_headers
+
         MMDist1 -> do
             outputListLno' TraceOutput ["Counts (first pass)..."]
             let firstpass = distributeMM just_idxs n_headers Nothing True
@@ -83,12 +88,15 @@ executeCount (NGOAnnotatedSet annot_fp headers_fp) args = do
 executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
 
-oneOverN indices n = V.create $ do
+all1 = all1OrOneOverN True
+oneOverN = all1OrOneOverN False
+all1OrOneOverN isAll1 indices n = V.create $ do
     counts <- VM.replicate n (0.0 :: Double)
     forM_ indices $ \cs -> do
         let nc = length cs
-        forM_ cs $ \i ->
-            unsafeIncrement' counts i (1.0 / convert nc)
+        forM_ cs $ \i -> do
+            let inc = if isAll1 then 1.0 else (1.0 / convert nc)
+            unsafeIncrement' counts i inc
     return counts
 
 distributeMM indices n current fractionResult = V.create $ do
