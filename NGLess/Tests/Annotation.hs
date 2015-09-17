@@ -3,11 +3,13 @@ module Tests.Annotation
     ( tgroup_Annotation
     ) where
 
+import Control.Applicative
 import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BL8
 
 import Language
 import NGLess
@@ -28,11 +30,17 @@ very_short_gff_fp = "test_samples/very_short.gtf"
 very_short_sam = "test_samples/very_short.sam"
 very_short_gff = "test_samples/very_short.gtf"
 
+
+equivalentLine (a,b) = parse a == parse b
+    where
+        parse :: BL.ByteString -> (BL.ByteString, Double)
+        parse ell = let [n,v] = BL8.split '\t' ell in (n, read $ BL8.unpack v)
+
 compareFiles fa fb = liftIO $ do
-    ca <- BL.readFile fa
-    cb <- BL.readFile fb
+    ca <- BL8.lines <$> BL.readFile fa
+    cb <- BL8.lines <$> BL.readFile fb
     assertBool (concat ["Expected files ", fa, " and ", fb, " to be equal."])
-        (ca == cb)
+        (all equivalentLine (zip ca cb))
 
 annotate_count_compare htseq_version sam gff minv opts = testNGLessIO $ do
     (a,h) <- _annotate sam gff opts
