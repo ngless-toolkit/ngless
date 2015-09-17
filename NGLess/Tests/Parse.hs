@@ -57,7 +57,12 @@ case_parse_sequence = parseBody seqs @?= seqr
 case_parse_num = parseBody nums @?= num
     where
         nums = "a = 0x10"
-        num  = [Assignment (Variable "a") (ConstNum 16)]
+        num  = [Assignment (Variable "a") (ConstInt 16)]
+
+case_parse_double = parseBody double_a_s @?= double_a
+    where
+        double_a_s = "d = 1.2"
+        double_a = [Assignment (Variable "d") (ConstDouble 1.2)]
 
 case_parse_bool = parseBody bools @?= bool
     where
@@ -67,17 +72,17 @@ case_parse_bool = parseBody bools @?= bool
 case_parse_if_else = parseBody blocks @?= block
     where
         blocks = "if true:\n 0\n 1\nelse:\n 2\n"
-        block  = [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [ConstNum 2])]
+        block  = [Condition (ConstBool True) (Sequence [ConstInt 0,ConstInt 1]) (Sequence [ConstInt 2])]
 
 case_parse_if = parseBody blocks @?= block
     where
         blocks = "if true:\n 0\n 1\n"
-        block  = [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence [])]
+        block  = [Condition (ConstBool True) (Sequence [ConstInt 0,ConstInt 1]) (Sequence [])]
 
 case_parse_if_end = parseBody blocks @?= block
     where
         blocks = "if true:\n 0\n 1\n2\n"
-        block  = [Condition (ConstBool True) (Sequence [ConstNum 0,ConstNum 1]) (Sequence []),ConstNum 2]
+        block  = [Condition (ConstBool True) (Sequence [ConstInt 0,ConstInt 1]) (Sequence []),ConstInt 2]
 
 case_parse_ngless = parsengless "test" True ngs @?= Right ng
     where
@@ -96,8 +101,8 @@ case_parse_indexexpr_10 = parseText _indexexpr "read[1:]"  @?= IndexExpression (
 case_parse_indexexpr_01 = parseText _indexexpr "read[:1]"  @?= IndexExpression (Lookup (Variable "read")) (IndexTwo Nothing j1)
 case_parse_indexexpr_00 = parseText _indexexpr "read[:]"   @?= IndexExpression (Lookup (Variable "read")) (IndexTwo Nothing Nothing)
 
-case_parse_indexexprone_1 = parseText _indexexpr "read[1]" @?= IndexExpression (Lookup (Variable "read")) (IndexOne (ConstNum 1))
-case_parse_indexexprone_2 = parseText _indexexpr "read[2]" @?= IndexExpression (Lookup (Variable "read")) (IndexOne (ConstNum 2))
+case_parse_indexexprone_1 = parseText _indexexpr "read[1]" @?= IndexExpression (Lookup (Variable "read")) (IndexOne (ConstInt 1))
+case_parse_indexexprone_2 = parseText _indexexpr "read[2]" @?= IndexExpression (Lookup (Variable "read")) (IndexOne (ConstInt 2))
 case_parse_indexexprone_var = parseText _indexexpr "read[var]" @?= IndexExpression (Lookup (Variable "read")) (IndexOne (Lookup (Variable "var")))
 
 case_parse_cleanupindents_0 = tokcleanupindents [TIndent 1] @?= []
@@ -118,8 +123,8 @@ case_parse_cleanupindents_4'' = tokcleanupindents toks @?= toks'
         toks  = [TOperator '(',TNewLine,TIndent 16,TNewLine,TIndent 16,TOperator ')',TNewLine]
         toks' = [TOperator '('                                        ,TOperator ')',TNewLine]
 
-j1 = Just (ConstNum 1)
+j1 = Just (ConstInt 1)
 tokcleanupindents = map snd . _cleanupindents . map (newPos "test" 0 0,)
 
-case_parse_kwargs = parseBody "unique(reads,maxCopies=2)\n" @?= [FunctionCall (FuncName "unique") (Lookup (Variable "reads")) [(Variable "maxCopies", ConstNum 2)] Nothing]
+case_parse_kwargs = parseBody "unique(reads,maxCopies=2)\n" @?= [FunctionCall (FuncName "unique") (Lookup (Variable "reads")) [(Variable "maxCopies", ConstInt 2)] Nothing]
 

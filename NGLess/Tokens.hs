@@ -49,7 +49,8 @@ ngltoken' = (,) <$> getPosition <*> ngltoken
 ngltoken = comment
         <|> symbol
         <|> tstring
-        <|> number
+        <|> double
+        <|> integer
         <|> word
         <|> boperator
         <|> operator
@@ -135,7 +136,11 @@ boperator = choice [
 indent = TIndent . length <$> many1 (char ' ')
 taberror = tab *> fail "Tabs are not used in NGLess. Please use spaces."
 
-number = TExpr . ConstNum <$> (try hex <|> dec)
+double = TExpr . ConstDouble . read <$> try double'
+    where
+        double' = (\int frac -> (int ++ "." ++ frac)) <$> many1 digit <*> (char '.' *> many1 digit)
+
+integer = TExpr . ConstInt <$> (try hex <|> dec)
     where
         hex = (read . ("0x"++)) <$> (string "0x" *> many1 hexDigit)
         dec = read <$> many1 digit

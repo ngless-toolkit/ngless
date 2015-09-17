@@ -92,6 +92,7 @@ data Block = Block
 data NGLType =
         NGLString
         | NGLInteger
+        | NGLDouble
         | NGLBool
         | NGLSymbol
         | NGLFilename
@@ -110,6 +111,7 @@ data NGLessObject =
         NGOString T.Text
         | NGOBool Bool
         | NGOInteger Integer
+        | NGODouble Double
         | NGOSymbol T.Text
         | NGOFilename FilePath
         | NGOShortRead ShortRead
@@ -130,7 +132,8 @@ data NGLessObject =
 data Expression =
         Lookup Variable -- ^ This looks up the variable name
         | ConstStr T.Text -- ^ constant string
-        | ConstNum Integer -- ^ integer
+        | ConstInt Integer -- ^ integer
+        | ConstDouble Double -- ^ integer
         | ConstBool Bool -- ^ true/false
         | ConstSymbol T.Text -- ^ a symbol
         | BuiltinConstant Variable -- ^ built-in constant
@@ -150,7 +153,8 @@ data Expression =
 instance Show Expression where
     show (Lookup (Variable v)) = "Lookup '"++T.unpack v++"'"
     show (ConstStr t) = show t
-    show (ConstNum n) = show n
+    show (ConstInt n) = show n
+    show (ConstDouble f) = show f
     show (ConstBool b) = show b
     show (ConstSymbol t) = "{"++T.unpack t++"}"
     show (BuiltinConstant (Variable v)) = T.unpack v

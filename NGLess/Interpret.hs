@@ -226,7 +226,8 @@ interpretExpr (BuiltinConstant (Variable v)) = throwShouldNotOccur ("Unknown bui
 interpretExpr (ConstStr t) = return (NGOString t)
 interpretExpr (ConstBool b) = return (NGOBool b)
 interpretExpr (ConstSymbol s) = return (NGOSymbol s)
-interpretExpr (ConstNum n) = return (NGOInteger n)
+interpretExpr (ConstInt n) = return (NGOInteger n)
+interpretExpr (ConstDouble n) = return (NGODouble n)
 interpretExpr (UnaryOp op v) = do
     v' <- interpretExpr v
     runEitherInROEnv (_evalUnary op v')

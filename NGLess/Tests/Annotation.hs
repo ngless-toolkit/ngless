@@ -38,7 +38,7 @@ annotate_count_compare htseq_version sam gff minv opts = testNGLessIO $ do
     (a,h) <- _annotate sam gff opts
     NGOCounts p <- executeCount (NGOAnnotatedSet a h) args
     compareFiles p ("test_samples/htseq-res/" ++htseq_version)
-  where args = [("verbose", NGOBool False), ("min", NGOInteger minv)]
+  where args = [("verbose", NGOBool False), ("min", NGOInteger minv), ("method", NGOSymbol "all1")]
 
 
 case_annotate_gene_noStrand_union =

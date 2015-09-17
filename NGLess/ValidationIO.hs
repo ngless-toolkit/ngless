@@ -81,7 +81,8 @@ get_const_val var s = do
         getAssignment _ = Nothing
         getConst (ConstStr t) = Just $ NGOString t
         getConst (ConstSymbol t) = Just $ NGOSymbol t
-        getConst (ConstNum v) = Just $ NGOInteger v
+        getConst (ConstInt v) = Just $ NGOInteger v
+        getConst (ConstDouble v) = Just $ NGODouble v
         getConst (ConstBool b) = Just $ NGOBool b
         getConst _ = Nothing
 

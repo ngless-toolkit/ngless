@@ -111,7 +111,8 @@ nglTypeOf (MethodCall m self arg args) = checkmethodargs m args *> checkmethodca
 nglTypeOf (Lookup (Variable v)) = envLookup v
 nglTypeOf (BuiltinConstant (Variable v)) = return (typeOfConstant v)
 nglTypeOf (ConstStr _) = return (Just NGLString)
-nglTypeOf (ConstNum _) = return (Just NGLInteger)
+nglTypeOf (ConstInt _) = return (Just NGLInteger)
+nglTypeOf (ConstDouble _) = return (Just NGLDouble)
 nglTypeOf (ConstBool _) = return (Just NGLBool)
 nglTypeOf (ConstSymbol _) = return (Just NGLSymbol)
 nglTypeOf e@(ListExpression _) = do
@@ -133,6 +134,7 @@ typeOfObject :: NGLessObject -> Maybe NGLType
 typeOfObject (NGOString _) = Just NGLString
 typeOfObject (NGOBool _) = Just NGLBool
 typeOfObject (NGOInteger _) = Just NGLInteger
+typeOfObject (NGODouble _) = Just NGLDouble
 typeOfObject (NGOSymbol _) = Just NGLSymbol
 typeOfObject (NGOFilename _) = Just NGLFilename
 typeOfObject (NGOShortRead _) = Just NGLRead
@@ -172,7 +174,7 @@ checkbool expr = do
             return (Just NGLBool)
         else return t
 
-checkinteger (ConstNum _) = return (Just NGLInteger)
+checkinteger (ConstInt _) = return (Just NGLInteger)
 checkinteger expr = do
     t <- nglTypeOf expr
     when (t /= Just NGLInteger) $

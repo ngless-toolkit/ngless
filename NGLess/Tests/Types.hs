@@ -26,7 +26,7 @@ isOkTypesText scriptText = case parsetest scriptText >>= checktypes [] of
 isErrorText scriptText = isError $ parsetest scriptText>>= checktypes []
 
 
-case_bad_type_fastq = isError $ checktypes [] (Script Nothing [(0,FunctionCall (FuncName "fastq") (ConstNum 3) [] Nothing)])
+case_bad_type_fastq = isError $ checktypes [] (Script Nothing [(0,FunctionCall (FuncName "fastq") (ConstInt 3) [] Nothing)])
 case_good_type_fastq = isOkTypes (Script Nothing [(0,FunctionCall (FuncName "fastq") (ConstStr "fastq.fq") [] Nothing)])
 
 case_type_complete = isOkTypesText
@@ -49,9 +49,8 @@ case_indent_empty_line = isOkTypesText
     \        discard\n"
 
 
-case_invalid_func_fastq = isError $ checktypes [] f_expr
-    where 
-        f_expr = Script Nothing [(0,FunctionCall (FuncName "fastq") (ConstStr "fastq.fq") [(Variable "fname", (ConstNum 10))] Nothing)]
+case_invalid_func_fastq = isError $ checktypes [] $
+    Script Nothing [(0,FunctionCall (FuncName "fastq") (ConstStr "fastq.fq") [(Variable "fname", ConstInt 10)] Nothing)]
 
 -- unique
 
