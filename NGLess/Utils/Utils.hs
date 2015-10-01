@@ -13,6 +13,7 @@ module Utils.Utils
 
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Codec.Compression.GZip as GZip
+import qualified Codec.Compression.BZip as BZip
 import System.IO
 
 import Control.Applicative ((<$>))
@@ -29,6 +30,7 @@ uniq = map head . group
 readPossiblyCompressedFile ::  FilePath -> IO BL.ByteString
 readPossiblyCompressedFile fname
     | ".gz" `isSuffixOf` fname = GZip.decompress <$> BL.readFile fname
+    | ".bz2" `isSuffixOf` fname = BZip.decompress <$> BL.readFile fname
     | otherwise = BL.readFile fname
 
 

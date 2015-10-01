@@ -46,7 +46,8 @@ visualised in a graphical user interface (GUI). Statistics calculated are:
 
 If not specified, the encoding is guessed from the file.
 
-The only compression method supported for the data sets is **gzip** (.gz).
+Gzip and bzip2 compressed files are transparently supported (determined by file
+extension, ``.gz`` and ``.bz2`` for gzip and bzip2 respectively).
 
 samfile
 -------
