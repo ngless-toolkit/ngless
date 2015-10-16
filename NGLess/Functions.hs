@@ -42,8 +42,8 @@ countArgs =
     ]
 
 selectArgs =
-    [ArgInformation "keep_if" False (NGList NGLSymbol) (Just ["mapped", "unmapped"])
-    ,ArgInformation "drop_if" False (NGList NGLSymbol) (Just ["mapped", "unmapped"])
+    [ArgInformation "keep_if" False (NGList NGLSymbol) (Just ["mapped", "unmapped", "unique"])
+    ,ArgInformation "drop_if" False (NGList NGLSymbol) (Just ["mapped", "unmapped", "unique"])
     ,ArgInformation "__oname" False NGLString Nothing
     ]
 
