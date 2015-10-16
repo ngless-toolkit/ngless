@@ -40,6 +40,7 @@ import CmdArgs
 import StandardModules.NGLStdlib
 
 import qualified BuiltinModules.AsReads as ModAsReads
+import qualified BuiltinModules.Argv as ModArgv
 
 -- | wrapPrint transforms the script by transforming the last expression <expr>
 -- into write(<expr>, ofile=STDOUT)
@@ -82,8 +83,9 @@ runNGLessIO context act = runResourceT (runExceptT act) >>= \case
 loadModules :: [ModInfo] -> NGLessIO [Module]
 loadModules mods  = do
     mA <- ModAsReads.loadModule ("" :: T.Text)
+    mArgv <- ModArgv.loadModule ("" :: T.Text)
     imported <- loadStdlibModules mods
-    return (mA:imported)
+    return (mArgv:mA:imported)
 
 printHeader :: IO ()
 printHeader = putStr

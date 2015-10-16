@@ -40,6 +40,7 @@ data NGLessModes =
               , color :: Maybe ColorSetting
               , no_header :: Bool
               , subsampleMode :: Bool
+              , extraArgs :: [String]
               }
         | InstallGenMode
               { input :: String
@@ -76,6 +77,7 @@ nglessArgs = record DefaultMode{}
         , color_setting
         , no_header := False += name "no-header" += help "Do not print version header"
         , subsampleMode := False += name "subsample" += help "Turn on sub-sampling"
+        , extraArgs := [] += args
         ]
         += details ["Example:" , "ngless script.ngl"]
 

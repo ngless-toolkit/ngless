@@ -533,6 +533,7 @@ _evalUnary UOpNot (NGOBool v) = return $ NGOBool (not v)
 _evalUnary op v = nglTypeError ("invalid unary operation ("++show op++") on value " ++ show v)
 
 _evalIndex :: NGLessObject -> [Maybe NGLessObject] -> Either NGError NGLessObject
+_evalIndex (NGOList elems) [Just (NGOInteger ix)] = return (elems !! fromInteger ix)
 _evalIndex sr index@[Just (NGOInteger a)] = _evalIndex sr $ (Just $ NGOInteger (a + 1)) : index
 _evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Nothing] =
     return . NGOShortRead $ ShortRead rId (B.drop (fromIntegral s) rSeq) (B.drop (fromIntegral s) rQual)

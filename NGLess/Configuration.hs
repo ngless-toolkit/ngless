@@ -26,10 +26,12 @@ import Control.Applicative ((<$>))
 import System.Environment (getExecutablePath)
 import System.Directory
 import System.FilePath.Posix
-import qualified Data.ByteString as B
 import Data.Maybe
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.ByteString as B
 import qualified Data.Configurator as CF
 
 import NGLess
@@ -49,6 +51,7 @@ data NGLessConfiguration = NGLessConfiguration
     , nConfColor :: ColorSetting
     , nConfPrintHeader :: Bool
     , nConfSubsample :: Bool
+    , nConfArgv :: [T.Text]
     } deriving (Eq, Show)
 
 
@@ -68,6 +71,7 @@ guessConfiguration = do
         , nConfColor = AutoColor
         , nConfPrintHeader = True
         , nConfSubsample = False
+        , nConfArgv = []
         }
 
 updateConfiguration :: NGLessConfiguration -> [FilePath] -> IO NGLessConfiguration
@@ -135,6 +139,7 @@ updateConfigurationOpts DefaultMode{..} config =
             , nConfPrintHeader = nConfPrintHeader config && not no_header && not print_last
             , nConfColor = fromMaybe (nConfColor config) color
             , nConfSubsample = subsampleMode
+            , nConfArgv = T.pack <$> (input:extraArgs)
             }
 updateConfigurationOpts _ config = config
 
