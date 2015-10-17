@@ -30,7 +30,6 @@ import Data.Maybe
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as B
 import qualified Data.Configurator as CF
 
@@ -47,6 +46,7 @@ data NGLessConfiguration = NGLessConfiguration
     , nConfTemporaryDirectory :: FilePath
     , nConfKeepTemporaryFiles :: Bool
     , nConfTrace :: Bool
+    , nConfCreateOutputDirectory :: Bool
     , nConfOutputDirectory :: FilePath
     , nConfColor :: ColorSetting
     , nConfPrintHeader :: Bool
@@ -64,6 +64,7 @@ guessConfiguration = do
         { nConfDownloadBaseURL = "http://127.0.0.1/"
         , nConfGlobalDataDirectory = nglessBinDirectory </> "../share/ngless/data"
         , nConfUserDirectory = defaultUserNglessDirectory
+        , nConfCreateOutputDirectory = True
         , nConfTemporaryDirectory = tmp
         , nConfKeepTemporaryFiles = False
         , nConfTrace = False
@@ -98,6 +99,7 @@ updateConfiguration NGLessConfiguration{..} cfiles = do
         , nConfTemporaryDirectory = nConfTemporaryDirectory'
         , nConfKeepTemporaryFiles = nConfKeepTemporaryFiles'
         , nConfTrace = nConfTrace
+        , nConfCreateOutputDirectory = nConfCreateOutputDirectory
         , nConfOutputDirectory = nConfOutputDirectory
         , nConfColor = nConfColor'
         , nConfPrintHeader = nConfPrintHeader'
@@ -134,6 +136,7 @@ updateConfigurationOpts DefaultMode{..} config =
     in config
             { nConfTrace = trace
             , nConfKeepTemporaryFiles = ktemp
+            , nConfCreateOutputDirectory = createOutputDirectory
             , nConfOutputDirectory = odir
             , nConfTemporaryDirectory = tmpdir
             , nConfPrintHeader = nConfPrintHeader config && not no_header && not print_last

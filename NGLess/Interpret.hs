@@ -42,7 +42,6 @@ import Utils.Utils
 import Substrim
 import Language
 import FileManagement
-import Configuration (outputDirectory)
 import Output
 import Modules
 import NGLess
@@ -190,8 +189,6 @@ traceExpr m e =
 
 interpret :: [Module] -> [(Int,Expression)] -> NGLessIO ()
 interpret modules es = do
-    odir <- outputDirectory
-    liftIO $ setupHtmlViewer odir
     evalStateT (interpretIO $ es) (NGLInterpretEnv modules Map.empty)
     outputListLno InfoOutput Nothing ["Interpretation finished."]
 

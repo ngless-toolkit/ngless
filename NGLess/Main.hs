@@ -37,6 +37,7 @@ import Output
 import NGLess
 import Modules
 import CmdArgs
+import FileManagement (setupHtmlViewer)
 import StandardModules.NGLStdlib
 
 import qualified BuiltinModules.AsReads as ModAsReads
@@ -100,6 +101,11 @@ optsExec opts@DefaultMode{} = do
     let reqversion = isNothing $ script opts
     setNumCapabilities (nThreads opts)
     initConfiguration opts
+    --Note that the input for ngless is always UTF-8.
+    --Always. This means that we cannot use T.readFile
+    --which is locale aware.
+    --We also assume that the text file is quite small and, therefore, loading
+    --it in to memory is not resource intensive.
     engltext <- case script opts of
         Just s -> return . Right . T.pack $ s
         _ -> T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
@@ -116,13 +122,11 @@ optsExec opts@DefaultMode{} = do
     when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
         whenStrictlyNormal (setVerbosity Quiet)
     odir <- runNGLessIO "cannot fail" outputDirectory
-    createDirectoryIfMissing False odir
+    shouldOutput <- runNGLessIO "cannot fail" $ nConfCreateOutputDirectory <$> nglConfiguration
+    when shouldOutput $ do
+        createDirectoryIfMissing False odir
+        setupHtmlViewer odir
     runNGLessIO "running script" $ do
-        --Note that the input for ngless is always UTF-8.
-        --Always. This means that we cannot use T.readFile
-        --which is locale aware.
-        --We also assume that the text file is quite small and, therefore, loading
-        --it in to memory is not resource intensive.
         shouldPrintHeader <- nConfPrintHeader <$> nglConfiguration
         when shouldPrintHeader $
             liftIO printHeader
@@ -132,7 +136,8 @@ optsExec opts@DefaultMode{} = do
             liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
         outputLno' InfoOutput "Script OK. Starting interpretation..."
         interpret modules (nglBody sc)
-    writeOutput (odir </> "output.js") fname ngltext
+    when shouldOutput $
+        writeOutput (odir </> "output.js") fname ngltext
     exitSuccess
 
 

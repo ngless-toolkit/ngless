@@ -33,6 +33,7 @@ data NGLessModes =
               , print_last :: Bool
               , trace_flag :: Maybe Bool
               , nThreads :: Int
+              , createOutputDirectory :: Bool
               , output_directory :: Maybe FilePath
               , temporary_directory :: Maybe FilePath
               , keep_temporary_files :: Maybe Bool
@@ -70,6 +71,7 @@ nglessArgs = record DefaultMode{}
         , trace_flag := Nothing += name "trace"
         , print_last := False += name "p"
         , nThreads := 1 += name "n" += name "j"
+        , createOutputDirectory := True += name "create-output-directory" += help "create an ngless_output directory"
         , output_directory := Nothing += name "o"
         , temporary_directory := Nothing += name "t"
         , keep_temporary_files := Nothing
