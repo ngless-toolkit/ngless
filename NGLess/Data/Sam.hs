@@ -122,7 +122,7 @@ numberMismatches cigar
     | B8.null cigar = 0
     | otherwise = n' + numberMismatches rest
         where
-            n' = if code `elem` "DHX" then n else 0
+            n' = if code `elem` "DNSHX" then n else 0
             code = S8.head code_rest
             rest = S8.tail code_rest
             (n,code_rest) = fromMaybe
