@@ -5,8 +5,7 @@
 {-# LANGUAGE TupleSections #-}
 
 module Interpretation.Map
-    ( interpretMapOp
-    , interpretMapOp2
+    ( executeMap
     , _calcSamStats
     ) where
 
@@ -82,13 +81,8 @@ mapToReference refIndex fps = do
                             bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '"] ++ fps ++ ["'\n",
                             "Bwa error code was ", show code, "."])
 
-interpretMapOp :: T.Text -> FilePath -> NGLessIO NGLessObject
-interpretMapOp r ds = interpretMapOp' r [ds]
-interpretMapOp2 :: T.Text -> FilePath -> FilePath -> NGLessIO NGLessObject
-interpretMapOp2 r mate1 mate2 = interpretMapOp' r [mate1, mate2]
-
-interpretMapOp' :: T.Text -> [FilePath] -> NGLessIO NGLessObject
-interpretMapOp' r ds = do
+interpretMapOp :: T.Text -> [FilePath] -> NGLessIO NGLessObject
+interpretMapOp r ds = do
     (ref', defGen') <- indexReference' (T.unpack r)
     samPath' <- mapToReference ref' ds
     getSamStats samPath'
@@ -135,3 +129,13 @@ printSamStats (total, aligned, unique, lowQ) = do
               y = fromIntegral b
           in (x / y) * (100 :: Double)
 
+executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeMap fps args = case lookup "reference" args of
+    Nothing  -> throwScriptError ("A reference must be suplied" ::String)
+    Just (NGOString ref) -> executeMap' fps
+        where
+            executeMap' (NGOList es) = NGOList <$> forM es executeMap'
+            executeMap' (NGOReadSet1 _enc file)    = interpretMapOp ref [file]
+            executeMap' (NGOReadSet2 _enc fp1 fp2) = interpretMapOp ref [fp1,fp2]
+            executeMap' v = throwShouldNotOccur ("map of " ++ show v ++ " not implemented yet")
+    _         -> throwShouldNotOccur ("map could not parse reference argument" :: String)

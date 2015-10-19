@@ -270,7 +270,7 @@ topFunction' (FuncName "fastq")     expr args Nothing = executeFastq expr args
 topFunction' (FuncName "samfile")   expr args Nothing = executeSamfile expr args
 topFunction' (FuncName "unique")    expr args Nothing = runNGLessIO (executeUnique expr args)
 topFunction' (FuncName "write")     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
-topFunction' (FuncName "map")       expr args Nothing = executeMap expr args
+topFunction' (FuncName "map")       expr args Nothing = runNGLessIO (executeMap expr args)
 topFunction' (FuncName "select")    expr args Nothing = runNGLessIO (executeSelect expr args)
 topFunction' (FuncName "annotate")  expr args Nothing = runNGLessIO (executeAnnotation expr args)
 topFunction' (FuncName "count")     expr args Nothing = runNGLessIO (executeCount expr args)
@@ -350,17 +350,6 @@ executeQualityProcess (NGOString fname) = do
 
 executeQualityProcess v = nglTypeError ("QC expected a string or readset. Got " ++ show v)
 executeQualityProcess' enc fname = runNGLessIO $ executeQProc enc fname
-
-executeMap :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
-executeMap fps args = case lookup "reference" args of
-    Nothing  -> throwScriptError ("A reference must be suplied" ::String)
-    Just (NGOString ref) -> executeMap' fps
-        where
-            executeMap' (NGOList es) = NGOList <$> forM es executeMap'
-            executeMap' (NGOReadSet1 _enc file)    = runNGLessIO $ interpretMapOp ref file
-            executeMap' (NGOReadSet2 _enc fp1 fp2) = runNGLessIO $ interpretMapOp2 ref fp1 fp2
-            executeMap' v = throwShouldNotOccur ("map of " ++ show v ++ " not implemented yet")
-    _         -> unreachable "map could not parse reference argument"
 
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
