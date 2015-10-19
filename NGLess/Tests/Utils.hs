@@ -2,6 +2,7 @@ module Tests.Utils
     ( isError
     , isErrorMsg
     , isOk
+    , isOkMsg
     , parsetest
     , fromRight
     ) where
@@ -21,6 +22,8 @@ isErrorMsg _ (Left _) = return ()
 isOk :: String -> Either a b -> Assertion
 isOk m (Left _) = assertFailure m
 isOk _ (Right _) = return ()
+
+isOkMsg = isOk
 
 parsetest :: T.Text -> Either T.Text Script
 parsetest = parsengless "test" True

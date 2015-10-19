@@ -54,12 +54,14 @@ import Tests.Validation
 import Tests.Types (tgroup_Types)
 import Tests.Annotation (tgroup_Annotation)
 import Tests.Parse (tgroup_Parse)
+import Tests.NGLessAPI (tgroup_NGLessAPI)
 
 test_FastQ = [tgroup_FastQ]
 test_Validation = [tgroup_Validation]
 test_Annotation = [tgroup_Annotation]
 test_Parse      = [tgroup_Parse]
 test_Types      = [tgroup_Types]
+test_NGLessAPI  = [tgroup_NGLessAPI]
 
 -- The main test driver sets verbosity to Quiet to avoid extraneous output and
 -- then uses the automatically generated function

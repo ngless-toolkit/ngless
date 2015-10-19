@@ -11,6 +11,11 @@ module NGLess
     , KwArgsValues
     , boolOrTypeError
     , symbolOrTypeError
+    , stringOrTypeError
+    , lookupStringOrScriptError
+    , lookupStringOrScriptErrorDef
+    , lookupStringListOrScriptError
+    , lookupStringListOrScriptErrorDef
     , testNGLessIO
     ) where
 
@@ -77,3 +82,32 @@ boolOrTypeError context val = throwScriptError (T.concat ["Expected a boolean (r
 symbolOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m T.Text
 symbolOrTypeError _ (NGOSymbol s) = return s
 symbolOrTypeError context val = throwScriptError (T.concat ["Expected a symbol (received ", T.pack . show $ val, ") in context '", asText context, "'"])
+
+-- | If argument is a NGOString, then unwraps it; else it raises a type error
+stringOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m T.Text
+stringOrTypeError _ (NGOString s) = return s
+stringOrTypeError context val = throwScriptError (T.concat ["Expected a string (received ", T.pack . show $ val, ") in context '", asText context, "'"])
+
+lookupStringOrScriptErrorDef :: (MonadError NGError m) => m T.Text -> String -> T.Text -> KwArgsValues -> m T.Text
+lookupStringOrScriptErrorDef defval context name args = case lookup name args of
+    Nothing -> defval
+    Just (NGOString s) -> return s
+    Just other -> throwScriptError (T.concat ["Expected a string in argument ", name, " in context '", T.pack context, "' instead observed: ", T.pack . show $ other])
+
+lookupStringOrScriptError :: (MonadError NGError m) => String-> T.Text -> KwArgsValues -> m T.Text
+lookupStringOrScriptError = requiredLookup lookupStringOrScriptErrorDef
+
+lookupStringListOrScriptErrorDef :: (MonadError NGError m) => m [T.Text] -> String -> T.Text -> KwArgsValues -> m [T.Text]
+lookupStringListOrScriptErrorDef defval context name args = case lookup name args of
+    Nothing -> defval
+    Just (NGOList ss) -> (stringOrTypeError context) `mapM` ss
+    Just other -> throwScriptError (T.concat ["Expected a string in argument ", name, " in context '", T.pack context, "', instead saw ", T.pack . show $ other])
+
+lookupStringListOrScriptError :: (MonadError NGError m) => String -> T.Text -> KwArgsValues -> m [T.Text]
+lookupStringListOrScriptError = requiredLookup lookupStringListOrScriptErrorDef
+
+requiredLookup :: (MonadError NGError m) => (m a -> String-> T.Text -> KwArgsValues -> m a) -> String-> T.Text -> KwArgsValues -> m a
+requiredLookup withDefaultLookup context name = withDefaultLookup errorAct context name
+    where
+        errorAct = throwScriptError (T.concat ["Could not find", name, " arguments (in context '", T.pack context, "')"])
+
