@@ -448,12 +448,13 @@ executePrint err  _ = throwScriptError ("Cannot print " ++ show err)
 executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executeSelectWBlock (NGOMappedReadSet fname ref) [] (Block [Variable var] body) = do
         runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", fname]
-        let oname = fname ++ ".selected"
+        (oname, ohandle) <- runNGLessIO $ openNGLTempFile fname "block_selected_" "sam"
         C.sourceFile fname
             $= CB.lines
             =$= C.filterM filterLine
             =$= C.unlinesAscii
-            $$ C.sinkFile oname
+            $$ C.sinkHandle ohandle
+        liftIO $ hClose ohandle
         return (NGOMappedReadSet oname ref)
     where
         filterLine line
