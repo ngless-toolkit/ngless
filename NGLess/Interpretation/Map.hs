@@ -47,13 +47,13 @@ ensureIndexExists refPath = do
     return refPath
 
 
-mapToReference :: FilePath -> [FilePath] -> NGLessIO String
-mapToReference refIndex fps = do
+mapToReference :: FilePath -> [FilePath] -> [String] -> NGLessIO String
+mapToReference refIndex fps extraArgs = do
     (rk, (newfp, hout)) <- openNGLTempFile' refIndex "mapped_" ".sam"
     outputListLno' InfoOutput ["Starting mapping to ", refIndex]
     outputListLno' DebugOutput ["Write .sam file to: ", newfp]
     bwaPath <- bwaBin
-    let cmdargs =  ["mem","-t", show numCapabilities, refIndex] ++ fps
+    let cmdargs =  concat [["mem", "-t", show numCapabilities, refIndex], extraArgs, fps]
     outputListLno' TraceOutput ["Calling binary ", bwaPath, " with args: ", unwords cmdargs]
     (err, exitCode) <- liftIO $ do
         (_, _, Just herr, jHandle) <-
@@ -81,10 +81,10 @@ mapToReference refIndex fps = do
                             bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '"] ++ fps ++ ["'\n",
                             "Bwa error code was ", show code, "."])
 
-interpretMapOp :: T.Text -> [FilePath] -> NGLessIO NGLessObject
-interpretMapOp r ds = do
+interpretMapOp :: T.Text -> [FilePath] -> [String] -> NGLessIO NGLessObject
+interpretMapOp r ds extraArgs = do
     (ref', defGen') <- indexReference' (T.unpack r)
-    samPath' <- mapToReference ref' ds
+    samPath' <- mapToReference ref' ds extraArgs
     getSamStats samPath'
     return $ NGOMappedReadSet samPath' defGen'
     where
@@ -130,12 +130,11 @@ printSamStats (total, aligned, unique, lowQ) = do
           in (x / y) * (100 :: Double)
 
 executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeMap fps args = case lookup "reference" args of
-    Nothing  -> throwScriptError ("A reference must be suplied" ::String)
-    Just (NGOString ref) -> executeMap' fps
-        where
-            executeMap' (NGOList es) = NGOList <$> forM es executeMap'
-            executeMap' (NGOReadSet1 _enc file)    = interpretMapOp ref [file]
-            executeMap' (NGOReadSet2 _enc fp1 fp2) = interpretMapOp ref [fp1,fp2]
-            executeMap' v = throwShouldNotOccur ("map of " ++ show v ++ " not implemented yet")
-    _         -> throwShouldNotOccur ("map could not parse reference argument" :: String)
+executeMap fps args = do
+    ref <- lookupStringOrScriptError "reference for map function" "reference" args
+    extraArgs <- (map T.unpack) <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
+    let executeMap' (NGOList es) = NGOList <$> forM es executeMap'
+        executeMap' (NGOReadSet1 _enc file)    = interpretMapOp ref [file] extraArgs
+        executeMap' (NGOReadSet2 _enc fp1 fp2) = interpretMapOp ref [fp1,fp2] extraArgs
+        executeMap' v = throwShouldNotOccur ("map of " ++ show v ++ " not implemented yet")
+    executeMap' fps
