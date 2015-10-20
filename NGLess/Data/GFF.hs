@@ -8,7 +8,7 @@ module Data.GFF
     , readAnnotations
     , parseGffAttributes
     , checkAttrTag
-    , trimString
+    , _trimString
     , parsegffType
     , readLine
     , strand
@@ -80,13 +80,11 @@ instance NFData GffType where
 parseGffAttributes :: S.ByteString -> [(S.ByteString, S.ByteString)]
 parseGffAttributes = map (\(aid,aval) -> (aid, S8.filter (/='\"') . S.tail $ aval))
                         . map (\x -> S8.break (== (checkAttrTag x)) x)
-                        . map trimString
+                        . map _trimString
                         . S8.split ';'
                         . removeLastDel
-                        . f -- remove white space from the beginning
-                        . f -- remove white space from the end
-       where f = S8.reverse . S8.dropWhile isSpace
-                 
+                        . _trimString
+
 
 removeLastDel :: S8.ByteString -> S8.ByteString
 removeLastDel s = case S8.last s of
@@ -100,23 +98,17 @@ checkAttrTag s = case S8.elemIndex '=' s of
     _       -> '='
 
 -- remove ' ' from begining and end.
-trimString :: S.ByteString -> S.ByteString
-trimString = trimBeg . trimEnd
+_trimString :: S.ByteString -> S.ByteString
+_trimString = trimBeg . trimEnd
     where
-        trimBeg x = if isSpace $ S8.index x 0 -- first element
-                        then S8.tail x
-                        else x
-        trimEnd x = if isSpace $ S8.last x -- last element 
-                        then S8.init x
-                        else x
-
-isSpace :: Char -> Bool
-isSpace = (== ' ')
+        trimBeg = B.dropWhile isSpace
+        trimEnd = fst . B.spanEnd isSpace
+        isSpace = (== ' ')
 
 
 gffGeneId :: S8.ByteString -> S8.ByteString
 gffGeneId g = fromMaybe "unknown" (listToMaybe . catMaybes $ map (`lookup` r) ["ID", "gene_id"])
-    where 
+    where
         r = parseGffAttributes g
 
 

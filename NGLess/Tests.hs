@@ -278,10 +278,11 @@ gff_structure  = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.
 case_check_attr_tag_1 = GFF.checkAttrTag "id = 10;" @?= '='
 case_check_attr_tag_2 = GFF.checkAttrTag "id 10;" @?= ' '
 
-case_trim_attrs_1  = GFF.trimString " x = 10" @?= "x = 10"
-case_trim_attrs_2  = GFF.trimString " x = 10 " @?= "x = 10"
-case_trim_attrs_3  = GFF.trimString "x = 10 " @?= "x = 10"
-case_trim_attrs_4  = GFF.trimString "x = 10" @?= "x = 10"
+case_trim_attrs_1  = GFF._trimString " x = 10" @?= "x = 10"
+case_trim_attrs_2  = GFF._trimString " x = 10 " @?= "x = 10"
+case_trim_attrs_3  = GFF._trimString "x = 10 " @?= "x = 10"
+case_trim_attrs_4  = GFF._trimString "x = 10" @?= "x = 10"
+case_trim_attrs_5  = GFF._trimString "   X    " @?= "X"
 
 
 case_parse_gff_line = GFF.readLine gff_line @?= gff_structure
