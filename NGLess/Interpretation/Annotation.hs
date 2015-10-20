@@ -58,8 +58,8 @@ data AnnotationOpts =
 executeAnnotation :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeAnnotation (NGOList e) args = NGOList <$> mapM (`executeAnnotation` args) e
 executeAnnotation (NGOMappedReadSet e dDS) args = do
-    ambiguity <- getBoolArg False "ambiguity" args
-    strand_specific <- getBoolArg False "strand" args
+    ambiguity <- lookupBoolOrScriptErrorDef (return False) "annotation function" "ambiguity" args
+    strand_specific <- lookupBoolOrScriptErrorDef (return False) "annotation function" "strand" args
     fs <- case lookup "features" args of
         Nothing -> return ["gene"]
         Just (NGOSymbol f) -> return [f]
@@ -212,9 +212,6 @@ matchingFeature s      = GffOther (B8.pack . T.unpack $ s)
 
 _matchFeatures :: [GffType] -> GffLine -> Bool
 _matchFeatures fs gf = gffType gf `elem` fs
-
-getBoolArg :: Bool -> T.Text -> KwArgsValues -> NGLessIO Bool
-getBoolArg def k args = boolOrTypeError ("Argument '"++T.unpack k++"' for function 'annotate'") $ lookupWithDefault (NGOBool def) k args
 
 evalMaybeString Nothing = return Nothing
 evalMaybeString (Just (NGOString s)) = return (Just $ T.unpack s)

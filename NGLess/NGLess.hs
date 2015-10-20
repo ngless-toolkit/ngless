@@ -12,6 +12,8 @@ module NGLess
     , boolOrTypeError
     , symbolOrTypeError
     , stringOrTypeError
+    , lookupBoolOrScriptError
+    , lookupBoolOrScriptErrorDef
     , lookupStringOrScriptError
     , lookupStringOrScriptErrorDef
     , lookupStringListOrScriptError
@@ -105,6 +107,15 @@ lookupStringListOrScriptErrorDef defval context name args = case lookup name arg
 
 lookupStringListOrScriptError :: (MonadError NGError m) => String -> T.Text -> KwArgsValues -> m [T.Text]
 lookupStringListOrScriptError = requiredLookup lookupStringListOrScriptErrorDef
+
+
+lookupBoolOrScriptError :: (MonadError NGError m) => String-> T.Text -> KwArgsValues -> m Bool
+lookupBoolOrScriptError = requiredLookup lookupBoolOrScriptErrorDef
+
+lookupBoolOrScriptErrorDef :: (MonadError NGError m) => m Bool -> String -> T.Text -> KwArgsValues -> m Bool
+lookupBoolOrScriptErrorDef defval context name args = case lookup name args of
+    Nothing -> defval
+    Just v -> boolOrTypeError context v
 
 requiredLookup :: (MonadError NGError m) => (m a -> String-> T.Text -> KwArgsValues -> m a) -> String-> T.Text -> KwArgsValues -> m a
 requiredLookup withDefaultLookup context name = withDefaultLookup errorAct context name
