@@ -26,21 +26,11 @@ import Control.Monad.Trans.Except
 import Control.Monad.Except
 import Control.Monad.Trans.Resource
 
+import NGLess.NGError
+
 import Language
 import Utils.StringLike
 
--- | An error in evaluating an ngless script
--- Normally, it's easier to use the function interface of 'throwShouldNotOccur' and friends
-data NGErrorType =
-    ShouldNotOccur -- ^ bug in ngless
-    | ScriptError -- ^ bug in user script
-    | DataError -- ^ bad input
-    | SystemError -- ^ system/IO issue
-    | GenericError -- ^ arbitrary error message
-    deriving (Show, Eq)
-
-data NGError = NGError !NGErrorType !T.Text
-        deriving (Show, Eq)
 
 type NGLessIO = ExceptT NGError (ResourceT IO)
 type NGLess = Either NGError
@@ -54,27 +44,6 @@ testNGLessIO act = do
     where
         showError (Right a) = a
         showError (Left e) = error (show e)
-
--- | Internal bug: user is requested to submit a bug report
-throwShouldNotOccur :: (StringLike s, MonadError NGError m) => s -> m a
-throwShouldNotOccur = throwError . NGError ShouldNotOccur . asText
-
--- | Script error: user can fix error by re-writing the script
-throwScriptError :: (StringLike s, MonadError NGError m) => s -> m a
-throwScriptError = throwError . NGError ScriptError . asText
-
--- | Data error: problem with input data
-throwDataError :: (StringLike s, MonadError NGError m) => s -> m a
-throwDataError = throwError . NGError DataError . asText
-
--- | System error: issues such as *subcommand failed* or *out of disk*
-throwSystemError :: (StringLike s, MonadError NGError m) => s -> m a
-throwSystemError = throwError . NGError SystemError . asText
-
--- | Generic error: any error message
-throwGenericError :: (StringLike s, MonadError NGError m) => s -> m a
-throwGenericError = throwError . NGError GenericError . asText
-
 
 boolOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m Bool
 boolOrTypeError _ (NGOBool b) = return b

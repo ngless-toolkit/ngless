@@ -211,7 +211,7 @@ case_isNotUnique = (not $ isUnique (samLine {samMapq = 0})) @? "Should not be un
 case_read_one_Sam_Line = readAlignments samLineFlat @?= [samLine]
 case_read_mul_Sam_Line = readAlignments (L.unlines $ replicate 10 samLineFlat) @?= replicate 10 samLine
 
-case_match_identity_soft = matchIdentity (head . readAlignments $ samline) < 0.9 @? "Soft clipped read (low identity)"
+case_match_identity_soft = fromRight (matchIdentity . head . readAlignments $ samline) < 0.9 @? "Soft clipped read (low identity)"
     where
         samline = "simulated:1:1:38:663#0\t0\tRef1\t1018\t3\t69M16S\t=\t1018\t0\tTTCGAGAAGATGGGTATCGTGGGAAATAACGGAACGGGGAAGTCTACCTTCATCAAGATGCTGCTGGGCTTGGTGAAACCCGACA\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\tNM:i:5\tMD:Z:17T5T14A2A2G24\tAS:i:44\tXS:i:40"
 

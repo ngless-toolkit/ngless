@@ -14,16 +14,17 @@ module Data.Sam
 ) where
 
 
+import qualified Data.ByteString as B
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
+import Control.DeepSeq
+
 
 import Data.Bits (testBit)
-import Data.Maybe
-
-import Control.DeepSeq
+import NGLess.NGError
 
 
 data SamLine = SamLine
@@ -118,20 +119,22 @@ P padding (silent deletion from padded reference).
 X sequence mismatch.
 --}
 
+numberMismatches :: B.ByteString -> Either NGError Int
 numberMismatches cigar
-    | B8.null cigar = 0
-    | otherwise = n' + numberMismatches rest
-        where
-            n' = if code `elem` "DNSHX" then n else 0
-            code = S8.head code_rest
-            rest = S8.tail code_rest
-            (n,code_rest) = fromMaybe
-                        (error ("could not parse cigar '"++S8.unpack cigar ++"'"))
-                        (S8.readInt cigar)
+    | B8.null cigar = return 0
+    | otherwise = case B8.readInt cigar of
+        Nothing -> throwDataError ("could not parse cigar '"++S8.unpack cigar ++"'")
+        Just (n,code_rest) -> do
+            let code = S8.head code_rest
+                rest = S8.tail code_rest
+                n' = if code `elem` "DNSHX" then n else 0
+            r <- numberMismatches rest
+            return (n' + r)
 
-matchIdentity :: SamLine -> Double
-matchIdentity samline = toDouble (len - errors) / toDouble len
-    where
-        len = samLength samline
-        toDouble = fromInteger . toInteger
-        errors = numberMismatches (samCigar samline)
+matchIdentity :: SamLine -> Either NGError Double
+matchIdentity samline = do
+        errors <- numberMismatches (samCigar samline)
+        let len = samLength samline
+            toDouble = fromInteger . toInteger
+            mid = toDouble (len - errors) / toDouble len
+        return mid
