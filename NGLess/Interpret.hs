@@ -459,9 +459,10 @@ executeSelectWBlock (NGOMappedReadSet fname ref) [] (Block [Variable var] body) 
     where
         filterLine line
             | "@" `B.isPrefixOf` line = return True -- The whole header is copied verbatim to the output
-            | otherwise = do
-                    let mr = NGOMappedRead (readSamLine . BL.fromChunks $ [line])
-                    mr' <- runInROEnvIO (interpretBlock1 [(var, mr)] body)
+            | otherwise = case readSamLine . BL.fromChunks $ [line] of
+                Left err -> throwDataError err
+                Right mr -> do
+                    mr' <- runInROEnvIO (interpretBlock1 [(var, NGOMappedRead mr)] body)
                     return (blockStatus mr' `elem` [BlockContinued, BlockOk])
 executeSelectWBlock _ _ _ = unreachable ("Select with block")
 

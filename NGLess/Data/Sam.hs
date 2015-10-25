@@ -1,49 +1,46 @@
 module Data.Sam
-    (
- SamLine(..)
- , SamResult(..)
- , samLength
- , readAlignments
- , readSamLine
- , isAligned
- , isUnique
- , isPositive
- , isNegative
- , hasQual
- , matchIdentity
-) where
-
+    ( SamLine(..)
+    , SamResult(..)
+    , samLength
+    , readAlignments
+    , readSamLine
+    , isAligned
+    , isUnique
+    , isPositive
+    , isNegative
+    , hasQual
+    , matchIdentity
+    ) where
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
 import Control.DeepSeq
 
-
+import Control.Applicative
 import Data.Bits (testBit)
 import NGLess.NGError
 
 
 data SamLine = SamLine
-            { samQName :: !S.ByteString
+            { samQName :: !B.ByteString
             , samFlag :: !Int
-            , samRName :: !S.ByteString
+            , samRName :: !B.ByteString
             , samPos :: !Int
             , samMapq :: !Int
-            , samCigar :: !S.ByteString
-            , samRNext :: !S.ByteString
+            , samCigar :: !B.ByteString
+            , samRNext :: !B.ByteString
             , samPNext :: !Int
             , samTLen :: !Int
-            , samSeq :: !S.ByteString
-            , samQual :: !S.ByteString
+            , samSeq :: !B.ByteString
+            , samQual :: !B.ByteString
             } deriving (Eq, Show, Ord)
 
 
 instance NFData SamLine where
-    rnf (SamLine qn f r p m c rn pn tl s qual) = qn `seq` f `seq` r `seq` p `seq` m `seq` c `seq` rn `seq` pn `seq` tl `seq` s `seq` qual `seq` ()
+    rnf (SamLine !qn !f !r !p !m !c !rn !pn !tl !s !qual) = ()
 
 
 data SamResult = Total | Aligned | Unique | LowQual deriving (Enum)
@@ -54,7 +51,6 @@ samLength = B8.length . samSeq
 -- 4 -> 2
 isAligned :: SamLine -> Bool
 isAligned = not . (`testBit` 2) . samFlag
-
 
 -- 16 -> 4
 isNegative :: SamLine -> Bool
@@ -72,38 +68,45 @@ hasQual :: SamLine -> Bool
 hasQual = (`testBit` 9) . samFlag
 
 
-readAlignments :: L.ByteString -> [SamLine]
+readAlignments :: BL.ByteString -> [SamLine]
 readAlignments = readAlignments' . L8.lines
 
-readAlignments' :: [L.ByteString] -> [SamLine]
+readAlignments' :: [BL.ByteString] -> [SamLine]
 readAlignments' [] = []
 readAlignments' (l:ls)
     | L8.head l == '@' = readAlignments' ls
-    | otherwise = (readSamLine l:readAlignments' ls)
+    | otherwise = readSamLine' l:readAlignments' ls
 
 
 readInt b = case L8.readInt b of
-    Just (v,_) -> v
-    _ -> error $ concat ["Expected int, got ", show b]
+    Just (v,_) -> Right v
+    _ -> Left ("Expected int, got " ++ show b)
 
-readSamLine :: L.ByteString -> SamLine
+readSamLine' :: BL.ByteString -> SamLine
+readSamLine' = rightOrError . readSamLine
+    where
+        rightOrError (Right v) = v
+        rightOrError (Left err) = error err
+
+readSamLine :: BL.ByteString -> Either String SamLine
 readSamLine line = case L8.split '\t' line of
-    (tk0:tk1:tk2:tk3:tk4:tk5:tk6:tk7:tk8:tk9:tk10:_) -> SamLine
-                (strict tk0)
-                (readInt tk1)
-                (strict tk2)
-                (readInt tk3)
-                (readInt tk4)
-                (strict tk5)
-                (strict tk6)
-                (readInt tk7)
-                (readInt tk8)
-                (strict tk9)
-                (strict tk10)
-    tokens -> error $ concat ["Expected 11 tokens, only got ", show $ length tokens,"\n\t\tLine was '", show line, "'"]
+    (tk0:tk1:tk2:tk3:tk4:tk5:tk6:tk7:tk8:tk9:tk10:_) ->
+        SamLine
+            <$> pure (strict tk0)
+            <*> readInt tk1
+            <*> pure (strict tk2)
+            <*> readInt tk3
+            <*> readInt tk4
+            <*> pure (strict tk5)
+            <*> pure (strict tk6)
+            <*> readInt tk7
+            <*> readInt tk8
+            <*> pure (strict tk9)
+            <*> pure (strict tk10)
+    tokens -> Left $ concat ["Expected 11 tokens, only got ", show $ length tokens,"\n\t\tLine was '", show line, "'"]
 
-strict :: L.ByteString -> S.ByteString
-strict = S.concat . L.toChunks
+strict :: BL.ByteString -> B.ByteString
+strict = B.concat . BL.toChunks
 
 
 {--

@@ -62,14 +62,17 @@ executeSelect (NGOMappedReadSet fpsam ref) args = do
                                     (fname',) <$> liftIO (openBinaryFile fname' WriteMode)
         Nothing -> openNGLTempFile fpsam "selected_" "sam"
         _ -> throwShouldNotOccur ("Non-string argument in __oname variable" :: T.Text)
-    liftIO $ do
-        samcontents <- BL.lines <$> BL.readFile fpsam
-        forM_ samcontents $ \line ->
-            when (BL.take 1 line == "@" ||
-                _matchConditions conditions (readSamLine line))
-                    (BL.hPut ohand line >> BL.hPut ohand "\n")
-        hClose ohand
-        return (NGOMappedReadSet oname ref)
+    samcontents <- liftIO (BL.lines <$> BL.readFile fpsam)
+    forM_ samcontents $ \line -> do
+        let writeLine = liftIO $ BL.hPut ohand line >> BL.hPut ohand "\n"
+        if BL.take 1 line == "@"
+            then writeLine
+            else case readSamLine line of
+                Left err -> throwDataError err
+                Right samline ->
+                    when (_matchConditions conditions samline) writeLine
+        liftIO (hClose ohand)
+    return (NGOMappedReadSet oname ref)
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
 executeMappedReadMethod :: MethodName -> SamLine -> Maybe NGLessObject -> KwArgsValues -> NGLess NGLessObject
