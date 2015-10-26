@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 
 module Data.FastQ
     ( ShortRead(..)
@@ -15,9 +15,11 @@ module Data.FastQ
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString as B
 import Control.Applicative ((<$>))
+import Control.Monad.Except
 import Data.Word
 
 import Utils.Utils
+import NGLess.NGError
 
 data ShortRead = ShortRead
         { srHeader :: !B.ByteString
@@ -37,11 +39,11 @@ encodingName :: FastQEncoding -> String
 encodingName SangerEncoding = "Sanger (also recent Illumina)"
 encodingName SolexaEncoding = "Solexa (older Illumina)"
 
-guessEncoding :: Word8 -> FastQEncoding
+guessEncoding :: (MonadError NGError m) => Word8 -> m FastQEncoding
 guessEncoding lowC
-    | lowC < 33 = error ("No known encodings with chars < 33 (Yours was "++ (show lowC) ++ ")")
-    | lowC < 58 = SangerEncoding
-    | otherwise = SolexaEncoding
+    | lowC < 33 = throwDataError ("No known encodings with chars < 33 (Yours was "++ (show lowC) ++ ")")
+    | lowC < 58 = return SangerEncoding
+    | otherwise = return SolexaEncoding
 
 
 parseFastQ :: FastQEncoding -> BL.ByteString -> [ShortRead]

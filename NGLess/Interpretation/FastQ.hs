@@ -11,7 +11,6 @@ module Interpretation.FastQ
 
 import System.IO
 import Data.List
-import Data.Maybe
 import Control.Applicative ((<$>))
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Conduit.Combinators as C
@@ -77,7 +76,9 @@ executeQProc :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
                 -> NGLessIO NGLessObject
 executeQProc enc f = do
         fd <- liftIO $ statsFromFastQ <$> readPossiblyCompressedFile f
-        let enc' = fromMaybe (guessEncoding . lc $ fd) enc
+        enc' <- case enc of
+                Just e -> return e
+                Nothing -> guessEncoding (lc fd)
         liftIO $ outputFQStatistics f fd enc'
         p "Simple Statistics completed for: " f
         p "Number of base pairs: "      (show $ length (qualCounts fd))

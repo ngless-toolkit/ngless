@@ -350,23 +350,24 @@ case_calc_perc_uq = _calcPercentile bps eT 0.75 @?= 5
           eT  = V.sum bps -- 8 -> mul: 0,75 -> 16 in arr = 18 index 5
 
 
+simpleStats s = case calculateStatistics s <$> guessEncoding (lc s) of
+    Left e -> error (show e)
+    Right v -> v
+
 -- negative tests quality on value 60 char ';'. Value will be 60 - 64 which is -4
 case_calc_statistics_negative = do
     s <- statsFromFastQ <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
-    head (stats' s) @?= (-4,-4,-4,-4)
-  where stats' s = calculateStatistics s (guessEncoding . lc $ s)
+    head (simpleStats s) @?= (-4,-4,-4,-4)
 
 -- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
 case_calc_statistics_low_positive = do
     s <- statsFromFastQ <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
-    last (stats' s) @?= (1,1,1,1)
-  where stats' s = calculateStatistics s (guessEncoding . lc $ s)
+    last (simpleStats s) @?= (1,1,1,1)
 
 
 case_calc_statistics_normal = do
     s <- statsFromFastQ <$> readPossiblyCompressedFile "test_samples/data_set_repeated.fq"
-    head (stats' s) @?= (25,33,31,33)
-  where stats' s = calculateStatistics s (guessEncoding . lc $ s)
+    head (simpleStats s) @?= (25,33,31,33)
 
 case_test_setup_html_view = do
     setupHtmlViewer "testing_tmp_dir_html"
@@ -377,10 +378,10 @@ case_test_setup_html_view = do
 -- MapOperations
 
 -- ProcessFastQ
-low_char_int = (lc . statsFromFastQ) <$> readPossiblyCompressedFile "test_samples/sample.fq.gz"
 
 case_read_and_write_fastQ = do
-    enc <- guessEncoding <$> low_char_int
+    low_char_int <- (lc . statsFromFastQ) <$> readPossiblyCompressedFile "test_samples/sample.fq.gz"
+    let enc = fromRight $ guessEncoding low_char_int
     rs <- readReadSet enc "test_samples/sample.fq.gz"
     testNGLessIO $ do
         fp <- writeTempFastQ "test_samples/sample.fq.gz" rs enc
