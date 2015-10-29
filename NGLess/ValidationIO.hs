@@ -117,7 +117,7 @@ check_reference v
 
 validate_write_output (Script _ es) = check_toplevel validate_write es
     where
-        validate_write (FunctionCall (FuncName "write") f args _) = validateArg check_can_write_dir "ofile" args es
+        validate_write (FunctionCall (FuncName "write") _ args _) = validateArg check_can_write_dir "ofile" args es
         validate_write _ = return []
 
 check_can_write_dir :: T.Text -> NGLessIO [T.Text]
