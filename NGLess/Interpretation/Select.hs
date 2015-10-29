@@ -71,7 +71,7 @@ executeSelect (NGOMappedReadSet fpsam ref) args = do
                 Left err -> throwDataError err
                 Right samline ->
                     when (_matchConditions conditions samline) writeLine
-        liftIO (hClose ohand)
+    liftIO (hClose ohand)
     return (NGOMappedReadSet oname ref)
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
