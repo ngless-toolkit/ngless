@@ -63,7 +63,9 @@ preprocessArgs =
     []
 
 mapArgs =
-    [ArgInformation "reference" True NGLString Nothing
+    [ArgInformation "reference" False NGLString Nothing
+    ,ArgInformation "fafile" False NGLString Nothing
+    ,ArgInformation "__extra_bwa" False (NGList NGLString) Nothing
     ,ArgInformation "__oname" False NGLString Nothing
     ]
 

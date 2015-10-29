@@ -32,6 +32,7 @@ validate mods expr = case errors of
             ,validate_req_function_args -- check for the existence of required arguments in functions.
             ,validate_symbol_in_args
             ,validate_STDIN_only_used_once
+            ,validate_map_ref_input
             ]
 
 {- Each checking function has the type
@@ -113,6 +114,16 @@ validate_symbol_in_args mods (Script _ es) = check_toplevel (check_recursive val
         validate_symbol_in_args' _ = Nothing
 
 
+
+validate_map_ref_input :: [Module] -> Script -> Maybe T.Text
+validate_map_ref_input _ (Script _ es) = check_toplevel (check_recursive validate_map_ref_input') es
+    where
+        validate_map_ref_input' (FunctionCall (FuncName "map") _ args _) =
+            case (lookup (Variable "reference") args, lookup (Variable "fafile") args) of
+                (Nothing, Nothing) -> Just "Either fafile or reference must be specified in argument to map function"
+                (Just _, Just _) -> Just "You cannot specify both fafile and reference in arguments to map function"
+                _ -> Nothing
+        validate_map_ref_input' _ = Nothing
 
 validate_STDIN_only_used_once :: [Module] -> Script -> Maybe T.Text
 validate_STDIN_only_used_once _ (Script _ code) = check_use Nothing code

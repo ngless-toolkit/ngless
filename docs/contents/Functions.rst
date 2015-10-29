@@ -131,6 +131,7 @@ Map
 The function map, maps a ReadSet to reference. For example::
 
     mapped = map(input, reference='sacCer3')
+    mapped = map(input, fafile='ref.fa')
 
 Argument:
 ~~~~~~~~~
@@ -148,11 +149,15 @@ Arguments by value:
 +-------------+-------------+------------+----------------+
 | Name        | Type        | Required   | Default Value  |
 +=============+=============+============+================+
-| reference   | String      | yes        | -              |
+| reference   | String      | no         | -              |
++-------------+-------------+------------+----------------+
+| fafile      | String      | no         | -              |
 +-------------+-------------+------------+----------------+
 
-The argument ``reference`` can either be a file path to a FASTA file or the
-name of a builtin dataset. NGLess provides the following builtin datasets:
+The user must provide either a path to a FASTA file in the ``fafile`` argument
+or the name of a builtin reference using the ``reference`` argument.
+
+NGLess provides the following builtin datasets:
 
 +-----------+-----------------------------+-------------+
 | Name      | Description                 | Assembly    |

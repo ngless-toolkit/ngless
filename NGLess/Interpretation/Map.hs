@@ -38,6 +38,18 @@ import Data.Sam
 import Utils.Bwa
 import Utils.Utils (readPossiblyCompressedFile)
 
+data Reference = Reference FilePath | FaFile FilePath
+
+lookupReference :: KwArgsValues -> NGLessIO Reference
+lookupReference args = do
+    let reference = lookup "reference" args
+        fafile = lookup "fafile" args
+    case (reference, fafile) of
+        (Nothing, Nothing) -> throwScriptError ("Either reference or fafile must be passed" :: String)
+        (Just _, Just _) -> throwScriptError ("Reference and fafile cannot be used simmultaneously" :: String)
+        (Just r, Nothing) -> (Reference . T.unpack) <$> stringOrTypeError "reference in map argument" r
+        (Nothing, Just fa) -> (FaFile . T.unpack) <$> stringOrTypeError "fafile in map argument" fa
+
 ensureIndexExists :: FilePath -> NGLessIO FilePath
 ensureIndexExists refPath = do
     hasIndex <- hasValidIndex refPath
@@ -81,19 +93,18 @@ mapToReference refIndex fps extraArgs = do
                             bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '"] ++ fps ++ ["'\n",
                             "Bwa error code was ", show code, "."])
 
-interpretMapOp :: T.Text -> [FilePath] -> [String] -> NGLessIO NGLessObject
-interpretMapOp r ds extraArgs = do
-    (ref', defGen') <- indexReference' (T.unpack r)
+interpretMapOp :: Reference -> [FilePath] -> [String] -> NGLessIO NGLessObject
+interpretMapOp ref ds extraArgs = do
+    (ref', defGen') <- indexReference ref
     samPath' <- mapToReference ref' ds extraArgs
     getSamStats samPath'
     return $ NGOMappedReadSet samPath' defGen'
     where
-        indexReference' :: FilePath -> NGLessIO (FilePath, Maybe T.Text)
-        indexReference' r'
-            | isDefaultReference r' = do
-                    basedir  <- ensureDataPresent r'
-                    return (buildGenomePath basedir, Just r)
-            | otherwise  = (, Nothing) <$> ensureIndexExists r'
+        indexReference :: Reference -> NGLessIO (FilePath, Maybe T.Text)
+        indexReference (FaFile fa) = (,Nothing) <$> ensureIndexExists fa
+        indexReference (Reference r) = do
+                basedir  <- ensureDataPresent r
+                return (buildGenomePath basedir, Just $ T.pack r)
 
 
 getSamStats :: FilePath -> NGLessIO ()
@@ -131,7 +142,7 @@ printSamStats (total, aligned, unique, lowQ) = do
 
 executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMap fps args = do
-    ref <- lookupStringOrScriptError "reference for map function" "reference" args
+    ref <- lookupReference args
     extraArgs <- (map T.unpack) <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
     let executeMap' (NGOList es) = NGOList <$> forM es executeMap'
         executeMap' (NGOReadSet1 _enc file)    = interpretMapOp ref [file] extraArgs
