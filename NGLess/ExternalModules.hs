@@ -15,7 +15,6 @@ import Control.Applicative
 import Control.Monad
 import Data.Maybe
 import System.Process
-import System.IO
 import System.Exit
 import System.Directory
 import System.FilePath.Posix

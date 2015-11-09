@@ -15,7 +15,6 @@ import Language
 import NGLess
 import Interpretation.Count
 import Interpretation.Annotation
-import Interpretation.Write
 import Data.GFF
 import qualified Data.GFF as GFF
 
