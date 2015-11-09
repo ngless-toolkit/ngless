@@ -75,17 +75,13 @@ executeSelect (NGOMappedReadSet fpsam ref) args = do
     return (NGOMappedReadSet oname ref)
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
-executeMappedReadMethod :: MethodName -> SamLine -> Maybe NGLessObject -> KwArgsValues -> NGLess NGLessObject
-executeMappedReadMethod Mflag samline (Just (NGOSymbol flag)) [] = do
+executeMappedReadMethod :: MethodName -> [SamLine] -> Maybe NGLessObject -> KwArgsValues -> NGLess NGLessObject
+executeMappedReadMethod Mflag samlines (Just (NGOSymbol flag)) [] = do
         f <- getFlag flag
-        return (NGOBool $ f samline)
+        return (NGOBool $ f samlines)
     where
-        getFlag "mapped" = return isAligned
-        getFlag "unmapped" = return (not . isAligned)
+        getFlag "mapped" = return (any isAligned)
+        getFlag "unmapped" = return (not . any isAligned)
         getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
-executeMappedReadMethod Mscore samline (Just (NGOSymbol scoref)) [] = case scoref of
-    "identity_pc" -> do
-        identity <- matchIdentity samline
-        return . NGOInteger . round $ 100 * identity
-    _ -> throwScriptError ("Unknown score function '"++T.unpack scoref++"'")
+
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")

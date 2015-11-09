@@ -29,6 +29,7 @@ import qualified Data.Text.IO as T
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Zlib as C
 import qualified Data.Conduit as C
+import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit (($=), ($$), (=$=), (=$))
 import Data.Conduit.Async ((=$=&), ($$&))
@@ -451,19 +452,42 @@ executeSelectWBlock (NGOMappedReadSet fname ref) [] (Block [Variable var] body) 
         (oname, ohandle) <- runNGLessIO $ openNGLTempFile fname "block_selected_" "sam"
         C.sourceFile fname
             $= CB.lines
-            =$= C.filterM filterLine
+            =$= readSamLineOrDie
+            =$= CL.groupBy groupLine
+            =$= C.mapM filterGroup
+            =$= CL.concat
             =$= C.unlinesAscii
-            $$ C.sinkHandle ohandle
+            $$ CB.sinkHandle ohandle
         liftIO $ hClose ohandle
         return (NGOMappedReadSet oname ref)
     where
-        filterLine line
-            | "@" `B.isPrefixOf` line = return True -- The whole header is copied verbatim to the output
-            | otherwise = case readSamLine . BL.fromChunks $ [line] of
+        readSamLineOrDie = C.awaitForever $ \line ->
+            case readSamLine (BL.fromChunks [line]) of
                 Left err -> throwDataError err
-                Right mr -> do
-                    mr' <- runInROEnvIO (interpretBlock1 [(var, NGOMappedRead mr)] body)
-                    return (blockStatus mr' `elem` [BlockContinued, BlockOk])
+                Right parsed -> C.yield (parsed,line)
+        groupLine (SamHeader _,_) _ = False
+        groupLine _ (SamHeader _,_) = False
+        groupLine (s0,_) (s1,_) = (samQName s0) == (samQName s1)
+        filterGroup :: [(SamLine, B.ByteString)] -> InterpretationEnvIO [B.ByteString]
+        filterGroup [] = return []
+        filterGroup [(SamHeader _, line)] = return [line]
+        filterGroup mappedreads  = do
+                    let _ = mappedreads :: [(SamLine, B.ByteString)]
+                    mrs' <- runInROEnvIO (interpretBlock1 [(var, NGOMappedRead (map fst mappedreads))] body)
+                    if blockStatus mrs' `elem` [BlockContinued, BlockOk]
+                        then case lookup var (blockValues mrs') of
+                            Just (NGOMappedRead []) -> return []
+                            Just (NGOMappedRead rs) -> return (filterMappedRead mappedreads rs)
+                            _ -> nglTypeError ("Expected variable "++show var++" to contain a mapped read.")
+
+                        else return []
+        filterMappedRead :: [(SamLine, B.ByteString)] -> [SamLine] -> [B.ByteString]
+        filterMappedRead [] _ = []
+        filterMappedRead _ [] = []
+        filterMappedRead ((r0,rl):rs) (r':rs')
+            | r' == r0 = rl:(filterMappedRead rs rs')
+            | otherwise = filterMappedRead rs (r':rs')
+
 executeSelectWBlock _ _ _ = unreachable ("Select with block")
 
 

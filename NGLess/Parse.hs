@@ -167,7 +167,6 @@ methodName = methodName' <?> "method name"
             mname <- word
             case mname of
                 "flag" -> pure Mflag
-                "score" -> pure Mscore
                 _ -> fail "Method name not found"
 
 pairedKwArgs = (++) <$> (wrap <$> expression) <*> (kwargs <* operator ')')

@@ -14,6 +14,7 @@ module Data.Sam
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
@@ -36,11 +37,13 @@ data SamLine = SamLine
             , samTLen :: !Int
             , samSeq :: !B.ByteString
             , samQual :: !B.ByteString
-            } deriving (Eq, Show, Ord)
+            } | SamHeader !B.ByteString
+             deriving (Eq, Show, Ord)
 
 
 instance NFData SamLine where
     rnf (SamLine !qn !f !r !p !m !c !rn !pn !tl !s !qual) = ()
+    rnf (SamHeader !_) = ()
 
 
 data SamResult = Total | Aligned | Unique | LowQual deriving (Enum)
@@ -89,7 +92,9 @@ readSamLine' = rightOrError . readSamLine
         rightOrError (Left err) = error err
 
 readSamLine :: BL.ByteString -> Either String SamLine
-readSamLine line = case L8.split '\t' line of
+readSamLine line
+    | BL8.head line == '@' = return (SamHeader $ strict line)
+    | otherwise = case BL8.split '\t' line of
     (tk0:tk1:tk2:tk3:tk4:tk5:tk6:tk7:tk8:tk9:tk10:_) ->
         SamLine
             <$> pure (strict tk0)
