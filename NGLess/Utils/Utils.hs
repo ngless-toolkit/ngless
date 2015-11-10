@@ -9,6 +9,7 @@ module Utils.Utils
     , uniq
     , readPossiblyCompressedFile
     , hWriteGZIP
+    , allSame
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -36,3 +37,8 @@ readPossiblyCompressedFile fname
 
 hWriteGZIP :: Handle -> BL.ByteString -> IO ()
 hWriteGZIP h = BL.hPut h . GZip.compress
+
+allSame :: Eq a => [a] -> Bool
+allSame [] = True
+allSame (e:es) = all (==e) es
+

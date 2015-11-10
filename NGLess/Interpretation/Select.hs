@@ -91,8 +91,7 @@ executeMappedReadMethod Mfilter samlines Nothing kwargs = do
             Left _ -> 0.0
         samlines' = filter ((< minQV) . matchIdentity') samlines
     return (NGOMappedRead samlines')
-
-
+executeMappedReadMethod Munique samlines Nothing [] = return . NGOMappedRead . mUnique $ samlines
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 filterPE :: [SamLine] -> [SamLine]
@@ -106,4 +105,7 @@ filterPE slines = (filterPE' . filter isAligned) slines
             | otherwise = filterPE' sls
         findMatch target = listToMaybe . filter (isMatch target)
         isMatch target other = isNegative other && (samRName target) == (samRName other)
-
+mUnique :: [SamLine] -> [SamLine]
+mUnique slines
+    | allSame (map samRName slines) = slines
+    | otherwise = []

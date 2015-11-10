@@ -42,8 +42,9 @@ instance Show FuncName where
 
 data MethodName =
         Mflag
-        | Mpe_filter
         | Mfilter
+        | Mpe_filter
+        | Munique
     deriving (Eq, Show)
 
 
@@ -52,6 +53,7 @@ methodArgTypeReturnType :: MethodName -> ((NGLType, Maybe NGLType), NGLType)
 methodArgTypeReturnType Mflag = ((NGLMappedRead, Just NGLSymbol), NGLBool)
 methodArgTypeReturnType Mpe_filter = ((NGLMappedRead, Nothing), NGLMappedRead)
 methodArgTypeReturnType Mfilter = ((NGLMappedRead, Nothing), NGLMappedRead)
+methodArgTypeReturnType Munique = ((NGLMappedRead, Nothing), NGLMappedRead)
 
 methodSelfType :: MethodName -> NGLType
 methodSelfType = fst . fst . methodArgTypeReturnType

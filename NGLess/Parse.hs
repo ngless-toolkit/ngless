@@ -176,6 +176,7 @@ methodName = methodName' <?> "method name"
                 "filter" -> pure Mfilter
                 "flag" -> pure Mflag
                 "pe_filter" -> pure Mpe_filter
+                "unique" -> pure Munique
                 _ -> fail "Method name not found"
 
 pairedKwArgs = (++) <$> (wrap <$> expression) <*> (kwargs <* operator ')')
