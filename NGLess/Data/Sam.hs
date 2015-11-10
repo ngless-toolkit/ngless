@@ -76,26 +76,22 @@ readInt b = case L8.readInt b of
 
 readSamLine :: BL.ByteString -> Either NGError SamLine
 readSamLine line
-    | BL8.head line == '@' = return (SamHeader $ strict line)
+    | BL8.head line == '@' = return (SamHeader $ BL.toStrict line)
     | otherwise = case BL8.split '\t' line of
     (tk0:tk1:tk2:tk3:tk4:tk5:tk6:tk7:tk8:tk9:tk10:_) ->
         SamLine
-            <$> pure (strict tk0)
+            <$> pure (BL.toStrict tk0)
             <*> readInt tk1
-            <*> pure (strict tk2)
+            <*> pure (BL.toStrict tk2)
             <*> readInt tk3
             <*> readInt tk4
-            <*> pure (strict tk5)
-            <*> pure (strict tk6)
+            <*> pure (BL.toStrict tk5)
+            <*> pure (BL.toStrict tk6)
             <*> readInt tk7
             <*> readInt tk8
-            <*> pure (strict tk9)
-            <*> pure (strict tk10)
+            <*> pure (BL.toStrict tk9)
+            <*> pure (BL.toStrict tk10)
     tokens -> throwDataError $ concat ["Expected 11 tokens, only got ", show $ length tokens,"\n\t\tLine was '", show line, "'"]
-
-strict :: BL.ByteString -> B.ByteString
-strict = B.concat . BL.toChunks
-
 
 {--
 Op     Description
