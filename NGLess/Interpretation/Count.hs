@@ -47,8 +47,8 @@ executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
 executeCount (NGOAnnotatedSet annot_fp headers_fp) args = do
     let c = lookup "counts" args
-        NGOInteger m = lookupWithDefault (NGOInteger 0) "min" args
         c' = GffGene
+    m <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
     methodS <- symbolOrTypeError "multiple argument to count " . lookupWithDefault (NGOSymbol "dist1") "multiple" $ args
     method <- methodFor methodS
     let second_col hline = BL8.split '\t' hline !! 1
