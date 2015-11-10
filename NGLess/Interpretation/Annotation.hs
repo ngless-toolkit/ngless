@@ -196,7 +196,7 @@ intersection' [] = []
 intersection' im = concat . IM.elems $ foldl1 IM.intersection im
 
 _allSameId :: [AnnotationInfo] -> Bool
-_allSameId (ai:ais) = all ((==snd ai) . snd) ais
+_allSameId = allSame . map snd
 
 intervals :: [GffLine] -> AnnotationMap
 intervals = foldl insertg M.empty
