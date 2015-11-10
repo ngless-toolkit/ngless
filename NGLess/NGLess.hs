@@ -19,6 +19,8 @@ module NGLess
     , lookupStringOrScriptErrorDef
     , lookupStringListOrScriptError
     , lookupStringListOrScriptErrorDef
+    , lookupIntegerOrScriptError
+    , lookupIntegerOrScriptErrorDef
     , testNGLessIO
     ) where
 
@@ -90,6 +92,13 @@ lookupBoolOrScriptErrorDef :: (MonadError NGError m) => m Bool -> String -> T.Te
 lookupBoolOrScriptErrorDef defval context name args = case lookup name args of
     Nothing -> defval
     Just v -> boolOrTypeError context v
+
+lookupIntegerOrScriptError :: (MonadError NGError m) => String-> T.Text -> KwArgsValues -> m Integer
+lookupIntegerOrScriptError = requiredLookup lookupIntegerOrScriptErrorDef
+lookupIntegerOrScriptErrorDef defval context name args = case lookup name args of
+    Nothing -> defval
+    Just (NGOInteger v) -> return v
+    Just other -> throwScriptError (T.concat ["Expected an integer in argument ", name, " in context '", T.pack context, "' instead observed: ", T.pack . show $ other])
 
 requiredLookup :: (MonadError NGError m) => (m a -> String-> T.Text -> KwArgsValues -> m a) -> String-> T.Text -> KwArgsValues -> m a
 requiredLookup withDefaultLookup context name = withDefaultLookup errorAct context name

@@ -43,6 +43,7 @@ instance Show FuncName where
 data MethodName =
         Mflag
         | Mpe_filter
+        | Mfilter
     deriving (Eq, Show)
 
 
@@ -50,6 +51,7 @@ data MethodName =
 methodArgTypeReturnType :: MethodName -> ((NGLType, Maybe NGLType), NGLType)
 methodArgTypeReturnType Mflag = ((NGLMappedRead, Just NGLSymbol), NGLBool)
 methodArgTypeReturnType Mpe_filter = ((NGLMappedRead, Nothing), NGLMappedRead)
+methodArgTypeReturnType Mfilter = ((NGLMappedRead, Nothing), NGLMappedRead)
 
 methodSelfType :: MethodName -> NGLType
 methodSelfType = fst . fst . methodArgTypeReturnType
@@ -61,6 +63,7 @@ methodReturnType :: MethodName -> NGLType
 methodReturnType = snd . methodArgTypeReturnType
 
 methodKwargType :: MethodName -> Variable -> NGLType
+methodKwargType Mfilter (Variable "min_identity_pc") = NGLInteger
 methodKwargType _ _ = NGLVoid
 
 typeOfConstant :: T.Text -> Maybe NGLType

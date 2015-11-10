@@ -82,6 +82,17 @@ executeMappedReadMethod Mflag samlines (Just (NGOSymbol flag)) [] = do
         getFlag "unmapped" = return (not . any isAligned)
         getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
 executeMappedReadMethod Mpe_filter samlines Nothing [] = return . NGOMappedRead . filterPE $ samlines
+executeMappedReadMethod Mfilter samlines Nothing kwargs = do
+    minQ <- lookupIntegerOrScriptError "filter method" "min_identity_pc" kwargs
+    let minQV :: Double
+        minQV = fromInteger minQ / 100.0
+        matchIdentity' s = case matchIdentity s of
+            Right v -> v
+            Left _ -> 0.0
+        samlines' = filter ((< minQV) . matchIdentity') samlines
+    return (NGOMappedRead samlines')
+
+
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 filterPE :: [SamLine] -> [SamLine]
