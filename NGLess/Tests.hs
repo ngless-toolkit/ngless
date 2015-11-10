@@ -204,9 +204,6 @@ case_isAligned_raw = isAligned (fromRight . readSamLine $ r) @? "Should be align
 
 case_isNotAligned = (not $ isAligned (samLine {samFlag = 4})) @? "Should not be aligned"
 
-case_isUnique = isUnique (samLine {samMapq = 5}) @? "Should be unique"
-case_isNotUnique = (not $ isUnique (samLine {samMapq = 0})) @? "Should not be unique"
-
 case_read_one_Sam_Line = readSamLine samLineFlat @?= Right samLine
 
 case_match_identity_soft = fromRight (matchIdentity =<< readSamLine sline) < 0.9 @? "Soft clipped read (low identity)"

@@ -116,7 +116,7 @@ executeMappedReadMethod Mfilter samlines Nothing kwargs = do
         matchIdentity' s = case matchIdentity s of
             Right v -> v
             Left _ -> 0.0
-        samlines' = filter ((< minQV) . matchIdentity') samlines
+        samlines' = filter ((>= minQV) . matchIdentity') samlines
     return (NGOMappedRead samlines')
 executeMappedReadMethod Munique samlines Nothing [] = return . NGOMappedRead . mUnique $ samlines
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
