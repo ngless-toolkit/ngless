@@ -42,11 +42,14 @@ instance Show FuncName where
 
 data MethodName =
         Mflag
+        | Mpe_filter
     deriving (Eq, Show)
 
 
+-- | method name -> ((method self type, method first argtype if any), method return type)
 methodArgTypeReturnType :: MethodName -> ((NGLType, Maybe NGLType), NGLType)
 methodArgTypeReturnType Mflag = ((NGLMappedRead, Just NGLSymbol), NGLBool)
+methodArgTypeReturnType Mpe_filter = ((NGLMappedRead, Nothing), NGLMappedRead)
 
 methodSelfType :: MethodName -> NGLType
 methodSelfType = fst . fst . methodArgTypeReturnType

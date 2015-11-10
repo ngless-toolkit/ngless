@@ -15,6 +15,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<$>))
 import System.IO
 import qualified Data.Text as T
+import Data.Maybe
 
 import Language
 import FileManagement
@@ -80,5 +81,18 @@ executeMappedReadMethod Mflag samlines (Just (NGOSymbol flag)) [] = do
         getFlag "mapped" = return (any isAligned)
         getFlag "unmapped" = return (not . any isAligned)
         getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
-
+executeMappedReadMethod Mpe_filter samlines Nothing [] = return . NGOMappedRead . filterPE $ samlines
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
+
+filterPE :: [SamLine] -> [SamLine]
+filterPE slines = (filterPE' . filter isAligned) slines
+    where
+        filterPE' [] = []
+        filterPE' (sl:sls)
+            | isPositive sl = case findMatch sl slines of
+                    Just sl2 -> sl:sl2:filterPE' sls
+                    Nothing -> filterPE' sls
+            | otherwise = filterPE' sls
+        findMatch target = listToMaybe . filter (isMatch target)
+        isMatch target other = isNegative other && (samRName target) == (samRName other)
+
