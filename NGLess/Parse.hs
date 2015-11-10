@@ -15,6 +15,7 @@ import Language
 import Tokens
 
 import Control.Applicative hiding ((<|>), many, optional)
+import Control.Monad
 import Control.Monad.Identity ()
 import qualified Data.Text as T
 import Text.ParserCombinators.Parsec.Prim hiding (Parser)
@@ -103,7 +104,13 @@ expression = expression' <* (many eol)
                     <|> assignment
                     <|> innerexpression
 
-innerexpression = binoperation_or_just_left
+innerexpression = try $ do
+    left <- left_expression
+    (try $ do {
+        bop <- binop;
+        right <- innerexpression;
+        return $ BinaryOp bop left right}) <|> return left
+
 left_expression =  uoperator
                     <|> method_call
                     <|> _indexexpr
@@ -166,6 +173,7 @@ methodName = methodName' <?> "method name"
         methodName' = do
             mname <- word
             case mname of
+                "filter" -> pure Mfilter
                 "flag" -> pure Mflag
                 "pe_filter" -> pure Mpe_filter
                 _ -> fail "Method name not found"
@@ -175,24 +183,19 @@ pairedKwArgs = (++) <$> (wrap <$> expression) <*> (kwargs <* operator ')')
 
 kwargs = many (operator ',' *> kwarg) <?> "keyword argument list"
 kwarg = kwarg' <?> "keyword argument"
-    where kwarg' = (,) <$> (variable <* operator '=') <*> expression
+    where kwarg' = (,) <$> (variable <* operator '=') <*> innerexpression
 
 assignment = try assignment'
     where assignment' =
             Assignment <$> variable <*> (operator '=' *> expression)
 
-binoperation_or_just_left = try $ do
-    left <- left_expression
-    (try $ do {
-        bop <- binop;
-        right <- innerexpression;
-        return $ BinaryOp bop left right}) <|> return left
-
 method_call = try $ do
     self <- base_expression <* operator '.'
     met <- methodName <* operator '('
-    a <- optionMaybe expression
-    kws <- kwargs <* operator ')'
+    a <- optionMaybe $ try (innerexpression <* notFollowedBy (operator '='))
+    optional (operator ',')
+    kws <- kwarg `sepBy` (operator ',')
+    void $ operator ')'
     return (MethodCall met self a kws)
 
 _indexexpr = try (IndexExpression <$> base_expression <*> indexing)

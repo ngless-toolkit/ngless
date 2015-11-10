@@ -128,3 +128,5 @@ tokcleanupindents = map snd . _cleanupindents . map (newPos "test" 0 0,)
 
 case_parse_kwargs = parseBody "unique(reads,maxCopies=2)\n" @?= [FunctionCall (FuncName "unique") (Lookup (Variable "reads")) [(Variable "maxCopies", ConstInt 2)] Nothing]
 
+case_parse_methods_kwargs_only = parseBody "sf.filter(min_identity_pc=90)\n" @?= [MethodCall Mfilter (Lookup (Variable "sf")) Nothing [(Variable "min_identity_pc", ConstInt 90)]]
+

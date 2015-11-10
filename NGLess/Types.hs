@@ -276,7 +276,7 @@ checkmethodcall m self arg = do
     let reqArgType = methodArgType m
     case (actualType, reqArgType) of
         (Nothing, _) -> return ()
-        (Just _, Nothing) -> errorInLineC ["Method ", show m, " does not take any unnamed argument"]
+        (Just _, Nothing) -> errorInLineC ["Method ", show m, " does not take any unnamed argument (saw ", show arg, ")"]
         (Just t, Just t') -> when (t /= t') (errorInLineC
                         ["Method ", show m, " expects type ", show t', " got ", show t])
     return . Just . methodReturnType $ m
