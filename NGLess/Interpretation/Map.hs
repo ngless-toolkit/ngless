@@ -127,7 +127,7 @@ _calcSamStats contents = (total, aligned, unique, lowQual)
         update (P4 t al u lQ) samLine =
             P4 (t + 1)
                 (al + (asInteger . isAligned $ samLine))
-                (u  + (asInteger . isUnique $ samLine))
+                0 --(u  + (asInteger . isUnique $ samLine))
                 (lQ + (asInteger . hasQual $ samLine))
         asInteger True = 1
         asInteger False = 0

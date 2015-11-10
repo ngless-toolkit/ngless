@@ -445,24 +445,14 @@ executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> Inte
 executeSelectWBlock (NGOMappedReadSet fname ref) [] (Block [Variable var] body) = do
         runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", fname]
         (oname, ohandle) <- runNGLessIO $ openNGLTempFile fname "block_selected_" "sam"
-        C.sourceFile fname
-            $= CB.lines
-            =$= readSamLineOrDie
-            =$= CL.groupBy groupLine
-            =$= C.mapM filterGroup
+        readSamGroupsAsConduit fname
+            $= C.mapM filterGroup
             =$= CL.concat
             =$= C.unlinesAscii
             $$ CB.sinkHandle ohandle
         liftIO $ hClose ohandle
         return (NGOMappedReadSet oname ref)
     where
-        readSamLineOrDie = C.awaitForever $ \line ->
-            case readSamLine (BL.fromChunks [line]) of
-                Left err -> throwError err
-                Right parsed -> C.yield (parsed,line)
-        groupLine (SamHeader _,_) _ = False
-        groupLine _ (SamHeader _,_) = False
-        groupLine (s0,_) (s1,_) = (samQName s0) == (samQName s1)
         filterGroup :: [(SamLine, B.ByteString)] -> InterpretationEnvIO [B.ByteString]
         filterGroup [] = return []
         filterGroup [(SamHeader _, line)] = return [line]

@@ -2,17 +2,23 @@
  - License: MIT
  -}
 
-{-# LANGUAGE TupleSections, OverloadedStrings #-}
+{-# LANGUAGE TupleSections, OverloadedStrings, RankNTypes #-}
 
 module Interpretation.Select
     ( executeSelect
     , executeMappedReadMethod
+    , readSamGroupsAsConduit
     ) where
 
+import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as BL
-import Control.Monad
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Except
 import Control.Applicative ((<$>))
+import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit as C
+import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Binary as CB
+import Data.Conduit (($=), ($$), (=$=))
 import System.IO
 import qualified Data.Text as T
 import Data.Maybe
@@ -46,30 +52,51 @@ _parseConditions args = do
         asSC (NGOSymbol "unique") = return SelectUnique
         asSC c = throwShouldNotOccur ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
 
-_matchConditions :: MatchCondition -> SamLine -> Bool
-_matchConditions _ (SamHeader _) = True
-_matchConditions (DropIf drop_if) samline = none (_match1 samline) drop_if
-    where none f = not . any f
-_matchConditions (KeepIf keep_if) samline = all (_match1 samline) keep_if
+_matchConditions :: MatchCondition -> [(SamLine,B.ByteString)] -> [B.ByteString]
+_matchConditions _ [(SamHeader _,line)] = [line]
+_matchConditions (DropIf []) slines = map snd slines
+_matchConditions (DropIf (c:cs)) slines = _matchConditions (DropIf cs) (_drop1 c slines)
+_matchConditions (KeepIf []) slines = map snd slines
+_matchConditions (KeepIf (c:cs)) slines = _matchConditions (DropIf cs) (_keep1 c slines)
 
-_match1 samline SelectMapped = isAligned samline
-_match1 samline SelectUnmapped = not $ isAligned samline
-_match1 samline SelectUnique = isUnique samline
+_drop1 SelectUnmapped = filter (isAligned . fst)
+_drop1 SelectMapped = filter (not . isAligned . fst)
+_drop1 SelectUnique = \g -> if isGroupUnique (map fst g) then [] else g
+
+_keep1 SelectMapped = filter (isAligned . fst)
+_keep1 SelectUnmapped = filter (not . isAligned . fst)
+_keep1 SelectUnique = \g -> if isGroupUnique (map fst g) then g else []
+
+-- readSamGroupsAsConduit :: (MonadIO m, MonadResource m) => FilePath -> C.Producer m [(SamLine, B.ByteString)]
+readSamGroupsAsConduit fname =
+        C.sourceFile fname
+            $= CB.lines
+            =$= readSamLineOrDie
+            =$= CL.groupBy groupLine
+    where
+        readSamLineOrDie = C.awaitForever $ \line ->
+            case readSamLine (BL.fromChunks [line]) of
+                Left err -> throwError err
+                Right parsed -> C.yield (parsed,line)
+        groupLine (SamHeader _,_) _ = False
+        groupLine _ (SamHeader _,_) = False
+        groupLine (s0,_) (s1,_) = (samQName s0) == (samQName s1)
+
 
 executeSelect :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSelect (NGOMappedReadSet fpsam ref) args = do
     conditions <- _parseConditions args
-    (oname,ohand) <- case lookup "__oname" args of
+    (oname,ohandle) <- case lookup "__oname" args of
         Just (NGOString fname) -> let fname' = T.unpack fname in
                                     (fname',) <$> liftIO (openBinaryFile fname' WriteMode)
         Nothing -> openNGLTempFile fpsam "selected_" "sam"
         _ -> throwShouldNotOccur ("Non-string argument in __oname variable" :: T.Text)
-    samcontents <- liftIO (BL.lines <$> BL.readFile fpsam)
-    forM_ samcontents $ \line -> do
-        parsed <- runNGLess (readSamLine line)
-        when (_matchConditions conditions parsed) $
-            liftIO (BL.hPut ohand line >> BL.hPut ohand "\n")
-    liftIO (hClose ohand)
+    readSamGroupsAsConduit fpsam
+        $= CL.map (_matchConditions conditions)
+        =$= CL.concat
+        =$= C.unlinesAscii
+        $$ CB.sinkHandle ohandle
+    liftIO (hClose ohandle)
     return (NGOMappedReadSet oname ref)
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
@@ -105,7 +132,11 @@ filterPE slines = (filterPE' . filter isAligned) slines
             | otherwise = filterPE' sls
         findMatch target = listToMaybe . filter (isMatch target)
         isMatch target other = isNegative other && (samRName target) == (samRName other)
+
 mUnique :: [SamLine] -> [SamLine]
 mUnique slines
-    | allSame (map samRName slines) = slines
+    | isGroupUnique slines = slines
     | otherwise = []
+
+isGroupUnique :: [SamLine] -> Bool
+isGroupUnique = allSame . map samRName

@@ -4,7 +4,6 @@ module Data.Sam
     , samLength
     , readSamLine
     , isAligned
-    , isUnique
     , isPositive
     , isNegative
     , hasQual
@@ -61,9 +60,6 @@ isNegative = (`testBit` 4) . samFlag
 -- all others
 isPositive :: SamLine -> Bool
 isPositive = not . isNegative
-
-isUnique :: SamLine -> Bool
-isUnique =  (> 0) . samMapq
 
 -- 512 -> 8
 hasQual :: SamLine -> Bool
