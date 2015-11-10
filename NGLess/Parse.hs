@@ -44,7 +44,7 @@ parsetoks input inputname reqversion toks = case parse (nglparser reqversion) in
 buildErrorMessage :: T.Text -> ParseError -> T.Text
 buildErrorMessage input err = T.concat $ ["Parsing error on file '", T.pack fname, "' on line ", T.pack . show $ line, " (column ", T.pack . show $ col, ")\n\n"]
                     ++ preLines 3
-                    ++ ["\n", indicatorLine]
+                    ++ ["\n\t", indicatorLine]
                     ++ postLines 2
                     ++ ["\n\n", T.pack . show $ err, "\n"]
     where
@@ -54,8 +54,8 @@ buildErrorMessage input err = T.concat $ ["Parsing error on file '", T.pack fnam
         col = sourceColumn pos
         sourceLines = T.lines input
         preLines :: Int -> [T.Text]
-        preLines n = withNLTAB $ sliceList (max 0 (line - n)) (line + 1) sourceLines
-        postLines n = withNLTAB $ sliceList (line + 1) (line + 1 + n) sourceLines
+        preLines n = withNLTAB $ sliceList (max 0 (line - n)) line sourceLines
+        postLines n = withNLTAB $ sliceList line (line +  n) sourceLines
         withNLTAB [] = []
         withNLTAB (ell:ls) = ("\n\t":ell:withNLTAB ls)
         indicatorLine = T.pack (['-' | _ <- [1..col+8]] ++ "^")
