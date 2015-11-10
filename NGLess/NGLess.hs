@@ -3,6 +3,7 @@ module NGLess
     ( NGLessIO
     , NGLess
     , NGError(..)
+    , runNGLess
     , throwShouldNotOccur
     , throwScriptError
     , throwDataError
@@ -36,6 +37,10 @@ type NGLessIO = ExceptT NGError (ResourceT IO)
 type NGLess = Either NGError
 
 type KwArgsValues = [(T.Text, NGLessObject)]
+
+runNGLess :: (MonadError NGError m) => Either NGError a -> m a
+runNGLess (Left err) = throwError err
+runNGLess (Right v) = return v
 
 testNGLessIO :: NGLessIO a -> IO a
 testNGLessIO act = do

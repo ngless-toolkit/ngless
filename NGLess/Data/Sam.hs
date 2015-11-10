@@ -2,7 +2,6 @@ module Data.Sam
     ( SamLine(..)
     , SamResult(..)
     , samLength
-    , readAlignments
     , readSamLine
     , isAligned
     , isUnique
@@ -71,27 +70,11 @@ hasQual :: SamLine -> Bool
 hasQual = (`testBit` 9) . samFlag
 
 
-readAlignments :: BL.ByteString -> [SamLine]
-readAlignments = readAlignments' . L8.lines
-
-readAlignments' :: [BL.ByteString] -> [SamLine]
-readAlignments' [] = []
-readAlignments' (l:ls)
-    | L8.head l == '@' = readAlignments' ls
-    | otherwise = readSamLine' l:readAlignments' ls
-
-
 readInt b = case L8.readInt b of
-    Just (v,_) -> Right v
-    _ -> Left ("Expected int, got " ++ show b)
+    Just (v,_) -> return v
+    _ -> throwDataError ("Expected int, got " ++ show b)
 
-readSamLine' :: BL.ByteString -> SamLine
-readSamLine' = rightOrError . readSamLine
-    where
-        rightOrError (Right v) = v
-        rightOrError (Left err) = error err
-
-readSamLine :: BL.ByteString -> Either String SamLine
+readSamLine :: BL.ByteString -> Either NGError SamLine
 readSamLine line
     | BL8.head line == '@' = return (SamHeader $ strict line)
     | otherwise = case BL8.split '\t' line of
@@ -108,7 +91,7 @@ readSamLine line
             <*> readInt tk8
             <*> pure (strict tk9)
             <*> pure (strict tk10)
-    tokens -> Left $ concat ["Expected 11 tokens, only got ", show $ length tokens,"\n\t\tLine was '", show line, "'"]
+    tokens -> throwDataError $ concat ["Expected 11 tokens, only got ", show $ length tokens,"\n\t\tLine was '", show line, "'"]
 
 strict :: BL.ByteString -> B.ByteString
 strict = B.concat . BL.toChunks

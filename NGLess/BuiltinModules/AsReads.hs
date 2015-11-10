@@ -10,9 +10,20 @@ module BuiltinModules.AsReads
     ) where
 
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString as B
 import qualified Data.Text as T
 import Control.Applicative ((<$>))
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit.Zlib as C
+import qualified Data.Conduit as C
+import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Binary as CB
+import Data.Conduit (($=), ($$), (=$=), (=$))
+import Data.Conduit.Async ((=$=&), ($$&))
+import Data.Function (on)
+import Control.Monad.Except
+import Control.Exception
 import System.IO
 
 import Language
@@ -32,14 +43,34 @@ executeReads arg _ = throwShouldNotOccur ("executeReads called with argument: " 
 samToFastQ :: FilePath -> NGLessIO FilePath
 samToFastQ fpsam = do
     (oname,ohand) <- openNGLTempFile fpsam "reads_" "fq"
-    liftIO $ do
-        fq <-  (map asFQ . readAlignments) <$> BL.readFile fpsam
-        BL.hPut ohand (BL.concat fq)
-        hClose ohand
-        return oname
+    C.sourceFile fpsam
+        $= CB.lines
+        =$= readSamGroupsC
+        =$= CL.map asFQ
+        =$= CL.concat
+        $$ CB.sinkHandle ohand
+    liftIO (hClose ohand)
+    return oname
 
-asFQ :: SamLine -> BL.ByteString
-asFQ SamLine{samQName=qname, samSeq=short, samQual=qs} = BL.fromChunks ["@", qname, "\n", short, "\n+\n", qs, "\n"]
+asFQ :: [SamLine] -> [B.ByteString]
+asFQ = asFQ' False False
+    where
+        asFQ'  _ _ []= []
+        asFQ' seen1 seen2 (s:ss)
+            | isPositive s && (not seen1) = asFQ1 s:asFQ' True seen2 ss
+            | isNegative s && (not seen2) = asFQ1 s:asFQ' seen1 True ss
+            | otherwise = asFQ' seen1 seen2 ss
+        asFQ1 SamLine{samQName=qname, samSeq=short, samQual=qs} = B.concat ["@", qname, "\n", short, "\n+\n", qs, "\n"]
+
+readSamGroupsC :: C.Conduit B.ByteString NGLessIO [SamLine]
+readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
+    where
+        readSamLineOrDie = C.awaitForever $ \line ->
+            case readSamLine (BL.fromStrict line) of
+                Left err -> throwError err
+                Right parsed@SamLine{} -> C.yield parsed
+                _ -> return ()
+        groupLine = (==) `on` samQName
 
 as_reads_Function = Function
     { funcName = FuncName "as_reads"

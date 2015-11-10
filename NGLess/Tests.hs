@@ -21,7 +21,6 @@ import System.Directory (removeFile
 import System.Console.CmdArgs.Verbosity
 
 import qualified Data.ByteString.Char8 as B
-import qualified Data.ByteString.Lazy.Char8 as L
 
 
 import Data.Convertible
@@ -199,7 +198,7 @@ samLine = SamLine
             }
 
 case_isAligned_sam = isAligned (samLine {samFlag = 16}) @? "Should be aligned"
-case_isAligned_raw = isAligned (head . readAlignments $ r) @? "Should be aligned"
+case_isAligned_raw = isAligned (fromRight . readSamLine $ r) @? "Should be aligned"
     where
         r = "SRR070372.3\t16\tV\t7198336\t21\t26M3D9M3D6M6D8M2D21M\t*\t0\t0\tCCCTTATGCAGGTCTTAACACAATTCTTGTATGTTCCATCGTTCTCCAGAATGAATATCAATGATACCAA\t014<<BBBBDDFFFDDDDFHHFFD?@??DBBBB5555::?=BBBBDDF@BBFHHHHHHHFFFFFD@@@@@\tNM:i:14\tMD:Z:26^TTT9^TTC6^TTTTTT8^AA21\tAS:i:3\tXS:i:0"
 
@@ -208,12 +207,11 @@ case_isNotAligned = (not $ isAligned (samLine {samFlag = 4})) @? "Should not be 
 case_isUnique = isUnique (samLine {samMapq = 5}) @? "Should be unique"
 case_isNotUnique = (not $ isUnique (samLine {samMapq = 0})) @? "Should not be unique"
 
-case_read_one_Sam_Line = readAlignments samLineFlat @?= [samLine]
-case_read_mul_Sam_Line = readAlignments (L.unlines $ replicate 10 samLineFlat) @?= replicate 10 samLine
+case_read_one_Sam_Line = readSamLine samLineFlat @?= Right samLine
 
-case_match_identity_soft = fromRight (matchIdentity . head . readAlignments $ samline) < 0.9 @? "Soft clipped read (low identity)"
+case_match_identity_soft = fromRight (matchIdentity =<< readSamLine sline) < 0.9 @? "Soft clipped read (low identity)"
     where
-        samline = "simulated:1:1:38:663#0\t0\tRef1\t1018\t3\t69M16S\t=\t1018\t0\tTTCGAGAAGATGGGTATCGTGGGAAATAACGGAACGGGGAAGTCTACCTTCATCAAGATGCTGCTGGGCTTGGTGAAACCCGACA\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\tNM:i:5\tMD:Z:17T5T14A2A2G24\tAS:i:44\tXS:i:40"
+        sline = "simulated:1:1:38:663#0\t0\tRef1\t1018\t3\t69M16S\t=\t1018\t0\tTTCGAGAAGATGGGTATCGTGGGAAATAACGGAACGGGGAAGTCTACCTTCATCAAGATGCTGCTGGGCTTGGTGAAACCCGACA\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\tNM:i:5\tMD:Z:17T5T14A2A2G24\tAS:i:44\tXS:i:40"
 
 preprocess_s = "ngless '0.0'\n\
     \input = fastq('test_samples/sample20.fq')\n\

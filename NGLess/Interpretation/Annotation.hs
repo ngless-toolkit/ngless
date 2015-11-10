@@ -14,6 +14,7 @@ module Interpretation.Annotation
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
 
@@ -29,7 +30,7 @@ import ReferenceDatabases
 import Output
 
 import Data.GFF
-import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readAlignments)
+import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamLine)
 import Language
 import FileManagement
 import NGLess
@@ -117,6 +118,16 @@ _annotate samFp gffFp opts = do
             return (newfp, newfp_headers)
     where
         filterFeats = filter (_matchFeatures $ optFeatures opts)
+
+readAlignments :: BL.ByteString -> [SamLine]
+readAlignments = filter isSL . map readSamLine' . BL8.lines
+    where
+        isSL (SamHeader _) = False
+        isSL SamLine{} = True
+        readSamLine' :: BL.ByteString -> SamLine
+        readSamLine' = rightOrError . readSamLine
+        rightOrError (Right v) = v
+        rightOrError (Left err) = error (show err)
 
 
 asHeaders :: AnnotationMap -> [B.ByteString]

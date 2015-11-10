@@ -46,6 +46,7 @@ _parseConditions args = do
         asSC c = throwShouldNotOccur ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
 
 _matchConditions :: MatchCondition -> SamLine -> Bool
+_matchConditions _ (SamHeader _) = True
 _matchConditions (DropIf drop_if) samline = none (_match1 samline) drop_if
     where none f = not . any f
 _matchConditions (KeepIf keep_if) samline = all (_match1 samline) keep_if
@@ -64,13 +65,9 @@ executeSelect (NGOMappedReadSet fpsam ref) args = do
         _ -> throwShouldNotOccur ("Non-string argument in __oname variable" :: T.Text)
     samcontents <- liftIO (BL.lines <$> BL.readFile fpsam)
     forM_ samcontents $ \line -> do
-        let writeLine = liftIO $ BL.hPut ohand line >> BL.hPut ohand "\n"
-        if BL.take 1 line == "@"
-            then writeLine
-            else case readSamLine line of
-                Left err -> throwDataError err
-                Right samline ->
-                    when (_matchConditions conditions samline) writeLine
+        parsed <- runNGLess (readSamLine line)
+        when (_matchConditions conditions parsed) $
+            liftIO (BL.hPut ohand line >> BL.hPut ohand "\n")
     liftIO (hClose ohand)
     return (NGOMappedReadSet oname ref)
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")

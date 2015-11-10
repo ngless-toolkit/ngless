@@ -174,11 +174,6 @@ runNGLessIO act = do
         Right val -> return val
         Left err -> throwError err
 
-runNGLess :: NGLess a -> InterpretationROEnv a
-runNGLess act = case act of
-    Right val -> return val
-    Left err -> throwError err
-
 -- | By necessity, this code has several unreachable corners
 
 unreachable :: ( MonadError NGError m) => String -> m a
@@ -463,7 +458,7 @@ executeSelectWBlock (NGOMappedReadSet fname ref) [] (Block [Variable var] body) 
     where
         readSamLineOrDie = C.awaitForever $ \line ->
             case readSamLine (BL.fromChunks [line]) of
-                Left err -> throwDataError err
+                Left err -> throwError err
                 Right parsed -> C.yield (parsed,line)
         groupLine (SamHeader _,_) _ = False
         groupLine _ (SamHeader _,_) = False

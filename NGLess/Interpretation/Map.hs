@@ -10,12 +10,13 @@ module Interpretation.Map
     ) where
 
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Text as T
 import Control.Monad
 import Control.Monad.Trans.Resource
 import Control.Concurrent
 import Control.Exception (evaluate)
-
+import Data.Maybe
 import Numeric
 
 import GHC.Conc (numCapabilities)
@@ -76,7 +77,7 @@ mapToReference refIndex fps extraArgs = do
         err <- hGetContents herr
         -- In a separate thread, consume all the error input
         -- the same pattern is used in the implementation of
-        -- readProcessWithErrorCode (which cannot be used here as we which to
+        -- readProcessWithErrorCode (which cannot be used here as we want to
         -- use `hout` for stdout)
         void . forkIO $ evaluate (length err) >> return ()
         exitCode <- waitForProcess jHandle
@@ -116,6 +117,12 @@ _calcSamStats :: BL.ByteString -> (Integer,Integer,Integer,Integer)
 _calcSamStats contents = (total, aligned, unique, lowQual)
     where
         P4 total aligned unique lowQual = computeStats . readAlignments $ contents
+        readAlignments :: BL.ByteString -> [SamLine]
+        readAlignments = mapMaybe readSamLine' . BL8.lines
+        readSamLine' line = case readSamLine line of
+            Left err -> error (show err)
+            Right SamHeader{} -> Nothing
+            Right v@SamLine{} -> Just v
         computeStats = foldl update (P4 0 0 0 0)
         update (P4 t al u lQ) samLine =
             P4 (t + 1)
