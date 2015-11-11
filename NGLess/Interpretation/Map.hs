@@ -37,7 +37,7 @@ import NGLess
 
 import Data.Sam
 import Utils.Bwa
-import Utils.Utils (readPossiblyCompressedFile)
+import Utils.Utils (readPossiblyCompressedFile, readProcessErrorWithExitCode)
 
 data Reference = Reference FilePath | FaFile FilePath
 
@@ -68,21 +68,8 @@ mapToReference refIndex fps extraArgs = do
     bwaPath <- bwaBin
     let cmdargs =  concat [["mem", "-t", show numCapabilities, refIndex], extraArgs, fps]
     outputListLno' TraceOutput ["Calling binary ", bwaPath, " with args: ", unwords cmdargs]
-    (err, exitCode) <- liftIO $ do
-        (_, _, Just herr, jHandle) <-
-            createProcess (
-                proc bwaPath cmdargs
-                ) { std_out = UseHandle hout,
-                    std_err = CreatePipe }
-        err <- hGetContents herr
-        -- In a separate thread, consume all the error input
-        -- the same pattern is used in the implementation of
-        -- readProcessWithErrorCode (which cannot be used here as we want to
-        -- use `hout` for stdout)
-        void . forkIO $ evaluate (length err) >> return ()
-        exitCode <- waitForProcess jHandle
-        hClose herr
-        return (err, exitCode)
+    let cp = (proc bwaPath cmdargs) { std_out = UseHandle hout }
+    (err, exitCode) <- liftIO $ readProcessErrorWithExitCode cp
     outputListLno' DebugOutput ["BWA info: ", err]
     case exitCode of
         ExitSuccess -> do

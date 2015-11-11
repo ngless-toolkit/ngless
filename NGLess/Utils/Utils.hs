@@ -8,6 +8,7 @@ module Utils.Utils
     ( lookupWithDefault
     , uniq
     , readPossiblyCompressedFile
+    , readProcessErrorWithExitCode
     , hWriteGZIP
     , allSame
     ) where
@@ -15,7 +16,11 @@ module Utils.Utils
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Codec.Compression.GZip as GZip
 import qualified Codec.Compression.BZip as BZip
+import Control.Exception (evaluate)
+import Control.Monad
+import Control.Concurrent
 import System.IO
+import System.Process
 
 import Control.Applicative ((<$>))
 
@@ -42,3 +47,16 @@ allSame :: Eq a => [a] -> Bool
 allSame [] = True
 allSame (e:es) = all (==e) es
 
+
+readProcessErrorWithExitCode cp = do
+    (_, _, Just herr, jHandle) <-
+        createProcess cp { std_err = CreatePipe }
+    err <- hGetContents herr
+    -- In a separate thread, consume all the error input
+    -- the same pattern is used in the implementation of
+    -- readProcessWithErrorCode (which cannot be used here as we want to
+    -- use `hout` for stdout)
+    void . forkIO $ void (evaluate (length err))
+    exitCode <- waitForProcess jHandle
+    hClose herr
+    return (err, exitCode)
