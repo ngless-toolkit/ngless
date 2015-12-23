@@ -13,7 +13,6 @@ module Unique
 
 import qualified Data.ByteString.Lazy.Char8 as BL
 
-import Control.Applicative ((<$>))
 import Control.Monad
 import Control.Monad.ST (runST)
 import Control.Monad.IO.Class (liftIO)

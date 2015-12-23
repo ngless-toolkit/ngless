@@ -14,7 +14,6 @@ module Parse
 import Language
 import Tokens
 
-import Control.Applicative hiding ((<|>), many, optional)
 import Control.Monad
 import Control.Monad.Identity ()
 import qualified Data.Text as T

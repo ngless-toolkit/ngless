@@ -14,7 +14,6 @@ module Data.FastQ
 
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString as B
-import Control.Applicative ((<$>))
 import Control.Monad.Except
 import Data.Word
 

@@ -22,7 +22,6 @@ module Configuration
 
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
-import Control.Applicative ((<$>))
 import System.Environment (getExecutablePath)
 import System.Directory
 import System.FilePath.Posix

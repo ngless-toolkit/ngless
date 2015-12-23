@@ -72,8 +72,8 @@ reqlogo = $(HTML_LIBS_DIR)/Octocat.png
 
 all: ngless
 
-ngless: nglessconf $(NGLESS_DATA_DEPENDENCIES)
-	cabal build
+ngless: $(NGLESS_DATA_DEPENDENCIES)
+	stack build
 
 dist: ngless-${VERSION}.tar.gz
 
@@ -84,7 +84,7 @@ test_samples/htseq-res/htseq_cds_noStrand_union.txt:
 	cd test_samples/htseq-res && ./generateHtseqFiles.sh
 
 check: ${testinputfiles}
-	cabal test
+	stack test
 
 install:
 	mkdir -p $(exec)
@@ -94,22 +94,13 @@ install:
 	cp -rf $(SAM_DIR) $(deps)
 	cp -f dist/build/ngless/ngless $(exec)/ngless
 
-nglessconf: cabal.sandbox.config $(SAM_DIR) $(BWA_DIR) $(reqhtmllibs) $(reqfonts) $(reqlogo)
-
-cabal.sandbox.config: NGLess.cabal
-	if [ ! -e $@ ] ; then \
-		cabal sandbox init; \
-	fi
-	cabal install --only-dependencies --force-reinstall --enable-tests
-	touch $@
+nglessconf: $(SAM_DIR) $(BWA_DIR) $(reqhtmllibs) $(reqfonts) $(reqlogo)
 
 clean:
 	rm -rf dist
 	rm -f $(NGLESS_DATA_DEPENDENCIES)
 
 distclean: clean
-	if [ -d .cabal.sandbox ]; then cabal sandbox delete; fi
-	rm -f cabal.sandbox.config
 	rm -rf $(HTML_FONTS_DIR) $(HTML_LIBS_DIR)
 	rm -rf $(BWA_DIR)
 	rm -rf $(SAM_DIR)
@@ -134,7 +125,7 @@ $(SAM_DIR):
 	rm $(SAM_TAR)
 
 $(SAM_DIR)/samtools: $(SAM_DIR)
-	cd $(SAM_DIR) && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC"
+	cd $(SAM_DIR) && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC" "LIBCURSES=$$LIBCURSES"
 
 
 NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/samtools
@@ -177,7 +168,7 @@ $(HTML_LIBS_DIR)/Octocat.png:
 
 ngless-${VERSION}.tar.gz: ngless
 	mkdir -p $(distdir)/share $(distdir)/bin
-	cabal build
+	stack build
 	cp dist/build/$(progname)/$(progname) $(distdir)/bin
 	cp -r $(BWA_DIR) $(distdir)/share
 	cp -r $(SAM_DIR) $(distdir)/share

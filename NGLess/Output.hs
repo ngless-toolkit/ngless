@@ -21,10 +21,8 @@ import Data.IORef
 import Data.Aeson
 import Data.Aeson.TH (deriveToJSON, defaultOptions)
 import Data.Time (getZonedTime)
-import Data.Time.Format (formatTime)
-import System.Locale (defaultTimeLocale)
+import Data.Time.Format (formatTime, defaultTimeLocale)
 import System.Console.ANSI
-import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import System.Console.CmdArgs.Verbosity (getVerbosity, Verbosity(..))

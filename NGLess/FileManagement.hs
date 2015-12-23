@@ -10,7 +10,6 @@ module FileManagement
     ) where
 
 import qualified Data.ByteString as BS
-import Control.Applicative ((<$>))
 import System.FilePath.Posix
 import Control.Monad
 import System.Posix.Internals (c_getpid)

@@ -12,8 +12,6 @@ module BuiltinModules.AsReads
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
 import qualified Data.Text as T
-import Control.Applicative ((<$>))
-import Control.Monad.IO.Class (liftIO)
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Zlib as C
 import qualified Data.Conduit as C

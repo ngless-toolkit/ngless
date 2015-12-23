@@ -1,7 +1,7 @@
 {- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
 module Interpretation.FastQ
     ( executeQProc
@@ -11,7 +11,6 @@ module Interpretation.FastQ
 
 import System.IO
 import Data.List
-import Control.Applicative ((<$>))
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C

@@ -1,7 +1,7 @@
 {- Copyright 2013-2015 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
 -- | This module handles tokenization
 module Tokens
@@ -11,7 +11,6 @@ module Tokens
     ) where
 
 import qualified Data.Text as T
-import Control.Applicative hiding ((<|>), many, optional)
 import Control.Monad (void)
 import Text.Parsec.Text ()
 import Text.Parsec.Combinator

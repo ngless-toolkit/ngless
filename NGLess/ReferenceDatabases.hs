@@ -20,7 +20,7 @@ import System.IO.Error
 import FileManagement (createTempDir)
 
 import Control.Monad
-import Control.Applicative ((<$>), (<|>))
+import Control.Applicative ((<|>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource(release)
 

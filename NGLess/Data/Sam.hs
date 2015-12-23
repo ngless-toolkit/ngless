@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Sam
     ( SamLine(..)
     , SamResult(..)
@@ -17,9 +18,8 @@ import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
 import Control.DeepSeq
-
-import Control.Applicative
 import Data.Bits (testBit)
+
 import NGLess.NGError
 
 
@@ -110,7 +110,7 @@ numberMismatches cigar
         Just (n,code_rest) -> do
             let code = S8.head code_rest
                 rest = S8.tail code_rest
-                n' = if code `elem` "DNSHX" then n else 0
+                n' = if code `elem` ("DNSHX" :: [Char]) then n else 0
             r <- numberMismatches rest
             return (n' + r)
 

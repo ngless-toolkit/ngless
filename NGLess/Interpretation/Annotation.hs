@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, LambdaCase #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase, FlexibleContexts #-}
 
 module Interpretation.Annotation
     ( AnnotationIntersectionMode(..)

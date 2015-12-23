@@ -1,7 +1,7 @@
 {- Copyright 2015 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, FlexibleContexts #-}
 module Interpretation.Count
     ( executeCount
     ) where

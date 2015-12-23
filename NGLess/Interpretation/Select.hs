@@ -2,7 +2,7 @@
  - License: MIT
  -}
 
-{-# LANGUAGE TupleSections, OverloadedStrings, RankNTypes #-}
+{-# LANGUAGE TupleSections, OverloadedStrings, RankNTypes, FlexibleContexts #-}
 
 module Interpretation.Select
     ( executeSelect
@@ -47,6 +47,7 @@ _parseConditions args = do
             ([], cs) -> return (DropIf cs)
             (_, _) -> throwScriptError ("To select, you cannot use both keep_if and drop_if" :: String)
     where
+        asSC :: NGLessObject -> NGLessIO SelectCondition
         asSC (NGOSymbol "mapped") = return SelectMapped
         asSC (NGOSymbol "unmapped") = return SelectUnmapped
         asSC (NGOSymbol "unique") = return SelectUnique
@@ -105,6 +106,7 @@ executeMappedReadMethod Mflag samlines (Just (NGOSymbol flag)) [] = do
         f <- getFlag flag
         return (NGOBool $ f samlines)
     where
+        getFlag :: T.Text -> NGLess ([SamLine] -> Bool)
         getFlag "mapped" = return (any isAligned)
         getFlag "unmapped" = return (not . any isAligned)
         getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")

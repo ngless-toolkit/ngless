@@ -22,8 +22,6 @@ import Control.Concurrent
 import System.IO
 import System.Process
 
-import Control.Applicative ((<$>))
-
 import Data.List (isSuffixOf, group)
 import Data.Maybe (fromMaybe)
 

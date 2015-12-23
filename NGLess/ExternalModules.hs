@@ -168,6 +168,7 @@ executeCommand basedir cmd input args = do
     outputListLno' TraceOutput ["Processing results: (STDOUT=", out, ", STDERR=", err,")"]
     return NGOVoid
 
+asfilePaths :: NGLessObject -> NGLessIO  [FilePath]
 asfilePaths (NGOReadSet1 _ fp) = return [fp]
 asfilePaths (NGOReadSet2 _ fp1 fp2) = return [fp1, fp2]
 asfilePaths (NGOReadSet3 _ fp1 fp2 fp3) = return [fp1, fp2, fp3]
