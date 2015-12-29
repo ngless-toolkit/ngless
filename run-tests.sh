@@ -15,13 +15,19 @@ if test $? -ne "0"; then
    ok=no
 fi
 
+ngless_bin=$PWD/$(stack path --dist-dir)/build/ngless/ngless
+if ! test -x $ngless_bin ; then
+    echo "Could not determine path for ngless (guessed $ngless_bin)"
+    exit 1
+fi
+
 basedir=$PWD
 for testdir in tests/*; do
     if test -d $testdir; then
         echo "Running $testdir"
         cd $testdir
         mkdir -p temp
-        ../../dist/build/ngless/ngless --quiet -t temp *.ngl > output.stdout.txt 2>output.stderr.txt
+        $ngless_bin --quiet -t temp *.ngl > output.stdout.txt 2>output.stderr.txt
         ngless_exit=$?
         if [[ $testdir == tests/error-* ]] ; then
             if test $ngless_exit -eq "0"; then
