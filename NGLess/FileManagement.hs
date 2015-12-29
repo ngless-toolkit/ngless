@@ -4,6 +4,7 @@ module FileManagement
     , generateDirId
     , openNGLTempFile
     , openNGLTempFile'
+    , removeFileIfExists
     , setupHtmlViewer
     , takeBaseNameNoExtensions
     , nglMaybeCopyFile

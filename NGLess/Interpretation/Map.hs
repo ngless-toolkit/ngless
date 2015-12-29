@@ -33,6 +33,7 @@ import NGLess
 
 import Data.Sam
 import Utils.Bwa
+import Utils.LockFile
 import Utils.Utils (readPossiblyCompressedFile, readProcessErrorWithExitCode)
 
 data Reference = Reference FilePath | FaFile FilePath
@@ -52,9 +53,20 @@ ensureIndexExists refPath = do
     hasIndex <- hasValidIndex refPath
     if hasIndex
         then outputListLno' DebugOutput ["Index for ", refPath, " already exists."]
-        else createIndex refPath
+        else withLockFile (LockParameters
+                            { lockFname = (refPath ++ ".ngless-index.lock")
+                            , maxAge = hoursToDiffTime 36
+                            , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = fromInteger 60 }
+                            }) $ do
+                -- recheck if index exists with the lock in place
+                -- it may have been created in the meanwhile (especially if we slept waiting for the lock)
+                hasIndex' <- hasValidIndex refPath
+                when (not hasIndex')
+                    (createIndex refPath)
     return refPath
 
+
+hoursToDiffTime h = fromInteger (h * 3600)
 
 mapToReference :: FilePath -> [FilePath] -> [String] -> NGLessIO String
 mapToReference refIndex fps extraArgs = do

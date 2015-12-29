@@ -6,6 +6,7 @@
 
 module Utils.Utils
     ( lookupWithDefault
+    , maybeM
     , uniq
     , readPossiblyCompressedFile
     , readProcessErrorWithExitCode
@@ -58,3 +59,8 @@ readProcessErrorWithExitCode cp = do
     exitCode <- waitForProcess jHandle
     hClose herr
     return (err, exitCode)
+
+maybeM :: (Monad m) => m (Maybe a) -> (a -> m (Maybe b)) -> m (Maybe b)
+maybeM ma f = ma >>= \case
+    Nothing -> return Nothing
+    Just a -> f a
