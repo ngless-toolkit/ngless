@@ -10,7 +10,6 @@ module ValidationIO
 import System.Directory
 import System.FilePath.Posix (takeDirectory)
 import Data.Maybe
-import Control.Applicative ((<$>), (<*>))
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.Text as T

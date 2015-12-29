@@ -14,8 +14,6 @@ import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Text as T
 import Control.Monad
 import Control.Monad.Trans.Resource
-import Control.Concurrent
-import Control.Exception (evaluate)
 import Data.Maybe
 import Numeric
 
@@ -23,9 +21,7 @@ import GHC.Conc (numCapabilities)
 
 import System.Process
 import System.Exit
-import System.IO
 
-import Control.Applicative ((<$>))
 import Control.Monad.IO.Class (liftIO)
 
 import Language

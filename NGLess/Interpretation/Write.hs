@@ -10,7 +10,6 @@ module Interpretation.Write
     ) where
 
 
-import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy.Char8 as BL

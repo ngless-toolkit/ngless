@@ -13,7 +13,6 @@ module Interpretation.Select
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Control.Monad.Except
-import Control.Applicative ((<$>))
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL

@@ -9,7 +9,6 @@ module Main
 import Data.Maybe
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
-import Control.Applicative
 import Control.Concurrent
 import System.Console.CmdArgs
 import System.FilePath.Posix

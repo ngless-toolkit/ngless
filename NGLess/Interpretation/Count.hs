@@ -7,7 +7,6 @@ module Interpretation.Count
     ) where
 
 import Control.Monad
-import Control.Applicative ((<$>))
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
 import qualified Data.ByteString as B

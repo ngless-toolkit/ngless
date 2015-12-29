@@ -11,15 +11,12 @@ module StandardModules.Samtools
 import System.FilePath.Posix
 
 import qualified Data.Text as T
-import Control.Monad
 import Control.Monad.Trans.Resource
-import Control.Concurrent
 
 import GHC.Conc (numCapabilities)
 
 import System.Process
 import System.Exit
-import System.IO
 
 import Control.Monad.IO.Class (liftIO)
 

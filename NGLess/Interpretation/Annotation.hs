@@ -22,7 +22,6 @@ import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
-import Control.Applicative
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 import System.IO
