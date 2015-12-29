@@ -34,6 +34,7 @@ import System.Posix.Internals
     , withFilePath
     )
 import Control.Monad.Trans.Resource
+import Network.BSD (getHostName)
 
 import NGLess
 import Output
@@ -96,7 +97,7 @@ acquireLock LockParameters{..} = liftIO (openLockFile lockFname) `maybeM` \h -> 
     outputListLno' DebugOutput ["Acquired lock file ", lockFname]
     liftIO $ do
         pid <- getProcessID
-        let hostname = "hostname"
+        hostname <- getHostName
         hPutStrLn h ("Lock file created for PID " ++ show pid ++ " on hostname " ++ hostname)
         release rkC
         return (Just rk)
