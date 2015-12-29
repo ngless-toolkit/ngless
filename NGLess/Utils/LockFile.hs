@@ -77,12 +77,17 @@ lockExists params@LockParameters{..} act = do
             IfLockedThrow err -> throwError err
             IfLockedRetry{ .. }
                 | nrLockRetries > 0 -> do
-                        outputListLno' InfoOutput ["Lock file ", lockFname, " exists and seems current, sleeping..."]
-                        liftIO $ threadDelay ((1000 *) . fromInteger . toInteger . round  $ timeBetweenRetries)
+                        outputListLno' InfoOutput ["Lock file ", lockFname, " exists and seems current, sleeping for ", show timeBetweenRetries, "."]
+                        liftIO $ sleep timeBetweenRetries
                         let lessOneTry = IfLockedRetry (nrLockRetries - 1) timeBetweenRetries
                         lockExists params { whenExistsStrategy = lessOneTry } act
                 | otherwise -> throwSystemError ("Could not obtain lock " ++ lockFname ++ " even after waiting for its release.")
-            
+sleep :: NominalDiffTime -> IO ()
+sleep = threadDelay . toMicroSeconds
+    where
+        toMicroSeconds :: NominalDiffTime -> Int
+        toMicroSeconds = (1000000 *) . fromInteger . round
+
 acquireLock :: LockParameters -> NGLessIO (Maybe ReleaseKey)
 acquireLock LockParameters{..} = liftIO (openLockFile lockFname) `maybeM` \h -> do
     -- rkC is for the case where an exception is raised between this line and the release call below
