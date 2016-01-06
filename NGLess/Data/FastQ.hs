@@ -65,4 +65,3 @@ asFastQ enc rs = BL.fromChunks (asFastQ' rs)
 
 readReadSet :: FastQEncoding -> FilePath -> IO [ShortRead]
 readReadSet enc fn = parseFastQ enc <$> readPossiblyCompressedFile fn
-

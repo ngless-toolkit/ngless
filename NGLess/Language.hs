@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE OverloadedStrings #-}
@@ -14,6 +14,7 @@ module Language
     , FuncName(..)
     , MethodName(..)
     , NGLType(..)
+    , ReadSet(..)
     , Header(..)
     , ModInfo(..)
     , Script(..)
@@ -113,6 +114,12 @@ data NGLType =
         | NGList NGLType
     deriving (Eq, Show)
 
+data ReadSet =
+        ReadSet1 FastQEncoding FilePath -- ^ encoding file_on_disk
+        | ReadSet2 FastQEncoding FilePath FilePath -- ^ encoding file_on_disk
+        | ReadSet3 FastQEncoding FilePath FilePath FilePath-- ^ encoding file_on_disk
+        deriving (Eq, Show, Ord)
+
 data NGLessObject =
         NGOString T.Text
         | NGOBool Bool
@@ -121,9 +128,7 @@ data NGLessObject =
         | NGOSymbol T.Text
         | NGOFilename FilePath
         | NGOShortRead ShortRead
-        | NGOReadSet1 FastQEncoding FilePath -- ^ encoding file_on_disk
-        | NGOReadSet2 FastQEncoding FilePath FilePath -- ^ encoding file_on_disk
-        | NGOReadSet3 FastQEncoding FilePath FilePath FilePath-- ^ encoding file_on_disk
+        | NGOReadSet ReadSet
         | NGOMappedReadSet FilePath (Maybe T.Text) -- ^ This is represented by a SAM file on disk + optional reference information
         | NGOMappedRead [SamLine]
         | NGOAnnotatedSet FilePath FilePath -- ^ annotated_reads headers

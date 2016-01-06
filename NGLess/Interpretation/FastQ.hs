@@ -72,7 +72,7 @@ optionalSubsample f = do
 -- ^ Process quality.
 executeQProc :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
                 -> FilePath         -- ^ FastQ file
-                -> NGLessIO NGLessObject
+                -> NGLessIO ReadSet
 executeQProc enc f = do
         fd <- liftIO $ statsFromFastQ <$> readPossiblyCompressedFile f
         enc' <- case enc of
@@ -83,7 +83,7 @@ executeQProc enc f = do
         p "Number of base pairs: "      (show $ length (qualCounts fd))
         p "Encoding is: "               (show enc')
         p "Number of sequences: "   (show $ nSeq fd)
-        return $ NGOReadSet1 enc' f
+        return (ReadSet1 enc' f)
     where
         p s0 s1  = outputListLno' DebugOutput [s0, s1]
 

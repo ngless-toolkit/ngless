@@ -48,16 +48,15 @@ getOFile args = do
         Just (NGOString p) -> return (T.unpack p ++ subpostfix)
         _ -> throwShouldNotOccur ("getOFile cannot decode file path" :: String)
 
-writeToUncFile :: NGLessObject -> FilePath -> NGLessIO NGLessObject
-writeToUncFile (NGOMappedReadSet path defGen) newfp = liftIO $ do
+writeToFile :: NGLessObject -> FilePath -> NGLessIO NGLessObject
+writeToFile (NGOMappedReadSet path defGen) newfp = liftIO $ do
     readPossiblyCompressedFile path >>= BL.writeFile newfp
     return $ NGOMappedReadSet newfp defGen
 
-writeToUncFile (NGOReadSet1 enc path) newfp = liftIO $ do
-    readPossiblyCompressedFile path >>= BL.writeFile newfp
-    return $ NGOReadSet1 enc newfp
+writeToFile obj _ = throwShouldNotOccur ("writeToFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ show obj)
 
-writeToUncFile obj _ = throwShouldNotOccur ("writeToUncFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ show obj)
+writeRSToFile enc path newfp = liftIO $ do
+    readPossiblyCompressedFile path >>= BL.writeFile newfp
 
 
 executeWrite :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
@@ -68,32 +67,33 @@ executeWrite (NGOList el) args = do
     res <- zipWithM (\e fp -> executeWrite e (("ofile", NGOFilename fp):args')) el fps
     return (NGOList res)
 
-executeWrite el@NGOReadSet1{} args = do
+executeWrite (NGOReadSet rs) args = do
     ofile <- getOFile args
-    writeToUncFile el ofile
-executeWrite (NGOReadSet2 enc r1 r2) args = do
-    newfp <- getOFile args
-    fname1 <- _formatFQOname newfp "pair.1"
-    fname2 <- _formatFQOname newfp "pair.2"
-    NGOReadSet1 _ r1' <- writeToUncFile (NGOReadSet1 enc r1) fname1
-    NGOReadSet1 _ r2' <- writeToUncFile (NGOReadSet1 enc r2) fname2
-    return (NGOReadSet2 enc r1' r2')
+    case rs of
+        ReadSet1 enc r -> do
+            writeRSToFile enc r ofile
+            return (NGOReadSet $ ReadSet1 enc ofile)
+        ReadSet2 enc r1 r2 -> do
+            fname1 <- _formatFQOname ofile "pair.1"
+            fname2 <- _formatFQOname ofile "pair.2"
+            writeRSToFile enc r1 fname1
+            writeRSToFile enc r2 fname2
+            return (NGOReadSet $ ReadSet2 enc fname1 fname2)
+        ReadSet3 enc r1 r2 r3 -> do
+            fname1 <- _formatFQOname ofile "pair.1"
+            fname2 <- _formatFQOname ofile "pair.2"
+            fname3 <- _formatFQOname ofile "singles"
+            writeRSToFile enc r1 fname1
+            writeRSToFile enc r2 fname2
+            writeRSToFile enc r3 fname3
+            return (NGOReadSet $ ReadSet3 enc fname1 fname2 fname3)
 
-executeWrite (NGOReadSet3 enc r1 r2 r3) args = do
-    newfp <- getOFile args
-    fname1 <- _formatFQOname newfp "pair.1"
-    fname2 <- _formatFQOname newfp "pair.2"
-    fname3 <- _formatFQOname newfp "singles"
-    NGOReadSet1 _ r1' <- writeToUncFile (NGOReadSet1 enc r1) fname1
-    NGOReadSet1 _ r2' <- writeToUncFile (NGOReadSet1 enc r2) fname2
-    NGOReadSet1 _ r3' <- writeToUncFile (NGOReadSet1 enc r3) fname3
-    return (NGOReadSet3 enc r1' r2' r3')
 
 executeWrite el@(NGOMappedReadSet fp defGen) args = do
     newfp <- getOFile args
     let format = fromMaybe (NGOSymbol "sam") (lookup "format" args)
     case format of
-        NGOSymbol "sam" -> writeToUncFile el newfp
+        NGOSymbol "sam" -> writeToFile el newfp
         NGOSymbol "bam" -> do
                         newfp' <- convertSamToBam fp newfp
                         return (NGOMappedReadSet newfp' defGen) --newfp will contain the bam

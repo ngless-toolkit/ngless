@@ -9,7 +9,6 @@ module BuiltinModules.Argv
     ) where
 
 import qualified Data.Text as T
-import Control.Applicative ((<$>))
 
 import Language
 import Configuration

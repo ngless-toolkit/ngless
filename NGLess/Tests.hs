@@ -1,3 +1,6 @@
+{- Copyright 2013-2016 NGLess Authors
+ - License: MIT
+ -}
 {-# LANGUAGE TemplateHaskell, OverloadedStrings, TupleSections #-}
 -- Unit tests are their own programme.
 
@@ -9,7 +12,6 @@ import Test.HUnit
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 import Control.Monad.Except
-import Control.Applicative
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
 
@@ -388,8 +390,8 @@ case_read_fastQ_store_enc = do
     nt <- testNGLessIO $ generateDirId fp
     createDirectoryIfMissing False $ dstDirBef nt
     createDirectoryIfMissing False $ dstDirAft nt
-    (NGOReadSet1 eb _) <- testNGLessIO $ executeQProc Nothing   fp
-    (NGOReadSet1 ea _) <- testNGLessIO $ executeQProc (Just eb) fp
+    (ReadSet1 eb _) <- testNGLessIO $ executeQProc Nothing   fp
+    (ReadSet1 ea _) <- testNGLessIO $ executeQProc (Just eb) fp
     removeDirectoryRecursive $ dstDirBef nt -- delete test generated data.
     removeDirectoryRecursive $ dstDirAft nt -- delete test generated data.
     eb @?= ea

@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -39,7 +39,7 @@ maxTempFileSize = 100*1000*1000 -- 100MB
 
 executeUnique :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeUnique (NGOList e) args = NGOList <$> mapM (`executeUnique` args) e
-executeUnique (NGOReadSet1 enc file) args = do
+executeUnique (NGOReadSet (ReadSet1 enc file)) args = do
         rs <- liftIO $ readReadSet enc file
         d <- _writeToNFiles file enc rs
         let NGOInteger mc = lookupWithDefault (NGOInteger 1) "max_copies" args
@@ -49,7 +49,7 @@ executeUnique (NGOReadSet1 enc file) args = do
         uniqueCalculations' numMaxOccur d = do
             fs <- liftIO $ _readNFiles enc (fromIntegral numMaxOccur) d
             nFp <- writeTempFastQ file fs enc
-            return $ NGOReadSet1 enc nFp
+            return (NGOReadSet $ ReadSet1 enc nFp)
 executeUnique expr _ = throwShouldNotOccur ("executeUnique: Cannot handle argument " ++ show expr)
 
 hashRead :: Int -> ShortRead -> Int

@@ -147,7 +147,7 @@ executeMap fps args = do
     ref <- lookupReference args
     extraArgs <- (map T.unpack) <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
     let executeMap' (NGOList es) = NGOList <$> forM es executeMap'
-        executeMap' (NGOReadSet1 _enc file)    = interpretMapOp ref [file] extraArgs
-        executeMap' (NGOReadSet2 _enc fp1 fp2) = interpretMapOp ref [fp1,fp2] extraArgs
+        executeMap' (NGOReadSet (ReadSet1 _enc file))   = interpretMapOp ref [file] extraArgs
+        executeMap' (NGOReadSet (ReadSet2 _enc fp1 fp2)) = interpretMapOp ref [fp1,fp2] extraArgs
         executeMap' v = throwShouldNotOccur ("map of " ++ show v ++ " not implemented yet")
     executeMap' fps

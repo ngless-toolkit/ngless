@@ -35,7 +35,7 @@ import NGLess
 executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeReads (NGOMappedReadSet fpsam _) _ = do
     fp <- samToFastQ fpsam
-    return (NGOReadSet1 SangerEncoding fp)
+    return (NGOReadSet $ ReadSet1 SangerEncoding fp)
 executeReads arg _ = throwShouldNotOccur ("executeReads called with argument: " ++ show arg)
 
 samToFastQ :: FilePath -> NGLessIO FilePath

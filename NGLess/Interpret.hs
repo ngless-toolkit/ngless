@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE LambdaCase #-}
@@ -272,21 +272,21 @@ topFunction' (FuncName "annotate")  expr args Nothing = runNGLessIO (executeAnno
 topFunction' (FuncName "count")     expr args Nothing = runNGLessIO (executeCount expr args)
 topFunction' (FuncName "print")     expr args Nothing = executePrint expr args
 
-topFunction' (FuncName "paired") mate1 args Nothing = do
+topFunction' (FuncName "paired") mate1 args Nothing = NGOReadSet <$> do
     let Just mate2 = lookup "second" args
         mate3 = lookup "singles" args
     traceExpr "paired" [mate1, mate2]
-    NGOReadSet1 enc1 fp1 <- executeQualityProcess =<< optionalSubsample' mate1
-    NGOReadSet1 enc2 fp2 <- executeQualityProcess =<< optionalSubsample' mate2
+    NGOReadSet (ReadSet1 enc1 fp1) <- executeQualityProcess =<< optionalSubsample' mate1
+    NGOReadSet (ReadSet1 enc2 fp2) <- executeQualityProcess =<< optionalSubsample' mate2
     when (enc1 /= enc2) $
         throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
     case mate3 of
-        Nothing -> return (NGOReadSet2 enc1 fp1 fp2)
+        Nothing -> return (ReadSet2 enc1 fp1 fp2)
         Just f3 -> do
-            NGOReadSet1 enc3 fp3 <- executeQualityProcess =<< optionalSubsample' f3
+            NGOReadSet (ReadSet1 enc3 fp3) <- executeQualityProcess =<< optionalSubsample' f3
             when (enc1 /= enc3) $
                 throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
-            return (NGOReadSet3 enc1 fp1 fp2 fp3)
+            return (ReadSet3 enc1 fp1 fp2 fp3)
 topFunction' (FuncName "select") expr args (Just b) = executeSelectWBlock expr args b
 topFunction' fname@(FuncName fname') expr args Nothing = do
     traceExpr ("executing module function: '"++T.unpack fname'++"'") expr
@@ -307,10 +307,10 @@ executeFastq expr args = do
             "solexa" -> return $ Just SolexaEncoding
             _ -> unreachable "impossible to reach"
     case expr of
-        (NGOString fname) -> do
+        (NGOString fname) -> NGOReadSet <$> do
             let fp = T.unpack fname
             executeQualityProcess' enc =<< runNGLessIO (optionalSubsample fp)
-        (NGOList fps) -> NGOList <$> sequence [executeQualityProcess' enc (T.unpack fname) | NGOString fname <- fps]
+        (NGOList fps) -> NGOList <$> sequence [NGOReadSet <$> executeQualityProcess' enc (T.unpack fname) | NGOString fname <- fps]
         v -> unreachable ("fastq function: unexpected first argument: " ++ show v)
 
 executeSamfile expr [] = do
@@ -326,23 +326,22 @@ optionalSubsample' _ = throwShouldNotOccur ("This case should not occurr" :: T.T
 
 executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
 executeQualityProcess (NGOList e) = NGOList <$> mapM executeQualityProcess e
-executeQualityProcess (NGOReadSet1 enc fname) = executeQualityProcess' (Just enc) fname
-executeQualityProcess (NGOReadSet2 enc fp1 fp2) = do
-    NGOReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1
-    NGOReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2
-    when (enc1 /= enc2) $
-        throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ")")
-    return (NGOReadSet2 enc1 fp1' fp2')
-executeQualityProcess (NGOReadSet3 enc fp1 fp2 fp3) = do
-    NGOReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1
-    NGOReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2
-    NGOReadSet1 enc3 fp3' <- executeQualityProcess' (Just enc) fp3
-    when (enc1 /= enc2 || enc2 /= enc3) $
-        throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ", third one is " ++ show enc3 ++")")
-    return (NGOReadSet3 enc1 fp1' fp2' fp3')
-executeQualityProcess (NGOString fname) = do
-    let fname' = T.unpack fname
-    executeQualityProcess' Nothing fname'
+executeQualityProcess (NGOReadSet rs) = NGOReadSet <$> case rs of
+    ReadSet1 enc fname -> executeQualityProcess' (Just enc) fname
+    ReadSet2 enc fp1 fp2 -> do
+        ReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1
+        ReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2
+        when (enc1 /= enc2) $
+            throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ")")
+        return (ReadSet2 enc1 fp1' fp2')
+    ReadSet3 enc fp1 fp2 fp3 -> do
+        ReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1
+        ReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2
+        ReadSet1 enc3 fp3' <- executeQualityProcess' (Just enc) fp3
+        when (enc1 /= enc2 || enc2 /= enc3) $
+            throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ", third one is " ++ show enc3 ++")")
+        return (ReadSet3 enc1 fp1' fp2' fp3')
+executeQualityProcess (NGOString fname) = NGOReadSet <$> executeQualityProcess' Nothing (T.unpack fname)
 
 executeQualityProcess v = nglTypeError ("QC expected a string or readset. Got " ++ show v)
 executeQualityProcess' enc fname = runNGLessIO $ executeQProc enc fname
@@ -350,7 +349,7 @@ executeQualityProcess' enc fname = runNGLessIO $ executeQProc enc fname
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
-executePreprocess (NGOReadSet1 enc file) _args (Block [Variable var] block) = do
+executePreprocess (NGOReadSet (ReadSet1 enc file)) _args (Block [Variable var] block) = do
         runNGLessIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         (newfp, h) <- runNGLessIO $ openNGLTempFile file "preprocessed_" "fq.gz"
@@ -366,13 +365,13 @@ executePreprocess (NGOReadSet1 enc file) _args (Block [Variable var] block) = do
                     (C.concat :: C.Conduit (V.Vector B.ByteString) InterpretationEnvIO B.ByteString)
                     =$= C.gzip =$ C.sinkHandle h)
         liftIO (hClose h)
-        return $ NGOReadSet1 enc newfp
+        return . NGOReadSet $ ReadSet1 enc newfp
     where
         toStrict = B.concat . BL.toChunks
         transformInterpret :: NGLessObject -> InterpretationEnvIO (Maybe ShortRead)
         transformInterpret r = runInROEnvIO $ interpretPBlock1 block var r
-executePreprocess (NGOReadSet2 enc fp1 fp2) _args block = executePreprocess (NGOReadSet3 enc fp1 fp2 "") _args block
-executePreprocess (NGOReadSet3 enc fp1 fp2 fp3) _args (Block [Variable var] block) = do
+executePreprocess (NGOReadSet (ReadSet2 enc fp1 fp2)) _args block = executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 "")) _args block
+executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) _args (Block [Variable var] block) = do
         runNGLessIO $ outputListLno' DebugOutput (["Preprocess on paired end ",
                                                 fp1, "+", fp2] ++ (if fp3 /= ""
                                                                     then [" with singles ", fp3]
@@ -391,9 +390,9 @@ executePreprocess (NGOReadSet3 enc fp1 fp2 fp3) _args (Block [Variable var] bloc
         unless (anySingle || anySingle')
             (liftIO $ removeFile fps)
         runNGLessIO $ outputLno' DebugOutput "Preprocess finished"
-        return $ if anySingle || anySingle'
-                    then NGOReadSet3 enc fp1' fp2' fps
-                    else NGOReadSet2 enc fp1' fp2'
+        return . NGOReadSet $ if anySingle || anySingle'
+                    then ReadSet3 enc fp1' fp2' fps
+                    else ReadSet2 enc fp1' fp2'
     where
         preprocBlock :: Handle -> [NGLessObject] -> InterpretationEnvIO Bool
         preprocBlock hsingles rs = do
