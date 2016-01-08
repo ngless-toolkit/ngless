@@ -38,6 +38,7 @@ import qualified Data.Vector as V
 import System.IO
 import System.Directory
 import Data.Maybe
+import Data.List (find)
 
 import Utils.Utils
 import Substrim
@@ -107,6 +108,9 @@ data BlockResult = BlockResult
                 , blockValues :: [(T.Text, NGLessObject)]
                 } deriving (Eq,Show)
 
+autoComprehendNB f (NGOList es) args = NGOList <$> sequence [f e args | e <- es]
+autoComprehendNB f e args = f e args
+
 -- Set line number
 setlno :: Int -> InterpretationEnvIO ()
 setlno !n = liftIO $ setOutputLno (Just n)
@@ -135,7 +139,12 @@ findFunction :: FuncName -> InterpretationEnvIO (NGLessObject -> KwArgsValues ->
 findFunction fname = do
         mods <- gets ieModules
         case filter hasF mods of
-            [m] -> return $ (runFunction m) (getName fname)
+            [m] -> do
+                let Just func = find ((== fname) . funcName) (modFunctions m)
+                    wrap = if funcAllowsAutoComprehension func
+                                then autoComprehendNB
+                                else id
+                return $ wrap $ (runFunction m) (getName fname)
             [] -> throwShouldNotOccur $ T.concat ["Function '", getName fname, "' not found (not builtin and not in any loaded module)"]
             ms -> throwShouldNotOccur $ T.concat (["Function '", T.pack $ show fname, "' found in multiple modules! ("] ++ [T.concat [modname, ":"] | modname <- modName . modInfo <$> ms])
     where
@@ -263,7 +272,7 @@ topFunction f expr args block = do
 
 topFunction' :: FuncName -> NGLessObject -> KwArgsValues -> Maybe Block -> InterpretationEnvIO NGLessObject
 topFunction' (FuncName "fastq")     expr args Nothing = executeFastq expr args
-topFunction' (FuncName "samfile")   expr args Nothing = executeSamfile expr args
+topFunction' (FuncName "samfile")   expr args Nothing = autoComprehendNB executeSamfile expr args
 topFunction' (FuncName "unique")    expr args Nothing = runNGLessIO (executeUnique expr args)
 topFunction' (FuncName "write")     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
 topFunction' (FuncName "map")       expr args Nothing = runNGLessIO (executeMap expr args)
@@ -313,13 +322,10 @@ executeFastq expr args = do
         (NGOList fps) -> NGOList <$> sequence [NGOReadSet <$> executeQualityProcess' enc (T.unpack fname) | NGOString fname <- fps]
         v -> unreachable ("fastq function: unexpected first argument: " ++ show v)
 
-executeSamfile expr [] = do
+executeSamfile expr@(NGOString fname) [] = do
     traceExpr "samfile" expr
-    case expr of
-        (NGOString fname) -> return $ NGOMappedReadSet (T.unpack fname) Nothing
-        (NGOList sams) -> NGOList <$> sequence [executeSamfile s [] | s <- sams]
-        v -> unreachable ("samfile function: unexpected first argument: " ++ show v)
-executeSamfile _ args = unreachable ("samfile does not take any arguments, got " ++ show args)
+    return $ NGOMappedReadSet (T.unpack fname) Nothing
+executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show args)
 
 optionalSubsample' (NGOString f) = NGOString . T.pack <$> runNGLessIO (optionalSubsample $ T.unpack f)
 optionalSubsample' _ = throwShouldNotOccur ("This case should not occurr" :: T.Text)
