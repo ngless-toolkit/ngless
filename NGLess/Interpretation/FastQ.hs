@@ -1,7 +1,7 @@
 {- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, MultiWayIf #-}
 
 module Interpretation.FastQ
     ( executeFastq
@@ -96,19 +96,70 @@ executeGroup :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeGroup (NGOList rs) args = do
         name <- lookupStringOrScriptError "group call" "name" args
         rs' <- getRSOrError `mapM` rs
-        (newfp, h) <- openNGLTempFile (T.unpack name) "concatenated_" "fq"
-        catFiles h rs'
-        liftIO (hClose h)
-        let NGOReadSet (ReadSet1 enc _) = head rs
-        return (NGOSample name [ReadSet1 enc newfp])
+        grouped <- groupFiles name rs'
+        return (NGOSample name [grouped])
     where
         getRSOrError (NGOReadSet r) = return r
         getRSOrError other = throwShouldNotOccur . concat $ ["In group call, all arguments should have been NGOReadSet! Got ", show other]
 executeGroup other _ = throwScriptError ("Illegal argument to group(): " ++ show other)
 
-catFiles h fs = forM_ fs $ \(ReadSet1 _ fp) -> catFile fp
-    where
-        catFile fp = liftIO (BL.readFile fp >>= BL.hPut h)
+groupFiles :: T.Text -> [ReadSet] -> NGLessIO ReadSet
+groupFiles name rs = do
+    let encs = map rsEncoding rs
+    when (not $ allSame encs) $
+        throwDataError ("In group call not all input files have the same encoding!" :: String)
+    let dims = map dim1 rs
+        dim1 :: ReadSet -> Int
+        dim1 ReadSet1{} = 1
+        dim1 ReadSet2{} = 2
+        dim1 ReadSet3{} = 3
+    if
+        | all (==1) dims -> catFiles1 name rs
+        | all (==2) dims -> catFiles2 name rs
+        -- If it has a single 3 or a mix of 2s & 1s, then it's a 3
+        | otherwise -> catFiles3 name rs
+
+
+catFiles1 name rs@((ReadSet1 enc _):_) = do
+    (newfp, h) <- openNGLTempFile (T.unpack name) "concatenated_" "fq"
+    forM_ rs $ \(ReadSet1 _ fp) -> do
+        hCat h fp
+    liftIO (hClose h)
+    return (ReadSet1 enc newfp)
+
+catFiles2 name rs@((ReadSet2 enc _ _):_) = do
+    (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq"
+    (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq"
+    forM_ rs $ \(ReadSet2 _ fp1 fp2) -> do
+        hCat h1 fp1
+        hCat h2 fp2
+    liftIO (hClose h1)
+    liftIO (hClose h2)
+    return (ReadSet2 enc newfp1 newfp2)
+catFiles3 name rs@(r:_) = do
+    (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq"
+    (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq"
+    (newfp3, h3) <- openNGLTempFile (T.unpack name) "concatenated_" ".singles.fq"
+    let enc = rsEncoding r
+    forM_ rs $ \case
+        ReadSet1 _ fp -> hCat h3 fp
+        ReadSet2 _ fp1 fp2 -> do
+            hCat h1 fp1
+            hCat h2 fp2
+        ReadSet3 _ fp1 fp2 fp3 -> do
+            hCat h1 fp1
+            hCat h2 fp2
+            hCat h3 fp3
+    liftIO (hClose h1)
+    liftIO (hClose h2)
+    liftIO (hClose h3)
+    return (ReadSet3 enc newfp1 newfp2 newfp3)
+
+hCat h fp = liftIO (BL.readFile fp >>= BL.hPut h)
+rsEncoding (ReadSet1 enc _) = enc
+rsEncoding (ReadSet2 enc _ _) = enc
+rsEncoding (ReadSet3 enc _ _ _) = enc
+
 
 executeFastq :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeFastq expr args = do
