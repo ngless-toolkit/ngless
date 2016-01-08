@@ -83,7 +83,7 @@ doQC1 enc f = do
         enc' <- case enc of
                 Just e -> return e
                 Nothing -> guessEncoding (lc fd)
-        liftIO $ outputFQStatistics f fd enc'
+        outputFQStatistics f fd enc'
         p "Simple Statistics completed for: " f
         p "Number of base pairs: "      (show $ length (qualCounts fd))
         p "Encoding is: "               (show enc')

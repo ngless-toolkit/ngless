@@ -14,9 +14,7 @@
             <div class="navbar-collapse">
                 <ul class="nav navbar-nav">
                     <li class="active"><a href="#">Home</a></li>
-                    <li><a href="nglessScriptCreator.html">Create Script</a></li>
-                    <li><a href="nglessKeeperbeforeQC.html">Before QC</a></li>
-                    <li><a href="nglessKeeperafterQC.html">After QC</a></li>
+                    <li><a href="nglessQC.html">Quality Control Results</a></li>
                 </ul>
             </div><!--/.nav-collapse -->
             </div>
@@ -25,7 +23,7 @@
 
         <div class="bs-docs-header" id="content">
             <div class="container">
-                <h1>NGLess Processing Results</h1>
+                <h1>NGLess Log</h1>
             </div>
         </div>
         <div ng-app="myApp" ng-controller="NGlessCtrl">
@@ -33,7 +31,9 @@
             <div class="container">
                 <div class="panel-body">
                     <h2>Script</h2>
-                    <p style="white-space: pre-wrap">{{output.processed.script}}</p>
+                    <div ng-repeat="line in output.processed.script" style="position: relative">
+                        <p style="white-space: pre-wrap"><span ng-if="line[0]" style="position: absolute; left: -4em"><a href="nglessQC.html#{{line[0].lno}}">QC!</a> </span>{{line[1]}}</p>
+                    </div>
                 </div>
             </div>
             <div class="container">

@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell #-}
@@ -63,6 +63,7 @@ $(deriveToJSON defaultOptions ''BPosInfo)
 
 data FQInfo = FQInfo
                 { fileName :: String
+                , scriptLno :: !Int
                 , gcContent :: Double
                 , encoding :: String
                 , numSeqs :: Int
@@ -149,38 +150,55 @@ encodeBPStats :: FQ.Result -> FastQEncoding -> [BPosInfo]
 encodeBPStats res enc = map encode1 (FQ.calculateStatistics res enc)
     where encode1 (mean, median, lq, uq) = BPosInfo mean median lq uq
 
-outputFQStatistics :: FilePath -> FQ.Result -> FastQEncoding -> IO ()
-outputFQStatistics fname stats enc = do
+outputFQStatistics :: FilePath -> FQ.Result -> FastQEncoding -> NGLessIO ()
+outputFQStatistics fname stats enc = liftIO $ do
+    lno' <- readIORef curLine
     let enc'    = encodingName enc
         sSize'  = FQ.seqSize stats
         nSeq'   = FQ.nSeq stats
         gc'     = FQ.gcFraction stats
         st      = encodeBPStats stats enc
-        binfo   = FQInfo fname gc' enc' nSeq' sSize' st
+        lno     = fromMaybe 0 lno'
+        binfo   = FQInfo fname lno gc' enc' nSeq' sSize' st
     modifyIORef savedFQOutput (binfo:)
 
 
-data FilesProcessed = FilesProcessed String String T.Text deriving (Show, Eq)
-instance ToJSON FilesProcessed where
-   toJSON (FilesProcessed a b c) = object [ "name" .= a,
-                                            "time" .= b,
-                                            "script" .=c ]
+data InfoLink = HasQCInfo !Int
+    deriving (Eq, Show)
+instance ToJSON InfoLink where
+    toJSON (HasQCInfo lno) = object
+                                [ "info_type" .= ("has_QCInfo" :: String)
+                                , "lno" .= show lno
+                                ]
 
-createFilesProcessed :: FilePath -> T.Text -> IO FilesProcessed
-createFilesProcessed template script = do
-    t <- getZonedTime
-    return $ FilesProcessed template (show t) script
+data ScriptInfo = ScriptInfo String String [(Maybe InfoLink,T.Text)] deriving (Show, Eq)
+instance ToJSON ScriptInfo where
+   toJSON (ScriptInfo a b c) = object [ "name" .= a,
+                                            "time" .= b,
+                                            "script" .= toJSON c ]
+
+wrapScript :: [(Int, T.Text)] -> [FQInfo] -> [(Maybe InfoLink, T.Text)]
+wrapScript script tags =
+    let getLno (FQInfo _ lno _ _ _ _ _) = lno
+        lnos = map getLno tags
+        mapFst f = map (\(a,b) -> (f a,b))
+        annotate i
+            | i `elem` lnos = Just (HasQCInfo i)
+            | otherwise =  Nothing
+    in mapFst annotate script
 
 writeOutput :: FilePath -> FilePath -> T.Text -> IO ()
 writeOutput fname scriptName script = do
     fullOutput <- reverse <$> readIORef savedOutput
     fqStats <- reverse <$> readIORef savedFQOutput
-    processed <- createFilesProcessed scriptName script
+    t <- getZonedTime
+    let script' = zip [1..] (T.lines script)
+        sInfo = ScriptInfo fname (show t) (wrapScript script' fqStats)
     BL.writeFile fname (BL.concat
                     ["var output = "
                     , encode $ object
                         [ "output" .= fullOutput
-                        , "processed" .= processed
+                        , "processed" .= sInfo
                         , "fqStats" .= fqStats
                         ]
                     ,";\n"])
