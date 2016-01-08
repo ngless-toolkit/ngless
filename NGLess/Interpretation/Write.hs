@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -123,15 +123,11 @@ getDelimiter v =  throwShouldNotOccur ("Type of 'format' in 'write' must be NGOS
 convertSamToBam samfile newfp = do
     outputListLno' DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
     samPath <- samtoolsBin
-    (errmsg, exitCode) <- liftIO $ withFile newfp WriteMode $ \hout -> do
-            (_, _, Just herr, jHandle) <- createProcess (
+    (errmsg, exitCode) <- liftIO $ withFile newfp WriteMode $ \hout ->
+        readProcessErrorWithExitCode (
                 proc samPath
                     ["view", "-bS", samfile]
-                ){ std_out = UseHandle hout,
-                   std_err = CreatePipe }
-            errmsg' <- hGetContents herr
-            exitCode' <- waitForProcess jHandle
-            return (errmsg', exitCode')
+                ) { std_out = UseHandle hout }
     outputListLno' InfoOutput ["Message from samtools: ", errmsg]
     case exitCode of
        ExitSuccess -> return newfp
