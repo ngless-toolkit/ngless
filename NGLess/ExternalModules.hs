@@ -1,4 +1,4 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -15,6 +15,7 @@ import Control.Applicative
 import Control.Monad
 import Data.Maybe
 import System.Process
+import System.Environment (getEnvironment)
 import System.Exit
 import System.Directory
 import System.FilePath.Posix
@@ -160,8 +161,10 @@ executeCommand basedir cmd input args = do
     paths <- asfilePaths input
     paths' <- liftIO $ mapM canonicalizePath paths
     args' <- argsArguments cmd args
+    env <- liftIO getEnvironment
     let cmdline = (paths' ++ args')
-        process = (proc (arg0 cmd) cmdline) { cwd = Just basedir }
+        env' = ("NGLESS_MODULE_DIR", basedir):env
+        process = (proc (arg0 cmd) cmdline) { env = Just env' }
     outputListLno' TraceOutput ("executing command: ":arg0 cmd:cmdline)
     (exitCode, out, err) <- liftIO $
         readCreateProcessWithExitCode process ""
