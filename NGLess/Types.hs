@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE OverloadedStrings, LambdaCase #-}
@@ -31,9 +31,8 @@ type TypeMSt b = StateT (Int, TypeMap) (MaybeT (ReaderT [Module] (Writer [T.Text
 checktypes :: [Module] -> Script -> Either T.Text Script
 checktypes mods script@(Script _ exprs) = let w = runMaybeT (runStateT (inferScriptM exprs) (0,Map.empty)) in
     case runWriter (runReaderT w mods) of
-        (Nothing, errs) -> Left (T.concat errs)
-        (Just ((),_), []) -> Right script
-        (Just _,  errs) -> Left (T.concat errs)
+        (Just _, []) -> Right script
+        (_, errs) -> Left (T.unlines errs)
 
 errorInLineC :: [String] -> TypeMSt ()
 errorInLineC = errorInLine . T.concat . map fromString
