@@ -25,7 +25,10 @@ import Functions
 
 
 type TypeMap = Map.Map T.Text NGLType
-type TypeMSt b = StateT (Int, TypeMap) (MaybeT (ReaderT [Module] (Writer [T.Text]))) b
+type TypeMSt = StateT (Int, TypeMap)        -- ^ Current line & current type map (type map is inferred top-to-bottom)
+                (MaybeT                     -- ^ to enable early exit for certain types of error
+                    (ReaderT [Module]       -- ^ the modules passed in (fixed)
+                        (Writer [T.Text]))) -- ^ we write out error messages
 
 -- | checktypes will either return an error message or pass through the script
 checktypes :: [Module] -> Script -> Either T.Text Script
@@ -63,7 +66,7 @@ inferM (Assignment (Variable v) expr) = do
     case mrtype of
         Nothing -> errorInLine "Cannot infer type for right-hand of assignment"
         Just rtype -> envInsert v rtype
-inferM (Condition c te fe) = checkbool c >> inferM te >> inferM fe
+inferM (Condition c te fe) = checkBool c *> inferM te *> inferM fe
 inferM e = void (nglTypeOf e)
 
 inferBlock :: FuncName -> Maybe Block -> TypeMSt ()
@@ -72,7 +75,7 @@ inferBlock (FuncName f) (Just (Block vars es)) = case f of
         "preprocess" -> inferBlock' NGLRead
         "select" -> inferBlock' NGLMappedRead
         _ -> do
-            errorInLineC ["This function '", T.unpack f, "' does not accept blocks"]
+            errorInLineC ["Function '", T.unpack f, "' does not accept blocks"]
             void $ cannotContinue
     where
         inferBlock' btype = do
@@ -105,7 +108,7 @@ check_assignment a b = when (a /= b)
         showType = T.pack . show . fromJust
 
 nglTypeOf :: Expression -> TypeMSt (Maybe NGLType)
-nglTypeOf (FunctionCall f arg args b) = inferBlock f b *> checkfuncargs f args *> checkfunccall f arg
+nglTypeOf (FunctionCall f arg args b) = inferBlock f b *> checkFuncKwArgs f args *> checkFuncUnnamed f arg
 nglTypeOf (MethodCall m self arg args) = checkmethodargs m args *> checkmethodcall m self arg
 nglTypeOf (Lookup (Variable v)) = envLookup v
 nglTypeOf (BuiltinConstant (Variable v)) = return (typeOfConstant v)
@@ -149,10 +152,10 @@ typeOfObject (NGOList (v:_)) = NGList <$> typeOfObject v
 
 checkuop UOpLen e = checklist e *> return (Just NGLInteger)
 checkuop UOpMinus e = checkinteger e
-checkuop UOpNot e = checkbool e
+checkuop UOpNot e = checkBool e
 
 checkbop BOpAdd a b = checkinteger a *> checkinteger b
-checkbop BOpMul a b = checkinteger a *> checkinteger b 
+checkbop BOpMul a b = checkinteger a *> checkinteger b
 
 checkbop BOpGT  a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
 checkbop BOpGTE a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
@@ -162,20 +165,18 @@ checkbop BOpEQ  a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
 checkbop BOpNEQ a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
 
 
-checkbool (ConstBool _) = return (Just NGLBool)
-checkbool expr = do
+checkBool (ConstBool _) = return (Just NGLBool)
+checkBool expr = do
     t <- nglTypeOf expr
-    if t /= Just NGLBool
-        then do
-            errorInLineC ["Expected boolean expression, got ", show t, " for expression ", show expr]
-            return (Just NGLBool)
-        else return t
+    when (t /= Just NGLBool) $
+        errorInLineC ["Expected boolean expression, got ", show t, " for expression ", show expr]
+    return (Just NGLBool)
 
 checkinteger (ConstInt _) = return (Just NGLInteger)
 checkinteger expr = do
     t <- nglTypeOf expr
     when (t /= Just NGLInteger) $
-        errorInLine "Expected integer"
+        errorInLineC ["Expected integer expression, got ", show t, " for expression ", show expr]
     return (Just NGLInteger)
 
 checkindex expr index = checkindex' index *> checklist expr
@@ -217,15 +218,16 @@ funcInfo fn = do
             errorInLineC ["Too many matches for function '", show fn, "'"]
             cannotContinue
 
-checkfunccall :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
-checkfunccall f arg = do
+checkFuncUnnamed :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
+checkFuncUnnamed f arg = do
         targ <- nglTypeOf arg
-        Function _ (Just etype) rtype _ _ <- funcInfo f
+        Function _ (Just etype) rtype _ allowAutoComp <- funcInfo f
         case targ of
-            Just (NGList t) -> checkfunctype etype t *> return (Just (NGList rtype))
+            Just (NGList t)
+                | allowAutoComp -> checkfunctype etype t *> return (Just (NGList rtype))
             Just t -> checkfunctype etype t *> return (Just rtype)
             Nothing -> do
-                errorInLineC ["While checking types for function ", show $ f, "Could not infer type of argument (saw :", show $ arg, ")"]
+                errorInLineC ["While checking types for function ", show f, "Could not infer type of argument (saw :", show arg, ")"]
                 cannotContinue
     where
         checkfunctype NGLAny NGLVoid = errorInLineC
@@ -236,8 +238,8 @@ checkfunccall f arg = do
                                     ["Bad type in function call (function '", show f,"' expects ", show t, " got ", show t', ")."]
                 | otherwise = return ()
 
-checkfuncargs :: FuncName -> [(Variable, Expression)] -> TypeMSt ()
-checkfuncargs f args = do
+checkFuncKwArgs :: FuncName -> [(Variable, Expression)] -> TypeMSt ()
+checkFuncKwArgs f args = do
     Function _ _ _ argInfo _ <- funcInfo f
     mapM_ (checkfuncarg f argInfo) args
 
