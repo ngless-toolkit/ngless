@@ -21,6 +21,8 @@ module NGLess
     , lookupStringListOrScriptErrorDef
     , lookupIntegerOrScriptError
     , lookupIntegerOrScriptErrorDef
+    , lookupSymbolOrScriptError
+    , lookupSymbolOrScriptErrorDef
     , testNGLessIO
     ) where
 
@@ -99,6 +101,14 @@ lookupIntegerOrScriptErrorDef defval context name args = case lookup name args o
     Nothing -> defval
     Just (NGOInteger v) -> return v
     Just other -> throwScriptError (T.concat ["Expected an integer in argument ", name, " in context '", T.pack context, "' instead observed: ", T.pack . show $ other])
+
+lookupSymbolOrScriptError :: (MonadError NGError m) => String-> T.Text -> KwArgsValues -> m T.Text
+lookupSymbolOrScriptError = requiredLookup lookupSymbolOrScriptErrorDef
+lookupSymbolOrScriptErrorDef defval context name args = case lookup name args of
+    Nothing -> defval
+    Just (NGOSymbol s) -> return s
+    Just other -> throwScriptError (T.concat ["Expected a symbol in argument ", name, " in context '", T.pack context, "' instead observed: ", T.pack . show $ other])
+
 
 requiredLookup :: (MonadError NGError m) => (m a -> String-> T.Text -> KwArgsValues -> m a) -> String-> T.Text -> KwArgsValues -> m a
 requiredLookup withDefaultLookup context name = withDefaultLookup errorAct context name

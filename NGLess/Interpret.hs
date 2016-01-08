@@ -261,7 +261,7 @@ topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block
 topFunction (FuncName "preprocess") expr@(Lookup (Variable varName)) args (Just block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ interpretArguments args
-    res' <- executePreprocess expr' args' block >>= executeQualityProcess
+    res' <- executePreprocess expr' args' block >>= runNGLessIO . executeQualityProcess
     setVariableValue varName res'
     return res'
 topFunction (FuncName "preprocess") expr _ _ = throwShouldNotOccur ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
@@ -271,7 +271,7 @@ topFunction f expr args block = do
     topFunction' f expr' args' block
 
 topFunction' :: FuncName -> NGLessObject -> KwArgsValues -> Maybe Block -> InterpretationEnvIO NGLessObject
-topFunction' (FuncName "fastq")     expr args Nothing = executeFastq expr args
+topFunction' (FuncName "fastq")     expr args Nothing = runNGLessIO (executeFastq expr args)
 topFunction' (FuncName "group")     expr args Nothing = runNGLessIO (executeGroup expr args)
 topFunction' (FuncName "samfile")   expr args Nothing = autoComprehendNB executeSamfile expr args
 topFunction' (FuncName "unique")    expr args Nothing = runNGLessIO (executeUnique expr args)
@@ -286,14 +286,14 @@ topFunction' (FuncName "paired") mate1 args Nothing = NGOReadSet <$> do
     let Just mate2 = lookup "second" args
         mate3 = lookup "singles" args
     traceExpr "paired" [mate1, mate2]
-    NGOReadSet (ReadSet1 enc1 fp1) <- executeQualityProcess =<< optionalSubsample' mate1
-    NGOReadSet (ReadSet1 enc2 fp2) <- executeQualityProcess =<< optionalSubsample' mate2
+    NGOReadSet (ReadSet1 enc1 fp1) <- runNGLessIO . executeQualityProcess =<< optionalSubsample' mate1
+    NGOReadSet (ReadSet1 enc2 fp2) <- runNGLessIO . executeQualityProcess =<< optionalSubsample' mate2
     when (enc1 /= enc2) $
         throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
     case mate3 of
         Nothing -> return (ReadSet2 enc1 fp1 fp2)
         Just f3 -> do
-            NGOReadSet (ReadSet1 enc3 fp3) <- executeQualityProcess =<< optionalSubsample' f3
+            NGOReadSet (ReadSet1 enc3 fp3) <- runNGLessIO . executeQualityProcess =<< optionalSubsample' f3
             when (enc1 /= enc3) $
                 throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
             return (ReadSet3 enc1 fp1 fp2 fp3)
@@ -305,24 +305,6 @@ topFunction' fname@(FuncName fname') expr args Nothing = do
 
 topFunction' f _ _ _ = throwShouldNotOccur . concat $ ["Interpretation of ", (show f), " is not implemented"]
 
-executeFastq :: NGLessObject -> KwArgsValues -> InterpretationEnvIO NGLessObject
-executeFastq expr args = do
-    traceExpr "fastq" expr
-    let NGOSymbol encName = lookupWithDefault (NGOSymbol "auto") "encoding" args
-    enc <- case encName of
-            "auto" -> return Nothing
-            "33" -> return $ Just SangerEncoding
-            "sanger" -> return $ Just SangerEncoding
-            "64" -> return $ Just SolexaEncoding
-            "solexa" -> return $ Just SolexaEncoding
-            _ -> unreachable "impossible to reach"
-    case expr of
-        (NGOString fname) -> NGOReadSet <$> do
-            let fp = T.unpack fname
-            executeQualityProcess' enc =<< runNGLessIO (optionalSubsample fp)
-        (NGOList fps) -> NGOList <$> sequence [NGOReadSet <$> executeQualityProcess' enc (T.unpack fname) | NGOString fname <- fps]
-        v -> unreachable ("fastq function: unexpected first argument: " ++ show v)
-
 executeSamfile expr@(NGOString fname) args = do
     traceExpr "samfile" expr
     gname <- lookupStringOrScriptErrorDef (return fname) "samfile group name" "name" args
@@ -331,29 +313,6 @@ executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show 
 
 optionalSubsample' (NGOString f) = NGOString . T.pack <$> runNGLessIO (optionalSubsample $ T.unpack f)
 optionalSubsample' _ = throwShouldNotOccur ("This case should not occurr" :: T.Text)
-
-executeQualityProcess :: NGLessObject -> InterpretationEnvIO NGLessObject
-executeQualityProcess (NGOList e) = NGOList <$> mapM executeQualityProcess e
-executeQualityProcess (NGOReadSet rs) = NGOReadSet <$> case rs of
-    ReadSet1 enc fname -> executeQualityProcess' (Just enc) fname
-    ReadSet2 enc fp1 fp2 -> do
-        ReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1
-        ReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2
-        when (enc1 /= enc2) $
-            throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ")")
-        return (ReadSet2 enc1 fp1' fp2')
-    ReadSet3 enc fp1 fp2 fp3 -> do
-        ReadSet1 enc1 fp1' <- executeQualityProcess' (Just enc) fp1
-        ReadSet1 enc2 fp2' <- executeQualityProcess' (Just enc) fp2
-        ReadSet1 enc3 fp3' <- executeQualityProcess' (Just enc) fp3
-        when (enc1 /= enc2 || enc2 /= enc3) $
-            throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ", third one is " ++ show enc3 ++")")
-        return (ReadSet3 enc1 fp1' fp2' fp3')
-executeQualityProcess (NGOString fname) = NGOReadSet <$> executeQualityProcess' Nothing (T.unpack fname)
-
-executeQualityProcess v = nglTypeError ("QC expected a string or readset. Got " ++ show v)
-executeQualityProcess' enc fname = runNGLessIO $ executeQProc enc fname
-
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
