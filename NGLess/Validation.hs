@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE LambdaCase #-}
@@ -19,6 +19,7 @@ import Language
 import Modules
 import Functions
 
+-- | Returns either an error message if it finds any errors or the input script unscathed
 validate :: [Module] -> Script -> Either T.Text Script
 validate mods expr = case errors of
         [] -> Right expr
@@ -26,7 +27,7 @@ validate mods expr = case errors of
     where
         errors = catMaybes (map (\f -> f mods expr) checks)
         checks =
-            [validate_types
+            [validate_symbol_lists
             ,validate_version
             ,validate_pure_function
             ,validate_req_function_args -- check for the existence of required arguments in functions.
@@ -59,17 +60,18 @@ validate_version _ sc = nglVersion  <$> nglHeader sc >>= \case
     "0.0" -> Nothing
     version -> Just (T.concat ["Version ", version, " is not supported (only version 0.0 is available)."])
 
-validate_types :: [Module] -> Script -> Maybe T.Text
-validate_types _ (Script _ es) = check_toplevel validate_types' es
-    where validate_types' (Assignment _ e@(ConstSymbol _)) = validate_symbol symbols e
-          validate_types' (Assignment _ (ListExpression e@[ConstSymbol _])) = errors_from_list $ map (validate_symbol symbols_list) e
-          validate_types' _ = Nothing
+validate_symbol_lists :: [Module] -> Script -> Maybe T.Text
+validate_symbol_lists _ (Script _ es) = check_toplevel validate_symbol_lists' es
+    where
+        validate_symbol_lists' (Assignment _ e@(ConstSymbol _)) = check1 symbols e
+        validate_symbol_lists' (Assignment _ (ListExpression e@[ConstSymbol _])) = errors_from_list $ map (check1 symbols_list) e
+        validate_symbol_lists' _ = Nothing
 
-validate_symbol :: [T.Text] -> Expression -> Maybe T.Text
-validate_symbol s (ConstSymbol k)
-    | elem k s = Nothing
-    | otherwise = Just (T.concat ["Used symbol `", k, "` but possible symbols are: ", T.pack . show $ s])
-validate_symbol _ _ = Nothing
+        check1 :: [T.Text] -> Expression -> Maybe T.Text
+        check1 s (ConstSymbol k)
+            | elem k s = Nothing
+            | otherwise = Just (T.concat ["Used symbol `", k, "` but possible symbols are: ", T.pack . show $ s])
+        check1 _ _ = Nothing
 
 
 -- | check whether results of calling pure functions are use
