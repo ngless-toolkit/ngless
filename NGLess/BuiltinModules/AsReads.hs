@@ -18,10 +18,8 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit (($=), ($$), (=$=), (=$))
-import Data.Conduit.Async ((=$=&), ($$&))
 import Data.Function (on)
 import Control.Monad.Except
-import Control.Exception
 import System.IO
 
 import Language
@@ -33,7 +31,7 @@ import Modules
 import NGLess
 
 executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeReads (NGOMappedReadSet fpsam _) _ = do
+executeReads (NGOMappedReadSet _ fpsam _) _ = do
     fp <- samToFastQ fpsam
     return (NGOReadSet $ ReadSet1 SangerEncoding fp)
 executeReads arg _ = throwShouldNotOccur ("executeReads called with argument: " ++ show arg)

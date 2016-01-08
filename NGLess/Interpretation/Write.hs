@@ -49,9 +49,9 @@ getOFile args = do
         _ -> throwShouldNotOccur ("getOFile cannot decode file path" :: String)
 
 writeToFile :: NGLessObject -> FilePath -> NGLessIO NGLessObject
-writeToFile (NGOMappedReadSet path defGen) newfp = liftIO $ do
+writeToFile (NGOMappedReadSet name path defGen) newfp = liftIO $ do
     readPossiblyCompressedFile path >>= BL.writeFile newfp
-    return $ NGOMappedReadSet newfp defGen
+    return $ NGOMappedReadSet name newfp defGen
 
 writeToFile obj _ = throwShouldNotOccur ("writeToFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ show obj)
 
@@ -89,22 +89,22 @@ executeWrite (NGOReadSet rs) args = do
             return (NGOReadSet $ ReadSet3 enc fname1 fname2 fname3)
 
 
-executeWrite el@(NGOMappedReadSet fp defGen) args = do
+executeWrite el@(NGOMappedReadSet name fp defGen) args = do
     newfp <- getOFile args
     let format = fromMaybe (NGOSymbol "sam") (lookup "format" args)
     case format of
         NGOSymbol "sam" -> writeToFile el newfp
         NGOSymbol "bam" -> do
                         newfp' <- convertSamToBam fp newfp
-                        return (NGOMappedReadSet newfp' defGen) --newfp will contain the bam
+                        return (NGOMappedReadSet name newfp' defGen) --newfp will contain the bam
         NGOSymbol s -> throwScriptError (T.concat ["write does not accept format {", s, "} with input type ", T.pack . show $ el])
         _ -> throwShouldNotOccur ("Type checking fail: format argument is not a symbol for write()" :: String)
 
-executeWrite (NGOAnnotatedSet fp headers) args = do
+executeWrite (NGOAnnotatedSet name fp headers) args = do
     newfp <- getOFile args
     outputListLno' InfoOutput ["Writing AnnotatedSet to: ", newfp]
     nglMaybeCopyFile fp newfp
-    return $ NGOAnnotatedSet newfp headers
+    return $ NGOAnnotatedSet name newfp headers
 
 executeWrite (NGOCounts fp) args = do
     newfp <- getOFile args

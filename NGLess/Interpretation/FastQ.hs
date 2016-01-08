@@ -1,17 +1,21 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
 module Interpretation.FastQ
     ( executeQProc
+    , executeGroup
     , optionalSubsample
     , writeTempFastQ
     ) where
 
 import System.IO
 import Data.List
+import Control.Monad
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.Text as T
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Zlib as C
@@ -87,3 +91,19 @@ executeQProc enc f = do
     where
         p s0 s1  = outputListLno' DebugOutput [s0, s1]
 
+executeGroup :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeGroup (NGOList rs) args = do
+        name <- lookupStringOrScriptError "group call" "name" args
+        rs' <- getRSOrError `mapM` rs
+        (newfp, h) <- openNGLTempFile (T.unpack name) "concatenated_" "fq"
+        catFiles h rs'
+        liftIO (hClose h)
+        let NGOReadSet (ReadSet1 enc _) = head rs
+        return (NGOSample name [ReadSet1 enc newfp])
+    where
+        getRSOrError (NGOReadSet r) = return r
+        getRSOrError other = throwShouldNotOccur . concat $ ["In group call, all arguments should have been NGOReadSet! Got ", show other]
+
+catFiles h fs = forM_ fs $ \(ReadSet1 _ fp) -> catFile fp
+    where
+        catFile fp = liftIO (BL.readFile fp >>= BL.hPut h)

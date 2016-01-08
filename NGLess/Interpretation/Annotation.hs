@@ -1,3 +1,6 @@
+{- Copyright 2013-2016 NGLess Authors
+ - License: MIT
+ -}
 {-# LANGUAGE OverloadedStrings, LambdaCase, FlexibleContexts #-}
 
 module Interpretation.Annotation
@@ -57,7 +60,7 @@ data AnnotationOpts =
 
 executeAnnotation :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeAnnotation (NGOList e) args = NGOList <$> mapM (`executeAnnotation` args) e
-executeAnnotation (NGOMappedReadSet e dDS) args = do
+executeAnnotation (NGOMappedReadSet name e dDS) args = do
     ambiguity <- lookupBoolOrScriptErrorDef (return False) "annotation function" "ambiguity" args
     strand_specific <- lookupBoolOrScriptErrorDef (return False) "annotation function" "strand" args
     fs <- case lookup "features" args of
@@ -68,7 +71,7 @@ executeAnnotation (NGOMappedReadSet e dDS) args = do
     m <- _annotationRule <$> parseAnnotationMode args
     g <- evalMaybeString $ lookup "gff" args
     gff <- whichAnnotationFile g dDS
-    uncurry NGOAnnotatedSet <$> _annotate e gff AnnotationOpts
+    uncurry (NGOAnnotatedSet name) <$> _annotate e gff AnnotationOpts
                 { optFeatures = map matchingFeature fs
                 , optIntersectMode = m
                 , optStrandSpecific = strand_specific

@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -94,7 +94,7 @@ interpretMapOp ref ds extraArgs = do
     (ref', defGen') <- indexReference ref
     samPath' <- mapToReference ref' ds extraArgs
     getSamStats samPath'
-    return $ NGOMappedReadSet samPath' defGen'
+    return $ NGOMappedReadSet "noname" samPath' defGen'
     where
         indexReference :: Reference -> NGLessIO (FilePath, Maybe T.Text)
         indexReference (FaFile fa) = (,Nothing) <$> ensureIndexExists fa
@@ -149,5 +149,6 @@ executeMap fps args = do
     let executeMap' (NGOList es) = NGOList <$> forM es executeMap'
         executeMap' (NGOReadSet (ReadSet1 _enc file))   = interpretMapOp ref [file] extraArgs
         executeMap' (NGOReadSet (ReadSet2 _enc fp1 fp2)) = interpretMapOp ref [fp1,fp2] extraArgs
+        executeMap' (NGOSample name [ReadSet1 _enc file]) = interpretMapOp ref [file] extraArgs
         executeMap' v = throwShouldNotOccur ("map of " ++ show v ++ " not implemented yet")
     executeMap' fps

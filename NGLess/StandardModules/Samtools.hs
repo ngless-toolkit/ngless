@@ -30,7 +30,7 @@ import Utils.Utils
 
 
 executeSort :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeSort (NGOMappedReadSet fpsam rinfo) _ = do
+executeSort (NGOMappedReadSet name fpsam rinfo) _ = do
     (rk, (newfp, hout)) <- openNGLTempFile' fpsam "sorted_" ".sam"
     (trk, tdirectory) <- createTempDir "samtools_sort_temp"
     let cmdargs = ["sort", "-@", show numCapabilities, "-O", "sam", "-T", tdirectory </> "samruntmp", fpsam]
@@ -43,7 +43,7 @@ executeSort (NGOMappedReadSet fpsam rinfo) _ = do
     case exitCode of
         ExitSuccess -> do
             outputListLno' InfoOutput ["Done samtools sort"]
-            return (NGOMappedReadSet newfp rinfo)
+            return (NGOMappedReadSet name newfp rinfo)
         ExitFailure code -> do
             release rk
             throwSystemError $ concat ["Failed samtools sort\nCommand line was::\n\t",

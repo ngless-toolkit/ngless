@@ -41,12 +41,20 @@ for testdir in tests/*; do
             fi
         fi
         for f in expected.*; do
-            diff -u $f output${f#expected}
+            out=output${f#expected}
+            diff -u $f $out
             if test $? -ne "0"; then
-               echo "ERROR IN TEST"
+               echo "ERROR in test $testdir: $out did not match $f"
                ok=no
             fi
         done
+        if test -x ./check.sh; then
+            ./check.sh
+            if test $? -ne "0"; then
+                echo "ERROR in test $testdir: ./check.sh failed"
+                ok=no
+            fi
+        fi
         rm -rf temp
         rm -rf *.output_ngless
         cd $basedir

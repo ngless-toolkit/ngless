@@ -1,0 +1,11 @@
+ngless '0.0'
+one = fastq('sample.fq')
+mapped = map(one,reference='sacCer3')
+write(mapped, ofile='one.sam')
+
+split1 = fastq('split1.fq')
+split2 = fastq('split2.fq')
+split = group([split1, split2], name='sample')
+mapped = map(split, reference='sacCer3')
+write(mapped, ofile='split.sam')
+

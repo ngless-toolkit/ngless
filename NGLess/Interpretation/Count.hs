@@ -1,4 +1,4 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE LambdaCase, FlexibleContexts #-}
@@ -9,6 +9,7 @@ module Interpretation.Count
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy as BL
@@ -44,7 +45,7 @@ methodFor other = throwShouldNotOccur (T.concat ["Unexpected multiple method ", 
 
 executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
-executeCount (NGOAnnotatedSet annot_fp headers_fp) args = do
+executeCount (NGOAnnotatedSet gname annot_fp headers_fp) args = do
     let c = lookup "counts" args
         c' = GffGene
     m <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
@@ -78,6 +79,7 @@ executeCount (NGOAnnotatedSet annot_fp headers_fp) args = do
 
     (newfp,hout) <- openNGLTempFile annot_fp "counts." "txt"
     liftIO $ do
+        BL.hPut hout (BL.fromChunks ["\t", T.encodeUtf8 gname])
         forM_ (zip (M.keys index) [0..]) $ \(hn,i) -> do
             v <- V.indexM result i
             when (v > fromIntegral m) $

@@ -129,11 +129,20 @@ data NGLessObject =
         | NGOFilename FilePath
         | NGOShortRead ShortRead
         | NGOReadSet ReadSet
-        | NGOMappedReadSet FilePath (Maybe T.Text) -- ^ This is represented by a SAM file on disk + optional reference information
+        | NGOMappedReadSet
+                    { nglgroupName :: T.Text
+                    , nglSamFile :: FilePath
+                    , nglReference :: (Maybe T.Text)
+                    }
         | NGOMappedRead [SamLine]
-        | NGOAnnotatedSet FilePath FilePath -- ^ annotated_reads headers
+        | NGOAnnotatedSet
+                    { nglgroupName :: T.Text
+                    , nglAnnotatedReads :: FilePath
+                    , nglAnnotationHeader :: FilePath
+                    }
         | NGOCounts FilePath
         | NGOVoid
+        | NGOSample T.Text [ReadSet]
         | NGOList [NGLessObject]
     deriving (Eq, Show, Ord)
 

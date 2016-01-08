@@ -1,4 +1,4 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -84,7 +84,7 @@ readSamGroupsAsConduit fname =
 
 
 executeSelect :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeSelect (NGOMappedReadSet fpsam ref) args = do
+executeSelect (NGOMappedReadSet name fpsam ref) args = do
     conditions <- _parseConditions args
     (oname,ohandle) <- case lookup "__oname" args of
         Just (NGOString fname) -> let fname' = T.unpack fname in
@@ -97,7 +97,7 @@ executeSelect (NGOMappedReadSet fpsam ref) args = do
         =$= C.unlinesAscii
         $$ CB.sinkHandle ohandle
     liftIO (hClose ohandle)
-    return (NGOMappedReadSet oname ref)
+    return (NGOMappedReadSet name oname ref)
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
 executeMappedReadMethod :: MethodName -> [SamLine] -> Maybe NGLessObject -> KwArgsValues -> NGLess NGLessObject

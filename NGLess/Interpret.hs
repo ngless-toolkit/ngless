@@ -272,6 +272,7 @@ topFunction f expr args block = do
 
 topFunction' :: FuncName -> NGLessObject -> KwArgsValues -> Maybe Block -> InterpretationEnvIO NGLessObject
 topFunction' (FuncName "fastq")     expr args Nothing = executeFastq expr args
+topFunction' (FuncName "group")     expr args Nothing = runNGLessIO (executeGroup expr args)
 topFunction' (FuncName "samfile")   expr args Nothing = autoComprehendNB executeSamfile expr args
 topFunction' (FuncName "unique")    expr args Nothing = runNGLessIO (executeUnique expr args)
 topFunction' (FuncName "write")     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
@@ -322,9 +323,10 @@ executeFastq expr args = do
         (NGOList fps) -> NGOList <$> sequence [NGOReadSet <$> executeQualityProcess' enc (T.unpack fname) | NGOString fname <- fps]
         v -> unreachable ("fastq function: unexpected first argument: " ++ show v)
 
-executeSamfile expr@(NGOString fname) [] = do
+executeSamfile expr@(NGOString fname) args = do
     traceExpr "samfile" expr
-    return $ NGOMappedReadSet (T.unpack fname) Nothing
+    gname <- lookupStringOrScriptErrorDef (return fname) "samfile group name" "name" args
+    return $ NGOMappedReadSet gname (T.unpack fname) Nothing
 executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show args)
 
 optionalSubsample' (NGOString f) = NGOString . T.pack <$> runNGLessIO (optionalSubsample $ T.unpack f)
@@ -447,7 +449,7 @@ executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
 executePrint err  _ = throwScriptError ("Cannot print " ++ show err)
 
 executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
-executeSelectWBlock (NGOMappedReadSet fname ref) [] (Block [Variable var] body) = do
+executeSelectWBlock input@NGOMappedReadSet{ nglSamFile= fname} [] (Block [Variable var] body) = do
         runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", fname]
         (oname, ohandle) <- runNGLessIO $ openNGLTempFile fname "block_selected_" "sam"
         readSamGroupsAsConduit fname
@@ -456,7 +458,7 @@ executeSelectWBlock (NGOMappedReadSet fname ref) [] (Block [Variable var] body) 
             =$= C.unlinesAscii
             $$ CB.sinkHandle ohandle
         liftIO $ hClose ohandle
-        return (NGOMappedReadSet oname ref)
+        return input { nglSamFile = oname }
     where
         filterGroup :: [(SamLine, B.ByteString)] -> InterpretationEnvIO [B.ByteString]
         filterGroup [] = return []
