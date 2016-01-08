@@ -122,9 +122,6 @@ optsExec opts@DefaultMode{} = do
         whenStrictlyNormal (setVerbosity Quiet)
     odir <- runNGLessIO "cannot fail" outputDirectory
     shouldOutput <- runNGLessIO "cannot fail" $ nConfCreateOutputDirectory <$> nglConfiguration
-    when shouldOutput $ do
-        createDirectoryIfMissing False odir
-        setupHtmlViewer odir
     runNGLessIO "running script" $ do
         shouldPrintHeader <- nConfPrintHeader <$> nglConfiguration
         when shouldPrintHeader $
@@ -135,7 +132,9 @@ optsExec opts@DefaultMode{} = do
             liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
         outputLno' InfoOutput "Script OK. Starting interpretation..."
         interpret modules (nglBody sc)
-    when shouldOutput $
+    when shouldOutput $ do
+        createDirectoryIfMissing False odir
+        setupHtmlViewer odir
         writeOutput (odir </> "output.js") fname ngltext
     exitSuccess
 
