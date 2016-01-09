@@ -16,7 +16,7 @@ SAM_DIR = samtools-1.0
 SAM_URL = http://sourceforge.net/projects/samtools/files/samtools/1.0/samtools-1.0.tar.bz2
 SAM_TAR = samtools-1.0.tar.bz2
 
-NGLESS_DATA_DEPENDENCIES := NGLess/Dependencies/samtools_data.c NGLess/Dependencies/bwa_data.c
+NGLESS_BUILD_BINARIES := NGLess/Dependencies/samtools_data.c NGLess/Dependencies/bwa_data.c
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
@@ -72,8 +72,11 @@ reqlogo = $(HTML_LIBS_DIR)/Octocat.png
 
 all: ngless
 
-ngless: $(NGLESS_DATA_DEPENDENCIES)
+ngless: $(NGLESS_BUILD_BINARIES)
 	stack build
+
+static:
+	stack build --ghc-options='-optl-static -optl-pthread' --force-dirty
 
 dist: ngless-${VERSION}.tar.gz
 
@@ -97,8 +100,8 @@ install:
 nglessconf: $(SAM_DIR) $(BWA_DIR) $(reqhtmllibs) $(reqfonts) $(reqlogo)
 
 clean:
-	rm -rf dist
-	rm -f $(NGLESS_DATA_DEPENDENCIES)
+	rm -f $(NGLESS_BUILD_BINARIES)
+	stack clean
 
 distclean: clean
 	rm -rf $(HTML_FONTS_DIR) $(HTML_LIBS_DIR)
@@ -176,4 +179,4 @@ ngless-${VERSION}.tar.gz: ngless
 	tar -zcvf $(distdir).tar.gz $(distdir)
 	rm -rf $(distdir)
 
-.PHONY: all build clean check nglessconf distclean dist
+.PHONY: all build clean check nglessconf distclean dist static
