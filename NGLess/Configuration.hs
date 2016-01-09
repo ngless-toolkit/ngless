@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE RecordWildCards #-}
@@ -18,6 +18,7 @@ module Configuration
     , temporaryFileDirectory
     , traceFlag
     , versionStr
+    , dateStr
     , setVerbosity
     , getVerbosity
     ) where
@@ -37,6 +38,12 @@ import qualified Data.Configurator as CF
 import NGLess
 import Dependencies.Embedded
 import CmdArgs
+
+versionStr :: String
+versionStr = "0.0.0"
+
+dateStr :: String
+dateStr = "not released"
 
 data InstallMode = User | Root deriving (Eq, Show)
 
@@ -177,9 +184,6 @@ temporaryFileDirectory = nConfTemporaryDirectory <$> nglConfiguration
 
 traceFlag :: NGLessIO Bool
 traceFlag = nConfTrace <$> nglConfiguration
-
-versionStr :: String
-versionStr = "0.0.0"
 
 nglessDataBaseURL :: NGLessIO FilePath
 nglessDataBaseURL = nConfDownloadBaseURL <$> nglConfiguration

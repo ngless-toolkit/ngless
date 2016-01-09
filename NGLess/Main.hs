@@ -160,7 +160,14 @@ modeExec (CreateReferencePackMode ofile gen gtf) = runNGLessIO "creating referen
 main = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
         foottext = concat ["ngless v", versionStr, "(C) NGLess Authors 2013-2016"]
-    args <- execParser (info (helper <*> nglessArgs) metainfo)
+        versioner =
+            (infoOption ("ngless v" ++ versionStr ++ " (release date: " ++  dateStr ++ ")")
+                (long "version" <> short 'V' <> help "print version and exit"))
+            <*>
+            (infoOption versionStr (long "version-short" <> help "print just version string (useful for scripting)"))
+            <*>
+            (infoOption dateStr (long "date-short" <> help "print just release date string (useful for scripting)"))
+    args <- execParser (info (versioner <*> helper <*> nglessArgs) metainfo)
     setVerbosity (if quiet args then Quiet else verbosity args)
     initConfiguration args
     modeExec (mode args)
