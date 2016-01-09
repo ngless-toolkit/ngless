@@ -25,7 +25,6 @@ import Data.Time.Format (formatTime, defaultTimeLocale)
 import System.Console.ANSI
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
-import System.Console.CmdArgs.Verbosity (getVerbosity, Verbosity(..))
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
 
@@ -33,6 +32,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.FastQ (FastQEncoding(..), encodingName)
 import qualified Data.FastQStatistics as FQ
 import Configuration
+import CmdArgs (Verbosity(..))
 import NGLess
 
 data OutputType = TraceOutput | DebugOutput | InfoOutput | ResultOutput | WarningOutput | ErrorOutput

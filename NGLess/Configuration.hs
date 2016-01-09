@@ -18,6 +18,8 @@ module Configuration
     , temporaryFileDirectory
     , traceFlag
     , versionStr
+    , setVerbosity
+    , getVerbosity
     ) where
 
 import Control.Monad
@@ -53,6 +55,14 @@ data NGLessConfiguration = NGLessConfiguration
     , nConfArgv :: [T.Text]
     } deriving (Eq, Show)
 
+verbosityRef :: IORef Verbosity
+{-# NOINLINE verbosityRef #-}
+verbosityRef = unsafePerformIO (newIORef Normal)
+
+setVerbosity :: Verbosity -> IO ()
+setVerbosity = writeIORef verbosityRef
+getVerbosity :: IO Verbosity
+getVerbosity = readIORef verbosityRef
 
 guessConfiguration :: IO NGLessConfiguration
 guessConfiguration = do
@@ -110,15 +120,19 @@ setupTestConfiguration = do
     config <- guessConfiguration
     writeIORef nglConfigurationRef $ config { nConfTemporaryDirectory = "testing_tmp_dir", nConfKeepTemporaryFiles = True }
 
-initConfiguration :: NGLessModes -> IO ()
+initConfiguration :: NGLessArgs -> IO ()
 initConfiguration opts = do
     config <- guessConfiguration
-    config' <- updateConfiguration config (case opts of
-        DefaultMode{config_files = Just cs} -> cs
+    config' <- updateConfiguration config (case mode opts of
+        DefaultMode{config_files = cs} -> cs
         _ -> [])
     writeIORef nglConfigurationRef (updateConfigurationOpts opts config')
 
-updateConfigurationOpts DefaultMode{..} config =
+updateConfigurationOpts NGLessArgs{..} config =
+        updateConfigurationOptsMode mode $
+            config { nConfColor = fromMaybe (nConfColor config) color }
+
+updateConfigurationOptsMode DefaultMode{..} config =
     let trace = fromMaybe
                     (nConfTrace config)
                     trace_flag
@@ -139,11 +153,10 @@ updateConfigurationOpts DefaultMode{..} config =
             , nConfOutputDirectory = odir
             , nConfTemporaryDirectory = tmpdir
             , nConfPrintHeader = nConfPrintHeader config && not no_header && not print_last
-            , nConfColor = fromMaybe (nConfColor config) color
             , nConfSubsample = subsampleMode
             , nConfArgv = T.pack <$> (input:extraArgs)
             }
-updateConfigurationOpts _ config = config
+updateConfigurationOptsMode _ config = config
 
 nglConfigurationRef :: IORef NGLessConfiguration
 {-# NOINLINE nglConfigurationRef #-}
@@ -236,4 +249,6 @@ samtoolsBin :: NGLessIO FilePath
 samtoolsBin = findOrCreateBin samtoolsFname =<< liftIO samtoolsData
     where
         samtoolsFname = "ngless-" ++ versionStr ++ "-samtools"
+
+
 

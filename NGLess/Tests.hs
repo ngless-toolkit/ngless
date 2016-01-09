@@ -20,8 +20,6 @@ import System.Directory (removeFile
                         ,createDirectoryIfMissing
                         ,doesFileExist
                         )
-import System.Console.CmdArgs.Verbosity
-
 import qualified Data.ByteString.Char8 as B
 
 
@@ -37,6 +35,7 @@ import Substrim
 import FileManagement
 import Data.FastQStatistics
 import Interpretation.FastQ
+import CmdArgs
 import Configuration
 import NGLess
 

@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE DeriveDataTypeable, OverloadedStrings, LambdaCase #-}
@@ -10,7 +10,7 @@ import Data.Maybe
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent
-import System.Console.CmdArgs
+import Options.Applicative
 import System.FilePath.Posix
 import System.Directory
 import System.IO (stderr, hPutStrLn)
@@ -94,20 +94,27 @@ printHeader = putStr
     "http://luispedro.github.io/ngless\n"++
     "\n")
 
-optsExec :: NGLessModes -> IO ()
-optsExec opts@DefaultMode{} = do
+loadScript :: Maybe String -> FilePath -> IO (Either String T.Text)
+loadScript (Just s) _ = return . Right . T.pack $ s
+loadScript Nothing "" = return . Left $ "Either a filename (including - for stdin) or a --script argument must be given to ngless"
+loadScript Nothing fname =
+        --Note that the input for ngless is always UTF-8.
+        --Always. This means that we cannot use T.readFile
+        --which is locale aware.
+        --We also assume that the text file is quite small and, therefore, loading
+        --it in to memory is not resource intensive.
+        (showError . T.decodeUtf8') <$> (if fname == "-" then B.getContents else B.readFile fname)
+    where
+        showError :: (Show e) => Either e a -> Either String a
+        showError (Left err) = Left (show err)
+        showError (Right r) = Right r
+
+modeExec :: NGLessMode -> IO ()
+modeExec opts@DefaultMode{} = do
     let fname = input opts
     let reqversion = isNothing $ script opts
     setNumCapabilities (nThreads opts)
-    initConfiguration opts
-    --Note that the input for ngless is always UTF-8.
-    --Always. This means that we cannot use T.readFile
-    --which is locale aware.
-    --We also assume that the text file is quite small and, therefore, loading
-    --it in to memory is not resource intensive.
-    engltext <- case script opts of
-        Just s -> return . Right . T.pack $ s
-        _ -> T.decodeUtf8' <$> (if fname == "-" then B.getContents else B.readFile fname)
+    engltext <- loadScript (script opts) (input opts)
     ngltext <- rightOrDie (case engltext of { Right e -> Right e ; Left b -> Left . T.pack . show $ b })
     let maybe_add_print = (if print_last opts then wrapPrint else Right)
     let parsed = parsengless fname reqversion ngltext >>= maybe_add_print
@@ -140,21 +147,20 @@ optsExec opts@DefaultMode{} = do
 
 
 -- if user uses the flag -i he will install a Reference Genome to all users
-optsExec (InstallGenMode ref _)
+modeExec (InstallGenMode ref)
     | isDefaultReference ref = void . runNGLessIO "installing data" $ installData Nothing ref
     | otherwise =
         error (concat ["Reference ", ref, " is not a known reference."])
 
-optsExec (CreateReferencePackMode ofile gen gtf _) = runNGLessIO "creating reference package" $ do
+modeExec (CreateReferencePackMode ofile gen gtf) = runNGLessIO "creating reference package" $ do
         outputLno' InfoOutput "Starting packaging (will download and index genomes)..."
         createReferencePack ofile gen gtf
 
-getModes :: Mode (CmdArgs NGLessModes)
-getModes = cmdArgsMode_ $ nglessModes
-    += verbosity
-    += summary sumtext
-    += help "ngless implement the NGLess language"
-    += helpArg [name "h"]
-    where sumtext = concat ["ngless v", versionStr, "(C) NGLess Authors 2013-2015"]
+main = do
+    let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
+        foottext = concat ["ngless v", versionStr, "(C) NGLess Authors 2013-2016"]
+    args <- execParser (info (helper <*> nglessArgs) metainfo)
+    setVerbosity (if quiet args then Quiet else verbosity args)
+    initConfiguration args
+    modeExec (mode args)
 
-main = cmdArgsRun getModes >>= optsExec
