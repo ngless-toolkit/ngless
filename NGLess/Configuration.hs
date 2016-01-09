@@ -143,9 +143,13 @@ updateConfigurationOptsMode DefaultMode{..} config =
                     (nConfTemporaryDirectory config)
                     temporary_directory
         odir = case (output_directory, input) of
-            (Nothing, "-") -> "STDIN.output_ngless"
-            (Nothing, _) -> input ++ ".output_ngless"
+            (Nothing, ScriptFilePath "-") -> "STDIN.output_ngless"
+            (Nothing, ScriptFilePath fpscript) -> fpscript ++ ".output_ngless"
+            (Nothing, InlineScript _ ) -> "INLINE_SCRIPT.output_ngless"
             (Just odir', _) -> odir'
+        argv = case input of
+            ScriptFilePath f -> f:extraArgs
+            _ -> extraArgs
     in config
             { nConfTrace = trace
             , nConfKeepTemporaryFiles = ktemp
@@ -154,7 +158,7 @@ updateConfigurationOptsMode DefaultMode{..} config =
             , nConfTemporaryDirectory = tmpdir
             , nConfPrintHeader = nConfPrintHeader config && not no_header && not print_last
             , nConfSubsample = subsampleMode
-            , nConfArgv = T.pack <$> (input:extraArgs)
+            , nConfArgv = T.pack <$> argv
             }
 updateConfigurationOptsMode _ config = config
 

@@ -94,10 +94,10 @@ printHeader = putStr
     "http://luispedro.github.io/ngless\n"++
     "\n")
 
-loadScript :: Maybe String -> FilePath -> IO (Either String T.Text)
-loadScript (Just s) _ = return . Right . T.pack $ s
-loadScript Nothing "" = return . Left $ "Either a filename (including - for stdin) or a --script argument must be given to ngless"
-loadScript Nothing fname =
+loadScript :: NGLessInput -> IO (Either String T.Text)
+loadScript (InlineScript s) = return . Right . T.pack $ s
+loadScript (ScriptFilePath "") = return . Left $ "Either a filename (including - for stdin) or a --script argument must be given to ngless"
+loadScript (ScriptFilePath fname) =
         --Note that the input for ngless is always UTF-8.
         --Always. This means that we cannot use T.readFile
         --which is locale aware.
@@ -111,10 +111,11 @@ loadScript Nothing fname =
 
 modeExec :: NGLessMode -> IO ()
 modeExec opts@DefaultMode{} = do
-    let fname = input opts
-    let reqversion = isNothing $ script opts
+    let (fname,reqversion) = case input opts of
+                ScriptFilePath fp -> (fp,True)
+                InlineScript _ -> ("inline",False)
     setNumCapabilities (nThreads opts)
-    engltext <- loadScript (script opts) (input opts)
+    engltext <- loadScript (input opts)
     ngltext <- rightOrDie (case engltext of { Right e -> Right e ; Left b -> Left . T.pack . show $ b })
     let maybe_add_print = (if print_last opts then wrapPrint else Right)
     let parsed = parsengless fname reqversion ngltext >>= maybe_add_print

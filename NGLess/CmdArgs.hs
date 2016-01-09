@@ -5,6 +5,7 @@
 module CmdArgs
     ( ColorSetting(..)
     , Verbosity(..)
+    , NGLessInput(..)
     , NGLessArgs(..)
     , NGLessMode(..)
     , nglessArgs
@@ -29,6 +30,12 @@ instance CF.Configured ColorSetting where
     convert (CF.String "none") = Just NoColor
     convert _ = Nothing
 
+
+data NGLessInput =
+        InlineScript String
+        | ScriptFilePath FilePath
+    deriving (Eq, Show)
+
 data NGLessArgs = NGLessArgs
         { verbosity :: Verbosity
         , quiet :: Bool
@@ -37,9 +44,8 @@ data NGLessArgs = NGLessArgs
         } deriving (Eq, Show)
 data NGLessMode =
         DefaultMode
-              { input :: String
+              { input :: NGLessInput
               , debug_mode :: String
-              , script :: Maybe String
               , print_last :: Bool
               , trace_flag :: Maybe Bool
               , nThreads :: Int
@@ -53,7 +59,7 @@ data NGLessMode =
               , extraArgs :: [String]
               }
         | InstallGenMode
-              { input :: String
+              { refname :: String
               }
         | CreateReferencePackMode
               { oname :: FilePath
@@ -79,10 +85,16 @@ parseColor = optional $ option (eitherReader readColor) (long "color" <> help co
         readColor _ = Left "Could not parse color option"
         colorHelp = "Color settings, one of 'auto' (color if writing to a terminal, this is the default), 'force' (always color), 'no' (no color)."
 
+parseInput :: Parser NGLessInput
+parseInput = InlineScript <$> strOption
+                        (long "script"
+                        <> short 'e'
+                        <> help "inline script to execute")
+            <|> ScriptFilePath <$> strArgument (metavar "INPUT" <> help "Filename of script to interpret")
+
 mainArgs = DefaultMode
-              <$> strArgument (metavar "INPUT" <> value "")-- input :: String
+              <$> parseInput -- input :: NGLessInput
               <*> strOption (long "debug" <> value "") -- debug_mode :: String
-              <*> optional (strOption (long "script" <> short 'e')) -- script :: Maybe String
               <*> switch (long "print-last" <> short 'p' <> help "print value of last line in script") -- print_last :: Bool
               <*> optional (switch (long "trace")) -- trace_flag :: Maybe Bool
               <*> option auto (long "jobs" <> short 'j' <> value 1) -- nThreads :: Int
@@ -96,7 +108,7 @@ mainArgs = DefaultMode
               <*> many (strArgument (metavar "ARGV")) -- extraArgs :: [String]
 
 installArgs = (flag' InstallGenMode (long "install-reference-data"))
-                <*> strOption (long "reference")
+                <*> strArgument (help "Name of reference to install" <> metavar "REF")
         -- += details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
 
 createRefArgs = (flag' CreateReferencePackMode (long "create-reference-pack"))
