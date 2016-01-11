@@ -29,7 +29,8 @@ import qualified Data.Set as S
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
-import Data.Conduit (($=), ($$), (=$=))
+import Data.Conduit (($=), (=$), (=$=))
+import Data.Conduit.Async (buffer)
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Except (throwError)
@@ -129,12 +130,14 @@ _annotate samFp gffFp opts = do
 
 readGffFile :: FilePath -> AnnotationOpts -> NGLessIO AnnotationMap
 readGffFile gffFp opts =
-        conduitPossiblyCompressedFile gffFp
-                $= CB.lines
-                =$= readAnnotationOrDie
+        (conduitPossiblyCompressedFile gffFp
+                $= CB.lines) `buffer1000`
+                (readAnnotationOrDie
                 =$= CL.filter (_matchFeatures $ optFeatures opts)
-                $$ CL.fold insertg M.empty
+                =$ CL.fold insertg M.empty)
     where
+        buffer1000 = buffer 1000
+        readAnnotationOrDie :: C.Conduit B.ByteString NGLessIO GffLine
         readAnnotationOrDie = C.awaitForever $ \line ->
             case B8.head line of
                 '#' -> readAnnotationOrDie
