@@ -25,8 +25,16 @@ import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
+
+import qualified Data.Conduit as C
+import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Binary as CB
+import Data.Conduit (($=), ($$), (=$=))
+
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Except (throwError)
 import Data.Maybe
+
 import System.IO
 import ReferenceDatabases
 import Output
@@ -106,10 +114,10 @@ _annotationRule IntersectNonEmpty = _intersection_non_empty
 
 _annotate :: FilePath -> FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
 _annotate samFp gffFp opts = do
+        amap <- readGffFile gffFp opts
         (newfp, h) <- openNGLTempFile samFp "annotated." "tsv"
         (newfp_headers, h_headers) <- openNGLTempFile samFp "annotation_headers." "txt"
         liftIO $ do
-            amap <- intervals .  filterFeats .  readAnnotations <$> readPossiblyCompressedFile gffFp
             samC <- filter isAligned . readAlignments <$> readPossiblyCompressedFile samFp
             BL.hPut h . BL.concat $ concatMap (map encodeAR . annotateSamLine opts amap) samC
             hClose h
@@ -118,8 +126,24 @@ _annotate samFp gffFp opts = do
             hClose h_headers
 
             return (newfp, newfp_headers)
+
+readGffFile :: FilePath -> AnnotationOpts -> NGLessIO AnnotationMap
+readGffFile gffFp opts =
+        conduitPossiblyCompressedFile gffFp
+                $= CB.lines
+                =$= readAnnotationOrDie
+                =$= CL.filter (_matchFeatures $ optFeatures opts)
+                $$ CL.fold insertg M.empty
     where
-        filterFeats = filter (_matchFeatures $ optFeatures opts)
+        readAnnotationOrDie = C.awaitForever $ \line ->
+            case B8.head line of
+                '#' -> readAnnotationOrDie
+                _ -> case readGffLine line of
+                    Right g -> C.yield g
+                    Left err -> throwError err
+        insertg am g = M.alter (updateF g) (gffType g) am
+        updateF g mF = Just $ M.alter (updateChrMap g) (gffSeqId g) (fromMaybe M.empty mF)
+        updateChrMap g v  = Just $ insertGffLine g (fromMaybe IM.empty v)
 
 readAlignments :: BL.ByteString -> [SamLine]
 readAlignments = filter isSL . map readSamLine' . BL8.lines
@@ -200,12 +224,6 @@ intersection' im = concat . IM.elems $ foldl1 IM.intersection im
 _allSameId :: [AnnotationInfo] -> Bool
 _allSameId = allSame . map snd
 
-intervals :: [GffLine] -> AnnotationMap
-intervals = foldl insertg M.empty
-    where
-        insertg am g = M.alter (updateF g) (gffType g) am
-        updateF g mF = Just $ M.alter (updateChrMap g) (gffSeqId g) (fromMaybe M.empty mF)
-        updateChrMap g v  = Just $ insertGffLine g (fromMaybe IM.empty v)
 
 insertGffLine :: GffLine -> GffIMMap -> GffIMMap
 insertGffLine g = IM.alter insertGffLine' asInterval

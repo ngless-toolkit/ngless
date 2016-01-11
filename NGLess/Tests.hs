@@ -257,22 +257,10 @@ case_compute_stats_lc = do
 
 -- Parse GFF lines
 
-case_read_annotation_comp = do
-    c <- readPossiblyCompressedFile "test_samples/sample.gtf.gz"
-    length (GFF.readAnnotations c) @?= 98994
-
-case_read_annotation_uncomp = do
-    c <- readPossiblyCompressedFile "test_samples/sample.gtf.gz"
-    length (GFF.readAnnotations c) @?= 98994
-
-
 gff_line = "chrI\tunknown\texon\t4124\t4358\t.\t-\t.\tgene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-gff_attributes = "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";" 
+gff_attributes = "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
 gff_structure  = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.GffNegStrand (-1) "Y74C9A.3"
 
-
-case_check_attr_tag_1 = GFF.checkAttrTag "id = 10;" @?= '='
-case_check_attr_tag_2 = GFF.checkAttrTag "id 10;" @?= ' '
 
 case_trim_attrs_1  = GFF._trimString " x = 10" @?= "x = 10"
 case_trim_attrs_2  = GFF._trimString " x = 10 " @?= "x = 10"
@@ -281,7 +269,7 @@ case_trim_attrs_4  = GFF._trimString "x = 10" @?= "x = 10"
 case_trim_attrs_5  = GFF._trimString "   X    " @?= "X"
 
 
-case_parse_gff_line = GFF.readLine gff_line @?= gff_structure
+case_parse_gff_line = GFF.readGffLine gff_line @?= Right gff_structure
 case_parse_gff_atributes = GFF.parseGffAttributes gff_attributes @?= [("gene_id","Y74C9A.3"), ("transcript_id" ,"NM_058260"), ("gene_name", "Y74C9A.3"), ("p_id", "P23728"), ("tss_id", "TSS14501")]
 
 -- teste parseGffAttributes

@@ -5,7 +5,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Utils.Utils
-    ( lookupWithDefault
+    ( conduitPossiblyCompressedFile
+    , lookupWithDefault
     , maybeM
     , uniq
     , readPossiblyCompressedFile
@@ -17,6 +18,10 @@ module Utils.Utils
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Codec.Compression.GZip as GZip
 import qualified Codec.Compression.BZip as BZip
+import qualified Data.Conduit.Combinators as C
+import Data.Conduit (($=))
+import qualified Data.Conduit.Zlib as CZ
+import qualified Data.Conduit.BZlib as CZ
 import Control.Exception (evaluate)
 import Control.Monad
 import Control.Concurrent
@@ -64,3 +69,8 @@ maybeM :: (Monad m) => m (Maybe a) -> (a -> m (Maybe b)) -> m (Maybe b)
 maybeM ma f = ma >>= \case
     Nothing -> return Nothing
     Just a -> f a
+
+conduitPossiblyCompressedFile fname
+    | ".gz" `isSuffixOf` fname = C.sourceFile fname $= CZ.ungzip
+    | ".bz2" `isSuffixOf` fname = C.sourceFile fname $= CZ.bunzip2
+    | otherwise = C.sourceFile fname
