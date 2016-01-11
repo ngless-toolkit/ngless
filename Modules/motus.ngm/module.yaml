@@ -13,7 +13,7 @@ command:
             def: ''
             required: true
 
-check:
-    check_cmd: './run-python.sh'
+init:
+    init_cmd: './run-python.sh'
 
 

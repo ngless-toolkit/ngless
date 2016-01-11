@@ -111,33 +111,24 @@ data ExternalModule = ExternalModule
     { emInfo :: ModInfo
     , modulePath :: FilePath
     , command :: Command
-    , validate_cmd :: FilePath
-    , validate_args :: [String]
+    , initCmd :: FilePath
+    , initArgs :: [String]
+    , citation :: Maybe String
     } deriving (Eq, Show)
 
-data ExternalModuleRep = ExternalModuleRep
-    { emInfoRep :: ModInfo
-    , commandRep :: Command
-    , validate_cmdRep :: FilePath
-    , validate_argsRep :: [String]
-    } deriving (Eq, Show)
-
-instance FromJSON ExternalModuleRep where
+instance FromJSON ExternalModule where
     parseJSON = withObject "module" $ \o -> do
-        checkO <- o .: "check"
-        ExternalModuleRep
+        initO <- o .: "init"
+        ExternalModule
             <$> (ModInfo <$> o .: "name" <*> o .: "version")
+            <*> pure undefined
             <*> o .: "command"
-            <*> checkO .: "check_cmd"
-            <*> ((fromMaybe []) <$> checkO .:? "check_args")
+            <*> initO .: "init_cmd"
+            <*> (fromMaybe [] <$> initO .:? "init_args")
+            <*> o .:? "citation"
 
-addPathToRep mpath ExternalModuleRep{..} = ExternalModule
-    { emInfo = emInfoRep
-    , modulePath = mpath
-    , command = commandRep
-    , validate_cmd = validate_cmdRep
-    , validate_args = validate_argsRep
-    }
+addPathToRep :: FilePath -> ExternalModule -> ExternalModule
+addPathToRep mpath m = m { modulePath = mpath }
 
 
 asFunction Command{..} = Function (FuncName nglName) (Just $ asNGLType arg1) (fromMaybe NGLVoid $ asNGLType <$> ret) (map asArgInfo additional) False
@@ -156,15 +147,19 @@ asArgInfo (CommandOption name _ allowed) = ArgInformation name False NGLSymbol (
 asArgInfo (CommandInteger name _) = ArgInformation name False NGLInteger Nothing
 asArgInfo (CommandString name _ req) = ArgInformation name req NGLString Nothing
 
+nglessEnv :: FilePath -> NGLessIO [(String,String)]
+nglessEnv basedir = do
+    env <- liftIO getEnvironment
+    return $ ("NGLESS_MODULE_DIR", basedir):env
+
 executeCommand :: FilePath -> Command -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCommand basedir cmd input args = do
     paths <- asfilePaths input
     paths' <- liftIO $ mapM canonicalizePath paths
     args' <- argsArguments cmd args
-    env <- liftIO getEnvironment
-    let cmdline = (paths' ++ args')
-        env' = ("NGLESS_MODULE_DIR", basedir):env
-        process = (proc (arg0 cmd) cmdline) { env = Just env' }
+    env <- nglessEnv basedir
+    let cmdline = paths' ++ args'
+        process = (proc (arg0 cmd) cmdline) { env = Just env }
     outputListLno' TraceOutput ("executing command: ":arg0 cmd:cmdline)
     (exitCode, out, err) <- liftIO $
         readCreateProcessWithExitCode process ""
@@ -210,9 +205,10 @@ asInternalModule em@ExternalModule{..} = do
 
 validateModule :: ExternalModule -> NGLessIO ()
 validateModule  ExternalModule{..} = do
-    outputListLno' TraceOutput ("Running module validation for module ":show emInfo:" ":validate_cmd:" ":validate_args)
+    outputListLno' TraceOutput ("Running initialization for module ":show emInfo:" ":initCmd:" ":initArgs)
+    env <- nglessEnv modulePath
     (exitCode, out, err) <- liftIO $
-        readCreateProcessWithExitCode (proc validate_cmd validate_args) { cwd = Just modulePath } ""
+        readCreateProcessWithExitCode (proc initCmd initArgs) { env = Just env } ""
     case (exitCode,out,err) of
         (ExitSuccess, "", "") -> return ()
         (ExitSuccess, msg, "") -> outputListLno' TraceOutput ["Module OK. information: ", msg]
@@ -220,7 +216,7 @@ validateModule  ExternalModule{..} = do
         (ExitFailure code, _,_) -> do
             outputListLno' WarningOutput ["Module loading failed for module ", show emInfo]
             throwSystemError .concat $ ["Error loading module ", show emInfo, "\n",
-                    "When running the validation command (", validate_cmd, " with arguments ", show validate_args, ")\n",
+                    "When running the validation command (", initCmd, " with arguments ", show initArgs, ")\n",
                     "\texit code = ", show code,"\n",
                     "\tstdout='", out, "'\n",
                     "\tstderr='", err, "'"]

@@ -19,9 +19,9 @@ command:
                 - 'two'
                 - 'three'
 
-check:
-    check_cmd: '/bin/true'
-    check_args:
+init:
+    init_cmd: '/bin/true'
+    init_args:
         - "one"
         - "two"
 
