@@ -12,7 +12,8 @@ import System.FilePath.Posix (takeDirectory)
 import Data.Maybe
 import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader
+import Control.Monad.Reader
+import Control.Monad.Trans.Writer
 import qualified Data.Text as T
 
 import Modules
@@ -21,12 +22,13 @@ import NGLess
 import ReferenceDatabases
 
 
-type ValidateIO = ReaderT [Module] NGLessIO
+type ValidateIO = WriterT [T.Text] (ReaderT [Module] NGLessIO)
+tell1 = tell . (:[])
 
 validateIO :: [Module] -> Script -> NGLessIO (Maybe [T.Text])
-validateIO mods expr = do
-        err <- runReaderT (mapM ($expr) checks) mods
-        case concat err of
+validateIO mods sc = do
+        err <- runReaderT (execWriterT (mapM ($sc) checks)) mods
+        case err of
             [] -> return Nothing
             errors -> return (Just errors)
     where
@@ -38,39 +40,39 @@ validateIO mods expr = do
 
 
 -- | check that necessary files exist
-validate_files :: Script -> ValidateIO [T.Text]
+validate_files :: Script -> ValidateIO ()
 validate_files (Script _ es) = check_toplevel validate_files' es
     where
         validate_files' (FunctionCall (FuncName "fastq") f _ _) = check f
-        validate_files' (FunctionCall (FuncName "paired") f args _) = (++) <$> check f <*> validateArg check_can_read_file "second" args es
+        validate_files' (FunctionCall (FuncName "paired") f args _) = check f >> validateArg check_can_read_file "second" args es
         validate_files' (FunctionCall (FuncName "annotate") _ args _) = validateArg check_can_read_file "gff" args es
         validate_files' (Assignment _ e) = validate_files' e
-        validate_files' _ = return []
+        validate_files' _ = return ()
 
         check (ConstStr fname) = check_can_read_file fname
         check (Lookup var) = validateVar check_can_read_file var es
-        check _ = return []
+        check _ = return ()
 
-validate_def_genomes :: Script -> ValidateIO [T.Text]
+validate_def_genomes :: Script -> ValidateIO ()
 validate_def_genomes (Script _ es) = check_toplevel validate_def_genomes' es
     where
         validate_def_genomes' (FunctionCall (FuncName "map") _ args _) = validateArg check_reference "reference" args es
                                                                             >> validateArg check_fafile "fafile" args es
         validate_def_genomes' (Assignment _ e) = validate_def_genomes' e
-        validate_def_genomes' _ = return []
+        validate_def_genomes' _ = return ()
 
 
-validateArg :: (T.Text -> ValidateIO [T.Text]) -> T.Text -> [(Variable,Expression)] -> [(Int,Expression)] -> ValidateIO [T.Text]
+validateArg :: (T.Text -> ValidateIO ()) -> T.Text -> [(Variable,Expression)] -> [(Int,Expression)] -> ValidateIO ()
 validateArg f v args es = case lookup (Variable v) args of
         Just (ConstStr x) -> f x
         Just (Lookup   x) -> validateVar f x es
-        _                 -> return []
+        _                 -> return ()
 
-validateVar :: (T.Text -> ValidateIO [T.Text]) -> Variable -> [(Int,Expression)] -> ValidateIO [T.Text]
+validateVar :: (T.Text -> ValidateIO ()) -> Variable -> [(Int,Expression)] -> ValidateIO ()
 validateVar f v es = case get_const_val v es of
             Right (Just (NGOString t))  -> f t
-            Left  err       -> return [err]
-            _               -> return []
+            Left  err       -> tell1 err
+            _               -> return ()
     where
 
 get_const_val :: Variable -> [(Int,Expression)] -> Either T.Text (Maybe NGLessObject)
@@ -92,52 +94,51 @@ get_const_val var s = do
         getConst _ = Nothing
 
 
-check_toplevel :: (Expression -> ValidateIO [T.Text]) -> [(Int,Expression)] -> ValidateIO [T.Text]
-check_toplevel f es = concat <$> (forM es $ \(lno, e) -> do
-    errs <- f e
-    return $ map (\err -> T.concat ["Line ", T.pack (show lno), ": ", err]) errs)
+check_toplevel :: (Expression -> ValidateIO ()) -> [(Int,Expression)] -> ValidateIO ()
+check_toplevel f es = forM_ es $ \(lno, e) ->
+        censor (addLno lno) $ f e
+    where
+        addLno lno = map (addLno1 lno)
+        addLno1 lno err = T.concat ["Line ", T.pack (show lno), ": ", err]
 
 
-check_can_read_file :: T.Text -> ValidateIO [T.Text]
-check_can_read_file fname = liftIO $ do
+check_can_read_file :: T.Text -> ValidateIO ()
+check_can_read_file fname = do
     let fname' = T.unpack fname
-    r <- doesFileExist fname'
+    r <- liftIO $ doesFileExist fname'
     if not r
-        then return [T.concat ["File `", fname, "` does not exist."]]
+        then tell1 $ T.concat ["File `", fname, "` does not exist."]
         else do
-            p <- getPermissions fname'
-            return $ if readable p
-                then []
-                else [T.concat ["File `", fname, "` is not readable (permissions problem)."]]
+            p <- liftIO $ getPermissions fname'
+            unless (readable p) $
+                tell1 (T.concat ["File `", fname, "` is not readable (permissions problem)."])
 
-check_reference :: T.Text -> ValidateIO [T.Text]
+check_reference :: T.Text -> ValidateIO ()
 check_reference r
-    | isDefaultReference (T.unpack r)  = return []
+    | isDefaultReference (T.unpack r)  = return ()
     | otherwise = do
-        refs <- asks $ concatMap modReferences
-        if any ((==r) . refName) refs
-            then return []
-            else return [T.concat ["Could not find reference ", r, " (it is neither built in nor in any of the loaded modules)"]]
+        mods <- ask
+        let refs = concatMap modReferences mods
+        unless (any ((==r) . refName) refs) $
+            tell1 (T.concat ["Could not find reference ", r, " (it is neither built in nor in any of the loaded modules)"])
 
-check_fafile fafile = liftIO $ do
-        r <- doesFileExist (T.unpack fafile)
-        return $ if r
-            then []
-            else [T.concat ["Expected a filepath as argument 'fafile', got ", fafile, ", which is not a file."]]
+check_fafile fafile = do
+        r <- liftIO $ doesFileExist (T.unpack fafile)
+        when r $
+            tell1 (T.concat ["Expected a filepath as argument 'fafile', got ", fafile, ", which is not a file."])
 
 validate_write_output (Script _ es) = check_toplevel validate_write es
     where
         validate_write (FunctionCall (FuncName "write") _ args _) = validateArg check_can_write_dir "ofile" args es
-        validate_write _ = return []
+        validate_write _ = return ()
 
-check_can_write_dir :: T.Text -> ValidateIO [T.Text]
-check_can_write_dir ofile = liftIO $ do
+check_can_write_dir :: T.Text -> ValidateIO ()
+check_can_write_dir ofile = do
     let dirname = takeDirectory (T.unpack ofile)
-    exists <- doesDirectoryExist dirname
+    exists <- liftIO $ doesDirectoryExist dirname
     if not exists
-        then return [T.concat ["write call to file ", ofile, ", but directory ", T.pack dirname, " does not exist."]]
+        then tell1 $ T.concat ["write call to file ", ofile, ", but directory ", T.pack dirname, " does not exist."]
         else do
-            canWrite <- writable <$> getPermissions dirname
-            return $ if not canWrite
-                then [T.concat ["write call to file ", ofile, ", but directory ", T.pack dirname, " is not writable."]]
-                else []
+            canWrite <- liftIO $ writable <$> getPermissions dirname
+            unless canWrite $
+                tell1 (T.concat ["write call to file ", ofile, ", but directory ", T.pack dirname, " is not writable."])
