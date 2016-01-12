@@ -13,15 +13,17 @@ import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Map.Strict as M
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Unboxed.Mutable as VM
 import System.IO (hClose)
-import Data.Either
 import Data.Convertible
-import Data.List (groupBy)
 import Data.Function (on)
+
+import qualified Data.Conduit as C
+import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Binary as CB
+import Data.Conduit (($$), ($=), (=$=))
 
 import Language
 
@@ -48,19 +50,38 @@ executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
 executeCount (NGOAnnotatedSet gname annot_fp headers_fp) args = do
     let c = lookup "counts" args
         c' = GffGene
-    m <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
+    minCount <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
     methodS <- symbolOrTypeError "multiple argument to count " . lookupWithDefault (NGOSymbol "dist1") "multiple" $ args
     method <- methodFor methodS
-    let second_col hline = BL8.split '\t' hline !! 1
-    ids <- map (BL8.toStrict . second_col) . BL8.lines <$> liftIO (BL.readFile headers_fp)
-    let index = M.fromList (zip ids [0..])
-        n_headers = length (M.elems index)
+    let extractSecond hline = case B8.split '\t' hline of
+            [_, scol] -> return scol
+            _ -> throwDataError ("Could not parse internal intermediate file '"++headers_fp++"'. This may be a bug in ngless or your system is not preserving temp files")
 
-    annotated' <- map decodeAR . BL8.lines <$> liftIO (BL.readFile annot_fp)
-    let (errors, annotated) = partitionEithers annotated'
-    forM_ errors throwDataError
-    just_idxs <- asIndices index annotated
+        -- like Python's enumerate() as a Conduit
+        enumerate :: (Monad m) => C.Conduit a m (Int,a)
+        enumerate = loop 0
+            where
+                loop !n = C.await >>= \case
+                            Nothing -> return ()
+                            Just v -> do
+                                C.yield (n,v)
+                                loop (n+1)
+    index <- CB.sourceFile headers_fp
+                $= CB.lines
+                =$= CL.mapM extractSecond
+                =$= enumerate
+                $$ CL.fold (\m (i,a) -> M.insert a i m) M.empty
 
+    just_idxs <- CB.sourceFile annot_fp
+        $= CB.lines
+        =$= CL.mapM (\line -> case decodeAR $ BL.fromChunks [line] of
+                            Right v -> return v
+                            Left err -> throwDataError err)
+        =$= CL.groupBy ((==) `on` readId)
+        =$= CL.mapM (asIndices index)
+        $$ CL.consume
+
+    let n_headers = length (M.elems index)
     result <- case method of
         MMCountAll -> do
             outputListLno' TraceOutput ["Counts (all 1 method)..."]
@@ -79,14 +100,14 @@ executeCount (NGOAnnotatedSet gname annot_fp headers_fp) args = do
 
     (newfp,hout) <- openNGLTempFile annot_fp "counts." "txt"
     liftIO $ do
-        BL.hPut hout (BL.fromChunks ["\t", T.encodeUtf8 gname])
+        BL.hPut hout (BL.fromChunks ["\t", T.encodeUtf8 gname, "\n"])
         forM_ (zip (M.keys index) [0..]) $ \(hn,i) -> do
             v <- V.indexM result i
-            when (v > fromIntegral m) $
+            when (v > fromIntegral minCount) $
                 BL.hPut hout (BL.fromChunks [hn, "\t", B8.pack . show $ v, "\n"])
         hClose hout
     return $ NGOCounts newfp
-executeCount err _ = error ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
+executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
 
 all1 = all1OrOneOverN True
@@ -111,19 +132,19 @@ distributeMM indices n current fractionResult = V.create $ do
                 n_cs = convert (length cs)
                 adjust :: Double -> Double
                 adjust = if cs_sum > 0.0
-                            then (\c -> c / cs_sum)
+                            then (/ cs_sum)
                             else const  (1.0 / n_cs)
-            forM_ (zip vs cs) $ \(v,c) -> do
+            forM_ (zip vs cs) $ \(v,c) ->
                 unsafeIncrement' ncounts v (adjust c)
     when fractionResult $
         toFractions ncounts
     return ncounts
 
 
-asIndices :: M.Map B.ByteString Int -> [AnnotatedRead] -> NGLessIO [[Int]]
-asIndices index annotated = mapM (mapM lookupIx) $ groupBy ((==) `on` readId) annotated
+asIndices :: M.Map B.ByteString Int -> [AnnotatedRead] -> NGLessIO [Int]
+asIndices index = mapM lookupIx
     where
         lookupIx :: AnnotatedRead -> NGLessIO Int
         lookupIx val = case M.lookup (annotValue val) index of
             Just v -> return v
-            Nothing -> throwDataError ("Cannot header value lookup in count" :: String)
+            Nothing -> throwDataError ("Count: annotation not in header!" :: String)
