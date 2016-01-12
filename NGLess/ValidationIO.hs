@@ -124,8 +124,8 @@ check_reference r
 
 check_fafile fafile = do
         r <- liftIO $ doesFileExist (T.unpack fafile)
-        when r $
-            tell1 (T.concat ["Expected a filepath as argument 'fafile', got ", fafile, ", which is not a file."])
+        unless r $
+            tell1 (T.concat ["map function expects a file in argument 'fafile', got ", fafile, ", which is not the name of a file."])
 
 validate_write_output (Script _ es) = check_toplevel validate_write es
     where
