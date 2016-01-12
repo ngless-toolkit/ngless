@@ -135,7 +135,7 @@ modeExec opts@DefaultMode{} = do
         when shouldPrintHeader $
             liftIO printHeader
         outputLno' DebugOutput "Validating script..."
-        errs <- validateIO sc
+        errs <- validateIO modules sc
         when (isJust errs) $
             liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
         outputLno' InfoOutput "Script OK. Starting interpretation..."

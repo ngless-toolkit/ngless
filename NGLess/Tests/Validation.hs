@@ -58,13 +58,13 @@ case_mismatched_argument = isValidateError
 -- Validate IO
 
 validateIO_Ok script = do
-    err <- testNGLessIO $ validateIO (fromRight . parsetest $ script)
+    err <- testNGLessIO $ validateIO [] (fromRight . parsetest $ script)
     case err of
         Nothing -> assertBool "" True
         Just errmsg -> assertFailure (concat ["Expected no errors in validation, got ", show errmsg, ".\nScript was::\n\n", show script])
 
 validateIO_error script = do
-    err <- testNGLessIO $ validateIO (fromRight . parsetest $ script)
+    err <- testNGLessIO $ validateIO [] (fromRight . parsetest $ script)
     case err of
         Nothing -> assertFailure (concat ["ValidateIO should have detected an error on the script ", show script])
         Just _ -> return ()

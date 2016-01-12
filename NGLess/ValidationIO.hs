@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -12,15 +12,20 @@ import System.FilePath.Posix (takeDirectory)
 import Data.Maybe
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
 import qualified Data.Text as T
 
+import Modules
 import Language
 import NGLess
 import ReferenceDatabases
 
-validateIO :: Script -> NGLessIO (Maybe [T.Text])
-validateIO expr = do
-        err <- mapM ($expr) checks
+
+type ValidateIO = ReaderT [Module] NGLessIO
+
+validateIO :: [Module] -> Script -> NGLessIO (Maybe [T.Text])
+validateIO mods expr = do
+        err <- runReaderT (mapM ($expr) checks) mods
         case concat err of
             [] -> return Nothing
             errors -> return (Just errors)
@@ -33,7 +38,7 @@ validateIO expr = do
 
 
 -- | check that necessary files exist
-validate_files :: Script -> NGLessIO [T.Text]
+validate_files :: Script -> ValidateIO [T.Text]
 validate_files (Script _ es) = check_toplevel validate_files' es
     where
         validate_files' (FunctionCall (FuncName "fastq") f _ _) = check f
@@ -46,21 +51,22 @@ validate_files (Script _ es) = check_toplevel validate_files' es
         check (Lookup var) = validateVar check_can_read_file var es
         check _ = return []
 
-validate_def_genomes :: Script -> NGLessIO [T.Text]
+validate_def_genomes :: Script -> ValidateIO [T.Text]
 validate_def_genomes (Script _ es) = check_toplevel validate_def_genomes' es
     where
-        validate_def_genomes' (FunctionCall (FuncName "map") _ args _) = validateArg check_reference "reference" args es -- fromJust can be used, since reference is always required and already validated.
+        validate_def_genomes' (FunctionCall (FuncName "map") _ args _) = validateArg check_reference "reference" args es
+                                                                            >> validateArg check_fafile "fafile" args es
         validate_def_genomes' (Assignment _ e) = validate_def_genomes' e
         validate_def_genomes' _ = return []
 
 
-validateArg :: (T.Text -> NGLessIO [T.Text]) -> T.Text -> [(Variable,Expression)] -> [(Int,Expression)] -> NGLessIO [T.Text]
+validateArg :: (T.Text -> ValidateIO [T.Text]) -> T.Text -> [(Variable,Expression)] -> [(Int,Expression)] -> ValidateIO [T.Text]
 validateArg f v args es = case lookup (Variable v) args of
         Just (ConstStr x) -> f x
         Just (Lookup   x) -> validateVar f x es
         _                 -> return []
 
-validateVar :: (T.Text -> NGLessIO [T.Text]) -> Variable -> [(Int,Expression)] -> NGLessIO [T.Text]
+validateVar :: (T.Text -> ValidateIO [T.Text]) -> Variable -> [(Int,Expression)] -> ValidateIO [T.Text]
 validateVar f v es = case get_const_val v es of
             Right (Just (NGOString t))  -> f t
             Left  err       -> return [err]
@@ -86,13 +92,13 @@ get_const_val var s = do
         getConst _ = Nothing
 
 
-check_toplevel :: (Expression -> NGLessIO [T.Text]) -> [(Int,Expression)] -> NGLessIO [T.Text]
+check_toplevel :: (Expression -> ValidateIO [T.Text]) -> [(Int,Expression)] -> ValidateIO [T.Text]
 check_toplevel f es = concat <$> (forM es $ \(lno, e) -> do
     errs <- f e
     return $ map (\err -> T.concat ["Line ", T.pack (show lno), ": ", err]) errs)
 
 
-check_can_read_file :: T.Text -> NGLessIO [T.Text]
+check_can_read_file :: T.Text -> ValidateIO [T.Text]
 check_can_read_file fname = liftIO $ do
     let fname' = T.unpack fname
     r <- doesFileExist fname'
@@ -104,22 +110,27 @@ check_can_read_file fname = liftIO $ do
                 then []
                 else [T.concat ["File `", fname, "` is not readable (permissions problem)."]]
 
-check_reference :: T.Text -> NGLessIO [T.Text]
-check_reference v
-    | isDefaultReference v' = return []
-    | otherwise = liftIO $ do
-        r <- doesFileExist v'
+check_reference :: T.Text -> ValidateIO [T.Text]
+check_reference r
+    | isDefaultReference (T.unpack r)  = return []
+    | otherwise = do
+        refs <- asks $ concatMap modReferences
+        if any ((==r) . refName) refs
+            then return []
+            else return [T.concat ["Could not find reference ", r, " (it is neither built in nor in any of the loaded modules)"]]
+
+check_fafile fafile = liftIO $ do
+        r <- doesFileExist (T.unpack fafile)
         return $ if r
             then []
-            else [T.concat ["Value of argument reference ", v, " is neither a filepath or a default genome."]]
-    where v' = T.unpack v
+            else [T.concat ["Expected a filepath as argument 'fafile', got ", fafile, ", which is not a file."]]
 
 validate_write_output (Script _ es) = check_toplevel validate_write es
     where
         validate_write (FunctionCall (FuncName "write") _ args _) = validateArg check_can_write_dir "ofile" args es
         validate_write _ = return []
 
-check_can_write_dir :: T.Text -> NGLessIO [T.Text]
+check_can_write_dir :: T.Text -> ValidateIO [T.Text]
 check_can_write_dir ofile = liftIO $ do
     let dirname = takeDirectory (T.unpack ofile)
     exists <- doesDirectoryExist dirname
