@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, BangPatterns #-}
-module Functions
+module BuiltinFunctions
     ( builtinFunctions
     ) where
 
@@ -27,7 +27,7 @@ groupArgs =
     ]
 
 annotateArgs =
-    [ArgInformation "features" False (NGList NGLSymbol) (Just ["gene", "cds", "exon"])
+    [ArgInformation "features" False (NGList NGLSymbol) (Just ["gene", "cds", "exon", "seqname"])
     ,ArgInformation "mode" False NGLSymbol (Just ["union", "intersection_strict", "intersection_non_empty"])
     ,ArgInformation "gff" False NGLString Nothing
     ,ArgInformation "keep_ambiguous" False NGLBool Nothing

@@ -21,7 +21,7 @@ import Data.List (find)
 
 import Modules
 import Language
-import Functions
+import BuiltinFunctions
 
 
 type TypeMap = Map.Map T.Text NGLType

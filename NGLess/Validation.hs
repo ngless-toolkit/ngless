@@ -17,7 +17,7 @@ import Data.List
 
 import Language
 import Modules
-import Functions
+import BuiltinFunctions
 
 -- | Returns either an error message if it finds any errors or the input script unscathed
 validate :: [Module] -> Script -> Either T.Text Script

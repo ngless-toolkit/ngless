@@ -25,15 +25,16 @@ import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
-
 import qualified Data.Conduit as C
+import qualified Data.Conduit.Internal as CI
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
-import Data.Conduit (($=), (=$), (=$=))
+import Data.Conduit (($$), ($=), (=$), (=$=))
 import Data.Conduit.Async (buffer)
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Except (throwError)
+import Control.Monad
 import Data.Maybe
 
 import System.IO
@@ -45,6 +46,7 @@ import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamLine)
 import Language
 import FileManagement
 import NGLess
+import Interpretation.Select (readSamGroupsAsConduit)
 import Utils.Utils
 import Data.Annotation
 
@@ -69,7 +71,7 @@ data AnnotationOpts =
 
 executeAnnotation :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeAnnotation (NGOList e) args = NGOList <$> mapM (`executeAnnotation` args) e
-executeAnnotation (NGOMappedReadSet name e dDS) args = do
+executeAnnotation (NGOMappedReadSet name samFp dDS) args = do
     ambiguity <- lookupBoolOrScriptErrorDef (return False) "annotation function" "ambiguity" args
     strand_specific <- lookupBoolOrScriptErrorDef (return False) "annotation function" "strand" args
     fs <- case lookup "features" args of
@@ -78,14 +80,19 @@ executeAnnotation (NGOMappedReadSet name e dDS) args = do
         Just (NGOList feats') -> mapM (symbolOrTypeError "annotation features argument") feats'
         _ -> throwShouldNotOccur ("executeAnnotation: TYPE ERROR" :: String)
     m <- _annotationRule <$> parseAnnotationMode args
-    g <- evalMaybeString $ lookup "gff" args
-    gff <- whichAnnotationFile g dDS
-    uncurry (NGOAnnotatedSet name) <$> _annotate e gff AnnotationOpts
-                { optFeatures = map matchingFeature fs
-                , optIntersectMode = m
-                , optStrandSpecific = strand_specific
-                , optKeepAmbiguous = ambiguity
-                }
+    let opts = AnnotationOpts
+            { optFeatures = map matchingFeature fs
+            , optIntersectMode = m
+            , optStrandSpecific = strand_specific
+            , optKeepAmbiguous = ambiguity
+            }
+    uncurry (NGOAnnotatedSet name) <$>
+        if fs == ["seqname"]
+            then annotateSeqname samFp opts
+            else do
+                g <- maybeFilePathOrTypeError $ lookup "gff" args
+                gffFp <- whichAnnotationFile g dDS
+                _annotate samFp gffFp opts
 executeAnnotation e _ = throwShouldNotOccur ("Annotation can handle MappedReadSet(s) only. Got " ++ show e)
 
 parseAnnotationMode :: KwArgsValues -> NGLessIO AnnotationIntersectionMode
@@ -112,6 +119,31 @@ _annotationRule :: AnnotationIntersectionMode -> AnnotationRule
 _annotationRule IntersectUnion = union
 _annotationRule IntersectStrict = _intersection_strict
 _annotationRule IntersectNonEmpty = _intersection_non_empty
+
+annotateSeqname :: FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
+annotateSeqname samFp opts = do
+        (newfp, h) <- openNGLTempFile samFp "annotated." "tsv"
+        (newfp_headers, h_headers) <- openNGLTempFile samFp "annotation_headers." "txt"
+        ((), usednames) <- readSamGroupsAsConduit samFp
+            $= CL.map (seqName1 opts)
+            =$= CL.concat
+            $$ CI.zipSinks
+                (CL.map (BL.toStrict . encodeAR) =$ CB.sinkHandle h)
+                (CL.fold inserth (S.empty :: S.Set B.ByteString))
+        liftIO $ do
+            hClose h
+            forM_ (S.toAscList usednames) $ \name -> do
+                B8.hPutStr h_headers "seqname\t"
+                B8.hPutStrLn h_headers name
+            hClose h_headers
+        return (newfp, newfp_headers)
+    where
+        inserth s ar = S.insert (annotValue ar) s
+        seqName1 :: AnnotationOpts -> [(SamLine, B.ByteString)] -> [AnnotatedRead]
+        seqName1 _ = mapMaybe (seqAsAR . fst)
+        seqAsAR sr@SamLine{samQName = rid, samRName = rname }
+            | isAligned sr = Just (AnnotatedRead rid rname (GffOther "seqname") GffUnStranded)
+        seqAsAR  _ = Nothing
 
 _annotate :: FilePath -> FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
 _annotate samFp gffFp opts = do
@@ -160,7 +192,7 @@ readAlignments = filter isSL . map readSamLine' . BL8.lines
 
 
 asHeaders :: AnnotationMap -> [B.ByteString]
-asHeaders amap = S.toList . S.fromList $ concatMap asHeaders' (M.assocs amap)
+asHeaders amap = concatMap asHeaders' (M.assocs amap)
     where
 
         asHeaders' :: (GffType, M.Map B8.ByteString GffIMMap) -> [B.ByteString]
@@ -247,8 +279,8 @@ matchingFeature s      = GffOther (B8.pack . T.unpack $ s)
 _matchFeatures :: [GffType] -> GffLine -> Bool
 _matchFeatures fs gf = gffType gf `elem` fs
 
-evalMaybeString Nothing = return Nothing
-evalMaybeString (Just (NGOString s)) = return (Just $ T.unpack s)
-evalMaybeString o = throwShouldNotOccur ("evalString: Argument type must be NGOString (received " ++ show o ++ ").")
 
+maybeFilePathOrTypeError Nothing = return Nothing
+maybeFilePathOrTypeError (Just (NGOString s)) = return (Just $ T.unpack s)
+maybeFilePathOrTypeError o = throwScriptError ("GFF String: Argument type must be NGOString (received " ++ show o ++ ").")
 
