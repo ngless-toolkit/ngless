@@ -4,13 +4,9 @@ module Data.GFF
     ( GffLine(..)
     , GffType(..)
     , GffStrand(..)
-    , gffGeneId
     , readGffLine
-    , parseGffAttributes
+    , _parseGffAttributes
     , _trimString
-    , parsegffType
-    , strand
-    , showStrand
     ) where
 
 import Data.Maybe
@@ -69,8 +65,8 @@ instance NFData GffLine where
 instance NFData GffType where
     rnf a = a `seq` ()
 
-parseGffAttributes :: S.ByteString -> [(S.ByteString, S.ByteString)]
-parseGffAttributes = map (\(aid,aval) -> (aid, S8.filter (/='\"') . S.tail $ aval))
+_parseGffAttributes :: S.ByteString -> [(S.ByteString, S.ByteString)]
+_parseGffAttributes = map (\(aid,aval) -> (aid, S8.filter (/='\"') . S.tail $ aval))
                         . map (\x -> S8.break (== (checkAttrTag x)) x)
                         . map _trimString
                         . S8.split ';'
@@ -99,9 +95,9 @@ _trimString = trimBeg . trimEnd
 
 
 gffGeneId :: S8.ByteString -> S8.ByteString
-gffGeneId g = fromMaybe "unknown" (listToMaybe . catMaybes $ map (`lookup` r) ["ID", "gene_id"])
+gffGeneId g = fromMaybe "unknown" (listToMaybe . catMaybes $ map (`lookup` attrs) ["ID", "gene_id"])
     where
-        r = parseGffAttributes g
+        attrs = _parseGffAttributes g
 
 
 readGffLine :: B.ByteString -> Either NGError GffLine
@@ -113,7 +109,7 @@ readGffLine line
                 (read $ B8.unpack tk3)
                 (read $ B8.unpack tk4)
                 (score tk5)
-                (strand $ B8.head tk6)
+                (parseStrand $ B8.head tk6)
                 (phase tk7)
                 (S8.copy . gffGeneId $ tk8)
     |otherwise = throwDataError ("unexpected line in GFF: " ++ show line)
@@ -133,15 +129,9 @@ parsegffType "cds" = GffCDS
 parsegffType "CDS" = GffCDS
 parsegffType t = GffOther t
 
-strand :: Char -> GffStrand
-strand '.' = GffUnStranded
-strand '+' = GffPosStrand
-strand '-' = GffNegStrand
-strand '?' = GffUnknownStrand
-strand _ = error "unhandled value for strand"
-
-showStrand :: GffStrand -> S.ByteString
-showStrand GffUnStranded    = "."
-showStrand GffPosStrand     = "+"
-showStrand GffNegStrand     = "-"
-showStrand GffUnknownStrand = "?"
+parseStrand :: Char -> GffStrand
+parseStrand '.' = GffUnStranded
+parseStrand '+' = GffPosStrand
+parseStrand '-' = GffNegStrand
+parseStrand '?' = GffUnknownStrand
+parseStrand _ = error "unhandled value for strand"
