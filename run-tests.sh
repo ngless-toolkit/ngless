@@ -27,7 +27,11 @@ for testdir in tests/*; do
         echo "Running $testdir"
         cd $testdir
         mkdir -p temp
-        $ngless_bin --quiet -t temp *.ngl > output.stdout.txt 2>output.stderr.txt
+        validate_arg=""
+        if [[ $testdir == tests/error-validation-* ]] ; then
+            validate_arg="-n"
+        fi
+        $ngless_bin --quiet -t temp $validate_arg *.ngl > output.stdout.txt 2>output.stderr.txt
         ngless_exit=$?
         if [[ $testdir == tests/error-* ]] ; then
             if test $ngless_exit -eq "0"; then

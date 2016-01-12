@@ -138,8 +138,13 @@ modeExec opts@DefaultMode{} = do
         errs <- validateIO modules sc
         when (isJust errs) $
             liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
-        outputLno' InfoOutput "Script OK. Starting interpretation..."
-        interpret modules (nglBody sc)
+        if validateOnly opts
+            then do
+                outputLno' InfoOutput "Script OK."
+                liftIO exitSuccess
+            else do
+                outputLno' InfoOutput "Script OK. Starting interpretation..."
+                interpret modules (nglBody sc)
     when shouldOutput $ do
         createDirectoryIfMissing False odir
         setupHtmlViewer odir

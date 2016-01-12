@@ -46,6 +46,7 @@ data NGLessMode =
         DefaultMode
               { input :: NGLessInput
               , debug_mode :: String
+              , validateOnly :: Bool
               , print_last :: Bool
               , trace_flag :: Maybe Bool
               , nThreads :: Int
@@ -95,6 +96,7 @@ parseInput = InlineScript <$> strOption
 mainArgs = DefaultMode
               <$> parseInput -- input :: NGLessInput
               <*> strOption (long "debug" <> value "") -- debug_mode :: String
+              <*> switch (long "validate-only" <> short 'n' <> help "Only validate input, do not run script") -- validateOnly :: Bool
               <*> switch (long "print-last" <> short 'p' <> help "print value of last line in script") -- print_last :: Bool
               <*> optional (switch (long "trace")) -- trace_flag :: Maybe Bool
               <*> option auto (long "jobs" <> short 'j' <> value 1) -- nThreads :: Int
