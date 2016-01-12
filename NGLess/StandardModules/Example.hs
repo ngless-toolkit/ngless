@@ -1,4 +1,4 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -10,6 +10,7 @@ module StandardModules.Example
 
 import qualified Data.Text as T
 import Control.Monad.IO.Class (liftIO)
+import Data.Default
 
 import Language
 import Modules
@@ -34,7 +35,7 @@ exampleFunction = Function
     }
 
 loadModule :: T.Text -> NGLessIO Module
-loadModule _ = return Module
+loadModule _ = return def
     { modInfo = ModInfo "stdlib.example" "0.0"
     , modConstants =
             [("EXAMPLE_0", NGOInteger 0)
@@ -43,6 +44,5 @@ loadModule _ = return Module
             ]
     , modFunctions = [exampleFunction]
     , runFunction = execute
-    , validateFunction = const (return [])
     }
 

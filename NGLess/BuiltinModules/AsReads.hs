@@ -1,4 +1,4 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -21,6 +21,7 @@ import Data.Conduit (($=), ($$), (=$=), (=$))
 import Data.Function (on)
 import Control.Monad.Except
 import System.IO
+import Data.Default
 
 import Language
 import FileManagement
@@ -77,11 +78,9 @@ as_reads_Function = Function
     }
 
 loadModule :: T.Text -> NGLessIO Module
-loadModule _ = return Module
+loadModule _ = return def
     { modInfo = ModInfo "builtin.as_reads" "0.0"
-    , modConstants = []
     , modFunctions = [as_reads_Function]
     , runFunction = const executeReads
-    , validateFunction = const (return [])
     }
 

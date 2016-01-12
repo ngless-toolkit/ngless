@@ -1,4 +1,4 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -16,6 +16,7 @@ import Control.Applicative
 import Control.Monad
 import Text.Read
 import Data.Maybe
+import Data.Default
 
 import Language
 import Modules
@@ -46,13 +47,10 @@ loadModule _ = liftIO $ do
     ncpus <- getNcpus
     when (isJust ncpus) $
         setNumCapabilities (fromJust ncpus)
-    return Module
+    return def
         { modInfo = ModInfo "stdlib.batch" "0.0"
         , modConstants =
                 [("JOBINDEX_OR_0", NGOInteger (fromMaybe 0 job_id))
                 ,("JOBINDEX_VALID", NGOBool (isJust job_id))
                 ]
-        , modFunctions = []
-        , runFunction = \_ _ _ -> return NGOVoid
-        , validateFunction = const (return [])
         }

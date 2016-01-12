@@ -113,6 +113,7 @@ data ExternalModule = ExternalModule
     , command :: Command
     , initCmd :: FilePath
     , initArgs :: [String]
+    , references :: [ExternalReference]
     , citation :: Maybe String
     } deriving (Eq, Show)
 
@@ -124,7 +125,8 @@ instance FromJSON ExternalModule where
             <*> pure undefined
             <*> o .: "command"
             <*> initO .: "init_cmd"
-            <*> (fromMaybe [] <$> initO .:? "init_args")
+            <*> initO .:? "init_args" .!= []
+            <*> o .:? "references" .!= []
             <*> o .:? "citation"
 
 addPathToRep :: FilePath -> ExternalModule -> ExternalModule
@@ -198,6 +200,7 @@ asInternalModule em@ExternalModule{..} = do
     return Module
         { modInfo = emInfo
         , modConstants = []
+        , modReferences = references
         , modFunctions = [asFunction command]
         , runFunction = const (executeCommand modulePath command)
         , validateFunction = const (return [])

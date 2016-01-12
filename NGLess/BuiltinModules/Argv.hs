@@ -1,4 +1,4 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -9,6 +9,7 @@ module BuiltinModules.Argv
     ) where
 
 import qualified Data.Text as T
+import Data.Default
 
 import Language
 import Configuration
@@ -20,11 +21,8 @@ loadModule :: T.Text -> NGLessIO Module
 loadModule _ = do
     argv <- nConfArgv <$> nglConfiguration
     let nglARGV = NGOList (NGOString <$> argv)
-    return $ Module
+    return def
         { modInfo = ModInfo "builtin.argv" "0.0"
         , modConstants = [("ARGV", nglARGV)]
-        , modFunctions = []
-        , runFunction = \_ _ _ -> return NGOVoid
-        , validateFunction = const (return [])
         }
 

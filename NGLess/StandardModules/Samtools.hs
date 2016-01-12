@@ -1,4 +1,4 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -19,6 +19,7 @@ import System.Process
 import System.Exit
 
 import Control.Monad.IO.Class (liftIO)
+import Data.Default
 
 import Language
 import FileManagement
@@ -63,10 +64,8 @@ samtools_sort_function = Function
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
-        return Module
+        return def
         { modInfo = ModInfo "stdlib.samtools" "0.0"
-        , modConstants = []
         , modFunctions = [samtools_sort_function]
         , runFunction = const executeSort
-        , validateFunction = const (return [])
         }
