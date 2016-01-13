@@ -15,7 +15,7 @@ import Control.Applicative
 import Control.Monad
 import Data.Maybe
 import System.Process
-import System.Environment (getEnvironment)
+import System.Environment (getEnvironment, getExecutablePath)
 import System.Exit
 import System.Directory
 import System.FilePath.Posix
@@ -150,9 +150,12 @@ asArgInfo (CommandInteger name _) = ArgInformation name False NGLInteger Nothing
 asArgInfo (CommandString name _ req) = ArgInformation name req NGLString Nothing
 
 nglessEnv :: FilePath -> NGLessIO [(String,String)]
-nglessEnv basedir = do
-    env <- liftIO getEnvironment
-    return $ ("NGLESS_MODULE_DIR", basedir):env
+nglessEnv basedir = liftIO $ do
+    env <- getEnvironment
+    nglessPath <- getExecutablePath
+    return $ ("NGLESS_NGLESS_BIN", nglessPath)
+                :("NGLESS_MODULE_DIR", basedir)
+                :env
 
 executeCommand :: FilePath -> Command -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCommand basedir cmd input args = do
