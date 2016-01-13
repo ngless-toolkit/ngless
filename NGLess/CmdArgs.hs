@@ -67,6 +67,10 @@ data NGLessMode =
               , genome_url :: String
               , gtf_url :: String
               }
+        | DownloadFileMode
+              { origUrl :: String
+              , localFile :: FilePath
+              }
            deriving (Eq, Show)
 
 parseVerbosity = option (eitherReader readVerbosity) (long "verbosity" <> short 'v' <> value Normal)
@@ -119,10 +123,14 @@ createRefArgs = (flag' CreateReferencePackMode (long "create-reference-pack"))
                         <*> strOption (long "gtf-url")
         -- += details ["Example:", "ngless --create-reference-pack ref.tar.gz -g http://...genome.fa.gz -a http://...gtf.fa.gz"]
 
+downloadFileArgs = (flag' DownloadFileMode (long "download-file"))
+                        <*> strOption (long "download-url")
+                        <*> strOption (long "local-file")
+
 
 nglessArgs :: Parser NGLessArgs
 nglessArgs = NGLessArgs
                 <$> parseVerbosity
                 <*> switch (long "quiet" <> short 'q')
                 <*> parseColor
-                <*> (mainArgs <|> installArgs <|> createRefArgs)
+                <*> (mainArgs <|> downloadFileArgs <|> installArgs <|> createRefArgs)

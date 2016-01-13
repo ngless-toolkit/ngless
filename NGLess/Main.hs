@@ -38,6 +38,7 @@ import Modules
 import CmdArgs
 import FileManagement (setupHtmlViewer)
 import StandardModules.NGLStdlib
+import Utils.Network
 
 import qualified BuiltinModules.AsReads as ModAsReads
 import qualified BuiltinModules.Argv as ModArgv
@@ -161,6 +162,9 @@ modeExec (InstallGenMode ref)
 modeExec (CreateReferencePackMode ofile gen gtf) = runNGLessIO "creating reference package" $ do
         outputLno' InfoOutput "Starting packaging (will download and index genomes)..."
         createReferencePack ofile gen gtf
+
+modeExec (DownloadFileMode url local) =
+    downloadFile url local
 
 main = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
