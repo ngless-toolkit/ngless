@@ -13,6 +13,7 @@ module Utils.Utils
     , readProcessErrorWithExitCode
     , hWriteGZIP
     , allSame
+    , passthrough
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -74,3 +75,8 @@ conduitPossiblyCompressedFile fname
     | ".gz" `isSuffixOf` fname = C.sourceFile fname $= CZ.ungzip
     | ".bz2" `isSuffixOf` fname = C.sourceFile fname $= CZ.bunzip2
     | otherwise = C.sourceFile fname
+
+
+-- | passthrough applies the function 'f' and then return its argument again
+passthrough :: (Monad m) => (a -> m ()) -> a -> m a
+passthrough f a = f a >> return a

@@ -14,6 +14,7 @@ import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Text as T
 import Control.Monad
 import Control.Monad.Trans.Resource
+import Data.List (find)
 import Data.Maybe
 import Numeric
 
@@ -28,6 +29,7 @@ import Language
 import FileManagement
 import ReferenceDatabases
 import Configuration
+import Modules
 import Output
 import NGLess
 
@@ -53,16 +55,16 @@ ensureIndexExists refPath = do
     hasIndex <- hasValidIndex refPath
     if hasIndex
         then outputListLno' DebugOutput ["Index for ", refPath, " already exists."]
-        else withLockFile (LockParameters
-                            { lockFname = (refPath ++ ".ngless-index.lock")
+        else withLockFile LockParameters
+                            { lockFname = refPath ++ ".ngless-index.lock"
                             , maxAge = hoursToDiffTime 36
-                            , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = fromInteger 60 }
-                            }) $ do
+                            , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
+                            } $ do
                 -- recheck if index exists with the lock in place
                 -- it may have been created in the meanwhile (especially if we slept waiting for the lock)
                 hasIndex' <- hasValidIndex refPath
-                when (not hasIndex')
-                    (createIndex refPath)
+                unless hasIndex' $
+                    createIndex refPath
     return refPath
 
 
@@ -98,9 +100,21 @@ interpretMapOp ref ds extraArgs = do
     where
         indexReference :: Reference -> NGLessIO (FilePath, Maybe T.Text)
         indexReference (FaFile fa) = (,Nothing) <$> ensureIndexExists fa
-        indexReference (Reference r) = do
+        indexReference (Reference r)
+            | isDefaultReference r = do
                 basedir  <- ensureDataPresent r
                 return (buildGenomePath basedir, Just $ T.pack r)
+            | otherwise = do
+                externalRef <- findExternalReference (T.pack r)
+                return (externalRef, Just $ T.pack r)
+
+findExternalReference :: T.Text -> NGLessIO FilePath
+findExternalReference rname = do
+    mods <- loadedModules
+    let refs = concatMap modReferences mods
+    case find ((==rname) . refName) refs of
+        Just rinfo -> return . faFile $ rinfo
+        Nothing -> throwScriptError $ T.concat ["Could not find reference '", rname, "'. It is not builtin nor in one of the loaded modules."]
 
 
 getSamStats :: FilePath -> NGLessIO ()

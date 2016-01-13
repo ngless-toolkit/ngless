@@ -1,4 +1,4 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -12,11 +12,13 @@ import qualified StandardModules.Example as Example
 import qualified StandardModules.Batch as Batch
 import qualified StandardModules.Samtools as Samtools
 import qualified ExternalModules as Ext
+
+import Utils.Utils
 import Modules
 import NGLess
 
 loadStdlibModules :: [ModInfo] -> NGLessIO [Module]
-loadStdlibModules = mapM loadModules1
+loadStdlibModules = mapM (\m -> loadModules1 m >>= passthrough registerModule)
 
 externalModules =
         ["example-cmd"
@@ -24,6 +26,7 @@ externalModules =
         ,"samtools"
         ]
 
+loadModules1 :: ModInfo -> NGLessIO Module
 loadModules1 (ModInfo "example" version) = Example.loadModule version
 loadModules1 (ModInfo "batch" version) = Batch.loadModule version
 loadModules1 (ModInfo "samtools" version) = Samtools.loadModule version

@@ -1,17 +1,22 @@
 {- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE BangPatterns #-}
 module Modules
     ( ArgInformation(..)
     , Function(..)
     , ExternalReference(..)
     , Module(..)
     , ModInfo(..) -- re-export
+    , registerModule
+    , loadedModules
     ) where
 import qualified Data.Text as T
+import System.IO.Unsafe (unsafePerformIO)
+import Control.Monad.IO.Class (liftIO)
+import Data.IORef
 import Data.Aeson
 import Data.Default
+
 import Language
 import NGLess
 
@@ -68,3 +73,12 @@ instance Default Module where
         }
 
 
+loadedModulesRef :: IORef [Module]
+{-# NOINLINE loadedModulesRef #-}
+loadedModulesRef = unsafePerformIO (newIORef [])
+
+registerModule :: Module -> NGLessIO ()
+registerModule m = liftIO $ modifyIORef' loadedModulesRef (m:)
+
+loadedModules :: NGLessIO [Module]
+loadedModules = liftIO $ readIORef loadedModulesRef
