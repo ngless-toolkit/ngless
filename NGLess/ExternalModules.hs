@@ -164,7 +164,7 @@ executeCommand basedir cmd input args = do
     args' <- argsArguments cmd args
     env <- nglessEnv basedir
     let cmdline = paths' ++ args'
-        process = (proc (arg0 cmd) cmdline) { env = Just env }
+        process = (proc (basedir </> arg0 cmd) cmdline) { env = Just env }
     outputListLno' TraceOutput ("executing command: ":arg0 cmd:cmdline)
     (exitCode, out, err) <- liftIO $
         readCreateProcessWithExitCode process ""
@@ -215,7 +215,7 @@ validateModule  ExternalModule{..} = do
     outputListLno' TraceOutput ("Running initialization for module ":show emInfo:" ":initCmd:" ":initArgs)
     env <- nglessEnv modulePath
     (exitCode, out, err) <- liftIO $
-        readCreateProcessWithExitCode (proc initCmd initArgs) { env = Just env } ""
+        readCreateProcessWithExitCode (proc (modulePath </> initCmd) initArgs) { env = Just env } ""
     case (exitCode,out,err) of
         (ExitSuccess, "", "") -> return ()
         (ExitSuccess, msg, "") -> outputListLno' TraceOutput ["Module OK. information: ", msg]
