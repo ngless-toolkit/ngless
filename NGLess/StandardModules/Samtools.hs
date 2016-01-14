@@ -66,6 +66,12 @@ loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
         return def
         { modInfo = ModInfo "stdlib.samtools" "0.0"
+        , modCitation = Just citation
         , modFunctions = [samtools_sort_function]
         , runFunction = const executeSort
         }
+    where
+        citation = T.concat
+            ["'The Sequence Alignment/Map format and SAMtools' "
+            ,"by Heng Li, Bob Handsaker, Alec Wysoker, Tim Fennell, Jue Ruan, Nils Homer, Gabor Marth, Goncalo Abecasis, Richard Durbin, and 1000 Genome Project Data Processing Subgroup "
+            ,"in Bioinformatics (2009) 25 (16): 2078-2079 (2009) DOI:10.1093/bioinformatics/btp352"]
