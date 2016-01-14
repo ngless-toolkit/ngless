@@ -114,7 +114,7 @@ data ExternalModule = ExternalModule
     , initCmd :: FilePath
     , initArgs :: [String]
     , references :: [ExternalReference]
-    , citation :: Maybe String
+    , emCitation :: Maybe T.Text
     } deriving (Eq, Show)
 
 instance FromJSON ExternalModule where
@@ -202,6 +202,7 @@ asInternalModule em@ExternalModule{..} = do
     validateModule em
     return Module
         { modInfo = emInfo
+        , modCitation = emCitation
         , modConstants = []
         , modReferences = references
         , modFunctions = [asFunction command]

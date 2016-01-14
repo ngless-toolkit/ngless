@@ -52,6 +52,7 @@ instance FromJSON ExternalReference where
 
 data Module = Module
     { modInfo :: !ModInfo -- ^ name & version
+    , modCitation :: Maybe T.Text
     , modConstants :: [(T.Text, NGLessObject)] -- ^ constants defined in this module
     , modReferences :: [ExternalReference]
     , modFunctions :: [Function] -- ^ functions defined by this module
@@ -60,11 +61,12 @@ data Module = Module
     }
 
 instance Show Module where
-    show (Module info cs fs _ _ _) = "Module["++show info++"; constants="++show cs++"; functions="++show fs++"]"
+    show (Module info _ cs fs _ _ _) = "Module["++show info++"; constants="++show cs++"; functions="++show fs++"]"
 
 instance Default Module where
     def = Module
         { modInfo = ModInfo "builtin.default" "0.0"
+        , modCitation = Nothing
         , modConstants = []
         , modReferences = []
         , modFunctions = []

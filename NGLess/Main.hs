@@ -88,12 +88,21 @@ loadModules mods  = do
     imported <- loadStdlibModules mods
     return (mArgv:mA:imported)
 
-printHeader :: IO ()
-printHeader = putStr
-    ("NGLess v"++versionStr++" (C) NGLess authors\n"++
-    "\n"++
-    "http://luispedro.github.io/ngless\n"++
-    "\n")
+
+headerStr :: String
+headerStr = "NGLess v"++versionStr++" (C) NGLess authors\n"++
+            "\n"++
+            "http://luispedro.github.io/ngless\n"
+
+printHeader :: [Module] -> NGLessIO ()
+printHeader mods = liftIO $ do
+    let citations = mapMaybe modCitation mods
+    putStr headerStr
+    unless (null citations) $ do
+        putStr "When publishing results from this script, please cite the following works:\n"
+        forM_ citations $ \c ->
+            putStr ("\t - " ++ T.unpack c ++ "\n")
+        putStr "\n"
 
 loadScript :: NGLessInput -> IO (Either String T.Text)
 loadScript (InlineScript s) = return . Right . T.pack $ s
@@ -133,12 +142,12 @@ modeExec opts@DefaultMode{} = do
     shouldOutput <- runNGLessIO "cannot fail" $ nConfCreateOutputDirectory <$> nglConfiguration
     runNGLessIO "running script" $ do
         shouldPrintHeader <- nConfPrintHeader <$> nglConfiguration
-        when shouldPrintHeader $
-            liftIO printHeader
         outputLno' DebugOutput "Validating script..."
         errs <- validateIO modules sc
         when (isJust errs) $
             liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
+        when shouldPrintHeader $
+            printHeader modules
         if validateOnly opts
             then do
                 outputLno' InfoOutput "Script OK."
