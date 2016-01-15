@@ -91,8 +91,8 @@ loadModules mods  = do
 
 headerStr :: String
 headerStr = "NGLess v"++versionStr++" (C) NGLess authors\n"++
-            "\n"++
-            "http://luispedro.github.io/ngless\n"
+            "http://luispedro.github.io/ngless\n"++
+            "\n"
 
 printHeader :: [Module] -> NGLessIO ()
 printHeader mods = liftIO $ do
