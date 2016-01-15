@@ -171,9 +171,8 @@ readGffFile gffFp opts =
         buffer1000 = buffer 1000
         readAnnotationOrDie :: C.Conduit B.ByteString NGLessIO GffLine
         readAnnotationOrDie = C.awaitForever $ \line ->
-            case B8.head line of
-                '#' -> readAnnotationOrDie
-                _ -> case readGffLine line of
+            unless (B8.head line == '#') $
+                case readGffLine line of
                     Right g -> C.yield g
                     Left err -> throwError err
         insertg am g = M.alter (updateF g) (gffType g) am
