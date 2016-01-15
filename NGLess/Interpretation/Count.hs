@@ -34,7 +34,6 @@ import Data.Annotation
 import Data.Maybe
 import Data.GFF
 import Utils.Vector
-import Utils.Utils
 
 data MMMethod = MMCountAll | MM1OverN | MMDist1
     deriving (Eq, Show)
@@ -51,8 +50,8 @@ executeCount (NGOAnnotatedSet gname annot_fp headers_fp) args = do
     let c = lookup "counts" args
         c' = GffGene
     minCount <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
-    methodS <- symbolOrTypeError "multiple argument to count " . lookupWithDefault (NGOSymbol "dist1") "multiple" $ args
-    method <- methodFor methodS
+    method <- methodFor =<< lookupSymbolOrScriptErrorDef (return "dist1")
+                                    "multiple argument to count " "multiple" args
     let extractSecond hline = case B8.split '\t' hline of
             [_, scol] -> return scol
             _ -> throwDataError ("Could not parse internal intermediate file '"++headers_fp++"'. This may be a bug in ngless or your system is not preserving temp files")
