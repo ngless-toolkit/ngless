@@ -3,6 +3,7 @@ module Tests.Utils
     , isErrorMsg
     , isOk
     , isOkMsg
+    , isRight
     , parsetest
     , fromRight
     ) where
@@ -30,3 +31,7 @@ parsetest = parsengless "test" True
 
 fromRight (Right r) = r
 fromRight (Left e) = error (concat ["Unexpected Left: ",show e])
+
+isRight (Right _) = True
+isRight (Left _) = False
+

@@ -73,9 +73,6 @@ validate_Error script =
     when (isRight $ parsetest script >>= validate []) $
         assertFailure (concat ["Validate (pure) should have detected an error on the script ", show script])
 
-isRight (Right _) = True
-isRight (Left _) = False
-
 case_fastq_inexistence_file = validateIO_error
     "ngless '0.0'\n\
     \fastq('THIS_FILE_DOES_NOT_EXIST_SURELY.fq')\n"
@@ -97,7 +94,7 @@ case_invalid_not_pure_fp_fastq_const = validateIO_Ok
 
 case_valid_not_pure_map_reference_lit = validateIO_Ok
     "ngless '0.0'\n\
-    \map(x, reference='Makefile')\n"
+    \map(x, fafile='Makefile')\n"
 
 case_invalid_not_pure_map_def_reference_lit = validateIO_Ok
     "ngless '0.0'\n\
@@ -105,13 +102,17 @@ case_invalid_not_pure_map_def_reference_lit = validateIO_Ok
 
 case_invalid_not_pure_map_reference_lit = validateIO_error
     "ngless '0.0'\n\
-    \map(x, reference='THIS_FILE_DOES_NOT_EXIST_SURELY.fa')\n"
+    \map(x, fafile='THIS_FILE_DOES_NOT_EXIST_SURELY.fa')\n"
+
+case_inexistent_reference = validateIO_error
+    "ngless '0.0'\n\
+    \map(x, reference='UNKNOWN_REFERENCE')\n"
 
 
-case_valid_not_pure_map_reference_const = validateIO_Ok
+case_fafile_through_variable = validateIO_Ok
     "ngless '0.0'\n\
     \v = 'Makefile'\n\
-    \map(x, reference=v)\n"
+    \map(x, fafile=v)\n"
 
 case_invalid_not_pure_map_def_reference_const = validateIO_Ok
     "ngless '0.0'\n\
