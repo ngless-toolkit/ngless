@@ -75,7 +75,7 @@ all: ngless
 ngless: $(NGLESS_BUILD_BINARIES)
 	stack build
 
-static:
+static: $(NGLESS_BUILD_BINARIES)
 	stack build --ghc-options='-optl-static -optl-pthread' --force-dirty
 
 dist: ngless-${VERSION}.tar.gz
