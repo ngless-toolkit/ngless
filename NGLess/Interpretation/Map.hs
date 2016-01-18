@@ -14,7 +14,7 @@ import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Text as T
 import Control.Monad
 import Control.Monad.Trans.Resource
-import Data.List (find)
+import Data.List (find, foldl')
 import Data.Maybe
 import Numeric
 
@@ -132,7 +132,7 @@ _calcSamStats contents = (total, aligned, unique, lowQual)
             Left err -> error (show err)
             Right SamHeader{} -> Nothing
             Right v@SamLine{} -> Just v
-        computeStats = foldl update (P4 0 0 0 0)
+        computeStats = foldl' update (P4 0 0 0 0)
         update (P4 t al u lQ) samLine =
             P4 (t + 1)
                 (al + (asInteger . isAligned $ samLine))

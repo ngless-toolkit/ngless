@@ -34,9 +34,10 @@ import Data.Conduit.Async (buffer)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Except (throwError)
 import Control.Monad
+import Data.List (foldl1')
 import Data.Maybe
-
 import System.IO
+
 import ReferenceDatabases
 import Output
 
@@ -295,7 +296,7 @@ _intersection_non_empty im strand (sS, sE) = intersection' im'
 
 intersection' :: [GffIMMap] -> [AnnotationInfo]
 intersection' [] = []
-intersection' im = concat . IM.elems $ foldl1 IM.intersection im
+intersection' im = concat . IM.elems $ foldl1' IM.intersection im
 
 _allSameId :: [AnnotationInfo] -> Bool
 _allSameId = allSame . map snd
