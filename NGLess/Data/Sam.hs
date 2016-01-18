@@ -1,8 +1,12 @@
+{- Copyright 2014-2016 NGLess Authors
+ - License: MIT
+ -}
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Sam
     ( SamLine(..)
     , SamResult(..)
     , samLength
+    , readSamGroupsC
     , readSamLine
     , isAligned
     , isPositive
@@ -17,10 +21,16 @@ import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
-import Control.DeepSeq
+import qualified Data.Conduit.List as CL
+import qualified Data.Conduit as C
 import Data.Bits (testBit)
+import Control.DeepSeq
 
+import Data.Conduit ((=$=))
+import Data.Function (on)
+import Control.Monad.Except
 import NGLess.NGError
+
 
 
 data SamLine = SamLine
@@ -121,3 +131,15 @@ matchIdentity samline = do
             toDouble = fromInteger . toInteger
             mid = toDouble (len - errors) / toDouble len
         return mid
+
+-- | take in *lines* and transform them into groups of SamLines all refering to the same read
+readSamGroupsC :: (MonadError NGError m) => C.Conduit B.ByteString m [SamLine]
+readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
+    where
+        readSamLineOrDie = C.awaitForever $ \line ->
+            case readSamLine (BL.fromStrict line) of
+                Left err -> throwError err
+                Right parsed@SamLine{} -> C.yield parsed
+                _ -> return ()
+        groupLine = (==) `on` samQName
+

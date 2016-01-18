@@ -58,15 +58,6 @@ asFQ = asFQ' False False
             | otherwise = asFQ' seen1 seen2 ss
         asFQ1 SamLine{samQName=qname, samSeq=short, samQual=qs} = B.concat ["@", qname, "\n", short, "\n+\n", qs, "\n"]
 
-readSamGroupsC :: C.Conduit B.ByteString NGLessIO [SamLine]
-readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
-    where
-        readSamLineOrDie = C.awaitForever $ \line ->
-            case readSamLine (BL.fromStrict line) of
-                Left err -> throwError err
-                Right parsed@SamLine{} -> C.yield parsed
-                _ -> return ()
-        groupLine = (==) `on` samQName
 
 as_reads_Function = Function
     { funcName = FuncName "as_reads"

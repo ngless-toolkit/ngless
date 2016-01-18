@@ -1,7 +1,7 @@
 {- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings, LambdaCase, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase, FlexibleContexts, TupleSections #-}
 
 module Interpretation.Annotation
     ( AnnotationIntersectionMode(..)
@@ -17,7 +17,6 @@ module Interpretation.Annotation
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
 
@@ -29,7 +28,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Internal as CI
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
-import Data.Conduit (($$), ($=), (=$), (=$=))
+import Data.Conduit (($$), ($=), (=$), (=$=), ($$+), ($$+-))
 import Data.Conduit.Async (buffer)
 
 import Control.Monad.IO.Class (liftIO)
@@ -42,11 +41,10 @@ import ReferenceDatabases
 import Output
 
 import Data.GFF
-import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamLine)
+import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamGroupsC)
 import Language
-import FileManagement
+import FileManagement (openNGLTempFile)
 import NGLess
-import Interpretation.Select (readSamGroupsAsConduit)
 import Utils.Utils
 import Data.Annotation
 
@@ -59,6 +57,44 @@ type AnnotationRule = GffIMMap -> GffStrand -> (Int, Int) -> [AnnotationInfo]
 
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
+
+type GeneMapAnnotation = M.Map B8.ByteString [B8.ByteString]
+
+loadFunctionalMap :: FilePath -> [B.ByteString] -> NGLessIO GeneMapAnnotation
+loadFunctionalMap fname columns = do
+        (resume, [headers]) <- (CB.sourceFile fname =$ CB.lines)
+                $$+ (CL.isolate 1 =$= CL.map (B8.split '\t') =$ CL.consume)
+        cis <- lookUpColumns headers
+        resume $$+-
+                (CL.mapM (selectColumns cis . (B8.split '\t'))
+                =$ CL.fold (flip $ uncurry M.insert) M.empty)
+    where
+        lookUpColumns :: [B.ByteString] -> NGLessIO [Int]
+        lookUpColumns [] = throwDataError ("Loading functional map file '" ++ fname ++ "': Header line missing!")
+        lookUpColumns (_:headers) = do
+            cis <- lookUpColumns' (zip [0..] headers)
+            when (length cis /= length columns) $
+                -- TODO: It would be best to have a more comprehensive error message (could not find header XYZ
+                throwDataError ("Loading functional map file '" ++ fname ++ "': could not find all header columns")
+            return cis
+        lookUpColumns' [] = return []
+        lookUpColumns' ((ix,v):vs)
+            | v `elem` columns = do
+                rest <- lookUpColumns' vs
+                return (ix:rest)
+            | otherwise = lookUpColumns' vs
+
+        selectColumns :: [Int] -> [B.ByteString] -> NGLessIO (B.ByteString, [B.ByteString])
+        selectColumns cols (gene:mapped) = (gene,) <$> selectIds cols (zip [0..] mapped)
+        selectColumns _ [] = throwDataError ("Loading functional map file '" ++ fname ++ "': empty line.")
+
+        selectIds :: [Int] -> [(Int, B.ByteString)] -> NGLessIO [B.ByteString]
+        selectIds [] _ = return []
+        selectIds fs@(fi:rest) ((ci,v):vs)
+            | fi == ci = (v:) <$> selectIds rest vs
+            | otherwise = selectIds fs vs
+        selectIds _ _ = throwDataError ("Loading functional map file '" ++ fname ++ "': wrong number of columns")
+
 
 data AnnotationOpts =
     AnnotationOpts
@@ -90,9 +126,14 @@ executeAnnotation (NGOMappedReadSet name samFp dDS) args = do
         if fs == ["seqname"]
             then annotateSeqname samFp opts
             else do
-                g <- maybeFilePathOrTypeError $ lookup "gff" args
-                gffFp <- whichAnnotationFile g dDS
-                _annotate samFp gffFp opts
+                mapfile <- maybeFilePathOrTypeError $ lookup "mapfile" args
+                case mapfile of
+                    Nothing -> do
+                        g <- maybeFilePathOrTypeError $ lookup "gff" args
+                        gffFp <- whichAnnotationFile g dDS
+                        _annotate samFp gffFp opts
+                    Just mapfile' -> do
+                        annotateMap samFp mapfile' opts
 executeAnnotation e _ = throwShouldNotOccur ("Annotation can handle MappedReadSet(s) only. Got " ++ show e)
 
 parseAnnotationMode :: KwArgsValues -> NGLessIO AnnotationIntersectionMode
@@ -120,45 +161,58 @@ _annotationRule IntersectUnion = union
 _annotationRule IntersectStrict = _intersection_strict
 _annotationRule IntersectNonEmpty = _intersection_non_empty
 
+
 annotateSeqname :: FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
-annotateSeqname samFp opts = do
-        (newfp, h) <- openNGLTempFile samFp "annotated." "tsv"
-        (newfp_headers, h_headers) <- openNGLTempFile samFp "annotation_headers." "txt"
-        ((), usednames) <- readSamGroupsAsConduit samFp
-            $= CL.map (seqName1 opts)
-            =$= CL.concat
-            $$ CI.zipSinks
-                (CL.map (BL.toStrict . encodeAR) =$ CB.sinkHandle h)
-                (CL.fold inserth (S.empty :: S.Set B.ByteString))
-        liftIO $ do
-            hClose h
-            forM_ (S.toAscList usednames) $ \name -> do
-                B8.hPutStr h_headers "seqname\t"
-                B8.hPutStrLn h_headers name
-            hClose h_headers
-        return (newfp, newfp_headers)
+annotateSeqname samFp opts = genericAnnotate seqName1 samFp Nothing
     where
-        inserth s ar = S.insert (annotValue ar) s
-        seqName1 :: AnnotationOpts -> [(SamLine, B.ByteString)] -> [AnnotatedRead]
-        seqName1 _ = mapMaybe (seqAsAR . fst)
+        seqName1 :: [SamLine] -> [AnnotatedRead]
+        seqName1 = mapMaybe seqAsAR
         seqAsAR sr@SamLine{samQName = rid, samRName = rname }
             | isAligned sr = Just (AnnotatedRead rid rname (GffOther "seqname") GffUnStranded)
         seqAsAR  _ = Nothing
 
-_annotate :: FilePath -> FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
-_annotate samFp gffFp opts = do
-        amap <- readGffFile gffFp opts
-        (newfp, h) <- openNGLTempFile samFp "annotated." "tsv"
-        (newfp_headers, h_headers) <- openNGLTempFile samFp "annotation_headers." "txt"
+genericAnnotate :: ([SamLine] -> [AnnotatedRead]) -> FilePath -> Maybe [B.ByteString] -> NGLessIO (FilePath, FilePath)
+genericAnnotate annot_function samefile headers = do
+        (newfp, h) <- openNGLTempFile samefile "annotated." "tsv"
+        (newfp_headers, h_headers) <- openNGLTempFile samefile "annotation_headers." "txt"
+        ((), usednames) <-
+            (conduitPossiblyCompressedFile samefile
+                =$= CB.lines) `buffer1000`
+                (readSamGroupsC
+                $= CL.map annot_function
+                $= CL.concat
+                $= CI.zipSinks
+                    (CL.map (BL.toStrict . encodeAR) =$ CB.sinkHandle h)
+                    (case headers of
+                        Nothing -> (CL.fold inserth (S.empty :: S.Set B.ByteString))
+                        Just _ -> return S.empty))
         liftIO $ do
-            samC <- filter isAligned . readAlignments <$> readPossiblyCompressedFile samFp
-            BL.hPut h . BL.concat $ concatMap (map encodeAR . annotateSamLine opts amap) samC
-            hClose h
+            forM_ (S.toAscList usednames) $ \name -> do
+                B8.hPutStr h_headers "seqname\t"
+                B8.hPutStrLn h_headers name
+        liftIO (hClose h >> hClose h_headers)
+        return (newfp, newfp_headers)
+    where
+        inserth s ar = S.insert (annotValue ar) s
 
-            BL.hPut h_headers . BL.fromChunks $ asHeaders amap
-            hClose h_headers
+annotateMap :: FilePath -> FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
+annotateMap samfile mapfile opts = do
+    amap <- loadFunctionalMap mapfile (map getFeatureName $ optFeatures opts)
+    let mapAnnotation :: AnnotationOpts -> [SamLine] -> [AnnotatedRead]
+        mapAnnotation opts = concat . mapMaybe (mapAnnotation1 opts)
+        mapAnnotation1 :: AnnotationOpts -> SamLine -> Maybe [AnnotatedRead]
+        mapAnnotation1 _ samline = M.lookup (samRName samline) amap >>= \vs ->
+            return [(AnnotatedRead (samQName samline) rname (GffOther "mapped") GffUnStranded) | rname <- vs]
+    genericAnnotate (mapAnnotation opts) samfile Nothing
 
-            return (newfp, newfp_headers)
+getFeatureName (GffOther s) = s
+getFeatureName _ = error "getFeatureName called for non-GffOther input"
+
+
+_annotate :: FilePath -> FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
+_annotate samefile gffFp opts = do
+    amap <- readGffFile gffFp opts
+    genericAnnotate (concat . map (annotateSamLine opts amap)) samefile (Just $ asHeaders amap)
 
 readGffFile :: FilePath -> AnnotationOpts -> NGLessIO AnnotationMap
 readGffFile gffFp opts =
@@ -168,7 +222,6 @@ readGffFile gffFp opts =
                 =$= CL.filter (_matchFeatures $ optFeatures opts)
                 =$ CL.fold insertg M.empty)
     where
-        buffer1000 = buffer 1000
         readAnnotationOrDie :: C.Conduit B.ByteString NGLessIO GffLine
         readAnnotationOrDie = C.awaitForever $ \line ->
             unless (B8.head line == '#') $
@@ -178,17 +231,6 @@ readGffFile gffFp opts =
         insertg am g = M.alter (updateF g) (gffType g) am
         updateF g mF = Just $ M.alter (updateChrMap g) (gffSeqId g) (fromMaybe M.empty mF)
         updateChrMap g v  = Just $ insertGffLine g (fromMaybe IM.empty v)
-
-readAlignments :: BL.ByteString -> [SamLine]
-readAlignments = filter isSL . map readSamLine' . BL8.lines
-    where
-        isSL (SamHeader _) = False
-        isSL SamLine{} = True
-        readSamLine' :: BL.ByteString -> SamLine
-        readSamLine' = rightOrError . readSamLine
-        rightOrError (Right v) = v
-        rightOrError (Left err) = error (show err)
-
 
 asHeaders :: AnnotationMap -> [B.ByteString]
 asHeaders amap = concatMap asHeaders' (M.assocs amap)
@@ -282,4 +324,5 @@ _matchFeatures fs gf = gffType gf `elem` fs
 maybeFilePathOrTypeError Nothing = return Nothing
 maybeFilePathOrTypeError (Just (NGOString s)) = return (Just $ T.unpack s)
 maybeFilePathOrTypeError o = throwScriptError ("GFF String: Argument type must be NGOString (received " ++ show o ++ ").")
+buffer1000 = buffer 1000
 
