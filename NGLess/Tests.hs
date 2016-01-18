@@ -235,9 +235,10 @@ case_preprocess_script = case parsetest preprocess_s >>= checktypes [] of
 case_map_script = case parsetest map_s >>= checktypes [] of
     Left err -> assertFailure (show err)
     Right expr -> do
-        testNGLessIO $ (interpret []) . nglBody $ expr
-        res' <- readPossiblyCompressedFile "test_samples/sample20_mapped.sam"
-        _calcSamStats res' @?= (5,0,0,0)
+        sam <- testNGLessIO $ do
+            (interpret []) . nglBody $ expr
+            _samStats "test_samples/sample20_mapped.sam"
+        sam @?= (5,0,0,0)
         removeFile "test_samples/sample20_mapped.sam"
 
 map_s = "ngless '0.0'\n\
@@ -284,9 +285,8 @@ case_zero_vec = do
   v <- zeroVec 4 >>= V.freeze
   v @?= V.fromList [0,0,0,0]
 
-case_calc_sam_stats = do
-  r <- _calcSamStats <$> readPossiblyCompressedFile "test_samples/sample.sam.gz"
-  r @?=  (3072,1610,1554,0)
+case_calc_sam_stats = testNGLessIO (_samStats "test_samples/sample.sam.gz") >>= \r ->
+  r @?=  (2772,1310,1042,0)
 
 --- Unique.hs
 

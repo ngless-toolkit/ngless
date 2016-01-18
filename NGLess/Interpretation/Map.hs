@@ -6,17 +6,18 @@
 
 module Interpretation.Map
     ( executeMap
-    , _calcSamStats
+    , _samStats
     ) where
 
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Text as T
 import Control.Monad
 import Control.Monad.Trans.Resource
-import Data.List (find, foldl')
-import Data.Maybe
-import Numeric
+import Data.List (find)
+import Numeric (showFFloat)
+
+import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Binary as CB
+import Data.Conduit (($$), (=$=))
 
 import GHC.Conc (numCapabilities)
 
@@ -36,7 +37,7 @@ import NGLess
 import Data.Sam
 import Utils.Bwa
 import Utils.LockFile
-import Utils.Utils (readPossiblyCompressedFile, readProcessErrorWithExitCode)
+import Utils.Utils (conduitPossiblyCompressedFile, readProcessErrorWithExitCode)
 
 data Reference = Reference FilePath | FaFile FilePath
 
@@ -95,7 +96,7 @@ interpretMapOp :: Reference -> [FilePath] -> [String] -> NGLessIO NGLessObject
 interpretMapOp ref ds extraArgs = do
     (ref', defGen') <- indexReference ref
     samPath' <- mapToReference ref' ds extraArgs
-    getSamStats samPath'
+    printMappingStats samPath'
     return $ NGOMappedReadSet "noname" samPath' defGen'
     where
         indexReference :: Reference -> NGLessIO (FilePath, Maybe T.Text)
@@ -116,45 +117,36 @@ findExternalReference rname = do
         Just rinfo -> return . faFile $ rinfo
         Nothing -> throwScriptError $ T.concat ["Could not find reference '", rname, "'. It is not builtin nor in one of the loaded modules."]
 
+type P4 = (Integer, Integer, Integer, Integer)
+_samStats :: FilePath -> NGLessIO (Integer, Integer, Integer, Integer)
 
-getSamStats :: FilePath -> NGLessIO ()
-getSamStats fname = liftIO (readPossiblyCompressedFile fname) >>= printSamStats . _calcSamStats
+_samStats fname = do
+    let update :: P4 -> [SamLine] -> P4
+        update _ [] = error ("This is a bug in ngless") -- perhaps readSamGroupsC should use NonEmptyList
+        update (!t,!al,!u,!lQ) (h:rest) =
+            (t + 1
+                ,al + (toInteger . fromEnum . isAligned $ h)
+                ,u + (toInteger . fromEnum $ isAligned h && null rest)
+                ,lQ + (toInteger . fromEnum . hasQual $ h))
+    conduitPossiblyCompressedFile fname
+        =$= CB.lines
+        =$= readSamGroupsC
+        $$ CL.fold update (0,0,0,0)
 
-data P4 = P4 !Integer !Integer !Integer !Integer
-
-_calcSamStats :: BL.ByteString -> (Integer,Integer,Integer,Integer)
-_calcSamStats contents = (total, aligned, unique, lowQual)
-    where
-        P4 total aligned unique lowQual = computeStats . readAlignments $ contents
-        readAlignments :: BL.ByteString -> [SamLine]
-        readAlignments = mapMaybe readSamLine' . BL8.lines
-        readSamLine' line = case readSamLine line of
-            Left err -> error (show err)
-            Right SamHeader{} -> Nothing
-            Right v@SamLine{} -> Just v
-        computeStats = foldl' update (P4 0 0 0 0)
-        update (P4 t al u lQ) samLine =
-            P4 (t + 1)
-                (al + (asInteger . isAligned $ samLine))
-                0 --(u  + (asInteger . isUnique $ samLine))
-                (lQ + (asInteger . hasQual $ samLine))
-        asInteger True = 1
-        asInteger False = 0
-
-printSamStats (total, aligned, unique, lowQ) = do
+printMappingStats :: FilePath -> NGLessIO ()
+printMappingStats fname = do
+    (total,aligned,unique,lowQ) <- _samStats fname
+    let out = outputListLno' ResultOutput
     out ["Total reads: ", show total]
-    out ["Total reads aligned: ", show aligned, "[", showFloat' $ calcDiv aligned total, "%]"]
-    out ["Total reads Unique map: ", show unique, "[", showFloat' $ calcDiv unique aligned, "%]"]
-    out ["Total reads Non-Unique map: ", show $ aligned - unique, "[", showFloat' $ 100 - (calcDiv unique aligned), "%]"]
+    out ["Total reads aligned: ", showNumAndPercentage aligned total]
+    out ["Total reads Unique map: ", showNumAndPercentage unique total]
+    out ["Total reads Non-Unique map: ", showNumAndPercentage (aligned - unique) total]
     out ["Total reads without enough qual: ", show lowQ]
-  where
-    out = outputListLno' ResultOutput
-    showFloat' num = showFFloat (Just 2) num ""
-    calcDiv :: Integer -> Integer -> Double
-    calcDiv a b =
-          let x = fromIntegral a
-              y = fromIntegral b
-          in (x / y) * (100 :: Double)
+
+showNumAndPercentage :: Integer -> Integer -> String
+showNumAndPercentage v 0 = showNumAndPercentage v 1 -- same output & avoid division by zero
+showNumAndPercentage v total =
+    concat [show v, " [", showFFloat (Just 2) ((fromIntegral (100*v) / fromIntegral total) :: Double) "", "%"]
 
 executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMap fps args = do
