@@ -121,17 +121,16 @@ findExternalReference rname = do
         Just rinfo -> return . faFile $ rinfo
         Nothing -> throwScriptError $ T.concat ["Could not find reference '", rname, "'. It is not builtin nor in one of the loaded modules."]
 
-_samStats :: FilePath -> NGLessIO (Integer, Integer, Integer, Integer)
+_samStats :: FilePath -> NGLessIO (Int, Int, Int)
 _samStats fname = do
-    let add1if !v True = (v+1)
+    let add1if !v True = v+1
         add1if !v False = v
         --isAlignedRaw flagstr = (B.length flagstr == 1) && (B8.index flagstr 0 == '4')
         update _ [] = error "This is a bug in ngless" -- perhaps readSamGroupsC should use NonEmptyList
-        update (!t,!al,!u,!lQ) ((_,aligned):rest) =
+        update (!t,!al,!u) ((_,aligned):rest) =
             (t + 1
                 ,add1if al aligned
-                ,add1if u  (aligned && null rest)
-                ,add1if lQ False)
+                ,add1if u  (aligned && null rest))
         -- This is ugly code, but it makes a big difference in performance
         -- partialSamParse :: (MonadError NGError m) => C.Conduit B.ByteString m (B.ByteString, B.ByteString)
         partialSamParse = C.awaitForever $ \line ->
@@ -147,19 +146,18 @@ _samStats fname = do
         =$= CB.lines
         =$= partialSamParse
         =$= CL.groupBy ((==) `on` fst)
-        $$ CL.fold update (0,0,0,0)
+        $$ CL.fold update (0,0,0)
 
 printMappingStats :: FilePath -> NGLessIO ()
 printMappingStats fname = do
-    (total,aligned,unique,lowQ) <- _samStats fname
+    (total,aligned,unique) <- _samStats fname
     let out = outputListLno' ResultOutput
     out ["Total reads: ", show total]
     out ["Total reads aligned: ", showNumAndPercentage aligned total]
     out ["Total reads Unique map: ", showNumAndPercentage unique total]
     out ["Total reads Non-Unique map: ", showNumAndPercentage (aligned - unique) total]
-    out ["Total reads without enough qual: ", show lowQ]
 
-showNumAndPercentage :: Integer -> Integer -> String
+showNumAndPercentage :: Int  -> Int  -> String
 showNumAndPercentage v 0 = showNumAndPercentage v 1 -- same output & avoid division by zero
 showNumAndPercentage v total =
     concat [show v, " [", showFFloat (Just 2) ((fromIntegral (100*v) / fromIntegral total) :: Double) "", "%"]
