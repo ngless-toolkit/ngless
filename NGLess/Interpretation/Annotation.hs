@@ -63,12 +63,15 @@ type GeneMapAnnotation = M.Map B8.ByteString [B8.ByteString]
 
 loadFunctionalMap :: FilePath -> [B.ByteString] -> NGLessIO GeneMapAnnotation
 loadFunctionalMap fname columns = do
+        outputListLno' InfoOutput ["Loading map file ", fname]
         (resume, [headers]) <- (CB.sourceFile fname =$ CB.lines)
                 $$+ (CL.isolate 1 =$= CL.map (B8.split '\t') =$ CL.consume)
         cis <- lookUpColumns headers
-        resume $$+-
+        gmap <- resume $$+-
                 (CL.mapM (selectColumns cis . (B8.split '\t'))
                 =$ CL.fold (flip $ uncurry M.insert) M.empty)
+        outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
+        return gmap
     where
         lookUpColumns :: [B.ByteString] -> NGLessIO [Int]
         lookUpColumns [] = throwDataError ("Loading functional map file '" ++ fname ++ "': Header line missing!")
@@ -133,8 +136,7 @@ executeAnnotation (NGOMappedReadSet name samFp dDS) args = do
                         g <- maybeFilePathOrTypeError $ lookup "gff" args
                         gffFp <- whichAnnotationFile g dDS
                         _annotate samFp gffFp opts
-                    Just mapfile' -> do
-                        annotateMap samFp mapfile' opts
+                    Just mapfile' -> annotateMap samFp mapfile' opts
 executeAnnotation e _ = throwShouldNotOccur ("Annotation can handle MappedReadSet(s) only. Got " ++ show e)
 
 parseAnnotationMode :: KwArgsValues -> NGLessIO AnnotationIntersectionMode
@@ -164,7 +166,9 @@ _annotationRule IntersectNonEmpty = _intersection_non_empty
 
 
 annotateSeqname :: FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
-annotateSeqname samFp opts = genericAnnotate seqName1 samFp Nothing
+annotateSeqname samFp opts = do
+        outputListLno' InfoOutput ["Starting seqname annotation"]
+        genericAnnotate seqName1 samFp Nothing
     where
         seqName1 :: [SamLine] -> [AnnotatedRead]
         seqName1 = mapMaybe seqAsAR
@@ -173,11 +177,11 @@ annotateSeqname samFp opts = genericAnnotate seqName1 samFp Nothing
         seqAsAR  _ = Nothing
 
 genericAnnotate :: ([SamLine] -> [AnnotatedRead]) -> FilePath -> Maybe [B.ByteString] -> NGLessIO (FilePath, FilePath)
-genericAnnotate annot_function samefile headers = do
-        (newfp, h) <- openNGLTempFile samefile "annotated." "tsv"
-        (newfp_headers, h_headers) <- openNGLTempFile samefile "annotation_headers." "txt"
+genericAnnotate annot_function samfile headers = do
+        (newfp, h) <- openNGLTempFile samfile "annotated." "tsv"
+        (newfp_headers, h_headers) <- openNGLTempFile samfile "annotation_headers." "txt"
         ((), usednames) <-
-            (conduitPossiblyCompressedFile samefile
+            (conduitPossiblyCompressedFile samfile
                 =$= CB.lines) `buffer1000`
                 (readSamGroupsC
                 $= CL.map annot_function
@@ -187,11 +191,11 @@ genericAnnotate annot_function samefile headers = do
                     (case headers of
                         Nothing -> (CL.fold inserth (S.empty :: S.Set B.ByteString))
                         Just _ -> return S.empty))
-        liftIO $ do
-            forM_ (S.toAscList usednames) $ \name -> do
+        liftIO $ forM_ (S.toAscList usednames) $ \name -> do
                 B8.hPutStr h_headers "seqname\t"
                 B8.hPutStrLn h_headers name
         liftIO (hClose h >> hClose h_headers)
+        outputListLno' TraceOutput ["Finished annotation of file '", samfile, "'"]
         return (newfp, newfp_headers)
     where
         inserth s ar = S.insert (annotValue ar) s
@@ -211,17 +215,20 @@ getFeatureName _ = error "getFeatureName called for non-GffOther input"
 
 
 _annotate :: FilePath -> FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
-_annotate samefile gffFp opts = do
+_annotate samfile gffFp opts = do
     amap <- readGffFile gffFp opts
-    genericAnnotate (concat . map (annotateSamLine opts amap)) samefile (Just $ asHeaders amap)
+    genericAnnotate (concatMap (annotateSamLine opts amap)) samfile (Just $ asHeaders amap)
 
 readGffFile :: FilePath -> AnnotationOpts -> NGLessIO AnnotationMap
-readGffFile gffFp opts =
-        (conduitPossiblyCompressedFile gffFp
+readGffFile gffFp opts = do
+        outputListLno' TraceOutput ["Loading GFF file '", gffFp, "'..."]
+        amap <- (conduitPossiblyCompressedFile gffFp
                 $= CB.lines) `buffer1000`
                 (readAnnotationOrDie
                 =$= CL.filter (_matchFeatures $ optFeatures opts)
                 =$ CL.fold insertg M.empty)
+        outputListLno' TraceOutput ["Loading GFF file '", gffFp, "' complete."]
+        return amap
     where
         readAnnotationOrDie :: C.Conduit B.ByteString NGLessIO GffLine
         readAnnotationOrDie = C.awaitForever $ \line ->
