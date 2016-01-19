@@ -8,6 +8,7 @@ module Interpretation.Annotation
     , AnnotationOpts(..)
     , executeAnnotation
     , _annotate
+    , _annotateSeqname
     , _annotationRule
     , _intersection_strict
     , _matchFeatures
@@ -128,7 +129,7 @@ executeAnnotation (NGOMappedReadSet name samFp dDS) args = do
             }
     uncurry (NGOAnnotatedSet name) <$>
         if fs == ["seqname"]
-            then annotateSeqname samFp opts
+            then _annotateSeqname samFp opts
             else do
                 mapfile <- maybeFilePathOrTypeError $ lookup "mapfile" args
                 case mapfile of
@@ -165,8 +166,8 @@ _annotationRule IntersectStrict = _intersection_strict
 _annotationRule IntersectNonEmpty = _intersection_non_empty
 
 
-annotateSeqname :: FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
-annotateSeqname samFp opts = do
+_annotateSeqname :: FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
+_annotateSeqname samFp opts = do
         outputListLno' InfoOutput ["Starting seqname annotation"]
         genericAnnotate seqName1 samFp Nothing
     where
