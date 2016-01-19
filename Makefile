@@ -70,12 +70,15 @@ reqhtmllibs = $(addprefix $(HTML_LIBS_DIR)/, $(HTMLFILES))
 reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
 reqlogo = $(HTML_LIBS_DIR)/Octocat.png
 
-all: ngless
+all: NGLess.cabal ngless
 
-ngless: $(NGLESS_BUILD_BINARIES)
+NGLess.cabal: NGLess.cabal.m4
+	m4 $< > $@
+
+ngless: NGLess.cabal $(NGLESS_BUILD_BINARIES)
 	stack build
 
-static: $(NGLESS_BUILD_BINARIES)
+static: NGLess.cabal $(NGLESS_BUILD_BINARIES)
 	stack build --ghc-options='-optl-static -optl-pthread' --force-dirty
 
 dist: ngless-${VERSION}.tar.gz
@@ -86,8 +89,11 @@ test_samples/htseq-res/htseq_cds_noStrand_union.txt:
 	cd test_samples/ && gzip -dkf *.gz
 	cd test_samples/htseq-res && ./generateHtseqFiles.sh
 
-check: ${testinputfiles}
+check: ngless ${testinputfiles}
 	stack test
+
+bench: ngless
+	stack bench
 
 install:
 	mkdir -p $(exec)
