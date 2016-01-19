@@ -10,18 +10,23 @@ module Interpretation.Map
     ) where
 
 import qualified Data.Text as T
-import Control.Monad
-import Control.Monad.Trans.Resource
-import Data.List (find)
-import Numeric (showFFloat)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
+import           Control.Monad
+import           Control.Monad.Trans.Resource
 
+import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
-import Data.Conduit (($$), (=$=))
+import           Data.Conduit (($$), (=$=))
 
-import GHC.Conc (numCapabilities)
+import GHC.Conc     (numCapabilities)
+import Data.List    (find)
+import Numeric      (showFFloat)
+import Data.Bits    (testBit)
 
 import System.Process
+import Data.Function
 import System.Exit
 
 import Control.Monad.IO.Class (liftIO)
@@ -34,7 +39,6 @@ import Modules
 import Output
 import NGLess
 
-import Data.Sam
 import Utils.Bwa
 import Utils.LockFile
 import Utils.Utils (conduitPossiblyCompressedFile, readProcessErrorWithExitCode)
@@ -117,20 +121,32 @@ findExternalReference rname = do
         Just rinfo -> return . faFile $ rinfo
         Nothing -> throwScriptError $ T.concat ["Could not find reference '", rname, "'. It is not builtin nor in one of the loaded modules."]
 
-type P4 = (Integer, Integer, Integer, Integer)
 _samStats :: FilePath -> NGLessIO (Integer, Integer, Integer, Integer)
-
 _samStats fname = do
-    let update :: P4 -> [SamLine] -> P4
-        update _ [] = error ("This is a bug in ngless") -- perhaps readSamGroupsC should use NonEmptyList
-        update (!t,!al,!u,!lQ) (h:rest) =
+    let add1if !v True = (v+1)
+        add1if !v False = v
+        --isAlignedRaw flagstr = (B.length flagstr == 1) && (B8.index flagstr 0 == '4')
+        update _ [] = error "This is a bug in ngless" -- perhaps readSamGroupsC should use NonEmptyList
+        update (!t,!al,!u,!lQ) ((_,aligned):rest) =
             (t + 1
-                ,al + (toInteger . fromEnum . isAligned $ h)
-                ,u + (toInteger . fromEnum $ isAligned h && null rest)
-                ,lQ + (toInteger . fromEnum . hasQual $ h))
+                ,add1if al aligned
+                ,add1if u  (aligned && null rest)
+                ,add1if lQ False)
+        -- This is ugly code, but it makes a big difference in performance
+        -- partialSamParse :: (MonadError NGError m) => C.Conduit B.ByteString m (B.ByteString, B.ByteString)
+        partialSamParse = C.awaitForever $ \line ->
+            unless (B8.head line == '@') $
+                case B8.elemIndex '\t' line of
+                    Nothing -> throwDataError ("Cannot parse SAM file: '"++fname++"'")
+                    Just tab1 -> let (seqname,rest) = B.splitAt (tab1+1) line in -- splitting at tab1 will remove the tab
+                        case B8.readInt rest of
+                            Nothing -> throwDataError ("Cannot parse flags in SAM file '"++B8.unpack rest ++"'")
+                            Just (v,_) -> C.yield (seqname, not $ v `testBit` 2)
+
     conduitPossiblyCompressedFile fname
         =$= CB.lines
-        =$= readSamGroupsC
+        =$= partialSamParse
+        =$= CL.groupBy ((==) `on` fst)
         $$ CL.fold update (0,0,0,0)
 
 printMappingStats :: FilePath -> NGLessIO ()
