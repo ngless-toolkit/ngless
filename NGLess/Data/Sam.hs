@@ -16,9 +16,6 @@ module Data.Sam
     ) where
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BL8
-import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.Conduit.List as CL
@@ -76,27 +73,27 @@ hasQual :: SamLine -> Bool
 hasQual = (`testBit` 9) . samFlag
 
 
-readInt b = case L8.readInt b of
+readInt b = case B8.readInt b of
     Just (v,_) -> return v
     _ -> throwDataError ("Expected int, got " ++ show b)
 
-readSamLine :: BL.ByteString -> Either NGError SamLine
+readSamLine :: B.ByteString -> Either NGError SamLine
 readSamLine line
-    | BL8.head line == '@' = return (SamHeader $ BL.toStrict line)
-    | otherwise = case BL8.split '\t' line of
+    | B8.head line == '@' = return (SamHeader line)
+    | otherwise = case B8.split '\t' line of
     (tk0:tk1:tk2:tk3:tk4:tk5:tk6:tk7:tk8:tk9:tk10:_) ->
         SamLine
-            <$> pure (BL.toStrict tk0)
+            <$> pure tk0
             <*> readInt tk1
-            <*> pure (BL.toStrict tk2)
+            <*> pure tk2
             <*> readInt tk3
             <*> readInt tk4
-            <*> pure (BL.toStrict tk5)
-            <*> pure (BL.toStrict tk6)
+            <*> pure tk5
+            <*> pure tk6
             <*> readInt tk7
             <*> readInt tk8
-            <*> pure (BL.toStrict tk9)
-            <*> pure (BL.toStrict tk10)
+            <*> pure tk9
+            <*> pure tk10
     tokens -> throwDataError $ concat ["Expected 11 tokens, only got ", show $ length tokens,"\n\t\tLine was '", show line, "'"]
 
 {--
@@ -137,7 +134,7 @@ readSamGroupsC :: (MonadError NGError m) => C.Conduit B.ByteString m [SamLine]
 readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
     where
         readSamLineOrDie = C.awaitForever $ \line ->
-            case readSamLine (BL.fromStrict line) of
+            case readSamLine line of
                 Left err -> throwError err
                 Right parsed@SamLine{} -> C.yield parsed
                 _ -> return ()

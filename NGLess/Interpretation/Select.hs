@@ -75,7 +75,7 @@ readSamGroupsAsConduit fname =
             =$= CL.groupBy groupLine
     where
         readSamLineOrDie = C.awaitForever $ \line ->
-            case readSamLine (BL.fromChunks [line]) of
+            case readSamLine line of
                 Left err -> throwError err
                 Right parsed -> C.yield (parsed,line)
         groupLine (SamHeader _,_) _ = False
