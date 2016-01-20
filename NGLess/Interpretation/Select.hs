@@ -11,7 +11,6 @@ module Interpretation.Select
     ) where
 
 import qualified Data.ByteString.Char8 as B
-import qualified Data.ByteString.Lazy.Char8 as BL
 import Control.Monad.Except
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C

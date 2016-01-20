@@ -9,15 +9,12 @@ module BuiltinModules.AsReads
     , loadModule
     ) where
 
-import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as B
 import qualified Data.Text as T
 import qualified Data.Conduit.Combinators as C
-import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
-import Data.Conduit (($=), ($$), (=$=), (=$))
-import Data.Function (on)
+import Data.Conduit (($=), (=$=), ($$))
 import Control.Monad.Except
 import System.IO
 import Data.Default
