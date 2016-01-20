@@ -238,7 +238,7 @@ case_map_script = case parsetest map_s >>= checktypes [] of
         sam <- testNGLessIO $ do
             (interpret []) . nglBody $ expr
             _samStats "test_samples/sample20_mapped.sam"
-        sam @?= (5,0,0,0)
+        sam @?= (5,0,0)
         removeFile "test_samples/sample20_mapped.sam"
 
 map_s = "ngless '0.0'\n\
@@ -286,7 +286,7 @@ case_zero_vec = do
   v @?= V.fromList [0,0,0,0]
 
 case_calc_sam_stats = testNGLessIO (_samStats "test_samples/sample.sam.gz") >>= \r ->
-  r @?=  (2772,1310,1042,0)
+  r @?=  (2772,1310,1042)
 
 --- Unique.hs
 
