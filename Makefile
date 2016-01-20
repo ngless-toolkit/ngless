@@ -75,6 +75,8 @@ all: NGLess.cabal ngless
 NGLess.cabal: NGLess.cabal.m4
 	m4 $< > $@
 
+config: NGLess.cabal
+
 ngless: NGLess.cabal $(NGLESS_BUILD_BINARIES)
 	stack build
 
@@ -92,7 +94,7 @@ test_samples/htseq-res/htseq_cds_noStrand_union.txt:
 check: ngless ${testinputfiles}
 	stack test
 
-bench: ngless
+bench: config $(NGLESS_BUILD_BINARIES)
 	stack bench
 
 install:
@@ -185,4 +187,4 @@ ngless-${VERSION}.tar.gz: ngless
 	tar -zcvf $(distdir).tar.gz $(distdir)
 	rm -rf $(distdir)
 
-.PHONY: all build clean check nglessconf distclean dist static
+.PHONY: all build clean check config distclean dist static
