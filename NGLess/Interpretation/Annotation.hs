@@ -37,6 +37,7 @@ import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
 import GHC.Conc                 (getNumCapabilities)
 import Data.List                (foldl1')
+import Data.Monoid
 import Data.Maybe
 import System.IO
 
@@ -188,6 +189,7 @@ flattenVmap f vs = V.unfoldr access (0,[])
         access (vi, x:xs) = Just (x, (vi,xs))
 
 
+
 genericAnnotate :: ([SamLine] -> [AnnotatedRead]) -> FilePath -> Maybe [B.ByteString] -> NGLessIO (FilePath, FilePath)
 genericAnnotate annot_function samfile headers = do
         (newfp, h) <- openNGLTempFile samfile "annotated." "tsv"
@@ -208,6 +210,9 @@ genericAnnotate annot_function samfile headers = do
                         Just _ -> return S.empty
                         Nothing ->
                             asyncMapC nthreads (S.fromList . V.toList . V.map annotValue)
+                            -- The lines below could be factored to an asyncFold :: (Monoid a, MonadIO m) -> Int -> Int -> C.Consumer a m a
+                                $= C.conduitVector 12
+                                $= asyncMapC nthreads (V.foldl (<>) mempty)
                                 $= CL.fold S.union S.empty)
         liftIO $ forM_ (S.toAscList usednames) $ \name -> do
                 B8.hPutStr h_headers "seqname\t"
