@@ -125,7 +125,6 @@ _samStats :: FilePath -> NGLessIO (Int, Int, Int)
 _samStats fname = do
     let add1if !v True = v+1
         add1if !v False = v
-        --isAlignedRaw flagstr = (B.length flagstr == 1) && (B8.index flagstr 0 == '4')
         update _ [] = error "This is a bug in ngless" -- perhaps readSamGroupsC should use NonEmptyList
         update (!t,!al,!u) ((_,aligned):rest) =
             (t + 1
