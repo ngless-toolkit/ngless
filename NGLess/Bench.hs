@@ -12,7 +12,6 @@ import           Control.DeepSeq (NFData)
 
 import Control.Monad.Trans.Resource
 import Control.Monad.Trans.Class
-import Data.Either
 
 import NGLess (NGLessIO, testNGLessIO)
 import Configuration (setupTestConfiguration)
@@ -20,6 +19,7 @@ import Configuration (setupTestConfiguration)
 
 import Interpretation.Map (_samStats)
 import Interpretation.Annotation (_annotateSeqname)
+import Interpretation.Count (_performCount, MMMethod(..))
 import Data.Sam (readSamLine, readSamGroupsC)
 
 nfNGLessIO :: (NFData a) => NGLessIO a -> Benchmarkable
@@ -50,5 +50,8 @@ main = setupTestConfiguration >> defaultMain [
     ,bgroup "parse-sam"
         [ bench "readSamLine" $ nfRIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= CL.map readSamLine $$ countRights)
         , bench "samGroups" $ nfNGLessIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= readSamGroupsC $$ count)
+        ]
+    ,bgroup "count"
+        [ bench "count-base" $ nfNGLessIO (_performCount "test_samples/annotation_headers.txt" "test_samples/annotated.tsv" "benching" 0 MMDist1)
         ]
     ]

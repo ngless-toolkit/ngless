@@ -4,6 +4,8 @@
 {-# LANGUAGE LambdaCase, FlexibleContexts #-}
 module Interpretation.Count
     ( executeCount
+    , MMMethod(..)
+    , _performCount
     ) where
 
 import Control.Monad
@@ -52,6 +54,12 @@ executeCount (NGOAnnotatedSet gname annot_fp headers_fp) args = do
     minCount <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
     method <- methodFor =<< lookupSymbolOrScriptErrorDef (return "dist1")
                                     "multiple argument to count " "multiple" args
+    NGOCounts <$> _performCount headers_fp annot_fp gname minCount method
+executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
+
+
+_performCount :: FilePath -> FilePath -> T.Text -> Integer -> MMMethod -> NGLessIO FilePath
+_performCount headers_fp annot_fp gname minCount method = do
     let extractSecond hline = case B8.split '\t' hline of
             [_, scol] -> return scol
             _ -> throwDataError ("Could not parse internal intermediate file '"++headers_fp++"'. This may be a bug in ngless or your system is not preserving temp files")
@@ -105,9 +113,7 @@ executeCount (NGOAnnotatedSet gname annot_fp headers_fp) args = do
             when (v > fromIntegral minCount) $
                 BL.hPut hout (BL.fromChunks [hn, "\t", B8.pack . show $ v, "\n"])
         hClose hout
-    return $ NGOCounts newfp
-executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
-
+    return newfp
 
 all1 = all1OrOneOverN True
 oneOverN = all1OrOneOverN False
