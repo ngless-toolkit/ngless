@@ -15,5 +15,5 @@ command:
 
 init:
     init_cmd: './run-python.sh'
-
+citation: "Metagenomic species profiling using universal phylogenetic marker genes"
 
