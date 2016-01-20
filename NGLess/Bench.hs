@@ -10,17 +10,17 @@ import qualified Data.Conduit as C
 import           Data.Conduit ((=$=), ($$))
 import           Control.DeepSeq (NFData)
 
-import Control.Monad.Trans.Resource
-import Control.Monad.Trans.Class
+import Control.Monad.Trans.Resource (runResourceT)
 
 import NGLess (NGLessIO, testNGLessIO)
 import Configuration (setupTestConfiguration)
 
 
 import Interpretation.Map (_samStats)
-import Interpretation.Annotation (_annotateSeqname)
+import Interpretation.Annotation (_annotateSeqname, annotateMap, AnnotationOpts(..), _intersection_strict, loadFunctionalMap)
 import Interpretation.Count (_performCount, MMMethod(..))
 import Data.Sam (readSamLine, readSamGroupsC)
+import Data.GFF
 
 nfNGLessIO :: (NFData a) => NGLessIO a -> Benchmarkable
 nfNGLessIO = nfIO . testNGLessIO
@@ -46,6 +46,9 @@ main = setupTestConfiguration >> defaultMain [
         ]
     ,bgroup "annotation"
         [ bench "annotate-seqname" $ nfNGLessIO (_annotateSeqname "test_samples/sample.sam" undefined)
+        , bench "annotate-map"     $ nfNGLessIO (annotateMap     "test_samples/sample.sam" "test_samples/functional.map"
+                                        (AnnotationOpts [GffOther "ko", GffOther "cog"] _intersection_strict False True))
+        , bench "load-map"     $ nfNGLessIO (loadFunctionalMap   "test_samples/functional.map" ["ko", "cog"])
         ]
     ,bgroup "parse-sam"
         [ bench "readSamLine" $ nfRIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= CL.map readSamLine $$ countRights)

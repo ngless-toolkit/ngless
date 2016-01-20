@@ -7,11 +7,12 @@ module Interpretation.Annotation
     , AnnotationOpts(..)
     , executeAnnotation
     , _annotate
+    , annotateMap
     , _annotateSeqname
     , _annotationRule
     , _intersection_strict
+    , loadFunctionalMap
     , _matchFeatures
-    , _allSameId
     ) where
 
 
@@ -302,7 +303,7 @@ maybeFilterAmbiguous  :: Bool -> [AnnotationInfo] -> [AnnotationInfo]
 maybeFilterAmbiguous _ [] = []
 maybeFilterAmbiguous True toU = toU
 maybeFilterAmbiguous False ms
-    | _allSameId ms = [head ms]
+    | allSame (snd <$> ms) = [head ms]
     | otherwise = [] -- ambiguous: discard
 
 filterStrand :: GffStrand -> [(IM.Interval Int, [AnnotationInfo])] -> [(IM.Interval Int, [AnnotationInfo])]
@@ -328,8 +329,6 @@ intersection' :: [GffIMMap] -> [AnnotationInfo]
 intersection' [] = []
 intersection' im = concat . IM.elems $ foldl1' IM.intersection im
 
-_allSameId :: [AnnotationInfo] -> Bool
-_allSameId = allSame . map snd
 
 
 insertGffLine :: GffLine -> GffIMMap -> GffIMMap
