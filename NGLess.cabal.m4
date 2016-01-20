@@ -15,6 +15,7 @@ cabal-version:       >=1.18.0.3
 define(`BUILD_DEPENDS',
     `aeson == 0.8.*,
     ansi-terminal == 0.6.*,
+    async,
     base,
     bytestring == 0.10.*,
     bzlib == 0.5.*,

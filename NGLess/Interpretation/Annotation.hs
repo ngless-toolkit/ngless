@@ -1,6 +1,5 @@
 {- Copyright 2013-2016 NGLess Authors
- - License: MIT
- -}
+ - License: MIT -}
 {-# LANGUAGE OverloadedStrings, LambdaCase, FlexibleContexts, TupleSections #-}
 
 module Interpretation.Annotation
@@ -17,25 +16,27 @@ module Interpretation.Annotation
 
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
 
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+import qualified Data.Vector as V
 
 import qualified Data.Conduit as C
+import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Internal as CI
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
-import Data.Conduit (($$), ($=), (=$), (=$=), ($$+), ($$+-))
-import Data.Conduit.Async (buffer)
+import           Data.Conduit (($$), ($=), (=$), (=$=), ($$+), ($$+-))
+import           Data.Conduit.Async (buffer, (=$=&), ($$&))
 
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Except (throwError)
 import Control.Monad
-import Data.List (foldl1')
+import Control.Monad.IO.Class   (liftIO)
+import Control.Monad.Except     (throwError)
+import GHC.Conc                 (getNumCapabilities)
+import Data.List                (foldl1')
 import Data.Maybe
 import System.IO
 
@@ -47,6 +48,7 @@ import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamGroupsC)
 import Language
 import FileManagement (openNGLTempFile)
 import NGLess
+import Utils.Conduit
 import Utils.Utils
 import Data.Annotation
 
@@ -181,17 +183,20 @@ genericAnnotate :: ([SamLine] -> [AnnotatedRead]) -> FilePath -> Maybe [B.ByteSt
 genericAnnotate annot_function samfile headers = do
         (newfp, h) <- openNGLTempFile samfile "annotated." "tsv"
         (newfp_headers, h_headers) <- openNGLTempFile samfile "annotation_headers." "txt"
+        nthreads <- liftIO getNumCapabilities
         ((), usednames) <-
             (conduitPossiblyCompressedFile samfile
-                =$= CB.lines) `buffer1000`
-                (readSamGroupsC
-                $= CL.map annot_function
-                $= CL.concat
-                $= CI.zipSinks
-                    (CL.map (BL.toStrict . encodeAR) =$ CB.sinkHandle h)
+                =$= CB.lines
+                =$= readSamGroupsC
+                =$= C.conduitVector 256)
+                =$=& (asyncMapC nthreads (V.map annot_function))
+                $$& (C.concat :: C.Conduit (V.Vector [AnnotatedRead]) NGLessIO [AnnotatedRead])
+                =$= CL.concat
+                =$=  CI.zipSinks
+                    (CL.map encodeAR =$ CB.sinkHandle h)
                     (case headers of
                         Nothing -> (CL.fold inserth (S.empty :: S.Set B.ByteString))
-                        Just _ -> return S.empty))
+                        Just _ -> return S.empty)
         liftIO $ forM_ (S.toAscList usednames) $ \name -> do
                 B8.hPutStr h_headers "seqname\t"
                 B8.hPutStrLn h_headers name

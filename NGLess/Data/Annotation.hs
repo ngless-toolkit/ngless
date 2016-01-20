@@ -10,6 +10,7 @@ module Data.Annotation
     ) where
 
 import Control.Monad
+import Control.DeepSeq
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy as BL
@@ -24,9 +25,23 @@ data AnnotatedRead = AnnotatedRead
     , annotStrand :: !GffStrand
     } deriving (Eq,Show)
 
-encodeAR :: AnnotatedRead -> BL.ByteString
-encodeAR (AnnotatedRead rid v t s) = BL.fromChunks
-        [rid, "\t", v, "\t",  B8.pack (show t), "\t", B8.pack (show s), "\n"]
+instance NFData AnnotatedRead where
+    rnf !_ = ()
+
+encodeStrand GffPosStrand = "+"
+encodeStrand GffNegStrand = "-"
+encodeStrand GffUnknownStrand = "?"
+encodeStrand GffUnStranded = "."
+
+decodeStrand "+" = return GffPosStrand
+decodeStrand "-" = return GffNegStrand
+decodeStrand "?" = return GffUnknownStrand
+decodeStrand "." = return GffUnStranded
+decodeStrand  _ = fail "Ngless bug"
+
+encodeAR :: AnnotatedRead -> B.ByteString
+encodeAR (AnnotatedRead rid v t s) = B.concat
+        [rid, "\t", v, "\t",  B8.pack (show t), "\t", encodeStrand s, "\n"]
 
 decodeAR :: BL.ByteString -> Either String AnnotatedRead
 decodeAR a = do
@@ -38,5 +53,6 @@ decodeAR a = do
     when (length tokens /= 4) $
         fail "decodeAR wrong number of tokens"
     let [rid, avalue, atype, astrand] = tokens
-    return (AnnotatedRead (BL8.toStrict rid) (BL8.toStrict avalue) (read . BL8.unpack $ atype) (read . BL8.unpack $ astrand))
+    strand <- decodeStrand astrand
+    return (AnnotatedRead (BL8.toStrict rid) (BL8.toStrict avalue) (read . BL8.unpack $ atype) strand)
 
