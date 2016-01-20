@@ -179,6 +179,15 @@ _annotateSeqname samFp opts = do
             | isAligned sr = Just (AnnotatedRead rid rname (GffOther "seqname") GffUnStranded)
         seqAsAR  _ = Nothing
 
+flattenVmap :: (a -> [b]) -> V.Vector a -> V.Vector b
+flattenVmap f vs = V.unfoldr access (0,[])
+    where
+        access (vi,[])
+            | vi >= V.length vs = Nothing
+            | otherwise = access (vi+1, f $ V.unsafeIndex vs vi)
+        access (vi, x:xs) = Just (x, (vi,xs))
+
+
 genericAnnotate :: ([SamLine] -> [AnnotatedRead]) -> FilePath -> Maybe [B.ByteString] -> NGLessIO (FilePath, FilePath)
 genericAnnotate annot_function samfile headers = do
         (newfp, h) <- openNGLTempFile samfile "annotated." "tsv"
@@ -189,14 +198,17 @@ genericAnnotate annot_function samfile headers = do
                 =$= CB.lines
                 =$= readSamGroupsC
                 =$= C.conduitVector 256)
-                =$=& (asyncMapC nthreads (V.map annot_function))
-                $$& (C.concat :: C.Conduit (V.Vector [AnnotatedRead]) NGLessIO [AnnotatedRead])
-                =$= CL.concat
-                =$=  CI.zipSinks
-                    (CL.map encodeAR =$ CB.sinkHandle h)
+                $$& (asyncMapC nthreads (flattenVmap annot_function))
+                $=  CI.zipSinks
+                    (asyncMapC nthreads (V.map encodeAR)
+                        $= (C.awaitForever $ \vs ->
+                            forM_ vs $ \v ->
+                                liftIO (B.hPut h v)))
                     (case headers of
-                        Nothing -> (CL.fold inserth (S.empty :: S.Set B.ByteString))
-                        Just _ -> return S.empty)
+                        Just _ -> return S.empty
+                        Nothing ->
+                            asyncMapC nthreads (S.fromList . V.toList . V.map annotValue)
+                                $= CL.fold S.union S.empty)
         liftIO $ forM_ (S.toAscList usednames) $ \name -> do
                 B8.hPutStr h_headers "seqname\t"
                 B8.hPutStrLn h_headers name
