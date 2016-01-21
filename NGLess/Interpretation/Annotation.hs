@@ -36,8 +36,11 @@ import           Data.Conduit.Async (buffer, (=$=&), ($$&))
 import Control.Monad
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
+import Control.Parallel         (par)
 import GHC.Conc                 (getNumCapabilities)
 import Data.List                (foldl1')
+import Data.List.Utils          (merge)
+import Control.DeepSeq          (rnf, force)
 import Data.Monoid
 import Data.Maybe
 import System.IO
@@ -208,21 +211,20 @@ genericAnnotate annot_function samfile headers = do
                             forM_ vs $ \v ->
                                 liftIO (B.hPut h v)))
                     (case headers of
-                        Just _ -> return S.empty
+                        Just _ -> return []
                         Nothing ->
                             asyncMapC nthreads (S.fromList . V.toList . V.map annotValue)
-                            -- The lines below could be factored to an asyncFold :: (Monoid a, MonadIO m) -> Int -> Int -> C.Consumer a m a
                                 $= C.conduitVector 12
-                                $= asyncMapC nthreads (V.foldl (<>) mempty)
-                                $= CL.fold S.union S.empty)
-        liftIO $ forM_ (S.toAscList usednames) $ \name -> do
+                                $= asyncMapC nthreads (S.toAscList . V.foldl (<>) mempty)
+                                $= CL.fold merge' [])
+        liftIO $ forM_ usednames $ \name -> do
                 B8.hPutStr h_headers "seqname\t"
                 B8.hPutStrLn h_headers name
         liftIO (hClose h >> hClose h_headers)
         outputListLno' TraceOutput ["Finished annotation of file '", samfile, "'"]
         return (newfp, newfp_headers)
     where
-        inserth s ar = S.insert (annotValue ar) s
+        merge' a b = let c = merge a b in rnf c `par` c
 
 annotateMap :: FilePath -> FilePath -> AnnotationOpts -> NGLessIO (FilePath, FilePath)
 annotateMap samfile mapfile opts = do
