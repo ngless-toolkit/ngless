@@ -1,7 +1,9 @@
+{- Copyright 2013-2016 NGLess Authors
+ - License: MIT
+ -}
 {-# LANGUAGE TemplateHaskell #-}
 module FileManagement
     ( createTempDir
-    , generateDirId
     , openNGLTempFile
     , openNGLTempFile'
     , removeFileIfExists
@@ -67,11 +69,6 @@ createTempDir dst = do
             createDirectory fp
             return fp)
         removeDirectoryRecursive
-
-generateDirId :: FilePath -> NGLessIO FilePath
-generateDirId dst = do
-    odir <- outputDirectory
-    liftIO $ createTempDirectory odir (takeBaseNameNoExtensions dst)
 
 createTempDirectory :: FilePath -> String -> IO FilePath
 createTempDirectory dir t = do

@@ -30,6 +30,7 @@ import Data.FastQ
 import Configuration
 import Language
 import Output
+import Utils.Conduit (conduitPossiblyCompressedFile)
 import Utils.Utils
 import NGLess
 
@@ -64,8 +65,7 @@ optionalSubsample f = do
         else do
             outputListLno' TraceOutput ["Subsampling file ", f]
             (newfp,h) <- openNGLTempFile f "" "fq.gz"
-            C.sourceFile f
-                $= uncompressC f
+            conduitPossiblyCompressedFile f
                 =$= CB.lines
                 =$= drop100
                 =$= C.unlinesAscii
@@ -107,7 +107,7 @@ executeGroup other _ = throwScriptError ("Illegal argument to group(): " ++ show
 groupFiles :: T.Text -> [ReadSet] -> NGLessIO ReadSet
 groupFiles name rs = do
     let encs = map rsEncoding rs
-    when (not $ allSame encs) $
+    unless (allSame encs) $
         throwDataError ("In group call not all input files have the same encoding!" :: String)
     let dims = map dim1 rs
         dim1 :: ReadSet -> Int
@@ -121,14 +121,15 @@ groupFiles name rs = do
         | otherwise -> catFiles3 name rs
 
 
-catFiles1 name rs@((ReadSet1 enc _):_) = do
+catFiles1 name rs@(ReadSet1 enc _:_) = do
     (newfp, h) <- openNGLTempFile (T.unpack name) "concatenated_" "fq"
-    forM_ rs $ \(ReadSet1 _ fp) -> do
+    forM_ rs $ \(ReadSet1 _ fp) ->
         hCat h fp
     liftIO (hClose h)
     return (ReadSet1 enc newfp)
+catFiles1 _ rs = throwShouldNotOccur ("catFiles1 called with args : " ++ show rs)
 
-catFiles2 name rs@((ReadSet2 enc _ _):_) = do
+catFiles2 name rs@(ReadSet2 enc _ _:_) = do
     (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq"
     (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq"
     forM_ rs $ \(ReadSet2 _ fp1 fp2) -> do
@@ -137,6 +138,8 @@ catFiles2 name rs@((ReadSet2 enc _ _):_) = do
     liftIO (hClose h1)
     liftIO (hClose h2)
     return (ReadSet2 enc newfp1 newfp2)
+catFiles2 _ rs = throwShouldNotOccur ("catFiles2 called with args : " ++ show rs)
+
 catFiles3 name rs@(r:_) = do
     (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq"
     (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq"

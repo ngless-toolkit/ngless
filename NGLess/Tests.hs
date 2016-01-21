@@ -17,7 +17,6 @@ import Text.Parsec.Combinator (eof)
 
 import System.Directory (removeFile
                         ,removeDirectoryRecursive
-                        ,createDirectoryIfMissing
                         ,doesFileExist
                         )
 import qualified Data.ByteString.Char8 as B
@@ -359,8 +358,6 @@ case_test_setup_html_view = do
     assertBool "index.html should be present after setupHtmlViewer" ex
     removeDirectoryRecursive "testing_tmp_dir_html/"
 
--- MapOperations
-
 -- ProcessFastQ
 
 case_read_and_write_fastQ = do
@@ -372,17 +369,4 @@ case_read_and_write_fastQ = do
         newrs <- liftIO $ readReadSet enc fp
         liftIO $ newrs @?= rs
 
--- "test_samples/sample.fq.gz" has 33 as lowest char from the initial data set
-case_read_fastQ_store_enc = do
-    nt <- testNGLessIO $ generateDirId fp
-    createDirectoryIfMissing False $ dstDirBef nt
-    createDirectoryIfMissing False $ dstDirAft nt
-    (ReadSet1 eb _) <- testNGLessIO $ _doQC1 Nothing   fp
-    (ReadSet1 ea _) <- testNGLessIO $ _doQC1 (Just eb) fp
-    removeDirectoryRecursive $ dstDirBef nt -- delete test generated data.
-    removeDirectoryRecursive $ dstDirAft nt -- delete test generated data.
-    eb @?= ea
-  where fp = "test_samples/sample.fq.gz"
-        dstDirBef = (++ "$beforeQC")
-        dstDirAft = (++ "$afterQC")
 

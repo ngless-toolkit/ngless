@@ -55,7 +55,7 @@ writeToFile (NGOMappedReadSet name path defGen) newfp = liftIO $ do
 
 writeToFile obj _ = throwShouldNotOccur ("writeToFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ show obj)
 
-writeRSToFile enc path newfp = liftIO $ do
+writeRSToFile enc path newfp = liftIO $
     readPossiblyCompressedFile path >>= BL.writeFile newfp
 
 

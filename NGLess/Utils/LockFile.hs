@@ -19,9 +19,8 @@ import Control.Concurrent (threadDelay)
 
 import Data.Bits ((.|.))
 import Foreign.C (eEXIST, errnoToIOError, getErrno)
-import System.IO (Handle)
 import GHC.IO.Handle.FD (fdToHandle)
-import System.IO (hClose, hPutStrLn)
+import System.IO (Handle, hClose, hPutStrLn)
 import System.Posix.Internals
     ( c_close
     , c_open
@@ -52,7 +51,7 @@ data WhenExistsStrategy = IfLockedThrow NGError | IfLockedRetry { nrLockRetries 
             deriving (Eq, Show)
 
 withLockFile :: LockParameters -> NGLessIO a -> NGLessIO a
-withLockFile params act = 
+withLockFile params act =
     acquireLock params >>= \case
         Just rk -> do
             outputListLno' DebugOutput ["Acquired lock file ", lockFname params]
@@ -64,13 +63,11 @@ withLockFile params act =
             lockExists params act
 
 
-lockExists params@LockParameters{..} act = do
-    age <- liftIO $ fileAge lockFname
-    case age of
+lockExists params@LockParameters{..} act = liftIO (fileAge lockFname) >>= \case
         Nothing -> do
             outputListLno' InfoOutput ["Lock file ", lockFname, " existed but has been removed. Retrying."]
             withLockFile params act
-        Just age' | (age' > maxAge) -> do
+        Just age | age > maxAge -> do
             outputListLno' InfoOutput ["Lock file ", lockFname, " exists but is too old. Assuming it is stale and removing it."]
             liftIO $ removeFileIfExists lockFname
             withLockFile params act
@@ -83,6 +80,7 @@ lockExists params@LockParameters{..} act = do
                         let lessOneTry = IfLockedRetry (nrLockRetries - 1) timeBetweenRetries
                         lockExists params { whenExistsStrategy = lessOneTry } act
                 | otherwise -> throwSystemError ("Could not obtain lock " ++ lockFname ++ " even after waiting for its release.")
+
 sleep :: NominalDiffTime -> IO ()
 sleep = threadDelay . toMicroSeconds
     where
@@ -120,7 +118,7 @@ handleIf cond alt act = handleJust
     (\e -> if cond e then return (Just ()) else return Nothing)
     (const alt)
     act
-        
+
 fileAge :: FilePath -> IO (Maybe NominalDiffTime)
 fileAge fname = handleIf isDoesNotExistError (return Nothing) $ Just <$> do
     mtime <- getModificationTime fname

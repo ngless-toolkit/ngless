@@ -94,6 +94,8 @@ test_samples/htseq-res/htseq_cds_noStrand_union.txt:
 check: ngless ${testinputfiles}
 	stack test
 
+tests: check
+
 bench: config $(NGLESS_BUILD_BINARIES)
 	stack bench
 
@@ -187,4 +189,4 @@ ngless-${VERSION}.tar.gz: ngless
 	tar -zcvf $(distdir).tar.gz $(distdir)
 	rm -rf $(distdir)
 
-.PHONY: all build clean check config distclean dist static
+.PHONY: all build clean check tests config distclean dist static
