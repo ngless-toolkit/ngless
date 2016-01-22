@@ -1,4 +1,4 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -13,8 +13,6 @@ import Control.Monad
 import Control.DeepSeq
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BL8
 
 import Data.GFF
 
@@ -43,16 +41,16 @@ encodeAR :: AnnotatedRead -> B.ByteString
 encodeAR (AnnotatedRead rid v t s) = B.concat
         [rid, "\t", v, "\t",  B8.pack (show t), "\t", encodeStrand s, "\n"]
 
-decodeAR :: BL.ByteString -> Either String AnnotatedRead
+decodeAR :: B.ByteString -> Either String AnnotatedRead
 decodeAR a = do
-    let ilines = BL8.lines a
+    let ilines = B8.lines a
     when (length ilines /= 1) $
         fail "decodeAR expected a single line"
     let [line] = ilines
-        tokens = BL8.split '\t' line
+        tokens = B8.split '\t' line
     when (length tokens /= 4) $
         fail "decodeAR wrong number of tokens"
     let [rid, avalue, atype, astrand] = tokens
     strand <- decodeStrand astrand
-    return (AnnotatedRead (BL8.toStrict rid) (BL8.toStrict avalue) (read . BL8.unpack $ atype) strand)
+    return (AnnotatedRead rid avalue (read . B8.unpack $ atype) strand)
 

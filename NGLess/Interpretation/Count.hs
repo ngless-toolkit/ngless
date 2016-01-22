@@ -81,7 +81,7 @@ _performCount headers_fp annot_fp gname minCount method = do
 
     just_idxs <- CB.sourceFile annot_fp
         $= CB.lines
-        =$= CL.mapM (\line -> case decodeAR $ BL.fromChunks [line] of
+        =$= CL.mapM (\line -> case decodeAR line of
                             Right v -> return v
                             Left err -> throwDataError err)
         =$= CL.groupBy ((==) `on` readId)
