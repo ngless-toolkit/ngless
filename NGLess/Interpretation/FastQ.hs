@@ -13,7 +13,6 @@ module Interpretation.FastQ
     ) where
 
 import System.IO
-import Data.List
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
@@ -30,7 +29,6 @@ import Data.FastQ
 import Configuration
 import Language
 import Output
-import Utils.Conduit (conduitPossiblyCompressedFile)
 import Utils.Utils
 import NGLess
 
@@ -52,10 +50,6 @@ drop100 = loop (0 :: Int)
                     Just line -> C.yield line >> loop (n+1)
                     Nothing -> return ()
             | otherwise = C.await >> loop (n+1)
-
-uncompressC f
-    | ".gz" `isSuffixOf` f = C.ungzip
-    | otherwise = C.awaitForever C.yield
 
 optionalSubsample :: FilePath -> NGLessIO FilePath
 optionalSubsample f = do
@@ -140,6 +134,7 @@ catFiles2 name rs@(ReadSet2 enc _ _:_) = do
     return (ReadSet2 enc newfp1 newfp2)
 catFiles2 _ rs = throwShouldNotOccur ("catFiles2 called with args : " ++ show rs)
 
+catFiles3 _ [] = throwShouldNotOccur ("catFiles3 called with an empty list" :: String)
 catFiles3 name rs@(r:_) = do
     (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq"
     (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq"
