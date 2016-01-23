@@ -55,7 +55,7 @@ define(`BUILD_DEPENDS',
     time >= 1.5,
     transformers == 0.4.*,
     unix == 2.7.*,
-    vector >= 0.10,
+    vector == 0.10.*,
     yaml,
     zlib')
 
