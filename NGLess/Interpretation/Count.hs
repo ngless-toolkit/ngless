@@ -1,7 +1,7 @@
 {- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE LambdaCase, FlexibleContexts #-}
+{-# LANGUAGE LambdaCase, FlexibleContexts, TupleSections #-}
 module Interpretation.Count
     ( executeCount
     , MMMethod(..)
@@ -21,10 +21,12 @@ import qualified Data.Vector.Unboxed.Mutable as VM
 import System.IO (hClose)
 import Data.Convertible
 import Data.Function (on)
+import Data.List (nub)
 
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.Internal as CI
 import Data.Conduit (($$), ($=), (=$=))
 
 import Language
@@ -33,7 +35,6 @@ import NGLess
 import Output
 import FileManagement
 import Data.Annotation
-import Data.Maybe
 import Data.GFF
 import Utils.Vector
 
@@ -79,31 +80,34 @@ _performCount headers_fp annot_fp gname minCount method = do
                 =$= enumerate
                 $$ CL.fold (\m (i,a) -> M.insert a i m) M.empty
 
-    just_idxs <- CB.sourceFile annot_fp
+    let n_headers = length (M.keys index)
+    mcounts <- liftIO $ VM.replicate n_headers (0.0 :: Double)
+
+    outputListLno' TraceOutput ["Starting count..."]
+    ((),toDistribute) <- CB.sourceFile annot_fp
         $= CB.lines
         =$= CL.mapM (\line -> case decodeAR line of
                             Right v -> return v
                             Left err -> throwDataError err)
         =$= CL.groupBy ((==) `on` readId)
         =$= CL.mapM (asIndices index)
-        $$ CL.consume
-
-    let n_headers = length (M.elems index)
-    result <- case method of
-        MMCountAll -> do
-            outputListLno' TraceOutput ["Counts (all 1 method)..."]
-            return $ all1 just_idxs n_headers
-
-        MMDist1 -> do
-            outputListLno' TraceOutput ["Counts (first pass)..."]
-            let firstpass = distributeMM just_idxs n_headers Nothing True
-
-            outputListLno' TraceOutput ["Counts (second pass)..."]
-            let secondpass = distributeMM just_idxs n_headers (Just firstpass) False
-            return secondpass
-        MM1OverN -> do
-            outputListLno' TraceOutput ["Counts (1 over n method)..."]
-            return $ oneOverN just_idxs n_headers
+        =$= CL.map nub
+        $$ (case method of
+            MMCountAll -> (,[]) <$> CL.mapM_ (liftIO . incrementAll mcounts)
+            MM1OverN -> (,[]) <$> CL.mapM_ (liftIO . increment1OverN mcounts)
+            MMDist1 -> CI.zipSinks
+                (CL.mapM_ $ \case
+                            [v] -> liftIO $ unsafeIncrement mcounts v
+                            _ -> return ())
+                (CL.filter ((/= 1) . length) $= CL.consume))
+    counts <- liftIO $ V.unsafeFreeze mcounts
+    result <-
+        if method /= MMDist1
+            then return counts
+            else do
+                outputListLno' TraceOutput ["Counts (second pass)..."]
+                let secondpass = distributeMM toDistribute n_headers counts False
+                return secondpass
 
     (newfp,hout) <- openNGLTempFile annot_fp "counts." "txt"
     liftIO $ do
@@ -115,32 +119,28 @@ _performCount headers_fp annot_fp gname minCount method = do
         hClose hout
     return newfp
 
-all1 = all1OrOneOverN True
-oneOverN = all1OrOneOverN False
-all1OrOneOverN isAll1 indices n = V.create $ do
-    counts <- VM.replicate n (0.0 :: Double)
-    forM_ indices $ \cs -> do
-        let nc = length cs
-        forM_ cs $ \i -> do
-            let inc = if isAll1 then 1.0 else (1.0 / convert nc)
-            unsafeIncrement' counts i inc
-    return counts
+
+--incrementAll :: VM.MVector IO Double -> [Int] -> NGLessIO ()
+incrementAll counts vis = forM_ vis $ \vi -> unsafeIncrement counts vi
+
+--increment1OverN :: VM.MVector IO Double -> [Int] -> NGLessIO ()
+increment1OverN counts vis = forM_ vis $ \vi -> unsafeIncrement' counts vi (1.0 / nc)
+    where
+        nc :: Double
+        nc = 1.0 / convert (length vis)
 
 distributeMM indices n current fractionResult = V.create $ do
-    let Just current' = current
-    ncounts <- VM.replicate n (0.0 :: Double)
-    forM_ indices $ \case
-        [v] -> unsafeIncrement' ncounts v 1.0
-        vs -> when (isJust current) $ do
-            let cs = map (V.unsafeIndex current') vs
-                cs_sum = sum cs
-                n_cs = convert (length cs)
-                adjust :: Double -> Double
-                adjust = if cs_sum > 0.0
-                            then (/ cs_sum)
-                            else const  (1.0 / n_cs)
-            forM_ (zip vs cs) $ \(v,c) ->
-                unsafeIncrement' ncounts v (adjust c)
+    ncounts <- V.thaw current -- note that thaw performs a copy
+    forM_ indices $ \vs -> do
+        let cs = map (V.unsafeIndex current) vs
+            cs_sum = sum cs
+            n_cs = convert (length cs)
+            adjust :: Double -> Double
+            adjust = if cs_sum > 0.0
+                        then (/ cs_sum)
+                        else const  (1.0 / n_cs)
+        forM_ (zip vs cs) $ \(v,c) ->
+            unsafeIncrement' ncounts v (adjust c)
     when fractionResult $
         toFractions ncounts
     return ncounts
