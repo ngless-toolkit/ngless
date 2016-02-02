@@ -107,7 +107,6 @@ data NGLType =
         | NGLReadSet
         | NGLMappedRead
         | NGLMappedReadSet
-        | NGLAnnotatedSet
         | NGLCounts
         | NGLVoid
         | NGLAny
@@ -135,11 +134,6 @@ data NGLessObject =
                     , nglReference :: (Maybe T.Text)
                     }
         | NGOMappedRead [SamLine]
-        | NGOAnnotatedSet
-                    { nglgroupName :: T.Text
-                    , nglAnnotatedReads :: FilePath
-                    , nglAnnotationHeader :: FilePath
-                    }
         | NGOCounts FilePath
         | NGOVoid
         | NGOSample T.Text [ReadSet]

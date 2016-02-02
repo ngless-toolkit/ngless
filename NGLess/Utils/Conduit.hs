@@ -3,12 +3,18 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Utils.Conduit
-    ( conduitPossiblyCompressedFile
+    ( ByteLine(..)
+    , conduitPossiblyCompressedFile
     , asyncMapC
+    , linesC
     ) where
 
+import qualified Data.ByteString as B
 import qualified Control.Concurrent.Async as A
 import qualified Data.Conduit as C
+import           Data.Conduit ((=$=))
+import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Binary as CB
 import qualified Data.Sequence as Seq
 import           Data.Sequence ((|>), ViewL(..))
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -17,6 +23,10 @@ import           Control.DeepSeq
 
 import Utils.Utils (conduitPossiblyCompressedFile)
 
+newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
+
+linesC :: (Monad m) => C.Conduit B.ByteString m ByteLine
+linesC = CB.lines =$= CL.map ByteLine
 
 asyncMapC :: forall a m b . (MonadIO m, NFData b) => Int -> (a -> b) -> C.Conduit a m b
 asyncMapC maxSize f = initLoop (0 :: Int) (Seq.empty :: Seq.Seq (A.Async b))

@@ -100,12 +100,6 @@ executeWrite el@(NGOMappedReadSet name fp defGen) args = do
         NGOSymbol s -> throwScriptError (T.concat ["write does not accept format {", s, "} with input type ", T.pack . show $ el])
         _ -> throwShouldNotOccur ("Type checking fail: format argument is not a symbol for write()" :: String)
 
-executeWrite (NGOAnnotatedSet name fp headers) args = do
-    newfp <- getOFile args
-    outputListLno' InfoOutput ["Writing AnnotatedSet to: ", newfp]
-    nglMaybeCopyFile fp newfp
-    return $ NGOAnnotatedSet name newfp headers
-
 executeWrite (NGOCounts fp) args = do
     newfp <- getOFile args
     outputListLno' InfoOutput ["Writing counts to: ", newfp]

@@ -50,7 +50,6 @@ import NGLess
 import Data.Sam
 import Data.FastQ
 
-import Interpretation.Annotation
 import Interpretation.Count
 import Interpretation.FastQ
 import Interpretation.Map
@@ -278,7 +277,6 @@ topFunction' (FuncName "unique")    expr args Nothing = runNGLessIO (executeUniq
 topFunction' (FuncName "write")     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
 topFunction' (FuncName "map")       expr args Nothing = runNGLessIO (executeMap expr args)
 topFunction' (FuncName "select")    expr args Nothing = runNGLessIO (executeSelect expr args)
-topFunction' (FuncName "annotate")  expr args Nothing = runNGLessIO (executeAnnotation expr args)
 topFunction' (FuncName "count")     expr args Nothing = runNGLessIO (executeCount expr args)
 topFunction' (FuncName "print")     expr args Nothing = executePrint expr args
 

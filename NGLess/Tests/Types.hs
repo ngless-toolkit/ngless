@@ -94,106 +94,63 @@ case_valid_fmap_ref = isOkTypesText
     \x = fastq('fq')\n\
     \map(x, reference='xpto')\n"
 
--- annotate
+-- count
 case_valid_fannot_gff = isOkTypesText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \annotate(y, gff='xpto')"
+    \count(y, gff_file='xpto')"
 
 case_invalid_fannot_gff = isErrorText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \annotate(y, gff={xpto})"
+    \count(y, gff_file={xpto})"
 
 case_valid_fannot_mode = isOkTypesText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \annotate(y, mode={union})"
+    \count(y, mode={union})"
 
 case_invalid_fannot_mode = isErrorText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \annotate(y, mode='union')"
+    \count(y, mode='union')"
 
 case_valid_fannot_features = isOkTypesText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \annotate(y, features=[{gene}])"
+    \count(y, features=[{gene}])"
 
 case_invalid_fannot_features = isErrorText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \annotate(y, features='gene')"
+    \count(y, features='gene')"
 
 case_valid_fcount_min = isOkTypesText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \z = annotate(y, features=[{gene}])\n\
-    \k = count(z, min=10)"
+    \z = count(y, features=[{gene}], min=10)"
 
-case_invalid_fcount_min = isErrorText
-    "ngless '0.0'\n\
-    \x = fastq('fq')\n\
-    \y = map(x, reference='xpto')\n\
-    \z = annotate(y, features=[{gene}])\n\
-    \k = count(z, min='10')"
-
-
-case_valid_fcount_counts = isOkTypesText
-    "ngless '0.0'\n\
-    \x = fastq('fq')\n\
-    \y = map(x, reference='xpto')\n\
-    \z = annotate(y, features=[{gene}])\n\
-    \k = count(z, counts=[{gene}])"
-
-case_invalid_fcount_counts = isErrorText
-    "ngless '0.0'\n\
-    \x = fastq('fq')\n\
-    \y = map(x, reference='xpto')\n\
-    \z = annotate(y, features=[{gene}])\n\
-    \k = count(z, counts=['gene'])"
 
 -- write
 
-case_valid_fwrite_ofile = isOkTypesText
-    "ngless '0.0'\n\
-    \x = fastq('fq')\n\
-    \y = map(x, reference='xpto')\n\
-    \z = annotate(y, features=[{gene}])\n\
-    \write(count(z), ofile='10')"
-
-case_invalid_fwrite_ofile = isErrorText
-    "ngless '0.0'\n\
-    \x = fastq('fq')\n\
-    \y = map(x, reference='xpto')\n\
-    \z = annotate(y, features=[{gene}])\n\
-    \write(count(z), ofile=10)"
-
-
-case_count_on_mapped = isErrorText
-    "ngless '0.0'\n\
-    \input = fastq('fq')\n\
-    \mapped = map(input, reference='hg19')\n\
-    \counted = count(mapped)\n\
-    \write(counted, format={tsv})"
 
 case_valid_fwrite_format = isOkTypesText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \z = annotate(y, features=[{gene}])\n\
-    \write(count(z), format={tsv})"
+    \z = count(y, features=[{gene}])\n\
+    \write(z, format={tsv})"
 
 case_invalid_fwrite_format = isErrorText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \z = annotate(y, features=[{gene}])\n\
+    \z = count(y, features=[{gene}])\n\
     \write(count(z), format='tsv')"

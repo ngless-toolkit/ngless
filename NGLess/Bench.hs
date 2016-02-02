@@ -17,8 +17,7 @@ import Configuration (setupTestConfiguration)
 
 
 import Interpretation.Map (_samStats)
-import Interpretation.Annotation (_annotateSeqname, annotateMap, AnnotationOpts(..), _intersection_strict, loadFunctionalMap)
-import Interpretation.Count (_performCount, MMMethod(..))
+import Interpretation.Count (performCount, MMMethod(..), loadAnnotator, loadFunctionalMap, AnnotationOpts(..), annotationRule, AnnotationIntersectionMode(..), AnnotationMode(..))
 import Data.Sam (readSamLine, readSamGroupsC)
 import Data.GFF
 
@@ -40,21 +39,20 @@ count= loop (0 :: Int)
             Nothing -> return i
             Just _ -> loop (i+1)
 
+
 main = setupTestConfiguration >> defaultMain [
     bgroup "sam-stats"
         [ bench "sample" $ nfNGLessIO (_samStats "test_samples/sample.sam")
-        ]
-    ,bgroup "annotation"
-        [ bench "annotate-seqname" $ nfNGLessIO (_annotateSeqname "test_samples/sample.sam" undefined)
-        , bench "annotate-map"     $ nfNGLessIO (annotateMap     "test_samples/sample.sam" "test_samples/functional.map"
-                                        (AnnotationOpts [GffOther "ko", GffOther "cog"] _intersection_strict False True))
-        , bench "load-map"     $ nfNGLessIO (loadFunctionalMap   "test_samples/functional.map" ["ko", "cog"])
         ]
     ,bgroup "parse-sam"
         [ bench "readSamLine" $ nfRIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= CL.map readSamLine $$ countRights)
         , bench "samGroups" $ nfNGLessIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= readSamGroupsC $$ count)
         ]
     ,bgroup "count"
-        [ bench "count-base" $ nfNGLessIO (_performCount "test_samples/annotation_headers.txt" "test_samples/annotated.tsv" "benching" 0 MMDist1)
+        [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap   "test_samples/functional.map" ["ko", "cog"])
+        , bench "annotate-seqname" . nfNGLessIO $ do
+                    let opts = AnnotationOpts [GffOther "ko", GffOther "cog"] (annotationRule IntersectStrict) False True
+                    amap <- loadAnnotator (AnnotateFunctionalMap "test_samples/functional_map.map") opts
+                    performCount "test_samples/sample.sam" "testing" amap MMDist1 0
         ]
     ]

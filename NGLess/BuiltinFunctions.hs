@@ -16,22 +16,13 @@ builtinFunctions =
     ,Function (FuncName "substrim") (Just NGLRead) NGLRead substrimArgs False
     ,Function (FuncName "map") (Just NGLReadSet) NGLMappedReadSet mapArgs False
     ,Function (FuncName "select") (Just NGLMappedReadSet) NGLMappedReadSet selectArgs False
-    ,Function (FuncName "count") (Just NGLAnnotatedSet) NGLCounts countArgs False
-    ,Function (FuncName "annotate") (Just NGLMappedReadSet) NGLAnnotatedSet annotateArgs False
+    ,Function (FuncName "count") (Just NGLMappedReadSet) NGLCounts countArgs False
     ,Function (FuncName "write") (Just NGLAny) NGLVoid writeArgs False
     ,Function (FuncName "print") (Just NGLAny) NGLVoid [] False
     ]
 
 groupArgs =
     [ArgInformation "name" True NGLString Nothing
-    ]
-
-annotateArgs =
-    [ArgInformation "features" False (NGList NGLSymbol) (Just ["gene", "cds", "exon", "seqname"])
-    ,ArgInformation "mode" False NGLSymbol (Just ["union", "intersection_strict", "intersection_non_empty"])
-    ,ArgInformation "gff" False NGLString Nothing
-    ,ArgInformation "keep_ambiguous" False NGLBool Nothing
-    ,ArgInformation "strand" False NGLBool Nothing
     ]
 
 writeArgs =
@@ -42,8 +33,14 @@ writeArgs =
 
 countArgs =
     [ArgInformation "counts" False (NGList NGLSymbol) (Just ["gene", "cds", "exon"])
+    ,ArgInformation "features" False (NGList NGLSymbol) (Just ["gene", "cds", "exon", "seqname"])
     ,ArgInformation "min" False NGLInteger Nothing
     ,ArgInformation "multiple" False NGLSymbol (Just ["all1", "dist1", "1overN"])
+    ,ArgInformation "mode" False NGLSymbol (Just ["union", "intersection_strict", "intersection_non_empty"])
+    ,ArgInformation "gff_file" False NGLString Nothing
+    ,ArgInformation "functional_map" False NGLString Nothing
+    ,ArgInformation "keep_ambiguous" False NGLBool Nothing
+    ,ArgInformation "strand" False NGLBool Nothing
     ]
 
 selectArgs =

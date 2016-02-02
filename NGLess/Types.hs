@@ -143,7 +143,6 @@ typeOfObject (NGOShortRead _) = Just NGLRead
 typeOfObject NGOReadSet{} = Just NGLReadSet
 typeOfObject NGOMappedReadSet{} = Just NGLMappedReadSet
 typeOfObject NGOMappedRead{} = Just NGLMappedRead
-typeOfObject NGOAnnotatedSet{} = Just NGLAnnotatedSet
 typeOfObject NGOCounts{} = Just NGLCounts
 typeOfObject NGOVoid = Just NGLVoid
 typeOfObject (NGOList []) = Nothing
