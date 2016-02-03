@@ -28,6 +28,7 @@ import qualified Data.Vector.Unboxed.Mutable as VUM
 
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
@@ -40,7 +41,8 @@ import           Data.Conduit.Async (buffer, (=$=&), ($$&))
 import Control.Monad
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
-import Data.List                (foldl1', nub)
+import Data.List                (foldl1')
+import GHC.Conc                 (getNumCapabilities)
 import Data.Maybe
 import Data.Monoid
 
@@ -163,16 +165,14 @@ loadAnnotator (AnnotateGFF gf) opts = GFFAnnotator <$> loadGFF gf opts
 loadAnnotator (AnnotateFunctionalMap mm) opts = GeneMapAnnotator <$> loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
 
 performCount1Pass :: VUM.IOVector Double -> MMMethod -> C.Sink [Int] NGLessIO ((),[[Int]])
-performCount1Pass mcounts  method =
-    CL.map nub
-        $= case method of
-            MMCountAll -> (,[]) <$> CL.mapM_ (liftIO . incrementAll mcounts)
-            MM1OverN -> (,[]) <$> CL.mapM_ (liftIO . increment1OverN mcounts)
-            MMDist1 -> CI.zipSinks
-                (CL.mapM_ $ \case
-                            [v] -> liftIO $ unsafeIncrement mcounts v
-                            _ -> return ())
-                (CL.filter ((/= 1) . length) $= CL.consume)
+performCount1Pass mcounts method = case method of
+    MMCountAll -> (,[]) <$> CL.mapM_ (liftIO . incrementAll mcounts)
+    MM1OverN -> (,[]) <$> CL.mapM_ (liftIO . increment1OverN mcounts)
+    MMDist1 -> CI.zipSinks
+        (CL.mapM_ $ \case
+                    [v] -> liftIO $ unsafeIncrement mcounts v
+                    _ -> return ())
+        (CL.filter ((/= 1) . length) $= CL.consume)
 
 renumerate :: (Monad m) => C.Conduit a m (a, Int)
 renumerate = loop 0
@@ -181,7 +181,7 @@ renumerate = loop 0
                 Just v -> C.yield (v, n) >> loop (n+1)
                 Nothing -> return ()
 
-extractSeqnames = do
+extractSeqnames mapthreads = do
     let seqName :: B.ByteString -> Maybe B.ByteString
         seqName line
             | "@SQ\tSN:" `B.isPrefixOf` line = Just . B.copy . B.drop 3 . (!! 1) . B8.split '\t' $ line
@@ -191,13 +191,16 @@ extractSeqnames = do
     CL.mapMaybe seqName
         =$= renumerate
         =$= C.conduitVector 1024
-        =$= asyncMapC 8 buildMap
+        =$= asyncMapC mapthreads buildMap
         =$= CL.fold (<>) mempty
 
 
 indexRead :: M.Map B.ByteString Int -> [AnnotatedRead] -> Either NGError [Int]
-indexRead index = mapM index1
+indexRead index rs = listNub <$> mapM index1 rs
     where
+        listNub :: (Ord a) => [a] -> [a]
+        listNub = S.toList . S.fromList
+        index1 :: AnnotatedRead -> Either NGError Int
         index1 a = case M.lookup (annotValue a) index of
             Nothing -> throwShouldNotOccur ("Internal index missing an entry for " ++ (B8.unpack $ annotValue a))
             Just v -> return v
@@ -205,6 +208,8 @@ indexRead index = mapM index1
 performCount :: FilePath -> T.Text -> Annotator -> AnnotationOpts -> MMMethod -> Integer -> NGLessIO FilePath
 performCount samfp gname annotator opts method minCount = do
     outputListLno' TraceOutput ["Starting count..."]
+    numCapabilities <- liftIO getNumCapabilities
+    let mapthreads = max 1 (numCapabilities - 1)
     let isSeqName SeqNameAnnotator = True
         isSeqName _ = False
 
@@ -213,7 +218,7 @@ performCount samfp gname annotator opts method minCount = do
             =$= CB.lines
             $$+ C.takeWhile ((=='@') . B8.head)
             =$= if isSeqName annotator
-                    then extractSeqnames
+                    then extractSeqnames mapthreads
                     else (CL.sinkNull >> return M.empty)
 
     let index = fillIndex annotator index'
@@ -225,7 +230,7 @@ performCount samfp gname annotator opts method minCount = do
             samcontent
                 $$+- readSamGroupsC
                 =$= C.conduitVector 1024
-                =$= asyncMapC 8 (sequence . V.map (indexRead index . annotateReadGroup opts annotator))
+                =$= asyncMapC mapthreads (sequence . V.map (indexRead index . annotateReadGroup opts annotator))
                 =$= (C.awaitForever $ \case
                             Left err -> throwError err
                             Right v -> C.yield v)
