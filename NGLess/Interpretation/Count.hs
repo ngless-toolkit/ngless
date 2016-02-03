@@ -91,9 +91,6 @@ data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctiona
 data Annotator = SeqNameAnnotator | GFFAnnotator AnnotationMap | GeneMapAnnotator GeneMapAnnotation
     deriving (Eq, Show)
 
-isSeqName SeqNameAnnotator = True
-isSeqName _ = False
-
 annotateReadGroup :: AnnotationOpts -> Annotator -> [SamLine] -> [AnnotatedRead]
 annotateReadGroup _ SeqNameAnnotator = mapMaybe seqAsAR
     where
@@ -136,12 +133,8 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
                                     "multiple argument to count " "multiple" args
     ambiguity <- lookupBoolOrScriptErrorDef (return False) "annotation function" "ambiguity" args
     strand_specific <- lookupBoolOrScriptErrorDef (return False) "annotation function" "strand" args
-    mocatMap <- case lookup "functional_map" args of
-                    Nothing -> return Nothing
-                    Just a -> Just <$> stringOrTypeError "functional_map argument to count()" a
-    gffFile <- case lookup "gff_file" args of
-                    Nothing -> return Nothing
-                    Just a -> Just <$> stringOrTypeError "gff_file argument to count()" a
+    mocatMap <- lookupFilePath "functional_map argument to count()" "functional_map" args
+    gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
 
     fs <- case lookup "features" args of
         Nothing -> return ["gene"]
@@ -186,24 +179,30 @@ enumerate = loop 0
                 Nothing -> return ()
 
 extractSeqnames h = do
-    let seqName :: B.ByteString -> B.ByteString
-        seqName = B.copy . B.drop 1 .  (!! 0) . B8.split ' '
+    let seqName :: B.ByteString -> Maybe B.ByteString
+        seqName line
+            | "@SQ\tSN:" `B.isPrefixOf` line = Just . B.copy . B.drop 3 . (!! 1) . B8.split '\t' $ line
+            | otherwise = Nothing
         inserth (i,n) = liftIO $ H.insert h n (i :: Int)
-    CL.map seqName
+    CL.mapMaybe seqName
         =$= enumerate
         =$= CL.mapM_ inserth
+
 
 hashSize = H.foldM (\p _ -> return (p+1)) 0
 
 indexRead h ar =
     forM ar $ \a -> liftIO (H.lookup h $ annotValue a) >>= \case
-            Nothing -> throwShouldNotOccur ("Internal index missing an entry" :: String)
+            Nothing -> throwShouldNotOccur ("Internal index missing an entry for " ++ (B8.unpack $ annotValue a))
             Just v -> return v
 
 performCount :: FilePath -> T.Text -> Annotator -> AnnotationOpts -> MMMethod -> Integer -> NGLessIO FilePath
 performCount samfp gname annotator opts method minCount = do
     outputListLno' TraceOutput ["Starting count..."]
     h <- liftIO (H.new :: IO (H.BasicHashTable B.ByteString Int))
+    let isSeqName SeqNameAnnotator = True
+        isSeqName _ = False
+
     (samcontent, ()) <-
         conduitPossiblyCompressedFile samfp
             =$= CB.lines
@@ -214,6 +213,7 @@ performCount samfp gname annotator opts method minCount = do
     fillIndex annotator h
     n_headers <- liftIO $ hashSize h
 
+    outputListLno' TraceOutput ["Loaded headers (", show n_headers, " headers); starting parsing/distribution."]
     mcounts <- liftIO $ VUM.replicate n_headers (0.0 :: Double)
     ((), toDistribute) <-
             samcontent
@@ -232,8 +232,11 @@ performCount samfp gname annotator opts method minCount = do
                 return secondpass
 
     (newfp,hout) <- openNGLTempFile samfp "counts." "txt"
-    headers <- liftIO $ extractHeaders n_headers h
     liftIO $ do
+        mheaders <- VM.new n_headers
+        flip H.mapM_ h $ \(v,i) ->
+            VM.write mheaders i v
+        headers <- V.unsafeFreeze mheaders
         BL.hPut hout (BL.fromChunks ["\t", T.encodeUtf8 gname, "\n"])
         forM_ [0..VU.length result - 1] $ \i -> do
             let hn = (V.!) headers i
@@ -243,11 +246,6 @@ performCount samfp gname annotator opts method minCount = do
         hClose hout
     return newfp
 
-extractHeaders n_headers h = do
-    res <- VM.new n_headers
-    flip H.mapM_ h $ \(v,i) ->
-        VM.write res i v
-    V.unsafeFreeze res
 
 --incrementAll :: VUM.IOVector Double -> [Int] -> NGLessIO ()
 incrementAll counts vis = forM_ vis $ \vi -> unsafeIncrement counts vi
@@ -456,7 +454,7 @@ matchingFeature s      = GffOther (B8.pack . T.unpack $ s)
 matchFeatures :: [GffType] -> GffLine -> Bool
 matchFeatures fs gf = gffType gf `elem` fs
 
-maybeFilePathOrTypeError Nothing = return Nothing
-maybeFilePathOrTypeError (Just (NGOString s)) = return (Just $ T.unpack s)
-maybeFilePathOrTypeError o = throwScriptError ("GFF String: Argument type must be NGOString (received " ++ show o ++ ").")
+lookupFilePath context name args = case lookup name args of
+    Nothing -> return Nothing
+    Just a -> Just <$> stringOrTypeError context a
 
