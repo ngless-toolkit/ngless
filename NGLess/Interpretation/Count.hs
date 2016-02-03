@@ -26,8 +26,6 @@ import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Unboxed.Mutable as VUM
 
-import qualified Data.HashTable.IO as H
-
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Map.Strict as M
 
@@ -44,6 +42,7 @@ import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
 import Data.List                (foldl1', nub)
 import Data.Maybe
+import Data.Monoid
 
 import System.IO                (hClose)
 import Data.Convertible         (convert)
@@ -106,13 +105,9 @@ annotateReadGroup opts (GeneMapAnnotator amap) = mapAnnotation
         mapAnnotation1 _ samline = M.lookup (samRName samline) amap >>= \vs ->
             return [AnnotatedRead (samQName samline) rname (GffOther "mapped") GffUnStranded | rname <- vs]
 
-fillIndex SeqNameAnnotator _ = return ()
-fillIndex (GFFAnnotator amap) h =
-    forM_ (zip (asHeaders amap) [0..]) $ \(hd, i) ->
-        liftIO (H.insert h hd i)
-fillIndex (GeneMapAnnotator amap) h =
-    forM_ (zip (unravel amap) [0..]) $ \(hd, i) ->
-        liftIO (H.insert h hd i)
+fillIndex SeqNameAnnotator index = index
+fillIndex (GFFAnnotator amap) _ = M.fromList (zip (asHeaders amap) [0..])
+fillIndex (GeneMapAnnotator amap) _ = M.fromList (zip (unravel amap) [0..])
 
 unravel :: GeneMapAnnotation -> [B.ByteString]
 unravel amap = concat (M.elems amap)
@@ -171,55 +166,63 @@ performCount1Pass mcounts  method =
                             [v] -> liftIO $ unsafeIncrement mcounts v
                             _ -> return ())
                 (CL.filter ((/= 1) . length) $= CL.consume)
-enumerate :: (Monad m) => C.Conduit a m (Int,a)
-enumerate = loop 0
+
+renumerate :: (Monad m) => C.Conduit a m (a, Int)
+renumerate = loop 0
     where
         loop !n = C.await >>= \case
-                Just v -> C.yield (n, v) >> loop (n+1)
+                Just v -> C.yield (v, n) >> loop (n+1)
                 Nothing -> return ()
 
-extractSeqnames h = do
+extractSeqnames = do
     let seqName :: B.ByteString -> Maybe B.ByteString
         seqName line
             | "@SQ\tSN:" `B.isPrefixOf` line = Just . B.copy . B.drop 3 . (!! 1) . B8.split '\t' $ line
             | otherwise = Nothing
-        inserth (i,n) = liftIO $ H.insert h n (i :: Int)
+        buildMap :: V.Vector (B.ByteString, Int) -> M.Map B.ByteString Int
+        buildMap = M.fromList . V.toList
     CL.mapMaybe seqName
-        =$= enumerate
-        =$= CL.mapM_ inserth
+        =$= renumerate
+        =$= C.conduitVector 1024
+        =$= asyncMapC 8 buildMap
+        =$= CL.fold (<>) mempty
 
 
-hashSize = H.foldM (\p _ -> return (p+1)) 0
-
-indexRead h ar =
-    forM ar $ \a -> liftIO (H.lookup h $ annotValue a) >>= \case
+indexRead :: M.Map B.ByteString Int -> [AnnotatedRead] -> Either NGError [Int]
+indexRead index = mapM index1
+    where
+        index1 a = case M.lookup (annotValue a) index of
             Nothing -> throwShouldNotOccur ("Internal index missing an entry for " ++ (B8.unpack $ annotValue a))
             Just v -> return v
 
 performCount :: FilePath -> T.Text -> Annotator -> AnnotationOpts -> MMMethod -> Integer -> NGLessIO FilePath
 performCount samfp gname annotator opts method minCount = do
     outputListLno' TraceOutput ["Starting count..."]
-    h <- liftIO (H.new :: IO (H.BasicHashTable B.ByteString Int))
     let isSeqName SeqNameAnnotator = True
         isSeqName _ = False
 
-    (samcontent, ()) <-
+    (samcontent, index') <-
         conduitPossiblyCompressedFile samfp
             =$= CB.lines
             $$+ C.takeWhile ((=='@') . B8.head)
             =$= if isSeqName annotator
-                    then extractSeqnames h
-                    else CL.sinkNull
-    fillIndex annotator h
-    n_headers <- liftIO $ hashSize h
+                    then extractSeqnames
+                    else (CL.sinkNull >> return M.empty)
+
+    let index = fillIndex annotator index'
+        n_headers = M.size index
 
     outputListLno' TraceOutput ["Loaded headers (", show n_headers, " headers); starting parsing/distribution."]
     mcounts <- liftIO $ VUM.replicate n_headers (0.0 :: Double)
     ((), toDistribute) <-
             samcontent
                 $$+- readSamGroupsC
-                =$= CL.map (annotateReadGroup opts annotator)
-                =$= CL.mapM (indexRead h)
+                =$= C.conduitVector 1024
+                =$= asyncMapC 8 (sequence . V.map (indexRead index . annotateReadGroup opts annotator))
+                =$= (C.awaitForever $ \case
+                            Left err -> throwError err
+                            Right v -> C.yield v)
+                =$= (C.concat :: C.Conduit (V.Vector [Int]) NGLessIO [Int])
                 $= performCount1Pass mcounts method
     counts <- liftIO $ VU.unsafeFreeze mcounts
 
@@ -234,7 +237,7 @@ performCount samfp gname annotator opts method minCount = do
     (newfp,hout) <- openNGLTempFile samfp "counts." "txt"
     liftIO $ do
         mheaders <- VM.new n_headers
-        flip H.mapM_ h $ \(v,i) ->
+        forM_ (M.toList index) $ \(v,i) ->
             VM.write mheaders i v
         headers <- V.unsafeFreeze mheaders
         BL.hPut hout (BL.fromChunks ["\t", T.encodeUtf8 gname, "\n"])
