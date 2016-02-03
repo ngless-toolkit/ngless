@@ -52,7 +52,7 @@ main = setupTestConfiguration >> defaultMain [
         [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap   "test_samples/functional.map" ["ko", "cog"])
         , bench "annotate-seqname" . nfNGLessIO $ do
                     let opts = AnnotationOpts [GffOther "ko", GffOther "cog"] (annotationRule IntersectStrict) False True
-                    amap <- loadAnnotator (AnnotateFunctionalMap "test_samples/functional_map.map") opts
-                    performCount "test_samples/sample.sam" "testing" amap MMDist1 0
+                    amap <- loadAnnotator (AnnotateFunctionalMap "test_samples/functional.map") opts
+                    performCount "test_samples/sample.sam" "testing" amap opts MMDist1 0
         ]
     ]
