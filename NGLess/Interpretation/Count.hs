@@ -256,7 +256,7 @@ performCount samfp gname annotator opts method minCount = do
         forM_ [0..VU.length result - 1] $ \i -> do
             let hn = (V.!) headers i
             v <- VU.indexM result i
-            when (v > fromIntegral minCount) $
+            when (v >= fromIntegral minCount) $
                 BL.hPut hout (BL.fromChunks [hn, "\t", B8.pack . show $ v, "\n"])
         hClose hout
     return newfp
