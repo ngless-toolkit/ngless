@@ -13,7 +13,7 @@ import System.FilePath.Posix
 import qualified Data.Text as T
 import Control.Monad.Trans.Resource
 
-import GHC.Conc (numCapabilities)
+import GHC.Conc (getNumCapabilities)
 
 import System.Process
 import System.Exit
@@ -34,6 +34,7 @@ executeSort :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSort (NGOMappedReadSet name fpsam rinfo) _ = do
     (rk, (newfp, hout)) <- openNGLTempFile' fpsam "sorted_" ".sam"
     (trk, tdirectory) <- createTempDir "samtools_sort_temp"
+    numCapabilities <- liftIO getNumCapabilities
     let cmdargs = ["sort", "-@", show numCapabilities, "-O", "sam", "-T", tdirectory </> "samruntmp", fpsam]
     samtoolsPath <- samtoolsBin
     outputListLno' TraceOutput ["Calling binary ", samtoolsPath, " with args: ", unwords cmdargs]

@@ -20,7 +20,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import           Data.Conduit (($$), (=$=))
 
-import GHC.Conc     (numCapabilities)
+import GHC.Conc     (getNumCapabilities)
 import Data.List    (find)
 import Numeric      (showFFloat)
 import Data.Bits    (testBit)
@@ -81,6 +81,7 @@ mapToReference refIndex fps extraArgs = do
     outputListLno' InfoOutput ["Starting mapping to ", refIndex]
     outputListLno' DebugOutput ["Write .sam file to: ", newfp]
     bwaPath <- bwaBin
+    numCapabilities <- liftIO getNumCapabilities
     let cmdargs =  concat [["mem", "-t", show numCapabilities, refIndex], extraArgs, fps]
     outputListLno' TraceOutput ["Calling binary ", bwaPath, " with args: ", unwords cmdargs]
     let cp = (proc bwaPath cmdargs) { std_out = UseHandle hout }
