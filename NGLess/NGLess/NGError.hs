@@ -9,7 +9,8 @@ module NGLess.NGError
     ) where
 
 import qualified Data.Text as T
-import Control.Monad.Except
+import           Control.DeepSeq
+import           Control.Monad.Except
 
 import Utils.StringLike
 
@@ -23,8 +24,14 @@ data NGErrorType =
     | GenericError -- ^ arbitrary error message
     deriving (Show, Eq)
 
+instance NFData NGErrorType where
+    rnf !_ = ()
+
 data NGError = NGError !NGErrorType !T.Text
-        deriving (Show, Eq)
+    deriving (Show, Eq)
+
+instance NFData NGError where
+    rnf !_ = ()
 
 -- | Internal bug: user is requested to submit a bug report
 throwShouldNotOccur :: (StringLike s, MonadError NGError m) => s -> m a
