@@ -105,12 +105,19 @@ annotateReadGroup opts (GeneMapAnnotator amap) = mapAnnotation
         mapAnnotation1 _ samline = M.lookup (samRName samline) amap >>= \vs ->
             return [AnnotatedRead (samQName samline) rname (GffOther "mapped") GffUnStranded | rname <- vs]
 
-fillIndex SeqNameAnnotator index = index
-fillIndex (GFFAnnotator amap) _ = M.fromList (zip (asHeaders amap) [0..])
-fillIndex (GeneMapAnnotator amap) _ = M.fromList (zip (unravel amap) [0..])
-
-unravel :: GeneMapAnnotation -> [B.ByteString]
-unravel amap = concat (M.elems amap)
+fillIndex annotator index = case annotator of
+    SeqNameAnnotator -> index
+    GFFAnnotator amap -> listToMapIndex (asHeaders amap)
+    GeneMapAnnotator amap -> listToMapIndex (unravel amap)
+  where
+    unravel :: GeneMapAnnotation -> [B.ByteString]
+    unravel amap = concat (M.elems amap)
+    listToMapIndex :: [B.ByteString] -> M.Map B.ByteString Int
+    listToMapIndex = loop 0 M.empty
+    loop !_ !m [] = m
+    loop n m (h:hs)
+        | M.member h m = loop n m hs
+        | otherwise = loop (n+1) (M.insert h n m) hs
 
 
 methodFor "1overN" = return MM1OverN
