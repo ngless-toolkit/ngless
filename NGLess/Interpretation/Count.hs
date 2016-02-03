@@ -39,6 +39,7 @@ import           Data.Conduit (($=), (=$), (=$=), ($$+), ($$+-))
 import           Data.Conduit.Async (buffer, (=$=&), ($$&))
 
 import Control.Monad
+import Control.Arrow            (first)
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
 import Data.List                (foldl1')
@@ -182,13 +183,11 @@ renumerate = loop 0
                 Nothing -> return ()
 
 extractSeqnames mapthreads = do
-    let seqName :: B.ByteString -> Maybe B.ByteString
-        seqName line
-            | "@SQ\tSN:" `B.isPrefixOf` line = Just . B.copy . B.drop 3 . (!! 1) . B8.split '\t' $ line
-            | otherwise = Nothing
+    let seqName :: B.ByteString -> B.ByteString
+        seqName = B.copy . B.drop 3 . (!! 1) . B8.split '\t'
         buildMap :: V.Vector (B.ByteString, Int) -> M.Map B.ByteString Int
-        buildMap = M.fromList . V.toList
-    CL.mapMaybe seqName
+        buildMap = M.fromList . map (first seqName) . V.toList
+    CL.filter ("@SQ\tSN:" `B.isPrefixOf`)
         =$= renumerate
         =$= C.conduitVector 1024
         =$= asyncMapC mapthreads buildMap
