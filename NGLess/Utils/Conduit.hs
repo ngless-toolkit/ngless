@@ -28,6 +28,10 @@ newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
 linesC :: (Monad m) => C.Conduit B.ByteString m ByteLine
 linesC = CB.lines =$= CL.map ByteLine
 
+-- | This is like Data.Conduit.List.map, except that each element is processed
+-- in a separate thread (up to maxSize can be queued up at any one time).
+-- Results are evaluated to normal form (not WHNF!) to ensure that the
+-- computation is fully evaluated before being yielded to the next conduit.
 asyncMapC :: forall a m b . (MonadIO m, NFData b) => Int -> (a -> b) -> C.Conduit a m b
 asyncMapC maxSize f = initLoop (0 :: Int) (Seq.empty :: Seq.Seq (A.Async b))
     where
