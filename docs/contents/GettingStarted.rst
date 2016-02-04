@@ -122,25 +122,22 @@ After adding the preprocess code to the Text Editor, it's time to map against th
 Annotate
 ~~~~~~~~
 
-We are only interested in the human genes so lets annotate the map results with
-the only feature being genes. Since we used a genome provided by NGLess, we
-will also use the annotation provided by default::
+We are only interested in the human genes so lets annotate the mapping results
+to the corresponding genes.  Since we used a genome provided by NGLess, we do
+not need to specify which annotation file to use (it'll be built in)::
 
-	/* annotation features */
+	/* features to annotate */
 	feats = [{gene}]
-	annotated = annotate(mapped, strand=false, mode={union}, ambiguity=false, features=feats)
+	counts = count(mapped, strand=false, mode={union}, keep_ambiguous=false, features=feats)
 
 
-Count & Write
-~~~~~~~~~~~~~~
+Write to disk
+~~~~~~~~~~~~~
 
-Annotation will annotate the results but won't store them. In order to count and save them you have to write the counts of the annotation to somewhere in your disk:
-
-::
+Finally, we write the results to a file::
 
 	/* write counts to disk */
-	counts = count(annotated)
-	write(counts, verbose={yes}, ofile="samples/CountsResult.txt")
+	write(counts, ofile="samples/CountsResult.txt")
 
 Final Script
 ~~~~~~~~~~~~~~

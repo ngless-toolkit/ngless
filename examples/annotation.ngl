@@ -8,10 +8,6 @@ mapped = map(input,reference='ce10')
 
 //features
 feats = [{gene}]
-annotated = annotate(mapped, strand=false, mode={union}, features=feats)
+counts = count(mapped, strand=false, mode={union}, features=feats)
 
-//Minimum value
-min = 1
-
-counts = count(annotated)
 write(counts, ofile="samples/CountsResult.txt")
