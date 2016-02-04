@@ -4,7 +4,7 @@
 {-# LANGUAGE LambdaCase, FlexibleContexts, TupleSections #-}
 module Interpretation.Count
     ( executeCount
-    , AnnotationOpts(..)
+    , CountOpts(..)
     , AnnotationMode(..)
     , AnnotationIntersectionMode(..)
     , MMMethod(..)
@@ -79,12 +79,15 @@ type GeneMapAnnotation = M.Map B8.ByteString [B8.ByteString]
 data MMMethod = MMCountAll | MM1OverN | MMDist1
     deriving (Eq, Show)
 
-data AnnotationOpts =
-    AnnotationOpts
+data CountOpts =
+    CountOpts
     { optFeatures :: [GffType] -- ^ list of features to condider
     , optIntersectMode :: AnnotationRule
     , optStrandSpecific :: !Bool
     , optKeepAmbiguous :: !Bool
+    , optMinCount :: !Double
+    , optMMMethod :: !MMMethod
+    , optDelim :: !B.ByteString
     }
 
 data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctionalMap FilePath
@@ -93,7 +96,7 @@ data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctiona
 data Annotator = SeqNameAnnotator | GFFAnnotator AnnotationMap | GeneMapAnnotator GeneMapAnnotation
     deriving (Eq, Show)
 
-annotateReadGroup :: AnnotationOpts -> Annotator -> [SamLine] -> [AnnotatedRead]
+annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> [AnnotatedRead]
 annotateReadGroup _ SeqNameAnnotator = mapMaybe seqAsAR
     where
         seqAsAR sr@SamLine{samQName = rid, samRName = rname }
@@ -104,7 +107,7 @@ annotateReadGroup opts (GeneMapAnnotator amap) = mapAnnotation
     where
         mapAnnotation :: [SamLine] -> [AnnotatedRead]
         mapAnnotation = concat . mapMaybe (mapAnnotation1 opts)
-        mapAnnotation1 :: AnnotationOpts -> SamLine -> Maybe [AnnotatedRead]
+        mapAnnotation1 :: CountOpts -> SamLine -> Maybe [AnnotatedRead]
         mapAnnotation1 _ samline = M.lookup (samRName samline) amap >>= \vs ->
             return [AnnotatedRead (samQName samline) rname (GffOther "mapped") GffUnStranded | rname <- vs]
 
@@ -141,6 +144,8 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
     mocatMap <- lookupFilePath "functional_map argument to count()" "functional_map" args
     gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
 
+    delim <- T.encodeUtf8 <$> lookupStringOrScriptErrorDef (return "\t") "count hidden argument (should always be valid)" "__delim" args
+
     fs <- case lookup "features" args of
         Nothing -> return ["gene"]
         Just (NGOSymbol f) -> return [f]
@@ -148,19 +153,22 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
         _ -> throwShouldNotOccur ("executeAnnotation: TYPE ERROR" :: String)
 
     m <- annotationRule <$> parseAnnotationMode args
-    let opts = AnnotationOpts
+    let opts = CountOpts
             { optFeatures = map matchingFeature fs
             , optIntersectMode = m
             , optStrandSpecific = strand_specific
             , optKeepAmbiguous = ambiguity
+            , optMinCount = fromInteger minCount
+            , optMMMethod = method
+            , optDelim = delim
             }
     amode <- annotationMode (optFeatures opts) (T.unpack <$> refinfo) (T.unpack <$> mocatMap) (T.unpack <$> gffFile)
     annotator <- loadAnnotator amode opts
-    NGOCounts <$> performCount samfp rname annotator opts method minCount
+    NGOCounts <$> performCount samfp rname annotator opts
 executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
 
-loadAnnotator :: AnnotationMode -> AnnotationOpts -> NGLessIO Annotator
+loadAnnotator :: AnnotationMode -> CountOpts -> NGLessIO Annotator
 loadAnnotator AnnotateSeqName _ = return SeqNameAnnotator
 loadAnnotator (AnnotateGFF gf) opts = GFFAnnotator <$> loadGFF gf opts
 loadAnnotator (AnnotateFunctionalMap mm) opts = GeneMapAnnotator <$> loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
@@ -204,13 +212,15 @@ indexRead index rs = listNub <$> mapM index1 rs
             Nothing -> throwShouldNotOccur ("Internal index missing an entry for " ++ (B8.unpack $ annotValue a))
             Just v -> return v
 
-performCount :: FilePath -> T.Text -> Annotator -> AnnotationOpts -> MMMethod -> Integer -> NGLessIO FilePath
-performCount samfp gname annotator opts method minCount = do
+performCount :: FilePath -> T.Text -> Annotator -> CountOpts -> NGLessIO FilePath
+performCount samfp gname annotator opts = do
     outputListLno' TraceOutput ["Starting count..."]
     numCapabilities <- liftIO getNumCapabilities
     let mapthreads = max 1 (numCapabilities - 1)
-    let isSeqName SeqNameAnnotator = True
+        isSeqName SeqNameAnnotator = True
         isSeqName _ = False
+        method = optMMMethod opts
+        delim = optDelim opts
 
     (samcontent, index') <-
         conduitPossiblyCompressedFile samfp
@@ -251,11 +261,11 @@ performCount samfp gname annotator opts method minCount = do
         forM_ (M.toList index) $ \(v,i) ->
             VM.write mheaders i v
         headers <- V.unsafeFreeze mheaders
-        BL.hPut hout (BL.fromChunks ["\t", T.encodeUtf8 gname, "\n"])
+        BL.hPut hout (BL.fromChunks [delim, T.encodeUtf8 gname, "\n"])
         forM_ [0..VU.length result - 1] $ \i -> do
             let hn = (V.!) headers i
             v <- VU.indexM result i
-            when (v >= fromIntegral minCount) $
+            when (v >= optMinCount opts) $
                 BL.hPut hout (BL.fromChunks [hn, "\t", B8.pack . show $ v, "\n"])
         hClose hout
     return newfp
@@ -361,7 +371,7 @@ flattenVmap f vs = VU.unfoldr access (0,[])
 getFeatureName (GffOther s) = s
 getFeatureName _ = error "getFeatureName called for non-GffOther input"
 
-loadGFF :: FilePath -> AnnotationOpts -> NGLessIO AnnotationMap
+loadGFF :: FilePath -> CountOpts -> NGLessIO AnnotationMap
 loadGFF gffFp opts = do
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "'..."]
         amap <- (conduitPossiblyCompressedFile gffFp
@@ -395,7 +405,7 @@ asHeaders amap = concatMap asHeaders' (M.assocs amap)
         asHeaders''' :: GffType -> [AnnotationInfo] -> [B.ByteString]
         asHeaders''' k vs = [B.concat [B8.pack . show $ k, "\t", snd v, "\n"] | v <- vs]
 
-annotateSamLine :: AnnotationOpts -> AnnotationMap -> SamLine -> [AnnotatedRead]
+annotateSamLine :: CountOpts -> AnnotationMap -> SamLine -> [AnnotatedRead]
 annotateSamLine opts amap samline = concatMap annotateSamLine' (M.assocs amap)
     where
         rname = samRName samline

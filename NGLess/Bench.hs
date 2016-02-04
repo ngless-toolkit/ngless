@@ -17,7 +17,7 @@ import Configuration (setupTestConfiguration)
 
 
 import Interpretation.Map (_samStats)
-import Interpretation.Count (performCount, MMMethod(..), loadAnnotator, loadFunctionalMap, AnnotationOpts(..), annotationRule, AnnotationIntersectionMode(..), AnnotationMode(..))
+import Interpretation.Count (performCount, MMMethod(..), loadAnnotator, loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), AnnotationMode(..))
 import Data.Sam (readSamLine, readSamGroupsC)
 import Data.GFF
 
@@ -39,6 +39,15 @@ count= loop (0 :: Int)
             Nothing -> return i
             Just _ -> loop (i+1)
 
+basicCountOpts = CountOpts
+        { optFeatures = []
+        , optIntersectMode = annotationRule IntersectStrict
+        , optStrandSpecific = False
+        , optKeepAmbiguous = True
+        , optMinCount = 0.0
+        , optMMMethod = MMDist1
+        , optDelim = "\t"
+        }
 
 main = setupTestConfiguration >> defaultMain [
     bgroup "sam-stats"
@@ -51,8 +60,7 @@ main = setupTestConfiguration >> defaultMain [
     ,bgroup "count"
         [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap   "test_samples/functional.map" ["ko", "cog"])
         , bench "annotate-seqname" . nfNGLessIO $ do
-                    let opts = AnnotationOpts [GffOther "ko", GffOther "cog"] (annotationRule IntersectStrict) False True
-                    amap <- loadAnnotator (AnnotateFunctionalMap "test_samples/functional.map") opts
-                    performCount "test_samples/sample.sam" "testing" amap opts MMDist1 0
+                    amap <- loadAnnotator (AnnotateFunctionalMap "test_samples/functional.map") basicCountOpts
+                    performCount "test_samples/sample.sam" "testing" amap basicCountOpts
         ]
     ]
