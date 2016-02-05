@@ -92,8 +92,9 @@ data Index = IndexOne Expression
 --  f(a) using |inputvariables|:
 --      expression
 data Block = Block
-                [Variable] -- ^ input arguments
-                Expression -- ^ block body, will likely be Sequence
+                { blockVariable :: [Variable] -- ^ input arguments
+                , blockBody :: Expression -- ^ block body, will likely be Sequence
+                }
     deriving (Eq, Show)
 
 data NGLType =

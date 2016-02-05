@@ -17,7 +17,11 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 import System.Process
 import System.Exit
+import System.Directory
 import System.IO
+import System.IO.Error
+import Control.Exception
+import GHC.IO.Exception (IOErrorType(..))
 import Data.String.Utils
 import Data.List (isInfixOf)
 import Data.Maybe
@@ -48,15 +52,14 @@ getOFile args = do
         Just (NGOString p) -> return (T.unpack p ++ subpostfix)
         _ -> throwShouldNotOccur ("getOFile cannot decode file path" :: String)
 
-writeToFile :: NGLessObject -> FilePath -> NGLessIO NGLessObject
-writeToFile (NGOMappedReadSet name path defGen) newfp = liftIO $ do
-    readPossiblyCompressedFile path >>= BL.writeFile newfp
-    return $ NGOMappedReadSet name newfp defGen
-
-writeToFile obj _ = throwShouldNotOccur ("writeToFile: Should have received a NGOReadSet or a NGOMappedReadSet but the type was: " ++ show obj)
 
 writeRSToFile enc path newfp = liftIO $
     readPossiblyCompressedFile path >>= BL.writeFile newfp
+
+moveOrCopy :: FilePath -> FilePath -> IO ()
+moveOrCopy oldfp newfp = renameFile oldfp newfp `catch` (\e -> case ioeGetErrorType e of
+            UnsupportedOperation -> copyFile oldfp newfp
+            _ -> ioError e)
 
 
 executeWrite :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
@@ -91,9 +94,14 @@ executeWrite (NGOReadSet rs) args = do
 
 executeWrite el@(NGOMappedReadSet name fp defGen) args = do
     newfp <- getOFile args
+    canMove <- lookupBoolOrScriptErrorDef (return False) "__can_move" "internal write arg" args
     let format = fromMaybe (NGOSymbol "sam") (lookup "format" args)
     case format of
-        NGOSymbol "sam" -> writeToFile el newfp
+        NGOSymbol "sam" -> liftIO $ do
+            if canMove
+                then moveOrCopy fp newfp
+                else readPossiblyCompressedFile fp >>= BL.writeFile newfp
+            return (NGOMappedReadSet name newfp defGen)
         NGOSymbol "bam" -> do
                         newfp' <- convertSamToBam fp newfp
                         return (NGOMappedReadSet name newfp' defGen) --newfp will contain the bam

@@ -27,6 +27,7 @@ import qualified Data.ByteString as B
 import Interpret
 import Validation
 import ValidationIO
+import Transform
 import Language
 import Types
 import Parse
@@ -148,13 +149,17 @@ modeExec opts@DefaultMode{} = do
             liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
         when shouldPrintHeader $
             printHeader modules
-        if validateOnly opts
-            then do
-                outputLno' InfoOutput "Script OK."
-                liftIO exitSuccess
-            else do
-                outputLno' InfoOutput "Script OK. Starting interpretation..."
-                interpret modules (nglBody sc)
+        when (validateOnly opts) $ do
+            outputLno' InfoOutput "Script OK."
+            liftIO exitSuccess
+        outputLno' TraceOutput "Transforming script..."
+        when (debug_mode opts == "transform") $
+            liftIO (print sc)
+        transformed <- transform modules sc
+        when (debug_mode opts == "transform") $
+            liftIO (print transformed)
+        outputLno' InfoOutput "Script OK. Starting interpretation..."
+        interpret modules (nglBody transformed)
     when shouldOutput $ do
         createDirectoryIfMissing False odir
         setupHtmlViewer odir
