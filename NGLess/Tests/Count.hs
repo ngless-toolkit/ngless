@@ -3,7 +3,6 @@ module Tests.Count
     ( tgroup_Count
     ) where
 
-import Control.Applicative
 import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
@@ -11,7 +10,6 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
 
-import Language
 import NGLess
 import Interpretation.Count
 import Data.GFF
@@ -22,8 +20,6 @@ tgroup_Count = $(testGroupGenerator)
 
 ngo_gff_fp = "test_samples/sample.gtf"
 short_gff_fp = "test_samples/short.gtf"
-very_short_sam_fp = "test_samples/very_short.sam"
-very_short_gff_fp = "test_samples/very_short.gtf"
 
 very_short_sam = "test_samples/very_short.sam"
 very_short_gff = "test_samples/very_short.gtf"
@@ -129,7 +125,6 @@ gff_structure_Gene = GFF.GffLine "chrI" "unknown" GFF.GffGene 4124 4358 Nothing 
 gff_features_all = [GFF.GffGene, GFF.GffCDS, GFF.GffExon]
 gff_features_gene = [GFF.GffGene]
 gff_features_cds = [GFF.GffCDS]
-gff_features_exon = [GFF.GffExon]
 
 gff_lines_ex = [gff_structure_Exon,gff_structure_CDS,gff_structure_Gene]
 

@@ -42,7 +42,7 @@ import Control.Monad
 import Control.Arrow            (first)
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
-import Data.List                (foldl1')
+import Data.List                (foldl1', transpose)
 import GHC.Conc                 (getNumCapabilities)
 import Data.Maybe
 import Data.Monoid
@@ -96,17 +96,17 @@ data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctiona
 data Annotator = SeqNameAnnotator | GFFAnnotator AnnotationMap | GeneMapAnnotator GeneMapAnnotation
     deriving (Eq, Show)
 
-annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> [AnnotatedRead]
-annotateReadGroup _ SeqNameAnnotator = mapMaybe seqAsAR
+annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> [[AnnotatedRead]]
+annotateReadGroup _ SeqNameAnnotator = (:[]) . mapMaybe seqAsAR
     where
         seqAsAR sr@SamLine{samQName = rid, samRName = rname }
             | isAligned sr = Just (AnnotatedRead rid rname (GffOther "seqname") GffUnStranded)
         seqAsAR  _ = Nothing
-annotateReadGroup opts (GFFAnnotator amap) = concatMap (annotateSamLine opts amap)
-annotateReadGroup opts (GeneMapAnnotator amap) = mapAnnotation
+annotateReadGroup opts (GFFAnnotator amap) = map (annotateSamLine opts amap)
+annotateReadGroup opts (GeneMapAnnotator amap) = transpose . mapAnnotation
     where
-        mapAnnotation :: [SamLine] -> [AnnotatedRead]
-        mapAnnotation = concat . mapMaybe (mapAnnotation1 opts)
+        mapAnnotation :: [SamLine] -> [[AnnotatedRead]]
+        mapAnnotation =  mapMaybe (mapAnnotation1 opts)
         mapAnnotation1 :: CountOpts -> SamLine -> Maybe [AnnotatedRead]
         mapAnnotation1 _ samline = M.lookup (samRName samline) amap >>= \vs ->
             return [AnnotatedRead (samQName samline) rname (GffOther "mapped") GffUnStranded | rname <- vs]
@@ -149,7 +149,7 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
     fs <- case lookup "features" args of
         Nothing -> return ["gene"]
         Just (NGOSymbol f) -> return [f]
-        Just (NGOList feats') -> mapM (symbolOrTypeError "annotation features argument") feats'
+        Just (NGOList feats') -> mapM (stringOrTypeError "annotation features argument") feats'
         _ -> throwShouldNotOccur ("executeAnnotation: TYPE ERROR" :: String)
 
     m <- annotationRule <$> parseAnnotationMode args
@@ -239,7 +239,7 @@ performCount samfp gname annotator opts = do
             samcontent
                 $$+- readSamGroupsC
                 =$= C.conduitVector 1024
-                =$= asyncMapC mapthreads (sequence . V.map (indexRead index . annotateReadGroup opts annotator))
+                =$= asyncMapC mapthreads (sequence . flattenVmap (map (indexRead index) . annotateReadGroup opts annotator))
                 =$= (C.awaitForever $ \case
                             Left err -> throwError err
                             Right v -> C.yield v)
@@ -360,13 +360,13 @@ annotationRule IntersectUnion = union
 annotationRule IntersectStrict = intersection_strict
 annotationRule IntersectNonEmpty = intersection_non_empty
 
-flattenVmap :: (VUM.Unbox a, VUM.Unbox b) => (a -> [b]) -> VU.Vector a -> VU.Vector b
-flattenVmap f vs = VU.unfoldr access (0,[])
+flattenVmap :: (a -> [b]) -> V.Vector a -> V.Vector b
+flattenVmap f vs = V.unfoldr access (0,[])
     where
         access (!vi, x:xs) = Just (x, (vi,xs))
         access (!vi,[])
-            | vi >= VU.length vs = Nothing
-            | otherwise = access (vi+1, f $ VU.unsafeIndex vs vi)
+            | vi >= V.length vs = Nothing
+            | otherwise = access (vi+1, f $ V.unsafeIndex vs vi)
 
 getFeatureName (GffOther s) = s
 getFeatureName _ = error "getFeatureName called for non-GffOther input"

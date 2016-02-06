@@ -123,19 +123,19 @@ case_valid_fannot_features = isOkTypesText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \count(y, features=[{gene}])"
+    \count(y, features=['gene'])"
 
 case_invalid_fannot_features = isErrorText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \count(y, features='gene')"
+    \count(y, features={gene})"
 
 case_valid_fcount_min = isOkTypesText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \z = count(y, features=[{gene}], min=10)"
+    \z = count(y, features=['gene'], min=10)"
 
 
 -- write
@@ -145,7 +145,7 @@ case_valid_fwrite_format = isOkTypesText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
     \y = map(x, reference='xpto')\n\
-    \z = count(y, features=[{gene}])\n\
+    \z = count(y, features=['gene'])\n\
     \write(z, format={tsv})"
 
 case_invalid_fwrite_format = isErrorText

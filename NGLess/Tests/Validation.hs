@@ -25,15 +25,15 @@ isValidateError ftext = isErrorMsg ("Validation should have picked error for scr
 
 case_bad_function_attr_count = isValidateError
     "ngless '0.0'\n\
-    \count(annotated, count={gene})\n"
+    \count(annotated, features='gene')\n"
 
 case_good_function_attr_count_1 = isValidateOk
     "ngless '0.0'\n\
-    \write(count(annotated, counts=[{gene}]),ofile='gene_counts.csv',format={csv})"
+    \write(count(annotated, features=['gene']),ofile='gene_counts.csv',format={csv})"
 
 case_good_function_attr_count_2 = isValidateOk
     "ngless '0.0'\n\
-    \counts = count(annotated, counts=[{gene}])"
+    \counts = count(annotated, features=['gene'])"
 
 case_map_not_assigned = isValidateError
     "ngless '0.0'\n\

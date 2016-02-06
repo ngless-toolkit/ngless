@@ -32,8 +32,7 @@ writeArgs =
     ]
 
 countArgs =
-    [ArgInformation "counts" False (NGList NGLSymbol) (Just ["gene", "cds", "exon"])
-    ,ArgInformation "features" False (NGList NGLSymbol) (Just ["gene", "cds", "exon", "seqname"])
+    [ArgInformation "features" False (NGList NGLString) Nothing
     ,ArgInformation "min" False NGLInteger Nothing
     ,ArgInformation "multiple" False NGLSymbol (Just ["all1", "dist1", "1overN"])
     ,ArgInformation "mode" False NGLSymbol (Just ["union", "intersection_strict", "intersection_non_empty"])
