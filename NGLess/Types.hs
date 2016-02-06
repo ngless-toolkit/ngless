@@ -254,7 +254,8 @@ checkfuncarg f arginfo (Variable v, e) = do
         (_, Nothing) -> errorInLine "Could not infer type of argument"
         (Just ainfo', Just t') -> when (argType ainfo' /= t') $
                     (errorInLineC
-                            ["Bad argument type in ", show f ,", variable " , show v,". expects ", show t', " got ", show . argType $ ainfo', "."])
+                            ["Bad argument type in ", show f ,", variable " , show v, ". ",
+                            "Expected ", show . argType $ ainfo', " got ", show t', "."])
 
 requireType :: NGLType -> Expression -> TypeMSt NGLType
 requireType def_t e = nglTypeOf e >>= \case
