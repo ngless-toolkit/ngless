@@ -416,10 +416,10 @@ annotateSamLine opts amap samline = concatMap annotateSamLine' (M.assocs amap)
                         then if isPositive samline then GffPosStrand else GffNegStrand
                         else GffUnStranded
         annotateSamLine' (gtype,innermap) = case M.lookup rname innermap of
-            Nothing -> trace "GFF lookup empty" []
+            Nothing -> []
             Just im -> map (buildAR gtype) . maybeFilterAmbiguous (optKeepAmbiguous opts)
                         $ (optIntersectMode opts) im asStrand (sStart, sEnd)
-        buildAR gtype (_,name) = trace "GFF found something" $ AnnotatedRead (samQName samline) name gtype asStrand
+        buildAR gtype (_,name) = AnnotatedRead (samQName samline) name gtype asStrand
 
 
 matchStrand :: GffStrand -> GffStrand -> Bool

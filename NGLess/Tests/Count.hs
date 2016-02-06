@@ -50,75 +50,75 @@ case_annotate_gene_noStrand_union =
     annotate_count_compare
         "htseq_gene_noStrand_union.txt"
         "test_samples/sample.sam" ngo_gff_fp
-        $ CountOpts [GffGene] (annotationRule IntersectUnion) False False MMCountAll 0.0
+        $ CountOpts [GffGene] (annotationRule IntersectUnion) False False 0.0 MMCountAll "\t"
 
 case_annotate_exon_noStrand_union =
     annotate_count_compare
         "htseq_exon_noStrand_union.txt"
         "test_samples/sample.sam" ngo_gff_fp
-        $ CountOpts [GffExon] (annotationRule IntersectUnion) False False MMCountAll 0.0
+        $ CountOpts [GffExon] (annotationRule IntersectUnion) False False 0.0 MMCountAll "\t"
 
 case_annotate_cds_noStrand_union =
     annotate_count_compare
         "htseq_cds_noStrand_union.txt"
         "test_samples/sample.sam" ngo_gff_fp
-        $ CountOpts [GffCDS] (annotationRule IntersectUnion) False False MMCountAll 1.0
+        $ CountOpts [GffCDS] (annotationRule IntersectUnion) False False 1.0 MMCountAll "\t"
 
 case_annotate_gene_noStrand_inters_strict =
     annotate_count_compare
         "htseq_gene_noStrand_inters-strict.txt"
         "test_samples/sample.sam" ngo_gff_fp
-        $ CountOpts [GffGene] (annotationRule IntersectStrict) False False MMCountAll 0.0
+        $ CountOpts [GffGene] (annotationRule IntersectStrict) False False 0.0 MMCountAll "\t"
 
 case_annotate_gene_noStrand_inters_non_empty =
     annotate_count_compare
         "htseq_gene_noStrand_inters-nempty.txt"
         "test_samples/sample.sam" ngo_gff_fp
-        $ CountOpts [GffGene] (annotationRule IntersectNonEmpty) False False MMCountAll 0.0
+        $ CountOpts [GffGene] (annotationRule IntersectNonEmpty) False False 0.0 MMCountAll "\t"
 
 
 case_annotate_gene_noStrand_inters_non_empty_diff = -- this is a regression test
     annotate_count_compare
         "htseq_gene_noStrand_inters-nempty_diff.txt"
         "test_samples/nonempty_diff.sam" "test_samples/nonempty_diff.gtf"
-        $ CountOpts [GffGene] (annotationRule IntersectNonEmpty) False False MMCountAll 0.0
+        $ CountOpts [GffGene] (annotationRule IntersectNonEmpty) False False 0.0 MMCountAll "\t"
 
 
 case_annotate_gene_yesStrand_union =
     annotate_count_compare
         "htseq_gene_yesStrand_union.txt"
         "test_samples/sample.sam" ngo_gff_fp
-        $ CountOpts [GffGene] (annotationRule IntersectUnion) True True MMCountAll 0.0
+        $ CountOpts [GffGene] (annotationRule IntersectUnion) True True 0.0 MMCountAll "\t"
 
 case_annotate_gene_yesStrand_nempty =
     annotate_count_compare
         "htseq_gene_yesStrand_nempty.txt"
         "test_samples/sample.sam" ngo_gff_fp
-        $ CountOpts [GffGene] (annotationRule IntersectNonEmpty) True False MMCountAll 0.0
+        $ CountOpts [GffGene] (annotationRule IntersectNonEmpty) True False 0.0 MMCountAll "\t"
 
 case_short_annotate_union =
     annotate_count_compare
         "htseq_gene_yesStrand_union_short.txt"
         "test_samples/sample.sam" short_gff_fp
-        $ CountOpts [GffGene] (annotationRule IntersectUnion) True True MMCountAll 1.0
+        $ CountOpts [GffGene] (annotationRule IntersectUnion) True True 1.0 MMCountAll "\t"
 
 case_very_short_annotate_union =
     annotate_count_compare
         "htseq_gene_yesStrand_union_very_short.txt"
         very_short_sam very_short_gff
-        $ CountOpts [GffGene] (annotationRule IntersectUnion) True True MMCountAll 0.0
+        $ CountOpts [GffGene] (annotationRule IntersectUnion) True True 0.0 MMCountAll "\t"
 
 case_very_short_annotate_nempty_yesStrand =
     annotate_count_compare
         "htseq_gene_yesStrand_nempty_very_short.txt"
         very_short_sam very_short_gff
-        $ CountOpts [GffGene] (annotationRule IntersectNonEmpty) True False MMCountAll 0.0
+        $ CountOpts [GffGene] (annotationRule IntersectNonEmpty) True False 0.0 MMCountAll "\t"
 
 case_very_short_annotate_nempty_noStrand =
     annotate_count_compare
         "htseq_gene_noStrand_nempty_very_short.txt"
         very_short_sam very_short_gff
-        $ CountOpts [GffGene] (annotationRule IntersectNonEmpty) False False MMCountAll 0.0
+        $ CountOpts [GffGene] (annotationRule IntersectNonEmpty) False False 0.0 MMCountAll "\t"
 
 
 gff_structure_Exon = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
