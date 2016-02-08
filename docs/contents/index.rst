@@ -10,7 +10,7 @@ Welcome to ngless's documentation!
    :maxdepth: 2
 
    introduction
-   Installation
+   install
    GettingStarted
    Organisms
    Visualization
