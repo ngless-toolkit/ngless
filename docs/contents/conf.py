@@ -34,7 +34,7 @@ extensions = []
 templates_path = ['_templates']
 
 # The suffix of source filenames.
-source_suffix = '.rst'
+source_suffix = ['.rst', '.md']
 
 # The encoding of source files.
 #source_encoding = 'utf-8-sig'
@@ -44,7 +44,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'ngless'
-copyright = u'2014, Paulo Monteiro'
+copyright = u'2013-2016, NGLess Authors'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -197,7 +197,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
   ('index', 'ngless.tex', u'ngless Documentation',
-   u'Paulo Monteiro', 'manual'),
+   u'NGLess Authors', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -227,7 +227,7 @@ latex_documents = [
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'ngless', u'ngless Documentation',
-     [u'Paulo Monteiro'], 1)
+     [u'NGLess Authors'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -241,7 +241,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
   ('index', 'ngless', u'ngless Documentation',
-   u'Paulo Monteiro', 'ngless', 'One line description of project.',
+   u'NGLess Authors', 'ngless', 'One line description of project.',
    'Miscellaneous'),
 ]
 
