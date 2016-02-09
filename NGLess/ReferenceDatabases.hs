@@ -1,15 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module ReferenceDatabases
-    ( isDefaultReference
+    ( Reference(..)
+    , getBuiltinReference
     , buildGenomePath
     , buildGFFPath
     , createReferencePack
     , ensureDataPresent
     , installData
-    , findDataFiles
     ) where
 
+import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
@@ -17,7 +18,8 @@ import qualified Codec.Compression.GZip as GZip
 import System.FilePath.Posix
 import System.Directory
 import System.IO.Error
-import FileManagement (createTempDir)
+import Data.Maybe
+import Data.List        (find)
 
 import Control.Monad
 import Control.Applicative ((<|>))
@@ -26,12 +28,20 @@ import Control.Monad.Trans.Resource(release)
 
 import Utils.Network
 import Utils.Bwa as Bwa
+import FileManagement (createTempDir)
 import Configuration
 import Output
 import NGLess
 
-defaultGenomes :: [String]
-defaultGenomes =
+data Reference = Reference
+    { refName :: T.Text
+    , refUrl :: Maybe FilePath
+    , refHasGff :: Bool
+    , refHasFunctionalMap :: Bool
+    } deriving (Eq, Show)
+
+defaultGenomes :: [Reference]
+defaultGenomes = [Reference rn Nothing True False | rn <-
                 [ "hg19" -- Homo_sapiens
                 , "mm10" -- Mus_musculus
                 , "rn4" --  Rattus_norvegicus
@@ -40,9 +50,12 @@ defaultGenomes =
                 , "dm3" --Drosophila_melanogaster
                 , "ce10" --Caenorhabditis_elegans
                 , "sacCer3" --Saccharomyces_cerevisiae
-                ]
-isDefaultReference :: String -> Bool
-isDefaultReference =  (`elem` defaultGenomes)
+                ]]
+
+getBuiltinReference :: T.Text -> Maybe Reference
+getBuiltinReference rn = find ((==rn) . refName) defaultGenomes
+
+isDefaultReference = isJust . getBuiltinReference
 
 genomePATH = "Sequence/BWAIndex/genome.fa.gz"
 gffPATH = "Annotation/annotation.gtf.gz"
@@ -73,12 +86,16 @@ createReferencePack oname genome gtf = do
     release rk
 
 
-downloadReference :: String -> FilePath -> NGLessIO ()
+downloadReference :: Reference  -> FilePath -> NGLessIO ()
 downloadReference ref destPath = do
-    unless (isDefaultReference ref)
-        (throwScriptError ("Expected reference data, got "++ref))
-    baseURL <- nglessDataBaseURL
-    let url = baseURL </> ref <.> "tar.gz"
+    url <- case refUrl ref of
+        Just u -> return u
+        Nothing
+            | isDefaultReference (refName ref) -> do
+                    baseURL <- nglessDataBaseURL
+                    return $ baseURL </> T.unpack (refName ref) <.> "tar.gz"
+            | otherwise ->
+                throwScriptError ("Expected reference data, got "++T.unpack (refName ref))
     outputListLno' InfoOutput ["Starting download from ", url]
     liftIO $ downloadFile url destPath
     outputLno' InfoOutput "Reference download completed!"
@@ -97,7 +114,7 @@ ensureDataPresent ref = do
 -- When mode is Nothing, tries to install them in global directory, otherwise
 -- installs it in the user directory
 installData :: Maybe InstallMode -> String -> NGLessIO FilePath
-installData Nothing ref = do
+installData Nothing refname = do
     p' <- globalDataDirectory
     canInstallGlobal <- liftIO $ do
         created <- (createDirectoryIfMissing False p' >> return True) `catchIOError` (\_ -> return False)
@@ -105,18 +122,21 @@ installData Nothing ref = do
             then writable <$> getPermissions p'
             else return False
     if canInstallGlobal
-        then installData (Just Root) ref
-        else installData (Just User) ref
-installData (Just mode) ref = do
+        then installData (Just Root) refname
+        else installData (Just User) refname
+installData (Just mode) refname = do
     basedir <- if mode == Root
                 then globalDataDirectory
                 else userDataDirectory
     liftIO $ createDirectoryIfMissing True basedir
-    let tarName = basedir </> ref <.> "tar.gz"
+    let tarName = basedir </> refname <.> "tar.gz"
+    ref <- case getBuiltinReference (T.pack refname) of
+        Just r -> return r
+        Nothing -> throwScriptError ("Cannot install unknown reference '"++refname)
     downloadReference ref tarName
     liftIO $
         Tar.unpack basedir . Tar.read . GZip.decompress =<< BL.readFile tarName
-    return (basedir </> ref)
+    return (basedir </> refname)
 
 
 

@@ -21,6 +21,7 @@ import System.Directory
 import System.FilePath.Posix
 import Data.Aeson
 import Data.Yaml
+import Data.Default (def)
 
 import Utils.Utils
 import Language
@@ -41,19 +42,19 @@ instance FromJSON CommandArgument where
         name <- o .: "name"
         case atype of
             "flag" -> do
-                def <- o .: "def"
-                return (CommandFlag name def)
+                defVal <- o .: "def"
+                return (CommandFlag name defVal)
             "option" -> do
-                def <- o .:? "def"
+                defVal <- o .:? "def"
                 allowed <- o .: "allowed"
-                return (CommandOption name def allowed)
+                return (CommandOption name defVal allowed)
             "int" -> do
-                def <- o .:? "def"
-                return (CommandInteger name def)
+                defVal <- o .:? "def"
+                return (CommandInteger name defVal)
             "str" -> do
-                def <- o .:? "def"
+                defVal <- o .:? "def"
                 required <- o .: "required"
-                return (CommandString name def required)
+                return (CommandString name defVal required)
             _ -> fail ("unknown argument type "++atype)
 
 data FileTypeBase =
@@ -181,33 +182,31 @@ asfilePaths invalid = throwShouldNotOccur ("AsFile path got "++show invalid)
 argsArguments cmd args = catMaybes <$> forM (additional cmd) a1
     where
         a1 :: CommandArgument -> NGLessIO (Maybe String)
-        a1 (CommandFlag name def) = do
-                isSet <- boolOrTypeError "in command module" $ lookupWithDefault (NGOBool def) name args
+        a1 (CommandFlag name defVal) = do
+                isSet <- boolOrTypeError "in command module" $ lookupWithDefault (NGOBool defVal) name args
                 return (if isSet then Just ("--"++T.unpack name) else Nothing)
-        a1 (CommandOption name def _) = case lookup name args of
-                Nothing -> case def of
+        a1 (CommandOption name defVal _) = case lookup name args of
+                Nothing -> case defVal of
                     Nothing -> return Nothing
                     Just s -> return . Just $ ("--"++T.unpack name ++"="++T.unpack s)
                 Just v -> symbolOrTypeError "in command module" v >>= \s -> return . Just $ ("--"++T.unpack name++"="++T.unpack s)
-        a1 (CommandInteger name def) = case lookup name args <|> (NGOInteger <$> def) of
+        a1 (CommandInteger name defVal) = case lookup name args <|> (NGOInteger <$> defVal) of
                 Nothing -> return Nothing
                 Just (NGOInteger v) -> return . Just $ "--"++T.unpack name++"="++show v
                 _ -> throwShouldNotOccur ("in command module, int expected" :: T.Text)
-        a1 (CommandString name def req) = case lookup name args <|> (NGOString <$> def) of
+        a1 (CommandString name defVal req) = case lookup name args <|> (NGOString <$> defVal) of
                 Just (NGOString v) -> return . Just $ "--"++T.unpack name++"="++T.unpack v
                 _ -> throwShouldNotOccur ("in command module, string expected" :: T.Text)
 
 asInternalModule :: ExternalModule -> NGLessIO Module
 asInternalModule em@ExternalModule{..} = do
     validateModule em
-    return Module
+    return def
         { modInfo = emInfo
         , modCitation = emCitation
-        , modConstants = []
         , modReferences = references
         , modFunctions = [asFunction command]
         , runFunction = const (executeCommand modulePath command)
-        , validateFunction = const (return [])
         }
 
 validateModule :: ExternalModule -> NGLessIO ()

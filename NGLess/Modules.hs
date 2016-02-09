@@ -17,6 +17,7 @@ import Data.IORef
 import Data.Aeson
 import Data.Default
 
+import ReferenceDatabases
 import Language
 import NGLess
 
@@ -37,18 +38,31 @@ data Function = Function
     } deriving (Eq, Show)
 
 data ExternalReference = ExternalReference
-        { refName :: T.Text
+        { erefName :: T.Text
         , faFile :: FilePath
         , gtfFile :: Maybe FilePath
+        , geneMapFile :: Maybe FilePath
+        }
+        | ExternalPackagedReference
+        { refData :: Reference
         }
     deriving (Eq, Show)
 
 instance FromJSON ExternalReference where
-    parseJSON = withObject "external reference" $ \o ->
-                            ExternalReference
+    parseJSON = withObject "external reference" $ \o -> do
+                    rtype <- o .:? "rtype"
+                    case (rtype :: Maybe String) of
+                        Just "packaged" -> do
+                            name <- o .: "name"
+                            path <- o .: "url"
+                            hasGtf <- o .: "has-gtf"
+                            hasMap <- o .: "has-mapfile"
+                            return (ExternalPackagedReference (Reference name (Just path) hasGtf hasMap))
+                        _ -> ExternalReference
                                 <$> o .: "name"
                                 <*> o .: "fasta-file"
-                                <*> o .: "gtf-file"
+                                <*> o .:? "gtf-file"
+                                <*> o .:? "map-file"
 
 data Module = Module
     { modInfo :: !ModInfo -- ^ name & version

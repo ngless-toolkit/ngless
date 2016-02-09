@@ -115,11 +115,11 @@ check_can_read_file fname = do
 
 check_reference :: T.Text -> ValidateIO ()
 check_reference r
-    | isDefaultReference (T.unpack r)  = return ()
+    | isJust (getBuiltinReference r)  = return ()
     | otherwise = do
         mods <- ask
         let refs = concatMap modReferences mods
-        unless (any ((==r) . refName) refs) $
+        unless (any ((==r) . erefName) refs) $
             tell1 (T.concat ["Could not find reference ", r, " (it is neither built in nor in any of the loaded modules)"])
 
 check_fafile fafile = do

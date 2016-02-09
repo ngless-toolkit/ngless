@@ -43,16 +43,16 @@ import Utils.Bwa
 import Utils.LockFile
 import Utils.Utils (conduitPossiblyCompressedFile, readProcessErrorWithExitCode)
 
-data Reference = Reference FilePath | FaFile FilePath
+data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
 
-lookupReference :: KwArgsValues -> NGLessIO Reference
+lookupReference :: KwArgsValues -> NGLessIO ReferenceInfo
 lookupReference args = do
     let reference = lookup "reference" args
         fafile = lookup "fafile" args
     case (reference, fafile) of
         (Nothing, Nothing) -> throwScriptError ("Either reference or fafile must be passed" :: String)
         (Just _, Just _) -> throwScriptError ("Reference and fafile cannot be used simmultaneously" :: String)
-        (Just r, Nothing) -> (Reference . T.unpack) <$> stringOrTypeError "reference in map argument" r
+        (Just r, Nothing) -> PackagedReference <$> stringOrTypeError "reference in map argument" r
         (Nothing, Just fa) -> (FaFile . T.unpack) <$> stringOrTypeError "fafile in map argument" fa
 
 ensureIndexExists :: FilePath -> NGLessIO FilePath
@@ -97,28 +97,28 @@ mapToReference refIndex fps extraArgs = do
                             bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '"] ++ fps ++ ["'\n",
                             "Bwa error code was ", show code, "."])
 
-interpretMapOp :: Reference -> [FilePath] -> [String] -> NGLessIO NGLessObject
+interpretMapOp :: ReferenceInfo -> [FilePath] -> [String] -> NGLessIO NGLessObject
 interpretMapOp ref ds extraArgs = do
     (ref', defGen') <- indexReference ref
     samPath' <- mapToReference ref' ds extraArgs
     printMappingStats samPath'
     return $ NGOMappedReadSet "noname" samPath' defGen'
     where
-        indexReference :: Reference -> NGLessIO (FilePath, Maybe T.Text)
+        indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)
         indexReference (FaFile fa) = (,Nothing) <$> ensureIndexExists fa
-        indexReference (Reference r)
-            | isDefaultReference r = do
-                basedir  <- ensureDataPresent r
-                return (buildGenomePath basedir, Just $ T.pack r)
-            | otherwise = do
-                externalRef <- findExternalReference (T.pack r)
-                return (externalRef, Just $ T.pack r)
+        indexReference (PackagedReference r) = case getBuiltinReference r of
+            Just r' -> do
+                basedir  <- ensureDataPresent (T.unpack r)
+                return (buildGenomePath basedir, Just r)
+            Nothing -> do
+                externalRef <- findExternalReference r
+                return (externalRef, Just r)
 
 findExternalReference :: T.Text -> NGLessIO FilePath
 findExternalReference rname = do
     mods <- loadedModules
     let refs = concatMap modReferences mods
-    case find ((==rname) . refName) refs of
+    case find ((==rname) . erefName) refs of
         Just rinfo -> return . faFile $ rinfo
         Nothing -> throwScriptError $ T.concat ["Could not find reference '", rname, "'. It is not builtin nor in one of the loaded modules."]
 
