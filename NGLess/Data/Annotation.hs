@@ -19,7 +19,6 @@ import Data.GFF
 data AnnotatedRead = AnnotatedRead
     { readId :: !B.ByteString
     , annotValue :: !B.ByteString
-    , annotType :: !GffType
     , annotStrand :: !GffStrand
     } deriving (Eq,Show)
 
@@ -38,8 +37,8 @@ decodeStrand "." = return GffUnStranded
 decodeStrand  _ = fail "Ngless bug"
 
 encodeAR :: AnnotatedRead -> B.ByteString
-encodeAR (AnnotatedRead rid v t s) = B.concat
-        [rid, "\t", v, "\t",  B8.pack (show t), "\t", encodeStrand s, "\n"]
+encodeAR (AnnotatedRead rid v s) = B.concat
+        [rid, "\t", v, "\t", encodeStrand s, "\n"]
 
 decodeAR :: B.ByteString -> Either String AnnotatedRead
 decodeAR a = do
@@ -52,5 +51,5 @@ decodeAR a = do
         fail "decodeAR wrong number of tokens"
     let [rid, avalue, atype, astrand] = tokens
     strand <- decodeStrand astrand
-    return (AnnotatedRead rid avalue (read . B8.unpack $ atype) strand)
+    return (AnnotatedRead rid avalue strand)
 

@@ -100,7 +100,7 @@ annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> [[AnnotatedRead]]
 annotateReadGroup _ SeqNameAnnotator = (:[]) . mapMaybe seqAsAR
     where
         seqAsAR sr@SamLine{samQName = rid, samRName = rname }
-            | isAligned sr = Just (AnnotatedRead rid rname (GffOther "seqname") GffUnStranded)
+            | isAligned sr = Just (AnnotatedRead rid rname GffUnStranded)
         seqAsAR  _ = Nothing
 annotateReadGroup opts (GFFAnnotator amap) = map (annotateSamLine opts amap)
 annotateReadGroup opts (GeneMapAnnotator amap) = transpose . mapAnnotation
@@ -109,7 +109,7 @@ annotateReadGroup opts (GeneMapAnnotator amap) = transpose . mapAnnotation
         mapAnnotation =  mapMaybe (mapAnnotation1 opts)
         mapAnnotation1 :: CountOpts -> SamLine -> Maybe [AnnotatedRead]
         mapAnnotation1 _ samline = M.lookup (samRName samline) amap >>= \vs ->
-            return [AnnotatedRead (samQName samline) rname (GffOther "mapped") GffUnStranded | rname <- vs]
+            return [AnnotatedRead (samQName samline) rname GffUnStranded | rname <- vs]
 
 fillIndex annotator index = case annotator of
     SeqNameAnnotator -> index
@@ -403,7 +403,7 @@ asHeaders amap = concatMap asHeaders' (M.assocs amap)
         asHeaders'' k im = concatMap (asHeaders''' k . snd) (IM.toAscList im)
 
         asHeaders''' :: GffType -> [AnnotationInfo] -> [B.ByteString]
-        asHeaders''' k vs = [B.concat [B8.pack . show $ k, "\t", snd v, "\n"] | v <- vs]
+        asHeaders''' k vs = [B.concat [B8.pack . show $ k, "\t", snd v] | v <- vs]
 
 annotateSamLine :: CountOpts -> AnnotationMap -> SamLine -> [AnnotatedRead]
 annotateSamLine opts amap samline = concatMap annotateSamLine' (M.assocs amap)
@@ -419,7 +419,7 @@ annotateSamLine opts amap samline = concatMap annotateSamLine' (M.assocs amap)
             Nothing -> []
             Just im -> map (buildAR gtype) . maybeFilterAmbiguous (optKeepAmbiguous opts)
                         $ (optIntersectMode opts) im asStrand (sStart, sEnd)
-        buildAR gtype (_,name) = AnnotatedRead (samQName samline) name gtype asStrand
+        buildAR gtype (_,name) = AnnotatedRead (samQName samline) (B.concat [B8.pack (show gtype),"\t",name]) asStrand
 
 
 matchStrand :: GffStrand -> GffStrand -> Bool
