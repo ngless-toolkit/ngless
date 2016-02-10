@@ -160,7 +160,7 @@ printMappingStats fname = do
 showNumAndPercentage :: Int  -> Int  -> String
 showNumAndPercentage v 0 = showNumAndPercentage v 1 -- same output & avoid division by zero
 showNumAndPercentage v total =
-    concat [show v, " [", showFFloat (Just 2) ((fromIntegral (100*v) / fromIntegral total) :: Double) "", "%"]
+    concat [show v, " [", showFFloat (Just 2) ((fromIntegral (100*v) / fromIntegral total) :: Double) "", "%]"]
 
 executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMap fps args = do
