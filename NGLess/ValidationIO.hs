@@ -45,12 +45,14 @@ validate_files (Script _ es) = check_toplevel validate_files' es
     where
         validate_files' (FunctionCall (FuncName "fastq") f _ _) = check f
         validate_files' (FunctionCall (FuncName "paired") f args _) = check f >> validateArg check_can_read_file "second" args es
-        validate_files' (FunctionCall (FuncName "annotate") _ args _) = validateArg check_can_read_file "gff" args es
+        validate_files' (FunctionCall (FuncName "count") f args _) = do
+                                                                validateArg check_can_read_file "gff_file" args es
+                                                                validateArg check_can_read_file "functional_map" args es
         validate_files' (Assignment _ e) = validate_files' e
         validate_files' _ = return ()
 
         check (ConstStr fname) = check_can_read_file fname
-        check (Lookup var) = validateVar check_can_read_file var es
+        check (Lookup var) = validateStrVar check_can_read_file var es
         check _ = return ()
 
 validate_def_genomes :: Script -> ValidateIO ()
@@ -65,23 +67,20 @@ validate_def_genomes (Script _ es) = check_toplevel validate_def_genomes' es
 validateArg :: (T.Text -> ValidateIO ()) -> T.Text -> [(Variable,Expression)] -> [(Int,Expression)] -> ValidateIO ()
 validateArg f v args es = case lookup (Variable v) args of
         Just (ConstStr x) -> f x
-        Just (Lookup   x) -> validateVar f x es
+        Just (Lookup   x) -> validateStrVar f x es
         _                 -> return ()
 
-validateVar :: (T.Text -> ValidateIO ()) -> Variable -> [(Int,Expression)] -> ValidateIO ()
-validateVar f v es = case get_const_val v es of
+validateStrVar :: (T.Text -> ValidateIO ()) -> Variable -> [(Int,Expression)] -> ValidateIO ()
+validateStrVar f v es = case get_const_val v es of
             Right (Just (NGOString t))  -> f t
             Left  err       -> tell1 err
             _               -> return ()
-    where
 
 get_const_val :: Variable -> [(Int,Expression)] -> Either T.Text (Maybe NGLessObject)
-get_const_val var s = do
-        let r = mapMaybe (getAssignment . snd) s
-        case r of
-            [] -> Left (T.concat ["Variable: ", T.pack . show $ var, "was never assigned to a value."])
-            [val] -> Right . Just $ val
-            _ -> Right Nothing -- do not validate
+get_const_val var s = case mapMaybe (getAssignment . snd) s of
+        [] -> Left (T.concat ["Variable: ", T.pack . show $ var, "was not assigned to a constant value."])
+        [val] -> Right . Just $ val
+        _ -> Right Nothing -- do not validate
     where
         getAssignment :: Expression -> Maybe NGLessObject
         getAssignment (Assignment v val) | v == var = getConst val
