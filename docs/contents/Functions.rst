@@ -119,7 +119,17 @@ Void
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
-none
+
++---------------+--------------+------------+----------------+
+| Name          | Type         | Required   | Default Value  |
++===============+==============+============+================+
+| keep\_singles | bool         |  no        | true           |
++---------------+--------------+------------+----------------+
+
+When a paired-end input is being preprocessed in single-mode (i.e., each mate
+is preprocessed independently, it can happen that on eof the mates is
+discarded, while the other is kept). The default is to collect these into the
+singles pile. If ``keep_singles`` if false, however, they are discarded.
 
 This function also performs quality control on its output.
 

@@ -1,3 +1,6 @@
+{- Copyright 2013-2016 NGLess Authors
+ - License: MIT
+ -}
 {-# LANGUAGE OverloadedStrings, BangPatterns #-}
 module BuiltinFunctions
     ( builtinFunctions
@@ -61,7 +64,8 @@ uniqueArgs =
     [ArgInformation "max_copies" False NGLInteger Nothing]
 
 preprocessArgs =
-    []
+    [ArgInformation "keep_singles" False NGLBool Nothing
+    ]
 
 mapArgs =
     [ArgInformation "reference" False NGLString Nothing

@@ -1,4 +1,4 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE LambdaCase #-}
@@ -336,7 +336,8 @@ executePreprocess (NGOReadSet (ReadSet1 enc file)) _args (Block [Variable var] b
         transformInterpret :: NGLessObject -> InterpretationEnvIO (Maybe ShortRead)
         transformInterpret r = runInROEnvIO $ interpretPBlock1 block var r
 executePreprocess (NGOReadSet (ReadSet2 enc fp1 fp2)) _args block = executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 "")) _args block
-executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) _args (Block [Variable var] block) = do
+executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable var] block) = do
+        keepSingles <- runNGLessIO $ lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args
         runNGLessIO $ outputListLno' DebugOutput (["Preprocess on paired end ",
                                                 fp1, "+", fp2] ++ (if fp3 /= ""
                                                                     then [" with singles ", fp3]
@@ -346,7 +347,7 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) _args (Block [Variable
         (fps, hs) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.singles." ".fq"
         rs1 <- map NGOShortRead <$> liftIO (readReadSet enc fp1)
         rs2 <- map NGOShortRead <$> liftIO (readReadSet enc fp2)
-        anySingle <- intercalate (out1, out2, hs) rs1 rs2 False
+        anySingle <- intercalate (out1, out2, hs) rs1 rs2 False keepSingles
         rs3 <- (if fp3 /= ""
                     then map NGOShortRead <$> liftIO (readReadSet enc fp3)
                     else return [])
@@ -367,8 +368,8 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) _args (Block [Variable
                 ps' -> do
                     forM_ ps' (liftIO . writeSR hsingles)
                     return True
-        intercalate _ [] [] anySingle = return anySingle
-        intercalate hs@(out1, out2, hsingles) (r1:rs1) (r2:rs2) !anySingle = do
+        intercalate _ [] [] anySingle ks = return (anySingle && ks)
+        intercalate hs@(out1, out2, hsingles) (r1:rs1) (r2:rs2) !anySingle keepSingles = do
             r1' <- runInROEnvIO $ interpretPBlock1 block var r1
             r2' <- runInROEnvIO $ interpretPBlock1 block var r2
             anySingle' <- case (r1',r2') of
@@ -377,10 +378,10 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) _args (Block [Variable
                     writeSR out1 r1''
                     writeSR out2 r2''
                     return anySingle
-                (Just r, Nothing) -> writeSR hsingles r >> return True
-                (Nothing, Just r) -> writeSR hsingles r >> return True
-            intercalate hs rs1 rs2 anySingle'
-        intercalate _ _ _ _ = throwDataError ("preprocess: paired mates do not contain the same number of reads" :: String)
+                (Just r, Nothing) -> when keepSingles (writeSR hsingles r) >> return True
+                (Nothing, Just r) -> when keepSingles (writeSR hsingles r) >> return True
+            intercalate hs rs1 rs2 anySingle' keepSingles
+        intercalate _ _ _ _ _ = throwDataError ("preprocess: paired mates do not contain the same number of reads" :: String)
 
         writeSR h sr = liftIO $ BL.hPut h (asFastQ enc [sr])
 executePreprocess v _ _ = unreachable ("executePreprocess: Cannot handle this input: " ++ show v)
