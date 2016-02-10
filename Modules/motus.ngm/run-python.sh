@@ -6,5 +6,5 @@ if ! which python >/dev/null ; then
 fi
 
 if [[ ! -z "$1" ]] ; then
-    python motus-summary.py $1 > $2
+    python $NGLESS_MODULE_DIR/motus-summary.py $1 $2
 fi

@@ -1,9 +1,18 @@
 from collections import defaultdict
 import gzip
-import sys
+import os
+import argparse
 
-input_counts = sys.argv[1]
-write = sys.stdout.write
+parser = argparse.ArgumentParser(description='Summarize motus table')
+parser.add_argument('input_counts',
+                    help='gene counts from ngless')
+parser.add_argument('--ofile', dest='ofile',
+                    help='output file name')
+
+args = parser.parse_args()
+
+output_file = open(args.ofile, 'w')
+write = output_file.write
 
 
 # This could probably be done faster & simpler with a few numpy + pandas
@@ -29,17 +38,19 @@ def mean_or_na(vs):
 
 
 percog = {}
-for i,line in enumerate(open(input_counts)):
+for i,line in enumerate(open(args.input_counts)):
     tokens = line.rstrip().split('\t')
     if i == 0:
         headers = tokens[1:]
     else:
-        counts = [float(v) for v in tokens[1:]]
-        percog[tokens[0]] = counts
+        counts = [float(v) for v in tokens[2:]]
+        percog[tokens[1]] = counts
 
 summary = defaultdict(list)
 
-for i,line in enumerate(gzip.open('mOTU.nr.padded.motu.linkage.map.gz', 'r')):
+workdir = os.environ.get('NGLESS_MODULE_DIR', '.')
+
+for i,line in enumerate(gzip.open(workdir + '/mOTU.nr.padded.motu.linkage.map.gz', 'r')):
     if i == 0:
         continue
     tokens = line.rstrip('\n').split('\t')
