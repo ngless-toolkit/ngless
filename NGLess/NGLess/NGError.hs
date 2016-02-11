@@ -1,6 +1,10 @@
 {-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 module NGLess.NGError
     ( NGError(..)
+    , NGLessIO
+    , NGLess
+    , runNGLess
+    , testNGLessIO
     , throwShouldNotOccur
     , throwScriptError
     , throwDataError
@@ -11,6 +15,7 @@ module NGLess.NGError
 import qualified Data.Text as T
 import           Control.DeepSeq
 import           Control.Monad.Except
+import           Control.Monad.Trans.Resource
 
 import Utils.StringLike
 
@@ -32,6 +37,22 @@ data NGError = NGError !NGErrorType !T.Text
 
 instance NFData NGError where
     rnf !_ = ()
+
+type NGLessIO = ExceptT NGError (ResourceT IO)
+type NGLess = Either NGError
+
+
+runNGLess :: (MonadError NGError m) => Either NGError a -> m a
+runNGLess (Left err) = throwError err
+runNGLess (Right v) = return v
+
+testNGLessIO :: NGLessIO a -> IO a
+testNGLessIO act = do
+        perr <- (runResourceT . runExceptT) act
+        return (showError perr)
+    where
+        showError (Right a) = a
+        showError (Left e) = error (show e)
 
 -- | Internal bug: user is requested to submit a bug report
 throwShouldNotOccur :: (StringLike s, MonadError NGError m) => s -> m a

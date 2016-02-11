@@ -27,32 +27,14 @@ module NGLess
     ) where
 
 import qualified Data.Text as T
-import Control.Monad.Trans.Except
-import Control.Monad.Except
-import Control.Monad.Trans.Resource
-
-import NGLess.NGError
+import           Control.Monad.Except
 
 import Language
+import NGLess.NGError
 import Utils.StringLike
-
-
-type NGLessIO = ExceptT NGError (ResourceT IO)
-type NGLess = Either NGError
 
 type KwArgsValues = [(T.Text, NGLessObject)]
 
-runNGLess :: (MonadError NGError m) => Either NGError a -> m a
-runNGLess (Left err) = throwError err
-runNGLess (Right v) = return v
-
-testNGLessIO :: NGLessIO a -> IO a
-testNGLessIO act = do
-        perr <- (runResourceT . runExceptT) act
-        return (showError perr)
-    where
-        showError (Right a) = a
-        showError (Left e) = error (show e)
 
 boolOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m Bool
 boolOrTypeError _ (NGOBool b) = return b
