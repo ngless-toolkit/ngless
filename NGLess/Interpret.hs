@@ -519,6 +519,7 @@ _evalBinary BOpGTE (NGOInteger a) (NGOInteger b) = Right $ NGOBool (a >= b)
 _evalBinary BOpEQ lexpr rexpr = Right . NGOBool $ lexpr == rexpr
 _evalBinary BOpNEQ lexpr rexpr = Right . NGOBool $ lexpr /= rexpr
 _evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a + b)
+_evalBinary BOpAdd (NGOString a) (NGOString b) = Right $ NGOString (T.concat [a, b])
 _evalBinary BOpMul (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a * b)
 _evalBinary op a b = throwScriptError (concat ["_evalBinary: ", show op, " ", show a, " ", show b])
 
