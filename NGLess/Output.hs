@@ -29,8 +29,8 @@ import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
 
 
-import Data.FastQ (FastQEncoding(..), encodingName)
-import qualified Data.FastQStatistics as FQ
+import           Data.FastQ (FastQEncoding(..), encodingName)
+import qualified Data.FastQ as FQ
 import Configuration
 import CmdArgs (Verbosity(..))
 import NGLess
@@ -146,11 +146,11 @@ colorFor WarningOutput = Yellow
 colorFor ErrorOutput = Red
 
 
-encodeBPStats :: FQ.Result -> FastQEncoding -> [BPosInfo]
+encodeBPStats :: FQ.FQStatistics -> FastQEncoding -> [BPosInfo]
 encodeBPStats res enc = map encode1 (FQ.calculateStatistics res enc)
     where encode1 (mean, median, lq, uq) = BPosInfo mean median lq uq
 
-outputFQStatistics :: FilePath -> FQ.Result -> FastQEncoding -> NGLessIO ()
+outputFQStatistics :: FilePath -> FQ.FQStatistics -> FastQEncoding -> NGLessIO ()
 outputFQStatistics fname stats enc = liftIO $ do
     lno' <- readIORef curLine
     let enc'    = encodingName enc

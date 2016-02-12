@@ -32,7 +32,6 @@ import Tokens
 import Types
 import Substrim
 import FileManagement
-import Data.FastQStatistics
 import Interpretation.FastQ
 import CmdArgs
 import Configuration
@@ -252,8 +251,8 @@ map_s = "ngless '0.0'\n\
 -- Test compute stats
 
 case_compute_stats_lc = do
-    contents <- readPossiblyCompressedFile "test_samples/sample_small.fq"
-    (convert . lc $ statsFromFastQ contents) @?= ']'
+    r <- testNGLessIO $ statsFromFastQ "test_samples/sample_small.fq"
+    (convert . lc $ r) @?= ']'
 
 -- Parse GFF lines
 
@@ -320,15 +319,15 @@ case_unique_5 = let enc = SolexaEncoding in do
 
 -- PerBaseQualityScores 
 
-case_calc_perc_med = _calcPercentile bps eT 0.5 @?= 4
+case_calc_perc_med = calcPercentile bps eT 0.5 @?= 4
     where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
           eT  = V.sum bps -- 21 -> mul: 0,5  +- 11 in arr = 13 index 4
 
-case_calc_perc_lq = _calcPercentile bps eT 0.25 @?= 2
+case_calc_perc_lq = calcPercentile bps eT 0.25 @?= 2
     where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
           eT  = V.sum bps -- 21 -> mul: 0,25 -> 6 in arr = 6 index 2
 
-case_calc_perc_uq = _calcPercentile bps eT 0.75 @?= 5
+case_calc_perc_uq = calcPercentile bps eT 0.75 @?= 5
     where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
           eT  = V.sum bps -- 8 -> mul: 0,75 -> 16 in arr = 18 index 5
 
@@ -339,17 +338,17 @@ simpleStats s = case calculateStatistics s <$> guessEncoding (lc s) of
 
 -- negative tests quality on value 60 char ';'. Value will be 60 - 64 which is -4
 case_calc_statistics_negative = do
-    s <- statsFromFastQ <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
+    s <- testNGLessIO $ statsFromFastQ "test_samples/sample_low_qual.fq"
     head (simpleStats s) @?= (-4,-4,-4,-4)
 
 -- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
 case_calc_statistics_low_positive = do
-    s <- statsFromFastQ <$> readPossiblyCompressedFile "test_samples/sample_low_qual.fq"
+    s <- testNGLessIO $ statsFromFastQ "test_samples/sample_low_qual.fq"
     last (simpleStats s) @?= (1,1,1,1)
 
 
 case_calc_statistics_normal = do
-    s <- statsFromFastQ <$> readPossiblyCompressedFile "test_samples/data_set_repeated.fq"
+    s <- testNGLessIO $ statsFromFastQ "test_samples/data_set_repeated.fq"
     head (simpleStats s) @?= (25,33,31,33)
 
 case_test_setup_html_view = do
@@ -360,13 +359,12 @@ case_test_setup_html_view = do
 
 -- ProcessFastQ
 
-case_read_and_write_fastQ = do
-    low_char_int <- (lc . statsFromFastQ) <$> readPossiblyCompressedFile "test_samples/sample.fq.gz"
+case_read_and_write_fastQ = testNGLessIO $ do
+    low_char_int <- lc <$> statsFromFastQ "test_samples/sample.fq.gz"
     let enc = fromRight $ guessEncoding low_char_int
-    rs <- readReadSet enc "test_samples/sample.fq.gz"
-    testNGLessIO $ do
-        fp <- writeTempFastQ "test_samples/sample.fq.gz" rs enc
-        newrs <- liftIO $ readReadSet enc fp
-        liftIO $ newrs @?= rs
+    rs <- liftIO $ readReadSet enc "test_samples/sample.fq.gz"
+    fp <- writeTempFastQ "test_samples/sample.fq.gz" rs enc
+    newrs <- liftIO $ readReadSet enc fp
+    liftIO $ newrs @?= rs
 
 

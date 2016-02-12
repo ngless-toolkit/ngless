@@ -19,6 +19,7 @@ import Configuration (setupTestConfiguration)
 import Interpretation.Map (_samStats)
 import Interpretation.Count (performCount, MMMethod(..), loadAnnotator, loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), AnnotationMode(..))
 import Data.Sam (readSamLine, readSamGroupsC)
+import Data.FastQ (statsFromFastQ)
 import Data.GFF
 
 nfNGLessIO :: (NFData a) => NGLessIO a -> Benchmarkable
@@ -52,6 +53,9 @@ basicCountOpts = CountOpts
 main = setupTestConfiguration >> defaultMain [
     bgroup "sam-stats"
         [ bench "sample" $ nfNGLessIO (_samStats "test_samples/sample.sam")
+        ]
+    ,bgroup "fastq"
+        [ bench "fastqStats" $ nfNGLessIO (statsFromFastQ "test_samples/sample.fq.gz")
         ]
     ,bgroup "parse-sam"
         [ bench "readSamLine" $ nfRIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= CL.map readSamLine $$ countRights)

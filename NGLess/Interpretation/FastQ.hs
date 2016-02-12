@@ -24,7 +24,6 @@ import qualified Data.Conduit.Binary as CB
 import Data.Conduit (($=), ($$), (=$=))
 
 import FileManagement
-import Data.FastQStatistics
 import Data.FastQ
 import Configuration
 import Language
@@ -74,7 +73,7 @@ _doQC1 :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
                 -> FilePath         -- ^ FastQ file
                 -> NGLessIO ReadSet
 _doQC1 enc f = do
-        fd <- liftIO $ statsFromFastQ <$> readPossiblyCompressedFile f
+        fd <- statsFromFastQ f
         enc' <- case enc of
                 Just e -> return e
                 Nothing -> guessEncoding (lc fd)
