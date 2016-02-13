@@ -169,16 +169,10 @@ fqStatsC = do
             tCount <- getNoCaseV charCounts 't'
             return (FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq))
     where
-        getP = do
-            void C.await
-            bps <- C.await
-            void C.await
-            qs <- C.await
-            case (bps, qs) of
-                (Just bps', Just qs') -> do
-                    C.yield (bps', qs')
-                    getP
-                _ -> return ()
+        getP = groupC 4 =$= CL.mapM getP'
+        getP' [_, bps, _, qs] = return (bps, qs)
+        getP' _ = throwDataError ("fastq lines are not a multiple of 4" :: String)
+
         update :: VUM.IOVector Int -> VUM.IOVector Int -> IORef (VM.IOVector (VUM.IOVector Int)) -> (ByteLine, ByteLine) -> NGLessIO ()
         update charCounts stats qcs (ByteLine bps,ByteLine qs) = liftIO $ do
             let convert8 :: Word8 -> Int
