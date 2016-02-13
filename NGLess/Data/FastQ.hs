@@ -30,17 +30,21 @@ import Data.Conduit.Async   ((=$=&), ($$&))
 import Control.Monad
 import Control.Monad.Except
 
+import qualified Data.Vector as VB
+import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Unboxed as V
+import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Unboxed.Mutable as VUM
 
-import Data.Convertible (convert)
+import Data.IORef
+import Data.Foldable
 import Data.Char
 import Data.Word
 
 
 import NGLess.NGError
 import Utils.Conduit
-import Utils.Vector (zeroVec, unsafeIncrement)
+import Utils.Vector (zeroVec, unsafeIncrement, unsafeModify)
 import Utils.Utils
 
 data ShortRead = ShortRead
@@ -138,27 +142,72 @@ getEnc Nothing fp = do
     guessEncoding m
 
 
-data StatsIter = StatsIter !Int !Int !Int !Int [VUM.IOVector Int] (VUM.IOVector Int)
-
 fqStatsC :: C.Sink ByteLine NGLessIO FQStatistics
 fqStatsC = do
-        charCounts <- liftIO $ zeroVec 256
-        r <- groupC 4
-            =$= CL.mapM getP
-            =$= CL.foldM update (StatsIter 0 256 (maxBound :: Int) 0 [] charCounts)
-        liftIO (freeze r)
+        -- This is pretty ugly code, but threading the state through a foldM
+        -- was >2x slower. In any case, all the ugliness is well hidden.
+        (charCounts,stats,qualVals) <- liftIO $ do
+            charCounts <- zeroVec 256
+            -- stats is [ Nr-sequences, min-Quality-Value minSequenceSize maxSequenceSize ]
+            stats <- VUM.replicate 4 0
+            VUM.write stats 1 256
+            VUM.write stats 2 maxBound
+            qualVals <- newIORef =<< VM.new 0
+            return (charCounts, stats, qualVals)
+        getP
+            =$= CL.mapM_ (update charCounts stats qualVals)
+        liftIO $ do
+            qcs <- readIORef qualVals
+            n <- VUM.read stats 0
+            lcT <- VUM.read stats 1
+            minSeq <- VUM.read stats 2
+            maxSeq <- VUM.read stats 3
+            qcs' <- mapM VU.unsafeFreeze =<< VB.toList <$> VB.unsafeFreeze qcs
+            aCount <- getNoCaseV charCounts 'a'
+            cCount <- getNoCaseV charCounts 'c'
+            gCount <- getNoCaseV charCounts 'g'
+            tCount <- getNoCaseV charCounts 't'
+            return (FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq))
     where
-        getP [_,s,_,q] = return (s,q)
-        getP  _ = throwDataError ("Malformed FASTQ file: number of lines is not a multiple of 4" :: String)
+        getP = do
+            void C.await
+            bps <- C.await
+            void C.await
+            qs <- C.await
+            case (bps, qs) of
+                (Just bps', Just qs') -> do
+                    C.yield (bps', qs')
+                    getP
+                _ -> return ()
+        update :: VUM.IOVector Int -> VUM.IOVector Int -> IORef (VM.IOVector (VUM.IOVector Int)) -> (ByteLine, ByteLine) -> NGLessIO ()
+        update charCounts stats qcs (ByteLine bps,ByteLine qs) = liftIO $ do
+            let convert8 :: Word8 -> Int
+                convert8 = fromEnum
+            forM_ [0 .. B.length bps - 1] $ \i -> do
+                let bi = convert8 (B.index bps i)
+                unsafeIncrement charCounts bi
+            let len = B.length bps
+                qsM = convert8 . B.minimum $ qs
+            maxSeq <- VUM.read stats 3
+            when (len > maxSeq) $ do
+                pqcs <- readIORef qcs
+                nqcs <- VM.grow pqcs (len - maxSeq)
+                forM_ [maxSeq .. len - 1] $ \i -> do
+                    nv <- zeroVec 256
+                    VM.write nqcs i nv
+                writeIORef qcs nqcs
+            qcs' <- readIORef qcs
+            forM_ [0 .. B.length qs - 1] $ \i -> do
+                let qi = convert8 (B.index qs i)
+                qv <- VM.read qcs' i
+                unsafeIncrement qv qi
+            unsafeIncrement stats 0
+            unsafeModify stats (min qsM) 1
+            unsafeModify stats (min len) 2
+            unsafeModify stats (max len) 3
+            return ()
 
-        freeze :: StatsIter -> IO FQStatistics
-        freeze (StatsIter n lcT minSeq maxSeq qcs charCounts) = do
-                qcs' <- mapM V.freeze qcs
-                aCount <- getNoCaseV charCounts 'a'
-                cCount <- getNoCaseV charCounts 'c'
-                gCount <- getNoCaseV charCounts 'g'
-                tCount <- getNoCaseV charCounts 't'
-                return (FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq))
+
         getNoCaseV c p = do
             lower <- VUM.read c (ord p)
             upper <- VUM.read c (ord . toUpper $ p)
@@ -172,20 +221,6 @@ gcFraction res = gcCount / allBpCount
         gcCount = fromIntegral $ bpC + bpG
         allBpCount = fromIntegral $ bpA + bpC + bpG + bpT
 
-update :: StatsIter -> (ByteLine, ByteLine) -> NGLessIO StatsIter
-update (StatsIter n lcT minSeq maxSeq qcs charCounts) (ByteLine bps,ByteLine qs) = liftIO $ do
-    forM_ [0 .. B.length bps - 1] $ \i -> do
-        let bi = B.index bps i
-        unsafeIncrement charCounts (convert bi)
-    let len = B.length bps
-        qsM = convert . B.minimum $ qs
-    nq <- replicateM (len - maxSeq) $
-        zeroVec 256
-    let qcs' = qcs ++ nq
-    forM_ (zip [0 .. B.length qs - 1] qcs') $ \(i,qv) -> do
-        let qi = convert (B.index qs i)
-        unsafeIncrement qv qi
-    return (StatsIter (n + 1) (min qsM lcT) (min minSeq len) (max maxSeq len) qcs' charCounts)
 
 -- accUntilLim :: given lim, each position of the array is added until lim.
 -- Is returned the elem of the array in that position.
