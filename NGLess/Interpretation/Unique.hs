@@ -4,14 +4,12 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 
-module Unique
+module Interpretation.Unique
     ( executeUnique
     , _readNFiles
     , _writeToNFiles
     , _numFiles
     ) where
-
-import qualified Data.ByteString.Lazy.Char8 as BL
 
 import Control.Monad
 import Control.Monad.ST (runST)
@@ -23,8 +21,14 @@ import System.FilePath.Posix
 import System.Directory
 import qualified Data.Vector as V
 
-import FileManagement (createTempDir)
-import Interpretation.FastQ (writeTempFastQ)
+import qualified Data.ByteString as B
+import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit as C
+import qualified Data.Conduit.Zlib as C
+import qualified Data.Conduit.Binary as CB
+import Data.Conduit (($$), (=$=))
+
+import FileManagement (createTempDir, openNGLTempFile)
 import Data.FastQ
 import NGLess
 import Language
@@ -37,10 +41,21 @@ import qualified Data.HashTable.ST.Basic as H
 
 maxTempFileSize = 100*1000*1000 -- 100MB
 
+
+writeTempFastQ :: FilePath -> [ShortRead] -> FastQEncoding -> NGLessIO FilePath
+writeTempFastQ fn rs enc = do
+    (newfp,h) <- openNGLTempFile fn "" "fq.gz"
+    C.yieldMany rs
+        =$= fqEncodeC enc
+        =$= C.gzip
+        $$ CB.sinkHandle h
+    liftIO (hClose h)
+    return newfp
+
 executeUnique :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeUnique (NGOList e) args = NGOList <$> mapM (`executeUnique` args) e
 executeUnique (NGOReadSet (ReadSet1 enc file)) args = do
-        rs <- liftIO $ readReadSet enc file
+        rs <- liftIO (parseFastQ enc <$> readPossiblyCompressedFile file)
         d <- _writeToNFiles file enc rs
         let NGOInteger mc = lookupWithDefault (NGOInteger 1) "max_copies" args
         uniqueCalculations' mc d --default
@@ -63,7 +78,7 @@ _writeToNFiles fname enc rs = do
         fhs  <- openKFileHandles k dest
         forM_ rs $ \r -> do
             let pos = hashRead k r
-            BL.hPutStr (fhs ! pos) (asFastQ enc [r])
+            B.hPutStr (fhs ! pos) (fqEncode enc r)
         V.mapM_ hClose fhs
     outputLno' DebugOutput ("Wrote N Files to: " ++ dest)
     return dest

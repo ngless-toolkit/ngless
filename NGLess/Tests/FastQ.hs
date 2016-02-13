@@ -7,15 +7,16 @@ import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
 
+import qualified Data.ByteString.Lazy as BL
 import Tests.Utils
 import Data.FastQ
 
 tgroup_FastQ = $(testGroupGenerator)
 
-case_parse_encode_sanger = parse_encode SangerEncoding @?= reads3
-case_parse_encode_solexa = parse_encode SolexaEncoding @?= reads3
+case_parse_encode_sanger = encodeRecover SangerEncoding @?= reads3
+case_parse_encode_solexa = encodeRecover SolexaEncoding @?= reads3
 
-parse_encode enc = parseFastQ enc $ asFastQ enc reads3
+encodeRecover enc = parseFastQ enc . BL.fromChunks $ map (fqEncode enc) reads3
 reads3 =
     [ShortRead "x" "acttg" "\x23\x10\x22\x22\x18"
     ,ShortRead "y" "catgt" "\x21\x11\x19\x25\x12"

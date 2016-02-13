@@ -8,7 +8,6 @@ module Interpretation.FastQ
     , executeGroup
     , executeQualityProcess
     , optionalSubsample
-    , writeTempFastQ
     , _doQC1
     ) where
 
@@ -21,7 +20,7 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Zlib as C
 import qualified Data.Conduit.Binary as CB
-import Data.Conduit (($=), ($$), (=$=))
+import Data.Conduit (($$), (=$=))
 
 import FileManagement
 import Data.FastQ
@@ -30,14 +29,6 @@ import Language
 import Output
 import Utils.Utils
 import NGLess
-
-writeTempFastQ :: FilePath -> [ShortRead] -> FastQEncoding -> NGLessIO FilePath
-writeTempFastQ fn rs enc = do
-    (newfp,h) <- openNGLTempFile fn "" "fq.gz"
-    liftIO $ do
-        hWriteGZIP h (asFastQ enc rs)
-        hClose h
-    return newfp
 
 drop100 = loop (0 :: Int)
     where

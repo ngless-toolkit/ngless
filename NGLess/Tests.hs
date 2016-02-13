@@ -38,7 +38,7 @@ import Configuration
 import NGLess
 
 import Interpretation.Map
-import Unique
+import Interpretation.Unique
 
 import Data.FastQ
 import Data.Sam
@@ -356,15 +356,4 @@ case_test_setup_html_view = do
     ex <- doesFileExist "testing_tmp_dir_html/index.html"
     assertBool "index.html should be present after setupHtmlViewer" ex
     removeDirectoryRecursive "testing_tmp_dir_html/"
-
--- ProcessFastQ
-
-case_read_and_write_fastQ = testNGLessIO $ do
-    low_char_int <- lc <$> statsFromFastQ "test_samples/sample.fq.gz"
-    let enc = fromRight $ guessEncoding low_char_int
-    rs <- liftIO $ readReadSet enc "test_samples/sample.fq.gz"
-    fp <- writeTempFastQ "test_samples/sample.fq.gz" rs enc
-    newrs <- liftIO $ readReadSet enc fp
-    liftIO $ newrs @?= rs
-
 

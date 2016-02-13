@@ -22,8 +22,8 @@ import Control.Monad.State
 import Control.Monad.Trans.Resource
 
 import qualified Data.ByteString.Char8 as B
-import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as Map
+
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Conduit.Combinators as C
@@ -50,12 +50,13 @@ import NGLess
 import Data.Sam
 import Data.FastQ
 
+import Interpretation.Map
 import Interpretation.Count
 import Interpretation.FastQ
-import Interpretation.Map
-import Interpretation.Select
 import Interpretation.Write
-import Unique
+import Interpretation.Select
+import Interpretation.Unique
+import Utils.Conduit
 
 
 {- Interpretation is done inside 3 and a half monads
@@ -316,14 +317,16 @@ executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> Interp
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
 executePreprocess (NGOReadSet (ReadSet1 enc file)) _args (Block [Variable var] block) = do
         runNGLessIO $ outputListLno' DebugOutput ["Preprocess on ", file]
-        rs <- map NGOShortRead <$> liftIO (readReadSet enc file)
         (newfp, h) <- runNGLessIO $ openNGLTempFile file "preprocessed_" "fq.gz"
-        (C.yieldMany rs $= C.conduitVector 1000)
+        (conduitPossiblyCompressedFile file
+            =$= linesC
+            =$= fqConduitR enc
+            =$= CL.map NGOShortRead
+            =$= C.conduitVector 1000)
                 =$=& (
                     (C.concat :: C.Conduit (V.Vector NGLessObject) InterpretationEnvIO NGLessObject)
-                    =$= C.mapM transformInterpret
-                    =$= C.filter isJust
-                    =$= C.map (toStrict . asFastQ enc . (:[]) . fromJust)
+                    =$= CL.mapMaybeM transformInterpret
+                    =$= fqEncodeC enc
                     =$= C.conduitVector 4000
                     )
                 $$& (
@@ -332,7 +335,6 @@ executePreprocess (NGOReadSet (ReadSet1 enc file)) _args (Block [Variable var] b
         liftIO (hClose h)
         return . NGOReadSet $ ReadSet1 enc newfp
     where
-        toStrict = B.concat . BL.toChunks
         transformInterpret :: NGLessObject -> InterpretationEnvIO (Maybe ShortRead)
         transformInterpret r = runInROEnvIO $ interpretPBlock1 block var r
 executePreprocess (NGOReadSet (ReadSet2 enc fp1 fp2)) _args block = executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 "")) _args block
@@ -383,7 +385,7 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
             intercalate hs rs1 rs2 anySingle' keepSingles
         intercalate _ _ _ _ _ = throwDataError ("preprocess: paired mates do not contain the same number of reads" :: String)
 
-        writeSR h sr = liftIO $ BL.hPut h (asFastQ enc [sr])
+        writeSR h sr = liftIO $ B.hPut h (fqEncode enc sr)
 executePreprocess v _ _ = unreachable ("executePreprocess: Cannot handle this input: " ++ show v)
 
 executeMethod :: MethodName -> NGLessObject -> Maybe NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationROEnv NGLessObject

@@ -10,10 +10,12 @@ module Data.FastQ
     , encodingName
     , readReadSet
     , parseFastQ
-    , asFastQ
     , fqConduitR
+    , fqEncode
+    , fqEncodeC
     , gcFraction
     , statsFromFastQ
+    , fqStatsC
     , calculateStatistics
     , calcPercentile
     ) where
@@ -90,12 +92,14 @@ createRead enc rid rseq rqs = ShortRead rid rseq (decodeQual rqs)
         offset = encodingOffset enc
         sub v = v - offset
 
-asFastQ :: FastQEncoding -> [ShortRead] -> BL.ByteString
-asFastQ enc rs = BL.fromChunks (asFastQ' rs)
+fqEncodeC :: (Monad m) => FastQEncoding -> C.Conduit ShortRead m B.ByteString
+fqEncodeC enc = CL.map (fqEncode enc)
+
+fqEncode :: FastQEncoding -> ShortRead -> B.ByteString
+fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", encodeQual c, "\n"]
     where
-        asFastQ' [] = []
-        asFastQ' ((ShortRead a b c):rss) = [a, "\n", b, "\n+\n", encodeQual c, "\n"] ++ asFastQ' rss
-        encodeQual = B.map ((+) (encodingOffset enc))
+        offset = encodingOffset enc
+        encodeQual = B.map (offset +)
 
 readReadSet :: FastQEncoding -> FilePath -> IO [ShortRead]
 readReadSet enc fn = parseFastQ enc <$> readPossiblyCompressedFile fn
