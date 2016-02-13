@@ -8,6 +8,7 @@ module Utils.Conduit
     , asyncMapC
     , linesC
     , groupC
+    , awaitJust
     ) where
 
 import qualified Data.ByteString as B
@@ -75,3 +76,9 @@ groupC n = loop n []
             Nothing -> unless (null ps) $ C.yield (reverse ps)
             Just p -> loop (c-1) (p:ps)
 
+-- | This is a simple utility adapted from
+-- http://neilmitchell.blogspot.de/2015/07/thoughts-on-conduits.html
+awaitJust :: Monad m => (i -> C.Conduit i m o) -> C.Conduit i m o
+awaitJust f = C.await >>= \case
+        Nothing -> return ()
+        Just v -> f v
