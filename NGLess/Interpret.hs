@@ -313,6 +313,8 @@ executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show 
 optionalSubsample' (NGOString f) = NGOString . T.pack <$> runNGLessIO (optionalSubsample $ T.unpack f)
 optionalSubsample' _ = throwShouldNotOccur ("This case should not occurr" :: T.Text)
 
+data PreprocessPairOutput = Pair ShortRead ShortRead | Single ShortRead
+
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
 executePreprocess (NGOReadSet (ReadSet1 enc file)) _args (Block [Variable var] block) = do
@@ -341,51 +343,75 @@ executePreprocess (NGOReadSet (ReadSet2 enc fp1 fp2)) _args block = executePrepr
 executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable var] block) = do
         keepSingles <- runNGLessIO $ lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args
         runNGLessIO $ outputListLno' DebugOutput (["Preprocess on paired end ",
-                                                fp1, "+", fp2] ++ (if fp3 /= ""
+                                                fp1, " + ", fp2] ++ (if fp3 /= ""
                                                                     then [" with singles ", fp3]
                                                                     else []))
-        (fp1', out1) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.1." ".fq"
-        (fp2', out2) <- runNGLessIO $ openNGLTempFile fp2 "preprocessed.2." ".fq"
-        (fps, hs) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.singles." ".fq"
-        rs1 <- map NGOShortRead <$> liftIO (readReadSet enc fp1)
-        rs2 <- map NGOShortRead <$> liftIO (readReadSet enc fp2)
-        anySingle <- intercalate (out1, out2, hs) rs1 rs2 False keepSingles
-        rs3 <- (if fp3 /= ""
-                    then map NGOShortRead <$> liftIO (readReadSet enc fp3)
-                    else return [])
-        anySingle' <- preprocBlock hs rs3
-        liftIO $ hClose `mapM_` [out1, out2, hs]
-        unless (anySingle || anySingle')
+        (fp1', out1) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.1." ".fq.gz"
+        (fp2', out2) <- runNGLessIO $ openNGLTempFile fp2 "preprocessed.2." ".fq.gz"
+        (fps, out3) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.singles." ".fq.gz"
+        let rs1 :: C.Source InterpretationEnvIO ShortRead
+            rs1 = conduitPossiblyCompressedFile fp1 =$= linesC =$= fqConduitR enc
+
+            rs2 :: C.Source InterpretationEnvIO ShortRead
+            rs2 = conduitPossiblyCompressedFile fp2 =$= linesC =$= fqConduitR enc
+
+            rs3 :: C.Source InterpretationEnvIO ShortRead
+            rs3 = if fp3 /= ""
+                    then conduitPossiblyCompressedFile fp3 =$= linesC =$= fqConduitR enc
+                    else C.yieldMany []
+
+            pair :: C.Source InterpretationEnvIO (ShortRead,ShortRead)
+            pair = C.getZipSource ((,) <$> C.ZipSource rs1 <*> C.ZipSource rs2)
+
+            countC :: C.Consumer a InterpretationEnvIO Int
+            countC = CL.fold (\n _ -> (n+1)) 0
+            write h = C.passthroughSink (fqEncodeC enc =$= C.gzip =$= C.sinkHandle h) (const $ return ()) =$= countC
+            write1 = CL.mapMaybe (\case
+                            Pair sr _ -> Just sr
+                            _ -> Nothing) =$= write out1
+            write2 = CL.mapMaybe (\case
+                            Pair _ sr -> Just sr
+                            _ -> Nothing) =$= write out2
+            writeS = CL.mapMaybe (\case
+                            Single sr -> Just sr
+                            _ -> Nothing) =$= write out3
+
+        [_,_,n3] <-
+            pair
+                =$= intercalate keepSingles
+                $$ C.sequenceSinks
+                    [ write1
+                    , write2
+                    , writeS
+                    ]
+        n3' <- rs3
+                =$= preprocBlock
+                $$ writeS
+
+        let anySingle = n3 > 0 || n3' > 0
+        liftIO $ forM_ [out1, out2, out3] hClose
+        unless anySingle
             (liftIO $ removeFile fps)
         runNGLessIO $ outputLno' DebugOutput "Preprocess finished"
-        return . NGOReadSet $ if anySingle || anySingle'
+        return . NGOReadSet $ if anySingle
                     then ReadSet3 enc fp1' fp2' fps
                     else ReadSet2 enc fp1' fp2'
     where
-        preprocBlock :: Handle -> [NGLessObject] -> InterpretationEnvIO Bool
-        preprocBlock hsingles rs = do
-            ps <- forM rs  (runInROEnvIO . interpretPBlock1 block var)
-            case catMaybes ps of
-                [] -> return False
-                ps' -> do
-                    forM_ ps' (liftIO . writeSR hsingles)
-                    return True
-        intercalate _ [] [] anySingle ks = return (anySingle && ks)
-        intercalate hs@(out1, out2, hsingles) (r1:rs1) (r2:rs2) !anySingle keepSingles = do
-            r1' <- runInROEnvIO $ interpretPBlock1 block var r1
-            r2' <- runInROEnvIO $ interpretPBlock1 block var r2
-            anySingle' <- case (r1',r2') of
-                (Nothing, Nothing) -> return anySingle
-                (Just r1'', Just r2'') -> do
-                    writeSR out1 r1''
-                    writeSR out2 r2''
-                    return anySingle
-                (Just r, Nothing) -> when keepSingles (writeSR hsingles r) >> return True
-                (Nothing, Just r) -> when keepSingles (writeSR hsingles r) >> return True
-            intercalate hs rs1 rs2 anySingle' keepSingles
-        intercalate _ _ _ _ _ = throwDataError ("preprocess: paired mates do not contain the same number of reads" :: String)
+        preprocBlock :: C.Conduit ShortRead InterpretationEnvIO PreprocessPairOutput
+        preprocBlock = CL.mapMaybeM $ \r -> do
+            r' <- runInROEnvIO $ interpretPBlock1 block var (NGOShortRead r)
+            return (Single <$> r')
 
-        writeSR h sr = liftIO $ B.hPut h (fqEncode enc sr)
+
+        intercalate :: Bool -> C.Conduit (ShortRead, ShortRead) InterpretationEnvIO PreprocessPairOutput
+        intercalate keepSingles = C.awaitForever $ \(r1,r2) -> do
+                r1' <- lift . runInROEnvIO $ interpretPBlock1 block var (NGOShortRead r1)
+                r2' <- lift . runInROEnvIO $ interpretPBlock1 block var (NGOShortRead r2)
+                case (r1',r2') of
+                    (Just r1'', Just r2'') -> C.yield (Pair r1'' r2'')
+                    (Just r, Nothing) -> when keepSingles $ C.yield (Single r)
+                    (Nothing, Just r) -> when keepSingles $ C.yield (Single r)
+                    (Nothing, Nothing) -> return ()
 executePreprocess v _ _ = unreachable ("executePreprocess: Cannot handle this input: " ++ show v)
 
 executeMethod :: MethodName -> NGLessObject -> Maybe NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationROEnv NGLessObject
