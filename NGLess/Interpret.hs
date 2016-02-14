@@ -261,7 +261,7 @@ topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block
 topFunction (FuncName "preprocess") expr@(Lookup (Variable varName)) args (Just block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- runInROEnvIO $ interpretArguments args
-    res' <- executePreprocess expr' args' block >>= runNGLessIO . executeQualityProcess
+    res' <- executePreprocess expr' args' block
     setVariableValue varName res'
     return res'
 topFunction (FuncName "preprocess") expr _ _ = throwShouldNotOccur ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
@@ -335,7 +335,10 @@ executePreprocess (NGOReadSet (ReadSet1 enc file)) _args (Block [Variable var] b
                     (C.concat :: C.Conduit (V.Vector B.ByteString) InterpretationEnvIO B.ByteString)
                     =$= C.gzip =$ C.sinkHandle h)
         liftIO (hClose h)
-        return . NGOReadSet $ ReadSet1 enc newfp
+        let r = NGOReadSet $ ReadSet1 enc newfp
+        runNGLessIO $ executeQualityProcess r
+        return r
+
     where
         transformInterpret :: NGLessObject -> InterpretationEnvIO (Maybe ShortRead)
         transformInterpret r = runInROEnvIO $ interpretPBlock1 block var r
@@ -363,9 +366,15 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
             pair :: C.Source InterpretationEnvIO (ShortRead,ShortRead)
             pair = C.getZipSource ((,) <$> C.ZipSource rs1 <*> C.ZipSource rs2)
 
+            zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
+            zipSink3 a b c = C.getZipSink((,,) <$> C.ZipSink a <*> C.ZipSink b <*> C.ZipSink c)
+
             countC :: C.Consumer a InterpretationEnvIO Int
             countC = CL.fold (\n _ -> (n+1)) 0
-            write h = C.passthroughSink (fqEncodeC enc =$= C.gzip =$= C.sinkHandle h) (const $ return ()) =$= countC
+            write h = zipSink2
+                            (fqEncodeC enc =$= C.gzip =$= C.sinkHandle h)
+                            (CL.map (\(ShortRead _ bps qs) -> (ByteLine bps, ByteLine qs)) =$= C.transPipe runNGLessIO fqStatsC)
+
             write1 = CL.mapMaybe (\case
                             Pair sr _ -> Just sr
                             _ -> Nothing) =$= write out1
@@ -376,19 +385,27 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
                             Single sr -> Just sr
                             _ -> Nothing) =$= write out3
 
-        [_,_,n3] <-
-            pair
-                =$= intercalate keepSingles
-                $$ C.sequenceSinks
-                    [ write1
-                    , write2
-                    , writeS
-                    ]
-        n3' <- rs3
+        [((),s1),((),s2),((),s3)] <-
+            (pair
+                =$= C.conduitVector 4096)
+                =$=& ((C.concat :: C.Conduit (V.Vector (ShortRead,ShortRead)) InterpretationEnvIO (ShortRead,ShortRead))
+                    =$= intercalate keepSingles
+                    =$= C.conduitVector 4096)
+                $$& ((C.concat :: C.Conduit (V.Vector PreprocessPairOutput) InterpretationEnvIO PreprocessPairOutput)
+                    =$= C.sequenceSinks
+                        [ write1
+                        , write2
+                        , writeS
+                        ])
+        ((),s3') <- rs3
                 =$= preprocBlock
-                $$ writeS
+                =$= C.conduitVector 4096
+                $$& ((C.concat :: C.Conduit (V.Vector PreprocessPairOutput) InterpretationEnvIO PreprocessPairOutput)
+                =$= writeS)
 
-        let anySingle = n3 > 0 || n3' > 0
+        let n3 = nSeq s3
+            n3' = nSeq s3'
+            anySingle = n3 > 0 || n3' > 0
         liftIO $ forM_ [out1, out2, out3] hClose
         unless anySingle
             (liftIO $ removeFile fps)

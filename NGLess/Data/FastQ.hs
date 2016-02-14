@@ -119,7 +119,13 @@ statsFromFastQ :: FilePath -> NGLessIO FQStatistics
 statsFromFastQ fp =
     conduitPossiblyCompressedFile fp
         =$= linesC
+        =$= getP
         $$ fqStatsC
+
+getP = groupC 4 =$= CL.mapM getP'
+    where
+        getP' [_, bps, _, qs] = return (bps, qs)
+        getP' _ = throwDataError ("fastq lines are not a multiple of 4" :: String)
 
 getEnc :: Maybe FastQEncoding -> FilePath -> NGLessIO FastQEncoding
 getEnc (Just e) _ = return e
@@ -142,7 +148,7 @@ getEnc Nothing fp = do
     guessEncoding m
 
 
-fqStatsC :: C.Sink ByteLine NGLessIO FQStatistics
+fqStatsC :: C.Sink (ByteLine,ByteLine) NGLessIO FQStatistics
 fqStatsC = do
         -- This is pretty ugly code, but threading the state through a foldM
         -- was >2x slower. In any case, all the ugliness is well hidden.
@@ -154,8 +160,7 @@ fqStatsC = do
             VUM.write stats 2 maxBound
             qualVals <- newIORef =<< VM.new 0
             return (charCounts, stats, qualVals)
-        getP
-            =$= CL.mapM_ (update charCounts stats qualVals)
+        CL.mapM_ (update charCounts stats qualVals)
         liftIO $ do
             qcs <- readIORef qualVals
             n <- VUM.read stats 0
@@ -169,9 +174,6 @@ fqStatsC = do
             tCount <- getNoCaseV charCounts 't'
             return (FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq))
     where
-        getP = groupC 4 =$= CL.mapM getP'
-        getP' [_, bps, _, qs] = return (bps, qs)
-        getP' _ = throwDataError ("fastq lines are not a multiple of 4" :: String)
 
         update :: VUM.IOVector Int -> VUM.IOVector Int -> IORef (VM.IOVector (VUM.IOVector Int)) -> (ByteLine, ByteLine) -> NGLessIO ()
         update charCounts stats qcs (ByteLine bps,ByteLine qs) = liftIO $ do
