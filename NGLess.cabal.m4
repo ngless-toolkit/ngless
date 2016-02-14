@@ -60,7 +60,7 @@ define(`BUILD_DEPENDS',
     zlib')
 
 define(`BASE_CONFIG',
-  `ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2
+  `ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts
   C-sources: NGLess/Dependencies/embedded.c
   default-extensions:  BangPatterns, OverloadedStrings, LambdaCase
   other-extensions:    DeriveDataTypeable, TemplateHaskell
