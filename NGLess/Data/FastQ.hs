@@ -38,9 +38,9 @@ import qualified Data.Vector.Unboxed.Mutable as VUM
 
 import Data.IORef
 import Data.Foldable
+import Data.Maybe
 import Data.Char
 import Data.Word
-
 
 import NGLess.NGError
 import Utils.Conduit
@@ -154,20 +154,19 @@ fqStatsC = do
         -- was >2x slower. In any case, all the ugliness is well hidden.
         (charCounts,stats,qualVals) <- liftIO $ do
             charCounts <- zeroVec 256
-            -- stats is [ Nr-sequences, min-Quality-Value minSequenceSize maxSequenceSize ]
-            stats <- VUM.replicate 4 0
-            VUM.write stats 1 256
-            VUM.write stats 2 maxBound
+            -- stats is [ Nr-sequences minSequenceSize maxSequenceSize ]
+            stats <- VUM.replicate 3 0
+            VUM.write stats 1 maxBound
             qualVals <- newIORef =<< VM.new 0
             return (charCounts, stats, qualVals)
         CL.mapM_ (update charCounts stats qualVals)
         liftIO $ do
             qcs <- readIORef qualVals
             n <- VUM.read stats 0
-            lcT <- VUM.read stats 1
-            minSeq <- VUM.read stats 2
-            maxSeq <- VUM.read stats 3
+            minSeq <- VUM.read stats 1
+            maxSeq <- VUM.read stats 2
             qcs' <- mapM VU.unsafeFreeze =<< VB.toList <$> VB.unsafeFreeze qcs
+            let lcT = findMinQValue qcs'
             aCount <- getNoCaseV charCounts 'a'
             cCount <- getNoCaseV charCounts 'c'
             gCount <- getNoCaseV charCounts 'g'
@@ -183,12 +182,11 @@ fqStatsC = do
                 let bi = convert8 (B.index bps i)
                 unsafeIncrement charCounts bi
             let len = B.length bps
-                qsM = convert8 . B.minimum $ qs
-            maxSeq <- VUM.read stats 3
-            when (len > maxSeq) $ do
+            prevLen <- VM.length <$> readIORef qcs
+            when (len > prevLen) $ do
                 pqcs <- readIORef qcs
-                nqcs <- VM.grow pqcs (len - maxSeq)
-                forM_ [maxSeq .. len - 1] $ \i -> do
+                nqcs <- VM.grow pqcs (len - prevLen)
+                forM_ [prevLen .. len - 1] $ \i -> do
                     nv <- zeroVec 256
                     VM.write nqcs i nv
                 writeIORef qcs nqcs
@@ -198,9 +196,8 @@ fqStatsC = do
                 qv <- VM.read qcs' i
                 unsafeIncrement qv qi
             unsafeIncrement stats 0
-            unsafeModify stats (min qsM) 1
-            unsafeModify stats (min len) 2
-            unsafeModify stats (max len) 3
+            unsafeModify stats (min len) 1
+            unsafeModify stats (max len) 2
             return ()
 
 
@@ -208,6 +205,11 @@ fqStatsC = do
             lower <- VUM.read c (ord p)
             upper <- VUM.read c (ord . toUpper $ p)
             return (lower + upper)
+        findMinQValue :: [VU.Vector Int] -> Int
+        findMinQValue = minimum . map findMinQValue'
+        findMinQValue' :: VU.Vector Int -> Int
+        findMinQValue' qs = fromMaybe 256 (VU.findIndex (/= 0) qs)
+
 
 
 gcFraction :: FQStatistics -> Double
