@@ -47,11 +47,6 @@ case_good_function_attr_map_2 = isValidateOk
     "ngless '0.0'\n\
     \counts = map(input,reference='sacCer3')"
 
-case_mismatched_argument = isValidateError
-    "ngless '0.0'\n\
-    \input = fastq('input.fq')\n\
-    \mapped = map(input, reference='hg19')\n\
-    \ann = annotate(mapped, mode={deny}"
 
 
 
@@ -127,28 +122,28 @@ case_invalid_not_pure_map_reference_const = validateIO_error
 
 case_valid_not_pure_annotate_gff_lit = validateIO_Ok
     "ngless '0.0'\n\
-    \annotate(x, gff='Makefile')\n"
+    \count(x, gff_file='Makefile')\n"
 
 case_invalid_not_pure_annotate_gff_lit = validateIO_error
     "ngless '0.0'\n\
-    \annotate(x, gff='THIS_FILE_DOES_NOT_EXIST_SURELY.gff')\n"
+    \count(x, gff_file='THIS_FILE_DOES_NOT_EXIST_SURELY.gff')\n"
 
 case_valid_not_pure_annotate_gff_const = validateIO_Ok
     "ngless '0.0'\n\
     \v = 'Makefile'\n\
-    \annotate(x, gff=v)\n"
+    \count(x, gff_file=v)\n"
 
 case_invalid_not_pure_annotate_gff_const = validateIO_error
     "ngless '0.0'\n\
     \v = 'THIS_FILE_DOES_NOT_EXIST_SURELY.gff'\n\
-    \annotate(x, gff=v)\n"
+    \count(x, gff_file=v)\n"
 
 
 case_valid_not_pure_annotate_gff_const2 = validateIO_Ok
     "ngless '0.0'\n\
     \v = 'fq'\n\
     \v = 'Makefile'\n\
-    \annotate(x, gff=v)\n"
+    \count(x, gff_file=v)\n"
 
 case_validate_internal_call = validate_Error
     "ngless '0.0'\n\
