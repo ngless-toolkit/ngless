@@ -124,6 +124,7 @@ updateConfiguration NGLessConfiguration{..} cfiles = do
 
 setupTestConfiguration :: IO ()
 setupTestConfiguration = do
+    setVerbosity Quiet
     config <- guessConfiguration
     writeIORef nglConfigurationRef $ config { nConfTemporaryDirectory = "testing_tmp_dir", nConfKeepTemporaryFiles = True }
 

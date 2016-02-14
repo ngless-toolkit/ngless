@@ -7,6 +7,7 @@ import Criterion.Main
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit as C
+import qualified Data.Text as T
 import           Data.Conduit ((=$=), ($$))
 import           Control.DeepSeq (NFData)
 
@@ -18,12 +19,19 @@ import Configuration (setupTestConfiguration)
 
 import Interpretation.Map (_samStats)
 import Interpretation.Count (performCount, MMMethod(..), loadAnnotator, loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), AnnotationMode(..))
+import Interpret (interpret)
+import Parse (parsengless)
+import Language (Script(..))
 import Data.Sam (readSamLine, readSamGroupsC)
 import Data.FastQ (statsFromFastQ)
-import Data.GFF
 
 nfNGLessIO :: (NFData a) => NGLessIO a -> Benchmarkable
 nfNGLessIO = nfIO . testNGLessIO
+
+nfNGLessScript :: T.Text -> Benchmarkable
+nfNGLessScript sc = case parsengless "bench" False sc of
+    Left err -> error (show err)
+    Right expr -> nfNGLessIO $ interpret [] . nglBody $ expr
 
 
 nfRIO = nfIO . runResourceT
@@ -56,6 +64,9 @@ main = setupTestConfiguration >> defaultMain [
         ]
     ,bgroup "fastq"
         [ bench "fastqStats" $ nfNGLessIO (statsFromFastQ "test_samples/sample.fq.gz")
+        , bench "preprocess" $ nfNGLessScript "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n"
+        , bench "preprocess-pair" $ nfNGLessScript
+                "p = paired('test_samples/sample.fq.gz', 'test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n"
         ]
     ,bgroup "parse-sam"
         [ bench "readSamLine" $ nfRIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= CL.map readSamLine $$ countRights)
