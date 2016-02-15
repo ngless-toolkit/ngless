@@ -323,11 +323,10 @@ executePreprocess (NGOReadSet (ReadSet1 enc file)) _args (Block [Variable var] b
         (conduitPossiblyCompressedFile file
             =$= linesC
             =$= fqConduitR enc
-            =$= CL.map NGOShortRead
             =$= C.conduitVector 1000)
                 =$=& (
-                    (C.concat :: C.Conduit (V.Vector NGLessObject) InterpretationEnvIO NGLessObject)
-                    =$= CL.mapMaybeM transformInterpret
+                    (C.concat :: C.Conduit (V.Vector ShortRead) InterpretationEnvIO ShortRead)
+                    =$= CL.mapMaybeM (runInROEnvIO . interpretPBlock1 block var)
                     =$= fqEncodeC enc
                     =$= C.conduitVector 4000
                     )
@@ -338,10 +337,6 @@ executePreprocess (NGOReadSet (ReadSet1 enc file)) _args (Block [Variable var] b
         let r = NGOReadSet $ ReadSet1 enc newfp
         runNGLessIO $ executeQualityProcess r
         return r
-
-    where
-        transformInterpret :: NGLessObject -> InterpretationEnvIO (Maybe ShortRead)
-        transformInterpret r = runInROEnvIO $ interpretPBlock1 block var r
 executePreprocess (NGOReadSet (ReadSet2 enc fp1 fp2)) _args block = executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 "")) _args block
 executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable var] block) = do
         keepSingles <- runNGLessIO $ lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args
@@ -416,14 +411,14 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
     where
         preprocBlock :: C.Conduit ShortRead InterpretationEnvIO PreprocessPairOutput
         preprocBlock = CL.mapMaybeM $ \r -> do
-            r' <- runInROEnvIO $ interpretPBlock1 block var (NGOShortRead r)
+            r' <- runInROEnvIO $ interpretPBlock1 block var r
             return (Single <$> r')
 
 
         intercalate :: Bool -> C.Conduit (ShortRead, ShortRead) InterpretationEnvIO PreprocessPairOutput
         intercalate keepSingles = C.awaitForever $ \(r1,r2) -> do
-                r1' <- lift . runInROEnvIO $ interpretPBlock1 block var (NGOShortRead r1)
-                r2' <- lift . runInROEnvIO $ interpretPBlock1 block var (NGOShortRead r2)
+                r1' <- lift . runInROEnvIO $ interpretPBlock1 block var r1
+                r2' <- lift . runInROEnvIO $ interpretPBlock1 block var r2
                 case (r1',r2') of
                     (Just r1'', Just r2'') -> C.yield (Pair r1'' r2'')
                     (Just r, Nothing) -> when keepSingles $ C.yield (Single r)
@@ -436,9 +431,9 @@ executeMethod method (NGOMappedRead samline) arg kwargs = runNGLess (executeMapp
 executeMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 
-interpretPBlock1 :: Expression -> T.Text -> NGLessObject -> InterpretationROEnv (Maybe ShortRead)
+interpretPBlock1 :: Expression -> T.Text -> ShortRead -> InterpretationROEnv (Maybe ShortRead)
 interpretPBlock1 block var r = do
-    r' <- interpretBlock1 [(var, r)] block
+    r' <- interpretBlock1 [(var, NGOShortRead r)] block
     case blockStatus r' of
         BlockDiscarded -> return Nothing -- Discard Read.
         _ -> case lookup var (blockValues r') of
