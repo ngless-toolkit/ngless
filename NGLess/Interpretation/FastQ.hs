@@ -8,7 +8,6 @@ module Interpretation.FastQ
     , executeGroup
     , executeQualityProcess
     , optionalSubsample
-    , _doQC1
     ) where
 
 import System.IO
@@ -21,6 +20,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Zlib as C
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit (($$), (=$=))
+import Data.Maybe
 
 import FileManagement
 import Data.FastQ
@@ -60,22 +60,16 @@ optionalSubsample f = do
             return newfp
 
 -- ^ Process quality.
-_doQC1 :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
+doQC1 :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
                 -> FilePath         -- ^ FastQ file
                 -> NGLessIO ReadSet
-_doQC1 enc f = do
+doQC1 enc f = do
         fd <- statsFromFastQ f
         enc' <- case enc of
                 Just e -> return e
                 Nothing -> guessEncoding (lc fd)
         outputFQStatistics f fd enc'
-        p "Simple Statistics completed for: " f
-        p "Number of base pairs: "      (show $ length (qualCounts fd))
-        p "Encoding is: "               (show enc')
-        p "Number of sequences: "   (show $ nSeq fd)
         return (ReadSet1 enc' f)
-    where
-        p s0 s1  = outputListLno' DebugOutput [s0, s1]
 
 executeGroup :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeGroup (NGOList rs) args = do
@@ -160,29 +154,35 @@ executeFastq expr args = do
             "64" -> return $ Just SolexaEncoding
             "solexa" -> return $ Just SolexaEncoding
             other -> throwScriptError ("Unkown encoding for fastq " ++ T.unpack other)
+    qcNeeded <- lookupBoolOrScriptErrorDef (return True) "fastq hidden QC argument" "__perform_qc" args
     case expr of
         (NGOString fname) -> NGOReadSet <$> do
             let fp = T.unpack fname
-            _doQC1 enc =<< optionalSubsample fp
-        (NGOList fps) -> NGOList <$> sequence [NGOReadSet <$> _doQC1 enc (T.unpack fname) | NGOString fname <- fps]
+            fp' <- optionalSubsample fp
+            if qcNeeded
+                then doQC1 enc fp'
+                else do
+                    enc' <- fromMaybe (encodingFor fp') (return <$> enc)
+                    return (ReadSet1 enc' fp')
+        (NGOList fps) -> NGOList <$> sequence [NGOReadSet <$> doQC1 enc (T.unpack fname) | NGOString fname <- fps]
         v -> throwScriptError ("fastq function: unexpected first argument: " ++ show v)
 
 executeQualityProcess :: NGLessObject -> NGLessIO NGLessObject
 executeQualityProcess (NGOList e) = NGOList <$> mapM executeQualityProcess e
 executeQualityProcess (NGOReadSet rs) = NGOReadSet <$> case rs of
-    ReadSet1 enc fname -> _doQC1 (Just enc) fname
+    ReadSet1 enc fname -> doQC1 (Just enc) fname
     ReadSet2 enc fp1 fp2 -> do
-        ReadSet1 enc1 fp1' <- _doQC1 (Just enc) fp1
-        ReadSet1 enc2 fp2' <- _doQC1 (Just enc) fp2
+        ReadSet1 enc1 fp1' <- doQC1 (Just enc) fp1
+        ReadSet1 enc2 fp2' <- doQC1 (Just enc) fp2
         when (enc1 /= enc2) $
             throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ")")
         return (ReadSet2 enc1 fp1' fp2')
     ReadSet3 enc fp1 fp2 fp3 -> do
-        ReadSet1 enc1 fp1' <- _doQC1 (Just enc) fp1
-        ReadSet1 enc2 fp2' <- _doQC1 (Just enc) fp2
-        ReadSet1 enc3 fp3' <- _doQC1 (Just enc) fp3
+        ReadSet1 enc1 fp1' <- doQC1 (Just enc) fp1
+        ReadSet1 enc2 fp2' <- doQC1 (Just enc) fp2
+        ReadSet1 enc3 fp3' <- doQC1 (Just enc) fp3
         when (enc1 /= enc2 || enc2 /= enc3) $
             throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ", third one is " ++ show enc3 ++")")
         return (ReadSet3 enc1 fp1' fp2' fp3')
-executeQualityProcess (NGOString fname) = NGOReadSet <$> _doQC1 Nothing (T.unpack fname)
+executeQualityProcess (NGOString fname) = NGOReadSet <$> doQC1 Nothing (T.unpack fname)
 executeQualityProcess v = throwScriptError ("Sequence QC expected a string or readset. Got " ++ show v)

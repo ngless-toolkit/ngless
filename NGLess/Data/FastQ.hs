@@ -4,6 +4,7 @@ module Data.FastQ
     ( ShortRead(..)
     , FastQEncoding(..)
     , FQStatistics(..)
+    , encodingFor
     , srLength
     , guessEncoding
     , encodingOffset
@@ -16,6 +17,7 @@ module Data.FastQ
     , gcFraction
     , statsFromFastQ
     , fqStatsC
+    , getPairedLines
     , calculateStatistics
     , calcPercentile
     ) where
@@ -37,7 +39,6 @@ import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Unboxed.Mutable as VUM
 
 import Data.IORef
-import Data.Foldable
 import Data.Maybe
 import Data.Char
 import Data.Word
@@ -119,17 +120,17 @@ statsFromFastQ :: FilePath -> NGLessIO FQStatistics
 statsFromFastQ fp =
     conduitPossiblyCompressedFile fp
         =$= linesC
-        =$= getP
+        =$= getPairedLines
         $$ fqStatsC
 
-getP = groupC 4 =$= CL.mapM getP'
+getPairedLines :: C.Conduit ByteLine NGLessIO (ByteLine,ByteLine)
+getPairedLines = groupC 4 =$= CL.mapM getPairedLines'
     where
-        getP' [_, bps, _, qs] = return (bps, qs)
-        getP' _ = throwDataError ("fastq lines are not a multiple of 4" :: String)
+        getPairedLines' [_, bps, _, qs] = return (bps, qs)
+        getPairedLines' _ = throwDataError ("fastq lines are not a multiple of 4" :: String)
 
-getEnc :: Maybe FastQEncoding -> FilePath -> NGLessIO FastQEncoding
-getEnc (Just e) _ = return e
-getEnc Nothing fp = do
+encodingFor :: FilePath -> NGLessIO FastQEncoding
+encodingFor fp = do
     let countMin :: (Int, Word8) -> Word8 -> (Int, Word8)
         countMin (!c,!m) m' = (c+1, min m m')
         minLc :: (MonadError NGError m) => [ByteLine] -> m Word8

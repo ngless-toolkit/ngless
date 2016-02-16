@@ -35,6 +35,7 @@ import Data.Conduit (($=), ($$), (=$=), (=$))
 import Data.Conduit.Async ((=$=&), ($$&))
 import qualified Data.Vector as V
 
+import Data.IORef
 import System.IO
 import System.Directory
 import Data.Maybe
@@ -317,26 +318,39 @@ data PreprocessPairOutput = Pair ShortRead ShortRead | Single ShortRead
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
-executePreprocess (NGOReadSet (ReadSet1 enc file)) _args (Block [Variable var] block) = do
+executePreprocess (NGOReadSet (ReadSet1 enc file)) args (Block [Variable var] block) = do
         runNGLessIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         (newfp, h) <- runNGLessIO $ openNGLTempFile file "preprocessed_" "fq.gz"
+        qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__qc_input" args
+        qcPre <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
+        qcPost <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
+        let inline = if qcInput
+                    then C.passthroughSink (C.transPipe runNGLessIO (getPairedLines $= fqStatsC)) (liftIO . writeIORef qcPre . Just)
+                    else C.awaitForever C.yield -- identity monad
+
         (conduitPossiblyCompressedFile file
             =$= linesC
+            =$= inline
             =$= fqConduitR enc
-            =$= C.conduitVector 1000)
+            =$= C.conduitVector 2048)
                 =$=& (
                     (C.concat :: C.Conduit (V.Vector ShortRead) InterpretationEnvIO ShortRead)
                     =$= CL.mapMaybeM (runInROEnvIO . interpretPBlock1 block var)
                     =$= fqEncodeC enc
+                    =$= C.passthroughSink (C.transPipe runNGLessIO (linesC =$= getPairedLines =$= fqStatsC)) (liftIO . writeIORef qcPost . Just)
                     =$= C.conduitVector 4000
                     )
                 $$& (
                     (C.concat :: C.Conduit (V.Vector B.ByteString) InterpretationEnvIO B.ByteString)
                     =$= C.gzip =$ C.sinkHandle h)
         liftIO (hClose h)
-        let r = NGOReadSet $ ReadSet1 enc newfp
-        runNGLessIO $ executeQualityProcess r
-        return r
+        when qcInput $ do
+            Just qcPreStats <- liftIO $ readIORef qcPre
+            runNGLessIO $ outputFQStatistics file qcPreStats enc
+        Just qcPostStats <- liftIO $ readIORef qcPost
+        runNGLessIO $ outputFQStatistics (file ++ "-preprocessed") qcPostStats enc
+        return (NGOReadSet $ ReadSet1 enc newfp)
+
 executePreprocess (NGOReadSet (ReadSet2 enc fp1 fp2)) _args block = executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 "")) _args block
 executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable var] block) = do
         keepSingles <- runNGLessIO $ lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args

@@ -52,12 +52,15 @@ selectArgs =
     ]
 
 fastqArgs =
-    [ArgInformation "encoding" False NGLSymbol (Just ["auto", "33", "64", "sanger", "solexa"])]
+    [ArgInformation "encoding" False NGLSymbol (Just ["auto", "33", "64", "sanger", "solexa"])
+    ,ArgInformation "__perform_qc" False NGLBool Nothing
+    ]
 
 samfileArgs = []
 pairedArgs =
     [ArgInformation "second" True NGLString Nothing
     ,ArgInformation "singles" False NGLString Nothing
+    ,ArgInformation "__perform_qc" False NGLBool Nothing
     ]
 
 uniqueArgs =
@@ -65,6 +68,7 @@ uniqueArgs =
 
 preprocessArgs =
     [ArgInformation "keep_singles" False NGLBool Nothing
+    ,ArgInformation "__qc_input" False NGLBool Nothing
     ]
 
 mapArgs =

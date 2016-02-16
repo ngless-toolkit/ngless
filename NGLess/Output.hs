@@ -151,8 +151,8 @@ encodeBPStats res enc = map encode1 (FQ.calculateStatistics res enc)
     where encode1 (mean, median, lq, uq) = BPosInfo mean median lq uq
 
 outputFQStatistics :: FilePath -> FQ.FQStatistics -> FastQEncoding -> NGLessIO ()
-outputFQStatistics fname stats enc = liftIO $ do
-    lno' <- readIORef curLine
+outputFQStatistics fname stats enc = do
+    lno' <- liftIO $ readIORef curLine
     let enc'    = encodingName enc
         sSize'  = FQ.seqSize stats
         nSeq'   = FQ.nSeq stats
@@ -160,8 +160,12 @@ outputFQStatistics fname stats enc = liftIO $ do
         st      = encodeBPStats stats enc
         lno     = fromMaybe 0 lno'
         binfo   = FQInfo fname lno gc' enc' nSeq' sSize' st
-    modifyIORef savedFQOutput (binfo:)
-
+    let p s0 s1  = outputListLno' DebugOutput [s0, s1]
+    p "Simple Statistics completed for: " fname
+    p "Number of base pairs: "      (show $ length (FQ.qualCounts stats))
+    p "Encoding is: "               (show enc)
+    p "Number of sequences: "   (show $ FQ.nSeq stats)
+    liftIO $ modifyIORef savedFQOutput (binfo:)
 
 data InfoLink = HasQCInfo !Int
     deriving (Eq, Show)
