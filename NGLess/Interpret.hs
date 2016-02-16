@@ -34,6 +34,7 @@ import qualified Data.Conduit.Binary as CB
 import Data.Conduit (($=), ($$), (=$=), (=$))
 import Data.Conduit.Async ((=$=&), ($$&))
 import qualified Data.Vector as V
+import           Control.DeepSeq (NFData(..))
 
 import Data.IORef
 import System.IO
@@ -314,6 +315,9 @@ optionalSubsample' (NGOString f) = NGOString . T.pack <$> runNGLessIO (optionalS
 optionalSubsample' _ = throwShouldNotOccur ("This case should not occurr" :: T.Text)
 
 data PreprocessPairOutput = Pair ShortRead ShortRead | Single ShortRead
+instance NFData PreprocessPairOutput where
+    rnf (Pair a b) = rnf a `seq` rnf b
+    rnf (Single a) = rnf a
 
 
 vMapMaybeLifted :: (a -> Either e (Maybe b)) -> V.Vector a -> Either e (V.Vector b)
@@ -391,7 +395,6 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
             pair = C.getZipSource ((,) <$> C.ZipSource rs1 <*> C.ZipSource rs2)
 
             zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
-            zipSink3 a b c = C.getZipSink((,,) <$> C.ZipSink a <*> C.ZipSink b <*> C.ZipSink c)
 
             countC :: C.Consumer a InterpretationEnvIO Int
             countC = CL.fold (\n _ -> (n+1)) 0
@@ -409,13 +412,17 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
                             Single sr -> Just sr
                             _ -> Nothing) =$= write out3
 
+        env <- gets id
+        numCapabilities <- liftIO getNumCapabilities
+        let mapthreads = max 1 (numCapabilities - 1)
         [((),s1),((),s2),((),s3)] <-
             (pair
                 =$= C.conduitVector 4096)
-                =$=& ((C.concat :: C.Conduit (V.Vector (ShortRead,ShortRead)) InterpretationEnvIO (ShortRead,ShortRead))
-                    =$= intercalate keepSingles
-                    =$= C.conduitVector 4096)
-                $$& ((C.concat :: C.Conduit (V.Vector PreprocessPairOutput) InterpretationEnvIO PreprocessPairOutput)
+                $$& (asyncMapC mapthreads (vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles))
+                    =$= C.awaitForever (\case
+                            Right v -> C.yield v
+                            Left e -> throwError e)
+                    =$= (C.concat :: C.Conduit (V.Vector PreprocessPairOutput) InterpretationEnvIO PreprocessPairOutput)
                     =$= C.sequenceSinks
                         [ write1
                         , write2
@@ -444,15 +451,19 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
             return (Single <$> r')
 
 
-        intercalate :: Bool -> C.Conduit (ShortRead, ShortRead) InterpretationEnvIO PreprocessPairOutput
-        intercalate keepSingles = C.awaitForever $ \(r1,r2) -> do
-                r1' <- lift . runInROEnvIO $ interpretPBlock1 block var r1
-                r2' <- lift . runInROEnvIO $ interpretPBlock1 block var r2
-                case (r1',r2') of
-                    (Just r1'', Just r2'') -> C.yield (Pair r1'' r2'')
-                    (Just r, Nothing) -> when keepSingles $ C.yield (Single r)
-                    (Nothing, Just r) -> when keepSingles $ C.yield (Single r)
-                    (Nothing, Nothing) -> return ()
+        intercalate :: Bool -> (ShortRead, ShortRead) -> InterpretationROEnv (Maybe PreprocessPairOutput)
+        intercalate keepSingles (r1, r2) = do
+                r1' <- interpretPBlock1 block var r1
+                r2' <- interpretPBlock1 block var r2
+                return $ case (r1',r2') of
+                    (Just r1'', Just r2'') -> Just (Pair r1'' r2'')
+                    (Just r, Nothing) -> if keepSingles
+                                                then Just (Single r)
+                                                else Nothing
+                    (Nothing, Just r) -> if keepSingles
+                                                then Just (Single r)
+                                                else Nothing
+                    (Nothing, Nothing) -> Nothing
 executePreprocess v _ _ = unreachable ("executePreprocess: Cannot handle this input: " ++ show v)
 
 executeMethod :: MethodName -> NGLessObject -> Maybe NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationROEnv NGLessObject
