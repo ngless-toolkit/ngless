@@ -54,6 +54,9 @@ data ShortRead = ShortRead
         , srQualities :: !B.ByteString
         } deriving (Eq, Show, Ord)
 
+instance NFData ShortRead where
+    rnf (ShortRead _ _ _) = ()
+
 data FastQEncoding = SangerEncoding | SolexaEncoding deriving (Eq, Bounded, Enum, Show, Ord)
 
 data FQStatistics = FQStatistics

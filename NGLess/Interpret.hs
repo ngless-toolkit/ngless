@@ -40,6 +40,7 @@ import System.IO
 import System.Directory
 import Data.Maybe
 import Data.List (find)
+import GHC.Conc                 (getNumCapabilities)
 
 import Utils.Utils
 import Substrim
@@ -82,12 +83,9 @@ import Utils.Conduit
  -}
 
 
--- A variable map
-type NGLEnv_t = Map.Map T.Text NGLessObject
-
 data NGLInterpretEnv = NGLInterpretEnv
     { ieModules :: [Module]
-    , ieVariableEnv :: NGLEnv_t
+    , ieVariableEnv :: Map.Map T.Text NGLessObject
     }
 
 type InterpretationEnvT m =
@@ -151,6 +149,8 @@ findFunction fname = do
     where
         hasF m = (fname `elem` (funcName `fmap` modFunctions m))
 
+runInterpretationRO :: NGLInterpretEnv -> InterpretationROEnv a -> Either NGError a
+runInterpretationRO env act = runReader (runExceptT act) env
 
 runInEnv :: InterpretationEnv a -> InterpretationEnvIO a
 runInEnv act = do
@@ -165,8 +165,7 @@ runInEnv act = do
 runInROEnv :: InterpretationROEnv a -> InterpretationEnv a
 runInROEnv action = do
     env <- gets id
-    let Identity mv = runReaderT (runExceptT action) env
-    case mv of
+    case runInterpretationRO env action of
         Left e -> throwError e
         Right v -> return v
 
@@ -316,6 +315,18 @@ optionalSubsample' _ = throwShouldNotOccur ("This case should not occurr" :: T.T
 
 data PreprocessPairOutput = Pair ShortRead ShortRead | Single ShortRead
 
+
+vMapMaybeLifted :: (a -> Either e (Maybe b)) -> V.Vector a -> Either e (V.Vector b)
+vMapMaybeLifted f v = sequence $ V.unfoldr loop 0
+    where
+        loop i
+            | i < V.length v = let !n = i+1 in
+                            case f (v V.! i) of
+                                Right Nothing -> loop n
+                                Right (Just val) -> Just (Right val, n)
+                                Left err -> Just (Left err, n)
+            | otherwise = Nothing
+
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
 executePreprocess (NGOReadSet (ReadSet1 enc file)) args (Block [Variable var] block) = do
@@ -328,15 +339,19 @@ executePreprocess (NGOReadSet (ReadSet1 enc file)) args (Block [Variable var] bl
                     then C.passthroughSink (C.transPipe runNGLessIO (getPairedLines $= fqStatsC)) (liftIO . writeIORef qcPre . Just)
                     else C.awaitForever C.yield -- identity monad
 
+        env <-gets id
+        numCapabilities <- liftIO getNumCapabilities
+        let mapthreads = max 1 (numCapabilities - 1)
         (conduitPossiblyCompressedFile file
             =$= linesC
             =$= inline
             =$= fqConduitR enc
-            =$= C.conduitVector 2048)
-                =$=& (
-                    (C.concat :: C.Conduit (V.Vector ShortRead) InterpretationEnvIO ShortRead)
-                    =$= CL.mapMaybeM (runInROEnvIO . interpretPBlock1 block var)
-                    =$= fqEncodeC enc
+            =$= C.conduitVector 8192)
+            =$=& (asyncMapC mapthreads (vMapMaybeLifted ((liftM (liftM $ fqEncode enc)) . runInterpretationRO env . interpretPBlock1 block var))
+                    =$= (C.awaitForever $ \case
+                            Right v -> C.yield v
+                            Left e -> throwError e)
+                    =$= (C.concat :: C.Conduit (V.Vector B.ByteString) InterpretationEnvIO B.ByteString)
                     =$= C.passthroughSink (C.transPipe runNGLessIO (linesC =$= getPairedLines =$= fqStatsC)) (liftIO . writeIORef qcPost . Just)
                     =$= C.conduitVector 4000
                     )
