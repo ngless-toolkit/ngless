@@ -148,7 +148,6 @@ encodingFor fp = do
         $$ CL.fold countMin (0,maxBound :: Word8)
     when (c < 2) $
         throwDataError ("Cannot determine encoding for input file '" ++ fp ++ "'. File is too short [ngless requires at least 2 sequences]")
-    liftIO $ putStrLn ("Found min char: " ++ show m ++ " in " ++ show c ++ " sequences")
     guessEncoding m
 
 
