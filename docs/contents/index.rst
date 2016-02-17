@@ -13,7 +13,6 @@ Welcome to ngless's documentation!
    install
    GettingStarted
    Organisms
-   Visualization
    Language
    Functions
    methods
