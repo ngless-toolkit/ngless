@@ -281,23 +281,8 @@ topFunction' (FuncName "map")       expr args Nothing = runNGLessIO (executeMap 
 topFunction' (FuncName "select")    expr args Nothing = runNGLessIO (executeSelect expr args)
 topFunction' (FuncName "count")     expr args Nothing = runNGLessIO (executeCount expr args)
 topFunction' (FuncName "print")     expr args Nothing = executePrint expr args
-
-topFunction' (FuncName "paired") mate1 args Nothing = NGOReadSet <$> do
-    let Just mate2 = lookup "second" args
-        mate3 = lookup "singles" args
-    traceExpr "paired" [mate1, mate2]
-    NGOReadSet (ReadSet1 enc1 fp1) <- runNGLessIO . executeQualityProcess =<< optionalSubsample' mate1
-    NGOReadSet (ReadSet1 enc2 fp2) <- runNGLessIO . executeQualityProcess =<< optionalSubsample' mate2
-    when (enc1 /= enc2) $
-        throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
-    case mate3 of
-        Nothing -> return (ReadSet2 enc1 fp1 fp2)
-        Just f3 -> do
-            NGOReadSet (ReadSet1 enc3 fp3) <- runNGLessIO . executeQualityProcess =<< optionalSubsample' f3
-            when (enc1 /= enc3) $
-                throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
-            return (ReadSet3 enc1 fp1 fp2 fp3)
-topFunction' (FuncName "select") expr args (Just b) = executeSelectWBlock expr args b
+topFunction' (FuncName "paired")   mate1 args Nothing = runNGLessIO (executePaired mate1 args)
+topFunction' (FuncName "select")    expr args (Just b) = executeSelectWBlock expr args b
 topFunction' fname@(FuncName fname') expr args Nothing = do
     traceExpr ("executing module function: '"++T.unpack fname'++"'") expr
     execF <- findFunction fname
@@ -310,9 +295,6 @@ executeSamfile expr@(NGOString fname) args = do
     gname <- lookupStringOrScriptErrorDef (return fname) "samfile group name" "name" args
     return $ NGOMappedReadSet gname (T.unpack fname) Nothing
 executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show args)
-
-optionalSubsample' (NGOString f) = NGOString . T.pack <$> runNGLessIO (optionalSubsample $ T.unpack f)
-optionalSubsample' _ = throwShouldNotOccur ("This case should not occurr" :: T.Text)
 
 data PreprocessPairOutput = Pair ShortRead ShortRead | Single ShortRead
 instance NFData PreprocessPairOutput where
@@ -331,6 +313,9 @@ vMapMaybeLifted f v = sequence $ V.unfoldr loop 0
                                 Left err -> Just (Left err, n)
             | otherwise = Nothing
 
+inlineQCIf False _ = C.awaitForever C.yield -- identity monad
+inlineQCIf True resVar = C.passthroughSink (C.transPipe runNGLessIO (getPairedLines $= fqStatsC)) (liftIO . writeIORef resVar . Just)
+
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
 executePreprocess (NGOReadSet (ReadSet1 enc file)) args (Block [Variable var] block) = do
@@ -339,16 +324,13 @@ executePreprocess (NGOReadSet (ReadSet1 enc file)) args (Block [Variable var] bl
         qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__qc_input" args
         qcPre <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
         qcPost <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
-        let inline = if qcInput
-                    then C.passthroughSink (C.transPipe runNGLessIO (getPairedLines $= fqStatsC)) (liftIO . writeIORef qcPre . Just)
-                    else C.awaitForever C.yield -- identity monad
 
         env <-gets id
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
         (conduitPossiblyCompressedFile file
             =$= linesC
-            =$= inline
+            =$= inlineQCIf qcInput qcPre
             =$= fqConduitR enc
             =$= C.conduitVector 8192)
             =$=& (asyncMapC mapthreads (vMapMaybeLifted ((liftM (liftM $ fqEncode enc)) . runInterpretationRO env . interpretPBlock1 block var))
@@ -373,6 +355,8 @@ executePreprocess (NGOReadSet (ReadSet1 enc file)) args (Block [Variable var] bl
 executePreprocess (NGOReadSet (ReadSet2 enc fp1 fp2)) _args block = executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 "")) _args block
 executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable var] block) = do
         keepSingles <- runNGLessIO $ lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args
+        qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__qc_input" args
+
         runNGLessIO $ outputListLno' DebugOutput (["Preprocess on paired end ",
                                                 fp1, " + ", fp2] ++ (if fp3 /= ""
                                                                     then [" with singles ", fp3]
@@ -380,15 +364,20 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
         (fp1', out1) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.1." ".fq.gz"
         (fp2', out2) <- runNGLessIO $ openNGLTempFile fp2 "preprocessed.2." ".fq.gz"
         (fps, out3) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.singles." ".fq.gz"
+
+        qcPre1 <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
+        qcPre2 <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
+        qcPre3 <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
+
         let rs1 :: C.Source InterpretationEnvIO ShortRead
-            rs1 = conduitPossiblyCompressedFile fp1 =$= linesC =$= fqConduitR enc
+            rs1 = conduitPossiblyCompressedFile fp1 =$= linesC =$= inlineQCIf qcInput qcPre1 =$= fqConduitR enc
 
             rs2 :: C.Source InterpretationEnvIO ShortRead
-            rs2 = conduitPossiblyCompressedFile fp2 =$= linesC =$= fqConduitR enc
+            rs2 = conduitPossiblyCompressedFile fp2 =$= linesC =$= inlineQCIf qcInput qcPre2 =$= fqConduitR enc
 
             rs3 :: C.Source InterpretationEnvIO ShortRead
             rs3 = if fp3 /= ""
-                    then conduitPossiblyCompressedFile fp3 =$= linesC =$= fqConduitR enc
+                    then conduitPossiblyCompressedFile fp3 =$= linesC =$= inlineQCIf qcInput qcPre3 =$= fqConduitR enc
                     else C.yieldMany []
 
             pair :: C.Source InterpretationEnvIO (ShortRead,ShortRead)
@@ -440,6 +429,11 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
         liftIO $ forM_ [out1, out2, out3] hClose
         unless anySingle
             (liftIO $ removeFile fps)
+        forM_ (zip [qcPre1, qcPre2, qcPre3] [fp1, fp2, fp3]) $ \(q,fp) ->
+            liftIO (readIORef q) >>= \case
+                Nothing -> return ()
+                Just qcPreStats -> runNGLessIO $ outputFQStatistics fp qcPreStats enc
+
         runNGLessIO $ outputLno' DebugOutput "Preprocess finished"
         return . NGOReadSet $ if anySingle
                     then ReadSet3 enc fp1' fp2' fps

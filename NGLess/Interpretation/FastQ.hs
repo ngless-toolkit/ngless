@@ -5,9 +5,8 @@
 
 module Interpretation.FastQ
     ( executeFastq
+    , executePaired
     , executeGroup
-    , executeQualityProcess
-    , optionalSubsample
     ) where
 
 import System.IO
@@ -146,43 +145,51 @@ rsEncoding (ReadSet3 enc _ _ _) = enc
 
 executeFastq :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeFastq expr args = do
-    encName <- lookupSymbolOrScriptErrorDef (return "auto") "fastq arguments" "encoding" args
-    enc <- case encName of
+    enc <- getEncArgument "fastq" args
+    qcNeeded <- lookupBoolOrScriptErrorDef (return True) "fastq hidden QC argument" "__perform_qc" args
+    case expr of
+        (NGOString fname) -> NGOReadSet <$> asReadSet1mayQC qcNeeded enc fname
+        (NGOList fps) -> NGOList <$> sequence [NGOReadSet <$> doQC1 enc (T.unpack fname) | NGOString fname <- fps]
+        v -> throwScriptError ("fastq function: unexpected first argument: " ++ show v)
+
+
+asReadSet1mayQC :: Bool -> Maybe FastQEncoding -> T.Text -> NGLessIO ReadSet
+asReadSet1mayQC qcNeeded enc fpt = do
+    let fp = T.unpack fpt
+    fp' <- optionalSubsample fp
+    if qcNeeded
+        then doQC1 enc fp
+        else do
+            enc' <- fromMaybe (encodingFor fp') (return <$> enc)
+            return (ReadSet1 enc' fp)
+
+executePaired :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executePaired (NGOString mate1) args = NGOReadSet <$> do
+    enc <- getEncArgument "paired" args
+    mate2 <- lookupStringOrScriptError "automatic argument" "second" args
+    let mate3 = lookup "singles" args
+    outputListLno' TraceOutput ["Executing paired on ", show mate1, show mate2, show mate3]
+    qcNeeded <- lookupBoolOrScriptErrorDef (return True) "fastq hidden QC argument" "__perform_qc" args
+
+    (ReadSet1 enc1 fp1) <- asReadSet1mayQC qcNeeded enc mate1
+    (ReadSet1 enc2 fp2) <- asReadSet1mayQC qcNeeded enc mate2
+    when (enc1 /= enc2) $
+        throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
+    case mate3 of
+        Nothing -> return (ReadSet2 enc1 fp1 fp2)
+        Just (NGOString f3) -> do
+            (ReadSet1 enc3 fp3) <- asReadSet1mayQC qcNeeded enc f3
+            when (enc1 /= enc3) $
+                throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
+            return (ReadSet3 enc1 fp1 fp2 fp3)
+executePaired expr _ = throwScriptError ("Function paired expects a string, got: " ++ show expr)
+
+getEncArgument fname args =
+    lookupSymbolOrScriptErrorDef (return "auto") fname "encoding" args
+        >>= \case
             "auto" -> return Nothing
             "33" -> return $ Just SangerEncoding
             "sanger" -> return $ Just SangerEncoding
             "64" -> return $ Just SolexaEncoding
             "solexa" -> return $ Just SolexaEncoding
             other -> throwScriptError ("Unkown encoding for fastq " ++ T.unpack other)
-    qcNeeded <- lookupBoolOrScriptErrorDef (return True) "fastq hidden QC argument" "__perform_qc" args
-    case expr of
-        (NGOString fname) -> NGOReadSet <$> do
-            let fp = T.unpack fname
-            fp' <- optionalSubsample fp
-            if qcNeeded
-                then doQC1 enc fp'
-                else do
-                    enc' <- fromMaybe (encodingFor fp') (return <$> enc)
-                    return (ReadSet1 enc' fp')
-        (NGOList fps) -> NGOList <$> sequence [NGOReadSet <$> doQC1 enc (T.unpack fname) | NGOString fname <- fps]
-        v -> throwScriptError ("fastq function: unexpected first argument: " ++ show v)
-
-executeQualityProcess :: NGLessObject -> NGLessIO NGLessObject
-executeQualityProcess (NGOList e) = NGOList <$> mapM executeQualityProcess e
-executeQualityProcess (NGOReadSet rs) = NGOReadSet <$> case rs of
-    ReadSet1 enc fname -> doQC1 (Just enc) fname
-    ReadSet2 enc fp1 fp2 -> do
-        ReadSet1 enc1 fp1' <- doQC1 (Just enc) fp1
-        ReadSet1 enc2 fp2' <- doQC1 (Just enc) fp2
-        when (enc1 /= enc2) $
-            throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ")")
-        return (ReadSet2 enc1 fp1' fp2')
-    ReadSet3 enc fp1 fp2 fp3 -> do
-        ReadSet1 enc1 fp1' <- doQC1 (Just enc) fp1
-        ReadSet1 enc2 fp2' <- doQC1 (Just enc) fp2
-        ReadSet1 enc3 fp3' <- doQC1 (Just enc) fp3
-        when (enc1 /= enc2 || enc2 /= enc3) $
-            throwDataError ("Mates do not seem to have the same quality encoding! (first one is " ++ show enc1++" while second one is "++show enc2 ++ ", third one is " ++ show enc3 ++")")
-        return (ReadSet3 enc1 fp1' fp2' fp3')
-executeQualityProcess (NGOString fname) = NGOReadSet <$> doQC1 Nothing (T.unpack fname)
-executeQualityProcess v = throwScriptError ("Sequence QC expected a string or readset. Got " ++ show v)

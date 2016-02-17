@@ -82,10 +82,10 @@ qcInPreprocess :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 qcInPreprocess [] = return []
 qcInPreprocess ((lno,expr):rest) = case fastQVar expr of
         Nothing -> ((lno,expr):) <$> qcInPreprocess rest
-        Just v -> if not $ canQCPreprocessTransform v rest
+        Just (fname, v) -> if not $ canQCPreprocessTransform v rest
                     then ((lno,expr):) <$> qcInPreprocess rest
                     else do
-                        let expr' = addArgument "fastq" (Variable "__perform_qc", ConstBool False) expr
+                        let expr' = addArgument fname (Variable "__perform_qc", ConstBool False) expr
                             rest' = rewritePreprocess v rest
                         outputListLno' TraceOutput ["Transformation for QC triggered for variable ", show v, " on line ", show lno, "."]
                         ((lno, expr'):) <$> qcInPreprocess rest'
@@ -98,8 +98,9 @@ rewritePreprocess v ((lno,expr):rest) = case expr of
                     in (lno,expr'):rest
     _ -> (lno,expr):rewritePreprocess v rest
 
-fastQVar :: Expression -> Maybe Variable
-fastQVar (Assignment v (FunctionCall (FuncName "fastq") _ _ _)) = Just v
+fastQVar :: Expression -> Maybe (T.Text, Variable)
+fastQVar (Assignment v (FunctionCall (FuncName fname) _ _ _))
+        | fname `elem` ["fastq", "paired"] = Just (fname, v)
 fastQVar _ = Nothing
 
 -- The rule is: we can perform the transform if the first usage of the Variable
