@@ -9,20 +9,33 @@ module Utils.Conduit
     , linesC
     , groupC
     , awaitJust
+    , bsConcatTo
+    , asyncGzipTo
     ) where
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Internal as BI -- not a fully kosher import
 import qualified Control.Concurrent.Async as A
-import qualified Data.Conduit as C
-import           Data.Conduit ((=$=))
-import qualified Data.Conduit.List as CL
+import qualified Control.Concurrent.STM.TBMQueue as TQ
+
+import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.TQueue as CA
+import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Zlib as C
+import qualified Data.Conduit as C
+import           Data.Conduit ((=$=), ($$))
+
 import qualified Data.Sequence as Seq
 import           Data.Sequence ((|>), ViewL(..))
 import           Control.Monad (unless)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Exception (evaluate)
 import           Control.DeepSeq
+import           Foreign.ForeignPtr
+import           System.IO
+import           Data.Word
+import           Foreign.Ptr
 
 import Utils.Utils (conduitPossiblyCompressedFile)
 
@@ -82,3 +95,47 @@ awaitJust :: Monad m => (i -> C.Conduit i m o) -> C.Conduit i m o
 awaitJust f = C.await >>= \case
         Nothing -> return ()
         Just v -> f v
+
+bsConcatTo :: (Monad m, MonadIO m) => Int -> C.Conduit B.ByteString m B.ByteString
+bsConcatTo chunkSize = awaitJust start
+    where
+        start v
+            | B.length v >= chunkSize = C.yield v >> bsConcatTo chunkSize
+            | otherwise = do
+                buff <- liftIO $ allocateBuffer chunkSize
+                liftIO $ copyTo buff 0 v
+                continue buff (B.length v)
+        continue buff nextPos = C.await >>= \case
+            Nothing -> C.yield (freeze buff nextPos)
+            Just v
+                | B.length v + nextPos > chunkSize -> C.yield (freeze buff nextPos) >> start v
+                | otherwise -> do
+                    liftIO $ copyTo buff nextPos v
+                    continue buff (nextPos + B.length v)
+
+        allocateBuffer :: Int -> IO (ForeignPtr Word8)
+        allocateBuffer n = mallocForeignPtrBytes n
+
+        copyTo :: (ForeignPtr Word8) -> Int -> B.ByteString -> IO ()
+        copyTo fp offset src = let (srcfp,srcoff,srcsize) = BI.toForeignPtr src in
+                 withForeignPtr fp $ \p -> withForeignPtr srcfp $ \src ->
+                    BI.memcpy (p `plusPtr` offset) (src `plusPtr` srcoff) srcsize
+
+        freeze :: (ForeignPtr Word8) -> Int -> B.ByteString
+        freeze p size = BI.fromForeignPtr p 0 size
+
+-- | A simple sink which performs gzip in a separate thread and writes the results to `h`.
+asyncGzipTo :: forall m m'. (MonadIO m, MonadIO m') => Handle -> m (C.Sink B.ByteString m' ())
+asyncGzipTo h = do
+    -- We allocate the queue separately (instead of using CA.paired*) so that
+    -- `src` and `sink` end up with different underlying monads (src is a
+    -- conduit over IO, while sink is over m):
+    q <- liftIO $ TQ.newTBMQueueIO 4
+    let src :: C.Source IO B.ByteString
+        src = CA.sourceTBMQueue q
+    consumer <- liftIO $ A.async (src $$ C.gzip =$= C.sinkHandle h)
+    let sink :: C.Sink B.ByteString m' ()
+        sink = C.addCleanup (\_ -> liftIO (A.wait consumer)) $ CA.sinkTBMQueue q True
+    return (bsConcatTo (2^15) =$= sink)
+
+

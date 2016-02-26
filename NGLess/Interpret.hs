@@ -27,10 +27,10 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Zlib as C
 import qualified Data.Conduit as C
-import qualified Data.Conduit.List as CL
-import qualified Data.Conduit.Binary as CB
 import Data.Conduit (($=), ($$), (=$=), (=$))
 import Data.Conduit.Async ((=$=&), ($$&))
 import qualified Data.Vector as V
@@ -385,25 +385,29 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
 
             zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
 
-            countC :: C.Consumer a InterpretationEnvIO Int
-            countC = CL.fold (\n _ -> (n+1)) 0
-            write h = zipSink2
-                            (fqEncodeC enc =$= C.gzip =$= C.sinkHandle h)
-                            (CL.map (\(ShortRead _ bps qs) -> (ByteLine bps, ByteLine qs)) =$= C.transPipe runNGLessIO fqStatsC)
+            write :: Handle -> InterpretationEnvIO (C.Sink ShortRead InterpretationEnvIO ((),FQStatistics))
+            write h = do
+                sink <- asyncGzipTo h
+                return $ zipSink2
+                        (fqEncodeC enc =$= sink)
+                        (CL.map (\(ShortRead _ bps qs) -> (ByteLine bps, ByteLine qs)) =$= C.transPipe runNGLessIO fqStatsC)
 
-            write1 = CL.mapMaybe (\case
+            filter1 = CL.mapMaybe (\case
                             Pair sr _ -> Just sr
-                            _ -> Nothing) =$= write out1
-            write2 = CL.mapMaybe (\case
+                            _ -> Nothing)
+            filter2 = CL.mapMaybe (\case
                             Pair _ sr -> Just sr
-                            _ -> Nothing) =$= write out2
-            writeS = CL.mapMaybe (\case
+                            _ -> Nothing)
+            filterS = CL.mapMaybe (\case
                             Single sr -> Just sr
-                            _ -> Nothing) =$= write out3
+                            _ -> Nothing)
 
         env <- gets id
         numCapabilities <- liftIO getNumCapabilities
-        let mapthreads = max 1 (numCapabilities - 1)
+        let mapthreads = max 1 (numCapabilities - 2)
+        w1 <- write out1
+        w2 <- write out2
+        wS <- write out3
         [((),s1),((),s2),((),s3)] <-
             (pair
                 =$= C.conduitVector 4096)
@@ -413,16 +417,17 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
                             Left e -> throwError e)
                     =$= (C.concat :: C.Conduit (V.Vector PreprocessPairOutput) InterpretationEnvIO PreprocessPairOutput)
                     =$= C.sequenceSinks
-                        [ write1
-                        , write2
-                        , writeS
+                        [ filter1 =$= w1
+                        , filter2 =$= w2
+                        , filterS =$= wS
                         ])
+        wS' <- write out3
         ((),s3') <- rs3
                 =$= preprocBlock
+                =$= filterS
                 =$= C.conduitVector 4096
-                $$& ((C.concat :: C.Conduit (V.Vector PreprocessPairOutput) InterpretationEnvIO PreprocessPairOutput)
-                =$= writeS)
-
+                $$& ((C.concat :: C.Conduit (V.Vector ShortRead) InterpretationEnvIO ShortRead)
+                =$= wS')
         let n3 = nSeq s3
             n3' = nSeq s3'
             anySingle = n3 > 0 || n3' > 0
