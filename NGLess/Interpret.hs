@@ -380,11 +380,6 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
                     then conduitPossiblyCompressedFile fp3 =$= linesC =$= inlineQCIf qcInput qcPre3 =$= fqConduitR enc
                     else C.yieldMany []
 
-            pair :: C.Source InterpretationEnvIO (ShortRead,ShortRead)
-            pair = C.getZipSource ((,) <$> C.ZipSource rs1 <*> C.ZipSource rs2)
-
-            zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
-
             write :: Handle -> InterpretationEnvIO (C.Sink ShortRead InterpretationEnvIO ((),FQStatistics))
             write h = do
                 sink <- asyncGzipTo h
@@ -409,7 +404,7 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
         w2 <- write out2
         wS <- write out3
         [((),s1),((),s2),((),s3)] <-
-            (pair
+            (zipSource2 rs1 rs2
                 =$= C.conduitVector 4096)
                 $$& (asyncMapC mapthreads (vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles))
                     =$= C.awaitForever (\case

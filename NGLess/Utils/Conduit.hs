@@ -11,6 +11,8 @@ module Utils.Conduit
     , awaitJust
     , bsConcatTo
     , asyncGzipTo
+    , zipSink2
+    , zipSource2
     ) where
 
 import qualified Data.ByteString as B
@@ -139,3 +141,5 @@ asyncGzipTo h = do
     return (bsConcatTo (2^15) =$= sink)
 
 
+zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
+zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
