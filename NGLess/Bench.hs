@@ -6,6 +6,7 @@ import Criterion.Main
 
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
+import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Conduit as C
 import qualified Data.Text as T
 import           Data.Conduit ((=$=), ($$))
@@ -23,7 +24,8 @@ import Interpret (interpret)
 import Parse (parsengless)
 import Language (Script(..))
 import Data.Sam (readSamLine, readSamGroupsC)
-import Data.FastQ (statsFromFastQ)
+import Data.FastQ (statsFromFastQ, parseFastQ, FastQEncoding(..), ShortRead(..))
+import Substrim (substrim)
 
 nfNGLessIO :: (NFData a) => NGLessIO a -> Benchmarkable
 nfNGLessIO = nfIO . testNGLessIO
@@ -41,6 +43,14 @@ countRights = loop (0 :: Int)
             Nothing -> return i
             Just (Right _) -> loop (i+1)
             _ -> loop i
+
+exampleSR :: ShortRead
+exampleSR = head . parseFastQ SangerEncoding $ BL.fromChunks
+                ["@SRR867735.1 HW-ST997:253:C16APACXX:7:1101:2971:1948/1\n"
+                ,"NCCGCTGCTCGGGATCAAGACATACCGCGGGGGGAGGGGAGCGGGACCAC\n"
+                ,"+\n"
+                ,"#11ABDD6DFBDFHEGHDDGFFFHE?@GEEGA##################\n"]
+
 
 count= loop (0 :: Int)
     where
@@ -67,6 +77,7 @@ main = setupTestConfiguration >> defaultMain [
         , bench "preprocess" $ nfNGLessScript "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n"
         , bench "preprocess-pair" $ nfNGLessScript
                 "p = paired('test_samples/sample.fq.gz', 'test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n"
+        , bench "substrim" $ nf (substrim 30) exampleSR
         ]
     ,bgroup "parse-sam"
         [ bench "readSamLine" $ nfRIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= CL.map readSamLine $$ countRights)
