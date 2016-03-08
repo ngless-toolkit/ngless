@@ -100,7 +100,7 @@ data Command = Command
     } deriving (Eq, Show)
 
 instance FromJSON Command where
-    parseJSON = withObject "command" $ \o ->
+    parseJSON = withObject "function" $ \o ->
         Command
             <$> o .: "nglName"
             <*> o .: "arg0"
@@ -124,7 +124,7 @@ instance FromJSON ExternalModule where
         ExternalModule
             <$> (ModInfo <$> o .: "name" <*> o .: "version")
             <*> pure undefined
-            <*> o .: "command"
+            <*> o .: "function"
             <*> initO .: "init_cmd"
             <*> initO .:? "init_args" .!= []
             <*> o .:? "references" .!= []
