@@ -6,6 +6,7 @@ module Utils.Conduit
     ( ByteLine(..)
     , conduitPossiblyCompressedFile
     , asyncMapC
+    , asyncMapEitherC
     , linesC
     , groupC
     , awaitJust
@@ -32,6 +33,7 @@ import qualified Data.Sequence as Seq
 import           Data.Sequence ((|>), ViewL(..))
 import           Control.Monad (unless)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Exception (evaluate)
 import           Control.DeepSeq
 import           Foreign.ForeignPtr
@@ -80,6 +82,15 @@ asyncMapC maxSize f = initLoop (0 :: Int) (Seq.empty :: Seq.Seq (A.Async b))
                             C.yield =<< liftIO (A.wait r)
                             loop (rest |> v')
                         _ -> error "should never happen"
+
+-- | asyncMapC with error handling. The inner function can now return an error
+-- (as a 'Left'). When the first error is seen, it 'throwError's in the main
+-- monad. Note that if 'f' is not pure, then 'f' may be evaluated for arguments
+-- beyond the first error (as this is being performed in a separate thread.
+asyncMapEitherC :: forall a m b e . (MonadIO m, NFData b, NFData e, MonadError e m) => Int -> (a -> Either e b) -> C.Conduit a m b
+asyncMapEitherC maxSize f = asyncMapC maxSize f =$= (C.awaitForever $ \case
+                                Right v -> C.yield v
+                                Left err -> throwError err)
 
 -- | groupC yields the input as groups of 'n' elements. If the input is not a
 -- multiple of 'n', the last element will be incomplete
