@@ -62,7 +62,6 @@ import NGLess
 import Utils.Conduit
 import Utils.Utils
 import Utils.Vector
-import Utils.Debug
 
 type AnnotationInfo = (GffStrand, B.ByteString)
 type GffIMMap = IM.IntervalMap Int [AnnotationInfo]
@@ -75,6 +74,8 @@ data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNo
     deriving (Eq, Show)
 
 type GeneMapAnnotation = M.Map B8.ByteString [B8.ByteString]
+
+type FeatureSizeMap = M.Map B.ByteString Double
 
 data MMMethod = MMCountAll | MM1OverN | MMDist1
     deriving (Eq, Show)
@@ -111,6 +112,7 @@ annotateReadGroup opts (GeneMapAnnotator amap) = transpose . mapAnnotation
         mapAnnotation1 _ samline = M.lookup (samRName samline) amap >>= \vs ->
             return [AnnotatedRead (samQName samline) rname GffUnStranded | rname <- vs]
 
+fillIndex :: Annotator -> M.Map B.ByteString Int -> M.Map B.ByteString Int
 fillIndex annotator index = case annotator of
     SeqNameAnnotator -> index
     GFFAnnotator amap -> listToMapIndex (asHeaders amap)
@@ -183,22 +185,29 @@ performCount1Pass mcounts method = case method of
                     _ -> return ())
         (CL.filter ((/= 1) . length) $= CL.consume)
 
-renumerate :: (Monad m) => C.Conduit a m (a, Int)
-renumerate = loop 0
+-- | Equivalent to Python's enumerate
+enumerate :: (Monad m) => C.Conduit a m (Int, a)
+enumerate = loop 0
     where
         loop !n = C.await >>= \case
-                Just v -> C.yield (v, n) >> loop (n+1)
+                Just v -> C.yield (n, v) >> loop (n+1)
                 Nothing -> return ()
 
 extractSeqnames mapthreads = do
-    let seqName :: B.ByteString -> B.ByteString
-        seqName = B.copy . B.drop 3 . (!! 1) . B8.split '\t'
-        buildMap :: V.Vector (B.ByteString, Int) -> M.Map B.ByteString Int
-        buildMap = M.fromList . map (first seqName) . V.toList
+    let seqNameSize :: (Int, B.ByteString) -> Either NGError (B.ByteString, (Int, Double))
+        seqNameSize (n, h) = do
+            let tokens = B8.split '\t' h
+            case tokens of
+                [_,seqname,sizestr] -> case B8.readInt (B.drop 3 sizestr) of
+                    Just (size, _) -> return (B.copy (B.drop 3 seqname), (n, convert size))
+                    Nothing -> throwDataError ("Could not parse sequence length in header (line: " ++ show n ++ ")")
+                _ -> throwDataError ("SAM file does not contain the right number of tokens (line: " ++ show n ++ ")")
+        buildMap :: V.Vector (Int, B.ByteString) -> Either NGError (M.Map B.ByteString (Int,Double))
+        buildMap pairs = M.fromList <$> (mapM seqNameSize (V.toList pairs))
     CL.filter ("@SQ\tSN:" `B.isPrefixOf`)
-        =$= renumerate
+        =$= enumerate
         =$= C.conduitVector 1024
-        =$= asyncMapC mapthreads buildMap
+        =$= asyncMapEitherC mapthreads buildMap
         =$= CL.fold (<>) mempty
 
 
@@ -227,7 +236,7 @@ performCount samfp gname annotator opts = do
             =$= CB.lines
             $$+ C.takeWhile ((=='@') . B8.head)
             =$= if isSeqName annotator
-                    then extractSeqnames mapthreads
+                    then M.map fst <$> extractSeqnames mapthreads
                     else (CL.sinkNull >> return M.empty)
 
     let index = fillIndex annotator index'
@@ -271,10 +280,10 @@ performCount samfp gname annotator opts = do
     return newfp
 
 
---incrementAll :: VUM.IOVector Double -> [Int] -> NGLessIO ()
+incrementAll :: VUM.IOVector Double -> [Int] -> IO ()
 incrementAll counts vis = forM_ vis $ \vi -> unsafeIncrement counts vi
 
---increment1OverN :: VUM.IOVector Double -> [Int] -> NGLessIO ()
+increment1OverN :: VUM.IOVector Double -> [Int] -> IO ()
 increment1OverN counts vis = forM_ vis $ \vi -> unsafeIncrement' counts vi (1.0 / nc)
     where
         nc :: Double
