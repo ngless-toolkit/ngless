@@ -429,7 +429,7 @@ annotateSamLine opts amap samline = concatMap annotateSamLine' (M.assocs amap)
                         else GffUnStranded
         annotateSamLine' (gtype,innermap) = case M.lookup rname innermap of
             Nothing -> []
-            Just im -> map (buildAR gtype) . maybeFilterAmbiguous (optKeepAmbiguous opts)
+            Just im -> map (buildAR gtype) . (if optKeepAmbiguous opts then id else filterAmbiguous)
                         $ (optIntersectMode opts) im asStrand (sStart, sEnd)
         buildAR gtype (_,name) = AnnotatedRead (samQName samline) (B.concat [B8.pack (show gtype),"\t",name]) asStrand
 
@@ -439,10 +439,9 @@ matchStrand GffUnStranded _ = True
 matchStrand _ GffUnStranded = True
 matchStrand a b = a == b
 
-maybeFilterAmbiguous  :: Bool -> [AnnotationInfo] -> [AnnotationInfo]
-maybeFilterAmbiguous _ [] = []
-maybeFilterAmbiguous True toU = toU
-maybeFilterAmbiguous False ms
+filterAmbiguous  :: [AnnotationInfo] -> [AnnotationInfo]
+filterAmbiguous [] = []
+filterAmbiguous ms
     | allSame (snd <$> ms) = [head ms]
     | otherwise = [] -- ambiguous: discard
 
