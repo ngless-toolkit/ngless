@@ -99,6 +99,9 @@ tests: check
 bench: config $(NGLESS_BUILD_BINARIES)
 	stack bench
 
+profile:
+	stack build --executable-profiling --library-profiling --ghc-options="-fprof-auto -rtsopts"
+
 install:
 	mkdir -p $(exec)
 	mkdir -p $(deps)
