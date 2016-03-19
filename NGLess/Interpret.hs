@@ -313,7 +313,7 @@ vMapMaybeLifted f v = sequence $ V.unfoldr loop 0
                                 Left err -> Just (Left err, n)
             | otherwise = Nothing
 
-inlineQCIf False _ = C.awaitForever C.yield -- identity monad
+inlineQCIf False _ = C.awaitForever C.yield -- identity conduit
 inlineQCIf True resVar = C.passthroughSink (C.transPipe runNGLessIO (getPairedLines $= fqStatsC)) (liftIO . writeIORef resVar . Just)
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
@@ -333,10 +333,7 @@ executePreprocess (NGOReadSet (ReadSet1 enc file)) args (Block [Variable var] bl
             =$= inlineQCIf qcInput qcPre
             =$= fqConduitR enc
             =$= C.conduitVector 8192)
-            =$=& (asyncMapC mapthreads (vMapMaybeLifted ((liftM (liftM $ fqEncode enc)) . runInterpretationRO env . interpretPBlock1 block var))
-                    =$= (C.awaitForever $ \case
-                            Right v -> C.yield v
-                            Left e -> throwError e)
+            =$=& (asyncMapEitherC mapthreads (vMapMaybeLifted ((liftM (liftM $ fqEncode enc)) . runInterpretationRO env . interpretPBlock1 block var))
                     =$= (C.concat :: C.Conduit (V.Vector B.ByteString) InterpretationEnvIO B.ByteString)
                     =$= C.passthroughSink (C.transPipe runNGLessIO (linesC =$= getPairedLines =$= fqStatsC)) (liftIO . writeIORef qcPost . Just)
                     =$= C.conduitVector 4000
@@ -406,10 +403,7 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
         [((),s1),((),s2),((),s3)] <-
             (zipSource2 rs1 rs2
                 =$= C.conduitVector 4096)
-                $$& (asyncMapC mapthreads (vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles))
-                    =$= C.awaitForever (\case
-                            Right v -> C.yield v
-                            Left e -> throwError e)
+                $$& (asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles))
                     =$= (C.concat :: C.Conduit (V.Vector PreprocessPairOutput) InterpretationEnvIO PreprocessPairOutput)
                     =$= C.sequenceSinks
                         [ filter1 =$= w1
