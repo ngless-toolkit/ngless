@@ -89,6 +89,7 @@ data CountOpts =
     , optMinCount :: !Double
     , optMMMethod :: !MMMethod
     , optDelim :: !B.ByteString
+    , optNormSize :: !Bool
     }
 
 data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctionalMap FilePath
@@ -145,6 +146,7 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
     strand_specific <- lookupBoolOrScriptErrorDef (return False) "annotation function" "strand" args
     mocatMap <- lookupFilePath "functional_map argument to count()" "functional_map" args
     gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
+    normSize <- lookupBoolOrScriptErrorDef (return False) "count function" "norm" args
 
     delim <- T.encodeUtf8 <$> lookupStringOrScriptErrorDef (return "\t") "count hidden argument (should always be valid)" "__delim" args
 
@@ -163,6 +165,7 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
             , optMinCount = fromInteger minCount
             , optMMMethod = method
             , optDelim = delim
+            , optNormSize = normSize
             }
     amode <- annotationMode (optFeatures opts) (T.unpack <$> refinfo) (T.unpack <$> mocatMap) (T.unpack <$> gffFile)
     annotator <- loadAnnotator amode opts
@@ -237,7 +240,7 @@ performCount samfp gname annotator opts = do
             $$+ C.takeWhile ((=='@') . B8.head)
             =$= if isSeqName annotator
                     then M.map fst <$> extractSeqnames mapthreads
-                    else (CL.sinkNull >> return M.empty)
+                    else CL.sinkNull >> return M.empty
 
     let index = fillIndex annotator index'
         n_headers = M.size index
