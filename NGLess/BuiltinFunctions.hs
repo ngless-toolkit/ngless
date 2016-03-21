@@ -43,6 +43,7 @@ countArgs =
     ,ArgInformation "functional_map" False NGLString Nothing
     ,ArgInformation "keep_ambiguous" False NGLBool Nothing
     ,ArgInformation "strand" False NGLBool Nothing
+    ,ArgInformation "norm" False NGLBool Nothing
     ]
 
 selectArgs =

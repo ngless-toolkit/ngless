@@ -95,11 +95,15 @@ data CountOpts =
 data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctionalMap FilePath
     deriving (Eq, Show)
 
-data Annotator = SeqNameAnnotator | GFFAnnotator AnnotationMap | GeneMapAnnotator GeneMapAnnotation
+data BaseAnnotator = SeqNameAnnotator (Maybe (M.Map B.ByteString Int)) | GFFAnnotator AnnotationMap | GeneMapAnnotator GeneMapAnnotation
     deriving (Eq, Show)
+data Annotator = Annotator
+                    { annBase :: BaseAnnotator
+                    , annSizes :: FeatureSizeMap
+                    } deriving (Eq, Show)
 
-annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> [[AnnotatedRead]]
-annotateReadGroup _ SeqNameAnnotator = (:[]) . mapMaybe seqAsAR
+annotateReadGroup :: CountOpts -> BaseAnnotator -> [SamLine] -> [[AnnotatedRead]]
+annotateReadGroup _ (SeqNameAnnotator _) = (:[]) . mapMaybe seqAsAR
     where
         seqAsAR sr@SamLine{samQName = rid, samRName = rname }
             | isAligned sr = Just (AnnotatedRead rid rname GffUnStranded)
@@ -113,9 +117,13 @@ annotateReadGroup opts (GeneMapAnnotator amap) = transpose . mapAnnotation
         mapAnnotation1 _ samline = M.lookup (samRName samline) amap >>= \vs ->
             return [AnnotatedRead (samQName samline) rname GffUnStranded | rname <- vs]
 
-fillIndex :: Annotator -> M.Map B.ByteString Int -> M.Map B.ByteString Int
-fillIndex annotator index = case annotator of
-    SeqNameAnnotator -> index
+finishAnnotator :: Annotator -> M.Map B.ByteString (Int,Double) -> Annotator
+finishAnnotator (Annotator SeqNameAnnotator{} _) idszmap = Annotator (SeqNameAnnotator (Just (M.map fst idszmap))) (M.map snd idszmap)
+finishAnnotator ann _ = ann
+
+annIndex :: Annotator -> M.Map B.ByteString Int
+annIndex (Annotator base _) = case base of
+    SeqNameAnnotator (Just ix) -> ix
     GFFAnnotator amap -> listToMapIndex (asHeaders amap)
     GeneMapAnnotator amap -> listToMapIndex (unravel amap)
   where
@@ -174,9 +182,13 @@ executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or 
 
 
 loadAnnotator :: AnnotationMode -> CountOpts -> NGLessIO Annotator
-loadAnnotator AnnotateSeqName _ = return SeqNameAnnotator
-loadAnnotator (AnnotateGFF gf) opts = GFFAnnotator <$> loadGFF gf opts
-loadAnnotator (AnnotateFunctionalMap mm) opts = GeneMapAnnotator <$> loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
+loadAnnotator AnnotateSeqName _ = return $ Annotator (SeqNameAnnotator Nothing) M.empty
+loadAnnotator (AnnotateGFF gf) opts = do
+    (ann,sizemap) <- loadGFF gf opts
+    return $ Annotator (GFFAnnotator ann) sizemap
+loadAnnotator (AnnotateFunctionalMap mm) opts = do
+    funcmap <- loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
+    return $ Annotator (GeneMapAnnotator funcmap) M.empty
 
 performCount1Pass :: VUM.IOVector Double -> MMMethod -> C.Sink [Int] NGLessIO ((),[[Int]])
 performCount1Pass mcounts method = case method of
@@ -196,7 +208,8 @@ enumerate = loop 0
                 Just v -> C.yield (n, v) >> loop (n+1)
                 Nothing -> return ()
 
-extractSeqnames mapthreads = do
+annSamHeaderParser :: Int -> Annotator -> C.Sink B.ByteString NGLessIO (M.Map B.ByteString (Int, Double))
+annSamHeaderParser mapthreads (Annotator SeqNameAnnotator{} _) = do
     let seqNameSize :: (Int, B.ByteString) -> Either NGError (B.ByteString, (Int, Double))
         seqNameSize (n, h) = do
             let tokens = B8.split '\t' h
@@ -206,12 +219,13 @@ extractSeqnames mapthreads = do
                     Nothing -> throwDataError ("Could not parse sequence length in header (line: " ++ show n ++ ")")
                 _ -> throwDataError ("SAM file does not contain the right number of tokens (line: " ++ show n ++ ")")
         buildMap :: V.Vector (Int, B.ByteString) -> Either NGError (M.Map B.ByteString (Int,Double))
-        buildMap pairs = M.fromList <$> (mapM seqNameSize (V.toList pairs))
+        buildMap pairs = M.fromList <$> mapM seqNameSize (V.toList pairs)
     CL.filter ("@SQ\tSN:" `B.isPrefixOf`)
         =$= enumerate
         =$= C.conduitVector 1024
         =$= asyncMapEitherC mapthreads buildMap
         =$= CL.fold (<>) mempty
+annSamHeaderParser _ _ = C.sinkNull >> return M.empty
 
 
 indexRead :: M.Map B.ByteString Int -> [AnnotatedRead] -> Either NGError [Int]
@@ -225,24 +239,20 @@ indexRead index rs = listNub <$> mapM index1 rs
             Just v -> return v
 
 performCount :: FilePath -> T.Text -> Annotator -> CountOpts -> NGLessIO FilePath
-performCount samfp gname annotator opts = do
+performCount samfp gname annotator0 opts = do
     outputListLno' TraceOutput ["Starting count..."]
     numCapabilities <- liftIO getNumCapabilities
     let mapthreads = max 1 (numCapabilities - 1)
-        isSeqName SeqNameAnnotator = True
-        isSeqName _ = False
         method = optMMMethod opts
         delim = optDelim opts
 
-    (samcontent, index') <-
+    (samcontent, headerinfo) <-
         conduitPossiblyCompressedFile samfp
             =$= CB.lines
             $$+ C.takeWhile ((=='@') . B8.head)
-            =$= if isSeqName annotator
-                    then M.map fst <$> extractSeqnames mapthreads
-                    else CL.sinkNull >> return M.empty
-
-    let index = fillIndex annotator index'
+            =$= annSamHeaderParser mapthreads annotator0
+    let annotator = finishAnnotator annotator0 headerinfo
+        index = annIndex annotator
         n_headers = M.size index
 
     outputListLno' TraceOutput ["Loaded headers (", show n_headers, " headers); starting parsing/distribution."]
@@ -251,12 +261,18 @@ performCount samfp gname annotator opts = do
             samcontent
                 $$+- readSamGroupsC
                 =$= C.conduitVector 1024
-                =$= asyncMapC mapthreads (sequence . flattenVmap (map (indexRead index) . annotateReadGroup opts annotator))
-                =$= (C.awaitForever $ \case
-                            Left err -> throwError err
-                            Right v -> C.yield v)
+                =$= asyncMapEitherC mapthreads (sequence . flattenVmap (map (indexRead index) . annotateReadGroup opts (annBase annotator)))
                 =$= (C.concat :: C.Conduit (V.Vector [Int]) NGLessIO [Int])
                 $= performCount1Pass mcounts method
+
+    when (optNormSize opts) $ do
+        sizes <- liftIO $ VUM.new n_headers
+        forM_ (M.toList index) $ \(name,i) -> do
+            s <- case M.lookup name (annSizes annotator) of
+                Just v -> return v
+                Nothing -> throwShouldNotOccur ("Header does not exist in sizes: "++show name)
+            liftIO $ VUM.write sizes i s
+        normalizeCounts mcounts sizes
     counts <- liftIO $ VU.unsafeFreeze mcounts
 
     result <-
@@ -283,6 +299,7 @@ performCount samfp gname annotator opts = do
     return newfp
 
 
+
 incrementAll :: VUM.IOVector Double -> [Int] -> IO ()
 incrementAll counts vis = forM_ vis $ \vi -> unsafeIncrement counts vi
 
@@ -291,6 +308,16 @@ increment1OverN counts vis = forM_ vis $ \vi -> unsafeIncrement' counts vi (1.0 
     where
         nc :: Double
         nc = 1.0 / convert (length vis)
+
+normalizeCounts :: VUM.IOVector Double -> VUM.IOVector Double -> NGLessIO ()
+normalizeCounts counts sizes = do
+    let n = VUM.length counts
+        n' = VUM.length sizes
+    unless (n == n') $
+        throwShouldNotOccur ("Counts vector is of size " ++ show n ++ ", but sizes if of size " ++ show n')
+    forM_ [0 .. n - 1] $ \i -> liftIO $ do
+        s <- VUM.read sizes i
+        unsafeModify counts (/ s) i
 
 distributeMM indices current fractionResult = VU.create $ do
     ncounts <- VU.thaw current -- note that thaw performs a copy
@@ -383,16 +410,18 @@ flattenVmap f vs = V.unfoldr access (0,[])
 getFeatureName (GffOther s) = s
 getFeatureName _ = error "getFeatureName called for non-GffOther input"
 
-loadGFF :: FilePath -> CountOpts -> NGLessIO AnnotationMap
+loadGFF :: FilePath -> CountOpts -> NGLessIO (AnnotationMap, FeatureSizeMap)
 loadGFF gffFp opts = do
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "'..."]
-        amap <- (conduitPossiblyCompressedFile gffFp
+        amap_szmap <- (conduitPossiblyCompressedFile gffFp
                 $= CB.lines)
                 $$& (readAnnotationOrDie
                 =$= CL.filter (matchFeatures $ optFeatures opts)
-                =$ CL.fold insertg M.empty)
+                =$= CI.zipSinks
+                    (CL.fold insertg M.empty)
+                    (CL.fold inserts M.empty))
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "' complete."]
-        return amap
+        return amap_szmap
     where
         readAnnotationOrDie :: C.Conduit B.ByteString NGLessIO GffLine
         readAnnotationOrDie = C.awaitForever $ \line ->
@@ -400,9 +429,17 @@ loadGFF gffFp opts = do
                 case readGffLine line of
                     Right g -> C.yield g
                     Left err -> throwError err
-        insertg am g = M.alter (updateF g) (gffType g) am
+        inserts :: M.Map B.ByteString Double -> GffLine -> M.Map B.ByteString Double
+        inserts szmap gline = M.alter (inserts1 gline) (B.concat [B8.pack . show $ (gffType gline), "\t", gffSeqId gline]) szmap
+
         updateF g mF = Just $ M.alter (updateChrMap g) (gffSeqId g) (fromMaybe M.empty mF)
         updateChrMap g v  = Just $ insertGffLine g (fromMaybe IM.empty v)
+
+        inserts1 :: GffLine -> Maybe Double -> Maybe Double
+        inserts1 g cur = Just $ convert (gffSize g) + fromMaybe 0.0 cur
+
+        insertg am g = M.alter (updateF g) (gffType g) am
+        gffSize g = gffEnd g - gffStart g
 
 asHeaders :: AnnotationMap -> [B.ByteString]
 asHeaders amap = concatMap asHeaders' (M.assocs amap)
