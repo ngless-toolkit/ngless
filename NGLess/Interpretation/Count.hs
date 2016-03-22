@@ -190,9 +190,7 @@ executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or 
 loadAnnotator :: AnnotationMode -> CountOpts -> NGLessIO Annotator
 loadAnnotator AnnotateSeqName _ = return $ SeqNameAnnotator Nothing
 loadAnnotator (AnnotateGFF gf) opts = loadGFF gf opts
-loadAnnotator (AnnotateFunctionalMap mm) opts = do
-    funcmap <- loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
-    return $ GeneMapAnnotator funcmap [] M.empty
+loadAnnotator (AnnotateFunctionalMap mm) opts = loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
 
 performCount1Pass :: VUM.IOVector Double -> MMMethod -> C.Sink [Int] NGLessIO ((),[[Int]])
 performCount1Pass mcounts method = case method of
@@ -330,7 +328,7 @@ distributeMM indices current fractionResult = VU.create $ do
     return ncounts
 
 
-loadFunctionalMap :: FilePath -> [B.ByteString] -> NGLessIO GeneMapAnnotation
+loadFunctionalMap :: FilePath -> [B.ByteString] -> NGLessIO Annotator
 loadFunctionalMap fname columns = do
         outputListLno' InfoOutput ["Loading map file ", fname]
         (resume, [headers]) <- (CB.sourceFile fname =$ CB.lines)
@@ -340,7 +338,7 @@ loadFunctionalMap fname columns = do
                 (CL.mapM (selectColumns cis . B8.split '\t')
                 =$ CL.fold inserts (0, M.empty,M.empty))
         outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
-        return gmap
+        return $ GeneMapAnnotator gmap (M.keys namemap) M.empty
     where
         inserts :: (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int) -> (B.ByteString, [B.ByteString]) -> (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int)
         inserts (next, gmap, namemap) (name, ids) = (next', gmap', namemap')
