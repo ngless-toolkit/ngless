@@ -97,12 +97,12 @@ mapToReference refIndex fps extraArgs = do
                             bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '"] ++ fps ++ ["'\n",
                             "Bwa error code was ", show code, "."])
 
-interpretMapOp :: ReferenceInfo -> [FilePath] -> [String] -> NGLessIO NGLessObject
-interpretMapOp ref ds extraArgs = do
+interpretMapOp :: ReferenceInfo -> T.Text -> [FilePath] -> [String] -> NGLessIO NGLessObject
+interpretMapOp ref name ds extraArgs = do
     (ref', defGen') <- indexReference ref
     samPath' <- mapToReference ref' ds extraArgs
     printMappingStats samPath'
-    return $ NGOMappedReadSet "noname" samPath' defGen'
+    return $ NGOMappedReadSet name samPath' defGen'
     where
         indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)
         indexReference (FaFile fa) = (,Nothing) <$> ensureIndexExists fa
@@ -167,7 +167,7 @@ executeMap fps args = do
     ref <- lookupReference args
     extraArgs <- (map T.unpack) <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
     let executeMap' (NGOList es) = NGOList <$> forM es executeMap'
-        executeMap' (NGOReadSet _ (ReadSet1 _enc file))   = interpretMapOp ref [file] extraArgs
-        executeMap' (NGOReadSet _ (ReadSet2 _enc fp1 fp2)) = interpretMapOp ref [fp1,fp2] extraArgs
+        executeMap' (NGOReadSet name (ReadSet1 _enc file))   = interpretMapOp ref name [file] extraArgs
+        executeMap' (NGOReadSet name (ReadSet2 _enc fp1 fp2)) = interpretMapOp ref name [fp1,fp2] extraArgs
         executeMap' v = throwShouldNotOccur ("map of " ++ show v ++ " not implemented yet")
     executeMap' fps
