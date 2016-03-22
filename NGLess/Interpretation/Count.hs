@@ -43,6 +43,7 @@ import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
 import Data.List                (foldl1', transpose)
 import GHC.Conc                 (getNumCapabilities)
+import Control.DeepSeq          (NFData(..))
 import Data.Maybe
 import Data.Monoid
 
@@ -98,6 +99,10 @@ data Annotator =
                 | GFFAnnotator GFFAnnotationMap [B.ByteString] FeatureSizeMap
                 | GeneMapAnnotator GeneMapAnnotation [B.ByteString] FeatureSizeMap
     deriving (Eq, Show)
+instance NFData Annotator where
+    rnf (SeqNameAnnotator m) = rnf m
+    rnf (GFFAnnotator amap headers szmap) = rnf amap `seq` rnf headers `seq` rnf szmap
+    rnf (GeneMapAnnotator amap headers szmap) = rnf amap `seq` rnf headers `seq` rnf szmap
 
 mapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m [b]
 mapMaybeM f xs = catMaybes <$> mapM f xs

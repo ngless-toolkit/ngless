@@ -45,6 +45,8 @@ instance Read GffType where
 data GffStrand = GffPosStrand | GffNegStrand | GffUnknownStrand | GffUnStranded
             deriving (Eq, Show, Read, Enum)
 
+instance NFData GffStrand where
+    rnf !_ = ()
 
 data GffLine = GffLine
             { gffSeqId :: !B.ByteString

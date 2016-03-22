@@ -25,6 +25,7 @@ import Parse (parsengless)
 import Language (Script(..))
 import Data.Sam (readSamLine, readSamGroupsC)
 import Data.FastQ (statsFromFastQ, parseFastQ, FastQEncoding(..), ShortRead(..))
+import Utils.Conduit (linesC)
 import Substrim (substrim)
 
 nfNGLessIO :: (NFData a) => NGLessIO a -> Benchmarkable
@@ -82,10 +83,10 @@ main = setupTestConfiguration >> defaultMain [
         ]
     ,bgroup "parse-sam"
         [ bench "readSamLine" $ nfRIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= CL.map readSamLine $$ countRights)
-        , bench "samGroups" $ nfNGLessIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= readSamGroupsC $$ count)
+        , bench "samGroups" $ nfNGLessIO (CB.sourceFile "test_samples/sample.sam" =$= linesC =$= readSamGroupsC $$ count)
         ]
     ,bgroup "count"
-        [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap   "test_samples/functional.map" ["ko", "cog"])
+        [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap "test_samples/functional.map" ["ko", "cog"])
         , bench "annotate-seqname" . nfNGLessIO $ do
                     amap <- loadAnnotator (AnnotateFunctionalMap "test_samples/functional.map") basicCountOpts
                     performCount "test_samples/sample.sam" "testing" amap basicCountOpts
