@@ -39,7 +39,6 @@ import           Data.Conduit (($=), (=$), (=$=), ($$+), ($$+-))
 import           Data.Conduit.Async (buffer, (=$=&), ($$&))
 
 import Control.Monad
-import Control.Arrow            (first)
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
 import Data.List                (foldl1', transpose)
@@ -54,7 +53,6 @@ import Data.GFF
 import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamGroupsC)
 import FileManagement (openNGLTempFile)
 import ReferenceDatabases
-import Data.Annotation
 import Language
 import Output
 import NGLess
@@ -63,17 +61,17 @@ import Utils.Conduit
 import Utils.Utils
 import Utils.Vector
 
-type AnnotationInfo = (GffStrand, B.ByteString)
-type GffIMMap = IM.IntervalMap Int [AnnotationInfo]
--- AnnotationMap maps from `GffType` to `References` (e.g., chromosomes) to positions to (features/count)
-type AnnotationMap = M.Map GffType (M.Map B8.ByteString GffIMMap)
 
-type AnnotationRule = GffIMMap -> GffStrand -> (Int, Int) -> [AnnotationInfo]
+-- GFFAnnotationMap maps from `References` (e.g., chromosomes) to positions to (strand/feature-id)
+type AnnotationInfo = (GffStrand, Int)
+type GffIMMap = IM.IntervalMap Int [AnnotationInfo]
+type GFFAnnotationMap = M.Map B.ByteString GffIMMap
+type AnnotationRule = GffIMMap -> GffStrand -> (Int, Int) -> [(GffStrand,Int)]
 
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
 
-type GeneMapAnnotation = M.Map B8.ByteString [B8.ByteString]
+type GeneMapAnnotation = M.Map B8.ByteString [Int]
 
 type FeatureSizeMap = M.Map B.ByteString Double
 
@@ -95,47 +93,55 @@ data CountOpts =
 data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctionalMap FilePath
     deriving (Eq, Show)
 
-data BaseAnnotator = SeqNameAnnotator (Maybe (M.Map B.ByteString Int)) | GFFAnnotator AnnotationMap | GeneMapAnnotator GeneMapAnnotation
+data Annotator =
+                SeqNameAnnotator (Maybe (M.Map B.ByteString (Int, Double)))
+                | GFFAnnotator GFFAnnotationMap [B.ByteString] FeatureSizeMap
+                | GeneMapAnnotator GeneMapAnnotation [B.ByteString] FeatureSizeMap
     deriving (Eq, Show)
-data Annotator = Annotator
-                    { annBase :: BaseAnnotator
-                    , annSizes :: FeatureSizeMap
-                    } deriving (Eq, Show)
 
-annotateReadGroup :: CountOpts -> BaseAnnotator -> [SamLine] -> [[AnnotatedRead]]
-annotateReadGroup _ (SeqNameAnnotator _) = (:[]) . mapMaybe seqAsAR
+mapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m [b]
+mapMaybeM f xs = catMaybes <$> mapM f xs
+
+annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> Either NGError [[Int]]
+annotateReadGroup _ (SeqNameAnnotator Nothing) _ = throwShouldNotOccur ("Incomplete annotator used" :: String)
+annotateReadGroup _ (SeqNameAnnotator (Just szmap)) samlines = (:[]) . listNub <$> mapMaybeM getID samlines
     where
-        seqAsAR sr@SamLine{samQName = rid, samRName = rname }
-            | isAligned sr = Just (AnnotatedRead rid rname GffUnStranded)
-        seqAsAR  _ = Nothing
-annotateReadGroup opts (GFFAnnotator amap) = map (annotateSamLine opts amap)
-annotateReadGroup opts (GeneMapAnnotator amap) = transpose . mapAnnotation
+        getID :: SamLine -> Either NGError (Maybe Int)
+        getID sr@SamLine{samRName = rname }
+            | isAligned sr = case M.lookup rname szmap of
+                    Just (ix,_) -> Right (Just ix)
+                    Nothing -> throwDataError ("Unknown sequence id: " ++ show rname)
+        getID  _ = Right Nothing
+annotateReadGroup opts (GFFAnnotator amap _ _) samlines = return . map (annotateSamLine opts amap) $ samlines
+annotateReadGroup opts (GeneMapAnnotator amap _ _) samlines = return . transpose . mapAnnotation $ samlines
     where
-        mapAnnotation :: [SamLine] -> [[AnnotatedRead]]
+        mapAnnotation :: [SamLine] -> [[Int]]
         mapAnnotation =  mapMaybe (mapAnnotation1 opts)
-        mapAnnotation1 :: CountOpts -> SamLine -> Maybe [AnnotatedRead]
-        mapAnnotation1 _ samline = M.lookup (samRName samline) amap >>= \vs ->
-            return [AnnotatedRead (samQName samline) rname GffUnStranded | rname <- vs]
+        mapAnnotation1 :: CountOpts -> SamLine -> Maybe [Int]
+        mapAnnotation1 _ samline = M.lookup (samRName samline) amap
 
 finishAnnotator :: Annotator -> M.Map B.ByteString (Int,Double) -> Annotator
-finishAnnotator (Annotator SeqNameAnnotator{} _) idszmap = Annotator (SeqNameAnnotator (Just (M.map fst idszmap))) (M.map snd idszmap)
+finishAnnotator SeqNameAnnotator{} idszmap = SeqNameAnnotator (Just idszmap)
 finishAnnotator ann _ = ann
 
-annIndex :: Annotator -> M.Map B.ByteString Int
-annIndex (Annotator base _) = case base of
-    SeqNameAnnotator (Just ix) -> ix
-    GFFAnnotator amap -> listToMapIndex (asHeaders amap)
-    GeneMapAnnotator amap -> listToMapIndex (unravel amap)
-  where
-    unravel :: GeneMapAnnotation -> [B.ByteString]
-    unravel amap = concat (M.elems amap)
-    listToMapIndex :: [B.ByteString] -> M.Map B.ByteString Int
-    listToMapIndex = loop 0 M.empty
-    loop !_ !m [] = m
-    loop n m (h:hs)
-        | M.member h m = loop n m hs
-        | otherwise = loop (n+1) (M.insert h n m) hs
+annSizeOf :: Annotator -> B.ByteString -> Either NGError Double
+annSizeOf (SeqNameAnnotator Nothing) _ = throwShouldNotOccur ("Using unloaded annotator" :: String)
+annSizeOf (SeqNameAnnotator (Just ix)) name = snd <$> annSizeOf' name ix
+annSizeOf (GFFAnnotator _ _ szmap) name = annSizeOf' name szmap
+annSizeOf (GeneMapAnnotator _ _ szmap) name = annSizeOf' name szmap
+annSizeOf' name ix = case M.lookup name ix of
+    Just s -> return s
+    Nothing -> throwShouldNotOccur ("Header does not exist in sizes: "++show name)
 
+
+annEnumerate :: Annotator -> [(B.ByteString, Int)]
+annEnumerate (SeqNameAnnotator Nothing) = error "Using unfinished annotator"
+annEnumerate (SeqNameAnnotator (Just ix)) = M.assocs $ M.map fst ix
+annEnumerate (GFFAnnotator _ headers _) = zip headers [0..]
+annEnumerate (GeneMapAnnotator _ headers _) = zip headers [0..]
+
+annSize :: Annotator -> Int
+annSize ann = length (annEnumerate ann)
 
 methodFor "1overN" = return MM1OverN
 methodFor "dist1" = return MMDist1
@@ -182,13 +188,11 @@ executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or 
 
 
 loadAnnotator :: AnnotationMode -> CountOpts -> NGLessIO Annotator
-loadAnnotator AnnotateSeqName _ = return $ Annotator (SeqNameAnnotator Nothing) M.empty
-loadAnnotator (AnnotateGFF gf) opts = do
-    (ann,sizemap) <- loadGFF gf opts
-    return $ Annotator (GFFAnnotator ann) sizemap
+loadAnnotator AnnotateSeqName _ = return $ SeqNameAnnotator Nothing
+loadAnnotator (AnnotateGFF gf) opts = loadGFF gf opts
 loadAnnotator (AnnotateFunctionalMap mm) opts = do
     funcmap <- loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
-    return $ Annotator (GeneMapAnnotator funcmap) M.empty
+    return $ GeneMapAnnotator funcmap [] M.empty
 
 performCount1Pass :: VUM.IOVector Double -> MMMethod -> C.Sink [Int] NGLessIO ((),[[Int]])
 performCount1Pass mcounts method = case method of
@@ -209,7 +213,7 @@ enumerate = loop 0
                 Nothing -> return ()
 
 annSamHeaderParser :: Int -> Annotator -> C.Sink B.ByteString NGLessIO (M.Map B.ByteString (Int, Double))
-annSamHeaderParser mapthreads (Annotator SeqNameAnnotator{} _) = do
+annSamHeaderParser mapthreads SeqNameAnnotator{} = do
     let seqNameSize :: (Int, B.ByteString) -> Either NGError (B.ByteString, (Int, Double))
         seqNameSize (n, h) = do
             let tokens = B8.split '\t' h
@@ -228,15 +232,8 @@ annSamHeaderParser mapthreads (Annotator SeqNameAnnotator{} _) = do
 annSamHeaderParser _ _ = C.sinkNull >> return M.empty
 
 
-indexRead :: M.Map B.ByteString Int -> [AnnotatedRead] -> Either NGError [Int]
-indexRead index rs = listNub <$> mapM index1 rs
-    where
-        listNub :: (Ord a) => [a] -> [a]
-        listNub = S.toList . S.fromList
-        index1 :: AnnotatedRead -> Either NGError Int
-        index1 a = case M.lookup (annotValue a) index of
-            Nothing -> throwShouldNotOccur ("Internal index missing an entry for " ++ (B8.unpack $ annotValue a))
-            Just v -> return v
+listNub :: (Ord a) => [a] -> [a]
+listNub = S.toList . S.fromList
 
 performCount :: FilePath -> T.Text -> Annotator -> CountOpts -> NGLessIO FilePath
 performCount samfp gname annotator0 opts = do
@@ -252,25 +249,22 @@ performCount samfp gname annotator0 opts = do
             $$+ C.takeWhile ((=='@') . B8.head)
             =$= annSamHeaderParser mapthreads annotator0
     let annotator = finishAnnotator annotator0 headerinfo
-        index = annIndex annotator
-        n_headers = M.size index
+        n_entries = annSize annotator
 
-    outputListLno' TraceOutput ["Loaded headers (", show n_headers, " headers); starting parsing/distribution."]
-    mcounts <- liftIO $ VUM.replicate n_headers (0.0 :: Double)
+    outputListLno' TraceOutput ["Loaded headers (", show n_entries, " headers); starting parsing/distribution."]
+    mcounts <- liftIO $ VUM.replicate n_entries (0.0 :: Double)
     ((), toDistribute) <-
             samcontent
                 $$+- readSamGroupsC
                 =$= C.conduitVector 1024
-                =$= asyncMapEitherC mapthreads (sequence . flattenVmap (map (indexRead index) . annotateReadGroup opts (annBase annotator)))
+                =$= asyncMapEitherC mapthreads (flattenEitherVmap (annotateReadGroup opts annotator))
                 =$= (C.concat :: C.Conduit (V.Vector [Int]) NGLessIO [Int])
                 $= performCount1Pass mcounts method
 
     when (optNormSize opts) $ do
-        sizes <- liftIO $ VUM.new n_headers
-        forM_ (M.toList index) $ \(name,i) -> do
-            s <- case M.lookup name (annSizes annotator) of
-                Just v -> return v
-                Nothing -> throwShouldNotOccur ("Header does not exist in sizes: "++show name)
+        sizes <- liftIO $ VUM.new n_entries
+        forM_ (annEnumerate annotator) $ \(name,i) -> do
+            s <- runNGLess $ annSizeOf annotator name
             liftIO $ VUM.write sizes i s
         normalizeCounts mcounts sizes
     counts <- liftIO $ VU.unsafeFreeze mcounts
@@ -285,8 +279,8 @@ performCount samfp gname annotator0 opts = do
 
     (newfp,hout) <- openNGLTempFile samfp "counts." "txt"
     liftIO $ do
-        mheaders <- VM.new n_headers
-        forM_ (M.toList index) $ \(v,i) ->
+        mheaders <- VM.new n_entries
+        forM_ (annEnumerate annotator) $ \(v,i) ->
             VM.write mheaders i v
         headers <- V.unsafeFreeze mheaders
         BL.hPut hout (BL.fromChunks [delim, T.encodeUtf8 gname, "\n"])
@@ -342,12 +336,27 @@ loadFunctionalMap fname columns = do
         (resume, [headers]) <- (CB.sourceFile fname =$ CB.lines)
                 $$+ (CL.isolate 1 =$= CL.map (B8.split '\t') =$ CL.consume)
         cis <- lookUpColumns headers
-        gmap <- resume $$+-
+        (_,gmap,namemap) <- resume $$+-
                 (CL.mapM (selectColumns cis . B8.split '\t')
-                =$ CL.fold (flip $ uncurry M.insert) M.empty)
+                =$ CL.fold inserts (0, M.empty,M.empty))
         outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
         return gmap
     where
+        inserts :: (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int) -> (B.ByteString, [B.ByteString]) -> (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int)
+        inserts (next, gmap, namemap) (name, ids) = (next', gmap', namemap')
+            where
+                (next', ids', namemap') = mapnames next ids namemap
+
+                mapnames next [] curmap = (next, [], curmap)
+                mapnames next (n:ns) curmap = case M.lookup n curmap of
+                    Nothing -> let  nextmap = M.insert n next curmap
+                                    (next', ns', finalmap) = mapnames (next+1) ns nextmap
+                                in (next', next:ns', finalmap)
+                    Just ix -> let (next', ns', nextmap) = mapnames next ns curmap
+                                in (next', ix:ns', nextmap)
+                gmap' = M.insert name ids' gmap
+
+
         lookUpColumns :: [B.ByteString] -> NGLessIO [Int]
         lookUpColumns [] = throwDataError ("Loading functional map file '" ++ fname ++ "': Header line missing!")
         lookUpColumns (_:headers) = do
@@ -399,29 +408,32 @@ annotationRule IntersectUnion = union
 annotationRule IntersectStrict = intersection_strict
 annotationRule IntersectNonEmpty = intersection_non_empty
 
-flattenVmap :: (a -> [b]) -> V.Vector a -> V.Vector b
-flattenVmap f vs = V.unfoldr access (0,[])
+flattenEitherVmap :: (a -> Either e [b]) -> V.Vector a -> Either e (V.Vector b)
+flattenEitherVmap f vs = unfoldV <$> V.mapM f vs
     where
-        access (!vi, x:xs) = Just (x, (vi,xs))
-        access (!vi,[])
-            | vi >= V.length vs = Nothing
-            | otherwise = access (vi+1, f $ V.unsafeIndex vs vi)
+        unfoldV :: V.Vector [a] -> V.Vector a
+        unfoldV v = V.unfoldr access (0, [])
+            where
+                access (!vi, x:xs) = Just (x, (vi,xs))
+                access (!vi,[])
+                    | vi >= V.length vs = Nothing
+                    | otherwise = access (vi+1, V.unsafeIndex v vi)
 
 getFeatureName (GffOther s) = s
 getFeatureName _ = error "getFeatureName called for non-GffOther input"
 
-loadGFF :: FilePath -> CountOpts -> NGLessIO (AnnotationMap, FeatureSizeMap)
+loadGFF :: FilePath -> CountOpts -> NGLessIO Annotator
 loadGFF gffFp opts = do
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "'..."]
-        amap_szmap <- (conduitPossiblyCompressedFile gffFp
+        (_, amap,namemap,szmap) <- (conduitPossiblyCompressedFile gffFp
                 $= CB.lines)
                 $$& (readAnnotationOrDie
                 =$= CL.filter (matchFeatures $ optFeatures opts)
-                =$= CI.zipSinks
-                    (CL.fold insertg M.empty)
-                    (CL.fold inserts M.empty))
+                =$= (CL.fold insertg (0, M.empty, M.empty, M.empty)))
+
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "' complete."]
-        return amap_szmap
+        let (amap',headers) = reindex amap namemap
+        return (GFFAnnotator amap' headers szmap)
     where
         readAnnotationOrDie :: C.Conduit B.ByteString NGLessIO GffLine
         readAnnotationOrDie = C.awaitForever $ \line ->
@@ -429,33 +441,48 @@ loadGFF gffFp opts = do
                 case readGffLine line of
                     Right g -> C.yield g
                     Left err -> throwError err
-        inserts :: M.Map B.ByteString Double -> GffLine -> M.Map B.ByteString Double
-        inserts szmap gline = M.alter (inserts1 gline) (B.concat [B8.pack . show $ (gffType gline), "\t", gffSeqId gline]) szmap
+        insertg :: (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double) -> GffLine -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
+        insertg (next, gmap, namemap, szmap) gline = (next', gmap', namemap', szmap')
+            where
+                header = B.concat [B8.pack (show $ gffType gline), "\t", gffId gline]
+                (namemap', active, !next') = case M.lookup header namemap of
+                    Just v -> (namemap, v, next)
+                    Nothing -> (M.insert header next namemap, next, next+1)
 
-        updateF g mF = Just $ M.alter (updateChrMap g) (gffSeqId g) (fromMaybe M.empty mF)
-        updateChrMap g v  = Just $ insertGffLine g (fromMaybe IM.empty v)
+                gmap' :: GFFAnnotationMap
+                gmap' = M.alter insertg' (gffSeqId gline) gmap
+                insertg' immap = Just $ IM.alter insertGffLine' asInterval (fromMaybe IM.empty immap)
+
+                insertGffLine' Nothing  = Just [annot]
+                insertGffLine' (Just vs) = Just (annot:vs)
+                annot = (gffStrand gline, active)
+
+                asInterval :: IM.Interval Int
+                asInterval = IM.ClosedInterval (gffStart gline) (gffEnd gline)
+                szmap' = M.alter (inserts1 gline) header szmap
+        reindex :: GFFAnnotationMap -> M.Map B.ByteString Int -> (GFFAnnotationMap, [B.ByteString])
+        reindex amap namemap = (M.map (IM.mapWithKey (const $ map reindexAI)) amap, headers)
+            where
+                headers = M.keys namemap
+                reindexAI :: AnnotationInfo -> AnnotationInfo
+                reindexAI (s, v) = (s, reindexIx v)
+
+                reindexIx :: Int -> Int
+                reindexIx ov = fromJust (M.lookup ov ix)
+                ix = M.fromList $ map (\(i, (_,v)) -> (i,v)) $ zip [0..] (M.assocs namemap)
+
+        gffSize :: GffLine -> Int
+        gffSize g = gffEnd g - gffStart g
 
         inserts1 :: GffLine -> Maybe Double -> Maybe Double
         inserts1 g cur = Just $ convert (gffSize g) + fromMaybe 0.0 cur
 
-        insertg am g = M.alter (updateF g) (gffType g) am
-        gffSize g = gffEnd g - gffStart g
 
-asHeaders :: AnnotationMap -> [B.ByteString]
-asHeaders amap = concatMap asHeaders' (M.assocs amap)
-    where
-
-        asHeaders' :: (GffType, M.Map B8.ByteString GffIMMap) -> [B.ByteString]
-        asHeaders' (k,innermap) = concatMap (asHeaders'' k . snd) (M.assocs innermap)
-
-        asHeaders'' :: GffType -> GffIMMap -> [B.ByteString]
-        asHeaders'' k im = concatMap (asHeaders''' k . snd) (IM.toAscList im)
-
-        asHeaders''' :: GffType -> [AnnotationInfo] -> [B.ByteString]
-        asHeaders''' k vs = [B.concat [B8.pack . show $ k, "\t", snd v] | v <- vs]
-
-annotateSamLine :: CountOpts -> AnnotationMap -> SamLine -> [AnnotatedRead]
-annotateSamLine opts amap samline = concatMap annotateSamLine' (M.assocs amap)
+annotateSamLine :: CountOpts -> GFFAnnotationMap -> SamLine -> [Int]
+annotateSamLine opts amap samline = case M.lookup rname amap of
+        Nothing -> []
+        Just im ->  map snd . (if optKeepAmbiguous opts then id else filterAmbiguous)
+                    $ (optIntersectMode opts) im asStrand (sStart, sEnd)
     where
         rname = samRName samline
         sStart = samPos samline
@@ -464,11 +491,6 @@ annotateSamLine opts amap samline = concatMap annotateSamLine' (M.assocs amap)
         asStrand = if optStrandSpecific opts
                         then if isPositive samline then GffPosStrand else GffNegStrand
                         else GffUnStranded
-        annotateSamLine' (gtype,innermap) = case M.lookup rname innermap of
-            Nothing -> []
-            Just im -> map (buildAR gtype) . (if optKeepAmbiguous opts then id else filterAmbiguous)
-                        $ (optIntersectMode opts) im asStrand (sStart, sEnd)
-        buildAR gtype (_,name) = AnnotatedRead (samQName samline) (B.concat [B8.pack (show gtype),"\t",name]) asStrand
 
 
 matchStrand :: GffStrand -> GffStrand -> Bool
@@ -504,17 +526,6 @@ intersection_non_empty im strand (sS, sE) = intersection' im'
 intersection' :: [GffIMMap] -> [AnnotationInfo]
 intersection' [] = []
 intersection' im = concat . IM.elems $ foldl1' IM.intersection im
-
-
-
-insertGffLine :: GffLine -> GffIMMap -> GffIMMap
-insertGffLine g = IM.alter insertGffLine' asInterval
-    where
-        insertGffLine' Nothing  = Just [annot]
-        insertGffLine' (Just vs) = Just (annot:vs)
-        annot = (gffStrand g, gffId g)
-        asInterval :: IM.Interval Int
-        asInterval = IM.ClosedInterval (gffStart g) (gffEnd g)
 
 matchingFeature :: T.Text -> GffType
 matchingFeature "gene" = GffGene
