@@ -173,9 +173,9 @@ executeCommand basedir cmd input args = do
     return NGOVoid
 
 asfilePaths :: NGLessObject -> NGLessIO  [FilePath]
-asfilePaths (NGOReadSet (ReadSet1 _ fp)) = return [fp]
-asfilePaths (NGOReadSet (ReadSet2 _ fp1 fp2)) = return [fp1, fp2]
-asfilePaths (NGOReadSet (ReadSet3 _ fp1 fp2 fp3)) = return [fp1, fp2, fp3]
+asfilePaths (NGOReadSet _ (ReadSet1 _ fp)) = return [fp]
+asfilePaths (NGOReadSet _ (ReadSet2 _ fp1 fp2)) = return [fp1, fp2]
+asfilePaths (NGOReadSet _ (ReadSet3 _ fp1 fp2 fp3)) = return [fp1, fp2, fp3]
 asfilePaths (NGOCounts fp) = return [fp]
 asfilePaths invalid = throwShouldNotOccur ("AsFile path got "++show invalid)
 

@@ -70,18 +70,18 @@ executeWrite (NGOList el) args = do
     res <- zipWithM (\e fp -> executeWrite e (("ofile", NGOFilename fp):args')) el fps
     return (NGOList res)
 
-executeWrite (NGOReadSet rs) args = do
+executeWrite (NGOReadSet name rs) args = do
     ofile <- getOFile args
     case rs of
         ReadSet1 enc r -> do
             writeRSToFile enc r ofile
-            return (NGOReadSet $ ReadSet1 enc ofile)
+            return (NGOReadSet name $ ReadSet1 enc ofile)
         ReadSet2 enc r1 r2 -> do
             fname1 <- _formatFQOname ofile "pair.1"
             fname2 <- _formatFQOname ofile "pair.2"
             writeRSToFile enc r1 fname1
             writeRSToFile enc r2 fname2
-            return (NGOReadSet $ ReadSet2 enc fname1 fname2)
+            return (NGOReadSet name $ ReadSet2 enc fname1 fname2)
         ReadSet3 enc r1 r2 r3 -> do
             fname1 <- _formatFQOname ofile "pair.1"
             fname2 <- _formatFQOname ofile "pair.2"
@@ -89,7 +89,7 @@ executeWrite (NGOReadSet rs) args = do
             writeRSToFile enc r1 fname1
             writeRSToFile enc r2 fname2
             writeRSToFile enc r3 fname3
-            return (NGOReadSet $ ReadSet3 enc fname1 fname2 fname3)
+            return (NGOReadSet name $ ReadSet3 enc fname1 fname2 fname3)
 
 
 executeWrite el@(NGOMappedReadSet name fp defGen) args = do

@@ -128,16 +128,15 @@ data NGLessObject =
         | NGOSymbol T.Text
         | NGOFilename FilePath
         | NGOShortRead ShortRead
-        | NGOReadSet ReadSet
+        | NGOReadSet T.Text ReadSet
         | NGOMappedReadSet
                     { nglgroupName :: T.Text
                     , nglSamFile :: FilePath
-                    , nglReference :: (Maybe T.Text)
+                    , nglReference :: Maybe T.Text
                     }
         | NGOMappedRead [SamLine]
         | NGOCounts FilePath
         | NGOVoid
-        | NGOSample T.Text [ReadSet]
         | NGOList [NGLessObject]
     deriving (Eq, Show, Ord)
 

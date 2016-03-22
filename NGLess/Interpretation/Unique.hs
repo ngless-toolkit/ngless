@@ -54,7 +54,7 @@ writeTempFastQ fn rs enc = do
 
 executeUnique :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeUnique (NGOList e) args = NGOList <$> mapM (`executeUnique` args) e
-executeUnique (NGOReadSet (ReadSet1 enc file)) args = do
+executeUnique (NGOReadSet name (ReadSet1 enc file)) args = do
         rs <- liftIO (parseFastQ enc <$> readPossiblyCompressedFile file)
         d <- _writeToNFiles file enc rs
         let NGOInteger mc = lookupWithDefault (NGOInteger 1) "max_copies" args
@@ -64,7 +64,7 @@ executeUnique (NGOReadSet (ReadSet1 enc file)) args = do
         uniqueCalculations' numMaxOccur d = do
             fs <- liftIO $ _readNFiles enc (fromIntegral numMaxOccur) d
             nFp <- writeTempFastQ file fs enc
-            return (NGOReadSet $ ReadSet1 enc nFp)
+            return (NGOReadSet name $ ReadSet1 enc nFp)
 executeUnique expr _ = throwShouldNotOccur ("executeUnique: Cannot handle argument " ++ show expr)
 
 hashRead :: Int -> ShortRead -> Int

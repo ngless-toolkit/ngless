@@ -75,9 +75,9 @@ executeGroup (NGOList rs) args = do
         name <- lookupStringOrScriptError "group call" "name" args
         rs' <- getRSOrError `mapM` rs
         grouped <- groupFiles name rs'
-        return (NGOSample name [grouped])
+        return (NGOReadSet name grouped)
     where
-        getRSOrError (NGOReadSet r) = return r
+        getRSOrError (NGOReadSet _ r) = return r
         getRSOrError other = throwShouldNotOccur . concat $ ["In group call, all arguments should have been NGOReadSet! Got ", show other]
 executeGroup other _ = throwScriptError ("Illegal argument to group(): " ++ show other)
 
@@ -99,7 +99,7 @@ groupFiles name rs = do
 
 
 catFiles1 name rs@(ReadSet1 enc _:_) = do
-    (newfp, h) <- openNGLTempFile (T.unpack name) "concatenated_" "fq"
+    (newfp, h) <- openNGLTempFile (T.unpack name) "concatenated_" "fq.gz"
     forM_ rs $ \(ReadSet1 _ fp) ->
         hCat h fp
     liftIO (hClose h)
@@ -107,8 +107,8 @@ catFiles1 name rs@(ReadSet1 enc _:_) = do
 catFiles1 _ rs = throwShouldNotOccur ("catFiles1 called with args : " ++ show rs)
 
 catFiles2 name rs@(ReadSet2 enc _ _:_) = do
-    (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq"
-    (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq"
+    (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq.gz"
+    (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq.gz"
     forM_ rs $ \(ReadSet2 _ fp1 fp2) -> do
         hCat h1 fp1
         hCat h2 fp2
@@ -119,9 +119,9 @@ catFiles2 _ rs = throwShouldNotOccur ("catFiles2 called with args : " ++ show rs
 
 catFiles3 _ [] = throwShouldNotOccur ("catFiles3 called with an empty list" :: String)
 catFiles3 name rs@(r:_) = do
-    (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq"
-    (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq"
-    (newfp3, h3) <- openNGLTempFile (T.unpack name) "concatenated_" ".singles.fq"
+    (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq.gz"
+    (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq.gz"
+    (newfp3, h3) <- openNGLTempFile (T.unpack name) "concatenated_" ".singles.fq.gz"
     let enc = rsEncoding r
     forM_ rs $ \case
         ReadSet1 _ fp -> hCat h3 fp
@@ -137,7 +137,7 @@ catFiles3 name rs@(r:_) = do
     liftIO (hClose h3)
     return (ReadSet3 enc newfp1 newfp2 newfp3)
 
-hCat h fp = liftIO (BL.readFile fp >>= BL.hPut h)
+hCat h fp = CB.sourceFile fp $$ CB.sinkHandle h
 rsEncoding (ReadSet1 enc _) = enc
 rsEncoding (ReadSet2 enc _ _) = enc
 rsEncoding (ReadSet3 enc _ _ _) = enc
@@ -148,8 +148,8 @@ executeFastq expr args = do
     enc <- getEncArgument "fastq" args
     qcNeeded <- lookupBoolOrScriptErrorDef (return True) "fastq hidden QC argument" "__perform_qc" args
     case expr of
-        (NGOString fname) -> NGOReadSet <$> asReadSet1mayQC qcNeeded enc fname
-        (NGOList fps) -> NGOList <$> sequence [NGOReadSet <$> doQC1 enc (T.unpack fname) | NGOString fname <- fps]
+        (NGOString fname) -> NGOReadSet fname <$> asReadSet1mayQC qcNeeded enc fname
+        (NGOList fps) -> NGOList <$> sequence [NGOReadSet fname <$> doQC1 enc (T.unpack fname) | NGOString fname <- fps]
         v -> throwScriptError ("fastq function: unexpected first argument: " ++ show v)
 
 
@@ -164,7 +164,7 @@ asReadSet1mayQC qcNeeded enc fpt = do
             return (ReadSet1 enc' fp)
 
 executePaired :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executePaired (NGOString mate1) args = NGOReadSet <$> do
+executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
     enc <- getEncArgument "paired" args
     mate2 <- lookupStringOrScriptError "automatic argument" "second" args
     let mate3 = lookup "singles" args

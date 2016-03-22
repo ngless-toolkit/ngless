@@ -217,6 +217,7 @@ interpretTop _ = throwShouldNotOccur ("Top level statement is NOP" :: String)
 
 interpretTopValue :: Expression -> InterpretationEnvIO NGLessObject
 interpretTopValue (FunctionCall f e args b) = topFunction f e args b
+interpretTopValue (ListExpression es) = NGOList <$> mapM interpretTopValue es
 interpretTopValue e = runInROEnvIO (interpretExpr e)
 
 interpretExpr :: Expression -> InterpretationROEnv NGLessObject
@@ -248,7 +249,7 @@ interpretExpr (MethodCall met self arg args) = do
     arg' <- maybeInterpretExpr arg
     args' <- interpretArguments args
     executeMethod met self' arg' args'
-interpretExpr not_expr = throwShouldNotOccur ("Expected an expression, received " ++ show not_expr)
+interpretExpr not_expr = throwShouldNotOccur ("Expected an expression, received " ++ show not_expr ++ " (in interpretExpr)")
 
 interpretIndex :: Index -> InterpretationROEnv [Maybe NGLessObject]
 interpretIndex (IndexTwo a b) = forM [a,b] maybeInterpretExpr
@@ -310,7 +311,7 @@ vMapMaybeLifted f v = sequence $ V.unfoldr loop 0
                             case f (v V.! i) of
                                 Right Nothing -> loop n
                                 Right (Just val) -> Just (Right val, n)
-                                Left err -> Just (Left err, n)
+                                Left err -> Just (Left err, V.length v) -- early exit: we are done
             | otherwise = Nothing
 
 inlineQCIf False _ = C.awaitForever C.yield -- identity conduit
@@ -318,7 +319,7 @@ inlineQCIf True resVar = C.passthroughSink (C.transPipe runNGLessIO (getPairedLi
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
-executePreprocess (NGOReadSet (ReadSet1 enc file)) args (Block [Variable var] block) = do
+executePreprocess (NGOReadSet name (ReadSet1 enc file)) args (Block [Variable var] block) = do
         runNGLessIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         (newfp, h) <- runNGLessIO $ openNGLTempFile file "preprocessed_" "fq.gz"
         qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__qc_input" args
@@ -344,13 +345,13 @@ executePreprocess (NGOReadSet (ReadSet1 enc file)) args (Block [Variable var] bl
         liftIO (hClose h)
         when qcInput $ do
             Just qcPreStats <- liftIO $ readIORef qcPre
-            runNGLessIO $ outputFQStatistics file qcPreStats enc
+            runNGLessIO $ outputFQStatistics (T.unpack name) qcPreStats enc
         Just qcPostStats <- liftIO $ readIORef qcPost
-        runNGLessIO $ outputFQStatistics (file ++ "-preprocessed") qcPostStats enc
-        return (NGOReadSet $ ReadSet1 enc newfp)
+        runNGLessIO $ outputFQStatistics (T.unpack name ++ "-preprocessed") qcPostStats enc
+        return (NGOReadSet name $ ReadSet1 enc newfp)
 
-executePreprocess (NGOReadSet (ReadSet2 enc fp1 fp2)) _args block = executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 "")) _args block
-executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable var] block) = do
+executePreprocess (NGOReadSet name (ReadSet2 enc fp1 fp2)) _args block = executePreprocess (NGOReadSet name (ReadSet3 enc fp1 fp2 "")) _args block
+executePreprocess (NGOReadSet name (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable var] block) = do
         keepSingles <- runNGLessIO $ lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args
         qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__qc_input" args
 
@@ -429,7 +430,7 @@ executePreprocess (NGOReadSet (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable 
                 Just qcPreStats -> runNGLessIO $ outputFQStatistics fp qcPreStats enc
 
         runNGLessIO $ outputLno' DebugOutput "Preprocess finished"
-        return . NGOReadSet $ if anySingle
+        return . NGOReadSet name $ if anySingle
                     then ReadSet3 enc fp1' fp2' fps
                     else ReadSet2 enc fp1' fp2'
     where
