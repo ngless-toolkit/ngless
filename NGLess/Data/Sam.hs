@@ -27,7 +27,7 @@ import Data.Conduit ((=$=))
 import Data.Function (on)
 import Control.Monad.Except
 import NGLess.NGError
-
+import Utils.Conduit
 
 
 data SamLine = SamLine
@@ -130,10 +130,10 @@ matchIdentity samline = do
         return mid
 
 -- | take in *lines* and transform them into groups of SamLines all refering to the same read
-readSamGroupsC :: (MonadError NGError m) => C.Conduit B.ByteString m [SamLine]
+readSamGroupsC :: (MonadError NGError m) => C.Conduit ByteLine m [SamLine]
 readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
     where
-        readSamLineOrDie = C.awaitForever $ \line ->
+        readSamLineOrDie = C.awaitForever $ \(ByteLine line) ->
             case readSamLine line of
                 Left err -> throwError err
                 Right parsed@SamLine{} -> C.yield parsed

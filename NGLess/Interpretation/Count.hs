@@ -212,19 +212,19 @@ enumerate = loop 0
                 Just v -> C.yield (n, v) >> loop (n+1)
                 Nothing -> return ()
 
-annSamHeaderParser :: Int -> Annotator -> C.Sink B.ByteString NGLessIO (M.Map B.ByteString (Int, Double))
+annSamHeaderParser :: Int -> Annotator -> C.Sink ByteLine NGLessIO (M.Map B.ByteString (Int, Double))
 annSamHeaderParser mapthreads SeqNameAnnotator{} = do
-    let seqNameSize :: (Int, B.ByteString) -> Either NGError (B.ByteString, (Int, Double))
-        seqNameSize (n, h) = do
+    let seqNameSize :: (Int, ByteLine) -> Either NGError (B.ByteString, (Int, Double))
+        seqNameSize (n, ByteLine h) = do
             let tokens = B8.split '\t' h
             case tokens of
                 [_,seqname,sizestr] -> case B8.readInt (B.drop 3 sizestr) of
                     Just (size, _) -> return (B.copy (B.drop 3 seqname), (n, convert size))
                     Nothing -> throwDataError ("Could not parse sequence length in header (line: " ++ show n ++ ")")
                 _ -> throwDataError ("SAM file does not contain the right number of tokens (line: " ++ show n ++ ")")
-        buildMap :: V.Vector (Int, B.ByteString) -> Either NGError (M.Map B.ByteString (Int,Double))
+        buildMap :: V.Vector (Int, ByteLine) -> Either NGError (M.Map B.ByteString (Int,Double))
         buildMap pairs = M.fromList <$> mapM seqNameSize (V.toList pairs)
-    CL.filter ("@SQ\tSN:" `B.isPrefixOf`)
+    CL.filter ((B.isPrefixOf "@SQ\tSN:") . unwrapByteLine)
         =$= enumerate
         =$= C.conduitVector 1024
         =$= asyncMapEitherC mapthreads buildMap
@@ -245,8 +245,8 @@ performCount samfp gname annotator0 opts = do
 
     (samcontent, headerinfo) <-
         conduitPossiblyCompressedFile samfp
-            =$= CB.lines
-            $$+ C.takeWhile ((=='@') . B8.head)
+            =$= linesC
+            $$+ C.takeWhile ((=='@') . B8.head . unwrapByteLine)
             =$= annSamHeaderParser mapthreads annotator0
     let annotator = finishAnnotator annotator0 headerinfo
         n_entries = annSize annotator

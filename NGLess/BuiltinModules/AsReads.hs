@@ -26,6 +26,7 @@ import Data.Sam
 import Data.FastQ
 import Modules
 import NGLess
+import Utils.Conduit
 
 executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeReads (NGOMappedReadSet _ fpsam _) _ = do
@@ -37,7 +38,7 @@ samToFastQ :: FilePath -> NGLessIO FilePath
 samToFastQ fpsam = do
     (oname,ohand) <- openNGLTempFile fpsam "reads_" "fq"
     C.sourceFile fpsam
-        $= CB.lines
+        $= linesC
         =$= readSamGroupsC
         =$= CL.map asFQ
         =$= CL.concat
