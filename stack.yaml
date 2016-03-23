@@ -2,7 +2,7 @@
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
 
-resolver: lts-3.16
+resolver: lts-5.8
 compiler-check: newer-minor
 
 
