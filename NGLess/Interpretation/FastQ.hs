@@ -26,19 +26,16 @@ import Data.FastQ
 import Configuration
 import Language
 import Output
+import Utils.Conduit
 import Utils.Utils
 import NGLess
 
 drop100 = loop (0 :: Int)
     where
         loop 400 = loop 0
-        loop n
-            | n < 4 = do
-                mline <- C.await
-                case mline of
-                    Just line -> C.yield line >> loop (n+1)
-                    Nothing -> return ()
-            | otherwise = C.await >> loop (n+1)
+        loop !n = awaitJust $ \line -> do
+                when (n < 4) (C.yield line)
+                loop (n+1)
 
 optionalSubsample :: FilePath -> NGLessIO FilePath
 optionalSubsample f = do
