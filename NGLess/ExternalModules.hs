@@ -132,7 +132,19 @@ instance FromJSON ExternalModule where
             <*> o .:? "citation"
 
 addPathToRep :: FilePath -> ExternalModule -> ExternalModule
-addPathToRep mpath m = m { modulePath = mpath }
+addPathToRep mpath m = m { modulePath = mpath, references = map (addPathToRef mpath) (references m) }
+
+addPathToRef :: FilePath -> ExternalReference -> ExternalReference
+addPathToRef mpath er@ExternalReference{..} = er
+        { faFile = ma faFile
+        , gtfFile = ma <$> gtfFile
+        , geneMapFile = ma <$> geneMapFile
+        }
+    where
+        ma p
+            | isAbsolute p = p
+            | otherwise = mpath </> p
+addPathToRef _ er = er
 
 
 asFunction Command{..} = Function (FuncName nglName) (Just $ asNGLType arg1) (fromMaybe NGLVoid $ asNGLType <$> ret) (map asArgInfo additional) False
