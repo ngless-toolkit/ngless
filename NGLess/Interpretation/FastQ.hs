@@ -155,10 +155,10 @@ asReadSet1mayQC qcNeeded enc fpt = do
     let fp = T.unpack fpt
     fp' <- optionalSubsample fp
     if qcNeeded
-        then doQC1 enc fp
+        then doQC1 enc fp'
         else do
             enc' <- fromMaybe (encodingFor fp') (return <$> enc)
-            return (ReadSet1 enc' fp)
+            return (ReadSet1 enc' fp')
 
 executePaired :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
