@@ -26,7 +26,7 @@ import Control.Applicative ((<|>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource(release)
 
-import Utils.Network
+import Utils.Network (downloadFile, downloadOrCopyFile)
 import Utils.Bwa as Bwa
 import FileManagement (createTempDir)
 import Configuration
@@ -73,8 +73,8 @@ createReferencePack oname genome gtf = do
     liftIO $ do
         createDirectoryIfMissing True (tmpdir ++ "/Sequence/BWAIndex/")
         createDirectoryIfMissing True (tmpdir ++ "/Annotation/")
-        downloadFile genome (buildGenomePath tmpdir)
-        downloadFile gtf (buildGFFPath tmpdir)
+        downloadOrCopyFile genome (buildGenomePath tmpdir)
+        downloadOrCopyFile gtf (buildGFFPath tmpdir)
     Bwa.createIndex (buildGenomePath tmpdir)
     let filelist = gffPATH:[genomePATH ++ ext | ext <- [""
                                         ,".amb"
@@ -83,6 +83,7 @@ createReferencePack oname genome gtf = do
                                         ,".pac"
                                         ,".sa"]]
     liftIO $ Tar.create oname tmpdir filelist
+    outputListLno' ResultOutput ["Created reference package in file ", oname]
     release rk
 
 

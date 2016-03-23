@@ -2,17 +2,25 @@
 
 module Utils.Network
     ( downloadFile
+    , downloadOrCopyFile
     ) where
 
 import Control.Monad.IO.Class (liftIO)
 import Data.Conduit
 import Data.Conduit.Binary (sinkFile)
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)
+import System.Directory (copyFile)
+import Data.List (isPrefixOf)
 import qualified Data.ByteString.Char8 as B
 import qualified Network.HTTP.Conduit as HTTP
 import qualified Network.HTTP.Client as HTTP
 
 import Utils.ProgressBar
+
+downloadOrCopyFile :: FilePath -> FilePath -> IO ()
+downloadOrCopyFile src dest
+    | any (`isPrefixOf` src) ["http://", "https://", "ftp://"] = downloadFile src dest
+    | otherwise = copyFile src dest
 
 downloadFile :: String -> FilePath -> IO ()
 downloadFile url destPath = do
