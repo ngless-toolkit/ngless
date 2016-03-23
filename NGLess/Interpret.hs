@@ -519,7 +519,7 @@ interpretArguments = mapM interpretArguments'
 interpretBlock :: [(T.Text, NGLessObject)] -> [Expression] -> InterpretationROEnv BlockResult
 interpretBlock vs [] = return (BlockResult BlockOk vs)
 interpretBlock vs (e:es) = do
-    r <- interpretBlock1 vs e 
+    r <- interpretBlock1 vs e
     case blockStatus r of
         BlockOk -> interpretBlock (blockValues r) es
         _ -> return r
@@ -527,7 +527,7 @@ interpretBlock vs (e:es) = do
 interpretBlock1 :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv BlockResult
 interpretBlock1 vs (Assignment (Variable n) val) = do
     val' <- interpretBlockExpr vs val
-    if n `notElem` (map fst vs)
+    if n `notElem` map fst vs
         then throwShouldNotOccur ("only assignments to block variable are possible [assigning to '"++show n++"']")
         else do
             let vs' = map (\p@(a,_) -> (if a == n then (a,val') else p)) vs
@@ -547,15 +547,10 @@ interpretPreProcessExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretPreProcessExpr (FunctionCall (FuncName "substrim") var args _) = do
     NGOShortRead r <- interpretExpr var
     args' <- interpretArguments args
-    let mq = lookupWithDefault (NGOInteger 0) "min_quality" args'
-    mq' <- getInt mq
-    return . NGOShortRead $ substrim mq' r
+    mq <- fromInteger <$> lookupIntegerOrScriptErrorDef (return 0) "substrim argument" "min_quality" args'
+    return . NGOShortRead $ substrim mq r
 
 interpretPreProcessExpr expr = interpretExpr expr
-
-getInt (NGOInteger i) = return (fromInteger i)
-getInt o = nglTypeError ("getInt: Argument type must be NGOInteger (got " ++ show o ++ ").")
-
 
 _evalUnary :: UOp -> NGLessObject -> Either NGError NGLessObject
 _evalUnary UOpMinus (NGOInteger n) = return $ NGOInteger (-n)
