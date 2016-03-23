@@ -11,6 +11,7 @@ module ExternalModules
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
 import qualified Data.ByteString as B
+import qualified Data.List.Utils as LU
 import Control.Applicative
 import Control.Monad
 import Data.Maybe
@@ -166,7 +167,7 @@ executeCommand basedir cmd input args = do
     env <- nglessEnv basedir
     let cmdline = paths' ++ args'
         process = (proc (basedir </> arg0 cmd) cmdline) { env = Just env }
-    outputListLno' TraceOutput ("executing command: ":arg0 cmd:cmdline)
+    outputListLno' TraceOutput ["executing command: ", arg0 cmd, " ", LU.join " " cmdline]
     (exitCode, out, err) <- liftIO $
         readCreateProcessWithExitCode process ""
     outputListLno' TraceOutput ["Processing results: (STDOUT=", out, ", STDERR=", err,")"]
