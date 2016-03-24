@@ -4,14 +4,16 @@
 {-# LANGUAGE LambdaCase, FlexibleContexts, TupleSections #-}
 module Interpretation.Count
     ( executeCount
+    , Annotator(..)
     , CountOpts(..)
     , AnnotationMode(..)
     , AnnotationIntersectionMode(..)
     , MMMethod(..)
+    , annotateSamLine
+    , annotationRule
     , loadAnnotator
     , loadFunctionalMap
     , matchFeatures
-    , annotationRule
     , performCount
     ) where
 
@@ -475,7 +477,7 @@ loadGFF gffFp opts = do
                 ix = M.fromList $ map (\(i, (_,v)) -> (i,v)) $ zip [0..] (M.assocs namemap)
 
         gffSize :: GffLine -> Int
-        gffSize g = gffEnd g - gffStart g
+        gffSize g = (gffEnd g - gffStart g) + 1 -- gff format is inclusive at both ends!
 
         inserts1 :: GffLine -> Maybe Double -> Maybe Double
         inserts1 g cur = Just $ convert (gffSize g) + fromMaybe 0.0 cur

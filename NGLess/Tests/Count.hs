@@ -6,9 +6,14 @@ module Tests.Count
 import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
-import Control.Monad.IO.Class (liftIO)
+
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
+import qualified Data.IntervalMap.Strict as IM
+import qualified Data.Set as S
+import qualified Data.ByteString.Char8 as B8
+import qualified Data.Map as M
+import Control.Monad.IO.Class (liftIO)
 
 import NGLess
 import Interpretation.Count
@@ -144,4 +149,15 @@ case_filter_features_2 = filter (matchFeatures [GFF.GffGene]) gff_lines_ex @?= [
 case_filter_features_3 = filter (matchFeatures gff_features_gene) gff_lines_ex @?= [gff_structure_Gene]
 case_filter_features_4 = filter (matchFeatures gff_features_cds) gff_lines_ex @?= [gff_structure_CDS]
 case_filter_features_5 = filter (matchFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
+
+listNub = S.toList . S.fromList
+case_load_very_short = do
+    GFFAnnotator immap headers szmap <- testNGLessIO
+                $ loadAnnotator (AnnotateGFF very_short_gff) defCountOpts  { optFeatures = [GffGene] }
+    let usedIDs = map snd $ concat $ concatMap IM.elems $ M.elems immap
+    length (listNub usedIDs ) @?= length headers
+    minimum usedIDs @?= 0
+    maximum usedIDs @?= length headers - 1
+    M.size szmap @?= length headers
+    M.lookup "gene\tWBGene00010199" szmap @?= Just (721-119+1)
 
