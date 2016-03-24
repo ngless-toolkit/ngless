@@ -38,7 +38,7 @@ equivalentLine (a,b) = parse a == parse b
 compareFiles fa fb = liftIO $ do
     ca <- BL8.lines <$> BL.readFile fa
     cb <- BL8.lines <$> BL.readFile fb
-    assertBool (concat ["Expected files ", fa, " and ", fb, " to be equal."])
+    assertBool (concat ["Expected files ", fa, " and ", fb, " to be equivalent"])
         (all equivalentLine (zip ca cb))
 
 annotate_count_compare htseq_version sam gff opts = testNGLessIO $ do
@@ -159,5 +159,5 @@ case_load_very_short = do
     minimum usedIDs @?= 0
     maximum usedIDs @?= length headers - 1
     M.size szmap @?= length headers
-    M.lookup "gene\tWBGene00010199" szmap @?= Just (721-119+1)
+    M.lookup "WBGene00010199" szmap @?= Just (721-119+1)
 

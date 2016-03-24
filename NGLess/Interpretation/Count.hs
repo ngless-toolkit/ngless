@@ -440,6 +440,7 @@ loadGFF gffFp opts = do
         let (amap',headers) = reindex amap namemap
         return (GFFAnnotator amap' headers szmap)
     where
+        singleFeature = length (optFeatures opts) == 1
         readAnnotationOrDie :: C.Conduit B.ByteString NGLessIO GffLine
         readAnnotationOrDie = C.awaitForever $ \line ->
             unless (B8.head line == '#') $
@@ -449,7 +450,9 @@ loadGFF gffFp opts = do
         insertg :: (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double) -> GffLine -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
         insertg (next, gmap, namemap, szmap) gline = (next', gmap', namemap', szmap')
             where
-                header = B.concat [B8.pack (show $ gffType gline), "\t", gffId gline]
+                header = if singleFeature
+                                then gffId gline
+                                else B.concat [B8.pack (show $ gffType gline), "\t", gffId gline]
                 (namemap', active, !next') = case M.lookup header namemap of
                     Just v -> (namemap, v, next)
                     Nothing -> (M.insert header next namemap, next, next+1)
