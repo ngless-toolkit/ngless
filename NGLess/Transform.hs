@@ -7,13 +7,13 @@ module Transform
     ) where
 
 import qualified Data.Text as T
+import Control.Monad.Trans.Cont
+import Control.Monad.Writer
 
 import Language
 import Modules
 import Output
-import Utils.Debug
 import NGLess
-
 
 
 transform :: [Module] -> Script -> NGLessIO Script
@@ -28,8 +28,10 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , qcInPreprocess
                 ]
 
-
-addArgument :: T.Text -> (Variable, Expression) -> Expression -> Expression
+addArgument :: T.Text -- ^ function name
+            -> (Variable, Expression) -- ^ new argument
+            -> Expression -- ^ expression to transform
+            -> Expression -- ^ transformed expression
 addArgument func newArg expr = case expr of
     Assignment v e -> Assignment v (addArgument func newArg e)
     FunctionCall fname@(FuncName fname') e args b
@@ -41,18 +43,14 @@ isVarUsed :: Variable -> [(Int, Expression)] -> Bool
 isVarUsed v = any (isVarUsed1 v . snd)
 
 isVarUsed1 :: Variable -> Expression -> Bool
-isVarUsed1 v expr = case expr of
-    Lookup v'
-        | v' == v -> True
-    ListExpression es -> any (isVarUsed1 v) es
-    UnaryOp _ e -> isVarUsed1 v e
-    BinaryOp _ e1 e2 -> isVarUsed1 v e1 || isVarUsed1 v e2
-    Condition ec et ef -> any (isVarUsed1 v) [ec,et,ef]
-    IndexExpression e _ -> isVarUsed1 v e
-    Assignment _ e -> isVarUsed1 v e
-    FunctionCall _ e args block -> isVarUsed1 v e || any (isVarUsed1 v . snd) args || maybe False (isVarUsed1 v . blockBody) block
-    MethodCall _ e me args -> isVarUsed1 v e || maybe False (isVarUsed1 v) me || any (isVarUsed1 v . snd) args
-    _ -> False
+isVarUsed1 v expr = evalCont $ callCC $ \exit -> do
+                recursiveAnalyse (isVarUsed1' exit) expr
+                return False
+    where
+        isVarUsed1' :: (Bool -> Cont Bool ()) -> Expression -> Cont Bool ()
+        isVarUsed1' exit (Lookup v')
+            | v == v' = exit True
+        isVarUsed1' _ _ = return ()
 
 writeToMove :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 writeToMove = return . writeToMove'
@@ -62,15 +60,15 @@ writeToMove' ((lno,expr):rest) = (lno, addMove toRemove expr):writeToMove' rest
         toRemove = filter (not . flip isVarUsed rest) $ functionVars "write" expr
 
 -- | Variables used in calling the function func
-functionVars :: T.Text -> Expression -> [Variable]
-functionVars func (ListExpression exprs) = concatMap (functionVars func) exprs
-functionVars func (UnaryOp _ e) = functionVars func e
-functionVars func (BinaryOp _ e1 e2) = functionVars func e1 ++ functionVars func e2
-functionVars func (Assignment _ e) = functionVars func e
-functionVars func (FunctionCall (FuncName func') (Lookup v) _ _)
-    | func' == func = [v]
-functionVars func (Sequence es) = concatMap (functionVars func) es
-functionVars _ _ = []
+functionVars :: T.Text -- ^ function name
+                -> Expression -- expression to analyse
+                -> [Variable]
+functionVars fname expr = execWriter (recursiveAnalyse fvars expr)
+    where
+        fvars :: Expression -> Writer [Variable] ()
+        fvars (FunctionCall (FuncName fname') (Lookup v) _ _)
+            | fname' == fname = tell [v]
+        fvars _ = return ()
 
 addMove :: [Variable] -> Expression -> Expression
 addMove dead (Assignment v e) = Assignment v (addMove dead e)

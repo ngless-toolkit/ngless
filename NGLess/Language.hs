@@ -23,6 +23,7 @@ module Language
     , methodArgType
     , methodReturnType
     , methodKwargType
+    , recursiveAnalyse
     , typeOfConstant
     ) where
 
@@ -187,6 +188,23 @@ instance Show Expression where
                                         Just b -> "using {"++show b ++ "}")
     show (MethodCall mname self a args) = "(" ++ show self ++ ")." ++ show mname ++ "( " ++ show a ++ showArgs args ++ " )"
     show (Sequence e) = "Sequence " ++ show e
+
+-- 'recursiveAnalyse f e' will call the function 'f' for all the subexpression inside 'e'
+recursiveAnalyse :: (Monad m) => (Expression -> m ()) -> Expression -> m ()
+recursiveAnalyse f e = f e >> recursiveAnalyse' e
+    where
+        rf = recursiveAnalyse f
+        recursiveAnalyse' (ListExpression es) = mapM_ rf es
+        recursiveAnalyse' (UnaryOp _ e) = rf e
+        recursiveAnalyse' (BinaryOp _ e1 e2) = rf e1 >> rf e2
+        recursiveAnalyse' (Condition cE tE fE) = rf cE >> rf tE >> rf fE
+        recursiveAnalyse' (IndexExpression ei _) = rf ei
+        recursiveAnalyse' (Assignment v e) =  rf e
+        recursiveAnalyse' (FunctionCall _ e args block) = rf e >> mapM_ rf (snd <$> args) >> maybe (return ()) (rf . blockBody) block
+        recursiveAnalyse' (MethodCall _ e eargs args) = rf e >> maybe (return ()) rf eargs >> mapM_ rf (snd <$> args)
+        recursiveAnalyse' (Sequence es) =  mapM_ rf es
+        recursiveAnalyse' _ = return ()
+
 
 showArgs [] = ""
 showArgs ((Variable v, e):args) = "; "++T.unpack v++"="++show e++showArgs args
