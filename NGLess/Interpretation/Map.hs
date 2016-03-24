@@ -111,7 +111,7 @@ interpretMapOp ref name ds extraArgs = do
                 basedir  <- ensureDataPresent (T.unpack r)
                 return (buildGenomePath basedir, Just r)
             Nothing -> do
-                externalRef <- findExternalReference r
+                externalRef <- ensureIndexExists =<< findExternalReference r
                 return (externalRef, Just r)
 
 findExternalReference :: T.Text -> NGLessIO FilePath
