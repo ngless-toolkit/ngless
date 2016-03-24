@@ -496,35 +496,34 @@ annotateSamLine opts amap samline = case M.lookup rname amap of
                         else GffUnStranded
 
 
-matchStrand :: GffStrand -> GffStrand -> Bool
-matchStrand GffUnStranded _ = True
-matchStrand _ GffUnStranded = True
-matchStrand a b = a == b
-
 filterAmbiguous  :: [AnnotationInfo] -> [AnnotationInfo]
 filterAmbiguous [] = []
 filterAmbiguous ms
     | allSame (snd <$> ms) = [head ms]
     | otherwise = [] -- ambiguous: discard
 
-filterStrand :: GffStrand -> [(IM.Interval Int, [AnnotationInfo])] -> [(IM.Interval Int, [AnnotationInfo])]
-filterStrand strand im = filter (not . null . snd) $ map (\(k,vs) ->
-    (k, filter (matchStrand strand . fst) vs)) im
+filterStrand :: GffStrand -> IM.IntervalMap Int [AnnotationInfo] -> IM.IntervalMap Int [AnnotationInfo]
+filterStrand GffUnStranded = id
+filterStrand strand = IM.filterWithKey filterEmpty . IM.mapWithKey matchStrand
+    where
+        matchStrand _ = filter (matchStrand' . fst)
+        matchStrand' :: GffStrand -> Bool
+        matchStrand' GffUnStranded = True
+        matchStrand' s = strand == s
+        filterEmpty _ = not . null
 
 union :: AnnotationRule
-union im strand (sS, sE) =  concatMap snd . (filterStrand strand) $ IM.intersecting im intv
-    where intv = IM.ClosedInterval sS sE
+union im strand (sS, sE) =  concat . IM.elems . filterStrand strand . IM.intersecting im $ IM.ClosedInterval sS sE
 
 intersection_strict :: AnnotationRule
 intersection_strict im strand (sS, sE) = intersection' im'
-    where im' = map (IM.fromList . filterStrand strand . (IM.containing im)) [sS..sE]
+    where im' = map (filterStrand strand . IM.containing im) [sS..sE]
 
 intersection_non_empty :: AnnotationRule
 intersection_non_empty im strand (sS, sE) = intersection' im'
     where
-        im' = map IM.fromList . filter (not . null) .  map (filterStrand strand . IM.containing subim) $ [sS..sE]
-        subim = IM.fromList $ IM.intersecting im intv
-        intv = IM.ClosedInterval sS sE
+        im' = filter (not . null) .  map (filterStrand strand . IM.containing subim) $ [sS..sE]
+        subim = IM.intersecting im (IM.ClosedInterval sS sE)
 
 intersection' :: [GffIMMap] -> [AnnotationInfo]
 intersection' [] = []
