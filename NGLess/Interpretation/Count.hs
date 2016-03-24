@@ -477,7 +477,7 @@ loadGFF gffFp opts = do
 
                 reindexIx :: Int -> Int
                 reindexIx ov = fromJust (M.lookup ov ix)
-                ix = M.fromList $ map (\(i, (_,v)) -> (i,v)) $ zip [0..] (M.assocs namemap)
+                ix = M.fromList $ zip (M.elems namemap) [0..]
 
         gffSize :: GffLine -> Int
         gffSize g = (gffEnd g - gffStart g) + 1 -- gff format is inclusive at both ends!

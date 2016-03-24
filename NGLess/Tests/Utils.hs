@@ -6,12 +6,18 @@ module Tests.Utils
     , isRight
     , parsetest
     , fromRight
+    , asTempFile
     ) where
 import Test.HUnit
 import qualified Data.Text as T
+import qualified Data.ByteString as B
+import Control.Monad.IO.Class (liftIO)
+import System.IO
 
 import Language
 import Parse
+import FileManagement
+import NGLess
 
 isError :: Either a b -> Assertion
 isError = isErrorMsg "Error not caught"
@@ -34,4 +40,14 @@ fromRight (Left e) = error (concat ["Unexpected Left: ",show e])
 
 isRight (Right _) = True
 isRight (Left _) = False
+
+
+asTempFile :: B.ByteString -> FilePath -> NGLessIO FilePath
+asTempFile sf ext = do
+    (fp, h) <- openNGLTempFile "testing" "heredoc" ext
+    liftIO $ do
+        B.hPut h sf
+        (hClose h)
+    return fp
+
 

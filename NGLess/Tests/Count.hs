@@ -11,14 +11,17 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Set as S
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Map as M
 import Control.Monad.IO.Class (liftIO)
+import Data.Maybe
 
-import NGLess
-import Interpretation.Count
-import Data.GFF
 import qualified Data.GFF as GFF
+import Interpretation.Count
+import Tests.Utils
+import Data.GFF
+import NGLess
 
 
 tgroup_Count = $(testGroupGenerator)
@@ -160,4 +163,19 @@ case_load_very_short = do
     maximum usedIDs @?= length headers - 1
     M.size szmap @?= length headers
     M.lookup "WBGene00010199" szmap @?= Just (721-119+1)
+
+
+short3 :: B.ByteString
+short3 =
+    "V\tprotein_coding\tgene\t7322\t8892\t.\t-\t.\tgene_id \"WBGene00008825\"; gene_name \"F14H3.6\"; gene_source \"ensembl\"; gene_biotype \"protein_coding\";\n\
+    \X\tprotein_coding\tgene\t140\t218\t.\t+\t.\tgene_id \"WBGene00020330\"; gene_name \"T07H6.1\"; gene_source \"ensembl\"; gene_biotype \"protein_coding\";\n\
+    \X\tprotein_coding\tgene\t632\t733\t.\t+\t.\tgene_id \"WBGene00000526\"; gene_name \"clc-5\"; gene_source \"ensembl\"; gene_biotype \"protein_coding\";\n"
+
+-- this is a regression test
+case_load_gff_order = do
+    fp <- testNGLessIO $ asTempFile short3 "gtf"
+    GFFAnnotator immap headers szmap <- testNGLessIO
+                $ loadAnnotator (AnnotateGFF fp) defCountOpts  { optFeatures = [GffGene] }
+    let [h] = map snd . concat . IM.elems  . fromJust $ M.lookup "V" immap
+    (headers !! h) @?= "WBGene00008825"
 
