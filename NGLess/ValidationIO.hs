@@ -48,7 +48,6 @@ validate_files (Script _ es) = check_toplevel validate_files' es
         validate_files' (FunctionCall (FuncName "count") f args _) = do
                                                                 validateArg check_can_read_file "gff_file" args es
                                                                 validateArg check_can_read_file "functional_map" args es
-        validate_files' (Assignment _ e) = validate_files' e
         validate_files' _ = return ()
 
         check (ConstStr fname) = check_can_read_file fname
@@ -60,7 +59,6 @@ validate_def_genomes (Script _ es) = check_toplevel validate_def_genomes' es
     where
         validate_def_genomes' (FunctionCall (FuncName "map") _ args _) = validateArg check_reference "reference" args es
                                                                             >> validateArg check_fafile "fafile" args es
-        validate_def_genomes' (Assignment _ e) = validate_def_genomes' e
         validate_def_genomes' _ = return ()
 
 
@@ -95,7 +93,7 @@ get_const_val var s = case mapMaybe (getAssignment . snd) s of
 
 check_toplevel :: (Expression -> ValidateIO ()) -> [(Int,Expression)] -> ValidateIO ()
 check_toplevel f es = forM_ es $ \(lno, e) ->
-        censor (addLno lno) $ f e
+        censor (addLno lno) (recursiveAnalyse f e)
     where
         addLno lno = map (addLno1 lno)
         addLno1 lno err = T.concat ["Line ", T.pack (show lno), ": ", err]
