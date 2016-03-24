@@ -64,7 +64,10 @@ _semicolon = char ';' *> skipMany (char ' ') *> pure TNewLine
 
 try_string s = try (string s)
 
-symbol = char '{'  *> (TExpr . ConstSymbol . T.pack <$> many1 (char '_' <|> alphaNum)) <* char '}'
+symbol = char '{'  *>
+                (TExpr . ConstSymbol . T.pack <$> many1 (char '_' <|> alphaNum))
+                <* (option () $ char '-' *> parserFail "Symbols cannot contain hyphens (-), perhaps you meant to use an underscore.")
+                <* char '}'
 
 tstring = tstring' '\'' <|> tstring' '"'
     where tstring' term = char term *> (TExpr . ConstStr <$> strtext term) <* char term
