@@ -1,8 +1,6 @@
 {- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings #-}
-
 
 module Language
     ( Expression(..)
@@ -24,11 +22,13 @@ module Language
     , methodReturnType
     , methodKwargType
     , recursiveAnalyse
+    , recursiveTransform
     , typeOfConstant
     ) where
 
 {- This module defines the internal representation the language -}
 import qualified Data.Text as T
+import Control.Monad
 
 import Data.FastQ
 import Data.Sam
@@ -195,15 +195,38 @@ recursiveAnalyse f e = f e >> recursiveAnalyse' e
     where
         rf = recursiveAnalyse f
         recursiveAnalyse' (ListExpression es) = mapM_ rf es
-        recursiveAnalyse' (UnaryOp _ e) = rf e
+        recursiveAnalyse' (UnaryOp _ eu) = rf eu
         recursiveAnalyse' (BinaryOp _ e1 e2) = rf e1 >> rf e2
         recursiveAnalyse' (Condition cE tE fE) = rf cE >> rf tE >> rf fE
         recursiveAnalyse' (IndexExpression ei _) = rf ei
-        recursiveAnalyse' (Assignment v e) =  rf e
-        recursiveAnalyse' (FunctionCall _ e args block) = rf e >> mapM_ rf (snd <$> args) >> maybe (return ()) (rf . blockBody) block
-        recursiveAnalyse' (MethodCall _ e eargs args) = rf e >> maybe (return ()) rf eargs >> mapM_ rf (snd <$> args)
+        recursiveAnalyse' (Assignment _ ea) =  rf ea
+        recursiveAnalyse' (FunctionCall _ ef args block) = rf ef >> mapM_ rf (snd <$> args) >> maybe (return ()) (rf . blockBody) block
+        recursiveAnalyse' (MethodCall _ em eargs args) = rf em >> maybe (return ()) rf eargs >> mapM_ rf (snd <$> args)
         recursiveAnalyse' (Sequence es) =  mapM_ rf es
         recursiveAnalyse' _ = return ()
+
+-- 'recursiveTransform' calls 'f' for every sub-expression in its argument,
+-- 'f' will get called with expression where the sub-expressions have already been replaced!
+recursiveTransform :: (Monad m) => (Expression -> m Expression) -> Expression -> m Expression
+recursiveTransform f e = f =<< recursiveTransform' e
+    where
+        rf = recursiveTransform f
+        recursiveTransform' (ListExpression es) = ListExpression <$> mapM rf es
+        recursiveTransform' (UnaryOp op eu) = UnaryOp op <$> rf eu
+        recursiveTransform' (BinaryOp op e1 e2) = BinaryOp op <$> rf e1 <*> rf e2
+        recursiveTransform' (Condition cE tE fE) = Condition <$> rf cE <*> rf tE <*> rf fE
+        recursiveTransform' (IndexExpression ei ix) = flip IndexExpression ix <$> rf ei
+        recursiveTransform' (Assignment v ea) = Assignment v <$> rf ea
+        recursiveTransform' (FunctionCall fname ef args block) = FunctionCall fname
+                                    <$> rf ef
+                                    <*> forM args (\(n,av) -> (n,) <$> rf av)
+                                    <*> forM block (\(Block vars body) -> Block vars <$> rf body)
+        recursiveTransform' (MethodCall mname em earg args) = MethodCall mname
+                                    <$> rf em
+                                    <*> forM earg rf
+                                    <*> forM args (\(n, av) -> (n,) <$> rf av)
+        recursiveTransform' (Sequence es) = Sequence <$> mapM rf es
+        recursiveTransform' esimple = return esimple
 
 
 showArgs [] = ""

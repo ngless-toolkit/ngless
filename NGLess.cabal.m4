@@ -64,7 +64,7 @@ define(`BUILD_DEPENDS',
 define(`BASE_CONFIG',
   `ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts
   C-sources: NGLess/Dependencies/embedded.c
-  default-extensions:  BangPatterns, OverloadedStrings, LambdaCase
+  default-extensions:  BangPatterns, OverloadedStrings, LambdaCase, TupleSections
   other-extensions:    DeriveDataTypeable, TemplateHaskell
   hs-source-dirs: NGLess/
   default-language:    Haskell2010')
