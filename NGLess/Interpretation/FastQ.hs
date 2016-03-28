@@ -13,10 +13,8 @@ import System.IO
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
-import qualified Data.ByteString.Lazy as BL
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C
-import qualified Data.Conduit.Zlib as C
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit (($$), (=$=))
 import Data.Maybe
@@ -179,6 +177,7 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
             when (enc1 /= enc3) $
                 throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
             return (ReadSet3 enc1 fp1 fp2 fp3)
+        Just other -> throwScriptError ("Function paired expects a string for argument 'singles', got " ++ show other)
 executePaired expr _ = throwScriptError ("Function paired expects a string, got: " ++ show expr)
 
 getEncArgument fname args =
