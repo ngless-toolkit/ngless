@@ -103,8 +103,9 @@ type InterpretationROEnv = ExceptT NGError (Reader NGLInterpretEnv)
  -}
 data BlockStatus = BlockOk | BlockDiscarded | BlockContinued
     deriving (Eq,Show)
+
 data BlockResult = BlockResult
-                { blockStatus :: BlockStatus
+                { blockStatus :: {-# UNPACK #-} !BlockStatus
                 , blockValues :: [(T.Text, NGLessObject)]
                 } deriving (Eq,Show)
 
