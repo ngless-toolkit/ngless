@@ -506,8 +506,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile= fname} [] (Block [Variab
         filterMappedRead ((r0,rl):rs) (r':rs')
             | r' == r0 = rl:(filterMappedRead rs rs')
             | otherwise = filterMappedRead rs (r':rs')
-
-executeSelectWBlock _ _ _ = unreachable ("Select with block")
+executeSelectWBlock expr _ _ = unreachable ("Select with block, unexpected argument: " ++ show expr)
 
 
 interpretArguments :: [(Variable, Expression)] -> InterpretationROEnv [(T.Text, NGLessObject)]
