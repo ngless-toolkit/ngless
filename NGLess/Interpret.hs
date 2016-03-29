@@ -538,6 +538,12 @@ interpretBlock1 vs (Optimized (LenThresholdDiscard (Variable v) bop thresh)) = c
         binInt BOpLTE a b = a <= b
         binInt BOpGTE a b = a >= b
         binInt _ _ _ = error "This is impossible: the optimized transformation should ensure this case never exists"
+interpretBlock1 vs (Optimized (SubstrimReassign (Variable v) mq)) = case lookup v vs  of
+        Just (NGOShortRead r) -> let
+                nv = NGOShortRead (substrim mq r)
+                vs' = map (\p@(a,_) -> if a == v then (a,nv) else p) vs
+            in return (BlockResult BlockOk vs')
+        _ -> throwShouldNotOccur ("Variable name not found in optimized processing " ++ show v)
 interpretBlock1 vs (Assignment (Variable n) val) = do
     val' <- interpretBlockExpr vs val
     if n `notElem` map fst vs

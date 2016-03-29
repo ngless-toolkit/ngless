@@ -29,10 +29,14 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 [ writeToMove
                 , qcInPreprocess
                 , ifLenDiscardSpecial
+                , substrimReassign
                 ]
 
 pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression
 pureRecursiveTransform f e = runIdentity (recursiveTransform (return . f) e)
+
+pureTransform :: (Expression -> Expression) -> [(Int,Expression)] -> NGLessIO [(Int, Expression)]
+pureTransform f = return . map (second (pureRecursiveTransform f))
 
 addArgument :: T.Text -- ^ function name
             -> (Variable, Expression) -- ^ new argument
@@ -119,10 +123,15 @@ canQCPreprocessTransform v ((_, expr):rest)
 
 
 ifLenDiscardSpecial :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
-ifLenDiscardSpecial = return . map (second (pureRecursiveTransform ifLenDiscardSpecial'))
-    where
-        ifLenDiscardSpecial' (Condition (BinaryOp b (UnaryOp UOpLen (Lookup v)) (ConstInt thresh))
+ifLenDiscardSpecial = pureTransform $ \case
+        (Condition (BinaryOp b (UnaryOp UOpLen (Lookup v)) (ConstInt thresh))
                                     (Sequence [Discard])
                                     (Sequence []))
-            | b `elem` [BOpLT, BOpLTE, BOpGT, BOpGTE] = Optimized (LenThresholdDiscard v b (fromInteger thresh))
-        ifLenDiscardSpecial' e = e
+            | b `elem` [BOpLT, BOpLTE, BOpGT, BOpGTE] -> Optimized (LenThresholdDiscard v b (fromInteger thresh))
+        e -> e
+
+substrimReassign :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+substrimReassign = pureTransform $ \case
+        (Assignment v (FunctionCall (FuncName "substrim") (Lookup v') [(Variable "min_quality", ConstInt mq)] Nothing))
+            | v == v' -> Optimized (SubstrimReassign v (fromInteger mq))
+        e -> e
