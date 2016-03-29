@@ -4,6 +4,7 @@
 
 module Language
     ( Expression(..)
+    , OptimizedExpression(..)
     , Variable(..)
     , UOp(..)
     , BOp(..)
@@ -163,7 +164,13 @@ data Expression =
         | FunctionCall FuncName Expression [(Variable, Expression)] (Maybe Block)
         | MethodCall MethodName Expression (Maybe Expression) [(Variable, Expression)] -- ^ expr.method(expre)
         | Sequence [Expression]
+        | Optimized OptimizedExpression -- This is a special case, used internally
     deriving (Eq)
+
+data OptimizedExpression =
+        LenThresholdDiscard Variable BOp Int -- if len(r) <op> <int>: discard
+        | SubstrimReassign Variable Int -- r = substrim(r, min_quality=<int>)
+    deriving (Eq, Show)
 
 instance Show Expression where
     show (Lookup (Variable v)) = "Lookup '"++T.unpack v++"'"
@@ -188,6 +195,7 @@ instance Show Expression where
                                         Just b -> "using {"++show b ++ "}")
     show (MethodCall mname self a args) = "(" ++ show self ++ ")." ++ show mname ++ "( " ++ show a ++ showArgs args ++ " )"
     show (Sequence e) = "Sequence " ++ show e
+    show (Optimized se) = "Optimized (" ++ show se ++ ")"
 
 -- 'recursiveAnalyse f e' will call the function 'f' for all the subexpression inside 'e'
 recursiveAnalyse :: (Monad m) => (Expression -> m ()) -> Expression -> m ()

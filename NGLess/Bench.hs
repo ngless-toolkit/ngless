@@ -27,6 +27,7 @@ import Data.Sam (readSamLine, readSamGroupsC)
 import Data.FastQ (statsFromFastQ, parseFastQ, FastQEncoding(..), ShortRead(..))
 import Utils.Conduit (linesC)
 import Substrim (substrim)
+import Transform (transform)
 
 nfNGLessIO :: (NFData a) => NGLessIO a -> Benchmarkable
 nfNGLessIO = nfIO . testNGLessIO
@@ -35,6 +36,13 @@ nfNGLessScript :: T.Text -> Benchmarkable
 nfNGLessScript sc = case parsengless "bench" False sc of
     Left err -> error (show err)
     Right expr -> nfNGLessIO $ interpret [] . nglBody $ expr
+
+nfNGLessScriptWithTransform :: T.Text -> Benchmarkable
+nfNGLessScriptWithTransform code = case parsengless "bench" False code of
+    Left err -> error (show err)
+    Right sc -> nfNGLessIO $ do
+        sc' <- transform [] sc
+        interpret [] (nglBody sc')
 
 
 nfRIO = nfIO . runResourceT
@@ -76,7 +84,8 @@ main = setupTestConfiguration >> defaultMain [
         ]
     ,bgroup "fastq"
         [ bench "fastqStats" $ nfNGLessIO (statsFromFastQ "test_samples/sample.fq.gz")
-        , bench "preprocess" $ nfNGLessScript "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n"
+        , bench "preprocess" $ nfNGLessScript "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
+        , bench "preprocess-transformed" $ nfNGLessScriptWithTransform "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
         , bench "preprocess-pair" $ nfNGLessScript
                 "p = paired('test_samples/sample.fq.gz', 'test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n"
         , bench "substrim" $ nf (substrim 30) exampleSR

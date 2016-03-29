@@ -524,6 +524,19 @@ interpretBlock vs (e:es) = do
         _ -> return r
 
 interpretBlock1 :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv BlockResult
+interpretBlock1 vs (Optimized (LenThresholdDiscard (Variable v) bop thresh)) = case lookup v vs of
+        Just (NGOShortRead r) ->
+            let status = if binInt bop (srLength r) thresh
+                    then BlockDiscarded
+                    else BlockOk in return (BlockResult status vs)
+        _ -> throwShouldNotOccur ("Variable name not found in optimized processing " ++ show v)
+    where
+        binInt :: BOp -> Int -> Int -> Bool
+        binInt BOpLT a b = a < b
+        binInt BOpGT a b = a > b
+        binInt BOpLTE a b = a <= b
+        binInt BOpGTE a b = a >= b
+        binInt _ _ _ = error "This is impossible: the optimized transformation should ensure this case never exists"
 interpretBlock1 vs (Assignment (Variable n) val) = do
     val' <- interpretBlockExpr vs val
     if n `notElem` map fst vs

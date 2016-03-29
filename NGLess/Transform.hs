@@ -9,6 +9,8 @@ module Transform
 import qualified Data.Text as T
 import Control.Monad.Trans.Cont
 import Control.Monad.Writer
+import Control.Arrow (second)
+import Control.Monad.Identity (runIdentity)
 
 import Language
 import Modules
@@ -26,7 +28,11 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
         builtinTransforms =
                 [ writeToMove
                 , qcInPreprocess
+                , ifLenDiscardSpecial
                 ]
+
+pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression
+pureRecursiveTransform f e = runIdentity (recursiveTransform (return . f) e)
 
 addArgument :: T.Text -- ^ function name
             -> (Variable, Expression) -- ^ new argument
@@ -111,3 +117,12 @@ canQCPreprocessTransform v ((_, expr):rest)
     | isVarUsed1 v expr = False
     | otherwise = canQCPreprocessTransform v rest
 
+
+ifLenDiscardSpecial :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+ifLenDiscardSpecial = return . map (second (pureRecursiveTransform ifLenDiscardSpecial'))
+    where
+        ifLenDiscardSpecial' (Condition (BinaryOp b (UnaryOp UOpLen (Lookup v)) (ConstInt thresh))
+                                    (Sequence [Discard])
+                                    (Sequence []))
+            | b `elem` [BOpLT, BOpLTE, BOpGT, BOpGTE] = Optimized (LenThresholdDiscard v b (fromInteger thresh))
+        ifLenDiscardSpecial' e = e
