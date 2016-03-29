@@ -18,6 +18,7 @@ import           Control.Monad.Trans.Resource
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.Combinators as C
 import           Data.Conduit (($$), (=$=))
 
 import GHC.Conc     (getNumCapabilities)
@@ -26,6 +27,7 @@ import Numeric      (showFFloat)
 import Data.Bits    (testBit)
 
 import System.Process
+import System.IO
 import Data.Function
 import System.Exit
 
@@ -73,9 +75,25 @@ ensureIndexExists refPath = do
     return refPath
 
 
+mergeSams name sam0 sam1 = do
+    (newfp, hout) <- openNGLTempFile name "mapped_concat_" ".sam"
+    CB.sourceFile sam0 $$ CB.sinkHandle hout
+    CB.sourceFile sam1
+        =$= CB.lines
+        =$= CL.filter (\line -> not (B.null line) &&  B8.head line /= '@')
+        =$= C.unlinesAscii
+        $$ CB.sinkHandle hout
+    liftIO $ hClose hout
+    return newfp
+
 hoursToDiffTime h = fromInteger (h * 3600)
 
-mapToReference :: FilePath -> [FilePath] -> [String] -> NGLessIO String
+mapToReference :: FilePath -> [FilePath] -> [String] -> NGLessIO FilePath
+mapToReference refIndex [fp1,fp2, fp3] extraArgs = do
+    fp0 <- mapToReference refIndex [fp1, fp2] extraArgs
+    fp1 <- mapToReference refIndex [fp3] extraArgs
+    mergeSams refIndex fp0 fp1
+
 mapToReference refIndex fps extraArgs = do
     (rk, (newfp, hout)) <- openNGLTempFile' refIndex "mapped_" ".sam"
     outputListLno' InfoOutput ["Starting mapping to ", refIndex]
@@ -86,6 +104,7 @@ mapToReference refIndex fps extraArgs = do
     outputListLno' TraceOutput ["Calling binary ", bwaPath, " with args: ", unwords cmdargs]
     let cp = (proc bwaPath cmdargs) { std_out = UseHandle hout }
     (err, exitCode) <- liftIO $ readProcessErrorWithExitCode cp
+    liftIO $ hClose hout
     outputListLno' DebugOutput ["BWA info: ", err]
     case exitCode of
         ExitSuccess -> do
@@ -98,9 +117,9 @@ mapToReference refIndex fps extraArgs = do
                             "Bwa error code was ", show code, "."])
 
 interpretMapOp :: ReferenceInfo -> T.Text -> [FilePath] -> [String] -> NGLessIO NGLessObject
-interpretMapOp ref name ds extraArgs = do
+interpretMapOp ref name fps extraArgs = do
     (ref', defGen') <- indexReference ref
-    samPath' <- mapToReference ref' ds extraArgs
+    samPath' <- mapToReference ref' fps extraArgs
     printMappingStats samPath'
     return $ NGOMappedReadSet name samPath' defGen'
     where
@@ -169,5 +188,6 @@ executeMap fps args = do
     let executeMap' (NGOList es) = NGOList <$> forM es executeMap'
         executeMap' (NGOReadSet name (ReadSet1 _enc file))   = interpretMapOp ref name [file] extraArgs
         executeMap' (NGOReadSet name (ReadSet2 _enc fp1 fp2)) = interpretMapOp ref name [fp1,fp2] extraArgs
-        executeMap' v = throwShouldNotOccur ("map of " ++ show v ++ " not implemented yet")
+        executeMap' (NGOReadSet name (ReadSet3 _enc fp1 fp2 fp3)) = interpretMapOp ref name [fp1,fp2,fp3] extraArgs
+        executeMap' v = throwShouldNotOccur ("map expects ReadSet, got " ++ show v ++ "")
     executeMap' fps
