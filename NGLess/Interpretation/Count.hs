@@ -37,7 +37,7 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Internal as CI
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit (($=), (=$), (=$=), ($$+), ($$+-))
+import           Data.Conduit (($=), (=$), (=$=), ($$+), ($$+-), ($$))
 import           Data.Conduit.Async (buffer, (=$=&), ($$&))
 
 import Control.Monad
@@ -96,8 +96,15 @@ data CountOpts =
 data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctionalMap FilePath
     deriving (Eq, Show)
 
+
+data RefSeqInfo = RefSeqInfo {-# UNPACK #-} !Int {-# UNPACK #-} !Double
+    deriving (Eq, Show)
+
+instance NFData RefSeqInfo where
+    rnf !_ = ()
+
 data Annotator =
-                SeqNameAnnotator (Maybe (M.Map B.ByteString (Int, Double)))
+                SeqNameAnnotator (Maybe (M.Map B.ByteString RefSeqInfo))
                 | GFFAnnotator GFFAnnotationMap [B.ByteString] FeatureSizeMap
                 | GeneMapAnnotator GeneMapAnnotation [B.ByteString] FeatureSizeMap
     deriving (Eq, Show)
@@ -109,31 +116,29 @@ instance NFData Annotator where
 mapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m [b]
 mapMaybeM f xs = catMaybes <$> mapM f xs
 
-annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> Either NGError [[Int]]
-annotateReadGroup _ (SeqNameAnnotator Nothing) _ = throwShouldNotOccur ("Incomplete annotator used" :: String)
-annotateReadGroup _ (SeqNameAnnotator (Just szmap)) samlines = (:[]) . listNub <$> mapMaybeM getID samlines
+annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> Either NGError [Int]
+annotateReadGroup opts ann samlines = listNub <$> case ann of
+        SeqNameAnnotator Nothing -> throwShouldNotOccur ("Incomplete annotator used" :: String)
+        SeqNameAnnotator (Just szmap) -> mapMaybeM (getID szmap) samlines
+        GFFAnnotator amap _ _ -> return . concatMap (annotateSamLine opts amap) $ samlines
+        GeneMapAnnotator amap _ _ -> return . concatMap (mapAnnotation1 amap) $ samlines
     where
-        getID :: SamLine -> Either NGError (Maybe Int)
-        getID sr@SamLine{samRName = rname }
+        getID :: M.Map B.ByteString RefSeqInfo -> SamLine -> Either NGError (Maybe Int)
+        getID szmap sr@SamLine{samRName = rname }
             | isAligned sr = case M.lookup rname szmap of
-                    Just (ix,_) -> Right (Just ix)
+                    Just (RefSeqInfo ix _) -> Right (Just ix)
                     Nothing -> throwDataError ("Unknown sequence id: " ++ show rname)
-        getID  _ = Right Nothing
-annotateReadGroup opts (GFFAnnotator amap _ _) samlines = return . map (annotateSamLine opts amap) $ samlines
-annotateReadGroup opts (GeneMapAnnotator amap _ _) samlines = return . transpose . mapAnnotation $ samlines
-    where
-        mapAnnotation :: [SamLine] -> [[Int]]
-        mapAnnotation =  mapMaybe (mapAnnotation1 opts)
-        mapAnnotation1 :: CountOpts -> SamLine -> Maybe [Int]
-        mapAnnotation1 _ samline = M.lookup (samRName samline) amap
+        getID _ _ = Right Nothing
+        mapAnnotation1 :: GeneMapAnnotation ->  SamLine -> [Int]
+        mapAnnotation1 amap samline = fromMaybe [] $ M.lookup (samRName samline) amap
 
-finishAnnotator :: Annotator -> M.Map B.ByteString (Int,Double) -> Annotator
+finishAnnotator :: Annotator -> M.Map B.ByteString RefSeqInfo -> Annotator
 finishAnnotator SeqNameAnnotator{} idszmap = SeqNameAnnotator (Just idszmap)
 finishAnnotator ann _ = ann
 
 annSizeOf :: Annotator -> B.ByteString -> Either NGError Double
 annSizeOf (SeqNameAnnotator Nothing) _ = throwShouldNotOccur ("Using unloaded annotator" :: String)
-annSizeOf (SeqNameAnnotator (Just ix)) name = snd <$> annSizeOf' name ix
+annSizeOf (SeqNameAnnotator (Just ix)) name = (\(RefSeqInfo _ s) -> s)  <$> annSizeOf' name ix
 annSizeOf (GFFAnnotator _ _ szmap) name = annSizeOf' name szmap
 annSizeOf (GeneMapAnnotator _ _ szmap) name = annSizeOf' name szmap
 annSizeOf' name ix = case M.lookup name ix of
@@ -143,7 +148,7 @@ annSizeOf' name ix = case M.lookup name ix of
 
 annEnumerate :: Annotator -> [(B.ByteString, Int)]
 annEnumerate (SeqNameAnnotator Nothing) = error "Using unfinished annotator"
-annEnumerate (SeqNameAnnotator (Just ix)) = M.assocs $ M.map fst ix
+annEnumerate (SeqNameAnnotator (Just ix)) = M.assocs $ M.map (\(RefSeqInfo i _) -> i) ix
 annEnumerate (GFFAnnotator _ headers _) = zip headers [0..]
 annEnumerate (GeneMapAnnotator _ headers _) = zip headers [0..]
 
@@ -217,19 +222,19 @@ enumerate = loop 0
                 Just v -> C.yield (n, v) >> loop (n+1)
                 Nothing -> return ()
 
-annSamHeaderParser :: Int -> Annotator -> C.Sink ByteLine NGLessIO (M.Map B.ByteString (Int, Double))
+annSamHeaderParser :: Int -> Annotator -> C.Sink ByteLine NGLessIO (M.Map B.ByteString RefSeqInfo)
 annSamHeaderParser mapthreads SeqNameAnnotator{} = do
-    let seqNameSize :: (Int, ByteLine) -> Either NGError (B.ByteString, (Int, Double))
+    let seqNameSize :: (Int, ByteLine) -> Either NGError (B.ByteString, RefSeqInfo)
         seqNameSize (n, ByteLine h) = do
             let tokens = B8.split '\t' h
             case tokens of
                 [_,seqname,sizestr] -> case B8.readInt (B.drop 3 sizestr) of
-                    Just (size, _) -> return (B.copy (B.drop 3 seqname), (n, convert size))
+                    Just (size, _) -> return (B.copy (B.drop 3 seqname), RefSeqInfo n (convert size))
                     Nothing -> throwDataError ("Could not parse sequence length in header (line: " ++ show n ++ ")")
                 _ -> throwDataError ("SAM file does not contain the right number of tokens (line: " ++ show n ++ ")")
-        buildMap :: V.Vector (Int, ByteLine) -> Either NGError (M.Map B.ByteString (Int,Double))
+        buildMap :: V.Vector (Int, ByteLine) -> Either NGError (M.Map B.ByteString RefSeqInfo)
         buildMap pairs = M.fromList <$> mapM seqNameSize (V.toList pairs)
-    CL.filter ((B.isPrefixOf "@SQ\tSN:") . unwrapByteLine)
+    CL.filter (B.isPrefixOf "@SQ\tSN:" . unwrapByteLine)
         =$= enumerate
         =$= C.conduitVector 1024
         =$= asyncMapEitherC mapthreads buildMap
@@ -262,7 +267,7 @@ performCount samfp gname annotator0 opts = do
             samcontent
                 $$+- readSamGroupsC
                 =$= C.conduitVector 1024
-                =$= asyncMapEitherC mapthreads (flattenEitherVmap (annotateReadGroup opts annotator))
+                =$= asyncMapEitherC mapthreads (V.mapM (annotateReadGroup opts annotator))
                 =$= (C.concat :: C.Conduit (V.Vector [Int]) NGLessIO [Int])
                 $= performCount1Pass mcounts method
 
@@ -289,11 +294,26 @@ performCount samfp gname annotator0 opts = do
             VM.write mheaders i v
         headers <- V.unsafeFreeze mheaders
         BL.hPut hout (BL.fromChunks [delim, T.encodeUtf8 gname, "\n"])
-        forM_ [0..VU.length result - 1] $ \i -> do
-            let hn = (V.!) headers i
-            v <- VU.indexM result i
-            when (v >= optMinCount opts) $
-                BL.hPut hout (BL.fromChunks [hn, "\t", B8.pack . show $ v, "\n"])
+
+        let encodeResults :: (Int,Int) -> B.ByteString
+            encodeResults (s,e) = B.concat . concatMap encode1 $ [s .. e-1]
+            encode1 i = let
+                        hn = (V.!) headers i
+                        v = (VU.!) result i
+                    in if v >= optMinCount opts
+                                then [hn, "\t", B8.pack . show $ v, "\n"]
+                                else []
+
+            n = VU.length result
+            nextIndex :: Int -> Maybe ((Int,Int), Int)
+            nextIndex ix
+                | ix == n = Nothing
+                | otherwise = let
+                                next = min n (ix + 4096)
+                            in Just ((ix,next), next)
+        CL.unfold nextIndex 0
+            =$= asyncMapC mapthreads encodeResults
+            $$ CB.sinkHandle hout
         hClose hout
     return newfp
 

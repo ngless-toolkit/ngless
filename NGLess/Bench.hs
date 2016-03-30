@@ -19,7 +19,7 @@ import Configuration (setupTestConfiguration)
 
 
 import Interpretation.Map (_samStats)
-import Interpretation.Count (performCount, MMMethod(..), loadAnnotator, loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), AnnotationMode(..))
+import Interpretation.Count (performCount, MMMethod(..), loadAnnotator, loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), AnnotationMode(..), Annotator(..))
 import Interpret (interpret)
 import Parse (parsengless)
 import Language (Script(..))
@@ -97,6 +97,8 @@ main = setupTestConfiguration >> defaultMain [
     ,bgroup "count"
         [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap "test_samples/functional.map" ["ko", "cog"])
         , bench "annotate-seqname" . nfNGLessIO $ do
+                    performCount "test_samples/sample.sam" "testing" (SeqNameAnnotator Nothing) basicCountOpts
+        , bench "annotate-functionalmap" . nfNGLessIO $ do
                     amap <- loadAnnotator (AnnotateFunctionalMap "test_samples/functional.map") basicCountOpts
                     performCount "test_samples/sample.sam" "testing" amap basicCountOpts
         ]
