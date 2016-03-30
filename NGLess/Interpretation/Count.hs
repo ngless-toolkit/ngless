@@ -433,17 +433,6 @@ annotationRule IntersectUnion = union
 annotationRule IntersectStrict = intersection_strict
 annotationRule IntersectNonEmpty = intersection_non_empty
 
-flattenEitherVmap :: (a -> Either e [b]) -> V.Vector a -> Either e (V.Vector b)
-flattenEitherVmap f vs = unfoldV <$> V.mapM f vs
-    where
-        unfoldV :: V.Vector [a] -> V.Vector a
-        unfoldV v = V.unfoldr access (0, [])
-            where
-                access (!vi, x:xs) = Just (x, (vi,xs))
-                access (!vi,[])
-                    | vi >= V.length vs = Nothing
-                    | otherwise = access (vi+1, V.unsafeIndex v vi)
-
 getFeatureName (GffOther s) = s
 getFeatureName _ = error "getFeatureName called for non-GffOther input"
 
