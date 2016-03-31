@@ -50,8 +50,8 @@ countRights = loop (0 :: Int)
     where
         loop !i = C.await >>= \case
             Nothing -> return i
-            Just (Right _) -> loop (i+1)
-            _ -> loop i
+            Just (Right !_) -> loop (i+1)
+            Just (Left !_) -> loop i
 
 exampleSR :: ShortRead
 exampleSR = head . parseFastQ SangerEncoding $ BL.fromChunks
@@ -96,8 +96,7 @@ main = setupTestConfiguration >> defaultMain [
         ]
     ,bgroup "count"
         [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap "test_samples/functional.map" ["ko", "cog"])
-        , bench "annotate-seqname" . nfNGLessIO $ do
-                    performCount "test_samples/sample.sam" "testing" (SeqNameAnnotator Nothing) basicCountOpts
+        , bench "annotate-seqname" . nfNGLessIO $ performCount "test_samples/sample.sam" "testing" (SeqNameAnnotator Nothing) basicCountOpts
         , bench "annotate-functionalmap" . nfNGLessIO $ do
                     amap <- loadAnnotator (AnnotateFunctionalMap "test_samples/functional.map") basicCountOpts
                     performCount "test_samples/sample.sam" "testing" amap basicCountOpts
