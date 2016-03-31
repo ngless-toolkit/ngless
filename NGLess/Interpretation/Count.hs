@@ -19,7 +19,9 @@ module Interpretation.Count
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Double.Conversion.ByteString as D
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
@@ -225,9 +227,7 @@ enumerate = loop 0
 annSamHeaderParser :: Int -> Annotator -> C.Sink ByteLine NGLessIO (M.Map B.ByteString RefSeqInfo)
 annSamHeaderParser mapthreads SeqNameAnnotator{} = do
     let seqNameSize :: (Int, ByteLine) -> Either NGError (B.ByteString, RefSeqInfo)
-        seqNameSize (n, ByteLine h) = do
-            let tokens = B8.split '\t' h
-            case tokens of
+        seqNameSize (n, ByteLine h) = case B8.split '\t' h of
                 [_,seqname,sizestr] -> case B8.readInt (B.drop 3 sizestr) of
                     Just (size, _) -> return (B.copy (B.drop 3 seqname), RefSeqInfo n (convert size))
                     Nothing -> throwDataError ("Could not parse sequence length in header (line: " ++ show n ++ ")")
@@ -295,25 +295,20 @@ performCount samfp gname annotator0 opts = do
         headers <- V.unsafeFreeze mheaders
         BL.hPut hout (BL.fromChunks [delim, T.encodeUtf8 gname, "\n"])
 
-        let encodeResults :: (Int,Int) -> B.ByteString
-            encodeResults (s,e) = B.concat . concatMap encode1 $ [s .. e-1]
-            encode1 i = let
+        let nlB :: BB.Builder
+            nlB = BB.word8 10
+            tabB :: BB.Builder
+            tabB = BB.word8 9
+            encode1 :: Int -> BB.Builder
+            encode1 !i = let
                         hn = (V.!) headers i
                         v = (VU.!) result i
                     in if v >= optMinCount opts
-                                then [hn, "\t", B8.pack . show $ v, "\n"]
-                                else []
+                                then mconcat [BB.byteString hn, tabB, BB.byteString (D.toShortest v), nlB]
+                                else mempty
 
             n = VU.length result
-            nextIndex :: Int -> Maybe ((Int,Int), Int)
-            nextIndex ix
-                | ix == n = Nothing
-                | otherwise = let
-                                next = min n (ix + 4096)
-                            in Just ((ix,next), next)
-        CL.unfold nextIndex 0
-            =$= asyncMapC mapthreads encodeResults
-            $$ CB.sinkHandle hout
+        mapM_ (BB.hPutBuilder hout. encode1) [0 .. n - 1]
         hClose hout
     return newfp
 
