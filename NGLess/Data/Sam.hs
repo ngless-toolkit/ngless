@@ -73,28 +73,47 @@ hasQual :: SamLine -> Bool
 hasQual = (`testBit` 9) . samFlag
 
 
-readInt b = case B8.readInt b of
-    Just (v,_) -> return v
-    _ -> throwDataError ("Expected int, got " ++ show b)
+newtype SimpleParser a = SimpleParser { runSimpleParser :: B.ByteString -> Maybe (a, B.ByteString) }
+instance Functor SimpleParser where
+    fmap f p = SimpleParser $ \b -> do
+                                (v,rest) <- runSimpleParser p b
+                                return (f v, rest)
+
+instance Applicative SimpleParser where
+    pure v = SimpleParser (\b -> Just (v,b))
+    f <*> g = SimpleParser (\b -> do
+                                (f', rest) <- runSimpleParser f b
+                                (g', rest') <- runSimpleParser g rest
+                                return (f' g', rest'))
 
 readSamLine :: B.ByteString -> Either NGError SamLine
 readSamLine line
     | B8.head line == '@' = return (SamHeader line)
-    | otherwise = case B8.split '\t' line of
-    (tk0:tk1:tk2:tk3:tk4:tk5:tk6:tk7:tk8:tk9:tk10:_) ->
-        SamLine
-            <$> pure tk0
-            <*> readInt tk1
-            <*> pure tk2
-            <*> readInt tk3
-            <*> readInt tk4
-            <*> pure tk5
-            <*> pure tk6
-            <*> readInt tk7
-            <*> readInt tk8
-            <*> pure tk9
-            <*> pure tk10
-    tokens -> throwDataError $ concat ["Expected 11 tokens, only got ", show $ length tokens,"\n\t\tLine was '", show line, "'"]
+    | otherwise = case runSimpleParser samP line of
+        Just (v,_) -> return v
+        Nothing -> throwDataError ("Could not parse sam line "++show line)
+
+tabDelim :: SimpleParser B.ByteString
+tabDelim = SimpleParser $ \input -> do
+    ix <- B8.elemIndex '\t' input
+    return (B.take ix input, B.drop (ix+1) input)
+
+readIntTab = SimpleParser $ \b -> do
+        (v,rest) <- B8.readInt b
+        return (v, B.tail rest)
+restParser = SimpleParser $ \b -> Just (b, B.empty)
+samP = SamLine
+    <$> tabDelim
+    <*> readIntTab
+    <*> tabDelim
+    <*> readIntTab
+    <*> readIntTab
+    <*> tabDelim
+    <*> tabDelim
+    <*> readIntTab
+    <*> readIntTab
+    <*> tabDelim
+    <*> restParser
 
 {--
 Op     Description
