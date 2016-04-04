@@ -45,7 +45,7 @@ import Data.Word
 
 import NGLess.NGError
 import Utils.Conduit
-import Utils.Vector (zeroVec, unsafeIncrement, unsafeModify)
+import Utils.Vector (zeroVec, unsafeIncrement)
 import Utils.Utils
 
 data ShortRead = ShortRead
@@ -199,8 +199,8 @@ fqStatsC = do
                 qv <- VM.read qcs' i
                 unsafeIncrement qv qi
             unsafeIncrement stats 0
-            unsafeModify stats (min len) 1
-            unsafeModify stats (max len) 2
+            VUM.unsafeModify stats (min len) 1
+            VUM.unsafeModify stats (max len) 2
             return ()
 
 

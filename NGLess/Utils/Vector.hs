@@ -3,7 +3,6 @@ module Utils.Vector
  , toFractions
  , unsafeIncrement
  , unsafeIncrement'
- , unsafeModify
 
  , binarySearch
  , binarySearchBy
@@ -26,14 +25,7 @@ unsafeIncrement :: (Num a, PrimMonad m, VM.Unbox a) => VM.MVector (PrimState m) 
 unsafeIncrement v i = unsafeIncrement' v i 1
 
 unsafeIncrement' :: (Num a, PrimMonad m, VM.Unbox a) => VM.MVector (PrimState m) a -> Int -> a -> m ()
-unsafeIncrement' v i inc = unsafeModify v (+ inc) i
-
--- in vector >= 0.11, this function is already there:
-unsafeModify :: (PrimMonad m, VM.Unbox a) => VM.MVector (PrimState m) a -> (a -> a) -> Int -> m ()
-unsafeModify v f i = do
-    c <- VM.unsafeRead v i
-    VM.unsafeWrite v i (f c)
-
+unsafeIncrement' v i inc = VM.unsafeModify v (+ inc) i
 
 toFractions :: (PrimMonad m, VM.Unbox a, Fractional a, Eq a, Num a) => VM.MVector (PrimState m) a -> m ()
 toFractions v = do
@@ -42,7 +34,7 @@ toFractions v = do
         n = VM.length v
     when (total /= 0) $
         forM_ [0..n - 1] $ \i ->
-            unsafeModify v (/ total) i
+            VM.unsafeModify v (/ total) i
 
 binarySearch :: (Ord a) => V.Vector a -> a -> Int
 binarySearch v = binarySearchByRange 0 (V.length v) compare v

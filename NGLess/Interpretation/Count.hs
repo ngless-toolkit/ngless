@@ -389,7 +389,7 @@ normalizeCounts counts sizes = do
         throwShouldNotOccur ("Counts vector is of size " ++ show n ++ ", but sizes if of size " ++ show n')
     forM_ [0 .. n - 1] $ \i -> liftIO $ do
         s <- VUM.read sizes i
-        unsafeModify counts (/ s) i
+        VUM.unsafeModify counts (/ s) i
 
 distributeMM indices current fractionResult = VU.create $ do
     ncounts <- VU.thaw current -- note that thaw performs a copy
