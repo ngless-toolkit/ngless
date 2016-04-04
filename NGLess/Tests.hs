@@ -52,6 +52,7 @@ import Tests.Validation
 import Tests.Types (tgroup_Types)
 import Tests.Count (tgroup_Count)
 import Tests.Parse (tgroup_Parse)
+import Tests.Vector (tgroup_Vector)
 import Tests.NGLessAPI (tgroup_NGLessAPI)
 
 test_FastQ      = [tgroup_FastQ]
@@ -60,6 +61,7 @@ test_Count      = [tgroup_Count]
 test_Parse      = [tgroup_Parse]
 test_Types      = [tgroup_Types]
 test_NGLessAPI  = [tgroup_NGLessAPI]
+test_Vector     = [tgroup_Vector]
 
 -- The main test driver sets verbosity to Quiet to avoid extraneous output and
 -- then uses the automatically generated function
@@ -277,11 +279,6 @@ case_parse_gff_atributes_normal_2 = GFF._parseGffAttributes "gene_id=chrI;dbxref
 case_parse_gff_atributes_trail_del = GFF._parseGffAttributes "gene_id=chrI;dbxref=NCBI:NC_001133;Name=chrI;" @?= [("gene_id","chrI"),("dbxref","NCBI:NC_001133"),("Name","chrI")]
 case_parse_gff_atributes_trail_del_space = GFF._parseGffAttributes "gene_id=chrI;dbxref=NCBI:NC_001133;Name=chrI; " @?= [("gene_id","chrI"),("dbxref","NCBI:NC_001133"),("Name","chrI")]
 
-
------ VectorOperations.hs
-case_zero_vec = do
-  v <- zeroVec 4 >>= V.freeze
-  v @?= V.fromList [0,0,0,0]
 
 case_calc_sam_stats = testNGLessIO (_samStats "test_samples/sample.sam.gz") >>= \r ->
   r @?=  (2772,1310,1042)
