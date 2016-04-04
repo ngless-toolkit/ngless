@@ -29,10 +29,12 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Unboxed.Mutable as VUM
+import           Data.Vector.Algorithms.Intro (sort)
 
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+import           Data.Strict.Tuple (Pair(..))
 
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
@@ -45,11 +47,11 @@ import           Data.Conduit.Async (buffer, (=$=&), ($$&))
 import Control.Monad
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
-import Data.List                (foldl1', transpose)
+import Data.List                (foldl1')
 import GHC.Conc                 (getNumCapabilities)
 import Control.DeepSeq          (NFData(..))
+import Control.Error            (note)
 import Data.Maybe
-import Data.Monoid
 
 import System.IO                (hClose)
 import Data.Convertible         (convert)
@@ -58,6 +60,7 @@ import Data.GFF
 import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamGroupsC)
 import FileManagement (openNGLTempFile)
 import ReferenceDatabases
+import NGLess.NGError
 import Language
 import Output
 import NGLess
@@ -99,14 +102,20 @@ data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctiona
     deriving (Eq, Show)
 
 
-data RefSeqInfo = RefSeqInfo {-# UNPACK #-} !Int {-# UNPACK #-} !Double
+data RefSeqInfo = RefSeqInfo {-# UNPACK #-} !B.ByteString {-# UNPACK #-} !Double
     deriving (Eq, Show)
 
 instance NFData RefSeqInfo where
     rnf !_ = ()
 
+instance Ord RefSeqInfo where
+    compare (RefSeqInfo s0 _) (RefSeqInfo s1 _) = compare s0 s1
+
+compareShortLong  :: RefSeqInfo -> B.ByteString -> Ordering
+compareShortLong (RefSeqInfo short _) long = compare short long
+
 data Annotator =
-                SeqNameAnnotator (Maybe (M.Map B.ByteString RefSeqInfo))
+                SeqNameAnnotator (Maybe (V.Vector RefSeqInfo))
                 | GFFAnnotator GFFAnnotationMap [B.ByteString] FeatureSizeMap
                 | GeneMapAnnotator GeneMapAnnotation [B.ByteString] FeatureSizeMap
     deriving (Eq, Show)
@@ -125,22 +134,22 @@ annotateReadGroup opts ann samlines = listNub <$> case ann of
         GFFAnnotator amap _ _ -> return . concatMap (annotateSamLine opts amap) $ samlines
         GeneMapAnnotator amap _ _ -> return . concatMap (mapAnnotation1 amap) $ samlines
     where
-        getID :: M.Map B.ByteString RefSeqInfo -> SamLine -> Either NGError (Maybe Int)
+        getID :: V.Vector RefSeqInfo -> SamLine -> Either NGError (Maybe Int)
         getID szmap sr@SamLine{samRName = rname }
-            | isAligned sr = case M.lookup rname szmap of
-                    Just (RefSeqInfo ix _) -> Right (Just ix)
+            | isAligned sr = case binarySearchByExact compareShortLong szmap rname of
                     Nothing -> throwDataError ("Unknown sequence id: " ++ show rname)
+                    ix -> return ix
         getID _ _ = Right Nothing
         mapAnnotation1 :: GeneMapAnnotation ->  SamLine -> [Int]
         mapAnnotation1 amap samline = fromMaybe [] $ M.lookup (samRName samline) amap
 
-finishAnnotator :: Annotator -> M.Map B.ByteString RefSeqInfo -> Annotator
+finishAnnotator :: Annotator -> V.Vector RefSeqInfo -> Annotator
 finishAnnotator SeqNameAnnotator{} idszmap = SeqNameAnnotator (Just idszmap)
 finishAnnotator ann _ = ann
 
 annSizeOf :: Annotator -> B.ByteString -> Either NGError Double
 annSizeOf (SeqNameAnnotator Nothing) _ = throwShouldNotOccur ("Using unloaded annotator" :: String)
-annSizeOf (SeqNameAnnotator (Just ix)) name = (\(RefSeqInfo _ s) -> s)  <$> annSizeOf' name ix
+annSizeOf (SeqNameAnnotator (Just ix)) name = (\(RefSeqInfo _ s) -> s)  <$> note (NGError DataError "unknown error") (binaryFindBy compareShortLong ix name)
 annSizeOf (GFFAnnotator _ _ szmap) name = annSizeOf' name szmap
 annSizeOf (GeneMapAnnotator _ _ szmap) name = annSizeOf' name szmap
 annSizeOf' name ix = case M.lookup name ix of
@@ -150,7 +159,7 @@ annSizeOf' name ix = case M.lookup name ix of
 
 annEnumerate :: Annotator -> [(B.ByteString, Int)]
 annEnumerate (SeqNameAnnotator Nothing) = error "Using unfinished annotator"
-annEnumerate (SeqNameAnnotator (Just ix)) = M.assocs $ M.map (\(RefSeqInfo i _) -> i) ix
+annEnumerate (SeqNameAnnotator (Just ix)) = V.toList . flip V.imap ix $ \i (RefSeqInfo n _) -> (n, i)
 annEnumerate (GFFAnnotator _ headers _) = zip headers [0..]
 annEnumerate (GeneMapAnnotator _ headers _) = zip headers [0..]
 
@@ -220,26 +229,75 @@ performCount1Pass mcounts method = case method of
 enumerate :: (Monad m) => C.Conduit a m (Int, a)
 enumerate = loop 0
     where
-        loop !n = C.await >>= \case
-                Just v -> C.yield (n, v) >> loop (n+1)
-                Nothing -> return ()
+        loop !n = awaitJust $ \v -> C.yield (n, v) >> loop (n+1)
 
-annSamHeaderParser :: Int -> Annotator -> C.Sink ByteLine NGLessIO (M.Map B.ByteString RefSeqInfo)
+annSamHeaderParser :: Int -> Annotator -> C.Sink ByteLine NGLessIO (V.Vector RefSeqInfo)
 annSamHeaderParser mapthreads SeqNameAnnotator{} = do
-    let seqNameSize :: (Int, ByteLine) -> Either NGError (B.ByteString, RefSeqInfo)
+    let seqNameSize :: (Int, ByteLine) -> Either NGError RefSeqInfo
         seqNameSize (n, ByteLine h) = case B8.split '\t' h of
                 [_,seqname,sizestr] -> case B8.readInt (B.drop 3 sizestr) of
-                    Just (size, _) -> return (B.copy (B.drop 3 seqname), RefSeqInfo n (convert size))
+                    Just (size, _) -> return $! RefSeqInfo (B.drop 3 seqname) (convert size)
                     Nothing -> throwDataError ("Could not parse sequence length in header (line: " ++ show n ++ ")")
                 _ -> throwDataError ("SAM file does not contain the right number of tokens (line: " ++ show n ++ ")")
-        buildMap :: V.Vector (Int, ByteLine) -> Either NGError (M.Map B.ByteString RefSeqInfo)
-        buildMap pairs = M.fromList <$> mapM seqNameSize (V.toList pairs)
+
+        buildVector :: V.Vector (Int, ByteLine) -> Either NGError (V.Vector RefSeqInfo)
+        buildVector pairs = case V.mapM seqNameSize pairs of
+            Right v -> let !r = V.create $ do
+                                        v' <- V.unsafeThaw v
+                                        sort v'
+                                        return v'
+                        in Right r
+            err -> err
     CL.filter (B.isPrefixOf "@SQ\tSN:" . unwrapByteLine)
         =$= enumerate
-        =$= C.conduitVector 1024
-        =$= asyncMapEitherC mapthreads buildMap
-        =$= CL.fold (<>) mempty
-annSamHeaderParser _ _ = C.sinkNull >> return M.empty
+        =$= C.conduitVector 16384
+        =$= asyncMapEitherC mapthreads buildVector
+        =$= (getVector <$> CL.fold mergeVM (VectorMerge []))
+annSamHeaderParser _ _ = C.sinkNull >> return V.empty
+
+{- This is a simple type that just accumulates sorted vectors into increasingly large blocks -}
+newtype VectorMerge a = VectorMerge [Pair Int (V.Vector a)]
+
+mergeVM :: (Ord a) => VectorMerge a -> V.Vector a -> VectorMerge a
+mergeVM (VectorMerge start) newv = VectorMerge $! mergeVM' 1 start newv
+    where
+        mergeVM' w [] !v = [w :!: v]
+        mergeVM' w vm@((w' :!: v'):rs) v
+            | w == w' = mergeVM' (w+1) rs (mergeV v v')
+            | otherwise = (w :!: v):vm
+
+getVector :: (Ord a) => VectorMerge a -> V.Vector a
+getVector (VectorMerge vm) = loop vm V.empty
+    where
+        loop [] v = v
+        loop ((_ :!: v'):rs) v = loop rs (mergeV v v')
+
+mergeV :: (Ord a) => V.Vector a -> V.Vector a -> V.Vector a
+mergeV v0 v1
+    | V.length v0 == 0 = v1
+    | V.length v1 == 0 = v0
+    | otherwise = V.create $ do
+        let n0 = V.length v0
+            n1 = V.length v1
+            n = n0 + n1
+        r <- VM.new n
+
+        let loop p0 p1 pr
+                | p0 < n0 && p1 < n1 = case compare ((V.!) v0 p0) ((V.!) v1 p1) of
+                    LT -> vectorCopyElem' v0 p0 pr >> loop (p0 + 1) p1      (pr + 1)
+                    _  -> vectorCopyElem' v1 p1 pr >> loop  p0     (p1 + 1) (pr + 1)
+                | p0 < n0 = copyRest v0 p0 pr n0
+                | p1 < n1 = copyRest v1 p1 pr n1
+                | otherwise = return ()
+            copyRest v s pr n
+                | s == n = return ()
+                | otherwise = vectorCopyElem' v s pr >> copyRest v (s + 1) (pr + 1) n
+
+            vectorCopyElem' v !i !j = do
+                val <- V.indexM v i
+                VM.write r j val
+        loop 0 0 0
+        return r
 
 
 listNub :: (Ord a) => [a] -> [a]

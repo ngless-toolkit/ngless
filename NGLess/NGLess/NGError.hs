@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 module NGLess.NGError
     ( NGError(..)
+    , NGErrorType(..)
     , NGLessIO
     , NGLess
     , runNGLess
