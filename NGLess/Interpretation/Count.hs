@@ -215,15 +215,25 @@ loadAnnotator AnnotateSeqName _ = return $ SeqNameAnnotator Nothing
 loadAnnotator (AnnotateGFF gf) opts = loadGFF gf opts
 loadAnnotator (AnnotateFunctionalMap mm) opts = loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
 
-performCount1Pass :: VUM.IOVector Double -> MMMethod -> C.Sink [Int] NGLessIO ((),[[Int]])
-performCount1Pass mcounts method = case method of
-    MMCountAll -> (,[]) <$> CL.mapM_ (liftIO . incrementAll mcounts)
-    MM1OverN -> (,[]) <$> CL.mapM_ (liftIO . increment1OverN mcounts)
-    MMDist1 -> CI.zipSinks
-        (CL.mapM_ $ \case
-                    [v] -> liftIO $ unsafeIncrement mcounts v
-                    _ -> return ())
-        (CL.filter ((/= 1) . length) $= CL.consume)
+
+performCount1Pass :: VUM.IOVector Double -> MMMethod -> C.Sink (VU.Vector Int, V.Vector [Int]) NGLessIO [V.Vector [Int]]
+performCount1Pass mcounts method = loop []
+    where
+        loop acc = C.await >>= \case
+            Nothing -> return acc
+            Just (singles,mms) -> case method of
+                MMCountAll -> do
+                    liftIO $ incrementAll mcounts singles
+                    loop acc
+                MM1OverN -> do
+                    liftIO $ incrementAll mcounts singles
+                    forM_ mms (liftIO . increment1OverN mcounts)
+                    loop acc
+                MMDist1 ->  do
+                    liftIO $ incrementAll mcounts singles
+                    loop $ if V.length mms > 0
+                                then mms:acc
+                                else acc
 
 -- | Equivalent to Python's enumerate
 enumerate :: (Monad m) => C.Conduit a m (Int, a)
@@ -303,6 +313,26 @@ mergeV v0 v1
 listNub :: (Ord a) => [a] -> [a]
 listNub = S.toList . S.fromList
 
+splitSingles :: MMMethod -> V.Vector [Int] -> (VU.Vector Int, V.Vector [Int])
+splitSingles method values = (singles, mms)
+    where
+        singles = VU.create $ do
+            v <- VU.unsafeThaw $ VU.unfoldr getsingle1 0
+            sort v -- sorting is completely unnecessary for correctness, but improves cache performance as close-by indices will be accessed together
+            return v
+        getsingle1 :: Int -> Maybe (Int, Int)
+        getsingle1 ix = do
+            v <- values V.!? ix
+            case v of
+                [v] -> return (v, ix + 1)
+                _ -> getsingle1 (ix + 1)
+        mms = if method /= MMDist1
+                then V.empty
+                else V.filter larger1 values
+        larger1 []  = False
+        larger1 [_] = False
+        larger1 _   = True
+
 performCount :: FilePath -> T.Text -> Annotator -> CountOpts -> NGLessIO FilePath
 performCount samfp gname annotator0 opts = do
     outputListLno' TraceOutput ["Starting count..."]
@@ -321,13 +351,12 @@ performCount samfp gname annotator0 opts = do
 
     outputListLno' TraceOutput ["Loaded headers (", show n_entries, " headers); starting parsing/distribution."]
     mcounts <- liftIO $ VUM.replicate n_entries (0.0 :: Double)
-    ((), toDistribute) <-
+    toDistribute <-
             samcontent
                 $$+- readSamGroupsC
-                =$= C.conduitVector 1024
-                =$= asyncMapEitherC mapthreads (V.mapM (annotateReadGroup opts annotator))
-                =$= (C.concat :: C.Conduit (V.Vector [Int]) NGLessIO [Int])
-                $= performCount1Pass mcounts method
+                =$= C.conduitVector 2048
+                =$= asyncMapEitherC mapthreads (liftM (splitSingles method) . V.mapM (annotateReadGroup opts annotator))
+                =$= performCount1Pass mcounts method
 
     when (optNormSize opts) $ do
         sizes <- liftIO $ VUM.new n_entries
@@ -372,8 +401,8 @@ performCount samfp gname annotator0 opts = do
 
 
 
-incrementAll :: VUM.IOVector Double -> [Int] -> IO ()
-incrementAll counts vis = forM_ vis $ \vi -> unsafeIncrement counts vi
+incrementAll :: VUM.IOVector Double -> VU.Vector Int -> IO ()
+incrementAll counts vis = VU.forM_ vis $ \vi -> unsafeIncrement counts vi
 
 increment1OverN :: VUM.IOVector Double -> [Int] -> IO ()
 increment1OverN counts vis = forM_ vis $ \vi -> unsafeIncrement' counts vi (1.0 / nc)
@@ -393,7 +422,7 @@ normalizeCounts counts sizes = do
 
 distributeMM indices current fractionResult = VU.create $ do
     ncounts <- VU.thaw current -- note that thaw performs a copy
-    forM_ indices $ \vs -> do
+    forM_ indices $ \vss -> forM_ vss $ \vs -> do
         let cs = map (VU.unsafeIndex current) vs
             cs_sum = sum cs
             n_cs = convert (length cs)
