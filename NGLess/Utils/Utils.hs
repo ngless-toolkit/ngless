@@ -8,6 +8,7 @@ module Utils.Utils
     ( conduitPossiblyCompressedFile
     , lookupWithDefault
     , maybeM
+    , mapMaybeM
     , uniq
     , readPossiblyCompressedFile
     , readProcessErrorWithExitCode
@@ -30,7 +31,7 @@ import System.IO
 import System.Process
 
 import Data.List (isSuffixOf, group)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, catMaybes)
 
 lookupWithDefault :: Eq b => a -> b -> [(b,a)] -> a
 lookupWithDefault def key values = fromMaybe def $ lookup key values
@@ -71,6 +72,9 @@ maybeM ma f = ma >>= \case
     Nothing -> return Nothing
     Just a -> f a
 
+mapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m [b]
+mapMaybeM f xs = catMaybes <$> mapM f xs
+
 conduitPossiblyCompressedFile fname
     | ".gz" `isSuffixOf` fname = C.sourceFile fname $= CZ.ungzip
     | ".bz2" `isSuffixOf` fname = C.sourceFile fname $= CZ.bunzip2
@@ -80,3 +84,4 @@ conduitPossiblyCompressedFile fname
 -- | passthrough applies the function 'f' and then return its argument again
 passthrough :: (Monad m) => (a -> m ()) -> a -> m a
 passthrough f a = f a >> return a
+

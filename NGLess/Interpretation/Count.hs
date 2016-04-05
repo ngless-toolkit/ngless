@@ -124,9 +124,6 @@ instance NFData Annotator where
     rnf (GFFAnnotator amap headers szmap) = rnf amap `seq` rnf headers `seq` rnf szmap
     rnf (GeneMapAnnotator amap headers szmap) = rnf amap `seq` rnf headers `seq` rnf szmap
 
-mapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m [b]
-mapMaybeM f xs = catMaybes <$> mapM f xs
-
 annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> Either NGError [Int]
 annotateReadGroup opts ann samlines = listNub <$> case ann of
         SeqNameAnnotator Nothing -> throwShouldNotOccur ("Incomplete annotator used" :: String)
