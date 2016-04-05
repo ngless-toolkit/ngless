@@ -215,19 +215,21 @@ loadAnnotator (AnnotateFunctionalMap mm) opts = loadFunctionalMap mm (map getFea
 
 
 performCount1Pass :: VUM.IOVector Double -> MMMethod -> C.Sink (VU.Vector Int, V.Vector [Int]) NGLessIO [V.Vector [Int]]
-performCount1Pass mcounts method = loop []
+performCount1Pass mcounts MMCountAll = do
+    C.awaitForever $ \(singles, mms) -> liftIO $ do
+        incrementAll mcounts singles
+        forM_ mms (incrementAll2 mcounts)
+    return []
+performCount1Pass mcounts MM1OverN = do
+    C.awaitForever $ \(singles, mms) -> liftIO $ do
+        incrementAll mcounts singles
+        forM_ mms (increment1OverN mcounts)
+    return []
+performCount1Pass mcounts MMDist1 = loop []
     where
         loop acc = C.await >>= \case
             Nothing -> return acc
-            Just (singles,mms) -> case method of
-                MMCountAll -> do
-                    liftIO $ incrementAll mcounts singles
-                    loop acc
-                MM1OverN -> do
-                    liftIO $ incrementAll mcounts singles
-                    forM_ mms (liftIO . increment1OverN mcounts)
-                    loop acc
-                MMDist1 ->  do
+            Just (singles, mms) ->  do
                     liftIO $ incrementAll mcounts singles
                     loop $ if V.length mms > 0
                                 then mms:acc
@@ -401,6 +403,9 @@ performCount samfp gname annotator0 opts = do
 
 incrementAll :: VUM.IOVector Double -> VU.Vector Int -> IO ()
 incrementAll counts vis = VU.forM_ vis $ \vi -> unsafeIncrement counts vi
+
+incrementAll2 :: VUM.IOVector Double -> [Int] -> IO ()
+incrementAll2 counts vis = forM_ vis $ \vi -> unsafeIncrement counts vi
 
 increment1OverN :: VUM.IOVector Double -> [Int] -> IO ()
 increment1OverN counts vis = forM_ vis $ \vi -> unsafeIncrement' counts vi (1.0 / nc)
