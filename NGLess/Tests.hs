@@ -43,7 +43,6 @@ import Interpretation.Unique
 import Data.FastQ
 import Data.Sam
 import Utils.Utils
-import Utils.Vector
 import qualified Data.GFF as GFF
 
 import Tests.Utils
