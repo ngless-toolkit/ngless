@@ -20,6 +20,7 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
+import           Data.Strict.Tuple (Pair(..))
 import Data.Bits (testBit)
 import Control.DeepSeq
 
@@ -32,16 +33,16 @@ import Utils.Conduit
 
 data SamLine = SamLine
             { samQName :: !B.ByteString
-            , samFlag :: !Int
-            , samRName :: !B.ByteString
-            , samPos :: !Int
-            , samMapq :: !Int
-            , samCigar :: !B.ByteString
-            , samRNext :: !B.ByteString
-            , samPNext :: !Int
-            , samTLen :: !Int
-            , samSeq :: !B.ByteString
-            , samQual :: !B.ByteString
+            , samFlag :: {-# UNPACK #-} !Int
+            , samRName :: {-# UNPACK #-} !B.ByteString
+            , samPos :: {-# UNPACK #-} !Int
+            , samMapq :: {-# UNPACK #-} !Int
+            , samCigar :: {-# UNPACK #-} !B.ByteString
+            , samRNext :: {-# UNPACK #-} !B.ByteString
+            , samPNext :: {-# UNPACK #-} !Int
+            , samTLen :: {-# UNPACK #-} !Int
+            , samSeq :: {-# UNPACK #-} !B.ByteString
+            , samQual :: {-# UNPACK #-} !B.ByteString
             } | SamHeader !B.ByteString
              deriving (Eq, Show, Ord)
 
@@ -73,35 +74,35 @@ hasQual :: SamLine -> Bool
 hasQual = (`testBit` 9) . samFlag
 
 
-newtype SimpleParser a = SimpleParser { runSimpleParser :: B.ByteString -> Maybe (a, B.ByteString) }
+newtype SimpleParser a = SimpleParser { runSimpleParser :: B.ByteString -> Maybe (Pair a B.ByteString) }
 instance Functor SimpleParser where
     fmap f p = SimpleParser $ \b -> do
-                                (v,rest) <- runSimpleParser p b
-                                return (f v, rest)
+                                (v :!: rest) <- runSimpleParser p b
+                                return $! (f v :!: rest)
 
 instance Applicative SimpleParser where
-    pure v = SimpleParser (\b -> Just (v,b))
+    pure v = SimpleParser (\b -> Just (v :!: b))
     f <*> g = SimpleParser (\b -> do
-                                (f', rest) <- runSimpleParser f b
-                                (g', rest') <- runSimpleParser g rest
-                                return (f' g', rest'))
+                                (f' :!: rest) <- runSimpleParser f b
+                                (g' :!: rest') <- runSimpleParser g rest
+                                return $! (f' g' :!: rest'))
 
 readSamLine :: B.ByteString -> Either NGError SamLine
 readSamLine line
     | B8.head line == '@' = return (SamHeader line)
     | otherwise = case runSimpleParser samP line of
-        Just (v,_) -> return v
+        Just (v :!: _) -> return v
         Nothing -> throwDataError ("Could not parse sam line "++show line)
 
 tabDelim :: SimpleParser B.ByteString
 tabDelim = SimpleParser $ \input -> do
     ix <- B8.elemIndex '\t' input
-    return (B.take ix input, B.drop (ix+1) input)
+    return $! (B.take ix input :!: B.drop (ix+1) input)
 
 readIntTab = SimpleParser $ \b -> do
         (v,rest) <- B8.readInt b
-        return (v, B.tail rest)
-restParser = SimpleParser $ \b -> Just (b, B.empty)
+        return $! (v :!: B.tail rest)
+restParser = SimpleParser $ \b -> Just (b :!: B.empty)
 samP = SamLine
     <$> tabDelim
     <*> readIntTab
