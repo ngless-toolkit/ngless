@@ -164,6 +164,7 @@ annEnumerate (GFFAnnotator _ headers _) = zip headers [0..]
 annEnumerate (GeneMapAnnotator _ headers _) = zip headers [0..]
 
 annSize :: Annotator -> Int
+annSize (SeqNameAnnotator (Just ix)) = V.length ix
 annSize ann = length (annEnumerate ann)
 
 methodFor "1overN" = return MM1OverN
