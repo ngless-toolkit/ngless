@@ -34,17 +34,16 @@ import           Data.Vector.Algorithms.Intro (sort)
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import           Data.Strict.Tuple (Pair(..))
 
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
-import qualified Data.Conduit.Internal as CI
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit (($=), (=$), (=$=), ($$+), ($$+-), ($$))
 import           Data.Conduit.Async (buffer, (=$=&), ($$&))
 
 import Control.Monad
+import Control.Exception        (evaluate)
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
 import Data.List                (foldl1')
@@ -57,7 +56,7 @@ import System.IO                (hClose)
 import Data.Convertible         (convert)
 
 import Data.GFF
-import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamGroupsC)
+import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamLine)
 import FileManagement (openNGLTempFile)
 import ReferenceDatabases
 import NGLess.NGError
@@ -249,65 +248,16 @@ annSamHeaderParser mapthreads SeqNameAnnotator{} = do
                     Just (size, _) -> return $! RefSeqInfo (B.drop 3 seqname) (convert size)
                     Nothing -> throwDataError ("Could not parse sequence length in header (line: " ++ show n ++ ")")
                 _ -> throwDataError ("SAM file does not contain the right number of tokens (line: " ++ show n ++ ")")
-
-        buildVector :: V.Vector (Int, ByteLine) -> Either NGError (V.Vector RefSeqInfo)
-        buildVector pairs = case V.mapM seqNameSize pairs of
-            Right v -> let !r = V.create $ do
-                                        v' <- V.unsafeThaw v
-                                        sort v'
-                                        return v'
-                        in Right r
-            err -> err
-    CL.filter (B.isPrefixOf "@SQ\tSN:" . unwrapByteLine)
+    chunks <- CL.filter (B.isPrefixOf "@SQ\tSN:" . unwrapByteLine)
         =$= enumerate
-        =$= C.conduitVector 16384
-        =$= asyncMapEitherC mapthreads buildVector
-        =$= (getVector <$> CL.fold mergeVM (VectorMerge []))
+        =$= C.conduitVector 32768
+        =$= asyncMapEitherC mapthreads (V.mapM seqNameSize)
+        =$= CL.fold (flip (:)) []
+    liftIO $ do
+        v <- V.unsafeThaw (V.concat chunks)
+        sortParallel mapthreads v
+        V.unsafeFreeze v
 annSamHeaderParser _ _ = C.sinkNull >> return V.empty
-
-{- This is a simple type that just accumulates sorted vectors into increasingly large blocks -}
-newtype VectorMerge a = VectorMerge [Pair Int (V.Vector a)]
-
-mergeVM :: (Ord a) => VectorMerge a -> V.Vector a -> VectorMerge a
-mergeVM (VectorMerge start) newv = VectorMerge $! mergeVM' 1 start newv
-    where
-        mergeVM' w [] !v = [w :!: v]
-        mergeVM' w vm@((w' :!: v'):rs) v
-            | w == w' = mergeVM' (w+1) rs (mergeV v v')
-            | otherwise = (w :!: v):vm
-
-getVector :: (Ord a) => VectorMerge a -> V.Vector a
-getVector (VectorMerge vm) = loop vm V.empty
-    where
-        loop [] v = v
-        loop ((_ :!: v'):rs) v = loop rs (mergeV v v')
-
-mergeV :: (Ord a) => V.Vector a -> V.Vector a -> V.Vector a
-mergeV v0 v1
-    | V.length v0 == 0 = v1
-    | V.length v1 == 0 = v0
-    | otherwise = V.create $ do
-        let n0 = V.length v0
-            n1 = V.length v1
-            n = n0 + n1
-        r <- VM.new n
-
-        let loop p0 p1 pr
-                | p0 < n0 && p1 < n1 = case compare ((V.!) v0 p0) ((V.!) v1 p1) of
-                    LT -> vectorCopyElem' v0 p0 pr >> loop (p0 + 1) p1      (pr + 1)
-                    _  -> vectorCopyElem' v1 p1 pr >> loop  p0     (p1 + 1) (pr + 1)
-                | p0 < n0 = copyRest v0 p0 pr n0
-                | p1 < n1 = copyRest v1 p1 pr n1
-                | otherwise = return ()
-            copyRest v s pr n
-                | s == n = return ()
-                | otherwise = vectorCopyElem' v s pr >> copyRest v (s + 1) (pr + 1) n
-
-            vectorCopyElem' v !i !j = do
-                val <- V.indexM v i
-                VM.write r j val
-        loop 0 0 0
-        return r
 
 
 listNub :: (Ord a) => [a] -> [a]
@@ -333,6 +283,44 @@ splitSingles method values = (singles, mms)
         larger1 [_] = False
         larger1 _   = True
 
+
+readSamGroupsC' :: Int -> C.Conduit ByteLine NGLessIO (V.Vector [SamLine])
+readSamGroupsC' mapthreads =
+        C.conduitVector 16384
+            =$= asyncMapEitherC mapthreads (liftM groupByName . V.mapM (readSamLine . unwrapByteLine))
+            =$= fixSamGroups
+    where
+        groupByName :: V.Vector SamLine -> V.Vector [SamLine]
+        groupByName vs = V.unfoldr groupByName' (0, B.empty, [])
+            where
+                groupByName' :: (Int, B.ByteString, [SamLine]) -> Maybe ([SamLine], (Int, B.ByteString, [SamLine]))
+                groupByName' (ix,name, acc)
+                    | ix == V.length vs = if null acc
+                                            then Nothing
+                                            else Just (acc,(ix, name,[]))
+                    | null acc = groupByName' (ix + 1, samQName (vs V.! ix), [vs V.! ix])
+                    | samQName (vs V.! ix) == name = groupByName' (ix + 1, name, vs V.! ix: acc)
+                    | otherwise = Just (acc, (ix + 1, B.empty, []))
+        fixSamGroups :: C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
+        fixSamGroups = fixSamGroups' []
+        fixSamGroups' prev = C.await >>= \case
+            Nothing -> unless (null prev) (C.yield (V.singleton prev))
+            Just gs -> do
+                    let prev' = V.last gs
+                    _ <- liftIO (evaluate prev') -- make sure we are not holding a reference to gs after this line.
+                    gs' <- liftIO $ injectLast prev gs
+                    C.yield (V.slice 0 (V.length gs' - 1) gs')
+                    fixSamGroups' prev'
+        injectLast :: [SamLine] -> V.Vector [SamLine] -> IO (V.Vector [SamLine])
+        injectLast [] gs = return gs
+        injectLast prev@(h:_) gs
+            | samQName h == (samQName . head . V.head $ gs) = do
+                gs' <- V.unsafeThaw gs
+                VM.modify gs' (prev ++ ) 0
+                V.unsafeFreeze gs'
+            | otherwise = return $ V.cons prev gs
+
+
 performCount :: FilePath -> T.Text -> Annotator -> CountOpts -> NGLessIO FilePath
 performCount samfp gname annotator0 opts = do
     outputListLno' TraceOutput ["Starting count..."]
@@ -353,8 +341,7 @@ performCount samfp gname annotator0 opts = do
     mcounts <- liftIO $ VUM.replicate n_entries (0.0 :: Double)
     toDistribute <-
             samcontent
-                $$+- readSamGroupsC
-                =$= C.conduitVector 2048
+                $$+- readSamGroupsC' mapthreads
                 =$= asyncMapEitherC mapthreads (liftM (splitSingles method) . V.mapM (annotateReadGroup opts annotator))
                 =$= performCount1Pass mcounts method
 
