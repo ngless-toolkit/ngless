@@ -284,7 +284,7 @@ splitSingles method values = (singles, mms)
 
 readSamGroupsC' :: Int -> C.Conduit ByteLine NGLessIO (V.Vector [SamLine])
 readSamGroupsC' mapthreads =
-        C.conduitVector 16384
+        C.conduitVector 65536
             =$= asyncMapEitherC mapthreads (liftM groupByName . V.mapM (readSamLine . unwrapByteLine))
             =$= fixSamGroups
     where
