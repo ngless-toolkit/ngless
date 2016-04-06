@@ -276,9 +276,7 @@ splitSingles method values = (singles, mms)
             case v of
                 [v] -> return (v, ix + 1)
                 _ -> getsingle1 (ix + 1)
-        mms = if method /= MMDist1
-                then V.empty
-                else V.filter larger1 values
+        mms = V.filter larger1 values
         larger1 []  = False
         larger1 [_] = False
         larger1 _   = True
