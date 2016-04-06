@@ -47,6 +47,7 @@ newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
 
 linesC :: (Monad m) => C.Conduit B.ByteString m ByteLine
 linesC = CB.lines =$= CL.map ByteLine
+{-# INLINE linesC #-}
 
 -- | This is like Data.Conduit.List.map, except that each element is processed
 -- in a separate thread (up to maxSize can be queued up at any one time).
