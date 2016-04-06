@@ -67,6 +67,7 @@ import NGLess
 import Utils.Conduit
 import Utils.Utils
 import Utils.Vector
+import qualified Utils.IntGroups as IG
 
 
 -- GFFAnnotationMap maps from `References` (e.g., chromosomes) to positions to (strand/feature-id)
@@ -213,24 +214,25 @@ loadAnnotator (AnnotateGFF gf) opts = loadGFF gf opts
 loadAnnotator (AnnotateFunctionalMap mm) opts = loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
 
 
-performCount1Pass :: VUM.IOVector Double -> MMMethod -> C.Sink (VU.Vector Int, V.Vector [Int]) NGLessIO [V.Vector [Int]]
+performCount1Pass :: VUM.IOVector Double -> MMMethod -> C.Sink (VU.Vector Int, IG.IntGroups) NGLessIO [IG.IntGroups]
 performCount1Pass mcounts MMCountAll = do
     C.awaitForever $ \(singles, mms) -> liftIO $ do
         incrementAll mcounts singles
-        forM_ mms (incrementAll2 mcounts)
+        IG.forM_ mms (incrementAll2 mcounts)
     return []
 performCount1Pass mcounts MM1OverN = do
     C.awaitForever $ \(singles, mms) -> liftIO $ do
         incrementAll mcounts singles
-        forM_ mms (increment1OverN mcounts)
+        IG.forM_ mms (increment1OverN mcounts)
     return []
 performCount1Pass mcounts MMDist1 = loop []
     where
+        loop :: [IG.IntGroups] -> C.Sink (VU.Vector Int, IG.IntGroups) NGLessIO [IG.IntGroups]
         loop acc = C.await >>= \case
             Nothing -> return acc
             Just (singles, mms) ->  do
                     liftIO $ incrementAll mcounts singles
-                    loop $ if V.length mms > 0
+                    loop $ if not (IG.null mms)
                                 then mms:acc
                                 else acc
 
@@ -263,7 +265,7 @@ annSamHeaderParser _ _ = C.sinkNull >> return V.empty
 listNub :: (Ord a) => [a] -> [a]
 listNub = S.toList . S.fromList
 
-splitSingles :: MMMethod -> V.Vector [Int] -> (VU.Vector Int, V.Vector [Int])
+splitSingles :: MMMethod -> V.Vector [Int] -> (VU.Vector Int, IG.IntGroups)
 splitSingles method values = (singles, mms)
     where
         singles = VU.create $ do
@@ -276,7 +278,7 @@ splitSingles method values = (singles, mms)
             case v of
                 [v] -> return (v, ix + 1)
                 _ -> getsingle1 (ix + 1)
-        mms = V.filter larger1 values
+        mms = IG.fromList (filter larger1 (V.toList values))
         larger1 []  = False
         larger1 [_] = False
         larger1 _   = True
@@ -413,7 +415,7 @@ normalizeCounts counts sizes = do
 
 distributeMM indices current fractionResult = VU.create $ do
     ncounts <- VU.thaw current -- note that thaw performs a copy
-    forM_ indices $ \vss -> forM_ vss $ \vs -> do
+    forM_ indices $ \vss -> IG.forM_ vss $ \vs -> do
         let cs = map (VU.unsafeIndex current) vs
             cs_sum = sum cs
             n_cs = convert (length cs)

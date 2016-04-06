@@ -52,6 +52,7 @@ import Tests.Types (tgroup_Types)
 import Tests.Count (tgroup_Count)
 import Tests.Parse (tgroup_Parse)
 import Tests.Vector (tgroup_Vector)
+import Tests.IntGroups (tgroup_IntGroups)
 import Tests.NGLessAPI (tgroup_NGLessAPI)
 
 test_FastQ      = [tgroup_FastQ]
@@ -61,6 +62,7 @@ test_Parse      = [tgroup_Parse]
 test_Types      = [tgroup_Types]
 test_NGLessAPI  = [tgroup_NGLessAPI]
 test_Vector     = [tgroup_Vector]
+test_IntGroups  = [tgroup_IntGroups]
 
 -- The main test driver sets verbosity to Quiet to avoid extraneous output and
 -- then uses the automatically generated function
