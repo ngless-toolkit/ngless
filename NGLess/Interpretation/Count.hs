@@ -302,23 +302,26 @@ readSamGroupsC' mapthreads =
                     | samQName (vs V.! ix) == name = groupByName' (ix + 1, name, vs V.! ix: acc)
                     | otherwise = Just (acc, (ix + 1, B.empty, []))
         fixSamGroups :: C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
-        fixSamGroups = fixSamGroups' []
+        fixSamGroups = awaitJust fixSamGroups'
+        fixSamGroups' :: V.Vector [SamLine] -> C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
         fixSamGroups' prev = C.await >>= \case
-            Nothing -> unless (null prev) (C.yield (V.singleton prev))
-            Just gs -> do
-                    let prev' = V.last gs
-                    _ <- liftIO (evaluate prev') -- make sure we are not holding a reference to gs after this line.
-                    gs' <- liftIO $ injectLast prev gs
-                    C.yield (V.slice 0 (V.length gs' - 1) gs')
-                    fixSamGroups' prev'
+            Nothing -> C.yield prev
+            Just cur -> do
+                    let (lastprev:_) = V.last prev
+                        (curfirst:_) = V.head cur
+                    if samQName lastprev /= samQName curfirst
+                        then do -- lucky case, the groups align with the vector boundary
+                            C.yield prev
+                            fixSamGroups' cur
+                        else do
+                            C.yield (V.slice 0 (V.length prev - 1) prev)
+                            cur' <- liftIO $ injectLast (V.last prev) cur
+                            fixSamGroups' cur'
         injectLast :: [SamLine] -> V.Vector [SamLine] -> IO (V.Vector [SamLine])
-        injectLast [] gs = return gs
-        injectLast prev@(h:_) gs
-            | samQName h == (samQName . head . V.head $ gs) = do
-                gs' <- V.unsafeThaw gs
-                VM.modify gs' (prev ++ ) 0
-                V.unsafeFreeze gs'
-            | otherwise = return $ V.cons prev gs
+        injectLast prev gs = do
+            gs' <- V.unsafeThaw gs
+            VM.modify gs' (prev ++ ) 0
+            V.unsafeFreeze gs'
 
 
 performCount :: FilePath -> T.Text -> Annotator -> CountOpts -> NGLessIO FilePath
