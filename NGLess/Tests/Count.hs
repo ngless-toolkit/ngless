@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, OverloadedStrings, TupleSections #-}
+{-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
 module Tests.Count
     ( tgroup_Count
     ) where
@@ -7,13 +7,18 @@ import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
 
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Set as S
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Map as M
+
+import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.List as CL
+import qualified Data.Conduit as C
+import           Data.Conduit ((=$=), ($$))
+import           Control.Monad.Trans.Resource (runResourceT)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 
@@ -21,6 +26,7 @@ import qualified Data.GFF as GFF
 import Interpretation.Count
 import Tests.Utils
 import Data.GFF
+import Utils.Here
 import NGLess
 
 
@@ -33,16 +39,26 @@ very_short_sam = "test_samples/very_short.sam"
 very_short_gff = "test_samples/very_short.gtf"
 
 
-equivalentLine (a,b) = parse a == parse b
+readCountFile :: Bool -> FilePath -> IO (M.Map B.ByteString Double)
+readCountFile skipFirst fp = do
+    runResourceT $
+        C.sourceFile fp
+            =$= CB.lines
+            =$= maySkipFirst
+            $$ CL.foldMap parseLine
     where
-        parse :: BL.ByteString -> (BL.ByteString, Double)
-        parse ell = let [n,v] = BL8.split '\t' ell in (n, read $ BL8.unpack v)
+        maySkipFirst = if skipFirst
+                        then C.await >> (C.awaitForever C.yield)
+                        else C.awaitForever C.yield
+        parseLine line = case B8.split '\t' line of
+            [h,val] -> M.singleton h (read $ B8.unpack val)
+            _ -> error ("Could not parse line: " ++ show line)
 
 compareFiles fa fb = liftIO $ do
-    ca <- BL8.lines <$> BL.readFile fa
-    cb <- BL8.lines <$> BL.readFile fb
+    ca <- readCountFile True fa
+    cb <- readCountFile False fb
     assertBool (concat ["Expected files ", fa, " and ", fb, " to be equivalent"])
-        (all equivalentLine (zip ca cb))
+        (ca == cb)
 
 annotate_count_compare htseq_version sam gff opts = testNGLessIO $ do
     ann <- loadAnnotator (AnnotateGFF gff) opts
@@ -178,4 +194,28 @@ case_load_gff_order = do
                 $ loadAnnotator (AnnotateGFF fp) defCountOpts  { optFeatures = [GffGene] }
     let [h] = map snd . concat . IM.elems  . fromJust $ M.lookup "V" immap
     (headers !! h) @?= "WBGene00008825"
+
+short1 :: B.ByteString
+short1 = [here|
+X	protein_coding	gene	610	1473	.	+	.	gene_id "WBGene00002254"; gene_name "lbp-2"; gene_source "ensembl"; gene_biotype "protein_coding";
+|]
+
+short_sam :: B.ByteString
+short_sam = [here|
+@SQ	SN:X	LN:18942
+SRR070372.1096	0	X	1174	60	62S75M1D37M46D58M10S	*	0	0	GTTCTACAACGTCCAGATCGGAAGCAAGTTCGAAGGAGAGGGTCTTGATAACACCAAGCACGAGGTTACCTTCACTCTCAAGGACGGACACTTGTTCGAACATCACAAGCCACTTGAAGAGGGAGAATCCAAGGAAGAACCTATGAGTATTACTTTGATGGAGATTTTCTTATTCAGAAGATGAGCTTCAACAATATCGAAGGCCGCAGATTCTACAAGAGACTCCCATAAAGTTAACTATC	IIIIIIF@@@CIIIIIIIIIIIIIIIIIIIIIHHIIIB=5669CIIIIIIIIIIIIIIIIIIIIIIIIIIHHHIHIIIIIIIIIIIIIIIIIIIHIIIIIIIIIIIIIIIHIH>>>FIIGBB@E??;75444<<:62///1>?BAAAD?AE;72217<AAAA;=/1117//7AADACDDGIEEEEEGGHGD@@@GGGGD@@@@DD@@@DDEBCBEBB@:566?6333;C@@=BAA:?E9911	NM:i:47	MD:Z:75^A37^CAGGTAAAATTTGGTCAATCTATTTGACATACATTTTTGTTAATTA58	AS:i:111	XS:i:19	SA:Z:X,1053,+,7M3D59M176S,60,3;
+SRR070372.1096	2048	X	1053	60	7M3D59M176H	*	0	0	GTTCTACAACGTCCAGATCGGAAGCAAGTTCGAAGGAGAGGGTCTTGATAACACCAAGCACGAGGT	IIIIIIF@@@CIIIIIIIIIIIIIIIIIIIIIHHIIIB=5669CIIIIIIIIIIIIIIIIIIIIII	NM:i:3	MD:Z:7^AAA59	AS:i:59	XS:i:0	SA:Z:X,1174,+,62S75M1D37M46D58M10S,60,47;
+SRR070372.1334	0	X	1174	60	61S75M1D16M1D10M1D9M46D55M1D7M1D6M1D10M1D5M2D25M2D11M2D16M	*	0	0	GTTCTACAACGTCCAGATCGGAAGCAAGTTCGAAGGAGAGGTCTTGATAACACCAAGCACGAGGTTACCTTCACTCTCAAGGACGGACACTTGTTCGAACATCACAAGCCACTTGAAGAGGGAGAATCCAAGGAAGAACCTATGAGTATTACTTGATGGAGATTTCTTATTCAGAAGATGAGCTTCAACAATATCGAAGGCCGCAGATTCTACAAGAGACTCCCATAAAGTTTAACTTATCTATTGAAATTTCTAAATTGCAATTCAATTTCATTTCCGAAAAATAAATTATTTCAAGCAATCTTC	IIIIIII???GIIIIIIIICCCCIIIIIIIIIIIIIIB?555?IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIICCCIIIICCBBBBB?;;6688EEEEGEIE:::?<<?CGEDDEEBBCC44:EIIIEEEIIIIGHGGGHGGIIIIIIEGCCCCEEIIIIICC?<?EEEG?AAEB1//5=<52.---,.=../,34A?CB<<<4777/222;;@@DDDAEEEEEBGA74496:,,,,,.,,,--.221326::477<BEE	NM:i:61	MD:Z:75^A16^T10^T9^CAGGTAAAATTTGGTCAATCTATTTGACATACATTTTTGTTAATTA55^A7^A6^T10^T5^TA2T22^AA11^TA0T15	AS:i:110	XS:i:20	SA:Z:X,1053,+,7M3D32M1D26M241S,60,4;
+SRR070372.1334	2048	X	1053	60	7M3D32M1D26M241H	*	0	0	GTTCTACAACGTCCAGATCGGAAGCAAGTTCGAAGGAGAGGTCTTGATAACACCAAGCACGAGGT	IIIIIII???GIIIIIIIICCCCIIIIIIIIIIIIIIB?555?IIIIIIIIIIIIIIIIIIIIII	NM:i:4	MD:Z:7^AAA32^G26	AS:i:51	XS:i:0	SA:Z:X,1174,+,61S75M1D16M1D10M1D9M46D55M1D7M1D6M1D10M1D5M2D25M2D11M2D16M,60,61;
+|]
+
+case_count_two = do
+    c <- testNGLessIO $ do
+        let opts = defCountOpts { optFeatures = [GffGene] }
+        gff <- asTempFile short1 "gff"
+        samf <- asTempFile short_sam "sam"
+        ann <- loadAnnotator (AnnotateGFF gff) opts
+        cfp <- performCount samf "testing" ann opts
+        liftIO (readCountFile True cfp)
+    c @?= M.fromList [("WBGene00002254", 2)]
 
