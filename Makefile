@@ -70,18 +70,22 @@ reqhtmllibs = $(addprefix $(HTML_LIBS_DIR)/, $(HTMLFILES))
 reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
 reqlogo = $(HTML_LIBS_DIR)/Octocat.png
 
+PREBUILD = NGLess.cabal $(NGLESS_BUILD_BINARIES)
+
 all: NGLess.cabal ngless
 
 NGLess.cabal: NGLess.cabal.m4
 	m4 $< > $@
 
-config: NGLess.cabal
-
-ngless: NGLess.cabal $(NGLESS_BUILD_BINARIES)
+ngless: $(PREBUILD)
 	stack build
 
-static: NGLess.cabal $(NGLESS_BUILD_BINARIES)
+static: $(PREBUILD)
 	stack build --ghc-options='-optl-static -optl-pthread' --force-dirty
+
+fast: $(PREBUILD)
+	stack build  --ghc-options=-O0
+
 
 dist: ngless-${VERSION}.tar.gz
 
@@ -91,12 +95,13 @@ test_samples/htseq-res/htseq_cds_noStrand_union.txt:
 	cd test_samples/ && gzip -dkf *.gz
 	cd test_samples/htseq-res && ./generateHtseqFiles.sh
 
-check: ngless ${testinputfiles}
+check: $(PREBUILD)
 	stack test
-
+fastcheck: $(PREBUILD)
+	stack test --ghc-options=-O0
 tests: check
 
-bench: config $(NGLESS_BUILD_BINARIES)
+bench: $(PREBUILD)
 	stack bench
 
 profile:
@@ -192,4 +197,4 @@ ngless-${VERSION}.tar.gz: ngless
 	tar -zcvf $(distdir).tar.gz $(distdir)
 	rm -rf $(distdir)
 
-.PHONY: all build clean check tests config distclean dist static
+.PHONY: all build clean check tests distclean dist static fast fastcheck
