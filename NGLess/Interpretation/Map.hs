@@ -43,7 +43,8 @@ import NGLess
 
 import Utils.Bwa
 import Utils.LockFile
-import Utils.Utils (conduitPossiblyCompressedFile, readProcessErrorWithExitCode)
+import Utils.Utils (readProcessErrorWithExitCode)
+import Utils.Conduit (conduitPossiblyCompressedFile)
 
 data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
 

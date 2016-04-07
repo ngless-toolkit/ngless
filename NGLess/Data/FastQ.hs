@@ -9,7 +9,6 @@ module Data.FastQ
     , guessEncoding
     , encodingOffset
     , encodingName
-    , readReadSet
     , parseFastQ
     , fqConduitR
     , fqEncode
@@ -28,7 +27,6 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import           Control.DeepSeq (NFData(..))
 import Data.Conduit         (($$), (=$=))
-import Data.Conduit.Async   ((=$=&), ($$&))
 import Control.Monad
 import Control.Monad.Except
 
@@ -46,7 +44,6 @@ import Data.Word
 import NGLess.NGError
 import Utils.Conduit
 import Utils.Vector (zeroVec, unsafeIncrement)
-import Utils.Utils
 
 data ShortRead = ShortRead
         { srHeader :: !B.ByteString
@@ -108,9 +105,6 @@ fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", encodeQual c, "\
     where
         offset = encodingOffset enc
         encodeQual = B.map (offset +)
-
-readReadSet :: FastQEncoding -> FilePath -> IO [ShortRead]
-readReadSet enc fn = parseFastQ enc <$> readPossiblyCompressedFile fn
 
 fqConduitR :: (Monad m, MonadError NGError m) => FastQEncoding -> C.Conduit ByteLine m ShortRead
 fqConduitR enc = groupC 4 =$= CL.mapM parseShortReads

@@ -39,11 +39,9 @@ import           Control.DeepSeq (NFData(..))
 import Data.IORef
 import System.IO
 import System.Directory
-import Data.Maybe
 import Data.List (find)
 import GHC.Conc                 (getNumCapabilities)
 
-import Utils.Utils
 import Substrim
 import Language
 import FileManagement

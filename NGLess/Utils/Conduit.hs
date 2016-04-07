@@ -26,6 +26,8 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.TQueue as CA
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Zlib as C
+import qualified Data.Conduit.Zlib as CZ
+import qualified Data.Conduit.BZlib as CZ
 import qualified Data.Conduit as C
 import           Data.Conduit ((=$=), ($$))
 
@@ -40,8 +42,7 @@ import           Foreign.ForeignPtr
 import           System.IO
 import           Data.Word
 import           Foreign.Ptr
-
-import Utils.Utils (conduitPossiblyCompressedFile)
+import           Data.List (isSuffixOf)
 
 newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
 
@@ -150,8 +151,14 @@ asyncGzipTo h = do
     consumer <- liftIO $ A.async (src $$ C.gzip =$= C.sinkHandle h)
     let sink :: C.Sink B.ByteString m' ()
         sink = C.addCleanup (\_ -> liftIO (A.wait consumer)) $ CA.sinkTBMQueue q True
-    return (bsConcatTo (2^15) =$= sink)
+    return (bsConcatTo ((2 :: Int) ^ (15 :: Int)) =$= sink)
 
 
 zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
 zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
+
+conduitPossiblyCompressedFile fname
+    | ".gz" `isSuffixOf` fname = C.sourceFile fname =$= CZ.ungzip
+    | ".bz2" `isSuffixOf` fname = C.sourceFile fname =$= CZ.bunzip2
+    | otherwise = C.sourceFile fname
+

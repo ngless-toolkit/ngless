@@ -12,9 +12,10 @@ module Interpretation.Write
 
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
-import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
+import qualified Data.Conduit.Combinators as C
+import           Data.Conduit (($$))
 import System.Process
 import System.Exit
 import System.Directory
@@ -32,6 +33,7 @@ import Configuration
 import NGLess
 import Output
 import Utils.Utils
+import Utils.Conduit (conduitPossiblyCompressedFile)
 
 removeEnd :: String -> String -> String
 removeEnd base suffix = take (length base - length suffix) base
@@ -53,8 +55,8 @@ getOFile args = do
         _ -> throwShouldNotOccur ("getOFile cannot decode file path" :: String)
 
 
-writeRSToFile enc path newfp = liftIO $
-    readPossiblyCompressedFile path >>= BL.writeFile newfp
+writeRSToFile enc path newfp =
+    conduitPossiblyCompressedFile path $$ C.sinkFile newfp
 
 moveOrCopy :: FilePath -> FilePath -> IO ()
 moveOrCopy oldfp newfp = renameFile oldfp newfp `catch` (\e -> case ioeGetErrorType e of
@@ -100,7 +102,7 @@ executeWrite el@(NGOMappedReadSet name fp defGen) args = do
         NGOSymbol "sam" -> liftIO $ do
             if canMove
                 then moveOrCopy fp newfp
-                else readPossiblyCompressedFile fp >>= BL.writeFile newfp
+                else liftIO (copyFile fp newfp)
             return (NGOMappedReadSet name newfp defGen)
         NGOSymbol "bam" -> do
                         newfp' <- convertSamToBam fp newfp

@@ -11,7 +11,6 @@ import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
-import Control.Monad.Except
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
 
@@ -20,6 +19,9 @@ import System.Directory (removeFile
                         ,doesFileExist
                         )
 import qualified Data.ByteString.Char8 as B
+
+import qualified Data.Conduit as C
+import           Data.Conduit ((=$=), ($$))
 
 
 import Data.Convertible
@@ -32,7 +34,6 @@ import Tokens
 import Types
 import Substrim
 import FileManagement
-import Interpretation.FastQ
 import CmdArgs
 import Configuration
 import NGLess
@@ -42,7 +43,7 @@ import Interpretation.Unique
 
 import Data.FastQ
 import Data.Sam
-import Utils.Utils
+import Utils.Conduit
 import qualified Data.GFF as GFF
 
 import Tests.Utils
@@ -197,6 +198,7 @@ samLine = SamLine
             , samTLen = 0
             , samSeq = "AAAAAAAAAAAAAAAAAAAAAAA"
             , samQual = "aaaaaaaaaaaaaaaaaa`aa`^"
+            , samExtra = "AS:i:0  XS:i:0"
             }
 
 case_isAligned_sam = isAligned (samLine {samFlag = 16}) @? "Should be aligned"
@@ -288,33 +290,24 @@ case_calc_sam_stats = testNGLessIO (_samStats "test_samples/sample.sam.gz") >>= 
 
 --File "test_samples/data_set_repeated.fq" has 216 reads in which 54 are unique.
 
-case_num_files_1 = do
-  n <- _numFiles "test_samples/data_set_repeated.fq"
-  n @?= 1
-
-case_num_files_2 = do -- github rejects files with more than 100MB
-  n <- _numFiles "test_samples/sample.sam"
-  n @?= 1
-
-
+countC = loop (0 :: Int)
+    where
+        loop !n = C.await >>= maybe (return n) (const (loop $ n+1))
 make_unique_test n = let enc = SolexaEncoding in do
-    c <- readReadSet enc "test_samples/data_set_repeated.fq"
-    ds <- testNGLessIO $ do
-        p <- _writeToNFiles "test_samples/data_set_repeated.fq" enc c
-        liftIO $ _readNFiles enc n p
-    length ds @?=  (n * 54)
+    nuniq <- testNGLessIO $ do
+        newfp <- performUnique "test_samples/data_set_repeated.fq" enc n
+        conduitPossiblyCompressedFile newfp
+                =$= linesC
+                =$= fqConduitR enc
+                $$ countC
+    let n' = min n 4
+    nuniq @?=  (n' * 54)
 
-case_unique_1_read = make_unique_test 1
-case_unique_2_read = make_unique_test 2
-case_unique_3_read = make_unique_test 3
-
-case_unique_5 = let enc = SolexaEncoding in do
-    c <- readReadSet enc "test_samples/data_set_repeated.fq"
-    ds <- testNGLessIO $ do
-        p <- _writeToNFiles "test_samples/data_set_repeated.fq" enc c
-        liftIO $ _readNFiles enc 5 p
-    length ds @?=  (4 * 54) -- there are only 4 copies!
-
+case_unique_1 = make_unique_test 1
+case_unique_2 = make_unique_test 2
+case_unique_3 = make_unique_test 3
+case_unique_4 = make_unique_test 4
+case_unique_5 = make_unique_test 5
 -- PerBaseQualityScores 
 
 case_calc_perc_med = calcPercentile bps eT 0.5 @?= 4

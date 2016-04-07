@@ -43,12 +43,13 @@ data SamLine = SamLine
             , samTLen :: {-# UNPACK #-} !Int
             , samSeq :: {-# UNPACK #-} !B.ByteString
             , samQual :: {-# UNPACK #-} !B.ByteString
+            , samExtra :: {-# UNPACK #-} !B.ByteString
             } | SamHeader !B.ByteString
              deriving (Eq, Show, Ord)
 
 
 instance NFData SamLine where
-    rnf (SamLine !qn !f !r !p !m !c !rn !pn !tl !s !qual) = ()
+    rnf (SamLine !qn !f !r !p !m !c !rn !pn !tl !s !qual !extra) = ()
     rnf (SamHeader !_) = ()
 
 
@@ -113,6 +114,7 @@ samP = SamLine
     <*> tabDelim
     <*> readIntTab
     <*> readIntTab
+    <*> tabDelim
     <*> tabDelim
     <*> restParser
 
