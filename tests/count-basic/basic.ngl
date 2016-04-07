@@ -1,0 +1,11 @@
+ngless '0.0'
+mapped = samfile('basic.sam')
+
+counted = count(mapped, features=['seqname'], multiple={all1})
+write(counted, ofile='output.all1.txt')
+
+counted = count(mapped, features=['seqname'], multiple={dist1})
+write(counted, ofile='output.dist1.txt')
+
+counted = count(mapped, features=['seqname'], multiple={1overN})
+write(counted, ofile='output.1overN.txt')

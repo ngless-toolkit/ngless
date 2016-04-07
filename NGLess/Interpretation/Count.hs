@@ -300,7 +300,7 @@ readSamGroupsC' mapthreads =
                                             else Just (acc,(ix, name,[]))
                     | null acc = groupByName' (ix + 1, samQName (vs V.! ix), [vs V.! ix])
                     | samQName (vs V.! ix) == name = groupByName' (ix + 1, name, vs V.! ix: acc)
-                    | otherwise = Just (acc, (ix + 1, B.empty, []))
+                    | otherwise = Just (acc, (ix, B.empty, []))
         fixSamGroups :: C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
         fixSamGroups = awaitJust fixSamGroups'
         fixSamGroups' :: V.Vector [SamLine] -> C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
