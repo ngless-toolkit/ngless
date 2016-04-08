@@ -43,11 +43,12 @@ validateIO mods sc = do
 validate_files :: Script -> ValidateIO ()
 validate_files (Script _ es) = check_toplevel validate_files' es
     where
-        validate_files' (FunctionCall (FuncName "fastq") f _ _) = check f
         validate_files' (FunctionCall (FuncName "paired") f args _) = check f >> validateArg check_can_read_file "second" args es
         validate_files' (FunctionCall (FuncName "count") f args _) = do
                                                                 validateArg check_can_read_file "gff_file" args es
                                                                 validateArg check_can_read_file "functional_map" args es
+        validate_files' (FunctionCall (FuncName fname) f _ _)
+            | fname `elem` ["fastq", "samfile"] = check f
         validate_files' _ = return ()
 
         check (ConstStr fname) = check_can_read_file fname

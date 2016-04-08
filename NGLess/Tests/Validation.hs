@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, OverloadedStrings, TupleSections #-}
+{-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
 module Tests.Validation
     ( tgroup_Validation
     ) where
@@ -6,13 +6,14 @@ module Tests.Validation
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.HUnit
+import Control.Monad
 import qualified Data.Text as T
 
 import Tests.Utils
 import Validation
 import ValidationIO
+import Utils.Here
 import NGLess
-import Control.Monad
 
 tgroup_Validation = $(testGroupGenerator)
 
@@ -124,9 +125,16 @@ case_valid_not_pure_annotate_gff_lit = validateIO_Ok
     "ngless '0.0'\n\
     \count(x, gff_file='Makefile')\n"
 
-case_invalid_not_pure_annotate_gff_lit = validateIO_error
-    "ngless '0.0'\n\
-    \count(x, gff_file='THIS_FILE_DOES_NOT_EXIST_SURELY.gff')\n"
+case_invalid_not_pure_annotate_gff_lit = validateIO_error [here|
+ngless '0.0'
+count(x, gff_file='THIS_FILE_DOES_NOT_EXIST_SURELY.gff')
+|]
+
+case_samfile_check_file = validateIO_error [here|
+ngless '0.0'
+mapped = samfile('THIS_FILE_DOES_NOT_EXIST_SURELY.sam')
+write(mapped, ofile='copy.sam')
+|]
 
 case_valid_not_pure_annotate_gff_const = validateIO_Ok
     "ngless '0.0'\n\
