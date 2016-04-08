@@ -57,7 +57,9 @@ fastqArgs =
     ,ArgInformation "__perform_qc" False NGLBool Nothing
     ]
 
-samfileArgs = []
+samfileArgs =
+    [ArgInformation "name" False NGLString Nothing
+    ]
 pairedArgs =
     [ArgInformation "second" True NGLString Nothing
     ,ArgInformation "singles" False NGLString Nothing
