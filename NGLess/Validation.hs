@@ -18,6 +18,7 @@ import Data.List
 import Language
 import Modules
 import BuiltinFunctions
+import Utils.Suggestion
 
 -- | Returns either an error message if it finds any errors or the input script unscathed
 validate :: [Module] -> Script -> Either T.Text Script
@@ -174,11 +175,16 @@ check_symbol_val_in_arg mods f args = case findFunction mods f of
         showA [e] = T.concat ["{", e, "}"]
         showA (e:es) = T.concat ["{", e, "}, ", showA es]
         check1 finfo (Variable v, expr) = case expr of
-            ConstSymbol s       -> if s `elem` (allowed finfo v)
-                                    then Nothing
-                                    else Just (T.concat ["Argument: `", v, "` (for function ", T.pack (show f), ") expects one of ", allowedStr finfo v, " but got {", s, "}"])
-            ListExpression es   -> errors_from_list $ map (\e -> check1 finfo (Variable v, e)) es
-            _                   -> Nothing
+                ConstSymbol s       -> if s `elem` (allowed finfo v)
+                                        then Nothing
+                                        else Just . T.concat $ case findSuggestion s (allowed finfo v) of
+                                            Nothing ->
+                                                ["Argument: `", v, "` (for function ", T.pack (show f), ") expects one of ", allowedStr finfo v, " but got {", s, "}"]
+                                            Just (Suggestion valid reason) ->
+                                                ["Argument `", v, "` for function ", T.pack (show f), ", got {", s, "}.\n\tDid you mean {", valid, "} (", reason, ")\n\nAllowed arguments are: ", allowedStr finfo v]
+                ListExpression es   -> errors_from_list $ map (\e -> check1 finfo (Variable v, e)) es
+                _                   -> Nothing
+            where
 
 check_toplevel :: (Expression -> Maybe T.Text) -> [(Int, Expression)] -> Maybe T.Text
 check_toplevel _ [] = Nothing

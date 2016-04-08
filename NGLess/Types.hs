@@ -22,6 +22,7 @@ import Data.List (find)
 import Modules
 import Language
 import BuiltinFunctions
+import Utils.Suggestion
 
 
 type TypeMap = Map.Map T.Text NGLType
@@ -265,9 +266,12 @@ checkfuncarg f arginfo (Variable v, e) = do
     eType <- nglTypeOf e
     let ainfo = find ((==v) . argName) arginfo
     case (ainfo,eType) of
-        (Nothing, _) -> errorInLineC $
-                                    ["Bad argument '", T.unpack v, "' for function '", show f, "'.\nThis function takes the following arguments:\n"]++
-                                    (map ((\aname -> ("\t"++aname++"\n")) . T.unpack . argName) arginfo)
+        (Nothing, _) -> errorInLineC $ ["Bad argument '", T.unpack v, "' for function '", show f, "'.\n"]
+                            ++ (case findSuggestion v (argName <$> arginfo) of
+                                Just (Suggestion valid reason) -> ["\tDid you mean `", T.unpack valid, "` (", T.unpack reason, ").\n\n"]
+                                Nothing -> []
+                            ) ++ ["This function takes the following arguments:\n"]
+                            ++ (map ((\aname -> ("\t"++aname++"\n")) . T.unpack . argName) arginfo)
         (_, Nothing) -> errorInLine "Could not infer type of argument"
         (Just ainfo', Just t') -> when (argType ainfo' /= t') $
                     (errorInLineC
