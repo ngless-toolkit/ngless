@@ -91,9 +91,9 @@ hoursToDiffTime h = fromInteger (h * 3600)
 
 mapToReference :: FilePath -> [FilePath] -> [String] -> NGLessIO FilePath
 mapToReference refIndex [fp1,fp2, fp3] extraArgs = do
-    fp0 <- mapToReference refIndex [fp1, fp2] extraArgs
-    fp1 <- mapToReference refIndex [fp3] extraArgs
-    mergeSams refIndex fp0 fp1
+    out0 <- mapToReference refIndex [fp1, fp2] extraArgs
+    out1 <- mapToReference refIndex [fp3] extraArgs
+    mergeSams refIndex out0 out1
 
 mapToReference refIndex fps extraArgs = do
     (rk, (newfp, hout)) <- openNGLTempFile' refIndex "mapped_" ".sam"
@@ -127,7 +127,7 @@ interpretMapOp ref name fps extraArgs = do
         indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)
         indexReference (FaFile fa) = (,Nothing) <$> ensureIndexExists fa
         indexReference (PackagedReference r) = case getBuiltinReference r of
-            Just r' -> do
+            Just _ -> do
                 basedir  <- ensureDataPresent (T.unpack r)
                 return (buildGenomePath basedir, Just r)
             Nothing -> do

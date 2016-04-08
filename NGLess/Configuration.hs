@@ -119,6 +119,8 @@ updateConfiguration NGLessConfiguration{..} cfiles = do
         , nConfOutputDirectory = nConfOutputDirectory
         , nConfColor = nConfColor'
         , nConfPrintHeader = nConfPrintHeader'
+        , nConfSubsample = nConfSubsample
+        , nConfArgv = nConfArgv
         }
 
 

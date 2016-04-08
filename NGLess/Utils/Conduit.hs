@@ -132,9 +132,9 @@ bsConcatTo chunkSize = awaitJust start
         allocateBuffer n = mallocForeignPtrBytes n
 
         copyTo :: (ForeignPtr Word8) -> Int -> B.ByteString -> IO ()
-        copyTo fp offset src = let (srcfp,srcoff,srcsize) = BI.toForeignPtr src in
-                 withForeignPtr fp $ \p -> withForeignPtr srcfp $ \src ->
-                    BI.memcpy (p `plusPtr` offset) (src `plusPtr` srcoff) srcsize
+        copyTo fp offset src = let (src_fp,src_off,src_size) = BI.toForeignPtr src in
+                 withForeignPtr fp $ \p -> withForeignPtr src_fp $ \src_p ->
+                    BI.memcpy (p `plusPtr` offset) (src_p `plusPtr` src_off) src_size
 
         freeze :: (ForeignPtr Word8) -> Int -> B.ByteString
         freeze p size = BI.fromForeignPtr p 0 size

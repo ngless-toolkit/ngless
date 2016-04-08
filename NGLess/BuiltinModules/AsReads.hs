@@ -55,6 +55,7 @@ asFQ = asFQ' False False
             | isNegative s && (not seen2) = asFQ1 s:asFQ' seen1 True ss
             | otherwise = asFQ' seen1 seen2 ss
         asFQ1 SamLine{samQName=qname, samSeq=short, samQual=qs} = B.concat ["@", qname, "\n", short, "\n+\n", qs, "\n"]
+        asFQ1 SamHeader{} = error "Should not have seen a header in this place"
 
 
 as_reads_Function = Function

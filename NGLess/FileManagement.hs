@@ -26,7 +26,7 @@ import Control.Exception
 import Control.Monad.Trans.Resource
 import Control.Monad.IO.Class (liftIO)
 
-import Configuration (temporaryFileDirectory, outputDirectory, nConfKeepTemporaryFiles, nglConfiguration)
+import Configuration (temporaryFileDirectory, nConfKeepTemporaryFiles, nglConfiguration)
 import NGLess
 
 -- | open a temporary file

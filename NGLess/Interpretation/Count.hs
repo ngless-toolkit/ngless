@@ -43,7 +43,6 @@ import           Data.Conduit (($=), (=$), (=$=), ($$+), ($$+-), ($$))
 import           Data.Conduit.Async (buffer, (=$=&), ($$&))
 
 import Control.Monad
-import Control.Exception        (evaluate)
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
 import Data.List                (foldl1')
@@ -274,8 +273,8 @@ splitSingles method values = (singles, mms)
             return v
         getsingle1 :: Int -> Maybe (Int, Int)
         getsingle1 ix = do
-            v <- values V.!? ix
-            case v of
+            vs <- values V.!? ix
+            case vs of
                 [v] -> return (v, ix + 1)
                 _ -> getsingle1 (ix + 1)
         mms = IG.fromList (filter larger1 (V.toList values))
