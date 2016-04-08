@@ -39,7 +39,7 @@ import Modules
 import CmdArgs
 import FileManagement (setupHtmlViewer)
 import StandardModules.NGLStdlib
-import Utils.Network
+import Network
 
 import qualified BuiltinModules.AsReads as ModAsReads
 import qualified BuiltinModules.Argv as ModArgv
@@ -177,7 +177,7 @@ modeExec (CreateReferencePackMode ofile gen gtf) = runNGLessIO "creating referen
         outputLno' InfoOutput "Starting packaging (will download and index genomes)..."
         createReferencePack ofile gen gtf
 
-modeExec (DownloadFileMode url local) =
+modeExec (DownloadFileMode url local) = runNGLessIO "download a file" $
     downloadFile url local
 
 main = do

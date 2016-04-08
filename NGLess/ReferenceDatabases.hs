@@ -26,9 +26,9 @@ import Control.Applicative ((<|>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource(release)
 
-import Utils.Network (downloadFile, downloadOrCopyFile)
-import Utils.Bwa as Bwa
+import Network (downloadFile, downloadOrCopyFile)
 import FileManagement (createTempDir)
+import Utils.Bwa as Bwa
 import Configuration
 import Output
 import NGLess
@@ -73,8 +73,8 @@ createReferencePack oname genome gtf = do
     liftIO $ do
         createDirectoryIfMissing True (tmpdir ++ "/Sequence/BWAIndex/")
         createDirectoryIfMissing True (tmpdir ++ "/Annotation/")
-        downloadOrCopyFile genome (buildGenomePath tmpdir)
-        downloadOrCopyFile gtf (buildGFFPath tmpdir)
+    downloadOrCopyFile genome (buildGenomePath tmpdir)
+    downloadOrCopyFile gtf (buildGFFPath tmpdir)
     Bwa.createIndex (buildGenomePath tmpdir)
     let filelist = gffPATH:[genomePATH ++ ext | ext <- [""
                                         ,".amb"
@@ -98,7 +98,7 @@ downloadReference ref destPath = do
             | otherwise ->
                 throwScriptError ("Expected reference data, got "++T.unpack (refName ref))
     outputListLno' InfoOutput ["Starting download from ", url]
-    liftIO $ downloadFile url destPath
+    downloadFile url destPath
     outputLno' InfoOutput "Reference download completed!"
 
 
