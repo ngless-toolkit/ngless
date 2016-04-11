@@ -88,6 +88,9 @@ loadModule _ =
         }
     where
         citation = T.concat
-            ["Kultima JR, Sunagawa S, Li J, Chen W, Chen H, Mende DR, et al. (2012)\n"
+            ["MOCAT2: a metagenomic assembly, annotation and profiling framework.\n"
+            ,"Kultima JR, Coelho LP, Forslund K, Huerta-Cepas J, Li S, Driessen M, et al. (2016)\n"
+            ,"Bioinformatics (2016) doi:10.1093/bioinformatics/btw183\n\n"
             ,"MOCAT: A Metagenomics Assembly and Gene Prediction Toolkit.\n"
-            ,"PLoS ONE 7(10): e47656. doi:10.1371/journal.pone.0047656"]
+            ,"Kultima JR, Sunagawa S, Li J, Chen W, Chen H, Mende DR, et al. (2012)\n"
+            ,"PLoS ONE 7(10): e47656. doi:10.1371/journal.pone.0047656\n"]
