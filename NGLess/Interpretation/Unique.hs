@@ -58,10 +58,9 @@ performUnique fname enc mc = do
         V.mapM_ (liftIO . hClose) fhs
         outputLno' DebugOutput ("Wrote N Files to: " ++ dest)
         (newfp,h) <- openNGLTempFile fname "" "fq.gz"
-        sink <- asyncGzipTo h
         readNFiles enc mc dest
             =$= fqEncodeC enc
-            $$ sink
+            $$  asyncGzipTo h
         liftIO (hClose h)
         return newfp
     where

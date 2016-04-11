@@ -378,10 +378,8 @@ executePreprocess (NGOReadSet name (ReadSet3 enc fp1 fp2 fp3)) args (Block [Vari
                     else C.yieldMany []
 
             write :: Handle -> InterpretationEnvIO (C.Sink ShortRead InterpretationEnvIO ((),FQStatistics))
-            write h = do
-                sink <- asyncGzipTo h
-                return $ zipSink2
-                        (fqEncodeC enc =$= sink)
+            write h = return $ zipSink2
+                        (fqEncodeC enc =$= asyncGzipTo h)
                         (CL.map (\(ShortRead _ bps qs) -> (ByteLine bps, ByteLine qs)) =$= C.transPipe runNGLessIO fqStatsC)
 
             filter1 = CL.mapMaybe (\case

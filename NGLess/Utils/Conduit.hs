@@ -140,7 +140,7 @@ bsConcatTo chunkSize = awaitJust start
         freeze p size = BI.fromForeignPtr p 0 size
 
 -- | A simple sink which performs gzip in a separate thread and writes the results to `h`.
-asyncGzipTo :: forall m m'. (MonadIO m, MonadIO m') => Handle -> m (C.Sink B.ByteString m' ())
+asyncGzipTo :: forall m. (MonadIO m) => Handle -> C.Sink B.ByteString m ()
 asyncGzipTo h = do
     -- We allocate the queue separately (instead of using CA.paired*) so that
     -- `src` and `sink` end up with different underlying monads (src is a
@@ -149,9 +149,8 @@ asyncGzipTo h = do
     let src :: C.Source IO B.ByteString
         src = CA.sourceTBMQueue q
     consumer <- liftIO $ A.async (src $$ C.gzip =$= C.sinkHandle h)
-    let sink :: C.Sink B.ByteString m' ()
-        sink = C.addCleanup (\_ -> liftIO (A.wait consumer)) $ CA.sinkTBMQueue q True
-    return (bsConcatTo ((2 :: Int) ^ (15 :: Int)) =$= sink)
+    bsConcatTo ((2 :: Int) ^ (15 :: Int)) =$= CA.sinkTBMQueue q True
+    liftIO (A.wait consumer)
 
 
 zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)

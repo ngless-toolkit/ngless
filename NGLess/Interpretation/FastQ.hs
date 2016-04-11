@@ -43,12 +43,11 @@ optionalSubsample f = do
         else do
             outputListLno' TraceOutput ["Subsampling file ", f]
             (newfp,h) <- openNGLTempFile f "" "fq.gz"
-            sink <- asyncGzipTo h
             conduitPossiblyCompressedFile f
                 =$= CB.lines
                 =$= drop100
                 =$= C.unlinesAscii
-                $$ sink
+                $$  asyncGzipTo h
             liftIO $ hClose h
             outputListLno' TraceOutput ["Finished subsampling (temp sampled file is ", newfp, ")"]
             return newfp
