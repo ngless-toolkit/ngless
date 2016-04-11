@@ -32,12 +32,6 @@ import NGLess
 
 tgroup_Count = $(testGroupGenerator)
 
-ngo_gff_fp = "test_samples/sample.gtf"
-short_gff_fp = "test_samples/short.gtf"
-
-very_short_sam = "test_samples/very_short.sam"
-very_short_gff = "test_samples/very_short.gtf"
-
 
 readCountFile :: Bool -> FilePath -> IO (M.Map B.ByteString Double)
 readCountFile skipFirst fp = do
@@ -54,104 +48,21 @@ readCountFile skipFirst fp = do
             [h,val] -> M.singleton h (read $ B8.unpack val)
             _ -> error ("Could not parse line: " ++ show line)
 
+
+runSamGffAnnotation:: B.ByteString -> B.ByteString -> CountOpts -> NGLessIO (M.Map B.ByteString Double)
+runSamGffAnnotation sam_content gff_content opts = do
+    sam_fp <- asTempFile sam_content "sam"
+    gff_fp <- asTempFile gff_content "gff"
+    ann <- loadAnnotator (AnnotateGFF gff_fp) opts
+    p <- performCount sam_fp "testing" ann opts
+    liftIO $ readCountFile True p
+
+
 compareFiles fa fb = liftIO $ do
     ca <- readCountFile True fa
     cb <- readCountFile False fb
     assertBool (concat ["Expected files ", fa, " and ", fb, " to be equivalent"])
         (ca == cb)
-
-annotate_count_compare htseq_version sam gff opts = testNGLessIO $ do
-    ann <- loadAnnotator (AnnotateGFF gff) opts
-    p <- performCount sam "testing" ann opts
-    compareFiles p ("test_samples/htseq-res/" ++htseq_version)
-
-defCountOpts =
-    CountOpts
-    { optFeatures = []
-    , optIntersectMode = annotationRule IntersectUnion
-    , optStrandSpecific = False
-    , optKeepAmbiguous = False
-    , optMinCount = 0.0
-    , optMMMethod = MMCountAll
-    , optDelim = "\t"
-    , optNormSize = False
-    }
-
-case_annotate_gene_noStrand_union =
-    annotate_count_compare
-        "htseq_gene_noStrand_union.txt"
-        "test_samples/sample.sam" ngo_gff_fp
-        $ defCountOpts { optFeatures = [GffGene] }
-
-case_annotate_exon_noStrand_union =
-    annotate_count_compare
-        "htseq_exon_noStrand_union.txt"
-        "test_samples/sample.sam" ngo_gff_fp
-        $ defCountOpts { optFeatures = [GffExon] }
-
-case_annotate_cds_noStrand_union =
-    annotate_count_compare
-        "htseq_cds_noStrand_union.txt"
-        "test_samples/sample.sam" ngo_gff_fp
-        $ defCountOpts { optFeatures = [GffCDS], optMinCount = 1.0 }
-
-case_annotate_gene_noStrand_inters_strict =
-    annotate_count_compare
-        "htseq_gene_noStrand_inters-strict.txt"
-        "test_samples/sample.sam" ngo_gff_fp
-        $ defCountOpts { optFeatures = [GffGene], optIntersectMode = annotationRule IntersectStrict }
-
-case_annotate_gene_noStrand_inters_non_empty =
-    annotate_count_compare
-        "htseq_gene_noStrand_inters-nempty.txt"
-        "test_samples/sample.sam" ngo_gff_fp
-        $ defCountOpts { optFeatures = [GffGene], optIntersectMode = annotationRule IntersectNonEmpty }
-
-
-case_annotate_gene_noStrand_inters_non_empty_diff = -- this is a regression test
-    annotate_count_compare
-        "htseq_gene_noStrand_inters-nempty_diff.txt"
-        "test_samples/nonempty_diff.sam" "test_samples/nonempty_diff.gtf"
-        $ defCountOpts { optFeatures = [GffGene], optIntersectMode = annotationRule IntersectNonEmpty }
-
-
-case_annotate_gene_yesStrand_union =
-    annotate_count_compare
-        "htseq_gene_yesStrand_union.txt"
-        "test_samples/sample.sam" ngo_gff_fp
-        $ defCountOpts { optFeatures = [GffGene], optStrandSpecific = True, optKeepAmbiguous = True }
-
-case_annotate_gene_yesStrand_nempty =
-    annotate_count_compare
-        "htseq_gene_yesStrand_nempty.txt"
-        "test_samples/sample.sam" ngo_gff_fp
-        $ defCountOpts { optFeatures = [GffGene], optIntersectMode = annotationRule IntersectNonEmpty, optStrandSpecific = True }
-
-case_short_annotate_union =
-    annotate_count_compare
-        "htseq_gene_yesStrand_union_short.txt"
-        "test_samples/sample.sam" short_gff_fp
-        $ defCountOpts { optFeatures = [GffGene], optStrandSpecific = True, optKeepAmbiguous = True, optMinCount = 1.0 }
-
-case_very_short_annotate_union =
-    annotate_count_compare
-        "htseq_gene_yesStrand_union_very_short.txt"
-        very_short_sam very_short_gff
-        $ defCountOpts { optFeatures = [GffGene], optStrandSpecific = True, optKeepAmbiguous = True }
-
-case_very_short_annotate_nempty_yesStrand =
-    annotate_count_compare
-        "htseq_gene_yesStrand_nempty_very_short.txt"
-        very_short_sam very_short_gff
-        $ defCountOpts { optFeatures = [GffGene], optIntersectMode = annotationRule IntersectNonEmpty, optStrandSpecific = True }
-
-case_very_short_annotate_nempty_noStrand =
-    annotate_count_compare
-        "htseq_gene_noStrand_nempty_very_short.txt"
-        very_short_sam very_short_gff
-        $ defCountOpts { optFeatures = [GffGene], optIntersectMode = annotationRule IntersectNonEmpty }
-
-
 gff_structure_Exon = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
 gff_structure_CDS = GFF.GffLine "chrI" "unknown" GFF.GffCDS 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
 gff_structure_Gene = GFF.GffLine "chrI" "unknown" GFF.GffGene 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
@@ -170,6 +81,22 @@ case_filter_features_4 = filter (matchFeatures gff_features_cds) gff_lines_ex @?
 case_filter_features_5 = filter (matchFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
 
 listNub = S.toList . S.fromList
+
+
+defCountOpts =
+    CountOpts
+    { optFeatures = []
+    , optIntersectMode = annotationRule IntersectUnion
+    , optStrandSpecific = False
+    , optKeepAmbiguous = False
+    , optMinCount = 0.0
+    , optMMMethod = MMCountAll
+    , optDelim = "\t"
+    , optNormSize = False
+    }
+
+
+very_short_gff = "test_samples/very_short.gtf"
 case_load_very_short = do
     GFFAnnotator immap headers szmap <- testNGLessIO
                 $ loadAnnotator (AnnotateGFF very_short_gff) defCountOpts  { optFeatures = [GffGene] }
@@ -182,10 +109,11 @@ case_load_very_short = do
 
 
 short3 :: B.ByteString
-short3 =
-    "V\tprotein_coding\tgene\t7322\t8892\t.\t-\t.\tgene_id \"WBGene00008825\"; gene_name \"F14H3.6\"; gene_source \"ensembl\"; gene_biotype \"protein_coding\";\n\
-    \X\tprotein_coding\tgene\t140\t218\t.\t+\t.\tgene_id \"WBGene00020330\"; gene_name \"T07H6.1\"; gene_source \"ensembl\"; gene_biotype \"protein_coding\";\n\
-    \X\tprotein_coding\tgene\t632\t733\t.\t+\t.\tgene_id \"WBGene00000526\"; gene_name \"clc-5\"; gene_source \"ensembl\"; gene_biotype \"protein_coding\";\n"
+short3 = [here|
+V	protein_coding	gene	7322	8892	.	-	.	gene_id "WBGene00008825"; gene_name "F14H3.6"; gene_source "ensembl"; gene_biotype "protein_coding";
+X	protein_coding	gene	140	218	.	+	.	gene_id "WBGene00020330"; gene_name "T07H6.1"; gene_source "ensembl"; gene_biotype "protein_coding";
+X	protein_coding	gene	632	733	.	+	.	gene_id "WBGene00000526"; gene_name "clc-5"; gene_source "ensembl"; gene_biotype "protein_coding";
+|]
 
 -- this is a regression test
 case_load_gff_order = do
@@ -218,4 +146,91 @@ case_count_two = do
         cfp <- performCount samf "testing" ann opts
         liftIO (readCountFile True cfp)
     c @?= M.fromList [("WBGene00002254", 2)]
+
+sam1 = [here|
+@SQ	SN:X	LN:10000
+Read1	0	X	200	60	35M	*	0	0	CAATTGGAGTGCATCAAGTGGTGCGATAAGGTCCTA	22777449446411100.,,,1.11..0000,,,,	NM:i:51		AS:i:430	XS:i:19
+|]
+sam1neg = [here|
+@SQ	SN:X	LN:10000
+Read1	16	X	200	60	35M	*	0	0	CAATTGGAGTGCATCAAGTGGTGCGATAAGGTCCTA	22777449446411100.,,,1.11..0000,,,,	NM:i:51		AS:i:430	XS:i:19
+|]
+
+samPartial = [here|
+@SQ	SN:X	LN:10000
+Read1	0	X	80	60	35M	*	0	0	CAATTGGAGTGCATCAAGTGGTGCGATAAGGTCCTA	22777449446411100.,,,1.11..0000,,,,	NM:i:51		AS:i:430	XS:i:19
+|]
+
+samAmbiguous = [here|
+@SQ	SN:X	LN:10000
+Read1	0	X	280	60	35M	*	0	0	CAATTGGAGTGCATCAAGTGGTGCGATAAGGTCCTA	22777449446411100.,,,1.11..0000,,,,	NM:i:51		AS:i:430	XS:i:19
+|]
+
+samAmbiguous2 = [here|
+@SQ	SN:X	LN:10000
+Read1	0	X	280	60	35M	*	0	0	CAATTGGAGTGCATCAAGTGGTGCGATAAGGTCCTA	22777449446411100.,,,1.11..0000,,,,	NM:i:51		AS:i:430	XS:i:19
+Read2	0	X	100	60	35M	*	0	0	CAATTGGAGTGCATCAAGTGGTGCGATAAGGTCCTA	22777449446411100.,,,1.11..0000,,,,	NM:i:51		AS:i:430	XS:i:19
+|]
+
+samAmbiguous3 = [here|
+@SQ	SN:X	LN:10000
+Ambiguous	0	X	280	60	35M	*	0	0	CAATTGGAGTGCATCAAGTGGTGCGATAAGGTCCTA	22777449446411100.,,,1.11..0000,,,,	NM:i:51		AS:i:430	XS:i:19
+Match100.1	0	X	100	60	35M	*	0	0	CAATTGGAGTGCATCAAGTGGTGCGATAAGGTCCTA	22777449446411100.,,,1.11..0000,,,,	NM:i:51		AS:i:430	XS:i:19
+Match100.2	0	X	100	60	35M	*	0	0	CAATTGGAGTGCATCAAGTGGTGCGATAAGGTCCTA	22777449446411100.,,,1.11..0000,,,,	NM:i:51		AS:i:430	XS:i:19
+Match100.3	0	X	100	60	35M	*	0	0	CAATTGGAGTGCATCAAGTGGTGCGATAAGGTCCTA	22777449446411100.,,,1.11..0000,,,,	NM:i:51		AS:i:430	XS:i:19
+Match300.1	0	X	420	60	35M	*	0	0	CAATTGGAGTGCATCAAGTGGTGCGATAAGGTCCTA	22777449446411100.,,,1.11..0000,,,,	NM:i:51		AS:i:430	XS:i:19
+|]
+
+gff1 = [here|
+X	protein_coding	gene	100	400	.	+	.	gene_id "Gene100"; gene_name "gene1"; gene_source "ensembl"; gene_biotype "protein_coding";
+X	protein_coding	gene	300	600	.	+	.	gene_id "Gene300"; gene_name "gene2"; gene_source "ensembl"; gene_biotype "protein_coding";
+|]
+
+case_gff_match = do
+    c <- testNGLessIO $ runSamGffAnnotation sam1 gff1 defCountOpts { optFeatures = [GffGene] }
+    c @?= M.fromList [("Gene100", 1), ("Gene300", 0)]
+
+case_gff_strand_check = do
+    c <- testNGLessIO $ runSamGffAnnotation sam1 gff1 defCountOpts { optFeatures = [GffGene], optStrandSpecific = True }
+    c @?= M.fromList [("Gene100", 1), ("Gene300", 0)]
+
+case_gff_strand_check_negstrand = do
+    c <- testNGLessIO $ runSamGffAnnotation sam1neg gff1 defCountOpts { optFeatures = [GffGene], optStrandSpecific = True }
+    c @?= M.fromList [("Gene100", 0), ("Gene300", 0)]
+
+case_gff_feature_mismatch = do
+    c <- testNGLessIO $ runSamGffAnnotation sam1 gff1 defCountOpts { optFeatures  = [GffCDS] }
+    c @?= M.fromList []
+
+case_gff_feature_partial = do
+    c <- testNGLessIO $ runSamGffAnnotation samPartial gff1 defCountOpts { optFeatures  = [GffGene] }
+    c @?= M.fromList [("Gene100", 1), ("Gene300", 0)]
+
+case_gff_feature_partial_intersect = do
+    c <- testNGLessIO $ runSamGffAnnotation samPartial gff1 defCountOpts { optFeatures  = [GffGene], optIntersectMode = annotationRule IntersectUnion }
+    c @?= M.fromList [("Gene100", 1), ("Gene300", 0)]
+
+case_gff_feature_ambiguous = do
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = True }
+    c @?= M.fromList [("Gene100", 1), ("Gene300", 1)]
+
+case_gff_feature_ambiguous_discard = do
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = False }
+    c @?= M.fromList [("Gene100", 0), ("Gene300", 0)]
+
+case_gff_1OverN = do
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = True, optMMMethod = MM1OverN }
+    c @?= M.fromList [("Gene100", 0.5), ("Gene300", 0.5)]
+
+case_gff_dist1_fallback = do
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = True, optMMMethod = MMDist1 }
+    c @?= M.fromList [("Gene100", 0.5), ("Gene300", 0.5)]
+
+case_gff_dist1_dist = do
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous2 gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = True, optMMMethod = MMDist1 }
+    c @?= M.fromList [("Gene100", 2.0), ("Gene300", 0.0)]
+
+case_gff_dist1_dist1_to_4 = do
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous3 gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = True, optMMMethod = MMDist1 }
+    c @?= M.fromList [("Gene100", 3.75), ("Gene300", 1.25)]
 

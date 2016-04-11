@@ -346,12 +346,19 @@ performCount samfp gname annotator0 opts = do
                 $$+- readSamGroupsC' mapthreads
                 =$= asyncMapEitherC mapthreads (liftM (splitSingles method) . V.mapM (annotateReadGroup opts annotator))
                 =$= performCount1Pass mcounts method
+    sizes <- if optNormSize opts || method == MMDist1
+                then do
+                    sizes <- liftIO $ VUM.new n_entries
+                    forM_ (annEnumerate annotator) $ \(name,i) -> do
+                        s <- runNGLess $ annSizeOf annotator name
+                        liftIO $ VUM.write sizes i s
+                    return sizes
+                else liftIO $ VUM.new 0
 
-    when (optNormSize opts) $ do
-        sizes <- liftIO $ VUM.new n_entries
-        forM_ (annEnumerate annotator) $ \(name,i) -> do
-            s <- runNGLess $ annSizeOf annotator name
-            liftIO $ VUM.write sizes i s
+    raw_counts <- if method == MMDist1
+                    then liftIO (VUM.clone mcounts)
+                    else return mcounts
+    when (optNormSize opts || method == MMDist1) $ do
         normalizeCounts mcounts sizes
     counts <- liftIO $ VU.unsafeFreeze mcounts
 
@@ -360,8 +367,10 @@ performCount samfp gname annotator0 opts = do
             then return counts
             else do
                 outputListLno' TraceOutput ["Counts (second pass)..."]
-                let secondpass = distributeMM toDistribute counts False
-                return secondpass
+                distributeMM toDistribute counts raw_counts False
+                when (optNormSize opts) $ do
+                    normalizeCounts raw_counts sizes
+                liftIO $ VU.unsafeFreeze raw_counts
 
     (newfp,hout) <- openNGLTempFile samfp "counts." "txt"
     liftIO $ do
@@ -397,10 +406,10 @@ incrementAll2 :: VUM.IOVector Double -> [Int] -> IO ()
 incrementAll2 counts vis = forM_ vis $ \vi -> unsafeIncrement counts vi
 
 increment1OverN :: VUM.IOVector Double -> [Int] -> IO ()
-increment1OverN counts vis = forM_ vis $ \vi -> unsafeIncrement' counts vi (1.0 / nc)
+increment1OverN counts vis = forM_ vis $ \vi -> unsafeIncrement' counts vi oneOverN
     where
-        nc :: Double
-        nc = 1.0 / convert (length vis)
+        oneOverN :: Double
+        oneOverN = 1.0 / convert (length vis)
 
 normalizeCounts :: VUM.IOVector Double -> VUM.IOVector Double -> NGLessIO ()
 normalizeCounts counts sizes = do
@@ -412,10 +421,9 @@ normalizeCounts counts sizes = do
         s <- VUM.read sizes i
         VUM.unsafeModify counts (/ s) i
 
-distributeMM indices current fractionResult = VU.create $ do
-    ncounts <- VU.thaw current -- note that thaw performs a copy
+distributeMM indices normed ncounts fractionResult = liftIO $ do
     forM_ indices $ \vss -> IG.forM_ vss $ \vs -> do
-        let cs = map (VU.unsafeIndex current) vs
+        let cs = map (VU.unsafeIndex normed) vs
             cs_sum = sum cs
             n_cs = convert (length cs)
             adjust :: Double -> Double
@@ -426,7 +434,6 @@ distributeMM indices current fractionResult = VU.create $ do
             unsafeIncrement' ncounts v (adjust c)
     when fractionResult $
         toFractions ncounts
-    return ncounts
 
 
 loadFunctionalMap :: FilePath -> [B.ByteString] -> NGLessIO Annotator
