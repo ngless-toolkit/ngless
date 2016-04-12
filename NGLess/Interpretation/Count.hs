@@ -101,9 +101,10 @@ data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctiona
     deriving (Eq, Show)
 
 
-data RefSeqInfo = RefSeqInfo {-# UNPACK #-} !B.ByteString {-# UNPACK #-} !Double
-    deriving (Eq, Show)
-
+data RefSeqInfo = RefSeqInfo
+                        { rsiName :: {-# UNPACK #-} !B.ByteString
+                        , rsiSize :: {-# UNPACK #-} !Double
+                        } deriving (Eq, Show)
 instance NFData RefSeqInfo where
     rnf !_ = ()
 
@@ -116,19 +117,19 @@ compareShortLong (RefSeqInfo short _) long = compare short long
 data Annotator =
                 SeqNameAnnotator (Maybe (V.Vector RefSeqInfo))
                 | GFFAnnotator GFFAnnotationMap [B.ByteString] FeatureSizeMap
-                | GeneMapAnnotator GeneMapAnnotation [B.ByteString] FeatureSizeMap
+                | GeneMapAnnotator GeneMapAnnotation (V.Vector RefSeqInfo)
     deriving (Eq, Show)
 instance NFData Annotator where
     rnf (SeqNameAnnotator m) = rnf m
     rnf (GFFAnnotator amap headers szmap) = rnf amap `seq` rnf headers `seq` rnf szmap
-    rnf (GeneMapAnnotator amap headers szmap) = rnf amap `seq` rnf headers `seq` rnf szmap
+    rnf (GeneMapAnnotator amap szmap) = rnf amap `seq` rnf szmap
 
 annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> Either NGError [Int]
 annotateReadGroup opts ann samlines = listNub <$> case ann of
         SeqNameAnnotator Nothing -> throwShouldNotOccur ("Incomplete annotator used" :: String)
         SeqNameAnnotator (Just szmap) -> mapMaybeM (getID szmap) samlines
         GFFAnnotator amap _ _ -> return . concatMap (annotateSamLine opts amap) $ samlines
-        GeneMapAnnotator amap _ _ -> return . concatMap (mapAnnotation1 amap) $ samlines
+        GeneMapAnnotator amap _ -> return . concatMap (mapAnnotation1 amap) $ samlines
     where
         getID :: V.Vector RefSeqInfo -> SamLine -> Either NGError (Maybe Int)
         getID szmap sr@SamLine{samRName = rname }
@@ -139,28 +140,27 @@ annotateReadGroup opts ann samlines = listNub <$> case ann of
         mapAnnotation1 :: GeneMapAnnotation ->  SamLine -> [Int]
         mapAnnotation1 amap samline = fromMaybe [] $ M.lookup (samRName samline) amap
 
-finishAnnotator :: Annotator -> V.Vector RefSeqInfo -> Annotator
-finishAnnotator SeqNameAnnotator{} idszmap = SeqNameAnnotator (Just idszmap)
-finishAnnotator ann _ = ann
-
 annSizeOf :: Annotator -> B.ByteString -> Either NGError Double
 annSizeOf (SeqNameAnnotator Nothing) _ = throwShouldNotOccur ("Using unloaded annotator" :: String)
-annSizeOf (SeqNameAnnotator (Just ix)) name = (\(RefSeqInfo _ s) -> s)  <$> note (NGError DataError "unknown error") (binaryFindBy compareShortLong ix name)
+annSizeOf (SeqNameAnnotator (Just ix)) name = annSizeOfInRSVector name ix
 annSizeOf (GFFAnnotator _ _ szmap) name = annSizeOf' name szmap
-annSizeOf (GeneMapAnnotator _ _ szmap) name = annSizeOf' name szmap
+annSizeOf (GeneMapAnnotator _ ix) name = annSizeOfInRSVector name ix
+annSizeOfInRSVector name ix = rsiSize <$> note (NGError DataError "Could not find size of item") (binaryFindBy compareShortLong ix name)
 annSizeOf' name ix = case M.lookup name ix of
     Just s -> return s
     Nothing -> throwShouldNotOccur ("Header does not exist in sizes: "++show name)
 
 
 annEnumerate :: Annotator -> [(B.ByteString, Int)]
-annEnumerate (SeqNameAnnotator Nothing) = error "Using unfinished annotator"
-annEnumerate (SeqNameAnnotator (Just ix)) = V.toList . flip V.imap ix $ \i (RefSeqInfo n _) -> (n, i)
-annEnumerate (GFFAnnotator _ headers _) = zip headers [0..]
-annEnumerate (GeneMapAnnotator _ headers _) = zip headers [0..]
+annEnumerate (SeqNameAnnotator Nothing)   = error "Using unfinished annotator"
+annEnumerate (SeqNameAnnotator (Just ix)) = enumerateRSVector ix
+annEnumerate (GeneMapAnnotator _ ix)      = enumerateRSVector ix
+annEnumerate (GFFAnnotator _ headers _)   = zip headers [0..]
+enumerateRSVector ix = V.toList . flip V.imap ix $ \i rs -> (rsiName rs, i)
 
 annSize :: Annotator -> Int
 annSize (SeqNameAnnotator (Just ix)) = V.length ix
+annSize (GeneMapAnnotator _ ix) = V.length ix
 annSize ann = length (annEnumerate ann)
 
 methodFor "1overN" = return MM1OverN
@@ -241,24 +241,54 @@ enumerate = loop 0
     where
         loop !n = awaitJust $ \v -> C.yield (n, v) >> loop (n+1)
 
-annSamHeaderParser :: Int -> Annotator -> C.Sink ByteLine NGLessIO (V.Vector RefSeqInfo)
-annSamHeaderParser mapthreads SeqNameAnnotator{} = do
-    let seqNameSize :: (Int, ByteLine) -> Either NGError RefSeqInfo
+annSamHeaderParser :: Int -> Annotator -> CountOpts -> C.Sink ByteLine NGLessIO Annotator
+annSamHeaderParser mapthreads ann opts = case ann of
+        SeqNameAnnotator Nothing -> do
+            chunks <- lineGroups
+                =$= asyncMapEitherC mapthreads (V.mapM seqNameSize)
+                =$= CL.fold (flip (:)) []
+            vsorted <- liftIO $ do
+                v <- V.unsafeThaw (V.concat chunks)
+                sortParallel mapthreads v
+                V.unsafeFreeze v
+            return $! SeqNameAnnotator (Just vsorted)
+        GeneMapAnnotator gmap isizes
+            | optNormSize opts -> do
+                msizes <- liftIO $ V.thaw isizes
+                chunks <- lineGroups
+                    =$= asyncMapEitherC mapthreads (liftM flattenVs . V.mapM (indexUpdates gmap))
+                    =$= CL.mapM_ (liftIO . updateSizes msizes)
+                GeneMapAnnotator gmap <$> liftIO (V.unsafeFreeze msizes)
+        _ -> C.sinkNull >> return ann
+    where
+        lineGroups = CL.filter (B.isPrefixOf "@SQ\tSN:" . unwrapByteLine)
+                    =$= enumerate
+                    =$= C.conduitVector 32768
+        flattenVs :: VU.Unbox a => V.Vector [a] -> VU.Vector a
+        flattenVs chunks = VU.unfoldr getNext (0,[])
+            where
+                getNext (!vi, v:vs) = Just (v, (vi,vs))
+                getNext (vi,[])
+                    | vi >= V.length chunks = Nothing
+                    | otherwise = getNext (vi + 1, chunks V.! vi)
+
+        updateSizes :: VM.IOVector RefSeqInfo -> VU.Vector (Int,Double) -> IO ()
+        updateSizes msizes updates =
+            VU.forM_ updates $ \(ix,val) ->
+                VM.modify msizes (rsiAdd val) ix
+        rsiAdd !val (RefSeqInfo n cur) = RefSeqInfo n (cur + val)
+        indexUpdates :: GeneMapAnnotation -> (Int, ByteLine) -> Either NGError [(Int, Double)]
+        indexUpdates gmap line = do
+            RefSeqInfo seqid val <- seqNameSize line
+            case M.lookup seqid gmap of
+                Nothing -> return []
+                Just ixs -> return [(ix,val) | ix <- ixs]
+        seqNameSize :: (Int, ByteLine) -> Either NGError RefSeqInfo
         seqNameSize (n, ByteLine h) = case B8.split '\t' h of
                 [_,seqname,sizestr] -> case B8.readInt (B.drop 3 sizestr) of
                     Just (size, _) -> return $! RefSeqInfo (B.drop 3 seqname) (convert size)
                     Nothing -> throwDataError ("Could not parse sequence length in header (line: " ++ show n ++ ")")
                 _ -> throwDataError ("SAM file does not contain the right number of tokens (line: " ++ show n ++ ")")
-    chunks <- CL.filter (B.isPrefixOf "@SQ\tSN:" . unwrapByteLine)
-        =$= enumerate
-        =$= C.conduitVector 32768
-        =$= asyncMapEitherC mapthreads (V.mapM seqNameSize)
-        =$= CL.fold (flip (:)) []
-    liftIO $ do
-        v <- V.unsafeThaw (V.concat chunks)
-        sortParallel mapthreads v
-        V.unsafeFreeze v
-annSamHeaderParser _ _ = C.sinkNull >> return V.empty
 
 
 listNub :: (Ord a) => [a] -> [a]
@@ -331,13 +361,12 @@ performCount samfp gname annotator0 opts = do
         method = optMMMethod opts
         delim = optDelim opts
 
-    (samcontent, headerinfo) <-
+    (samcontent, annotator) <-
         conduitPossiblyCompressedFile samfp
             =$= linesC
             $$+ C.takeWhile ((=='@') . B8.head . unwrapByteLine)
-            =$= annSamHeaderParser mapthreads annotator0
-    let annotator = finishAnnotator annotator0 headerinfo
-        n_entries = annSize annotator
+            =$= annSamHeaderParser mapthreads annotator0 opts
+    let n_entries = annSize annotator
 
     outputListLno' TraceOutput ["Loaded headers (", show n_entries, " headers); starting parsing/distribution."]
     mcounts <- liftIO $ VUM.replicate n_entries (0.0 :: Double)
@@ -446,7 +475,7 @@ loadFunctionalMap fname columns = do
                 (CL.mapM (selectColumns cis . B8.split '\t')
                 =$ CL.fold inserts (0, M.empty,M.empty))
         outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
-        return $ GeneMapAnnotator gmap (M.keys namemap) M.empty
+        return $ GeneMapAnnotator gmap (V.fromList [RefSeqInfo n 0.0 | n <- M.keys namemap])
     where
         inserts :: (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int) -> (B.ByteString, [B.ByteString]) -> (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int)
         inserts (next, gmap, namemap) (name, ids) = (next', gmap', namemap')
