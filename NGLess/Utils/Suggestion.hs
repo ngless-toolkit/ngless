@@ -9,7 +9,7 @@ module Utils.Suggestion
 
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Alignment (editDistance)
+import           Text.EditDistance
 import           Control.Monad
 import           Control.Applicative
 
@@ -29,6 +29,6 @@ findSuggestion used possible = matchCase <|> bestMatch
             return $! Suggestion s "closest match"
 
 dist :: T.Text -> T.Text -> Int
-dist a b = editDistance (T.encodeUtf8 a) (T.encodeUtf8 b)
+dist a b = levenshteinDistance defaultEditCosts (T.unpack a) (T.unpack b)
 
 
