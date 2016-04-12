@@ -12,12 +12,14 @@ module Interpretation.Map
 import qualified Data.Text as T
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Control.Monad
 import           Control.Monad.Trans.Resource
 
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.Process as CP
 import qualified Data.Conduit.Combinators as C
 import           Data.Conduit (($$), (=$=))
 
@@ -43,7 +45,6 @@ import NGLess
 
 import Utils.Bwa
 import Utils.LockFile
-import Utils.Utils (readProcessErrorWithExitCode)
 import Utils.Conduit (conduitPossiblyCompressedFile)
 
 data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
@@ -103,10 +104,14 @@ mapToReference refIndex fps extraArgs = do
     numCapabilities <- liftIO getNumCapabilities
     let cmdargs =  concat [["mem", "-t", show numCapabilities, refIndex], extraArgs, fps]
     outputListLno' TraceOutput ["Calling binary ", bwaPath, " with args: ", unwords cmdargs]
-    let cp = (proc bwaPath cmdargs) { std_out = UseHandle hout }
-    (err, exitCode) <- liftIO $ readProcessErrorWithExitCode cp
+    let cp = proc bwaPath cmdargs
+    (exitCode, (), err) <- liftIO $
+            CP.sourceProcessWithStreams cp
+                (return ()) -- stdin
+                (C.sinkHandle hout) --stdout
+                CL.consume -- stderr
     liftIO $ hClose hout
-    outputListLno' DebugOutput ["BWA info: ", err]
+    outputListLno' DebugOutput ["BWA info: ", BL8.unpack $ BL8.fromChunks err]
     case exitCode of
         ExitSuccess -> do
             outputListLno' InfoOutput ["Done mapping to ", refIndex]
