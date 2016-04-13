@@ -1,0 +1,3 @@
+ngless '0.0'
+write(as_reads(samfile('input.sam')),
+        ofile='output.fq')

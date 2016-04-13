@@ -11,7 +11,8 @@ module Data.Sam
     , isAligned
     , isPositive
     , isNegative
-    , hasQual
+    , isFirstInPair
+    , isSecondInPair
     , matchIdentity
     ) where
 
@@ -49,7 +50,7 @@ data SamLine = SamLine
 
 
 instance NFData SamLine where
-    rnf (SamLine !qn !f !r !p !m !c !rn !pn !tl !s !qual !extra) = ()
+    rnf SamLine{} = ()
     rnf (SamHeader !_) = ()
 
 
@@ -70,9 +71,11 @@ isNegative = (`testBit` 4) . samFlag
 isPositive :: SamLine -> Bool
 isPositive = not . isNegative
 
--- 512 -> 8
-hasQual :: SamLine -> Bool
-hasQual = (`testBit` 9) . samFlag
+isFirstInPair :: SamLine -> Bool
+isFirstInPair = (`testBit` 6) . samFlag
+
+isSecondInPair :: SamLine -> Bool
+isSecondInPair = (`testBit` 7) . samFlag
 
 
 newtype SimpleParser a = SimpleParser { runSimpleParser :: B.ByteString -> Maybe (Pair a B.ByteString) }
