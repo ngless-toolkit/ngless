@@ -297,11 +297,32 @@ executeSamfile expr@(NGOString fname) args = do
     return $ NGOMappedReadSet gname (T.unpack fname) Nothing
 executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show args)
 
-data PreprocessPairOutput = Pair ShortRead ShortRead | Single ShortRead
+data PreprocessPairOutput = Pair !ShortRead !ShortRead | Single !ShortRead
 instance NFData PreprocessPairOutput where
-    rnf (Pair a b) = rnf a `seq` rnf b
-    rnf (Single a) = rnf a
+    rnf (Pair _ _) = ()
+    rnf (Single _) = ()
 
+splitPreprocessPair :: V.Vector PreprocessPairOutput -> (V.Vector ShortRead, V.Vector ShortRead, V.Vector ShortRead)
+splitPreprocessPair input = (vMapMaybe extract1 input, vMapMaybe extract2 input, vMapMaybe extractS input)
+    where
+        extract1 = \case
+            Pair sr _ -> Just sr
+            _ -> Nothing
+        extract2 = \case
+            Pair _ sr -> Just sr
+            _ -> Nothing
+        extractS = \case
+            Single sr -> Just sr
+            _ -> Nothing
+
+vMapMaybe :: (a -> Maybe b) -> V.Vector a -> V.Vector b
+vMapMaybe f v = V.unfoldr loop 0
+    where
+        loop i
+            | i < V.length v = case f (v V.! i) of
+                                    Just val -> Just (val, i + 1)
+                                    Nothing -> loop (i + 1)
+            | otherwise = Nothing
 
 vMapMaybeLifted :: (a -> Either e (Maybe b)) -> V.Vector a -> Either e (V.Vector b)
 vMapMaybeLifted f v = sequence $ V.unfoldr loop 0
@@ -378,44 +399,32 @@ executePreprocess (NGOReadSet name (ReadSet3 enc fp1 fp2 fp3)) args (Block [Vari
                     then conduitPossiblyCompressedFile fp3 =$= linesC =$= inlineQCIf qcInput qcPre3 =$= fqConduitR enc
                     else C.yieldMany []
 
-            write :: Handle -> InterpretationEnvIO (C.Sink ShortRead InterpretationEnvIO ((),FQStatistics))
-            write h = return $ zipSink2
+            write :: Handle -> C.Sink (V.Vector ShortRead) InterpretationEnvIO ((),FQStatistics)
+            write h =
+                    (C.concat :: C.Conduit (V.Vector ShortRead) InterpretationEnvIO ShortRead)
+                    =$=zipSink2
                         (fqEncodeC enc =$= asyncGzipTo h)
                         (CL.map (\(ShortRead _ bps qs) -> (ByteLine bps, ByteLine qs)) =$= C.transPipe runNGLessIO fqStatsC)
-
-            filter1 = CL.mapMaybe (\case
-                            Pair sr _ -> Just sr
-                            _ -> Nothing)
-            filter2 = CL.mapMaybe (\case
-                            Pair _ sr -> Just sr
-                            _ -> Nothing)
-            filterS = CL.mapMaybe (\case
-                            Single sr -> Just sr
-                            _ -> Nothing)
 
         env <- gets id
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 2)
-        w1 <- write out1
-        w2 <- write out2
-        wS <- write out3
         [((),s1),((),s2),((),s3)] <-
             (zipSource2 rs1 rs2
-                =$= C.conduitVector 4096)
-                $$& (asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles))
-                    =$= (C.concat :: C.Conduit (V.Vector PreprocessPairOutput) InterpretationEnvIO PreprocessPairOutput)
-                    =$= C.sequenceSinks
-                        [ filter1 =$= w1
-                        , filter2 =$= w2
-                        , filterS =$= wS
+                =$= C.conduitVector 8192
+                =$= asyncMapEitherC mapthreads (liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles))
+                $$& C.sequenceSinks
+                        [CL.map (\(a,_,_) -> a) =$= write out1
+                        ,CL.map (\(_,a,_) -> a) =$= write out2
+                        ,CL.map (\(_,_,a) -> a) =$= write out3
                         ])
-        wS' <- write out3
         ((),s3') <- rs3
                 =$= preprocBlock
-                =$= filterS
+                =$= CL.mapMaybe (\case
+                                Single r -> Just r
+                                _ -> Nothing)
                 =$= C.conduitVector 4096
-                $$& ((C.concat :: C.Conduit (V.Vector ShortRead) InterpretationEnvIO ShortRead)
-                =$= wS')
+                $$& write out3
         let n3 = nSeq s3
             n3' = nSeq s3'
             anySingle = n3 > 0 || n3' > 0
