@@ -27,10 +27,10 @@ your work.
 
 ## Dependencies
 
-Cabal version 1.18 or higher is necessary.
-
-Running `make` should build a sandbox and download/install all dependencies
-into it.
+[stack](http://docs.haskellstack.org/en/stable/README/) is highly recommended.
+Install it and running `stack build` should (1) download all dependencies with
+the correct versions and (2) build ngless. It will perform this task in its own
+sandbox so it will not interfere with any other work.
 
 ## More information
 
