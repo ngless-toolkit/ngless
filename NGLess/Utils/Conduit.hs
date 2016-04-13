@@ -12,6 +12,7 @@ module Utils.Conduit
     , awaitJust
     , bsConcatTo
     , asyncGzipTo
+    , asyncGzipToFile
     , asyncGzipFrom
     , asyncGzipFromFile
     , zipSink2
@@ -152,6 +153,12 @@ asyncGzipTo h = do
     consumer <- liftIO $ A.async (src $$ CZ.gzip =$= C.sinkHandle h)
     bsConcatTo ((2 :: Int) ^ (15 :: Int)) =$= CA.sinkTBMQueue q True
     liftIO (A.wait consumer)
+
+asyncGzipToFile :: forall m. (MonadIO m) => FilePath -> C.Sink B.ByteString m ()
+asyncGzipToFile fname = do
+    h <- liftIO $ openFile fname WriteMode
+    asyncGzipTo h
+    liftIO (hClose h)
 
 -- | A source which ungzipped from the the given handle. Note that this "reads
 -- ahead" so if you do not use all the input, the Handle will probably be left

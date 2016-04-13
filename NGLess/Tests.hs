@@ -19,8 +19,10 @@ import System.Directory (removeFile
                         ,doesFileExist
                         )
 import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Char8 as B8
 
 import qualified Data.Conduit as C
+import qualified Data.Conduit.List as CL
 import           Data.Conduit ((=$=), ($$))
 
 
@@ -347,4 +349,16 @@ case_test_setup_html_view = do
     ex <- doesFileExist "testing_tmp_dir_html/index.html"
     assertBool "index.html should be present after setupHtmlViewer" ex
     removeDirectoryRecursive "testing_tmp_dir_html/"
+
+case_async_gzip_to_from = do
+    let testdata = [0 :: Int .. 12]
+    CL.sourceList testdata
+        =$= CL.map (B8.pack . (\n -> show n ++ "\n"))
+        $$ asyncGzipToFile "testing_tmp_dir/test.gz"
+    asyncGzipFromFile "testing_tmp_dir/test.gz" $$ asyncGzipToFile "testing_tmp_dir/test-copied.gz"
+    result <- asyncGzipFromFile "testing_tmp_dir/test-copied.gz"
+        =$= linesC
+        =$= CL.map (read . B8.unpack .  unwrapByteLine)
+        $$ CL.consume
+    result @?= testdata
 
