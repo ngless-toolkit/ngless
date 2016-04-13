@@ -15,6 +15,7 @@ module Interpretation.Count
     , loadFunctionalMap
     , matchFeatures
     , performCount
+    , RefSeqInfo(..)
     ) where
 
 import qualified Data.ByteString as B
@@ -45,7 +46,7 @@ import           Data.Conduit.Async (buffer, (=$=&), ($$&))
 import Control.Monad
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
-import Data.List                (foldl1')
+import Data.List                (foldl1', unfoldr)
 import GHC.Conc                 (getNumCapabilities)
 import Control.DeepSeq          (NFData(..))
 import Control.Error            (note)
@@ -66,6 +67,7 @@ import NGLess
 import Utils.Conduit
 import Utils.Utils
 import Utils.Vector
+import Utils.Suggestion
 import qualified Utils.IntGroups as IG
 
 
@@ -470,17 +472,35 @@ loadFunctionalMap fname columns = do
         outputListLno' InfoOutput ["Loading map file ", fname]
         (resume, [headers]) <- (CB.sourceFile fname =$ CB.lines)
                 $$+ (CL.isolate 1 =$= CL.map (B8.split '\t') =$ CL.consume)
-        cis <- lookUpColumns headers
-        (_,gmap,namemap) <- resume $$+-
-                (CL.mapM (selectColumns cis . B8.split '\t')
-                =$ CL.fold inserts (0, M.empty,M.empty))
+        cis <- runNGLess $ lookUpColumns headers
+        numCapabilities <- liftIO getNumCapabilities
+        let mapthreads = max 1 (numCapabilities - 1)
+        (_,gmap,namemap) <- resume
+                $$+- C.conduitVector 8192
+                =$= asyncMapEitherC mapthreads (V.mapM (selectColumns cis . B8.split '\t'))
+                =$ CL.fold (V.foldl' inserts1) (0, M.empty,M.empty)
         outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
-        return $ GeneMapAnnotator gmap (V.fromList [RefSeqInfo n 0.0 | n <- M.keys namemap])
+        return $ GeneMapAnnotator (reindex gmap namemap) (V.fromList [RefSeqInfo n 0.0 | n <- M.keys namemap])
     where
-        inserts :: (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int) -> (B.ByteString, [B.ByteString]) -> (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int)
-        inserts (next, gmap, namemap) (name, ids) = (next', gmap', namemap')
+        reindex :: M.Map B.ByteString [Int] -> M.Map B.ByteString Int -> M.Map B.ByteString [Int]
+        reindex gmap namemap = M.map (map reindex1) gmap
             where
-                (next', ids', namemap') = mapnames next ids namemap
+                reindex1 :: Int -> Int
+                reindex1 = fromJust . flip M.lookup remap
+                remap = M.fromList (zip (M.elems namemap) [0..])
+        inserts1 :: (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int) -> (B.ByteString, [B.ByteString]) -> (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int)
+        inserts1 (next, gmap, namemap) (name, ids) = (next', gmap', namemap')
+            where
+                (next', ids', namemap') = mapnames next (flattenIds ids) namemap
+
+                flattenIds = flatten . map (B8.split ',')
+
+                flatten :: [[a]] -> [a]
+                flatten = unfoldr flatten'
+                    where
+                        flatten' [] = Nothing
+                        flatten' ([]:xs) = flatten' xs
+                        flatten' ((v:vs):xs) = Just (v, vs:xs)
 
                 mapnames next [] curmap = (next, [], curmap)
                 mapnames next (n:ns) curmap = case M.lookup n curmap of
@@ -492,26 +512,22 @@ loadFunctionalMap fname columns = do
                 gmap' = M.insert name ids' gmap
 
 
-        lookUpColumns :: [B.ByteString] -> NGLessIO [Int]
+        lookUpColumns :: [B.ByteString] -> NGLess [Int]
         lookUpColumns [] = throwDataError ("Loading functional map file '" ++ fname ++ "': Header line missing!")
-        lookUpColumns (_:headers) = do
-            cis <- lookUpColumns' (zip [0..] headers)
-            when (length cis /= length columns) $
-                -- TODO: It would be best to have a more comprehensive error message (could not find header XYZ
-                throwDataError ("Loading functional map file '" ++ fname ++ "': could not find all header columns")
-            return cis
-        lookUpColumns' [] = return []
-        lookUpColumns' ((ix,v):vs)
-            | v `elem` columns = do
-                rest <- lookUpColumns' vs
-                return (ix:rest)
-            | otherwise = lookUpColumns' vs
-
-        selectColumns :: [Int] -> [B.ByteString] -> NGLessIO (B.ByteString, [B.ByteString])
+        lookUpColumns headers = mapM (lookUpColumns' $ M.fromList (zip (tail headers) [0..])) columns
+        lookUpColumns' :: M.Map B8.ByteString Int -> B8.ByteString -> NGLess Int
+        lookUpColumns' colmap col = note notfounderror $ M.lookup col colmap
+            where
+                notfounderror = NGError DataError errormsg
+                errormsg = T.concat (["Could not find column '", T.pack . B8.unpack $ col, "'."]
+                                ++ case findSuggestion (T.pack $ B8.unpack col) (map (T.pack . B8.unpack) $ M.keys colmap) of
+                                        Just (Suggestion valid reason) -> [" Did you mean '", valid, "' (", reason, ")?"]
+                                        Nothing -> [])
+        selectColumns :: [Int] -> [B.ByteString] -> NGLess (B.ByteString, [B.ByteString])
         selectColumns cols (gene:mapped) = (gene,) <$> selectIds cols (zip [0..] mapped)
         selectColumns _ [] = throwDataError ("Loading functional map file '" ++ fname ++ "': empty line.")
 
-        selectIds :: [Int] -> [(Int, B.ByteString)] -> NGLessIO [B.ByteString]
+        selectIds :: [Int] -> [(Int, B.ByteString)] -> NGLess [B.ByteString]
         selectIds [] _ = return []
         selectIds fs@(fi:rest) ((ci,v):vs)
             | fi == ci = (v:) <$> selectIds rest vs

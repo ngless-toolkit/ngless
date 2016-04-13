@@ -11,6 +11,7 @@ import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Set as S
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
+import qualified Data.Vector as V
 import qualified Data.Map as M
 
 import qualified Data.Conduit.Combinators as C
@@ -33,17 +34,14 @@ import NGLess
 tgroup_Count = $(testGroupGenerator)
 
 
-readCountFile :: Bool -> FilePath -> IO (M.Map B.ByteString Double)
-readCountFile skipFirst fp = do
+readCountFile :: FilePath -> IO (M.Map B.ByteString Double)
+readCountFile fp =
     runResourceT $
         C.sourceFile fp
             =$= CB.lines
-            =$= maySkipFirst
+            =$= (C.await >> (C.awaitForever C.yield)) -- skip first line
             $$ CL.foldMap parseLine
     where
-        maySkipFirst = if skipFirst
-                        then C.await >> (C.awaitForever C.yield)
-                        else C.awaitForever C.yield
         parseLine line = case B8.split '\t' line of
             [h,val] -> M.singleton h (read $ B8.unpack val)
             _ -> error ("Could not parse line: " ++ show line)
@@ -55,14 +53,9 @@ runSamGffAnnotation sam_content gff_content opts = do
     gff_fp <- asTempFile gff_content "gff"
     ann <- loadAnnotator (AnnotateGFF gff_fp) opts
     p <- performCount sam_fp "testing" ann opts
-    liftIO $ readCountFile True p
+    liftIO $ readCountFile p
 
 
-compareFiles fa fb = liftIO $ do
-    ca <- readCountFile True fa
-    cb <- readCountFile False fb
-    assertBool (concat ["Expected files ", fa, " and ", fb, " to be equivalent"])
-        (ca == cb)
 gff_structure_Exon = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
 gff_structure_CDS = GFF.GffLine "chrI" "unknown" GFF.GffCDS 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
 gff_structure_Gene = GFF.GffLine "chrI" "unknown" GFF.GffGene 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
@@ -144,7 +137,7 @@ case_count_two = do
         samf <- asTempFile short_sam "sam"
         ann <- loadAnnotator (AnnotateGFF gff) opts
         cfp <- performCount samf "testing" ann opts
-        liftIO (readCountFile True cfp)
+        liftIO (readCountFile cfp)
     c @?= M.fromList [("WBGene00002254", 2)]
 
 sam1 = [here|
@@ -234,3 +227,16 @@ case_gff_dist1_dist1_to_4 = do
     c <- testNGLessIO $ runSamGffAnnotation samAmbiguous3 gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = True, optMMMethod = MMDist1 }
     c @?= M.fromList [("Gene100", 3.75), ("Gene300", 1.25)]
 
+
+simple_map = [here|
+#gene	cog	ko	module
+gene1	NOG318324	NA	NA	NA
+gene2	COG2813	K00564	NA
+|]
+
+case_load_map = do
+    GeneMapAnnotator nmap names <- testNGLessIO $ do
+        map_fp <- asTempFile simple_map "map"
+        loadFunctionalMap map_fp ["ko"]
+    let Just [ix] = M.lookup "gene1" nmap
+    rsiName (names V.! ix) @?= "NA"
