@@ -12,6 +12,8 @@ module Utils.Conduit
     , awaitJust
     , bsConcatTo
     , asyncGzipTo
+    , asyncGzipFrom
+    , asyncGzipFromFile
     , zipSink2
     , zipSource2
     ) where
@@ -25,7 +27,6 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.TQueue as CA
 import qualified Data.Conduit.List as CL
-import qualified Data.Conduit.Zlib as C
 import qualified Data.Conduit.Zlib as CZ
 import qualified Data.Conduit.BZlib as CZ
 import qualified Data.Conduit as C
@@ -148,16 +149,34 @@ asyncGzipTo h = do
     q <- liftIO $ TQ.newTBMQueueIO 4
     let src :: C.Source IO B.ByteString
         src = CA.sourceTBMQueue q
-    consumer <- liftIO $ A.async (src $$ C.gzip =$= C.sinkHandle h)
+    consumer <- liftIO $ A.async (src $$ CZ.gzip =$= C.sinkHandle h)
     bsConcatTo ((2 :: Int) ^ (15 :: Int)) =$= CA.sinkTBMQueue q True
     liftIO (A.wait consumer)
 
+-- | A source which ungzipped from the the given handle. Note that this "reads
+-- ahead" so if you do not use all the input, the Handle will probably be left
+-- at an undefined position in the file.
+asyncGzipFrom :: forall m. (MonadIO m) => Handle -> C.Source m B.ByteString
+asyncGzipFrom h = do
+    -- We allocate the queue separately (instead of using CA.paired*) so that
+    -- `src` and `sink` end up with different underlying monads (sink is a
+    -- conduit over IO, while we are in m)
+    q <- liftIO $ TQ.newTBMQueueIO 4
+    producer <- liftIO $ A.async (C.sourceHandle h =$= CZ.ungzip $$ CA.sinkTBMQueue q True)
+    CA.sourceTBMQueue q
+    liftIO (A.cancel producer)
+
+asyncGzipFromFile :: forall m. (MonadIO m) => FilePath -> C.Source m B.ByteString
+asyncGzipFromFile fname = do
+    h <- liftIO $ openFile fname ReadMode
+    asyncGzipFrom h
+    liftIO (hClose h)
 
 zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
 zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
 
 conduitPossiblyCompressedFile fname
-    | ".gz" `isSuffixOf` fname = C.sourceFile fname =$= CZ.ungzip
+    | ".gz" `isSuffixOf` fname = asyncGzipFromFile fname
     | ".bz2" `isSuffixOf` fname = C.sourceFile fname =$= CZ.bunzip2
     | otherwise = C.sourceFile fname
 
