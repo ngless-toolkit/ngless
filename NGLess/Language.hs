@@ -35,10 +35,10 @@ import Data.FastQ
 import Data.Sam
 
 newtype Variable = Variable T.Text
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 newtype FuncName = FuncName T.Text
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 instance Show FuncName where
     show (FuncName f) = T.unpack f
@@ -48,7 +48,7 @@ data MethodName =
         | Mfilter
         | Mpe_filter
         | Munique
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 
 -- | method name -> ((method self type, method first argtype if any), method return type)
@@ -78,17 +78,17 @@ typeOfConstant _              = Nothing
 
 -- | unary operators
 data UOp = UOpLen | UOpMinus | UOpNot
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 -- | binary operators
 data BOp = BOpAdd | BOpMul | BOpGT | BOpGTE | BOpLT | BOpLTE | BOpEQ | BOpNEQ
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 -- | index expression encodes what is inside an index variable
 -- either [a] (IndexOne) or [a:b] (IndexTwo)
 data Index = IndexOne Expression
             | IndexTwo (Maybe Expression) (Maybe Expression)
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 -- | a block is
 --  f(a) using |inputvariables|:
@@ -97,7 +97,7 @@ data Block = Block
                 { blockVariable :: [Variable] -- ^ input arguments
                 , blockBody :: Expression -- ^ block body, will likely be Sequence
                 }
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 data NGLType =
         NGLString
@@ -113,7 +113,7 @@ data NGLType =
         | NGLCounts
         | NGLVoid
         | NGLAny
-        | NGList NGLType
+        | NGList !NGLType
     deriving (Eq, Show)
 
 data ReadSet =
@@ -140,6 +140,7 @@ data NGLessObject =
         | NGOCounts FilePath
         | NGOVoid
         | NGOList [NGLessObject]
+        | NGOExpression Expression
     deriving (Eq, Show, Ord)
 
 
@@ -165,12 +166,12 @@ data Expression =
         | MethodCall MethodName Expression (Maybe Expression) [(Variable, Expression)] -- ^ expr.method(expre)
         | Sequence [Expression]
         | Optimized OptimizedExpression -- This is a special case, used internally
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 data OptimizedExpression =
         LenThresholdDiscard Variable BOp Int -- if len(r) <op> <int>: discard
         | SubstrimReassign Variable Int -- r = substrim(r, min_quality=<int>)
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 instance Show Expression where
     show (Lookup (Variable v)) = "Lookup '"++T.unpack v++"'"

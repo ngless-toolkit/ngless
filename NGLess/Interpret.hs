@@ -286,8 +286,9 @@ topFunction' (FuncName "select")    expr args (Just b) = executeSelectWBlock exp
 topFunction' fname@(FuncName fname') expr args Nothing = do
     traceExpr ("executing module function: '"++T.unpack fname'++"'") expr
     execF <- findFunction fname
-    runNGLessIO (execF expr args)
-
+    runNGLessIO (execF expr args) >>= \case
+        NGOExpression expr -> interpretTopValue expr
+        val -> return val
 topFunction' f _ _ _ = throwShouldNotOccur . concat $ ["Interpretation of ", (show f), " is not implemented"]
 
 executeSamfile expr@(NGOString fname) args = do

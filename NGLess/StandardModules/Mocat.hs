@@ -15,7 +15,6 @@ import Data.String.Utils
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad
 import Control.Applicative
-import Data.Maybe
 import Data.Default
 
 import Output
@@ -41,32 +40,19 @@ mocatSamplePaired matched = do
         return (FunctionCall (FuncName "paired") (ConstStr . T.pack $ m1) [(Variable "second", ConstStr . T.pack $ m2)] Nothing)
 
 
-transformMocatLoad :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
-transformMocatLoad script = forM script $ \(lno, e) -> (lno,) <$> mocatToGroup e
-
-mocatToGroup :: Expression -> NGLessIO Expression
-mocatToGroup = recursiveTransform mocatToGroup'
-
-mocatToGroup' :: Expression -> NGLessIO Expression
-mocatToGroup' (FunctionCall (FuncName "mocat_load_sample") arg kwargs block) = do
-    when (isJust block) $
-        throwScriptError ("mocat_sample does not take a code block" :: String)
-    unless (null  kwargs) $
-        throwScriptError ("mocat_sample does not take any keyword arguments" :: String)
-    case arg of
-        ConstStr samplename -> do
-            outputListLno' TraceOutput ["Executing mocat_load_sample transform"]
-            let basedir = T.unpack samplename
-            matched <- liftIO $ liftM2 (++)
-                            (namesMatching (basedir </> "*.fq.gz"))
-                            (namesMatching (basedir </> "*.fq.bz2"))
-            let matched1 = filter (\f -> endswith ".1.fq.gz" f || endswith "1.fq.bz2" f) matched
-            args <- ListExpression <$> if null matched1
-                    then return [FunctionCall (FuncName "fastq") (ConstStr . T.pack $ f) [] Nothing | f <- matched]
-                    else mocatSamplePaired matched
-            return (FunctionCall (FuncName "group") args [(Variable "name", arg)] Nothing)
-        _ -> throwScriptError ("mocat_sample got wrong argument, expected a string, got " ++ show arg)
-mocatToGroup' e = return e
+executeLoad :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeLoad (NGOString samplename) [] = NGOExpression <$> do
+    outputListLno' TraceOutput ["Executing mocat_load_sample transform"]
+    let basedir = T.unpack samplename
+    matched <- liftIO $ liftM2 (++)
+                (namesMatching (basedir </> "*.fq.gz"))
+                (namesMatching (basedir </> "*.fq.bz2"))
+    let matched1 = filter (\f -> endswith ".1.fq.gz" f || endswith "1.fq.bz2" f) matched
+    args <- ListExpression <$> if null matched1
+            then return [FunctionCall (FuncName "fastq") (ConstStr . T.pack $ f) [] Nothing | f <- matched]
+            else mocatSamplePaired matched
+    return (FunctionCall (FuncName "group") args [(Variable "name", ConstStr samplename)] Nothing)
+executeLoad _ _ = throwShouldNotOccur ("mocat_load_sample got the wrong arguments." :: String)
 
 
 mocatLoadSample = Function
@@ -83,8 +69,8 @@ loadModule _ =
         return def
         { modInfo = ModInfo "stdlib.mocat" "0.0"
         , modCitation = Just citation
-        , modTransform = transformMocatLoad
         , modFunctions = [mocatLoadSample]
+        , runFunction = const executeLoad
         }
     where
         citation = T.concat
