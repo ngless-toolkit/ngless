@@ -169,7 +169,7 @@ asyncGzipFrom h = do
     -- `src` and `sink` end up with different underlying monads (sink is a
     -- conduit over IO, while we are in m)
     q <- liftIO $ TQ.newTBMQueueIO 4
-    producer <- liftIO $ A.async (C.sourceHandle h =$= CZ.ungzip $$ CA.sinkTBMQueue q True)
+    producer <- liftIO $ A.async (C.sourceHandle h =$= CZ.multiple CZ.ungzip $$ CA.sinkTBMQueue q True)
     CA.sourceTBMQueue q
     liftIO (A.cancel producer)
 
