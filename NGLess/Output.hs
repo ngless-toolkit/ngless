@@ -10,6 +10,7 @@ module Output
     , outputListLno'
     , setOutputLno
     , outputFQStatistics
+    , outputMapStatistics
     , writeOutput
     ) where
 
@@ -25,6 +26,8 @@ import Data.Time.Format (formatTime, defaultTimeLocale)
 import System.Console.ANSI
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
+import           Numeric (showFFloat)
+import           Control.Arrow (first)
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
 
@@ -73,6 +76,16 @@ data FQInfo = FQInfo
 
 $(deriveToJSON defaultOptions ''FQInfo)
 
+data MappingInfo = MappingInfo
+                { inputFile :: FilePath
+                , reference :: String
+                , totalReads :: !Int
+                , totalAligned :: !Int
+                , totalUnique :: !Int
+                } deriving (Show)
+
+$(deriveToJSON defaultOptions ''MappingInfo)
+
 curLine :: IORef (Maybe Int)
 {-# NOINLINE curLine #-}
 curLine = unsafePerformIO (newIORef Nothing)
@@ -84,6 +97,9 @@ savedOutput = unsafePerformIO (newIORef [])
 savedFQOutput :: IORef [FQInfo]
 {-# NOINLINE savedFQOutput #-}
 savedFQOutput = unsafePerformIO (newIORef [])
+
+savedMapOutput :: IORef [MappingInfo]
+savedMapOutput = unsafePerformIO (newIORef [])
 
 setOutputLno :: Maybe Int -> IO ()
 setOutputLno = writeIORef curLine
@@ -99,7 +115,10 @@ outputListLno' !ot ms = do
 outputLno' :: OutputType -> String -> NGLessIO ()
 outputLno' !ot m = outputListLno' ot [m]
 
-shouldPrint :: Bool -> OutputType -> Verbosity -> Bool
+shouldPrint :: Bool -- ^ is terminal
+                -> OutputType
+                -> Verbosity
+                -> Bool
 shouldPrint _ TraceOutput _ = False
 shouldPrint _      _ Loud = True
 shouldPrint False ot Quiet = ot == ErrorOutput
@@ -167,6 +186,27 @@ outputFQStatistics fname stats enc = do
     p "Number of sequences: "   (show $ FQ.nSeq stats)
     liftIO $ modifyIORef savedFQOutput (binfo:)
 
+outputMapStatistics :: String -- ^ input file
+                        -> String -- ^ mapping reference
+                        -> Int -- ^ total nr read
+                        -> Int -- ^ total aligned
+                        -> Int -- ^ total unique
+                        -> NGLessIO ()
+outputMapStatistics fname ref total aligned unique = do
+        lno' <- liftIO $ readIORef curLine
+        let out = outputListLno' ResultOutput
+        out ["Total reads: ", show total]
+        out ["Total reads aligned: ", showNumAndPercentage aligned total]
+        out ["Total reads Unique map: ", showNumAndPercentage unique total]
+        out ["Total reads Non-Unique map: ", showNumAndPercentage (aligned - unique) total]
+        liftIO $ modifyIORef savedMapOutput (MappingInfo fname ref total aligned unique:)
+    where
+        showNumAndPercentage :: Int  -> Int  -> String
+        showNumAndPercentage v 0 = showNumAndPercentage v 1 -- same output & avoid division by zero
+        showNumAndPercentage v total =
+            concat [show v, " [", showFFloat (Just 2) ((fromIntegral (100*v) / fromIntegral total) :: Double) "", "%]"]
+
+
 data InfoLink = HasQCInfo !Int
     deriving (Eq, Show)
 instance ToJSON InfoLink where
@@ -182,19 +222,19 @@ instance ToJSON ScriptInfo where
                                             "script" .= toJSON c ]
 
 wrapScript :: [(Int, T.Text)] -> [FQInfo] -> [(Maybe InfoLink, T.Text)]
-wrapScript script tags =
-    let getLno (FQInfo _ lno _ _ _ _ _) = lno
+wrapScript script tags = first annotate <$> script
+    where
+        getLno (FQInfo _ lno _ _ _ _ _) = lno
         lnos = map getLno tags
-        mapFst f = map (\(a,b) -> (f a,b))
         annotate i
             | i `elem` lnos = Just (HasQCInfo i)
             | otherwise =  Nothing
-    in mapFst annotate script
 
 writeOutput :: FilePath -> FilePath -> T.Text -> IO ()
 writeOutput fname scriptName script = do
     fullOutput <- reverse <$> readIORef savedOutput
     fqStats <- reverse <$> readIORef savedFQOutput
+    mapStats <- reverse <$> readIORef savedMapOutput
     t <- getZonedTime
     let script' = zip [1..] (T.lines script)
         sInfo = ScriptInfo fname (show t) (wrapScript script' fqStats)
@@ -204,6 +244,7 @@ writeOutput fname scriptName script = do
                         [ "output" .= fullOutput
                         , "processed" .= sInfo
                         , "fqStats" .= fqStats
+                        , "mapStats" .= mapStats
                         ]
                     ,";\n"])
 

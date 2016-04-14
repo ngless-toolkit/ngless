@@ -25,7 +25,6 @@ import           Data.Conduit (($$), (=$=))
 
 import GHC.Conc     (getNumCapabilities)
 import Data.List    (find)
-import Numeric      (showFFloat)
 import Data.Bits    (testBit)
 
 import System.Process
@@ -126,7 +125,7 @@ interpretMapOp :: ReferenceInfo -> T.Text -> [FilePath] -> [String] -> NGLessIO 
 interpretMapOp ref name fps extraArgs = do
     (ref', defGen') <- indexReference ref
     samPath' <- mapToReference ref' fps extraArgs
-    printMappingStats samPath'
+    printMappingStats ref' samPath'
     return $ NGOMappedReadSet name samPath' defGen'
     where
         indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)
@@ -173,19 +172,10 @@ _samStats fname = do
         =$= CL.groupBy ((==) `on` fst)
         $$ CL.fold update (0,0,0)
 
-printMappingStats :: FilePath -> NGLessIO ()
-printMappingStats fname = do
+printMappingStats :: String -> FilePath -> NGLessIO ()
+printMappingStats ref fname = do
     (total,aligned,unique) <- _samStats fname
-    let out = outputListLno' ResultOutput
-    out ["Total reads: ", show total]
-    out ["Total reads aligned: ", showNumAndPercentage aligned total]
-    out ["Total reads Unique map: ", showNumAndPercentage unique total]
-    out ["Total reads Non-Unique map: ", showNumAndPercentage (aligned - unique) total]
-
-showNumAndPercentage :: Int  -> Int  -> String
-showNumAndPercentage v 0 = showNumAndPercentage v 1 -- same output & avoid division by zero
-showNumAndPercentage v total =
-    concat [show v, " [", showFFloat (Just 2) ((fromIntegral (100*v) / fromIntegral total) :: Double) "", "%]"]
+    outputMapStatistics fname ref total aligned unique
 
 executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMap fps args = do
