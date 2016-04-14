@@ -352,13 +352,14 @@ case_test_setup_html_view = do
 
 case_async_gzip_to_from = do
     let testdata = [0 :: Int .. 12]
-    CL.sourceList testdata
-        =$= CL.map (B8.pack . (\n -> show n ++ "\n"))
-        $$ asyncGzipToFile "testing_tmp_dir/test.gz"
-    asyncGzipFromFile "testing_tmp_dir/test.gz" $$ asyncGzipToFile "testing_tmp_dir/test-copied.gz"
-    result <- asyncGzipFromFile "testing_tmp_dir/test-copied.gz"
-        =$= linesC
-        =$= CL.map (read . B8.unpack .  unwrapByteLine)
-        $$ CL.consume
+    result <- testNGLessIO $ do
+        CL.sourceList testdata
+            =$= CL.map (B8.pack . (\n -> show n ++ "\n"))
+            $$ asyncGzipToFile "testing_tmp_dir/test.gz"
+        asyncGzipFromFile "testing_tmp_dir/test.gz" $$ asyncGzipToFile "testing_tmp_dir/test-copied.gz"
+        asyncGzipFromFile "testing_tmp_dir/test-copied.gz"
+            =$= linesC
+            =$= CL.map (read . B8.unpack .  unwrapByteLine)
+            $$ CL.consume
     result @?= testdata
 

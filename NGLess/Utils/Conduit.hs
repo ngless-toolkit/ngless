@@ -38,6 +38,7 @@ import           Data.Sequence ((|>), ViewL(..))
 import           Control.Monad (unless)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.Trans.Resource (MonadResource)
 import           Control.Exception (evaluate)
 import           Control.DeepSeq
 import           Foreign.ForeignPtr
@@ -154,11 +155,11 @@ asyncGzipTo h = do
     bsConcatTo ((2 :: Int) ^ (15 :: Int)) =$= CA.sinkTBMQueue q True
     liftIO (A.wait consumer)
 
-asyncGzipToFile :: forall m. (MonadIO m) => FilePath -> C.Sink B.ByteString m ()
-asyncGzipToFile fname = do
-    h <- liftIO $ openFile fname WriteMode
-    asyncGzipTo h
-    liftIO (hClose h)
+asyncGzipToFile :: forall m. (MonadIO m, MonadResource m) => FilePath -> C.Sink B.ByteString m ()
+asyncGzipToFile fname = C.bracketP
+    (openFile fname WriteMode)
+    hClose
+    asyncGzipTo
 
 -- | A source which ungzipped from the the given handle. Note that this "reads
 -- ahead" so if you do not use all the input, the Handle will probably be left
@@ -173,11 +174,11 @@ asyncGzipFrom h = do
     CA.sourceTBMQueue q
     liftIO (A.cancel producer)
 
-asyncGzipFromFile :: forall m. (MonadIO m) => FilePath -> C.Source m B.ByteString
-asyncGzipFromFile fname = do
-    h <- liftIO $ openFile fname ReadMode
-    asyncGzipFrom h
-    liftIO (hClose h)
+asyncGzipFromFile :: forall m. (MonadIO m, MonadResource m) => FilePath -> C.Source m B.ByteString
+asyncGzipFromFile fname = C.bracketP
+    (openFile fname ReadMode)
+    hClose
+    asyncGzipFrom
 
 zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
 zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
