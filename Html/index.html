@@ -44,10 +44,11 @@
                 .output-debug { color: #336633;}
                 .output-result { color: #663333;}
                 </style>
+                <p><a ng-show="!showtime" ng-click="showtime = !showtime;">Show time</a><a ng-show="showtime" ng-click="showtime = !showtime;">Hide time</a>.
 
                 <p>
                 <div ng-repeat="oline in output.output">
-                    <span class="output-{{oline.otype}}"><strong>Line {{oline.lno}}</strong>: {{oline.message}}</span><br />
+                    <span class="output-{{oline.otype}}"><strong>Line {{oline.lno}}</strong><span ng-show="showtime"> [{{oline.time}}]</span>: {{oline.message}}</span><br />
                 </div>
             </div>
         </div><!-- /.container -->
@@ -55,7 +56,7 @@
 
         <footer id="footer">
             <div class="container">
-                <p>Happily designed by <a href="https://github.com/luispedro">Luis Pedro Coelho</a> and <a href="https://github.com/montoias">Paulo Monteiro</a>. <a href="https://github.com/luispedro/ngless"><img align="right" style="float:right; width:36px" src="htmllibs/Octocat.png"> </img> </a></p>
+                <p>Happily designed by <a href="https://github.com/luispedro">Luis Pedro Coelho</a> and <a href="https://github.com/montoias">Paulo Monteiro</a>.</p>
             </div>
         </footer>
         <!-- Bootstrap core JavaScript

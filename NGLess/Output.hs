@@ -21,7 +21,7 @@ import Data.Maybe
 import Data.IORef
 import Data.Aeson
 import Data.Aeson.TH (deriveToJSON, defaultOptions)
-import Data.Time (getZonedTime)
+import Data.Time (getZonedTime, ZonedTime(..))
 import Data.Time.Format (formatTime, defaultTimeLocale)
 import System.Console.ANSI
 import Control.Monad
@@ -49,11 +49,15 @@ instance Show OutputType where
     show WarningOutput = "warning"
     show ErrorOutput = "error"
 
-data OutputLine = OutputLine !Int !OutputType !String
-    deriving (Eq)
+data OutputLine = OutputLine !Int !OutputType !ZonedTime !String
 
 instance ToJSON OutputLine where
-    toJSON (OutputLine lno ot m) = object ["lno" .= lno, "otype" .= show ot, "message" .= m]
+    toJSON (OutputLine lno ot t m) = object
+                                        ["lno" .= lno
+                                        , "time" .=  formatTime defaultTimeLocale "%a %d-%m-%Y %T" t
+                                        , "otype" .= show ot
+                                        , "message" .= m
+                                        ]
 
 
 data BPosInfo = BPosInfo
@@ -139,7 +143,7 @@ output !ot !lno !msg = do
             AutoColor -> isTerm
     liftIO $ do
         t <- getZonedTime
-        modifyIORef savedOutput (OutputLine lno ot msg:)
+        modifyIORef savedOutput (OutputLine lno ot t msg:)
         when sp $ do
             let st = if doColor
                         then setSGRCode [SetColor Foreground Dull (colorFor ot)]

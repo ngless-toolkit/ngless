@@ -33,12 +33,7 @@ HTMLFILES += nv.d3.js
 HTMLFILES += nv.d3.css
 HTMLFILES += angular-sanitize.js
 HTMLFILES += bootstrap-glyphicons.css
-HTMLFILES += ng-table.js
-HTMLFILES += ng-table.css
-HTMLFILES += angular-ui-router.min.js
 HTMLFILES += angular-animate.min.js
-HTMLFILES += ace.js
-HTMLFILES += mode-python.js
 
 # Required fonts
 FONTFILES := glyphicons-halflings-regular.woff
@@ -49,8 +44,6 @@ jquery-latest.min.js = code.jquery.com/jquery-latest.min.js
 d3.min.js = cdnjs.cloudflare.com/ajax/libs/d3/3.1.6/d3.min.js
 nv.d3.js = cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.js
 nv.d3.css = cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.css
-ng-table.js = bazalt-cms.com/assets/ng-table/0.3.0/ng-table.js
-ng-table.css = bazalt-cms.com/assets/ng-table/0.3.0/ng-table.css
 angular-sanitize.js = code.angularjs.org/1.3.0-beta.1/angular-sanitize.js
 bootstrap.min.js = netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js
 bootstrap.min.css = netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css
@@ -60,15 +53,9 @@ bootstrap-theme.min.css = netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-
 glyphicons-halflings-regular.woff = netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.woff
 glyphicons-halflings-regular.ttf = netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.ttf
 angular-animate.min.js = ajax.googleapis.com/ajax/libs/angularjs/1.2.16/angular-animate.min.js
-angular-ui-router.min.js = cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.10/angular-ui-router.min.js
-ace.js = cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/ace.js
-mode-python.js = cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/mode-python.js
-
-GIT_LOGO := github-media-downloads.s3.amazonaws.com/Octocats.zip
 
 reqhtmllibs = $(addprefix $(HTML_LIBS_DIR)/, $(HTMLFILES))
 reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
-reqlogo = $(HTML_LIBS_DIR)/Octocat.png
 
 PREBUILD = NGLess.cabal $(NGLESS_BUILD_BINARIES)
 
@@ -115,7 +102,7 @@ install:
 	cp -rf $(SAM_DIR) $(deps)
 	cp -f dist/build/ngless/ngless $(exec)/ngless
 
-nglessconf: $(SAM_DIR) $(BWA_DIR) $(reqhtmllibs) $(reqfonts) $(reqlogo)
+nglessconf: $(SAM_DIR) $(BWA_DIR) $(reqhtmllibs) $(reqfonts)
 
 clean:
 	rm -f $(NGLESS_BUILD_BINARIES)
@@ -178,14 +165,6 @@ $(HTML_FONTS_DIR)/%.ttf:
 	mkdir -p $(HTML_FONTS_DIR)
 	echo $(notdir $@)
 	wget -O $@ $($(notdir $@))
-
-$(HTML_LIBS_DIR)/Octocat.png:
-	mkdir -p $(HTML_LIBS_DIR)
-	wget -O $(HTML_LIBS_DIR)/$(notdir $(GIT_LOGO)) $(GIT_LOGO);
-	unzip $(HTML_LIBS_DIR)/$(notdir $(GIT_LOGO)) -d $(HTML_LIBS_DIR);
-	cp $(HTML_LIBS_DIR)/Octocat/Octocat.png $(HTML_LIBS_DIR)/Octocat.png;
-	rm -rf $(HTML_LIBS_DIR)/__MACOSX $(HTML_LIBS_DIR)/Octocat $(HTML_LIBS_DIR)/Octocats.zip;
-	echo $(GIT_LOGO) configured;
 
 ngless-${VERSION}.tar.gz: ngless
 	mkdir -p $(distdir)/share $(distdir)/bin
