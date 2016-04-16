@@ -103,6 +103,7 @@ savedFQOutput :: IORef [FQInfo]
 savedFQOutput = unsafePerformIO (newIORef [])
 
 savedMapOutput :: IORef [MappingInfo]
+{-# NOINLINE savedMapOutput #-}
 savedMapOutput = unsafePerformIO (newIORef [])
 
 setOutputLno :: Maybe Int -> IO ()
