@@ -24,6 +24,7 @@ import Data.Aeson
 import Data.Yaml
 import Data.Default (def)
 
+import Configuration
 import Utils.Utils
 import Language
 import Modules
@@ -241,22 +242,31 @@ validateModule  ExternalModule{..} = do
                     "\tstderr='", err, "'"]
 
 
-findLoad :: T.Text -> NGLessIO ExternalModule
-findLoad modname = do
-    m <- liftIO $ findLoad' modname
-    case m of
-        Right m' -> return m'
-        Left err -> throwSystemError ("Could not find external module '" ++ T.unpack modname++"'.\nError message was:\n\t"++err)
+findFirstM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
+findFirstM f [] = return Nothing
+findFirstM f (x:xs) = f x >>= \case
+    Nothing -> findFirstM f xs
+    other -> return other
 
-findLoad' :: T.Text -> IO (Either String ExternalModule)
-findLoad' m = do
-    let modpath = "Modules" </> T.unpack m <.> "ngm"
-        modfile = modpath </> "module" <.> "yaml"
-    exist <- doesFileExist modfile
-    if not exist
-        then return $ Left ("Could not find module file at "++modfile)
-        else fmap (addPathToRep modpath) . decodeEither <$> B.readFile modfile
+findLoad :: T.Text -> T.Text -> NGLessIO ExternalModule
+findLoad modname version = do
+    let modpath = "Modules" </> T.unpack modname <.> "ngm" </> T.unpack version
+        modfile = "module.yaml"
+    globalDir <- globalDataDirectory
+    userDir <- userDataDirectory
+    found <- flip findFirstM [".", globalDir, userDir] $ \basedir -> do
+        let fname = basedir </> modpath </> modfile
+        exists <- liftIO $ doesFileExist fname
+        outputListLno' TraceOutput ["Looking for module ", T.unpack modname, "at ", fname, if exists then "and found it." else "and did not find it."]
+        return $ if exists
+            then Just basedir
+            else Nothing
+    case found of
+        Just mdir -> decodeEither <$> liftIO (B.readFile (mdir </> modfile)) >>= \case
+                    Right v -> return $ addPathToRep mdir v
+                    Left err -> throwSystemError ("Could not load module file "++ mdir </> modfile ++ ". Error was `" ++ err ++ "`")
+        Nothing -> throwSystemError ("Could not find external module '" ++ T.unpack modname)
 
 loadModule :: T.Text -> T.Text -> NGLessIO Module
-loadModule m _ = asInternalModule =<< findLoad m
+loadModule m version = asInternalModule =<< findLoad m version
 
