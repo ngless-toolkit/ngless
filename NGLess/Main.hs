@@ -43,6 +43,7 @@ import Network
 
 import qualified BuiltinModules.AsReads as ModAsReads
 import qualified BuiltinModules.Argv as ModArgv
+import qualified BuiltinModules.Readlines as Readlines
 
 -- | wrapPrint transforms the script by transforming the last expression <expr>
 -- into write(<expr>, ofile=STDOUT)
@@ -86,8 +87,9 @@ loadModules :: [ModInfo] -> NGLessIO [Module]
 loadModules mods  = do
     mA <- ModAsReads.loadModule ("" :: T.Text)
     mArgv <- ModArgv.loadModule ("" :: T.Text)
+    mReadlines <- Readlines.loadModule ("" :: T.Text)
     imported <- loadStdlibModules mods
-    return (mArgv:mA:imported)
+    return (mReadlines:mArgv:mA:imported)
 
 
 headerStr :: String
