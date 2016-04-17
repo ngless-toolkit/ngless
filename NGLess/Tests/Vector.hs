@@ -5,25 +5,18 @@ module Tests.Vector
 
 import Test.Framework.TH
 import Test.Framework.Providers.HUnit
+import Test.Framework.Providers.QuickCheck2
 import Test.HUnit
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
-import qualified Data.Vector.Mutable as VM
-import qualified Data.Vector.Generic.Mutable as VGM
+import System.IO.Unsafe (unsafePerformIO)
 
-
-import Tests.Utils
 import Control.Monad
 import Utils.Vector
 
 tgroup_Vector = $(testGroupGenerator)
 
 -- Pure Validation
-
-case_zero_vec = do
-  v <- zeroVec 4 >>= VU.freeze
-  v @?= VU.fromList [0,0,0,0]
-
 
 case_binarySearch1 = binarySearch (V.fromList [1,2,5]) ( 1 :: Int) @?= 0
 case_binarySearch2 = binarySearch (V.fromList [1,2,5]) ( 2 :: Int) @?= 1
@@ -33,13 +26,15 @@ case_binarySearch5 = binarySearch (V.fromList [1,2,5]) ( 5 :: Int) @?= 2
 case_binarySearch6 = binarySearch (V.fromList [1,2,5]) (15 :: Int) @?= 3
 case_binarySearch7 = binarySearch (V.fromList [1,2,5]) (-1 :: Int) @?= 0
 
+isSorted :: [Int] -> Bool
 isSorted [] = True
 isSorted [_] = True
 isSorted (a:b:rs) = a <= b && isSorted (b:rs)
 
-case_sortParallel = do
-    v <- V.unsafeThaw (V.fromList [0..20000 :: Int])
-    sortParallel 4 v
-    vs <- V.toList <$> V.unsafeFreeze v
-    assertBool "sort parallel results should be sorted" (isSorted vs)
+sortList :: [Int] -> [Int]
+sortList vs = unsafePerformIO $ do
+        v <- V.unsafeThaw (V.fromList vs)
+        sortParallel 4 v
+        V.toList <$> V.unsafeFreeze v
+prop_sortP vs = isSorted (sortList vs)
 

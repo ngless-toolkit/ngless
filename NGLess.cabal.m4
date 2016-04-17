@@ -91,7 +91,8 @@ Test-Suite nglesstest
     test-framework == 0.8.*,
     test-framework-hunit,
     test-framework-quickcheck2,
-    test-framework-th
+    test-framework-th,
+    QuickCheck == 2.8.*
 
 benchmark nglessbench
   type:         exitcode-stdio-1.0

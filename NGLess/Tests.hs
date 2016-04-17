@@ -11,6 +11,8 @@ import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
+import Test.QuickCheck.Arbitrary
+import Test.QuickCheck.Gen
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
 
@@ -113,6 +115,21 @@ prop_substrim_idempotent s = st == 0 && e == B.length s1
     where
         s1 = cutByteString (B.pack s) (subtrimPos (B.pack s) '\DC4')
         (st,e) = subtrimPos s1 '\DC4'
+
+data SplitByteString = SplitByteString B.ByteString Int Int
+    deriving (Show)
+
+instance Arbitrary SplitByteString where
+    arbitrary = do
+        qs <- B.pack <$> listOf1 arbitrary
+        st <- elements [0 .. B.length qs - 1]
+        n <- elements [0 .. B.length qs - st]
+        return $! SplitByteString qs st n
+
+prop_substrim_no_better (SplitByteString qs s n) = not valid || n' >= n
+    where
+        valid = all (> 'a') (B8.unpack . B.take n . B.drop s $ qs)
+        (_, n') = subtrimPos qs 'a'
 
 case_substrim_normal_exec =  subtrimPos "\n\v\f{zo\n\v\NUL" '\DC4' @?= (3,3)
 case_substrim_empty_quals = subtrimPos "" '\DC4' @?= (0,0)
