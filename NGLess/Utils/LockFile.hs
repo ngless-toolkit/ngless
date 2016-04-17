@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -7,6 +7,7 @@ module Utils.LockFile
     ( withLockFile
     , LockParameters(..)
     , WhenExistsStrategy(..)
+    , acquireLock
     ) where
 
 import System.Posix.Process
@@ -51,15 +52,15 @@ data WhenExistsStrategy = IfLockedThrow NGError | IfLockedRetry { nrLockRetries 
             deriving (Eq, Show)
 
 withLockFile :: LockParameters -> NGLessIO a -> NGLessIO a
-withLockFile params act =
-    acquireLock params >>= \case
+withLockFile params@LockParameters{..} act =
+    acquireLock lockFname >>= \case
         Just rk -> do
-            outputListLno' DebugOutput ["Acquired lock file ", lockFname params]
+            outputListLno' DebugOutput ["Acquired lock file ", lockFname]
             v <- act
             release rk
             return v
         Nothing -> do
-            outputListLno' InfoOutput ["Lock file exists ", lockFname params]
+            outputListLno' InfoOutput ["Lock file exists ", lockFname]
             lockExists params act
 
 
@@ -87,12 +88,12 @@ sleep = threadDelay . toMicroSeconds
         toMicroSeconds :: NominalDiffTime -> Int
         toMicroSeconds = (1000000 *) . fromInteger . round
 
-acquireLock :: LockParameters -> NGLessIO (Maybe ReleaseKey)
-acquireLock LockParameters{..} = liftIO (openLockFile lockFname) `maybeM` \h -> do
+acquireLock :: FilePath -> NGLessIO (Maybe ReleaseKey)
+acquireLock fname = liftIO (openLockFile fname) `maybeM` \h -> do
     -- rkC is for the case where an exception is raised between this line and the release call below
     rkC <- register (hClose h)
-    rk <- register (removeFileIfExists lockFname)
-    outputListLno' DebugOutput ["Acquired lock file ", lockFname]
+    rk <- register (removeFileIfExists fname)
+    outputListLno' DebugOutput ["Acquired lock file ", fname]
     liftIO $ do
         pid <- getProcessID
         hostname <- getHostName
