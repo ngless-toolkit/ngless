@@ -229,7 +229,9 @@ funcInfo fn = do
     case matched of
         [fi] -> return fi
         [] -> do
-            errorInLineC ["Unknown function '", show fn, "'"]
+            errorInLineC (["Unknown function '", show fn, "'"] ++ case findSuggestion (unwrapFuncName fn) (unwrapFuncName . funcName <$> fs) of
+                                        Nothing -> []
+                                        Just (Suggestion sug reason) -> [". Did you mean `", T.unpack sug, "` (", T.unpack reason, ")?"])
             cannotContinue
         _ -> do
             errorInLineC ["Too many matches for function '", show fn, "'"]

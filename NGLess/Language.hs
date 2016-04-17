@@ -37,7 +37,7 @@ import Data.Sam
 newtype Variable = Variable T.Text
     deriving (Eq, Ord, Show)
 
-newtype FuncName = FuncName T.Text
+newtype FuncName = FuncName { unwrapFuncName :: T.Text }
     deriving (Eq, Ord)
 
 instance Show FuncName where
