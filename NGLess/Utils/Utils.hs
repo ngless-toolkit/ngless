@@ -12,13 +12,18 @@ module Utils.Utils
     , readProcessErrorWithExitCode
     , allSame
     , passthrough
+    , moveOrCopy
     ) where
 
-import Control.Exception (evaluate)
 import Control.Monad
 import Control.Concurrent
 import System.IO
 import System.Process
+
+import System.Directory
+import System.IO.Error
+import Control.Exception
+import GHC.IO.Exception (IOErrorType(..))
 
 import Data.List (group)
 import Data.Maybe (fromMaybe, catMaybes)
@@ -60,3 +65,7 @@ mapMaybeM f xs = catMaybes <$> mapM f xs
 passthrough :: (Monad m) => (a -> m ()) -> a -> m a
 passthrough f a = f a >> return a
 
+moveOrCopy :: FilePath -> FilePath -> IO ()
+moveOrCopy oldfp newfp = renameFile oldfp newfp `catch` (\e -> case ioeGetErrorType e of
+            UnsupportedOperation -> copyFile oldfp newfp
+            _ -> ioError e)

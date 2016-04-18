@@ -20,9 +20,6 @@ import System.Process
 import System.Exit
 import System.Directory
 import System.IO
-import System.IO.Error
-import Control.Exception
-import GHC.IO.Exception (IOErrorType(..))
 import Data.String.Utils
 import Data.List (isInfixOf)
 import Data.Maybe
@@ -57,11 +54,6 @@ getOFile args = do
 
 writeRSToFile enc path newfp =
     conduitPossiblyCompressedFile path $$ C.sinkFile newfp
-
-moveOrCopy :: FilePath -> FilePath -> IO ()
-moveOrCopy oldfp newfp = renameFile oldfp newfp `catch` (\e -> case ioeGetErrorType e of
-            UnsupportedOperation -> copyFile oldfp newfp
-            _ -> ioError e)
 
 
 executeWrite :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
