@@ -40,6 +40,7 @@ import CmdArgs
 import FileManagement (setupHtmlViewer)
 import StandardModules.NGLStdlib
 import Network
+import Hooks
 
 import qualified BuiltinModules.AsReads as ModAsReads
 import qualified BuiltinModules.Argv as ModArgv
@@ -162,6 +163,7 @@ modeExec opts@DefaultMode{} = do
             liftIO (print transformed)
         outputLno' InfoOutput "Script OK. Starting interpretation..."
         interpret modules (nglBody transformed)
+        triggerHook FinishOkHook
     when shouldOutput $ do
         createDirectoryIfMissing False odir
         setupHtmlViewer odir
