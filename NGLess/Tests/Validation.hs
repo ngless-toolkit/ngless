@@ -77,6 +77,13 @@ case_invalid_not_pure_fp_fastq_lit = validateIO_Ok
     "ngless '0.0'\n\
     \fastq('Makefile')\n" --File Makefile exists
 
+case_build_path = validateIO_Ok [here|
+ngless '0.0'
+part1 = 'Make'
+part2 = 'file'
+fastq(part1 + part2)
+|]
+
 case_valid_not_pure_fp_fastq_const = validateIO_error
     "ngless '0.0'\n\
     \x = 'fq'\n\
