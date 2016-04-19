@@ -16,6 +16,7 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
+import Data.Bits (testBit, Bits(..))
 import Data.Conduit (($=), ($$), (=$=))
 import System.IO
 import qualified Data.Text as T
@@ -79,7 +80,7 @@ readSamGroupsAsConduit fname =
                 Right parsed -> C.yield (parsed,line)
         groupLine (SamHeader _,_) _ = False
         groupLine _ (SamHeader _,_) = False
-        groupLine (s0,_) (s1,_) = (samQName s0) == (samQName s1)
+        groupLine (s0,_) (s1,_) = samQName s0 == samQName s1
 
 
 executeSelect :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -110,13 +111,31 @@ executeMappedReadMethod Mflag samlines (Just (NGOSymbol flag)) [] = do
         getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
 executeMappedReadMethod Mpe_filter samlines Nothing [] = return . NGOMappedRead . filterPE $ samlines
 executeMappedReadMethod Mfilter samlines Nothing kwargs = do
-    minQ <- lookupIntegerOrScriptError "filter method" "min_identity_pc" kwargs
-    let minQV :: Double
-        minQV = fromInteger minQ / 100.0
+    minID <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_identity_pc" kwargs
+    minMatchSize <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_match_size" kwargs
+    action <- lookupSymbolOrScriptErrorDef (return "drop") "filter method" "action" kwargs
+    let minIDD :: Double
+        minIDD = fromInteger minID / 100.0
         matchIdentity' s = case matchIdentity s of
             Right v -> v
             Left _ -> 0.0
-        samlines' = filter ((>= minQV) . matchIdentity') samlines
+        matchSize' s = case matchSize s of
+            Right v -> v
+            Left _ -> 0
+        okID s
+            | minID == -1 = True
+            | otherwise = matchIdentity' s >= minIDD
+        okSize s
+            | minMatchSize == -1 = True
+            | otherwise = matchSize' s >= fromInteger minMatchSize
+        acceptSamLine s = okID s && okSize s
+        unmatchWhen c s
+            | c s = unmatch s
+            | otherwise = s
+        unmatch samline = samline { samFlag = (samFlag samline .|. 4) `clearBit` 1, samRName = "*", samCigar = "*" }
+        samlines'
+            | action == "drop" = filter acceptSamLine samlines
+            | action == "unmatch" = map (unmatchWhen acceptSamLine) samlines
     return (NGOMappedRead samlines')
 executeMappedReadMethod Munique samlines Nothing [] = return . NGOMappedRead . mUnique $ samlines
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
@@ -131,7 +150,7 @@ filterPE slines = (filterPE' . filter isAligned) slines
                     Nothing -> filterPE' sls
             | otherwise = filterPE' sls
         findMatch target = listToMaybe . filter (isMatch target)
-        isMatch target other = isNegative other && (samRName target) == (samRName other)
+        isMatch target other = isNegative other && samRName target == samRName other
 
 mUnique :: [SamLine] -> [SamLine]
 mUnique slines

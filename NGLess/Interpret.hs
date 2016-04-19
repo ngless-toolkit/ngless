@@ -486,33 +486,29 @@ executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> Inte
 executeSelectWBlock input@NGOMappedReadSet{ nglSamFile= fname} [] (Block [Variable var] body) = do
         runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", fname]
         (oname, ohandle) <- runNGLessIO $ openNGLTempFile fname "block_selected_" "sam"
-        readSamGroupsAsConduit fname
-            $= C.mapM filterGroup
+        conduitPossiblyCompressedFile fname
+            =$= linesC
+            =$= readSamGroupsC
+            =$= C.mapM filterGroup
             =$= CL.concat
             =$= C.unlinesAscii
             $$ CB.sinkHandle ohandle
         liftIO $ hClose ohandle
         return input { nglSamFile = oname }
     where
-        filterGroup :: [(SamLine, B.ByteString)] -> InterpretationEnvIO [B.ByteString]
+        filterGroup :: [SamLine] -> InterpretationEnvIO [B.ByteString]
         filterGroup [] = return []
-        filterGroup [(SamHeader _, line)] = return [line]
+        filterGroup [SamHeader line] = return [line]
         filterGroup mappedreads  = do
-                    let _ = mappedreads :: [(SamLine, B.ByteString)]
-                    mrs' <- runInROEnvIO (interpretBlock1 [(var, NGOMappedRead (map fst mappedreads))] body)
+                    let _ = mappedreads :: [SamLine]
+                    mrs' <- runInROEnvIO (interpretBlock1 [(var, NGOMappedRead mappedreads)] body)
                     if blockStatus mrs' `elem` [BlockContinued, BlockOk]
                         then case lookup var (blockValues mrs') of
                             Just (NGOMappedRead []) -> return []
-                            Just (NGOMappedRead rs) -> return (filterMappedRead mappedreads rs)
+                            Just (NGOMappedRead rs) -> return (encodeSamLine <$> rs)
                             _ -> nglTypeError ("Expected variable "++show var++" to contain a mapped read.")
 
                         else return []
-        filterMappedRead :: [(SamLine, B.ByteString)] -> [SamLine] -> [B.ByteString]
-        filterMappedRead [] _ = []
-        filterMappedRead _ [] = []
-        filterMappedRead ((r0,rl):rs) (r':rs')
-            | r' == r0 = rl:(filterMappedRead rs rs')
-            | otherwise = filterMappedRead rs (r':rs')
 executeSelectWBlock expr _ _ = unreachable ("Select with block, unexpected argument: " ++ show expr)
 
 

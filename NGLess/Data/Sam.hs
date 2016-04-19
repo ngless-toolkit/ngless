@@ -8,23 +8,28 @@ module Data.Sam
     , samLength
     , readSamGroupsC
     , readSamLine
+    , encodeSamLine
     , isAligned
     , isPositive
     , isNegative
     , isFirstInPair
     , isSecondInPair
+    , matchSize
     , matchIdentity
     ) where
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.Text as T
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import           Data.Strict.Tuple (Pair(..))
 import Data.Bits (testBit)
+import Control.Error (note)
 import Control.DeepSeq
 
+import Data.Maybe
 import Data.Conduit ((=$=))
 import Data.Function (on)
 import Control.Monad.Except
@@ -53,8 +58,10 @@ instance NFData SamLine where
     rnf SamLine{} = ()
     rnf (SamHeader !_) = ()
 
-
 data SamResult = Total | Aligned | Unique | LowQual deriving (Enum)
+
+isHeader SamHeader{} = True
+isHeader SamLine{} = False
 
 samLength = B8.length . samSeq
 
@@ -90,6 +97,24 @@ instance Applicative SimpleParser where
                                 (f' :!: rest) <- runSimpleParser f b
                                 (g' :!: rest') <- runSimpleParser g rest
                                 return $! (f' g' :!: rest'))
+
+encodeSamLine :: SamLine -> B.ByteString
+encodeSamLine (SamHeader b) = b
+encodeSamLine samline = B.intercalate "\t"
+    [ samQName samline
+    , int2BS . samFlag $ samline
+    , samRName samline
+    , int2BS . samPos $ samline
+    , int2BS . samMapq $ samline
+    , samCigar samline
+    , samRNext samline
+    , int2BS . samPNext $ samline
+    , int2BS . samTLen $ samline
+    , samSeq samline
+    , samQual samline
+    , samExtra samline
+    ]
+    where int2BS = B8.pack . show
 
 readSamLine :: B.ByteString -> Either NGError SamLine
 readSamLine line
@@ -134,25 +159,37 @@ P padding (silent deletion from padded reference).
 X sequence mismatch.
 --}
 
-numberMismatches :: B.ByteString -> Either NGError Int
-numberMismatches cigar
+matchSize :: SamLine -> Either NGError Int
+matchSize = matchSize' . samCigar
+matchSize' cigar
     | B8.null cigar = return 0
     | otherwise = case B8.readInt cigar of
         Nothing -> throwDataError ("could not parse cigar '"++S8.unpack cigar ++"'")
         Just (n,code_rest) -> do
             let code = S8.head code_rest
                 rest = S8.tail code_rest
-                n' = if code `elem` ("DNSHX" :: [Char]) then n else 0
-            r <- numberMismatches rest
+                n' = if code `elem` ("M=X" :: String) then n else 0
+            r <- matchSize' rest
             return (n' + r)
 
 matchIdentity :: SamLine -> Either NGError Double
 matchIdentity samline = do
-        errors <- numberMismatches (samCigar samline)
-        let len = samLength samline
-            toDouble = fromInteger . toInteger
-            mid = toDouble (len - errors) / toDouble len
-        return mid
+    let errmsg = T.pack $ "Could not get NM tag for samline " ++ B8.unpack (samQName samline) ++ ", extra tags were: "++ B8.unpack (samExtra samline)
+    errors <- note (NGError DataError errmsg) $ samIntTag samline "NM"
+    len <- matchSize samline
+    let toDouble = fromInteger . toInteger
+        mid = toDouble (len - errors) / toDouble len
+    return mid
+
+samIntTag :: SamLine -> B.ByteString -> Maybe Int
+samIntTag samline tname
+    | isHeader samline = Nothing
+    | otherwise = listToMaybe . mapMaybe gettag . B8.split '\t' . samExtra $ samline
+    where
+        gettag match
+            | B.take 2 match == tname
+                    && (fst <$> B8.uncons (B.drop 3 match)) == Just 'i' = fst <$> B8.readInt (B.drop 5 match)
+            | otherwise = Nothing
 
 -- | take in *lines* and transform them into groups of SamLines all refering to the same read
 readSamGroupsC :: (MonadError NGError m) => C.Conduit ByteLine m [SamLine]

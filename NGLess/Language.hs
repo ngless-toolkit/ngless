@@ -61,7 +61,7 @@ methodArgTypeReturnType Munique = ((NGLMappedRead, Nothing), NGLMappedRead)
 methodSelfType :: MethodName -> NGLType
 methodSelfType = fst . fst . methodArgTypeReturnType
 
-methodArgType :: MethodName -> (Maybe NGLType)
+methodArgType :: MethodName -> Maybe NGLType
 methodArgType = snd . fst. methodArgTypeReturnType
 
 methodReturnType :: MethodName -> NGLType
@@ -69,6 +69,8 @@ methodReturnType = snd . methodArgTypeReturnType
 
 methodKwargType :: MethodName -> Variable -> NGLType
 methodKwargType Mfilter (Variable "min_identity_pc") = NGLInteger
+methodKwargType Mfilter (Variable "min_match_size") = NGLInteger
+methodKwargType Mfilter (Variable "action") = NGLSymbol
 methodKwargType _ _ = NGLVoid
 
 typeOfConstant :: T.Text -> Maybe NGLType

@@ -46,13 +46,13 @@ import Interpretation.Map
 import Interpretation.Unique
 
 import Data.FastQ
-import Data.Sam
 import Utils.Conduit
 import qualified Data.GFF as GFF
 
 import Tests.Utils
 import Tests.FastQ
 import Tests.Validation
+import Tests.Select (tgroup_Select)
 import Tests.Types (tgroup_Types)
 import Tests.Count (tgroup_Count)
 import Tests.Parse (tgroup_Parse)
@@ -68,6 +68,7 @@ test_Types      = [tgroup_Types]
 test_NGLessAPI  = [tgroup_NGLessAPI]
 test_Vector     = [tgroup_Vector]
 test_IntGroups  = [tgroup_IntGroups]
+test_Select  = [tgroup_Select]
 
 -- The main test driver sets verbosity to Quiet to avoid extraneous output and
 -- then uses the automatically generated function
@@ -202,36 +203,6 @@ case_uop_minus_2 = _evalUnary UOpMinus (NGOInteger (-10)) @?= Right (NGOInteger 
 case_template_id = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq"
 case_template    = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= "xpto_1"
 
--- Sam operations
-
-samLineFlat = "IRIS:7:3:1046:1723#0\t4\t*\t0\t0\t37M\t*\t0\t0\tAAAAAAAAAAAAAAAAAAAAAAA\taaaaaaaaaaaaaaaaaa`aa`^\tAS:i:0  XS:i:0"
-samLine = SamLine
-            { samQName = "IRIS:7:3:1046:1723#0"
-            , samFlag = 4
-            , samRName = "*"
-            , samPos = 0
-            , samMapq = 0
-            , samCigar = "37M"
-            , samRNext = "*"
-            , samPNext = 0
-            , samTLen = 0
-            , samSeq = "AAAAAAAAAAAAAAAAAAAAAAA"
-            , samQual = "aaaaaaaaaaaaaaaaaa`aa`^"
-            , samExtra = "AS:i:0  XS:i:0"
-            }
-
-case_isAligned_sam = isAligned (samLine {samFlag = 16}) @? "Should be aligned"
-case_isAligned_raw = isAligned (fromRight . readSamLine $ r) @? "Should be aligned"
-    where
-        r = "SRR070372.3\t16\tV\t7198336\t21\t26M3D9M3D6M6D8M2D21M\t*\t0\t0\tCCCTTATGCAGGTCTTAACACAATTCTTGTATGTTCCATCGTTCTCCAGAATGAATATCAATGATACCAA\t014<<BBBBDDFFFDDDDFHHFFD?@??DBBBB5555::?=BBBBDDF@BBFHHHHHHHFFFFFD@@@@@\tNM:i:14\tMD:Z:26^TTT9^TTC6^TTTTTT8^AA21\tAS:i:3\tXS:i:0"
-
-case_isNotAligned = (not $ isAligned (samLine {samFlag = 4})) @? "Should not be aligned"
-
-case_read_one_Sam_Line = readSamLine samLineFlat @?= Right samLine
-
-case_match_identity_soft = fromRight (matchIdentity =<< readSamLine sline) < 0.9 @? "Soft clipped read (low identity)"
-    where
-        sline = "simulated:1:1:38:663#0\t0\tRef1\t1018\t3\t69M16S\t=\t1018\t0\tTTCGAGAAGATGGGTATCGTGGGAAATAACGGAACGGGGAAGTCTACCTTCATCAAGATGCTGCTGGGCTTGGTGAAACCCGACA\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\tNM:i:5\tMD:Z:17T5T14A2A2G24\tAS:i:44\tXS:i:40"
 
 preprocess_s = "ngless '0.0'\n\
     \input = fastq('test_samples/sample20.fq')\n\
