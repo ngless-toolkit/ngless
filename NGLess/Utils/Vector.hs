@@ -80,19 +80,22 @@ sortParallel n v = sortPByBounds n v 0 (VM.length v)
 sortPByBounds :: (Ord e) => Int -> VM.IOVector e -> Int -> Int -> IO ()
 sortPByBounds 1 v start end = sortByBounds compare v start end
 sortPByBounds threads v start end
-    | VM.length v < 1024 = sortByBounds compare v start end
+    | end - start < 1024 = sortByBounds compare v start end
     | otherwise = do
-        let t1 :: Int
-            t1 = threads `div` 2
-            t2 = threads - t1
         mid <- pivot v start end
         k <- VGM.unstablePartition (< mid) v
+        let t1 :: Int
+            t1
+                | k - start < 1024 = 1
+                | end - k < 1024 = threads - 1
+                | otherwise = threads `div` 2
+            t2 = threads - t1
         void $ A.concurrently
             (sortPByBounds t1 v start k)
             (sortPByBounds t2 v k end)
 
 pivot v start end = do
-        a <- VM.read v (start + 1)
+        a <- VM.read v start
         b <- VM.read v (end - 1)
         c <- VM.read v ((start + end) `div` 2)
         return $! median a b c

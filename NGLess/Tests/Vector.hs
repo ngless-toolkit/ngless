@@ -7,6 +7,8 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 import Test.HUnit
+import Test.QuickCheck
+import Test.QuickCheck.Gen
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import System.IO.Unsafe (unsafePerformIO)
@@ -36,5 +38,13 @@ sortList vs = unsafePerformIO $ do
         v <- V.unsafeThaw (V.fromList vs)
         sortParallel 4 v
         V.toList <$> V.unsafeFreeze v
-prop_sortP vs = isSorted (sortList vs)
+
+newtype BigList = BigList [Int]
+    deriving (Eq, Show)
+instance Arbitrary BigList where
+    arbitrary = BigList <$> resize (1024*16) arbitrary
+
+prop_sortP (BigList vs) = isSorted (sortList vs)
+
+case_pivot_extreme = assertBool "sort list pivot" (isSorted . sortList $ [10] ++ [0 | _ <- [0 :: Int ..10000]] ++ [1 :: Int])
 
