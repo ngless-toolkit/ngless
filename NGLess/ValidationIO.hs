@@ -9,6 +9,7 @@ module ValidationIO
 
 import System.Directory
 import System.FilePath.Posix (takeDirectory)
+import System.IO.Error
 import Data.Maybe
 import Control.Monad
 import Control.Monad.IO.Class
@@ -19,6 +20,7 @@ import qualified Data.Text as T
 import Modules
 import Language
 import NGLess
+import Utils.Suggestion
 import ReferenceDatabases
 
 
@@ -103,7 +105,10 @@ check_can_read_file fname = do
     let fname' = T.unpack fname
     r <- liftIO $ doesFileExist fname'
     if not r
-        then tell1 $ T.concat ["File `", fname, "` does not exist."]
+        then do
+            existing <- liftIO $ getDirectoryContents (takeDirectory fname')
+                                    `catchIOError` (\_ -> return [])
+            tell1 . T.concat $ ["File `", fname, "` does not exist. ", suggestionMessage fname (T.pack <$> existing)]
         else do
             p <- liftIO $ getPermissions fname'
             unless (readable p) $

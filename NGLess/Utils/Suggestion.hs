@@ -5,6 +5,7 @@
 module Utils.Suggestion
     ( Suggestion(..)
     , findSuggestion
+    , suggestionMessage
     ) where
 
 import qualified Data.Text as T
@@ -31,4 +32,7 @@ findSuggestion used possible = matchCase <|> bestMatch
 dist :: T.Text -> T.Text -> Int
 dist a b = levenshteinDistance defaultEditCosts (T.unpack a) (T.unpack b)
 
-
+suggestionMessage :: T.Text -> [T.Text] -> T.Text
+suggestionMessage used valid = case findSuggestion used valid of
+      Nothing -> ""
+      Just (Suggestion valid reason) -> T.concat ["Did you mean '", valid, "' (", reason, ")"]
