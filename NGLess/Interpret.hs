@@ -500,7 +500,6 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile= fname} [] (Block [Variab
         filterGroup [] = return []
         filterGroup [SamHeader line] = return [line]
         filterGroup mappedreads  = do
-                    let _ = mappedreads :: [SamLine]
                     mrs' <- runInROEnvIO (interpretBlock1 [(var, NGOMappedRead mappedreads)] body)
                     if blockStatus mrs' `elem` [BlockContinued, BlockOk]
                         then case lookup var (blockValues mrs') of
