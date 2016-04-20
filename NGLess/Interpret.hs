@@ -57,6 +57,7 @@ import Interpretation.FastQ
 import Interpretation.Write
 import Interpretation.Select
 import Interpretation.Unique
+import Utils.Utils
 import Utils.Conduit
 
 
@@ -194,7 +195,7 @@ traceExpr m e =
 
 interpret :: [Module] -> [(Int,Expression)] -> NGLessIO ()
 interpret modules es = do
-    evalStateT (interpretIO $ es) (NGLInterpretEnv modules Map.empty)
+    evalStateT (interpretIO es) (NGLInterpretEnv modules Map.empty)
     outputListLno InfoOutput Nothing ["Interpretation finished."]
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
@@ -205,7 +206,7 @@ interpretIO es = forM_ es $ \(ln,e) -> do
 
 interpretTop :: Expression -> InterpretationEnvIO ()
 interpretTop (Assignment (Variable var) val) = traceExpr "assignment" val >> interpretTopValue val >>= setVariableValue var
-interpretTop (FunctionCall f e args b) = void $ topFunction f e args b
+interpretTop (FunctionCall f e args b) = void $ interpretFunction f e args b
 interpretTop (Condition c ifTrue ifFalse) = do
     c' <- runInROEnvIO (interpretExpr c >>= boolOrTypeError "interpreting if condition")
     interpretTop (if c'
@@ -215,7 +216,7 @@ interpretTop (Sequence es) = forM_ es interpretTop
 interpretTop _ = throwShouldNotOccur ("Top level statement is NOP" :: String)
 
 interpretTopValue :: Expression -> InterpretationEnvIO NGLessObject
-interpretTopValue (FunctionCall f e args b) = topFunction f e args b
+interpretTopValue (FunctionCall f e args b) = interpretFunction f e args b
 interpretTopValue (ListExpression es) = NGOList <$> mapM interpretTopValue es
 interpretTopValue e = runInROEnvIO (interpretExpr e)
 
@@ -245,8 +246,10 @@ interpretExpr (IndexExpression expr ie) = do
 interpretExpr (ListExpression e) = NGOList <$> mapM interpretExpr e
 interpretExpr (MethodCall met self arg args) = do
     self' <- interpretExpr self
-    arg' <- maybeInterpretExpr arg
-    args' <- interpretArguments args
+    arg' <- fmapMaybeM interpretExpr arg
+    args' <- forM args $ \(Variable v, e) -> do
+        e' <- interpretExpr e
+        return (v, e')
     executeMethod met self' arg' args'
 interpretExpr not_expr = throwShouldNotOccur ("Expected an expression, received " ++ show not_expr ++ " (in interpretExpr)")
 
@@ -255,41 +258,40 @@ interpretIndex (IndexTwo a b) = forM [a,b] maybeInterpretExpr
 interpretIndex (IndexOne a) = forM [Just a] maybeInterpretExpr
 
 maybeInterpretExpr :: Maybe Expression -> InterpretationROEnv (Maybe NGLessObject)
-maybeInterpretExpr Nothing = return Nothing
-maybeInterpretExpr (Just e) = Just <$> interpretExpr e
+maybeInterpretExpr = fmapMaybeM interpretExpr
 
-topFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
-topFunction (FuncName "preprocess") expr@(Lookup (Variable varName)) args (Just block) = do
+interpretFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
+interpretFunction (FuncName "preprocess") expr@(Lookup (Variable varName)) args (Just block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
-    args' <- runInROEnvIO $ interpretArguments args
+    args' <- interpretArguments args
     res' <- executePreprocess expr' args' block
     setVariableValue varName res'
     return res'
-topFunction (FuncName "preprocess") expr _ _ = throwShouldNotOccur ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
-topFunction f expr args block = do
+interpretFunction (FuncName "preprocess") expr _ _ = throwShouldNotOccur ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
+interpretFunction f expr args block = do
     expr' <- interpretTopValue expr
-    args' <- runInROEnvIO $ interpretArguments args
-    topFunction' f expr' args' block
+    args' <- interpretArguments args
+    interpretFunction' f expr' args' block
 
-topFunction' :: FuncName -> NGLessObject -> KwArgsValues -> Maybe Block -> InterpretationEnvIO NGLessObject
-topFunction' (FuncName "fastq")     expr args Nothing = runNGLessIO (executeFastq expr args)
-topFunction' (FuncName "group")     expr args Nothing = runNGLessIO (executeGroup expr args)
-topFunction' (FuncName "samfile")   expr args Nothing = autoComprehendNB executeSamfile expr args
-topFunction' (FuncName "unique")    expr args Nothing = runNGLessIO (executeUnique expr args)
-topFunction' (FuncName "write")     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
-topFunction' (FuncName "map")       expr args Nothing = runNGLessIO (executeMap expr args)
-topFunction' (FuncName "select")    expr args Nothing = runNGLessIO (executeSelect expr args)
-topFunction' (FuncName "count")     expr args Nothing = runNGLessIO (executeCount expr args)
-topFunction' (FuncName "print")     expr args Nothing = executePrint expr args
-topFunction' (FuncName "paired")   mate1 args Nothing = runNGLessIO (executePaired mate1 args)
-topFunction' (FuncName "select")    expr args (Just b) = executeSelectWBlock expr args b
-topFunction' fname@(FuncName fname') expr args Nothing = do
+interpretFunction' :: FuncName -> NGLessObject -> KwArgsValues -> Maybe Block -> InterpretationEnvIO NGLessObject
+interpretFunction' (FuncName "fastq")     expr args Nothing = runNGLessIO (executeFastq expr args)
+interpretFunction' (FuncName "group")     expr args Nothing = runNGLessIO (executeGroup expr args)
+interpretFunction' (FuncName "samfile")   expr args Nothing = autoComprehendNB executeSamfile expr args
+interpretFunction' (FuncName "unique")    expr args Nothing = runNGLessIO (executeUnique expr args)
+interpretFunction' (FuncName "write")     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
+interpretFunction' (FuncName "map")       expr args Nothing = runNGLessIO (executeMap expr args)
+interpretFunction' (FuncName "select")    expr args Nothing = runNGLessIO (executeSelect expr args)
+interpretFunction' (FuncName "count")     expr args Nothing = runNGLessIO (executeCount expr args)
+interpretFunction' (FuncName "print")     expr args Nothing = executePrint expr args
+interpretFunction' (FuncName "paired")   mate1 args Nothing = runNGLessIO (executePaired mate1 args)
+interpretFunction' (FuncName "select")    expr args (Just b) = executeSelectWBlock expr args b
+interpretFunction' fname@(FuncName fname') expr args Nothing = do
     traceExpr ("executing module function: '"++T.unpack fname'++"'") expr
     execF <- findFunction fname
     runNGLessIO (execF expr args) >>= \case
         NGOExpression expr -> interpretTopValue expr
         val -> return val
-topFunction' f _ _ _ = throwShouldNotOccur . concat $ ["Interpretation of ", (show f), " is not implemented"]
+interpretFunction' f _ _ _ = throwShouldNotOccur . concat $ ["Interpretation of ", show f, " is not implemented"]
 
 executeSamfile expr@(NGOString fname) args = do
     traceExpr "samfile" expr
@@ -511,11 +513,11 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile= fname} [] (Block [Variab
 executeSelectWBlock expr _ _ = unreachable ("Select with block, unexpected argument: " ++ show expr)
 
 
-interpretArguments :: [(Variable, Expression)] -> InterpretationROEnv [(T.Text, NGLessObject)]
-interpretArguments = mapM interpretArguments'
-    where interpretArguments' (Variable v, e) = do
-            e' <- interpretExpr e
-            return (v,e')
+interpretArguments :: [(Variable, Expression)] -> InterpretationEnvIO [(T.Text, NGLessObject)]
+interpretArguments args =
+    forM args $ \(Variable v, e) -> do
+        e' <- interpretTopValue e
+        return (v, e')
 
 interpretBlock :: [(T.Text, NGLessObject)] -> [Expression] -> InterpretationROEnv BlockResult
 interpretBlock vs [] = return (BlockResult BlockOk vs)
@@ -566,7 +568,9 @@ interpretBlockExpr vs val = local (\(NGLInterpretEnv mods e) -> (NGLInterpretEnv
 interpretPreProcessExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretPreProcessExpr (FunctionCall (FuncName "substrim") var args _) = do
     NGOShortRead r <- interpretExpr var
-    args' <- interpretArguments args
+    args' <- forM args $ \(Variable v, e) -> do
+        e' <- interpretExpr e
+        return (v, e')
     mq <- fromInteger <$> lookupIntegerOrScriptErrorDef (return 0) "substrim argument" "min_quality" args'
     return . NGOShortRead $ substrim mq r
 

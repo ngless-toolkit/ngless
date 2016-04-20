@@ -1,0 +1,11 @@
+ngless "0.0"
+import "parallel" version "0.0"
+
+sample = lock1(readlines('input.txt'))
+input = fastq(sample)
+mapped = map(input, fafile='ref.fna')
+collect(count(mapped, features=['seqname']),
+    current=sample,
+    allneeded=readlines('input.txt'),
+    ofile='output.tsv')
+

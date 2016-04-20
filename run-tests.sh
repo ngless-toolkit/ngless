@@ -59,6 +59,9 @@ for testdir in tests/*; do
                 ok=no
             fi
         fi
+        if test -x ./cleanup.sh; then
+            ./cleanup.sh
+        fi
         rm -rf temp
         rm -rf *.output_ngless
         cd $basedir

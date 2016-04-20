@@ -8,6 +8,7 @@ module Utils.Utils
     ( lookupWithDefault
     , maybeM
     , mapMaybeM
+    , fmapMaybeM
     , uniq
     , readProcessErrorWithExitCode
     , allSame
@@ -59,6 +60,10 @@ maybeM ma f = ma >>= \case
 
 mapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m [b]
 mapMaybeM f xs = catMaybes <$> mapM f xs
+
+fmapMaybeM :: (Monad m) => (a -> m b) -> Maybe a -> m (Maybe b)
+fmapMaybeM _ Nothing = return Nothing
+fmapMaybeM f (Just v) = Just <$> f v
 
 
 -- | passthrough applies the function 'f' and then return its argument again
