@@ -4,7 +4,6 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Sam
     ( SamLine(..)
-    , SamResult(..)
     , samLength
     , readSamGroupsC
     , readSamLine
@@ -57,8 +56,6 @@ data SamLine = SamLine
 instance NFData SamLine where
     rnf SamLine{} = ()
     rnf (SamHeader !_) = ()
-
-data SamResult = Total | Aligned | Unique | LowQual deriving (Enum)
 
 isHeader SamHeader{} = True
 isHeader SamLine{} = False
