@@ -289,29 +289,45 @@ requireType def_t e = nglTypeOf e >>= \case
 
 checkmethodcall :: MethodName -> Expression -> (Maybe Expression) -> TypeMSt (Maybe NGLType)
 checkmethodcall m self arg = do
-    let reqSelfType = methodSelfType m
+    let minfo = findMethodInfo m
+        reqSelfType = methodSelfType minfo
+        reqArgType = methodArgType minfo
     stype <- requireType reqSelfType self
     when (stype /= reqSelfType) (errorInLineC
         ["Wrong type for method ", show m, ". This method is defined for type ", show reqSelfType,
          ", but expression (", show self, ") has type ", show stype])
     actualType <- maybe (return Nothing) nglTypeOf arg
-    let reqArgType = methodArgType m
     case (actualType, reqArgType) of
         (Nothing, _) -> return ()
         (Just _, Nothing) -> errorInLineC ["Method ", show m, " does not take any unnamed argument (saw ", show arg, ")"]
         (Just t, Just t') -> when (t /= t') (errorInLineC
                         ["Method ", show m, " expects type ", show t', " got ", show t])
-    return . Just . methodReturnType $ m
+    return . Just . methodReturnType $ minfo
 
 checkmethodargs :: MethodName -> [(Variable, Expression)] -> TypeMSt ()
-checkmethodargs m args = forM_ args check1arg
+checkmethodargs m args = forM_ args check1arg *> findAllRequired
     where
-        check1arg (v, e) = do
-            let reqType = methodKwargType m v
-            actualType <- requireType reqType e
-            when (actualType /= reqType) (errorInLineC
-                    ["Bad argument type for argument ", show v, " in method call ", show m, ". ",
-                     "Expected ", show reqType, " got ", show actualType])
+        minfo = findMethodInfo m
+        requiredArgs = filter argRequired (methodKwargsInfo minfo)
+        findAllRequired = mapM_ find1 requiredArgs
+
+        find1 :: ArgInformation -> TypeMSt ()
+        find1 ai = case filter (\(Variable v,_) -> v == argName ai) args of
+            [_] -> return ()
+            [] -> errorInLineC ["Argument ", T.unpack (argName ai), " is missing in method call ", show m, "."]
+            _ -> error "This should never happen: multiple arguments with the same name should have been caught before"
+        check1arg (Variable v, e) = do
+            case filter ((==v) . argName) (methodKwargsInfo minfo) of
+                [] -> errorInLineC ["Argument ", show v, " in method call ", show m, ": not recognized. ", T.unpack $ suggestionMessage v (argName <$> methodKwargsInfo minfo)]
+                [ainfo] -> do
+                    let reqType = argType ainfo
+                    actualType <- requireType reqType e
+                    when (actualType /= reqType) (errorInLineC
+                            ["Bad argument type for argument ", show v, " in method call ", show m, ". ",
+                             "Expected ", show reqType, " got ", show actualType])
+                _ -> error "This should never happen. Internal bug in ngless."
 
 
 
+
+findMethodInfo m = head (filter ((==m) . methodName) builtinMethods)

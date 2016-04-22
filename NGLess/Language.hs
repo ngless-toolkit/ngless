@@ -18,10 +18,6 @@ module Language
     , ModInfo(..)
     , Script(..)
     , NGLessObject(..)
-    , methodSelfType
-    , methodArgType
-    , methodReturnType
-    , methodKwargType
     , recursiveAnalyse
     , recursiveTransform
     , typeOfConstant
@@ -50,28 +46,6 @@ data MethodName =
         | Munique
     deriving (Eq, Ord, Show)
 
-
--- | method name -> ((method self type, method first argtype if any), method return type)
-methodArgTypeReturnType :: MethodName -> ((NGLType, Maybe NGLType), NGLType)
-methodArgTypeReturnType Mflag = ((NGLMappedRead, Just NGLSymbol), NGLBool)
-methodArgTypeReturnType Mpe_filter = ((NGLMappedRead, Nothing), NGLMappedRead)
-methodArgTypeReturnType Mfilter = ((NGLMappedRead, Nothing), NGLMappedRead)
-methodArgTypeReturnType Munique = ((NGLMappedRead, Nothing), NGLMappedRead)
-
-methodSelfType :: MethodName -> NGLType
-methodSelfType = fst . fst . methodArgTypeReturnType
-
-methodArgType :: MethodName -> Maybe NGLType
-methodArgType = snd . fst. methodArgTypeReturnType
-
-methodReturnType :: MethodName -> NGLType
-methodReturnType = snd . methodArgTypeReturnType
-
-methodKwargType :: MethodName -> Variable -> NGLType
-methodKwargType Mfilter (Variable "min_identity_pc") = NGLInteger
-methodKwargType Mfilter (Variable "min_match_size") = NGLInteger
-methodKwargType Mfilter (Variable "action") = NGLSymbol
-methodKwargType _ _ = NGLVoid
 
 typeOfConstant :: T.Text -> Maybe NGLType
 typeOfConstant "STDIN"        = Just NGLString

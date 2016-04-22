@@ -3,11 +3,25 @@
  -}
 {-# LANGUAGE OverloadedStrings, BangPatterns #-}
 module BuiltinFunctions
-    ( builtinFunctions
+    ( MethodName(..)
+    , MethodInfo(..)
+    , builtinFunctions
+    , builtinMethods
     ) where
+
+import qualified Data.Text as T
 
 import Modules
 import Language
+
+data MethodInfo = MethodInfo
+    { methodName :: MethodName
+    , methodSelfType :: NGLType
+    , methodArgType :: Maybe NGLType
+    , methodReturnType :: NGLType
+    , methodKwargsInfo :: [ArgInformation]
+    , methodIsPure :: Bool
+    } deriving (Eq, Show)
 
 builtinFunctions =
     [Function (FuncName "fastq") (Just NGLString) NGLReadSet fastqArgs False
@@ -85,4 +99,15 @@ substrimArgs =
     [ArgInformation "min_quality" True NGLInteger Nothing
     ]
 
+
+builtinMethods =
+    [MethodInfo Mflag   NGLMappedRead (Just NGLSymbol) NGLBool [] True
+    ,MethodInfo Mfilter NGLMappedRead Nothing NGLMappedRead filterArgs True
+    ,MethodInfo Munique NGLMappedRead Nothing NGLMappedRead [] True
+    ]
+filterArgs =
+    [ArgInformation "min_identity_pc" False NGLInteger Nothing
+    ,ArgInformation "min_match_size" False NGLInteger Nothing
+    ,ArgInformation "action" False NGLSymbol (Just ["drop", "unmap"])
+    ]
 
