@@ -289,7 +289,7 @@ interpretFunction' fname@(FuncName fname') expr args Nothing = do
     traceExpr ("executing module function: '"++T.unpack fname'++"'") expr
     execF <- findFunction fname
     runNGLessIO (execF expr args) >>= \case
-        NGOExpression expr -> interpretTopValue expr
+        NGOExpression expr' -> interpretTopValue expr'
         val -> return val
 interpretFunction' f _ _ _ = throwShouldNotOccur . concat $ ["Interpretation of ", show f, " is not implemented"]
 
@@ -401,17 +401,17 @@ executePreprocess (NGOReadSet name (ReadSet3 enc fp1 fp2 fp3)) args (Block [Vari
                     then conduitPossiblyCompressedFile fp3 =$= linesC =$= inlineQCIf qcInput qcPre3 =$= fqConduitR enc
                     else C.yieldMany []
 
-            write :: Handle -> C.Sink (V.Vector ShortRead) InterpretationEnvIO ((),FQStatistics)
+            write :: Handle -> C.Sink (V.Vector ShortRead) InterpretationEnvIO FQStatistics
             write h =
                     (C.concat :: C.Conduit (V.Vector ShortRead) InterpretationEnvIO ShortRead)
-                    =$=zipSink2
+                    =$= snd <$> (zipSink2
                         (fqEncodeC enc =$= asyncGzipTo h)
-                        (CL.map (\(ShortRead _ bps qs) -> (ByteLine bps, ByteLine qs)) =$= C.transPipe runNGLessIO fqStatsC)
+                        (CL.map (\(ShortRead _ bps qs) -> (ByteLine bps, ByteLine qs)) =$= C.transPipe runNGLessIO fqStatsC))
 
         env <- gets id
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 2)
-        [((),s1),((),s2),((),s3)] <-
+        [_, _, s3] <-
             (zipSource2 rs1 rs2
                 =$= C.conduitVector 8192
                 =$= asyncMapEitherC mapthreads (liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles))
@@ -420,7 +420,7 @@ executePreprocess (NGOReadSet name (ReadSet3 enc fp1 fp2 fp3)) args (Block [Vari
                         ,CL.map (\(_,a,_) -> a) =$= write out2
                         ,CL.map (\(_,_,a) -> a) =$= write out3
                         ])
-        ((),s3') <- rs3
+        s3' <- rs3
                 =$= preprocBlock
                 =$= CL.mapMaybe (\case
                                 Single r -> Just r

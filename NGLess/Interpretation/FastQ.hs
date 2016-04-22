@@ -68,7 +68,7 @@ executeGroup :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeGroup (NGOList rs) args = do
         name <- lookupStringOrScriptError "group call" "name" args
         if length rs == 1
-            then return (addName name (rs !! 0))
+            then addName name (rs !! 0)
             else do
                 rs' <- getRSOrError `mapM` rs
                 grouped <- groupFiles name rs'
@@ -76,7 +76,8 @@ executeGroup (NGOList rs) args = do
     where
         getRSOrError (NGOReadSet _ r) = return r
         getRSOrError other = throwShouldNotOccur . concat $ ["In group call, all arguments should have been NGOReadSet! Got ", show other]
-        addName name (NGOReadSet _ r) = (NGOReadSet name r)
+        addName name (NGOReadSet _ r) = return $! NGOReadSet name r
+        addName _  other = throwScriptError . concat $ ["In group call, all arguments should have been NGOReadSet, got ", show other]
 executeGroup other _ = throwScriptError ("Illegal argument to group(): " ++ show other)
 
 groupFiles :: T.Text -> [ReadSet] -> NGLessIO ReadSet

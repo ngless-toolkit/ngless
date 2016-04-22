@@ -41,7 +41,7 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit (($=), (=$), (=$=), ($$+), ($$+-), ($$))
-import           Data.Conduit.Async (buffer, (=$=&), ($$&))
+import           Data.Conduit.Async (buffer, ($$&))
 
 import Control.Monad
 import Control.Monad.IO.Class   (liftIO)

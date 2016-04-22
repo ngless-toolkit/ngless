@@ -9,8 +9,6 @@ module BuiltinFunctions
     , builtinMethods
     ) where
 
-import qualified Data.Text as T
-
 import Modules
 import Language
 

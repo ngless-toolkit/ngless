@@ -129,6 +129,7 @@ nglTypeOf (Assignment _ expr) = nglTypeOf expr
 nglTypeOf (UnaryOp uop expr) = checkuop uop expr
 nglTypeOf (BinaryOp bop a b) = checkbop bop a b
 nglTypeOf (IndexExpression expr index) = checkindex expr index
+nglTypeOf Optimized{}    = error "unexpected nglTypeOf(Optimized)"
 nglTypeOf Condition{}    = error "unexpected nglTypeOf(Condition)"
 nglTypeOf (Sequence _es) = error "unexpected nglTypeOf(Sequence)"
 
@@ -148,6 +149,7 @@ typeOfObject NGOCounts{} = Just NGLCounts
 typeOfObject NGOVoid = Just NGLVoid
 typeOfObject (NGOList []) = Nothing
 typeOfObject (NGOList (v:_)) = NGList <$> typeOfObject v
+typeOfObject (NGOExpression _) = error "unexpected typeOfObject(NGOExpression)"
 
 
 checkuop UOpLen e = checklist e *> return (Just NGLInteger)

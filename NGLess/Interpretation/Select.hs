@@ -16,7 +16,7 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
-import Data.Bits (testBit, Bits(..))
+import Data.Bits (Bits(..))
 import Data.Conduit (($=), ($$), (=$=))
 import System.IO
 import qualified Data.Text as T
@@ -136,6 +136,7 @@ executeMappedReadMethod Mfilter samlines Nothing kwargs = do
         samlines'
             | action == "drop" = filter acceptSamLine samlines
             | action == "unmatch" = map (unmatchWhen acceptSamLine) samlines
+            | otherwise = error "Unknown action in filter()"
     return (NGOMappedRead samlines')
 executeMappedReadMethod Munique samlines Nothing [] = return . NGOMappedRead . mUnique $ samlines
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")

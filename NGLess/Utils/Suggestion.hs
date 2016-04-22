@@ -9,7 +9,6 @@ module Utils.Suggestion
     ) where
 
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import           Text.EditDistance
 import           Control.Monad
 import           Control.Applicative
@@ -35,4 +34,4 @@ dist a b = levenshteinDistance defaultEditCosts (T.unpack a) (T.unpack b)
 suggestionMessage :: T.Text -> [T.Text] -> T.Text
 suggestionMessage used valid = case findSuggestion used valid of
       Nothing -> ""
-      Just (Suggestion valid reason) -> T.concat ["Did you mean '", valid, "' (", reason, ")"]
+      Just (Suggestion suggestion reason) -> T.concat ["Did you mean '", suggestion, "' (", reason, ")"]
