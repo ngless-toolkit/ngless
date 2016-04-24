@@ -115,13 +115,14 @@ check_can_read_file fname = do
                 tell1 (T.concat ["File `", fname, "` is not readable (permissions problem)."])
 
 check_reference :: T.Text -> ValidateIO ()
-check_reference r
-    | isJust (getBuiltinReference r)  = return ()
-    | otherwise = do
-        mods <- ask
-        let refs = concatMap modReferences mods
-        unless (any ((==r) . erefName) refs) $
-            tell1 (T.concat ["Could not find reference ", r, " (it is neither built in nor in any of the loaded modules)"])
+check_reference r = do
+    mods <- ask
+    let refs = concatMap modReferences mods
+        ename (ExternalPackagedReference er) = refName er
+        ename er = erefName er
+        allnames = (ename <$> refs) ++ (refName <$> builtinReferences)
+    unless (any (==r) allnames) $
+        tell1 (T.concat ["Could not find reference ", r, " (it is neither built in nor in any of the loaded modules)"])
 
 check_fafile fafile = do
         r <- liftIO $ doesFileExist (T.unpack fafile)

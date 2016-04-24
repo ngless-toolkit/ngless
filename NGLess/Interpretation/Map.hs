@@ -24,7 +24,6 @@ import qualified Data.Conduit.Combinators as C
 import           Data.Conduit (($$), (=$=))
 
 import GHC.Conc     (getNumCapabilities)
-import Data.List    (find)
 import Data.Bits    (testBit)
 
 import System.Process
@@ -38,7 +37,6 @@ import Language
 import FileManagement
 import ReferenceDatabases
 import Configuration
-import Modules
 import Output
 import NGLess
 
@@ -130,21 +128,11 @@ interpretMapOp ref name fps extraArgs = do
     where
         indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)
         indexReference (FaFile fa) = (,Nothing) <$> ensureIndexExists fa
-        indexReference (PackagedReference r) = case getBuiltinReference r of
-            Just _ -> do
-                basedir  <- ensureDataPresent (T.unpack r)
-                return (buildGenomePath basedir, Just r)
-            Nothing -> do
-                externalRef <- ensureIndexExists =<< findExternalReference r
-                return (externalRef, Just r)
-
-findExternalReference :: T.Text -> NGLessIO FilePath
-findExternalReference rname = do
-    mods <- loadedModules
-    let refs = concatMap modReferences mods
-    case find ((==rname) . erefName) refs of
-        Just rinfo -> return . faFile $ rinfo
-        Nothing -> throwScriptError $ T.concat ["Could not find reference '", rname, "'. It is not builtin nor in one of the loaded modules."]
+        indexReference (PackagedReference r) = do
+            ReferenceFilePaths fafile _ _ <- ensureDataPresent r
+            case fafile of
+                Just fp -> (, Just r) <$> ensureIndexExists fp
+                Nothing -> throwScriptError $ T.concat ["Could not find reference ", r]
 
 _samStats :: FilePath -> NGLessIO (Int, Int, Int)
 _samStats fname = do

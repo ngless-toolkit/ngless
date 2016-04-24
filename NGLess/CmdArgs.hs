@@ -18,6 +18,7 @@ module CmdArgs
 
 import Options.Applicative
 import qualified Data.Configurator.Types as CF
+import qualified Data.Text as T
 
 data Verbosity = Quiet | Normal | Loud
         deriving (Show, Eq, Ord, Enum)
@@ -60,7 +61,7 @@ data NGLessMode =
               , extraArgs :: [String]
               }
         | InstallGenMode
-              { refname :: String
+              { refname :: T.Text
               }
         | CreateReferencePackMode
               { oname :: FilePath
@@ -114,7 +115,7 @@ mainArgs = DefaultMode
               <*> many (strArgument (metavar "ARGV")) -- extraArgs :: [String]
 
 installArgs = (flag' InstallGenMode (long "install-reference-data"))
-                <*> strArgument (help "Name of reference to install" <> metavar "REF")
+                <*> (T.pack <$> strArgument (help "Name of reference to install" <> metavar "REF"))
         -- += details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
 
 createRefArgs = (flag' CreateReferencePackMode (long "create-reference-pack"))

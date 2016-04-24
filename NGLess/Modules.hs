@@ -4,6 +4,7 @@
 module Modules
     ( ArgInformation(..)
     , Function(..)
+    , Reference(..)
     , ExternalReference(..)
     , Module(..)
     , ModInfo(..) -- re-export
@@ -17,9 +18,16 @@ import Data.IORef
 import Data.Aeson
 import Data.Default
 
-import ReferenceDatabases
 import Language
 import NGLess
+
+data Reference = Reference
+    { refName :: T.Text
+    , refVersionedName :: T.Text
+    , refUrl :: Maybe FilePath
+    , refHasGff :: Bool
+    , refHasFunctionalMap :: Bool
+    } deriving (Eq, Show)
 
 -- | Basic information about argument to a function
 data ArgInformation = ArgInformation
@@ -54,10 +62,11 @@ instance FromJSON ExternalReference where
                     case (rtype :: Maybe String) of
                         Just "packaged" -> do
                             name <- o .: "name"
+                            vname <- o .: "name-version"
                             path <- o .: "url"
                             hasGtf <- o .: "has-gtf"
                             hasMap <- o .: "has-mapfile"
-                            return (ExternalPackagedReference (Reference name (Just path) hasGtf hasMap))
+                            return (ExternalPackagedReference (Reference name vname (Just path) hasGtf hasMap))
                         _ -> ExternalReference
                                 <$> o .: "name"
                                 <*> o .: "fasta-file"

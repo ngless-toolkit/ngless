@@ -173,9 +173,9 @@ modeExec opts@DefaultMode{} = do
 
 -- if user uses the flag -i he will install a Reference Genome to all users
 modeExec (InstallGenMode ref)
-    | isJust . getBuiltinReference . T.pack $ ref = void . runNGLessIO "installing data" $ installData Nothing ref
+    | any ((== ref) . refName) builtinReferences = void . runNGLessIO "installing data" $ installData Nothing ref
     | otherwise =
-        error (concat ["Reference ", ref, " is not a known reference."])
+        error (concat ["Reference ", T.unpack ref, " is not a known reference."])
 
 modeExec (CreateReferencePackMode ofile gen gtf) = runNGLessIO "creating reference package" $ do
         outputLno' InfoOutput "Starting packaging (will download and index genomes)..."

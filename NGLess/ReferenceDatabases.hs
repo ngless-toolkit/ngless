@@ -2,9 +2,8 @@
 
 module ReferenceDatabases
     ( Reference(..)
-    , getBuiltinReference
-    , buildGenomePath
-    , buildGFFPath
+    , ReferenceFilePaths(..)
+    , builtinReferences
     , createReferencePack
     , ensureDataPresent
     , installData
@@ -18,8 +17,8 @@ import qualified Codec.Compression.GZip as GZip
 import System.FilePath.Posix
 import System.Directory
 import System.IO.Error
+import Data.Foldable
 import Data.Maybe
-import Data.List        (find)
 
 import Control.Monad
 import Control.Applicative ((<|>))
@@ -29,19 +28,20 @@ import Control.Monad.Trans.Resource(release)
 import Network (downloadFile, downloadOrCopyFile)
 import FileManagement (createTempDir)
 import Utils.Bwa as Bwa
+import Utils.Utils
 import Configuration
+import Modules
 import Output
 import NGLess
 
-data Reference = Reference
-    { refName :: T.Text
-    , refUrl :: Maybe FilePath
-    , refHasGff :: Bool
-    , refHasFunctionalMap :: Bool
+data ReferenceFilePaths = ReferenceFilePaths
+    { rfpFaFile :: Maybe FilePath
+    , rfpGffFile :: Maybe FilePath
+    , rfpFunctionalMap :: Maybe FilePath
     } deriving (Eq, Show)
 
-defaultGenomes :: [Reference]
-defaultGenomes = [Reference rn Nothing True False | rn <-
+builtinReferences :: [Reference]
+builtinReferences = [Reference rn (T.concat [rn, "-0.0.0"]) Nothing True False | rn <-
                 [ "hg19" -- Homo_sapiens
                 , "mm10" -- Mus_musculus
                 , "rn4" --  Rattus_norvegicus
@@ -52,16 +52,22 @@ defaultGenomes = [Reference rn Nothing True False | rn <-
                 , "sacCer3" --Saccharomyces_cerevisiae
                 ]]
 
-getBuiltinReference :: T.Text -> Maybe Reference
-getBuiltinReference rn = find ((==rn) . refName) defaultGenomes
+isDefaultReference rn = isJust $ find ((==rn) . refName) builtinReferences
 
-isDefaultReference = isJust . getBuiltinReference
+moduleDirectReference :: T.Text -> NGLessIO (Maybe ReferenceFilePaths)
+moduleDirectReference rname = do
+    mods <- loadedModules
+    let refs = concatMap modReferences mods
+    findM refs $ \case
+        ExternalReference eref fafile gtffile mapfile
+            | eref == rname -> return . Just $! ReferenceFilePaths (Just fafile) gtffile mapfile
+        _ -> return Nothing
 
 genomePATH = "Sequence/BWAIndex/genome.fa.gz"
 gffPATH = "Annotation/annotation.gtf.gz"
 
-buildGenomePath :: FilePath -> FilePath
-buildGenomePath = (</> genomePATH)
+buildFaFilePath :: FilePath -> FilePath
+buildFaFilePath = (</> genomePATH)
 buildGFFPath :: FilePath -> FilePath
 buildGFFPath = (</> gffPATH)
 
@@ -73,9 +79,9 @@ createReferencePack oname genome gtf = do
     liftIO $ do
         createDirectoryIfMissing True (tmpdir ++ "/Sequence/BWAIndex/")
         createDirectoryIfMissing True (tmpdir ++ "/Annotation/")
-    downloadOrCopyFile genome (buildGenomePath tmpdir)
+    downloadOrCopyFile genome (buildFaFilePath tmpdir)
     downloadOrCopyFile gtf (buildGFFPath tmpdir)
-    Bwa.createIndex (buildGenomePath tmpdir)
+    Bwa.createIndex (buildFaFilePath tmpdir)
     let filelist = gffPATH:[genomePATH ++ ext | ext <- [""
                                         ,".amb"
                                         ,".ann"
@@ -102,19 +108,26 @@ downloadReference ref destPath = do
     outputLno' InfoOutput "Reference download completed!"
 
 
--- | Make sure that reference data is present, downloading it if necessary.
+-- | Make sure that the passed reference is present, downloading it if
+-- necessary.
 -- Returns the base path for the data.
-ensureDataPresent :: String -> NGLessIO FilePath
-ensureDataPresent ref = do
-    p <- findDataFiles ref
-    case p of
-        Just p' -> return p'
-        Nothing -> installData Nothing ref
+ensureDataPresent :: T.Text -- ^ reference name (unversioned)
+                        -> NGLessIO ReferenceFilePaths
+ensureDataPresent rname = moduleDirectReference rname >>= \case
+        Just r -> return r
+        Nothing -> findDataFiles (T.unpack rname) >>= \case
+            Just refdir -> wrapRefDir refdir
+            Nothing -> wrapRefDir =<< installData Nothing rname
+    where
+        wrapRefDir refdir = return $! ReferenceFilePaths
+                        (Just $ buildFaFilePath refdir)
+                        (Just $ buildGFFPath refdir)
+                        Nothing
 
 -- | Installs reference data uncondictionally
 -- When mode is Nothing, tries to install them in global directory, otherwise
 -- installs it in the user directory
-installData :: Maybe InstallMode -> String -> NGLessIO FilePath
+installData :: Maybe InstallMode -> T.Text -> NGLessIO FilePath
 installData Nothing refname = do
     p' <- globalDataDirectory
     canInstallGlobal <- liftIO $ do
@@ -129,15 +142,19 @@ installData (Just mode) refname = do
     basedir <- if mode == Root
                 then globalDataDirectory
                 else userDataDirectory
+    let tarName = basedir </> T.unpack refname <.> "tar.gz"
+    mods <- loadedModules
+    let unpackRef (ExternalPackagedReference r) = Just r
+        unpackRef _ = Nothing
+        refs = mapMaybe unpackRef $ concatMap modReferences mods
+    ref  <- case find ((==refname) . refName) (refs ++ builtinReferences) of
+        Just ref -> return ref
+        Nothing -> throwScriptError $ T.concat ["Could not find reference '", refname, "'. It is not builtin nor in one of the loaded modules."]
     liftIO $ createDirectoryIfMissing True basedir
-    let tarName = basedir </> refname <.> "tar.gz"
-    ref <- case getBuiltinReference (T.pack refname) of
-        Just r -> return r
-        Nothing -> throwScriptError ("Cannot install unknown reference '"++refname)
     downloadReference ref tarName
     liftIO $
         Tar.unpack basedir . Tar.read . GZip.decompress =<< BL.readFile tarName
-    return (basedir </> refname)
+    return (basedir </> T.unpack refname)
 
 
 
@@ -155,9 +172,9 @@ findDataFilesIn ref mode = do
                     then globalDataDirectory
                     else userDataDirectory
     let refdir = basedir </> ref
-    hasIndex <- hasValidIndex (buildGenomePath refdir)
+    hasIndex <- hasValidIndex (buildFaFilePath refdir)
     outputListLno' TraceOutput ["Looked for ", ref, " in directory ", refdir, if hasIndex then " (and found it)" else " (and did not find it)"]
-    return (if hasIndex
+    return $! (if hasIndex
                 then Just refdir
                 else Nothing)
 

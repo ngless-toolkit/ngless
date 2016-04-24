@@ -9,6 +9,7 @@ module Utils.Utils
     , maybeM
     , mapMaybeM
     , fmapMaybeM
+    , findM
     , uniq
     , readProcessErrorWithExitCode
     , allSame
@@ -74,3 +75,9 @@ moveOrCopy :: FilePath -> FilePath -> IO ()
 moveOrCopy oldfp newfp = renameFile oldfp newfp `catch` (\e -> case ioeGetErrorType e of
             UnsupportedOperation -> copyFile oldfp newfp
             _ -> ioError e)
+
+findM :: Monad m => [a] -> (a -> m (Maybe b)) -> m (Maybe b)
+findM [] _ = return Nothing
+findM (x:xs) f = f x >>= \case
+    Nothing -> findM xs f
+    val -> return val

@@ -203,7 +203,7 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
             , optDelim = delim
             , optNormSize = normSize
             }
-    amode <- annotationMode (optFeatures opts) (T.unpack <$> refinfo) (T.unpack <$> mocatMap) (T.unpack <$> gffFile)
+    amode <- annotationMode (optFeatures opts) refinfo (T.unpack <$> mocatMap) (T.unpack <$> gffFile)
     annotator <- loadAnnotator amode opts
     NGOCounts <$> performCount samfp rname annotator opts
 executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
@@ -542,15 +542,17 @@ parseAnnotationMode args = case lookupWithDefault (NGOSymbol "union") "mode" arg
     m -> throwScriptError (concat ["Unexpected annotation mode (", show m, ")."])
 
 
-annotationMode :: [GffType] -> Maybe FilePath -> Maybe FilePath -> Maybe FilePath -> NGLessIO AnnotationMode
+annotationMode :: [GffType] -> Maybe T.Text -> Maybe FilePath -> Maybe FilePath -> NGLessIO AnnotationMode
 annotationMode _ _ (Just _) (Just _) = throwScriptError ("Cannot simmultaneously pass a gff_file and an annotation_file for annotate() function" :: String)
 annotationMode [GffOther "seqname"] _ _ _ = return AnnotateSeqName
 annotationMode _ _ (Just r) _ = return (AnnotateFunctionalMap r)
 annotationMode _ _ _ (Just g) = return (AnnotateGFF g)
 annotationMode _ (Just ref) Nothing Nothing = do
     outputListLno' InfoOutput ["Annotate with default GFF: ", show ref]
-    basedir <- ensureDataPresent ref
-    return (AnnotateGFF $ buildGFFPath basedir) -- use default GFF
+    ReferenceFilePaths _ mgffpath _ <- ensureDataPresent ref
+    case mgffpath of
+        Just gffpath -> return $! AnnotateGFF gffpath
+        Nothing -> throwScriptError ("Could not find annotation file for '" ++ T.unpack ref ++ "'")
 annotationMode _ _ _ _ =
             throwShouldNotOccur ("For counting, you must do one of\n1. use seqname mode\n2. pass in a GFF file using the argument 'gff_file'\n3. pass in a gene map using the argument 'functional_map'" :: T.Text)
 
