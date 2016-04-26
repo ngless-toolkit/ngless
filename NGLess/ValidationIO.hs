@@ -121,8 +121,14 @@ check_reference r = do
         ename (ExternalPackagedReference er) = refName er
         ename er = erefName er
         allnames = (ename <$> refs) ++ (refName <$> builtinReferences)
-    unless (any (==r) allnames) $
-        tell1 (T.concat ["Could not find reference ", r, " (it is neither built in nor in any of the loaded modules)"])
+    unless (any (==r) allnames) $ do
+        exists <- liftIO $ doesFileExist (T.unpack r)
+        tell1 . T.concat $ [
+                    "Could not find reference ", r, " (it is neither built in nor in any of the loaded modules)."
+                    ] ++ (if exists
+                            then ["\n\tDid you mean to use the argument `fafile` to specify the FASTA file `", r, "`?\n",
+                                  "\tmap() uses the argument `reference` for builtin references and `fafile` for a FASTA file path."]
+                            else [])
 
 check_fafile fafile = do
         r <- liftIO $ doesFileExist (T.unpack fafile)
