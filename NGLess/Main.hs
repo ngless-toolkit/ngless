@@ -8,7 +8,7 @@ module Main
 
 import Data.Maybe
 import Control.Monad
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (liftIO, MonadIO(..))
 import Control.Concurrent
 import Options.Applicative
 import System.FilePath.Posix
@@ -61,19 +61,19 @@ wrapPrint (Script v sc) = wrap sc >>= Right . Script v
             | f `elem` ["print", "write"] = False
         wrapable _ = True
 
-rightOrDie :: Either T.Text a -> IO a
-rightOrDie (Left err) = fatalError (T.unpack err)
+rightOrDie :: (MonadIO m) => Either T.Text a -> m a
+rightOrDie (Left err) = liftIO $ fatalError (T.unpack err)
 rightOrDie (Right v) = return v
 
 fatalError :: String -> IO b
 fatalError err = do
+    hPutStrLn stderr "Exiting after fatal error:"
     let st = setSGRCode [SetColor Foreground Dull Red]
     hPutStrLn stderr (st ++ err)
-    hPutStrLn stderr "Exiting after fatal error..."
     exitFailure
 
 whenStrictlyNormal act = do
-    v <- getVerbosity
+    v <- liftIO $ getVerbosity
     when (v == Normal) act
 
 runNGLessIO :: String -> NGLessIO a -> IO a
@@ -129,8 +129,9 @@ modeExec opts@DefaultMode{} = do
                 ScriptFilePath fp -> (fp,True)
                 InlineScript _ -> ("inline",False)
     setNumCapabilities (nThreads opts)
-    engltext <- loadScript (input opts)
-    ngltext <- rightOrDie (case engltext of { Right e -> Right e ; Left b -> Left . T.pack . show $ b })
+    ngltext <- loadScript (input opts) >>= \case
+        Right t -> return t
+        Left err ->  fatalError err
     let maybe_add_print = (if print_last opts then wrapPrint else Right)
     let parsed = parsengless fname reqversion ngltext >>= maybe_add_print
     sc' <- rightOrDie parsed
@@ -138,18 +139,20 @@ modeExec opts@DefaultMode{} = do
         forM_ (nglBody sc') $ \(lno,e) ->
             putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)
         exitSuccess
-    modules <- runNGLessIO "loading modules" $ loadModules (fromMaybe [] (nglHeader sc' >>= Just . nglModules))
-    sc <- rightOrDie $ checktypes modules sc' >>= validate modules
-    when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
-        whenStrictlyNormal (setVerbosity Quiet)
-    odir <- runNGLessIO "cannot fail" outputDirectory
-    shouldOutput <- runNGLessIO "cannot fail" $ nConfCreateOutputDirectory <$> nglConfiguration
-    runNGLessIO "running script" $ do
+    (shouldOutput,odir) <- runNGLessIO "running script" $ do
+        outputLno' DebugOutput "Loading modules..."
+        modules <- loadModules (fromMaybe [] (nglModules <$> nglHeader sc'))
+        sc <- rightOrDie $ checktypes modules sc' >>= validate modules
+        when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
+            whenStrictlyNormal (liftIO $ setVerbosity Quiet)
+        odir <- outputDirectory
+        shouldOutput <- nConfCreateOutputDirectory <$> nglConfiguration
         shouldPrintHeader <- nConfPrintHeader <$> nglConfiguration
         outputLno' DebugOutput "Validating script..."
         errs <- validateIO modules sc
-        when (isJust errs) $
-            liftIO (rightOrDie (Left . T.concat . map (T.pack . show) . fromJust $ errs))
+        when (isJust errs) $ do
+            let errormessage = T.intercalate "\n\n" (fromJust errs)
+            liftIO $ fatalError (T.unpack errormessage)
         when shouldPrintHeader $
             printHeader modules
         when (validateOnly opts) $ do
@@ -164,6 +167,7 @@ modeExec opts@DefaultMode{} = do
         outputLno' InfoOutput "Script OK. Starting interpretation..."
         interpret modules (nglBody transformed)
         triggerHook FinishOkHook
+        return (shouldOutput, odir)
     when shouldOutput $ do
         createDirectoryIfMissing False odir
         setupHtmlViewer odir
