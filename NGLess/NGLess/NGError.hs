@@ -13,12 +13,9 @@ module NGLess.NGError
     , throwGenericError
     ) where
 
-import qualified Data.Text as T
 import           Control.DeepSeq
 import           Control.Monad.Except
 import           Control.Monad.Trans.Resource
-
-import Utils.StringLike
 
 -- | An error in evaluating an ngless script
 -- Normally, it's easier to use the function interface of 'throwShouldNotOccur' and friends
@@ -33,7 +30,7 @@ data NGErrorType =
 instance NFData NGErrorType where
     rnf !_ = ()
 
-data NGError = NGError !NGErrorType !T.Text
+data NGError = NGError !NGErrorType !String
     deriving (Show, Eq)
 
 instance NFData NGError where
@@ -56,22 +53,22 @@ testNGLessIO act = do
         showError (Left e) = error (show e)
 
 -- | Internal bug: user is requested to submit a bug report
-throwShouldNotOccur :: (StringLike s, MonadError NGError m) => s -> m a
-throwShouldNotOccur = throwError . NGError ShouldNotOccur . asText
+throwShouldNotOccur :: (MonadError NGError m) => String -> m a
+throwShouldNotOccur = throwError . NGError ShouldNotOccur
 
 -- | Script error: user can fix error by re-writing the script
-throwScriptError :: (StringLike s, MonadError NGError m) => s -> m a
-throwScriptError = throwError . NGError ScriptError . asText
+throwScriptError :: (MonadError NGError m) => String -> m a
+throwScriptError = throwError . NGError ScriptError
 
 -- | Data error: problem with input data
-throwDataError :: (StringLike s, MonadError NGError m) => s -> m a
-throwDataError = throwError . NGError DataError . asText
+throwDataError :: (MonadError NGError m) => String -> m a
+throwDataError = throwError . NGError DataError
 
 -- | System error: issues such as *subcommand failed* or *out of disk*
-throwSystemError :: (StringLike s, MonadError NGError m) => s -> m a
-throwSystemError = throwError . NGError SystemError . asText
+throwSystemError :: (MonadError NGError m) => String -> m a
+throwSystemError = throwError . NGError SystemError
 
 -- | Generic error: any error message
-throwGenericError :: (StringLike s, MonadError NGError m) => s -> m a
-throwGenericError = throwError . NGError GenericError . asText
+throwGenericError :: (MonadError NGError m) => String -> m a
+throwGenericError = throwError . NGError GenericError
 

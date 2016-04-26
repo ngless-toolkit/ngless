@@ -49,7 +49,7 @@ getOFile args = do
     case lookup "ofile" args of
         Just (NGOFilename p) -> return (p ++ subpostfix)
         Just (NGOString p) -> return (T.unpack p ++ subpostfix)
-        _ -> throwShouldNotOccur ("getOFile cannot decode file path" :: String)
+        _ -> throwShouldNotOccur "getOFile cannot decode file path"
 
 
 writeRSToFile enc path newfp =
@@ -99,8 +99,8 @@ executeWrite el@(NGOMappedReadSet name fp defGen) args = do
         NGOSymbol "bam" -> do
                         newfp' <- convertSamToBam fp newfp
                         return (NGOMappedReadSet name newfp' defGen) --newfp will contain the bam
-        NGOSymbol s -> throwScriptError (T.concat ["write does not accept format {", s, "} with input type ", T.pack . show $ el])
-        _ -> throwShouldNotOccur ("Type checking fail: format argument is not a symbol for write()" :: String)
+        NGOSymbol s -> throwScriptError ("write does not accept format {" ++ T.unpack s ++ "} with input type " ++ show el)
+        _ -> throwShouldNotOccur "Type checking fail: format argument is not a symbol for write()"
 
 executeWrite (NGOCounts fp) args = do
     newfp <- getOFile args

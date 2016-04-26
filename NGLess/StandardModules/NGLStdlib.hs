@@ -8,6 +8,7 @@ module StandardModules.NGLStdlib
     ) where
 
 
+import qualified Data.Text as T
 import qualified StandardModules.Example as Example
 import qualified StandardModules.Batch as Batch
 import qualified StandardModules.Samtools as Samtools
@@ -35,5 +36,5 @@ loadModules1 (ModInfo "mocat" version) = Mocat.loadModule version
 loadModules1 (ModInfo "parallel" version) = Parallel.loadModule version
 loadModules1 (ModInfo mname version)
     | mname `elem` externalModules = Ext.loadModule mname version
-loadModules1 (ModInfo modname _) = throwScriptError ("Could not load module " ++show modname)
+loadModules1 (ModInfo modname version) = throwScriptError ("Could not load module '" ++ T.unpack modname ++ "' version " ++ T.unpack version ++ ".")
 

@@ -126,7 +126,7 @@ lookupConstant !k = do
     case filter ((==k) . fst) constants of
         [] -> return Nothing
         [(_,v)] -> return (Just v)
-        _ -> throwShouldNotOccur $ T.concat ["Multiple hits found for constant ", k]
+        _ -> throwShouldNotOccur ("Multiple hits found for constant " ++ T.unpack k)
 
 
 
@@ -145,8 +145,8 @@ findFunction fname = do
                                 then autoComprehendNB
                                 else id
                 return $ wrap $ (runFunction m) (getName fname)
-            [] -> throwShouldNotOccur $ T.concat ["Function '", getName fname, "' not found (not builtin and not in any loaded module)"]
-            ms -> throwShouldNotOccur $ T.concat (["Function '", T.pack $ show fname, "' found in multiple modules! ("] ++ [T.concat [modname, ":"] | modname <- modName . modInfo <$> ms])
+            [] -> throwShouldNotOccur . T.unpack $ T.concat ["Function '", getName fname, "' not found (not builtin and not in any loaded module)"]
+            ms -> throwShouldNotOccur . T.unpack $ T.concat (["Function '", T.pack $ show fname, "' found in multiple modules! ("] ++ [T.concat [modname, ":"] | modname <- modName . modInfo <$> ms])
     where
         hasF m = (fname `elem` (funcName `fmap` modFunctions m))
 
@@ -213,7 +213,7 @@ interpretTop (Condition c ifTrue ifFalse) = do
         then ifTrue
         else ifFalse)
 interpretTop (Sequence es) = forM_ es interpretTop
-interpretTop _ = throwShouldNotOccur ("Top level statement is NOP" :: String)
+interpretTop _ = throwShouldNotOccur "Top level statement is NOP"
 
 interpretTopValue :: Expression -> InterpretationEnvIO NGLessObject
 interpretTopValue (FunctionCall f e args b) = interpretFunction f e args b
@@ -222,7 +222,7 @@ interpretTopValue e = runInROEnvIO (interpretExpr e)
 
 interpretExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretExpr (Lookup (Variable v)) = lookupVariable v >>= \case
-        Nothing -> throwScriptError ("Variable lookup error" :: String)
+        Nothing -> throwScriptError "Variable lookup error"
         Just r' -> return r'
 interpretExpr (BuiltinConstant (Variable "STDIN")) = return (NGOString "/dev/stdin")
 interpretExpr (BuiltinConstant (Variable "STDOUT")) = return (NGOString "/dev/stdout")

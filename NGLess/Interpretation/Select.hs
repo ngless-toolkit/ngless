@@ -44,7 +44,7 @@ _parseConditions args = do
         case (keep_if', drop_if') of
             (cs, []) -> return (KeepIf cs)
             ([], cs) -> return (DropIf cs)
-            (_, _) -> throwScriptError ("To select, you cannot use both keep_if and drop_if" :: String)
+            (_, _) -> throwScriptError "To select, you cannot use both keep_if and drop_if"
     where
         asSC :: NGLessObject -> NGLessIO SelectCondition
         asSC (NGOSymbol "mapped") = return SelectMapped
@@ -90,7 +90,7 @@ executeSelect (NGOMappedReadSet name fpsam ref) args = do
         Just (NGOString fname) -> let fname' = T.unpack fname in
                                     (fname',) <$> liftIO (openBinaryFile fname' WriteMode)
         Nothing -> openNGLTempFile fpsam "selected_" "sam"
-        _ -> throwShouldNotOccur ("Non-string argument in __oname variable" :: T.Text)
+        _ -> throwShouldNotOccur "Non-string argument in __oname variable"
     readSamGroupsAsConduit fpsam
         $= CL.map (_matchConditions conditions)
         =$= CL.concat

@@ -34,7 +34,7 @@ downloadFile url destPath = do
     res <- HTTP.http req manager
 
     case lookup "Content-Length" (HTTP.responseHeaders res) of
-        Nothing -> throwSystemError ("HTTP Response does not contain Content-Length header" :: String)
+        Nothing -> throwSystemError "HTTP Response does not contain Content-Length header"
         Just csize ->
             HTTP.responseBody res
                 $$+- printProgress (read (B.unpack csize))

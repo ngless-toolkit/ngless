@@ -52,7 +52,7 @@ executeLoad (NGOString samplename) [] = NGOExpression <$> do
             then return [FunctionCall (FuncName "fastq") (ConstStr . T.pack $ f) [] Nothing | f <- matched]
             else mocatSamplePaired matched
     return (FunctionCall (FuncName "group") args [(Variable "name", ConstStr samplename)] Nothing)
-executeLoad _ _ = throwShouldNotOccur ("mocat_load_sample got the wrong arguments." :: String)
+executeLoad _ _ = throwShouldNotOccur "mocat_load_sample got the wrong arguments."
 
 
 mocatLoadSample = Function

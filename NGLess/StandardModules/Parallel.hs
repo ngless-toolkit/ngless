@@ -53,7 +53,7 @@ executeLock1 arg _ = throwScriptError ("Wrong argument for lock1 (expected a lis
 
 getLock _ [] = do
    outputListLno' InfoOutput ["Could get a lock for any file."]
-   throwGenericError ("Could not obtain any lock" :: String)
+   throwGenericError "Could not obtain any lock"
 getLock basedir (x:xs) = do
     let fname = T.unpack x
     finished <- liftIO $ doesFileExist (basedir </> fname ++ ".finished")
@@ -84,9 +84,9 @@ executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ 
 concatlines :: [[B.ByteString]] -> NGLess B.ByteString
 concatlines [] = return B.empty
 concatlines entries
-    | any null entries = throwDataError ("Empty line in collect" :: String)
+    | any null entries = throwDataError "Empty line in collect"
     | allSame (head <$> entries) = return $! flip B8.snoc '\n' (B8.intercalate "\t" ((head . head $ entries):concat (tail <$> entries)))
-    | otherwise = throwDataError ("Mismatched collect()" :: String)
+    | otherwise = throwDataError "Mismatched collect()"
 
 concatCounts :: [T.Text] -> [FilePath] -> FilePath -> NGLessIO ()
 concatCounts headers inputs ofile = do

@@ -128,7 +128,7 @@ instance NFData Annotator where
 
 annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> Either NGError [Int]
 annotateReadGroup opts ann samlines = listNub <$> case ann of
-        SeqNameAnnotator Nothing -> throwShouldNotOccur ("Incomplete annotator used" :: String)
+        SeqNameAnnotator Nothing -> throwShouldNotOccur "Incomplete annotator used"
         SeqNameAnnotator (Just szmap) -> mapMaybeM (getID szmap) samlines
         GFFAnnotator amap _ _ -> return . concatMap (annotateSamLine opts amap) $ samlines
         GeneMapAnnotator amap _ -> return . concatMap (mapAnnotation1 amap) $ samlines
@@ -143,7 +143,7 @@ annotateReadGroup opts ann samlines = listNub <$> case ann of
         mapAnnotation1 amap samline = fromMaybe [] $ M.lookup (samRName samline) amap
 
 annSizeOf :: Annotator -> B.ByteString -> Either NGError Double
-annSizeOf (SeqNameAnnotator Nothing) _ = throwShouldNotOccur ("Using unloaded annotator" :: String)
+annSizeOf (SeqNameAnnotator Nothing) _ = throwShouldNotOccur "Using unloaded annotator"
 annSizeOf (SeqNameAnnotator (Just ix)) name = annSizeOfInRSVector name ix
 annSizeOf (GFFAnnotator _ _ szmap) name = annSizeOf' name szmap
 annSizeOf (GeneMapAnnotator _ ix) name = annSizeOfInRSVector name ix
@@ -168,7 +168,7 @@ annSize ann = length (annEnumerate ann)
 methodFor "1overN" = return MM1OverN
 methodFor "dist1" = return MMDist1
 methodFor "all1" = return MMCountAll
-methodFor other = throwShouldNotOccur (T.concat ["Unexpected multiple method ", other])
+methodFor other = throwShouldNotOccur ("Unexpected multiple method " ++ T.unpack other)
 
 executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
@@ -190,7 +190,7 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
         Nothing -> return ["gene"]
         Just (NGOSymbol f) -> return [f]
         Just (NGOList feats') -> mapM (stringOrTypeError "annotation features argument") feats'
-        _ -> throwShouldNotOccur ("executeAnnotation: TYPE ERROR" :: String)
+        _ -> throwShouldNotOccur "executeAnnotation: TYPE ERROR"
 
     m <- annotationRule <$> parseAnnotationMode args
     let opts = CountOpts
@@ -519,9 +519,9 @@ loadFunctionalMap fname columns = do
         lookUpColumns' colmap col = note notfounderror $ M.lookup col colmap
             where
                 notfounderror = NGError DataError errormsg
-                errormsg = T.concat (["Could not find column '", T.pack . B8.unpack $ col, "'."]
+                errormsg = concat (["Could not find column '", B8.unpack $ col, "'."]
                                 ++ case findSuggestion (T.pack $ B8.unpack col) (map (T.pack . B8.unpack) $ M.keys colmap) of
-                                        Just (Suggestion valid reason) -> [" Did you mean '", valid, "' (", reason, ")?"]
+                                        Just (Suggestion valid reason) -> [" Did you mean '", T.unpack valid, "' (", T.unpack reason, ")?"]
                                         Nothing -> [])
         selectColumns :: [Int] -> [B.ByteString] -> NGLess (B.ByteString, [B.ByteString])
         selectColumns cols (gene:mapped) = (gene,) <$> selectIds cols (zip [0..] mapped)
@@ -543,7 +543,7 @@ parseAnnotationMode args = case lookupWithDefault (NGOSymbol "union") "mode" arg
 
 
 annotationMode :: [GffType] -> Maybe T.Text -> Maybe FilePath -> Maybe FilePath -> NGLessIO AnnotationMode
-annotationMode _ _ (Just _) (Just _) = throwScriptError ("Cannot simmultaneously pass a gff_file and an annotation_file for annotate() function" :: String)
+annotationMode _ _ (Just _) (Just _) = throwScriptError "Cannot simmultaneously pass a gff_file and an annotation_file for annotate() function"
 annotationMode [GffOther "seqname"] _ _ _ = return AnnotateSeqName
 annotationMode _ _ (Just r) _ = return (AnnotateFunctionalMap r)
 annotationMode _ _ _ (Just g) = return (AnnotateGFF g)
@@ -554,7 +554,7 @@ annotationMode _ (Just ref) Nothing Nothing = do
         Just gffpath -> return $! AnnotateGFF gffpath
         Nothing -> throwScriptError ("Could not find annotation file for '" ++ T.unpack ref ++ "'")
 annotationMode _ _ _ _ =
-            throwShouldNotOccur ("For counting, you must do one of\n1. use seqname mode\n2. pass in a GFF file using the argument 'gff_file'\n3. pass in a gene map using the argument 'functional_map'" :: T.Text)
+            throwShouldNotOccur "For counting, you must do one of\n1. use seqname mode\n2. pass in a GFF file using the argument 'gff_file'\n3. pass in a gene map using the argument 'functional_map'"
 
 annotationRule :: AnnotationIntersectionMode -> AnnotationRule
 annotationRule IntersectUnion = union

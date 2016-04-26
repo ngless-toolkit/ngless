@@ -51,8 +51,8 @@ lookupReference args = do
     let reference = lookup "reference" args
         fafile = lookup "fafile" args
     case (reference, fafile) of
-        (Nothing, Nothing) -> throwScriptError ("Either reference or fafile must be passed" :: String)
-        (Just _, Just _) -> throwScriptError ("Reference and fafile cannot be used simmultaneously" :: String)
+        (Nothing, Nothing) -> throwScriptError "Either reference or fafile must be passed"
+        (Just _, Just _) -> throwScriptError "Reference and fafile cannot be used simmultaneously"
         (Just r, Nothing) -> PackagedReference <$> stringOrTypeError "reference in map argument" r
         (Nothing, Just fa) -> (FaFile . T.unpack) <$> stringOrTypeError "fafile in map argument" fa
 
@@ -132,7 +132,7 @@ interpretMapOp ref name fps extraArgs = do
             ReferenceFilePaths fafile _ _ <- ensureDataPresent r
             case fafile of
                 Just fp -> (, Just r) <$> ensureIndexExists fp
-                Nothing -> throwScriptError $ T.concat ["Could not find reference ", r]
+                Nothing -> throwScriptError ("Could not find reference '" ++ T.unpack r ++ "'.")
 
 _samStats :: FilePath -> NGLessIO (Int, Int, Int)
 _samStats fname = do

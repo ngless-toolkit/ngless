@@ -149,7 +149,7 @@ installData (Just mode) refname = do
         refs = mapMaybe unpackRef $ concatMap modReferences mods
     ref  <- case find ((==refname) . refName) (refs ++ builtinReferences) of
         Just ref -> return ref
-        Nothing -> throwScriptError $ T.concat ["Could not find reference '", refname, "'. It is not builtin nor in one of the loaded modules."]
+        Nothing -> throwScriptError ("Could not find reference '" ++ T.unpack refname ++ "'. It is not builtin nor in one of the loaded modules.")
     liftIO $ createDirectoryIfMissing True basedir
     downloadReference ref tarName
     liftIO $

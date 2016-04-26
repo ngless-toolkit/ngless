@@ -84,7 +84,7 @@ groupFiles :: T.Text -> [ReadSet] -> NGLessIO ReadSet
 groupFiles name rs = do
     let encs = map rsEncoding rs
     unless (allSame encs) $
-        throwDataError ("In group call not all input files have the same encoding!" :: String)
+        throwDataError "In group call not all input files have the same encoding!"
     let dims = map dim1 rs
         dim1 :: ReadSet -> Int
         dim1 ReadSet1{} = 1
@@ -116,7 +116,7 @@ catFiles2 name rs@(ReadSet2 enc _ _:_) = do
     return (ReadSet2 enc newfp1 newfp2)
 catFiles2 _ rs = throwShouldNotOccur ("catFiles2 called with args : " ++ show rs)
 
-catFiles3 _ [] = throwShouldNotOccur ("catFiles3 called with an empty list" :: String)
+catFiles3 _ [] = throwShouldNotOccur "catFiles3 called with an empty list"
 catFiles3 name rs@(r:_) = do
     (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq.gz"
     (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq.gz"
@@ -173,13 +173,13 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
     (ReadSet1 enc1 fp1) <- asReadSet1mayQC qcNeeded enc mate1
     (ReadSet1 enc2 fp2) <- asReadSet1mayQC qcNeeded enc mate2
     when (enc1 /= enc2) $
-        throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
+        throwDataError "Mates do not seem to have the same quality encoding!"
     case mate3 of
         Nothing -> return (ReadSet2 enc1 fp1 fp2)
         Just (NGOString f3) -> do
             (ReadSet1 enc3 fp3) <- asReadSet1mayQC qcNeeded enc f3
             when (enc1 /= enc3) $
-                throwDataError ("Mates do not seem to have the same quality encoding!" :: String)
+                throwDataError "Mates do not seem to have the same quality encoding!"
             return (ReadSet3 enc1 fp1 fp2 fp3)
         Just other -> throwScriptError ("Function paired expects a string for argument 'singles', got " ++ show other)
 executePaired expr _ = throwScriptError ("Function paired expects a string, got: " ++ show expr)

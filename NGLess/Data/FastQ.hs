@@ -110,7 +110,7 @@ fqConduitR :: (Monad m, MonadError NGError m) => FastQEncoding -> C.Conduit Byte
 fqConduitR enc = groupC 4 =$= CL.mapM parseShortReads
     where
         parseShortReads [ByteLine rid, ByteLine rseq, _, ByteLine rqs] = return (createRead enc rid rseq rqs)
-        parseShortReads _ = throwDataError ("Number of lines in FastQ file is not multiple of 4! EOF found" :: String)
+        parseShortReads _ = throwDataError "Number of lines in FastQ file is not multiple of 4! EOF found"
 
 
 statsFromFastQ :: FilePath -> NGLessIO FQStatistics
@@ -124,7 +124,7 @@ getPairedLines :: C.Conduit ByteLine NGLessIO (ByteLine,ByteLine)
 getPairedLines = groupC 4 =$= CL.mapM getPairedLines'
     where
         getPairedLines' [_, bps, _, qs] = return (bps, qs)
-        getPairedLines' _ = throwDataError ("fastq lines are not a multiple of 4" :: String)
+        getPairedLines' _ = throwDataError "fastq lines are not a multiple of 4"
 
 encodingFor :: FilePath -> NGLessIO FastQEncoding
 encodingFor fp = do

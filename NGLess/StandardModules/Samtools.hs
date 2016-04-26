@@ -51,7 +51,7 @@ executeSort (NGOMappedReadSet name fpsam rinfo) _ = do
             throwSystemError $ concat ["Failed samtools sort\nCommand line was::\n\t",
                             samtoolsPath, " with args: ", unwords cmdargs,
                             "\nexit code was ", show code, "."]
-executeSort _ _ = throwScriptError ("Unexpected arguments for samtools_sort function" :: String)
+executeSort _ _ = throwScriptError "Unexpected arguments for samtools_sort function"
 
 
 samtools_sort_function = Function

@@ -207,10 +207,10 @@ argsArguments cmd args = catMaybes <$> forM (additional cmd) a1
         a1 (CommandInteger name defVal) = case lookup name args <|> (NGOInteger <$> defVal) of
                 Nothing -> return Nothing
                 Just (NGOInteger v) -> return . Just $ "--"++T.unpack name++"="++show v
-                _ -> throwShouldNotOccur ("in command module, int expected" :: T.Text)
+                _ -> throwShouldNotOccur "in command module, int expected"
         a1 (CommandString name defVal req) = case lookup name args <|> (NGOString <$> defVal) of
                 Just (NGOString v) -> return . Just $ "--"++T.unpack name++"="++T.unpack v
-                _ -> throwShouldNotOccur ("in command module, string expected" :: T.Text)
+                _ -> throwShouldNotOccur "in command module, string expected"
 
 asInternalModule :: ExternalModule -> NGLessIO Module
 asInternalModule em@ExternalModule{..} = do

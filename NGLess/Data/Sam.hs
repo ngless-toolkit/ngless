@@ -20,7 +20,6 @@ module Data.Sam
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.Text as T
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import           Data.Strict.Tuple (Pair(..))
@@ -171,7 +170,7 @@ matchSize' cigar
 
 matchIdentity :: SamLine -> Either NGError Double
 matchIdentity samline = do
-    let errmsg = T.pack $ "Could not get NM tag for samline " ++ B8.unpack (samQName samline) ++ ", extra tags were: "++ B8.unpack (samExtra samline)
+    let errmsg = "Could not get NM tag for samline " ++ B8.unpack (samQName samline) ++ ", extra tags were: "++ B8.unpack (samExtra samline)
     errors <- note (NGError DataError errmsg) $ samIntTag samline "NM"
     len <- matchSize samline
     let toDouble = fromInteger . toInteger
