@@ -25,7 +25,7 @@ module Configuration
 
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
-import System.Environment (getExecutablePath)
+import System.Environment (getExecutablePath, lookupEnv)
 import System.Directory
 import System.FilePath.Posix
 import Data.Maybe
@@ -71,11 +71,16 @@ setVerbosity = writeIORef verbosityRef
 getVerbosity :: IO Verbosity
 getVerbosity = readIORef verbosityRef
 
+getDefaultUserNglessDirectory :: IO FilePath
+getDefaultUserNglessDirectory = liftM2 fromMaybe
+    ((</> ".local/share/ngless") <$> getHomeDirectory)
+    (liftM (</> "ngless")  <$> lookupEnv "XDG_DATA_HOME")
+
 guessConfiguration :: IO NGLessConfiguration
 guessConfiguration = do
     tmp <- getTemporaryDirectory
     nglessBinDirectory <- takeDirectory <$> getExecutablePath
-    defaultUserNglessDirectory <- (</> ".ngless") <$> getHomeDirectory
+    defaultUserNglessDirectory <- getDefaultUserNglessDirectory
     return NGLessConfiguration
         { nConfDownloadBaseURL = "http://127.0.0.1/"
         , nConfGlobalDataDirectory = nglessBinDirectory </> "../share/ngless/data"
