@@ -58,6 +58,7 @@ executeLoad _ _ = throwShouldNotOccur "mocat_load_sample got the wrong arguments
 mocatLoadSample = Function
     { funcName = FuncName "mocat_load_sample"
     , funcArgType = Just NGLString
+    , funcArgChecks = []
     , funcRetType = NGLReadSet
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False

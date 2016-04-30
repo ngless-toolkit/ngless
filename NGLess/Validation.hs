@@ -7,6 +7,7 @@
 module Validation
     ( validate
     , uses_STDOUT
+    , findFunction
     ) where
 
 import Data.Maybe
@@ -168,7 +169,7 @@ check_symbol_val_in_arg mods f args = case findFunction mods f of
         allowed :: Function -> T.Text -> [T.Text]
         allowed finfo v = fromMaybe [] $ do
             argInfo <- find ((==v) . argName) (funcKwArgs finfo)
-            ArgCheckSymbol ss <- find (\case { a@ArgCheckSymbol{} -> True; _ -> False }) (argChecks argInfo)
+            ArgCheckSymbol ss <- find (\case { ArgCheckSymbol{} -> True; _ -> False }) (argChecks argInfo)
             return ss
 
         allowedStr finfo v = T.concat ["[", showA (allowed finfo v), "]"]

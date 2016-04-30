@@ -47,6 +47,7 @@ data ArgInformation = ArgInformation
 data Function = Function
     { funcName :: FuncName -- ^ name of function
     , funcArgType :: Maybe NGLType -- ^ if it takes an unnamed argument, what is its type
+    , funcArgChecks :: [ArgCheck] -- ^ checks for first argument
     , funcRetType :: NGLType -- ^ what type it returns
     , funcKwArgs :: [ArgInformation] -- ^ what are the keyword arguments
     , funcAllowsAutoComprehension :: Bool -- ^ if true, then calling this function with [funcArgType] should return [funcRetType]

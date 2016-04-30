@@ -242,7 +242,7 @@ funcInfo fn = do
 checkFuncUnnamed :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
 checkFuncUnnamed f arg = do
         targ <- nglTypeOf arg
-        Function _ (Just etype) rtype _ allowAutoComp <- funcInfo f
+        Function _ (Just etype) _ rtype _ allowAutoComp <- funcInfo f
         case targ of
             Just (NGList t)
                 | allowAutoComp -> checkfunctype etype t *> return (Just (NGList rtype))
@@ -261,7 +261,7 @@ checkFuncUnnamed f arg = do
 
 checkFuncKwArgs :: FuncName -> [(Variable, Expression)] -> TypeMSt ()
 checkFuncKwArgs f args = do
-    Function _ _ _ argInfo _ <- funcInfo f
+    Function _ _ _ _ argInfo _ <- funcInfo f
     mapM_ (checkfuncarg f argInfo) args
 
 

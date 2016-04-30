@@ -69,6 +69,7 @@ asFQ = postproc . asFQ' False False
 as_reads_Function = Function
     { funcName = FuncName "as_reads"
     , funcArgType = Just NGLMappedReadSet
+    , funcArgChecks = []
     , funcRetType = NGLReadSet
     , funcKwArgs = []
     , funcAllowsAutoComprehension = True

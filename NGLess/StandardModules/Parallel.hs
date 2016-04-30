@@ -118,6 +118,7 @@ concatCounts headers inputs ofile = do
 lock1 = Function
     { funcName = FuncName "lock1"
     , funcArgType = Just (NGList NGLString)
+    , funcArgChecks = []
     , funcRetType = NGLString
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False
@@ -126,6 +127,7 @@ lock1 = Function
 collectFunction = Function
     { funcName = FuncName "collect"
     , funcArgType = Just NGLCounts
+    , funcArgChecks = []
     , funcRetType = NGLVoid
     , funcKwArgs =
         [ArgInformation "current" True NGLString []

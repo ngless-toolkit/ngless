@@ -31,6 +31,7 @@ executeReadlines arg _ = throwShouldNotOccur ("executeReadlines called with argu
 readlines_Function = Function
     { funcName = FuncName "readlines"
     , funcArgType = Just NGLString
+    , funcArgChecks = [ArgCheckFileReadable]
     , funcRetType = NGList NGLString
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False

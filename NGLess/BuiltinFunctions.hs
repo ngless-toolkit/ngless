@@ -22,18 +22,18 @@ data MethodInfo = MethodInfo
     } deriving (Eq, Show)
 
 builtinFunctions =
-    [Function (FuncName "fastq") (Just NGLString) NGLReadSet fastqArgs False
-    ,Function (FuncName "paired") (Just NGLString) NGLReadSet pairedArgs False
-    ,Function (FuncName "group") (Just (NGList NGLReadSet)) NGLReadSet groupArgs False
-    ,Function (FuncName "samfile") (Just NGLString) NGLMappedReadSet samfileArgs False
-    ,Function (FuncName "unique") (Just NGLReadSet) NGLReadSet uniqueArgs False
-    ,Function (FuncName "preprocess") (Just NGLReadSet) NGLVoid preprocessArgs False
-    ,Function (FuncName "substrim") (Just NGLRead) NGLRead substrimArgs False
-    ,Function (FuncName "map") (Just NGLReadSet) NGLMappedReadSet mapArgs False
-    ,Function (FuncName "select") (Just NGLMappedReadSet) NGLMappedReadSet selectArgs False
-    ,Function (FuncName "count") (Just NGLMappedReadSet) NGLCounts countArgs False
-    ,Function (FuncName "write") (Just NGLAny) NGLVoid writeArgs False
-    ,Function (FuncName "print") (Just NGLAny) NGLVoid [] False
+    [Function (FuncName "fastq") (Just NGLString) [ArgCheckFileReadable] NGLReadSet fastqArgs False
+    ,Function (FuncName "paired") (Just NGLString) [ArgCheckFileReadable] NGLReadSet pairedArgs False
+    ,Function (FuncName "group") (Just (NGList NGLReadSet)) [] NGLReadSet groupArgs False
+    ,Function (FuncName "samfile") (Just NGLString) [ArgCheckFileReadable] NGLMappedReadSet samfileArgs False
+    ,Function (FuncName "unique") (Just NGLReadSet) [] NGLReadSet uniqueArgs False
+    ,Function (FuncName "preprocess") (Just NGLReadSet) [] NGLVoid preprocessArgs False
+    ,Function (FuncName "substrim") (Just NGLRead) [] NGLRead substrimArgs False
+    ,Function (FuncName "map") (Just NGLReadSet) [] NGLMappedReadSet mapArgs False
+    ,Function (FuncName "select") (Just NGLMappedReadSet) [] NGLMappedReadSet selectArgs False
+    ,Function (FuncName "count") (Just NGLMappedReadSet) [] NGLCounts countArgs False
+    ,Function (FuncName "write") (Just NGLAny) [] NGLVoid writeArgs False
+    ,Function (FuncName "print") (Just NGLAny) [] NGLVoid [] False
     ]
 
 groupArgs =

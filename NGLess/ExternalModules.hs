@@ -148,7 +148,7 @@ addPathToRef mpath er@ExternalReference{..} = er
 addPathToRef _ er = er
 
 
-asFunction Command{..} = Function (FuncName nglName) (Just $ asNGLType arg1) (fromMaybe NGLVoid $ asNGLType <$> ret) (map asArgInfo additional) False
+asFunction Command{..} = Function (FuncName nglName) (Just $ asNGLType arg1) [] (fromMaybe NGLVoid $ asNGLType <$> ret) (map asArgInfo additional) False
 
 asNGLType = asNGLType' . fileTypeBase
 asNGLType' FastqFileSingle = NGLReadSet

@@ -57,6 +57,7 @@ executeSort _ _ = throwScriptError "Unexpected arguments for samtools_sort funct
 samtools_sort_function = Function
     { funcName = FuncName "samtools_sort"
     , funcArgType = Just NGLMappedReadSet
+    , funcArgChecks = []
     , funcRetType = NGLMappedReadSet
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False

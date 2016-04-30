@@ -27,6 +27,7 @@ execute fname input args = liftIO $do
 exampleFunction = Function
     { funcName = FuncName "example"
     , funcArgType = Just NGLReadSet
+    , funcArgChecks = []
     , funcRetType = NGLReadSet
     , funcKwArgs =
             [ArgInformation "opt1" False NGLSymbol [ArgCheckSymbol ["test1", "test2"]]
