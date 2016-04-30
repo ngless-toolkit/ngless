@@ -37,64 +37,64 @@ builtinFunctions =
     ]
 
 groupArgs =
-    [ArgInformation "name" True NGLString Nothing
+    [ArgInformation "name" True NGLString []
     ]
 
 writeArgs =
-    [ArgInformation "ofile" True NGLString Nothing
-    ,ArgInformation "format" False NGLSymbol (Just ["tsv", "csv", "bam", "sam"])
-    ,ArgInformation "verbose" False NGLBool Nothing
+    [ArgInformation "ofile" True NGLString []
+    ,ArgInformation "format" False NGLSymbol [ArgCheckSymbol ["tsv", "csv", "bam", "sam"]]
+    ,ArgInformation "verbose" False NGLBool []
     ]
 
 countArgs =
-    [ArgInformation "features" False (NGList NGLString) Nothing
-    ,ArgInformation "min" False NGLInteger Nothing
-    ,ArgInformation "multiple" False NGLSymbol (Just ["all1", "dist1", "1overN"])
-    ,ArgInformation "mode" False NGLSymbol (Just ["union", "intersection_strict", "intersection_non_empty"])
-    ,ArgInformation "gff_file" False NGLString Nothing
-    ,ArgInformation "functional_map" False NGLString Nothing
-    ,ArgInformation "keep_ambiguous" False NGLBool Nothing
-    ,ArgInformation "strand" False NGLBool Nothing
-    ,ArgInformation "norm" False NGLBool Nothing
+    [ArgInformation "features" False (NGList NGLString) []
+    ,ArgInformation "min" False NGLInteger []
+    ,ArgInformation "multiple" False NGLSymbol [ArgCheckSymbol ["all1", "dist1", "1overN"]]
+    ,ArgInformation "mode" False NGLSymbol [ArgCheckSymbol ["union", "intersection_strict", "intersection_non_empty"]]
+    ,ArgInformation "gff_file" False NGLString []
+    ,ArgInformation "functional_map" False NGLString []
+    ,ArgInformation "keep_ambiguous" False NGLBool []
+    ,ArgInformation "strand" False NGLBool []
+    ,ArgInformation "norm" False NGLBool []
     ]
 
 selectArgs =
-    [ArgInformation "keep_if" False (NGList NGLSymbol) (Just ["mapped", "unmapped", "unique"])
-    ,ArgInformation "drop_if" False (NGList NGLSymbol) (Just ["mapped", "unmapped", "unique"])
-    ,ArgInformation "__oname" False NGLString Nothing
+    [ArgInformation "keep_if" False (NGList NGLSymbol) [ArgCheckSymbol ["mapped", "unmapped", "unique"]]
+    ,ArgInformation "drop_if" False (NGList NGLSymbol) [ArgCheckSymbol ["mapped", "unmapped", "unique"]]
+    ,ArgInformation "__oname" False NGLString []
     ]
 
 fastqArgs =
-    [ArgInformation "encoding" False NGLSymbol (Just ["auto", "33", "64", "sanger", "solexa"])
-    ,ArgInformation "__perform_qc" False NGLBool Nothing
+    [ArgInformation "encoding" False NGLSymbol [ArgCheckSymbol ["auto", "33", "64", "sanger", "solexa"]]
+    ,ArgInformation "__perform_qc" False NGLBool []
     ]
 
 samfileArgs =
-    [ArgInformation "name" False NGLString Nothing
+    [ArgInformation "name" False NGLString []
     ]
 pairedArgs =
-    [ArgInformation "second" True NGLString Nothing
-    ,ArgInformation "singles" False NGLString Nothing
-    ,ArgInformation "__perform_qc" False NGLBool Nothing
+    [ArgInformation "second" True NGLString []
+    ,ArgInformation "singles" False NGLString []
+    ,ArgInformation "__perform_qc" False NGLBool []
     ]
 
 uniqueArgs =
-    [ArgInformation "max_copies" False NGLInteger Nothing]
+    [ArgInformation "max_copies" False NGLInteger []]
 
 preprocessArgs =
-    [ArgInformation "keep_singles" False NGLBool Nothing
-    ,ArgInformation "__qc_input" False NGLBool Nothing
+    [ArgInformation "keep_singles" False NGLBool []
+    ,ArgInformation "__qc_input" False NGLBool []
     ]
 
 mapArgs =
-    [ArgInformation "reference" False NGLString Nothing
-    ,ArgInformation "fafile" False NGLString Nothing
-    ,ArgInformation "__extra_bwa" False (NGList NGLString) Nothing
-    ,ArgInformation "__oname" False NGLString Nothing
+    [ArgInformation "reference" False NGLString []
+    ,ArgInformation "fafile" False NGLString []
+    ,ArgInformation "__extra_bwa" False (NGList NGLString) []
+    ,ArgInformation "__oname" False NGLString []
     ]
 
 substrimArgs =
-    [ArgInformation "min_quality" True NGLInteger Nothing
+    [ArgInformation "min_quality" True NGLInteger []
     ]
 
 
@@ -104,8 +104,8 @@ builtinMethods =
     ,MethodInfo Munique NGLMappedRead Nothing NGLMappedRead [] True
     ]
 filterArgs =
-    [ArgInformation "min_identity_pc" False NGLInteger Nothing
-    ,ArgInformation "min_match_size" False NGLInteger Nothing
-    ,ArgInformation "action" False NGLSymbol (Just ["drop", "unmap"])
+    [ArgInformation "min_identity_pc" False NGLInteger []
+    ,ArgInformation "min_match_size" False NGLInteger []
+    ,ArgInformation "action" False NGLSymbol [ArgCheckSymbol ["drop", "unmap"]]
     ]
 

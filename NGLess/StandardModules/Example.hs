@@ -29,7 +29,7 @@ exampleFunction = Function
     , funcArgType = Just NGLReadSet
     , funcRetType = NGLReadSet
     , funcKwArgs =
-            [ArgInformation "opt1" False NGLSymbol (Just ["test1", "test2"])
+            [ArgInformation "opt1" False NGLSymbol [ArgCheckSymbol ["test1", "test2"]]
             ]
     , funcAllowsAutoComprehension = True
     }

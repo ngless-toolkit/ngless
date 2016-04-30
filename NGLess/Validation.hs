@@ -166,9 +166,10 @@ check_symbol_val_in_arg mods f args = case findFunction mods f of
         Just finfo -> errors_from_list $ map (check1 finfo) args
     where
         allowed :: Function -> T.Text -> [T.Text]
-        allowed finfo v = case argAllowedSymbols =<< find ((==v) . argName) (funcKwArgs finfo) of
-            Just ss -> ss
-            Nothing -> []
+        allowed finfo v = fromMaybe [] $ do
+            argInfo <- find ((==v) . argName) (funcKwArgs finfo)
+            ArgCheckSymbol ss <- find (\case { a@ArgCheckSymbol{} -> True; _ -> False }) (argChecks argInfo)
+            return ss
 
         allowedStr finfo v = T.concat ["[", showA (allowed finfo v), "]"]
         showA [] = ""

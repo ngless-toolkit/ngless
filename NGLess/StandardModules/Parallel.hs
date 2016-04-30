@@ -128,9 +128,9 @@ collectFunction = Function
     , funcArgType = Just NGLCounts
     , funcRetType = NGLVoid
     , funcKwArgs =
-        [ArgInformation "current" True NGLString Nothing
-        ,ArgInformation "allneeded" True (NGList NGLString) Nothing
-        ,ArgInformation "ofile" True NGLString Nothing
+        [ArgInformation "current" True NGLString []
+        ,ArgInformation "allneeded" True (NGList NGLString) []
+        ,ArgInformation "ofile" True NGLString []
         ]
     , funcAllowsAutoComprehension = False
     }

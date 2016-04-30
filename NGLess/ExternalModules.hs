@@ -159,10 +159,10 @@ asNGLType' BamFile = NGLMappedReadSet
 asNGLType' SamOrBamFile = NGLMappedReadSet
 asNGLType' TSVFile = NGLCounts
 
-asArgInfo (CommandFlag name _) = ArgInformation name False NGLBool Nothing
-asArgInfo (CommandOption name _ allowed) = ArgInformation name False NGLSymbol (Just allowed)
-asArgInfo (CommandInteger name _) = ArgInformation name False NGLInteger Nothing
-asArgInfo (CommandString name _ req) = ArgInformation name req NGLString Nothing
+asArgInfo (CommandFlag name _) = ArgInformation name False NGLBool []
+asArgInfo (CommandOption name _ allowed) = ArgInformation name False NGLSymbol [ArgCheckSymbol allowed]
+asArgInfo (CommandInteger name _) = ArgInformation name False NGLInteger []
+asArgInfo (CommandString name _ req) = ArgInformation name req NGLString []
 
 nglessEnv :: FilePath -> NGLessIO [(String,String)]
 nglessEnv basedir = liftIO $ do

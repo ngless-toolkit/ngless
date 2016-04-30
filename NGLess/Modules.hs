@@ -3,6 +3,7 @@
  -}
 module Modules
     ( ArgInformation(..)
+    , ArgCheck(..)
     , Function(..)
     , Reference(..)
     , ExternalReference(..)
@@ -29,12 +30,18 @@ data Reference = Reference
     , refHasFunctionalMap :: Bool
     } deriving (Eq, Show)
 
+data ArgCheck =
+            ArgCheckSymbol [T.Text] -- ^ for symbols, list allowed values
+            | ArgCheckFileReadable -- ^ file should be readable
+            | ArgCheckFileWritable -- ^ file should be writeable (i.e., this is an output file)
+            deriving (Eq,Show)
+
 -- | Basic information about argument to a function
 data ArgInformation = ArgInformation
     { argName :: !T.Text -- ^ argument name
     , argRequired :: !Bool -- ^ whether it is required
     , argType :: !NGLType -- ^  type
-    , argAllowedSymbols :: !(Maybe [T.Text]) -- ^ if type is symbol, what are the allowed symbolx
+    , argChecks :: [ArgCheck] -- ^ what checks should be performed on the argument
     } deriving (Eq, Show)
 
 data Function = Function
