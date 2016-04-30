@@ -4,6 +4,7 @@
 
 module Transform
     ( transform
+    , pureTransform
     ) where
 
 import qualified Data.Text as T

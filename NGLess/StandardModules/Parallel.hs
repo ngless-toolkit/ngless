@@ -20,26 +20,35 @@ import Data.Default
 import Control.Monad
 import System.Directory (createDirectoryIfMissing, doesFileExist, copyFile)
 
+import qualified Data.Hash.MD5 as MD5
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import           Data.Conduit ((=$=), ($$))
 
+import Hooks
 import Output
 import NGLess
 import Modules
 import Language
+import Transform
 import FileManagement
-import Hooks
-import Utils.Conduit
+
 import Utils.Utils
+import Utils.Conduit
 import Utils.LockFile
 
-executeLock1 (NGOList entries) _  = do
+setupHashDirectory :: FilePath -> T.Text -> NGLessIO FilePath
+setupHashDirectory basename hash = do
+    let actiondir = basename </> take 8 (T.unpack hash)
+    liftIO $ createDirectoryIfMissing True actiondir
+    return actiondir
+
+executeLock1 (NGOList entries) kwargs  = do
     entries' <- mapM (stringOrTypeError "lock1") entries
-    let lockdir = "ngless-locks"
-    liftIO $ createDirectoryIfMissing True lockdir
+    hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
+    lockdir <- setupHashDirectory "ngless-lock" hash
     (e,rk) <- getLock lockdir entries'
     registerHook FinishOkHook $ do
         let receiptfile = lockdir </> (T.unpack e) ++ ".finished"
@@ -72,8 +81,9 @@ executeCollect (NGOCounts countfile) kwargs = do
     allentries <- lookupStringListOrScriptError "collect arguments" "allneeded" kwargs
     ofile <- lookupStringOrScriptError "collect arguments" "ofile" kwargs
     canMove <- lookupBoolOrScriptErrorDef (return True) "collect hidden argument" "__can_move" kwargs
+    hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
+    lockdir <- setupHashDirectory "ngless-partials" hash
 
-    liftIO $ createDirectoryIfMissing True "ngless-partials"
     liftIO $ (if canMove then moveOrCopy else copyFile) countfile (partialfile current)
     canCollect <- all id <$> forM allentries (\e -> liftIO $ doesFileExist (partialfile e))
     when canCollect $
@@ -125,12 +135,22 @@ collectFunction = Function
     , funcAllowsAutoComprehension = False
     }
 
+addHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+addHash script = pureTransform (addHash' hash) script
+    where
+        hash :: T.Text
+        hash = T.pack . MD5.md5s . MD5.Str . show . map snd $ script
+        addHash' :: T.Text -> Expression -> Expression
+        addHash' h (FunctionCall (FuncName fn) expr kwargs block)
+            | fn `elem` ["lock1", "collect"] = FunctionCall (FuncName fn) expr ((Variable "__hash", ConstStr h):kwargs) block
+        addHash' _ e = e
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
         return def
         { modInfo = ModInfo "stdlib.parallel" "0.0"
         , modFunctions = [lock1, collectFunction]
+        , modTransform = addHash
         , runFunction = \case
             "lock1" -> executeLock1
             "collect" -> executeCollect
