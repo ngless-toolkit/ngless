@@ -25,6 +25,7 @@ data NGErrorType =
     | DataError -- ^ bad input
     | SystemError -- ^ system/IO issue
     | GenericError -- ^ arbitrary error message
+    | NoErrorExit -- ^ escape valve: ngless should immediately exit without error (arguably should not be overloading the error code)
     deriving (Show, Eq)
 
 instance NFData NGErrorType where

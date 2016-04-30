@@ -35,6 +35,7 @@ import Configuration
 import ReferenceDatabases
 import Output
 import NGLess
+import NGLess.NGError
 import Modules
 import CmdArgs
 import FileManagement (setupHtmlViewer)
@@ -65,11 +66,13 @@ rightOrDie :: (MonadIO m) => Either T.Text a -> m a
 rightOrDie (Left err) = liftIO $ fatalError (T.unpack err)
 rightOrDie (Right v) = return v
 
+redColor = setSGRCode [SetColor Foreground Dull Red]
+
 fatalError :: String -> IO b
 fatalError err = do
     hPutStrLn stderr "Exiting after fatal error:"
-    let st = setSGRCode [SetColor Foreground Dull Red]
-    hPutStrLn stderr (st ++ err)
+    hPutStrLn stderr (redColor ++ err)
+    hPutStrLn stderr $ setSGRCode [Reset]
     exitFailure
 
 whenStrictlyNormal act = do
@@ -78,9 +81,22 @@ whenStrictlyNormal act = do
 
 runNGLessIO :: String -> NGLessIO a -> IO a
 runNGLessIO context act = runResourceT (runExceptT act) >>= \case
-        Left m -> do
-            putStrLn ("Error occurred: "++context)
-            print m
+        Left (NGError NoErrorExit _) -> exitSuccess
+        Left (NGError etype emsg) -> do
+            hPutStrLn stderr ("Exiting after fatal error while " ++ context)
+            case etype of
+                ShouldNotOccur ->
+                        hPutStrLn stderr "Should Not Occur Error! This probably indicates a bug in ngless.\n\tPlease get in touch with the authors <coelho@embl.de> with a description of how this happened."
+                ScriptError ->
+                        hPutStrLn stderr "Script Error"
+                DataError ->
+                        hPutStrLn stderr "Data Error (the input data did not conform to ngless' expectations)"
+                SystemError ->
+                        hPutStrLn stderr "System Error"
+                _ ->
+                        return ()
+            hPutStrLn stderr (redColor ++ emsg)
+            hPutStrLn stderr $ setSGRCode [Reset]
             exitFailure
         Right v -> return v
 
