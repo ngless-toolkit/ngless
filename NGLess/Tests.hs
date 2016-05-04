@@ -1,7 +1,7 @@
 {- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE TemplateHaskell, OverloadedStrings, TupleSections #-}
+{-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
 -- Unit tests are their own programme.
 
 module Main where
@@ -47,6 +47,7 @@ import Interpretation.Unique
 
 import Data.FastQ
 import Utils.Conduit
+import Utils.Here
 import qualified Data.GFF as GFF
 
 import Tests.Utils
@@ -234,13 +235,15 @@ case_map_script = case parsetest map_s >>= checktypes [] of
         sam @?= (5,0,0)
         removeFile "test_samples/sample20_mapped.sam"
 
-map_s = "ngless '0.0'\n\
-    \input = fastq('test_samples/sample20.fq')\n\
-    \preprocess(input) using |read|:\n\
-    \    if len(read) < 20:\n\
-    \        discard\n\
-    \mapped = map(input,reference='sacCer3')\n\
-    \write(mapped, ofile='test_samples/sample20_mapped.sam',format={sam})\n"
+map_s = [here|
+ngless '0.0'
+input = fastq('test_samples/sample20.fq')
+preprocess(input) using |read|:
+    if len(read) < 20:
+        discard
+mapped = map(input,reference='sacCer3')
+write(mapped, ofile='test_samples/sample20_mapped.sam',format={sam})
+|]
 
 
 -- Test compute stats
@@ -274,7 +277,7 @@ case_parse_gff_atributes_trail_del_space = GFF._parseGffAttributes "gene_id=chrI
 
 
 case_calc_sam_stats = testNGLessIO (_samStats "test_samples/sample.sam.gz") >>= \r ->
-  r @?=  (2772,1310,1042)
+  r @?=  (2772,1310,1299)
 
 --- Unique.hs
 

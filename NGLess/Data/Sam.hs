@@ -6,6 +6,7 @@ module Data.Sam
     ( SamLine(..)
     , samLength
     , readSamGroupsC
+    , readSamGroupsC'
     , readSamLine
     , encodeSamLine
     , isAligned
@@ -22,13 +23,16 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
+import qualified Data.Conduit.Combinators as C
+import           Data.Conduit ((=$=))
+import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as VM
 import           Data.Strict.Tuple (Pair(..))
 import Data.Bits (testBit)
 import Control.Error (note)
 import Control.DeepSeq
 
 import Data.Maybe
-import Data.Conduit ((=$=))
 import Data.Function (on)
 import Control.Monad.Except
 import NGLess.NGError
@@ -197,4 +201,46 @@ readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
                 Right parsed@SamLine{} -> C.yield parsed
                 _ -> return ()
         groupLine = (==) `on` samQName
+
+-- | a chunked variation of readSamGroupsC which uses mulitple threads
+readSamGroupsC' :: Int -> C.Conduit ByteLine NGLessIO (V.Vector [SamLine])
+readSamGroupsC' mapthreads = do
+        C.dropWhile (\(ByteLine line) -> B8.head line == '@')
+        C.conduitVector 65536
+            =$= asyncMapEitherC mapthreads (liftM groupByName . V.mapM (readSamLine . unwrapByteLine))
+            -- the groups may not be aligned on the group boundary, thus we need to fix them
+            =$= fixSamGroups
+    where
+        groupByName :: V.Vector SamLine -> V.Vector [SamLine]
+        groupByName vs = V.unfoldr groupByName' (0, B.empty, [])
+            where
+                groupByName' :: (Int, B.ByteString, [SamLine]) -> Maybe ([SamLine], (Int, B.ByteString, [SamLine]))
+                groupByName' (ix,name, acc)
+                    | ix == V.length vs = if null acc
+                                            then Nothing
+                                            else Just (acc,(ix, name,[]))
+                    | null acc = groupByName' (ix + 1, samQName (vs V.! ix), [vs V.! ix])
+                    | samQName (vs V.! ix) == name = groupByName' (ix + 1, name, vs V.! ix: acc)
+                    | otherwise = Just (acc, (ix, B.empty, []))
+        fixSamGroups :: C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
+        fixSamGroups = awaitJust fixSamGroups'
+        fixSamGroups' :: V.Vector [SamLine] -> C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
+        fixSamGroups' prev = C.await >>= \case
+            Nothing -> C.yield prev
+            Just cur -> do
+                    let (lastprev:_) = V.last prev
+                        (curfirst:_) = V.head cur
+                    if samQName lastprev /= samQName curfirst
+                        then do -- lucky case, the groups align with the vector boundary
+                            C.yield prev
+                            fixSamGroups' cur
+                        else do
+                            C.yield (V.slice 0 (V.length prev - 1) prev)
+                            cur' <- liftIO $ injectLast (V.last prev) cur
+                            fixSamGroups' cur'
+        injectLast :: [SamLine] -> V.Vector [SamLine] -> IO (V.Vector [SamLine])
+        injectLast prev gs = do
+            gs' <- V.unsafeThaw gs
+            VM.modify gs' (prev ++ ) 0
+            V.unsafeFreeze gs'
 

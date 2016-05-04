@@ -13,10 +13,10 @@ import qualified Data.Text as T
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy.Char8 as BL8
+import qualified Data.Vector as V
 import           Control.Monad
 import           Control.Monad.Trans.Resource
 
-import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Process as CP
@@ -24,11 +24,9 @@ import qualified Data.Conduit.Combinators as C
 import           Data.Conduit (($$), (=$=))
 
 import GHC.Conc     (getNumCapabilities)
-import Data.Bits    (testBit)
 
 import System.Process
 import System.IO
-import Data.Function
 import System.Exit
 
 import Control.Monad.IO.Class (liftIO)
@@ -40,9 +38,11 @@ import Configuration
 import Output
 import NGLess
 
+import Data.Sam
+import Utils.Utils
 import Utils.Bwa
 import Utils.LockFile
-import Utils.Conduit (conduitPossiblyCompressedFile)
+import Utils.Conduit
 
 data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
 
@@ -138,27 +138,26 @@ _samStats :: FilePath -> NGLessIO (Int, Int, Int)
 _samStats fname = do
     let add1if !v True = v+1
         add1if !v False = v
-        update _ [] = error "This is a bug in ngless" -- perhaps readSamGroupsC should use NonEmptyList
-        update (!t,!al,!u) ((_,aligned):rest) =
-            (t + 1
+        summarize = V.foldl summarize' (0, 0, 0)
+        summarize' _ [] = error "This is a bug in ngless"
+        summarize' (!t, !al, !u) g = let
+                    aligned = any isAligned g
+                    sameRName = allSame (samRName <$> g)
+                    unique = aligned && sameRName
+            in
+                (t + 1
                 ,add1if al aligned
-                ,add1if u  (aligned && null rest))
-        -- This is ugly code, but it makes a big difference in performance
-        -- partialSamParse :: (MonadError NGError m) => C.Conduit B.ByteString m (B.ByteString, B.ByteString)
-        partialSamParse = C.awaitForever $ \line ->
-            unless (B8.head line == '@') $
-                case B8.elemIndex '\t' line of
-                    Nothing -> throwDataError ("Cannot parse SAM file: '"++fname++"'")
-                    Just tab1 -> let (seqname,rest) = B.splitAt (tab1+1) line in -- splitting at tab1 will remove the tab
-                        case B8.readInt rest of
-                            Nothing -> throwDataError ("Cannot parse flags in SAM file '"++B8.unpack rest ++"'")
-                            Just (v,_) -> C.yield (seqname, not $ v `testBit` 2)
+                ,add1if  u unique
+                )
+        update (!a, !b, !c) (!a', !b', !c') = (a+a', b + b', c + c')
 
-    conduitPossiblyCompressedFile fname
-        =$= CB.lines
-        =$= partialSamParse
-        =$= CL.groupBy ((==) `on` fst)
-        $$ CL.fold update (0,0,0)
+    nthreads <- liftIO getNumCapabilities
+    (t, al, u) <- conduitPossiblyCompressedFile fname
+        =$= linesC
+        =$= readSamGroupsC' nthreads
+        =$= asyncMapC 1 summarize
+        $$ CL.fold update (0, 0, 0)
+    return (t, al, u)
 
 printMappingStats :: String -> FilePath -> NGLessIO ()
 printMappingStats ref fname = do
@@ -168,7 +167,7 @@ printMappingStats ref fname = do
 executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMap fps args = do
     ref <- lookupReference args
-    extraArgs <- (map T.unpack) <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
+    extraArgs <- map T.unpack <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
     let executeMap' (NGOList es) = NGOList <$> forM es executeMap'
         executeMap' (NGOReadSet name (ReadSet1 _enc file))   = interpretMapOp ref name [file] extraArgs
         executeMap' (NGOReadSet name (ReadSet2 _enc fp1 fp2)) = interpretMapOp ref name [fp1,fp2] extraArgs
