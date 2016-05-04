@@ -1,5 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
-
+{- Copyright 2013-2016 NGLess Authors
+ - License: MIT
+-}
 module ReferenceDatabases
     ( Reference(..)
     , ReferenceFilePaths(..)
@@ -63,7 +64,7 @@ moduleDirectReference rname = do
             | eref == rname -> return . Just $! ReferenceFilePaths (Just fafile) gtffile mapfile
         _ -> return Nothing
 
-genomePATH = "Sequence/BWAIndex/genome.fa.gz"
+genomePATH = "Sequence/BWAIndex/reference.fa.gz"
 gffPATH = "Annotation/annotation.gtf.gz"
 
 buildFaFilePath :: FilePath -> FilePath
@@ -73,13 +74,13 @@ buildGFFPath = (</> gffPATH)
 
 
 createReferencePack :: FilePath -> FilePath -> FilePath -> NGLessIO ()
-createReferencePack oname genome gtf = do
+createReferencePack oname reference gtf = do
     (rk,tmpdir) <- createTempDir "ngless_ref_creator_"
     outputListLno' DebugOutput ["Working with temporary directory: ", tmpdir]
     liftIO $ do
         createDirectoryIfMissing True (tmpdir ++ "/Sequence/BWAIndex/")
         createDirectoryIfMissing True (tmpdir ++ "/Annotation/")
-    downloadOrCopyFile genome (buildFaFilePath tmpdir)
+    downloadOrCopyFile reference (buildFaFilePath tmpdir)
     downloadOrCopyFile gtf (buildGFFPath tmpdir)
     Bwa.createIndex (buildFaFilePath tmpdir)
     let filelist = gffPATH:[genomePATH ++ ext | ext <- [""
