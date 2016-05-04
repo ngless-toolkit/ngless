@@ -25,6 +25,7 @@ module Language
 
 {- This module defines the internal representation the language -}
 import qualified Data.Text as T
+import           Control.Monad.Extra (whenJust)
 import Control.Monad
 
 import Data.FastQ
@@ -183,12 +184,14 @@ recursiveAnalyse f e = f e >> recursiveAnalyse' e
         recursiveAnalyse' (UnaryOp _ eu) = rf eu
         recursiveAnalyse' (BinaryOp _ e1 e2) = rf e1 >> rf e2
         recursiveAnalyse' (Condition cE tE fE) = rf cE >> rf tE >> rf fE
-        recursiveAnalyse' (IndexExpression ei _) = rf ei
+        recursiveAnalyse' (IndexExpression ei ix) = rf ei >> recurseIndex ix
         recursiveAnalyse' (Assignment _ ea) =  rf ea
         recursiveAnalyse' (FunctionCall _ ef args block) = rf ef >> mapM_ rf (snd <$> args) >> maybe (return ()) (rf . blockBody) block
         recursiveAnalyse' (MethodCall _ em eargs args) = rf em >> maybe (return ()) rf eargs >> mapM_ rf (snd <$> args)
         recursiveAnalyse' (Sequence es) =  mapM_ rf es
         recursiveAnalyse' _ = return ()
+        recurseIndex (IndexOne ix) = rf ix
+        recurseIndex (IndexTwo ix1 ix2) = whenJust ix1 rf >> whenJust ix2 rf
 
 -- 'recursiveTransform' calls 'f' for every sub-expression in its argument,
 -- 'f' will get called with expression where the sub-expressions have already been replaced!

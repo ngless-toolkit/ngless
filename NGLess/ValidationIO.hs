@@ -16,6 +16,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Writer
 import qualified Data.Text as T
+import           Control.Monad.Extra (whenJust)
 
 import Validation
 import Modules
@@ -42,7 +43,7 @@ validateIO mods sc = do
     where
         checks =
             [validateReadInputs
-            ,validate_write_output
+            ,validateOFile
             ,validate_def_genomes
             ]
 
@@ -53,17 +54,13 @@ validateReadInputs (Script _ es) = checkRecursive validateReadInputs' es
     where
         validateReadInputs' :: Expression -> ValidateIO ()
         validateReadInputs' (FunctionCall f expr args _) = do
-                    finfo <- findFunctionIO f
-                    when (ArgCheckFileReadable `elem` (funcArgChecks finfo)) $ do
-                        check expr
-                    forM_ (funcKwArgs finfo) $ \ainfo -> do
-                        when (ArgCheckFileReadable `elem` (argChecks ainfo)) $
-                           validateArg checkFileReadable (argName ainfo) args es
+            finfo <- findFunctionIO f
+            when (ArgCheckFileReadable `elem` funcArgChecks finfo) $
+                validateStrVal checkFileReadable es expr
+            forM_ (funcKwArgs finfo) $ \ainfo ->
+                when (ArgCheckFileReadable `elem` argChecks ainfo) $
+                   validateStrArg checkFileReadable (argName ainfo) args es
         validateReadInputs' _ = return ()
-
-        check (ConstStr fname) = checkFileReadable fname
-        check (Lookup var) = validateStrVar checkFileReadable var es
-        check _ = return ()
 
         checkFileReadable :: T.Text -> ValidateIO ()
         checkFileReadable fname = do
@@ -82,21 +79,20 @@ validateReadInputs (Script _ es) = checkRecursive validateReadInputs' es
 validate_def_genomes :: Script -> ValidateIO ()
 validate_def_genomes (Script _ es) = checkRecursive validate_def_genomes' es
     where
-        validate_def_genomes' (FunctionCall (FuncName "map") _ args _) = validateArg check_reference "reference" args es
-                                                                            >> validateArg check_fafile "fafile" args es
+        validate_def_genomes' (FunctionCall (FuncName "map") _ args _) = validateStrArg check_reference "reference" args es
+                                                                            >> validateStrArg check_fafile "fafile" args es
         validate_def_genomes' _ = return ()
 
 
-validateArg :: (T.Text -> ValidateIO ()) -> T.Text -> [(Variable,Expression)] -> [(Int,Expression)] -> ValidateIO ()
-validateArg f v args es = case lookup (Variable v) args of
-        Just (ConstStr x) -> f x
-        Just (Lookup   x) -> validateStrVar f x es
-        _                 -> return ()
+validateStrArg :: (T.Text -> ValidateIO ()) -> T.Text -> [(Variable,Expression)] -> [(Int,Expression)] -> ValidateIO ()
+validateStrArg f v args es = whenJust (lookup (Variable v) args) $ validateStrVal f es
 
-validateStrVar :: (T.Text -> ValidateIO ()) -> Variable -> [(Int,Expression)] -> ValidateIO ()
-validateStrVar f v es = case tryConstValue v es of
-            Just (NGOString t)  -> f t
-            _ -> return ()
+validateStrVal :: (T.Text -> ValidateIO ()) -> [(Int,Expression)] -> Expression -> ValidateIO ()
+validateStrVal f _ (ConstStr v) = f v
+validateStrVal f es (Lookup v) = case tryConstValue v es of
+    Just (NGOString t)  -> f t
+    _ -> return ()
+validateStrVal _ _ _ = return ()
 
 tryConstValue :: Variable -> [(Int,Expression)] -> Maybe NGLessObject
 tryConstValue var s = case mapMaybe (getAssignment . snd) s of
@@ -130,7 +126,7 @@ check_reference r = do
         ename (ExternalPackagedReference er) = refName er
         ename er = erefName er
         allnames = (ename <$> refs) ++ (refName <$> builtinReferences)
-    unless (any (==r) allnames) $ do
+    unless (r `elem` allnames) $ do
         exists <- liftIO $ doesFileExist (T.unpack r)
         tell1 . T.concat $ [
                     "Could not find reference ", r, " (it is neither built in nor in any of the loaded modules)."
@@ -144,18 +140,25 @@ check_fafile fafile = do
         unless r $
             tell1 (T.concat ["map function expects a file in argument 'fafile', got ", fafile, ", which is not the name of a file."])
 
-validate_write_output (Script _ es) = checkRecursive validate_write es
+validateOFile (Script _ es) = checkRecursive validateOFile' es
     where
-        validate_write (FunctionCall (FuncName "write") _ args _) = validateArg check_can_write_dir "ofile" args es
-        validate_write _ = return ()
+        validateOFile' (FunctionCall f expr args _) = do
+            finfo <- findFunctionIO f
+            when (ArgCheckFileWritable `elem` funcArgChecks finfo) $
+                validateStrVal checkOFile es expr
+            forM_ (funcKwArgs finfo) $ \ainfo ->
+                when (ArgCheckFileWritable `elem` argChecks ainfo) $
+                   validateStrArg checkOFile (argName ainfo) args es
+        validateOFile' _ = return ()
 
-check_can_write_dir :: T.Text -> ValidateIO ()
-check_can_write_dir ofile = do
+checkOFile :: T.Text -> ValidateIO ()
+checkOFile ofile = do
     let dirname = takeDirectory (T.unpack ofile)
     exists <- liftIO $ doesDirectoryExist dirname
     if not exists
-        then tell1 $ T.concat ["write call to file ", ofile, ", but directory ", T.pack dirname, " does not exist."]
+        then tell1 $ T.concat ["File name '", ofile, "' used as output, but directory ", T.pack dirname, " does not exist."]
         else do
             canWrite <- liftIO $ writable <$> getPermissions dirname
             unless canWrite $
                 tell1 (T.concat ["write call to file ", ofile, ", but directory ", T.pack dirname, " is not writable."])
+
