@@ -16,6 +16,8 @@ import qualified Data.Text as T
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
+import qualified Control.Concurrent.Async as A
+import Control.Monad.Trans.Resource
 import Data.Conduit (($$), (=$=))
 import Data.Maybe
 
@@ -35,22 +37,27 @@ drop100 = loop (0 :: Int)
                 when (n < 4) (C.yield line)
                 loop (n+1)
 
-optionalSubsample :: FilePath -> NGLessIO FilePath
-optionalSubsample f = do
-    subsampleActive <- nConfSubsample <$> nglConfiguration
-    if not subsampleActive
-        then return f
-        else do
-            outputListLno' TraceOutput ["Subsampling file ", f]
-            (newfp,h) <- openNGLTempFile f "" "fq.gz"
+performSubsample :: FilePath -> Handle -> IO ()
+performSubsample f h = do
+    runResourceT $
             conduitPossiblyCompressedFile f
                 =$= CB.lines
                 =$= drop100
                 =$= C.unlinesAscii
                 $$  asyncGzipTo h
-            liftIO $ hClose h
+    hClose h
+
+optionalSubsample :: FilePath -> NGLessIO FilePath
+optionalSubsample f = do
+    subsampleActive <- nConfSubsample <$> nglConfiguration
+    if subsampleActive
+        then do
+            outputListLno' TraceOutput ["Subsampling file ", f]
+            (newfp,h) <- openNGLTempFile f "" "fq.gz"
+            liftIO $ performSubsample f h
             outputListLno' TraceOutput ["Finished subsampling (temp sampled file is ", newfp, ")"]
             return newfp
+        else return f
 
 -- ^ Process quality.
 doQC1 :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
@@ -147,20 +154,18 @@ executeFastq expr args = do
     enc <- getEncArgument "fastq" args
     qcNeeded <- lookupBoolOrScriptErrorDef (return True) "fastq hidden QC argument" "__perform_qc" args
     case expr of
-        (NGOString fname) -> NGOReadSet fname <$> asReadSet1mayQC qcNeeded enc fname
+        (NGOString fname) -> NGOReadSet fname <$> do
+            fname' <- optionalSubsample (T.unpack fname)
+            asReadSet1mayQC qcNeeded enc fname'
         (NGOList fps) -> NGOList <$> sequence [NGOReadSet fname <$> doQC1 enc (T.unpack fname) | NGOString fname <- fps]
         v -> throwScriptError ("fastq function: unexpected first argument: " ++ show v)
 
 
-asReadSet1mayQC :: Bool -> Maybe FastQEncoding -> T.Text -> NGLessIO ReadSet
-asReadSet1mayQC qcNeeded enc fpt = do
-    let fp = T.unpack fpt
-    fp' <- optionalSubsample fp
-    if qcNeeded
-        then doQC1 enc fp'
-        else do
-            enc' <- fromMaybe (encodingFor fp') (return <$> enc)
-            return (ReadSet1 enc' fp')
+asReadSet1mayQC :: Bool -> Maybe FastQEncoding -> FilePath -> NGLessIO ReadSet
+asReadSet1mayQC True enc fp = doQC1 enc fp
+asReadSet1mayQC False enc fp = do
+    enc' <- fromMaybe (encodingFor fp) (return <$> enc)
+    return (ReadSet1 enc' fp)
 
 executePaired :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
@@ -170,14 +175,25 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
     outputListLno' TraceOutput ["Executing paired on ", show mate1, show mate2, show mate3]
     qcNeeded <- lookupBoolOrScriptErrorDef (return True) "fastq hidden QC argument" "__perform_qc" args
 
-    (ReadSet1 enc1 fp1) <- asReadSet1mayQC qcNeeded enc mate1
-    (ReadSet1 enc2 fp2) <- asReadSet1mayQC qcNeeded enc mate2
+    subsampleActive <- nConfSubsample <$> nglConfiguration
+    (fp1', fp2') <- if subsampleActive
+        then do
+            (fp1',h1') <- openNGLTempFile (T.unpack mate1) "subsampled" "1.fq.gz"
+            (fp2',h2') <- openNGLTempFile (T.unpack mate2) "subsampled" "2.fq.gz"
+            outputListLno' TraceOutput ["Subsampling paired files ", T.unpack mate1, " and ", T.unpack mate2, " (parallel processing)"]
+            void . liftIO $ A.concurrently
+                (performSubsample (T.unpack mate1) h1')
+                (performSubsample (T.unpack mate2) h2')
+            return (fp1', fp2')
+        else return (T.unpack mate1, T.unpack mate2)
+    (ReadSet1 enc1 fp1) <- asReadSet1mayQC qcNeeded enc fp1'
+    (ReadSet1 enc2 fp2) <- asReadSet1mayQC qcNeeded enc fp2'
     when (enc1 /= enc2) $
         throwDataError "Mates do not seem to have the same quality encoding!"
     case mate3 of
         Nothing -> return (ReadSet2 enc1 fp1 fp2)
         Just (NGOString f3) -> do
-            (ReadSet1 enc3 fp3) <- asReadSet1mayQC qcNeeded enc f3
+            (ReadSet1 enc3 fp3) <- optionalSubsample (T.unpack f3) >>= asReadSet1mayQC qcNeeded enc
             when (enc1 /= enc3) $
                 throwDataError "Mates do not seem to have the same quality encoding!"
             return (ReadSet3 enc1 fp1 fp2 fp3)
