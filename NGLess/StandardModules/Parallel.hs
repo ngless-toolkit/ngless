@@ -78,8 +78,8 @@ getLock basedir (x:xs) = do
             Nothing -> getLock basedir xs
             Just rk -> return (x,rk)
 
-partialfile :: T.Text -> FilePath
-partialfile entry = "ngless-partials" </> T.unpack entry <.> "part"
+partialfile :: FilePath -> T.Text -> FilePath
+partialfile hashdir entry = "ngless-partials" </> hashdir </> T.unpack entry <.> "part"
 
 executeCollect :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
 executeCollect (NGOCounts countfile) kwargs = do
@@ -88,12 +88,13 @@ executeCollect (NGOCounts countfile) kwargs = do
     ofile <- lookupStringOrScriptError "collect arguments" "ofile" kwargs
     canMove <- lookupBoolOrScriptErrorDef (return True) "collect hidden argument" "__can_move" kwargs
     hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
-    lockdir <- setupHashDirectory "ngless-partials" hash
+    hashdir <- setupHashDirectory "ngless-partials" hash
+    let partialfile' = partialfile hashdir
 
-    liftIO $ (if canMove then moveOrCopy else copyFile) countfile (partialfile current)
-    canCollect <- and <$> forM allentries (liftIO . doesFileExist . partialfile)
+    liftIO $ (if canMove then moveOrCopy else copyFile) countfile (partialfile' current)
+    canCollect <- and <$> forM allentries (liftIO . doesFileExist . partialfile')
     when canCollect $ do
-        newfp <- concatCounts allentries (map partialfile allentries)
+        newfp <- concatCounts allentries (map partialfile' allentries)
         liftIO $ moveOrCopy newfp (T.unpack ofile)
     return NGOVoid
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)
