@@ -12,6 +12,9 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import           Data.Time (getZonedTime)
+import           Data.Time.Format (formatTime, defaultTimeLocale)
+import           Data.List.Extra (snoc)
 import System.FilePath.Posix
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource
@@ -51,9 +54,12 @@ executeLock1 (NGOList entries) kwargs  = do
     lockdir <- setupHashDirectory "ngless-lock" hash
     (e,rk) <- getLock lockdir entries'
     registerHook FinishOkHook $ do
-        let receiptfile = lockdir </> (T.unpack e) ++ ".finished"
-        liftIO $ withFile receiptfile WriteMode $ \h ->
-            hPutStrLn h (concat ["Finished ", T.unpack e])
+        let receiptfile = lockdir </> T.unpack e ++ ".finished"
+        liftIO $ withFile receiptfile WriteMode $ \h -> do
+            t <- getZonedTime
+            let tformat = "%a %d-%m-%Y %R"
+                tstr = formatTime defaultTimeLocale tformat t
+            hPutStrLn h (concat ["Finished ", T.unpack e, " at ", tstr])
         release rk
     return $! NGOString e
 
@@ -85,9 +91,10 @@ executeCollect (NGOCounts countfile) kwargs = do
     lockdir <- setupHashDirectory "ngless-partials" hash
 
     liftIO $ (if canMove then moveOrCopy else copyFile) countfile (partialfile current)
-    canCollect <- all id <$> forM allentries (\e -> liftIO $ doesFileExist (partialfile e))
-    when canCollect $
-        concatCounts allentries (map partialfile allentries) (T.unpack ofile)
+    canCollect <- and <$> forM allentries (liftIO . doesFileExist . partialfile)
+    when canCollect $ do
+        newfp <- concatCounts allentries (map partialfile allentries)
+        liftIO $ moveOrCopy newfp (T.unpack ofile)
     return NGOVoid
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)
 
@@ -98,21 +105,33 @@ concatlines entries
     | allSame (head <$> entries) = return $! flip B8.snoc '\n' (B8.intercalate "\t" ((head . head $ entries):concat (tail <$> entries)))
     | otherwise = throwDataError "Mismatched collect()"
 
-concatCounts :: [T.Text] -> [FilePath] -> FilePath -> NGLessIO ()
-concatCounts headers inputs ofile = do
-    (newfp,hout) <- openNGLTempFile ofile "collected.counts." "txt"
-    liftIO $ T.hPutStrLn hout (T.intercalate "\t" ("":headers))
-    C.sequenceSources
-        [conduitPossiblyCompressedFile f
-            =$= CB.lines
-            =$= (C.await >> C.awaitForever C.yield) -- drop header line
-            =$= CL.map (B8.split '\t')
-            | f <- inputs]
-        =$= CL.mapM (runNGLess . concatlines)
-        $$ C.sinkHandle hout
-    liftIO $ do
-        hClose hout
-        moveOrCopy newfp ofile
+
+-- If the number of input files is very large (>1024, typically), we risk
+-- hitting the limit on open files by a process, so we work in batches of 512.
+maxNrOpenFiles = 512 :: Int
+
+concatCounts :: [T.Text] -> [FilePath] -> NGLessIO FilePath
+concatCounts headers inputs
+    | length inputs > maxNrOpenFiles = do
+        let current = take maxNrOpenFiles inputs
+            currenth = take maxNrOpenFiles headers
+            rest = drop maxNrOpenFiles inputs
+            resth = drop maxNrOpenFiles headers
+        first <- concatCounts currenth current
+        concatCounts (snoc resth $ T.intercalate "\t" currenth) (snoc rest first)
+    | otherwise = do
+        (newfp,hout) <- openNGLTempFile "collected" "collected.counts." "txt"
+        liftIO $ T.hPutStrLn hout (T.intercalate "\t" ("":headers))
+        C.sequenceSources
+            [conduitPossiblyCompressedFile f
+                =$= CB.lines
+                =$= (C.await >> C.awaitForever C.yield) -- drop header line
+                =$= CL.map (B8.split '\t')
+                | f <- inputs]
+            =$= CL.mapM (runNGLess . concatlines)
+            $$ C.sinkHandle hout
+        liftIO (hClose hout)
+        return newfp
 
 
 lock1 = Function
