@@ -37,5 +37,6 @@ Example
    Language
    Functions
    methods
+   modules
    faq
    advanced
