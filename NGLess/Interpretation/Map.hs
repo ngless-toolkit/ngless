@@ -6,6 +6,7 @@
 
 module Interpretation.Map
     ( executeMap
+    , executeMapStats
     , _samStats
     ) where
 
@@ -174,3 +175,18 @@ executeMap fps args = do
         executeMap' (NGOReadSet name (ReadSet3 _enc fp1 fp2 fp3)) = interpretMapOp ref name [fp1,fp2,fp3] extraArgs
         executeMap' v = throwShouldNotOccur ("map expects ReadSet, got " ++ show v ++ "")
     executeMap' fps
+
+executeMapStats :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeMapStats (NGOMappedReadSet name sampf _) _ = do
+    outputListLno' TraceOutput ["Computing mapstats on ", sampf]
+    (t,al,u) <- _samStats sampf
+    (countfp, hout) <- openNGLTempFile sampf "sam_stats_" ".stats"
+    liftIO . hPutStr hout . concat $
+        [     "\t",  T.unpack name, "\n"
+        ,"total\t",   show  t, "\n"
+        ,"aligned\t", show al, "\n"
+        ,"unique\t",  show  u, "\n"
+        ]
+    liftIO $ hClose hout
+    return $! NGOCounts countfp
+executeMapStats other _ = throwScriptError ("Wrong argument for mapstats: "++show other)

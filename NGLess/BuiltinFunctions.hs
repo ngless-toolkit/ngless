@@ -29,6 +29,7 @@ builtinFunctions =
     ,Function (FuncName "preprocess") (Just NGLReadSet) [] NGLVoid preprocessArgs False
     ,Function (FuncName "substrim") (Just NGLRead) [] NGLRead substrimArgs False
     ,Function (FuncName "map") (Just NGLReadSet) [] NGLMappedReadSet mapArgs False
+    ,Function (FuncName "mapstats") (Just NGLMappedReadSet) [] NGLCounts mapStatsArgs False
     ,Function (FuncName "select") (Just NGLMappedReadSet) [] NGLMappedReadSet selectArgs False
     ,Function (FuncName "count") (Just NGLMappedReadSet) [] NGLCounts countArgs False
     ,Function (FuncName "write") (Just NGLAny) [] NGLVoid writeArgs False
@@ -91,6 +92,8 @@ mapArgs =
     ,ArgInformation "__extra_bwa" False (NGList NGLString) []
     ,ArgInformation "__oname" False NGLString []
     ]
+
+mapStatsArgs = []
 
 substrimArgs =
     [ArgInformation "min_quality" True NGLInteger []
