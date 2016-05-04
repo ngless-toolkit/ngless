@@ -223,7 +223,7 @@ checklist (Lookup (Variable v)) = do
 checklist _ = errorInLine "List expected" >> return (Just NGLVoid)
 
 allFunctions = (builtinFunctions ++) <$> moduleFunctions
-moduleFunctions = concat . map modFunctions <$> ask
+moduleFunctions = concatMap modFunctions <$> ask
 
 funcInfo fn = do
     fs <- allFunctions
@@ -231,9 +231,7 @@ funcInfo fn = do
     case matched of
         [fi] -> return fi
         [] -> do
-            errorInLineC (["Unknown function '", show fn, "'"] ++ case findSuggestion (unwrapFuncName fn) (unwrapFuncName . funcName <$> fs) of
-                                        Nothing -> []
-                                        Just (Suggestion sug reason) -> [". Did you mean `", T.unpack sug, "` (", T.unpack reason, ")?"])
+            errorInLineC ["Unknown function '", show fn, "'", T.unpack (suggestionMessage (unwrapFuncName fn) (unwrapFuncName . funcName <$> fs))]
             cannotContinue
         _ -> do
             errorInLineC ["Too many matches for function '", show fn, "'"]
@@ -270,12 +268,11 @@ checkfuncarg f arginfo (Variable v, e) = do
     eType <- nglTypeOf e
     let ainfo = find ((==v) . argName) arginfo
     case (ainfo,eType) of
-        (Nothing, _) -> errorInLineC $ ["Bad argument '", T.unpack v, "' for function '", show f, "'.\n"]
-                            ++ (case findSuggestion v (argName <$> arginfo) of
-                                Just (Suggestion valid reason) -> ["\tDid you mean `", T.unpack valid, "` (", T.unpack reason, ").\n\n"]
-                                Nothing -> []
-                            ) ++ ["This function takes the following arguments:\n"]
-                            ++ (map ((\aname -> ("\t"++aname++"\n")) . T.unpack . argName) arginfo)
+        (Nothing, _) -> errorInLineC $
+                            ["Bad argument '", T.unpack v, "' for function '", show f
+                            ,"'.\n", T.unpack $ suggestionMessage v (argName <$> arginfo)
+                            ,"This function takes the following arguments:\n"]
+                            ++ map ((\aname -> ("\t"++aname++"\n")) . T.unpack . argName) arginfo
         (_, Nothing) -> errorInLine "Could not infer type of argument"
         (Just ainfo', Just t') -> when (argType ainfo' /= t') $
                     (errorInLineC
@@ -318,7 +315,7 @@ checkmethodargs m args = forM_ args check1arg *> findAllRequired
             [_] -> return ()
             [] -> errorInLineC ["Argument ", T.unpack (argName ai), " is missing in method call ", show m, "."]
             _ -> error "This should never happen: multiple arguments with the same name should have been caught before"
-        check1arg (Variable v, e) = do
+        check1arg (Variable v, e) =
             case filter ((==v) . argName) (methodKwargsInfo minfo) of
                 [] -> errorInLineC ["Argument ", show v, " in method call ", show m, ": not recognized. ", T.unpack $ suggestionMessage v (argName <$> methodKwargsInfo minfo)]
                 [ainfo] -> do

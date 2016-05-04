@@ -34,4 +34,4 @@ dist a b = levenshteinDistance defaultEditCosts (T.unpack a) (T.unpack b)
 suggestionMessage :: T.Text -> [T.Text] -> T.Text
 suggestionMessage used valid = case findSuggestion used valid of
       Nothing -> ""
-      Just (Suggestion suggestion reason) -> T.concat ["Did you mean '", suggestion, "' (", reason, ")"]
+      Just (Suggestion suggestion reason) -> T.concat ["Did you mean '", suggestion, "' (", reason, ")?"]
