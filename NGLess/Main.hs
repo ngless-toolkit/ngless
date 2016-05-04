@@ -1,7 +1,6 @@
 {- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE DeriveDataTypeable, OverloadedStrings, LambdaCase #-}
 module Main
     ( main
     ) where
