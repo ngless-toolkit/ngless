@@ -1,5 +1,9 @@
 ngless '0.0'
 mapped = samfile('input.sam')
+remapped = select(mapped) using |mread|:
+    mread = mread
+write(remapped, ofile='output.passthrough.sam')
+
 mapped_filtered = select(mapped) using |mread|:
     if not mread.flag({mapped}):
         discard

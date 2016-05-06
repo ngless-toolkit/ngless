@@ -63,7 +63,7 @@ setupHashDirectory basename hash = do
 executeLock1 (NGOList entries) kwargs  = do
     entries' <- mapM (stringOrTypeError "lock1") entries
     hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
-    lockdir <- setupHashDirectory "ngless-lock" hash
+    lockdir <- setupHashDirectory "ngless-locks" hash
     (e,rk) <- getLock lockdir entries'
     registerHook FinishOkHook $ do
         let receiptfile = lockdir </> T.unpack e ++ ".finished"
@@ -167,14 +167,19 @@ collectFunction = Function
     }
 
 addHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
-addHash script = pureTransform (addHash' hash) script
+addHash script = pureTransform addHash' script
     where
         hash :: T.Text
         hash = T.pack . MD5.md5s . MD5.Str . show . map snd $ script
-        addHash' :: T.Text -> Expression -> Expression
-        addHash' h (FunctionCall (FuncName fn) expr kwargs block)
+        addHash' :: Expression -> Expression
+        addHash' (FunctionCall (FuncName fn) expr kwargs block)
             | fn `elem` ["lock1", "collect"] = FunctionCall (FuncName fn) expr ((Variable "__hash", ConstStr h):kwargs) block
-        addHash' _ e = e
+            where
+                h = T.pack . MD5.md5s . MD5.Str . show $
+                        case fn of
+                            "lock1" -> map snd $ script
+                            "collect" -> expr:map snd script
+        addHash' e = e
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
