@@ -260,24 +260,26 @@ checkFuncUnnamed f arg = do
 checkFuncKwArgs :: FuncName -> [(Variable, Expression)] -> TypeMSt ()
 checkFuncKwArgs f args = do
     Function _ _ _ _ argInfo _ <- funcInfo f
-    mapM_ (checkfuncarg f argInfo) args
+    mapM_ (check1arg (concat ["function '", show f, "'"]) argInfo) args
 
 
-checkfuncarg :: FuncName -> [ArgInformation] -> (Variable, Expression) -> TypeMSt ()
-checkfuncarg f arginfo (Variable v, e) = do
+check1arg :: String -> [ArgInformation] -> (Variable, Expression) -> TypeMSt ()
+check1arg ferr arginfo (Variable v, e) = do
     eType <- nglTypeOf e
     let ainfo = find ((==v) . argName) arginfo
     case (ainfo,eType) of
         (Nothing, _) -> errorInLineC $
-                            ["Bad argument '", T.unpack v, "' for function '", show f
-                            ,"'.\n", T.unpack $ suggestionMessage v (argName <$> arginfo)
-                            ,"This function takes the following arguments:\n"]
-                            ++ map ((\aname -> ("\t"++aname++"\n")) . T.unpack . argName) arginfo
-        (_, Nothing) -> errorInLine "Could not infer type of argument"
-        (Just ainfo', Just t') -> when (argType ainfo' /= t') $
-                    (errorInLineC
-                            ["Bad argument type in ", show f ,", variable " , show v, ". ",
-                            "Expected ", show . argType $ ainfo', " got ", show t', "."])
+            ["Bad argument '", T.unpack v, "' for ",  ferr, ".\n"
+            ,T.unpack $ suggestionMessage v (argName <$> arginfo)
+            ,"This function takes the following arguments:\n"]
+            ++ map ((\aname -> "\t"++aname++"\n") . T.unpack . argName) arginfo
+        (_, Nothing) -> return () -- Could not infer type of argument. Maybe an error, but maybe not
+        (Just ainfo', Just t') ->
+            when (argType ainfo' /= t') $
+                errorInLineC
+                    ["Bad argument type in ", ferr ,", variable " , show v, ". ",
+                    "Expected ", show . argType $ ainfo', " got ", show t', "."]
+
 
 requireType :: NGLType -> Expression -> TypeMSt NGLType
 requireType def_t e = nglTypeOf e >>= \case
@@ -304,27 +306,16 @@ checkmethodcall m self arg = do
     return . Just . methodReturnType $ minfo
 
 checkmethodargs :: MethodName -> [(Variable, Expression)] -> TypeMSt ()
-checkmethodargs m args = forM_ args check1arg *> findAllRequired
+checkmethodargs m args = forM_ args (check1arg (concat ["method '", show m, "'"]) ainfo) *> findAllRequired
     where
         minfo = findMethodInfo m
-        requiredArgs = filter argRequired (methodKwargsInfo minfo)
-        findAllRequired = mapM_ find1 requiredArgs
-
-        find1 :: ArgInformation -> TypeMSt ()
-        find1 ai = case filter (\(Variable v,_) -> v == argName ai) args of
-            [_] -> return ()
-            [] -> errorInLineC ["Argument ", T.unpack (argName ai), " is missing in method call ", show m, "."]
-            _ -> error "This should never happen: multiple arguments with the same name should have been caught before"
-        check1arg (Variable v, e) =
-            case filter ((==v) . argName) (methodKwargsInfo minfo) of
-                [] -> errorInLineC ["Argument ", show v, " in method call ", show m, ": not recognized. ", T.unpack $ suggestionMessage v (argName <$> methodKwargsInfo minfo)]
-                [ainfo] -> do
-                    let reqType = argType ainfo
-                    actualType <- requireType reqType e
-                    when (actualType /= reqType) (errorInLineC
-                            ["Bad argument type for argument ", show v, " in method call ", show m, ". ",
-                             "Expected ", show reqType, " got ", show actualType])
-                _ -> error "This should never happen. Internal bug in ngless."
+        ainfo = methodKwargsInfo minfo
+        requiredArgs = filter argRequired ainfo
+        findAllRequired = forM_ requiredArgs $ \ai ->
+            case filter (\(Variable v,_) -> v == argName ai) args of
+                [_] -> return ()
+                [] -> errorInLineC ["Required argument ", T.unpack (argName ai), " is missing in method call ", show m, "."]
+                _ -> error "This should never happen: multiple arguments with the same name should have been caught before"
 
 
 
