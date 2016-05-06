@@ -21,7 +21,8 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Trans.Resource
 
-import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString as B
 import qualified Data.Map as Map
 
 import qualified Data.Text as T
@@ -31,8 +32,8 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Zlib as C
 import qualified Data.Conduit as C
-import Data.Conduit (($=), ($$), (=$=), (=$))
-import Data.Conduit.Async ((=$=&), ($$&))
+import           Data.Conduit (($=), (=$=), (=$), ($$+), ($$+-))
+import           Data.Conduit.Async ((=$=&), ($$&))
 import qualified Data.Vector as V
 import           Control.DeepSeq (NFData(..))
 
@@ -486,16 +487,22 @@ executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
 executePrint err  _ = throwScriptError ("Cannot print " ++ show err)
 
 executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
-executeSelectWBlock input@NGOMappedReadSet{ nglSamFile= fname} [] (Block [Variable var] body) = do
-        runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", fname]
-        (oname, ohandle) <- runNGLessIO $ openNGLTempFile fname "block_selected_" "sam"
-        conduitPossiblyCompressedFile fname
-            =$= linesC
-            =$= readSamGroupsC
+executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = samfp} [] (Block [Variable var] body) = do
+        runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", samfp]
+        (oname, ohandle) <- runNGLessIO $ openNGLTempFile samfp "block_selected_" "sam"
+        (samcontent, ()) <-
+            conduitPossiblyCompressedFile samfp
+                =$= linesC
+                $$+ C.takeWhile ((=='@') . B8.head . unwrapByteLine)
+                =$= CL.map unwrapByteLine
+                =$= C.unlinesAscii
+                =$= CB.sinkHandle ohandle
+        samcontent
+            $$+- readSamGroupsC
             =$= C.mapM filterGroup
             =$= CL.concat
             =$= C.unlinesAscii
-            $$ CB.sinkHandle ohandle
+            =$= CB.sinkHandle ohandle
         liftIO $ hClose ohandle
         return input { nglSamFile = oname }
     where

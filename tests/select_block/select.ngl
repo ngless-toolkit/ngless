@@ -6,6 +6,8 @@ write(mapped, ofile='output.sam')
 mapped_plus = select(mapped) using |mread|:
     if not mread.flag({mapped}):
         discard
+write(mapped_plus, ofile='output.plus.sam')
+
 reads_plus = as_reads(mapped_plus)
 write(reads_plus, ofile='output.plus.fq')
 

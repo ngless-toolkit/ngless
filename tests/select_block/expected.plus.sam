@@ -1,0 +1,19 @@
+@SQ	SN:I	LN:230218
+@SQ	SN:II	LN:813184
+@SQ	SN:III	LN:316620
+@SQ	SN:IV	LN:1531933
+@SQ	SN:IX	LN:439888
+@SQ	SN:Mito	LN:85779
+@SQ	SN:V	LN:576874
+@SQ	SN:VI	LN:270161
+@SQ	SN:VII	LN:1090940
+@SQ	SN:VIII	LN:562643
+@SQ	SN:X	LN:745751
+@SQ	SN:XI	LN:666816
+@SQ	SN:XII	LN:1078177
+@SQ	SN:XIII	LN:924431
+@SQ	SN:XIV	LN:784333
+@SQ	SN:XV	LN:1091291
+@SQ	SN:XVI	LN:948066
+@PG	ID:bwa	PN:bwa	VN:0.7.7-r441	CL:/home/luispedro/.local/share/ngless/bin/ngless-0.0.0-bwa mem -t 1 /home/luispedro/.local/share/ngless/data/sacCer3/Sequence/BWAIndex/reference.fa.gz sample.fq
+MATCH_YEAST	0	I	1	36	60M	*	0	0	CCACACCACACCCACACACCCACACACCACACCACACACCACACCACACCCACACACACA	ccacaccacacccacacacccacacaccacaccacacaccacaccacacccacacacaca	NM:i:0	MD:Z:60	AS:i:60	XS:i:49
