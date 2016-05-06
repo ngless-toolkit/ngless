@@ -15,7 +15,10 @@ import qualified Data.Text.IO as T
 import           Data.Time (getZonedTime)
 import           Data.Time.Format (formatTime, defaultTimeLocale)
 import           Data.List.Extra (snoc)
-import System.FilePath.Posix
+import           System.Posix.Unistd (fileSynchronise)
+import           System.Posix.IO (openFd, defaultFileFlags, closeFd, OpenMode(..), handleToFd)
+import           System.FilePath.Posix
+
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource
 import System.IO
@@ -41,6 +44,15 @@ import FileManagement
 import Utils.Utils
 import Utils.Conduit
 import Utils.LockFile
+
+syncFile :: FilePath -> IO ()
+syncFile fname = do
+    withFile fname ReadWriteMode $ handleToFd >=> fileSynchronise
+    -- withFile does not support directories
+    -- The code below will also not work on Windows
+    fd <- openFd (takeDirectory fname) ReadOnly Nothing defaultFileFlags
+    fileSynchronise fd
+    closeFd fd
 
 setupHashDirectory :: FilePath -> T.Text -> NGLessIO FilePath
 setupHashDirectory basename hash = do
@@ -78,23 +90,20 @@ getLock basedir (x:xs) = do
             Nothing -> getLock basedir xs
             Just rk -> return (x,rk)
 
-partialfile :: FilePath -> T.Text -> FilePath
-partialfile hashdir entry = "ngless-partials" </> hashdir </> T.unpack entry <.> "part"
-
 executeCollect :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
 executeCollect (NGOCounts countfile) kwargs = do
     current <- lookupStringOrScriptError "collect arguments" "current" kwargs
     allentries <- lookupStringListOrScriptError "collect arguments" "allneeded" kwargs
     ofile <- lookupStringOrScriptError "collect arguments" "ofile" kwargs
-    canMove <- lookupBoolOrScriptErrorDef (return True) "collect hidden argument" "__can_move" kwargs
+    canMove <- lookupBoolOrScriptErrorDef (return False) "collect hidden argument" "__can_move" kwargs
     hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
     hashdir <- setupHashDirectory "ngless-partials" hash
-    let partialfile' = partialfile hashdir
-
-    liftIO $ (if canMove then moveOrCopy else copyFile) countfile (partialfile' current)
-    canCollect <- and <$> forM allentries (liftIO . doesFileExist . partialfile')
+    let partialfile entry = hashdir </> T.unpack entry <.> "part"
+    liftIO $ syncFile countfile
+    liftIO $ (if canMove then moveOrCopy else copyFile) countfile (partialfile current)
+    canCollect <- and <$> forM allentries (liftIO . doesFileExist . partialfile)
     when canCollect $ do
-        newfp <- concatCounts allentries (map partialfile' allentries)
+        newfp <- concatCounts allentries (map partialfile allentries)
         liftIO $ moveOrCopy newfp (T.unpack ofile)
     return NGOVoid
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)
