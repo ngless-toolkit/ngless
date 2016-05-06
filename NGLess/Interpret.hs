@@ -490,6 +490,9 @@ executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> Inte
 executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = samfp} [] (Block [Variable var] body) = do
         runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", samfp]
         (oname, ohandle) <- runNGLessIO $ openNGLTempFile samfp "block_selected_" "sam"
+        env <- gets id
+        numCapabilities <- liftIO getNumCapabilities
+        let mapthreads = max 1 (numCapabilities - 2)
         (samcontent, ()) <-
             conduitPossiblyCompressedFile samfp
                 =$= linesC
@@ -498,19 +501,20 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = samfp} [] (Block [Varia
                 =$= C.unlinesAscii
                 =$= CB.sinkHandle ohandle
         samcontent
-            $$+- readSamGroupsC
-            =$= C.mapM filterGroup
-            =$= CL.concat
-            =$= C.unlinesAscii
+            $$+- C.transPipe runNGLessIO (readSamGroupsC' mapthreads)
+            =$= asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . filterGroup))
             =$= CB.sinkHandle ohandle
         liftIO $ hClose ohandle
         return input { nglSamFile = oname }
     where
-        filterGroup :: [SamLine] -> InterpretationEnvIO [B.ByteString]
+        concatLines :: V.Vector [B.ByteString] -> B.ByteString
+        concatLines = B8.unlines . concat . V.toList
+
+        filterGroup :: [SamLine] -> InterpretationROEnv [B.ByteString]
         filterGroup [] = return []
         filterGroup [SamHeader line] = return [line]
         filterGroup mappedreads  = do
-                    mrs' <- runInROEnvIO (interpretBlock1 [(var, NGOMappedRead mappedreads)] body)
+                    mrs' <- interpretBlock1 [(var, NGOMappedRead mappedreads)] body
                     if blockStatus mrs' `elem` [BlockContinued, BlockOk]
                         then case lookup var (blockValues mrs') of
                             Just (NGOMappedRead []) -> return []
