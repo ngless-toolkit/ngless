@@ -169,8 +169,6 @@ collectFunction = Function
 addHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 addHash script = pureTransform addHash' script
     where
-        hash :: T.Text
-        hash = T.pack . MD5.md5s . MD5.Str . show . map snd $ script
         addHash' :: Expression -> Expression
         addHash' (FunctionCall (FuncName fn) expr kwargs block)
             | fn `elem` ["lock1", "collect"] = FunctionCall (FuncName fn) expr ((Variable "__hash", ConstStr h):kwargs) block
