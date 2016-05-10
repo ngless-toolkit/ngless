@@ -10,14 +10,25 @@ module StandardModules.Parallel
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as VM
 import           Data.Time (getZonedTime)
 import           Data.Time.Format (formatTime, defaultTimeLocale)
-import           Data.List.Extra (snoc)
+import           Data.List.Extra (snoc, chunksOf)
 import           System.Posix.Unistd (fileSynchronise)
 import           System.Posix.IO (openFd, defaultFileFlags, closeFd, OpenMode(..), handleToFd)
 import           System.FilePath.Posix
+import           GHC.Conc (getNumCapabilities, atomically)
+import qualified Control.Concurrent.Async as A
+import qualified Control.Concurrent.STM.TBMQueue as TQ
+import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.TQueue as CA
+import           Control.Monad.ST
+import           Control.DeepSeq
+import           Data.Traversable
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource
@@ -29,7 +40,6 @@ import System.Directory (createDirectoryIfMissing, doesFileExist, copyFile)
 import qualified Data.Hash.MD5 as MD5
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
-import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import           Data.Conduit ((=$=), ($$))
 
@@ -108,13 +118,64 @@ executeCollect (NGOCounts countfile) kwargs = do
     return NGOVoid
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)
 
-concatlines :: [[B.ByteString]] -> NGLess B.ByteString
-concatlines [] = return B.empty
-concatlines entries
-    | any null entries = throwDataError "Empty line in collect"
-    | allSame (head <$> entries) = return $! flip B8.snoc '\n' (B8.intercalate "\t" ((head . head $ entries):concat (tail <$> entries)))
-    | otherwise = throwDataError "Mismatched collect()"
 
+-- | split a list into a given number of (roughly) equally sized chunks
+nChunks :: Int -- ^ number of chunks
+            -> [a] -> [[a]]
+nChunks 1 xs = [xs]
+nChunks n xs = chunksOf p xs
+    where
+        p = 1 + (length xs `div` n)
+
+splitLines :: [V.Vector B.ByteString] -> NGLess (V.Vector B.ByteString, V.Vector B.ByteString)
+splitLines = mapM splitLine1 >=> groupLines
+    where
+        splitLine1 :: V.Vector B.ByteString -> NGLess (V.Vector B.ByteString, V.Vector B.ByteString)
+        splitLine1 ells = runST $ do
+            let n = V.length ells
+            headers <- VM.new n
+            contents <- VM.new n
+            let split1 False _ _ = return False
+                split1 _ ix line = case B8.elemIndex '\t' line of
+                            Nothing -> return False
+                            Just p -> do
+                                let (h, c) = B.splitAt p line
+                                VM.write headers ix h
+                                VM.write contents ix c
+                                return True
+            isOk <- V.ifoldM split1 True ells
+            if isOk
+               then do
+                   headers' <- V.unsafeFreeze headers
+                   contents' <- V.unsafeFreeze contents
+                   return . Right $ (headers', contents')
+               else return $ throwDataError "Line does not have a TAB character"
+
+groupLines :: [(V.Vector B.ByteString, V.Vector B.ByteString)] -> NGLess (V.Vector B.ByteString, V.Vector B.ByteString)
+groupLines [] = return (V.empty, V.empty)
+groupLines groups
+    | allSame (fst <$> groups) = return (fst . head $ groups, V.unfoldr catContent 0)
+    | otherwise = throwDataError "Headers do not match"
+    where
+        n = V.length (head contents)
+        contents = snd <$> groups
+        catContent ix
+            | ix == n = Nothing
+            | otherwise = Just (B.concat (map (V.! ix) contents), ix + 1)
+
+concatPartials :: [(V.Vector B.ByteString, V.Vector B.ByteString)] -> NGLess BL.ByteString
+concatPartials [] = throwShouldNotOccur "concatPartials of empty set"
+concatPartials input = do
+    (header, contents) <- groupLines input
+    return . BL.fromChunks $ concatMap (\ix -> [header V.! ix, contents V.! ix, "\n"]) [0 .. V.length header - 1]
+
+
+-- | strict variation of sinkTBMQueue
+sinkTBMQueue' q shouldClose = do
+        C.awaitForever $ \ !v -> liftSTM (TQ.writeTBMQueue q v)
+        when shouldClose (liftSTM $ TQ.closeTBMQueue q)
+    where
+        liftSTM = liftIO . atomically
 
 -- If the number of input files is very large (>1024, typically), we risk
 -- hitting the limit on open files by a process, so we work in batches of 512.
@@ -132,14 +193,23 @@ concatCounts headers inputs
     | otherwise = do
         (newfp,hout) <- openNGLTempFile "collected" "collected.counts." "txt"
         liftIO $ T.hPutStrLn hout (T.intercalate "\t" ("":headers))
-        C.sequenceSources
-            [conduitPossiblyCompressedFile f
-                =$= CB.lines
-                =$= (C.await >> C.awaitForever C.yield) -- drop header line
-                =$= CL.map (B8.split '\t')
-                | f <- inputs]
-            =$= CL.mapM (runNGLess . concatlines)
+        numCapabilities <- liftIO getNumCapabilities
+        let mapthreads = max 1 (numCapabilities - 1)
+            sources =
+                [conduitPossiblyCompressedFile f
+                    =$= CB.lines
+                    =$= (C.await >> C.awaitForever C.yield) -- drop header line
+                    =$=  (C.conduitVector 2048 :: C.Conduit B.ByteString (ResourceT IO) (V.Vector B.ByteString))
+                    | f <- inputs]
+            sourcesplits = nChunks mapthreads sources
+        channels <- liftIO $ forM sourcesplits $ \ss -> do
+            ch <- TQ.newTBMQueueIO 4
+            a <- A.async $ runResourceT (C.sequenceSources ss =$= CL.map (force . splitLines) $$ sinkTBMQueue' ch True)
+            return (CA.sourceTBMQueue ch, a)
+        C.sequenceSources (fst <$> channels)
+            =$= asyncMapEitherC mapthreads (sequence >=> concatPartials)
             $$ C.sinkHandle hout
+        forM_ (snd <$> channels) (liftIO . A.wait)
         liftIO (hClose hout)
         return newfp
 
