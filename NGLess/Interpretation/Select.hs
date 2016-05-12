@@ -20,6 +20,7 @@ import Data.Bits (Bits(..))
 import Data.Conduit (($=), ($$), (=$=))
 import System.IO
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import Data.Maybe
 
 import Language
@@ -109,6 +110,12 @@ executeMappedReadMethod Mflag samlines (Just (NGOSymbol flag)) [] = do
         getFlag "mapped" = return (any isAligned)
         getFlag "unmapped" = return (not . any isAligned)
         getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
+executeMappedReadMethod Msome_match samlines (Just (NGOString target)) [] = return . NGOBool $ any ismatch samlines
+    where
+        ismatch :: SamLine -> Bool
+        ismatch = (==target') . samRName
+        target' = TE.encodeUtf8 target
+
 executeMappedReadMethod Mpe_filter samlines Nothing [] = return . NGOMappedRead . filterPE $ samlines
 executeMappedReadMethod Mfilter samlines Nothing kwargs = do
     minID <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_identity_pc" kwargs

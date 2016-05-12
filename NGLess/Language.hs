@@ -43,6 +43,7 @@ instance Show FuncName where
 data MethodName =
         Mflag
         | Mfilter
+        | Msome_match
         | Mpe_filter
         | Munique
     deriving (Eq, Ord, Show)

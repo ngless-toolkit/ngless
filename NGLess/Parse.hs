@@ -174,6 +174,7 @@ methodName = methodName' <?> "method name"
             case mname of
                 "filter" -> pure Mfilter
                 "flag" -> pure Mflag
+                "some_match" -> pure Msome_match
                 "pe_filter" -> pure Mpe_filter
                 "unique" -> pure Munique
                 _ -> fail "Method name not found"

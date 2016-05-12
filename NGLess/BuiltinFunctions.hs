@@ -103,6 +103,7 @@ substrimArgs =
 builtinMethods =
     [MethodInfo Mflag   NGLMappedRead (Just NGLSymbol) NGLBool [] True
     ,MethodInfo Mfilter NGLMappedRead Nothing NGLMappedRead filterArgs True
+    ,MethodInfo Msome_match NGLMappedRead (Just NGLString) NGLBool [] True
     ,MethodInfo Munique NGLMappedRead Nothing NGLMappedRead [] True
     ]
 filterArgs =
