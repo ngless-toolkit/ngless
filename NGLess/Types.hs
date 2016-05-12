@@ -85,11 +85,13 @@ inferBlock (FuncName f) (Just (Block vars es)) = case f of
             inferM es
 
 envLookup :: T.Text -> TypeMSt (Maybe NGLType)
-envLookup v = (liftM2 (<|>)) (constantLookup v) (Map.lookup v . snd <$> get)
+envLookup v = liftM2 (<|>)
+                    (constantLookup v)
+                    (Map.lookup v . snd <$> get)
 
 constantLookup :: T.Text -> TypeMSt (Maybe NGLType)
 constantLookup v = do
-    moduleBuiltins <- concat . map modConstants <$> ask
+    moduleBuiltins <- concatMap modConstants <$> ask
     case filter ((==v) . fst) moduleBuiltins of
         [] -> return Nothing
         [(_,r)] -> return $ typeOfObject r
@@ -237,6 +239,10 @@ funcInfo fn = do
             errorInLineC ["Too many matches for function '", show fn, "'"]
             cannotContinue
 
+findMethodInfo m = case filter ((==m) . methodName) builtinMethods of
+                     [mi] -> mi
+                     _ -> error ("Should have been able to find method '"++show m++"'")
+
 checkFuncUnnamed :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
 checkFuncUnnamed f arg = do
         targ <- nglTypeOf arg
@@ -288,7 +294,7 @@ requireType def_t e = nglTypeOf e >>= \case
         return def_t
     Just t -> return t
 
-checkmethodcall :: MethodName -> Expression -> (Maybe Expression) -> TypeMSt (Maybe NGLType)
+checkmethodcall :: MethodName -> Expression -> Maybe Expression -> TypeMSt (Maybe NGLType)
 checkmethodcall m self arg = do
     let minfo = findMethodInfo m
         reqSelfType = methodSelfType minfo
@@ -317,7 +323,3 @@ checkmethodargs m args = forM_ args (check1arg (concat ["method '", show m, "'"]
                 [] -> errorInLineC ["Required argument ", T.unpack (argName ai), " is missing in method call ", show m, "."]
                 _ -> error "This should never happen: multiple arguments with the same name should have been caught before"
 
-
-
-
-findMethodInfo m = head (filter ((==m) . methodName) builtinMethods)
