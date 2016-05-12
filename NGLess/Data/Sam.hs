@@ -206,7 +206,7 @@ readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
 readSamGroupsC' :: Int -> C.Conduit ByteLine NGLessIO (V.Vector [SamLine])
 readSamGroupsC' mapthreads = do
         C.dropWhile (\(ByteLine line) -> B8.head line == '@')
-        C.conduitVector 65536
+        C.conduitVector 4096
             =$= asyncMapEitherC mapthreads (liftM groupByName . V.mapM (readSamLine . unwrapByteLine))
             -- the groups may not be aligned on the group boundary, thus we need to fix them
             =$= fixSamGroups
