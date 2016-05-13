@@ -58,6 +58,7 @@ import Interpretation.FastQ
 import Interpretation.Write
 import Interpretation.Select
 import Interpretation.Unique
+import Utils.Samtools
 import Utils.Utils
 import Utils.Conduit
 
@@ -494,7 +495,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = samfp} [] (Block [Varia
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 2)
         (samcontent, ()) <-
-            conduitPossiblyCompressedFile samfp
+            C.transPipe runNGLessIO (samBamConduit samfp)
                 =$= linesC
                 $$+ C.takeWhile ((=='@') . B8.head . unwrapByteLine)
                 =$= CL.map unwrapByteLine

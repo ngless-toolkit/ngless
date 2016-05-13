@@ -40,8 +40,8 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit (($=), (=$), (=$=), ($$+), ($$+-), ($$))
-import           Data.Conduit.Async (buffer, ($$&))
+import           Data.Conduit (($=), (=$), (=$=), ($$+), ($$+-))
+import           Data.Conduit.Async (($$&))
 
 import Control.Monad
 import Control.Monad.IO.Class   (liftIO)
@@ -64,9 +64,10 @@ import Language
 import Output
 import NGLess
 
-import Utils.Conduit
 import Utils.Utils
 import Utils.Vector
+import Utils.Conduit
+import Utils.Samtools
 import Utils.Suggestion
 import qualified Utils.IntGroups as IG
 
@@ -324,7 +325,7 @@ performCount samfp gname annotator0 opts = do
         delim = optDelim opts
 
     (samcontent, annotator) <-
-        conduitPossiblyCompressedFile samfp
+        samBamConduit samfp
             =$= linesC
             $$+ C.takeWhile ((=='@') . B8.head . unwrapByteLine)
             =$= annSamHeaderParser mapthreads annotator0 opts

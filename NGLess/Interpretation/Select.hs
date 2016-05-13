@@ -7,7 +7,6 @@
 module Interpretation.Select
     ( executeSelect
     , executeMappedReadMethod
-    , readSamGroupsAsConduit
     ) where
 
 import qualified Data.ByteString.Char8 as B
@@ -27,6 +26,7 @@ import Language
 import FileManagement
 import NGLess
 
+import Utils.Samtools
 import Utils.Utils
 import Data.Sam
 
@@ -69,8 +69,9 @@ _keep1 SelectUnmapped = filter (not . isAligned . fst)
 _keep1 SelectUnique = \g -> if isGroupUnique (map fst g) then g else []
 
 -- readSamGroupsAsConduit :: (MonadIO m, MonadResource m) => FilePath -> C.Producer m [(SamLine, B.ByteString)]
+-- The reason we cannot just use readSamGroupsC is that we want to get the unparsed ByteString on the side
 readSamGroupsAsConduit fname =
-        C.sourceFile fname
+        samBamConduit fname
             $= CB.lines
             =$= readSamLineOrDie
             =$= CL.groupBy groupLine

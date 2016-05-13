@@ -11,9 +11,8 @@ module BuiltinModules.AsReads
 
 import qualified Data.ByteString as B
 import qualified Data.Text as T
-import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.List as CL
-import Data.Conduit (($=), (=$=), ($$))
+import Data.Conduit ((=$=), ($$))
 import Control.Monad.Except
 import System.IO
 import Data.Default
@@ -26,6 +25,7 @@ import Data.FastQ
 import Modules
 import Output
 import NGLess
+import Utils.Samtools
 import Utils.Conduit
 
 executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -37,8 +37,8 @@ samToFastQ fpsam = do
     (oname1,ohand1) <- openNGLTempFile fpsam "reads_" ".1.fq"
     (oname2,ohand2) <- openNGLTempFile fpsam "reads_" ".2.fq"
     (oname3,ohand3) <- openNGLTempFile fpsam "reads_" ".singles.fq"
-    C.sourceFile fpsam
-        $= linesC
+    samBamConduit fpsam
+        =$= linesC
         =$= readSamGroupsC
         =$= CL.map asFQ
         $$ CL.mapM_ (liftIO . \case

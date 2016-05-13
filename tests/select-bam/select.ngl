@@ -1,0 +1,9 @@
+ngless '0.0'
+
+
+mapped = samfile('input.bam')
+mapped_plus = select(mapped, keep_if=[{mapped}])
+write(mapped_plus, ofile='output.plus.sam')
+
+mapped_neg = select(mapped, drop_if=[{mapped}])
+write(mapped_neg, ofile='output.neg.sam')
