@@ -3,7 +3,7 @@ ngless '0.0'
 
 mapped = samfile('input.bam')
 mapped_plus = select(mapped, keep_if=[{mapped}])
-write(mapped_plus, ofile='output.plus.sam')
+write(mapped_plus, ofile='output.plus.bam')
 
 mapped_neg = select(mapped, drop_if=[{mapped}])
-write(mapped_neg, ofile='output.neg.sam')
+write(mapped_neg, ofile='output.neg.bam')

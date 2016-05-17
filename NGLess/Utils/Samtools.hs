@@ -41,7 +41,7 @@ samBamConduit samfp
         samtoolsPath <- lift samtoolsBin
         (hout, herr, err, sp) <- liftIO $ do
             numCapabilities <- getNumCapabilities
-            let cp = proc samtoolsPath ["view", "-@", show numCapabilities, samfp]
+            let cp = proc samtoolsPath ["view", "-h", "-@", show numCapabilities, samfp]
             (CP.ClosedStream
                 ,hout
                 ,herr

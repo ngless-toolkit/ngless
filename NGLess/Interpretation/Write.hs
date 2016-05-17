@@ -22,7 +22,6 @@ import System.Directory
 import System.IO
 import Data.String.Utils
 import Data.List (isInfixOf)
-import Data.Maybe
 
 import Language
 import FileManagement
@@ -88,19 +87,19 @@ executeWrite (NGOReadSet name rs) args = do
 
 executeWrite el@(NGOMappedReadSet name fp defGen) args = do
     newfp <- getOFile args
-    canMove <- lookupBoolOrScriptErrorDef (return False) "__can_move" "internal write arg" args
-    let format = fromMaybe (NGOSymbol "sam") (lookup "format" args)
-    case format of
-        NGOSymbol "sam" -> liftIO $ do
-            if canMove
-                then moveOrCopy fp newfp
-                else liftIO (copyFile fp newfp)
-            return (NGOMappedReadSet name newfp defGen)
-        NGOSymbol "bam" -> do
-                        newfp' <- convertSamToBam fp newfp
-                        return (NGOMappedReadSet name newfp' defGen) --newfp will contain the bam
-        NGOSymbol s -> throwScriptError ("write does not accept format {" ++ T.unpack s ++ "} with input type " ++ show el)
-        _ -> throwShouldNotOccur "Type checking fail: format argument is not a symbol for write()"
+    canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
+    let guess :: String -> T.Text
+        guess ofile
+            | endswith ".sam" ofile = "sam"
+            | endswith ".bam" ofile = "bam"
+            | otherwise = "bam"
+    format <- lookupSymbolOrScriptErrorDef (return $ guess newfp) "format for mappedreadset" "format" args
+    orig <- case format of
+        "sam" -> return fp
+        "bam" -> convertSamToBam fp
+        s -> throwScriptError ("write does not accept format {" ++ T.unpack s ++ "} with input type " ++ show el)
+    liftIO $ (if canMove then moveOrCopy else copyFile) orig newfp
+    return (NGOMappedReadSet name newfp defGen)
 
 executeWrite (NGOCounts fp) args = do
     newfp <- getOFile args
@@ -116,15 +115,14 @@ getDelimiter (NGOSymbol "tsv") = return "\t"
 getDelimiter (NGOSymbol f) = throwScriptError ("Invalid format in write: {"++T.unpack f++"}")
 getDelimiter v =  throwShouldNotOccur ("Type of 'format' in 'write' must be NGOSymbol, got " ++ show v)
 
-convertSamToBam samfile newfp = do
-    outputListLno' DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
+convertSamToBam samfile = do
     samPath <- samtoolsBin
-    (errmsg, exitCode) <- liftIO $ withFile newfp WriteMode $ \hout ->
-        readProcessErrorWithExitCode (
-                proc samPath
-                    ["view", "-bS", samfile]
-                ) { std_out = UseHandle hout }
+    (newfp, hout) <- openNGLTempFile samfile "converted_" "bam"
+    outputListLno' DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
+    (errmsg, exitCode) <- liftIO $ readProcessErrorWithExitCode
+                                    (proc samPath ["view", "-bS", samfile]) { std_out = UseHandle hout }
     outputListLno' InfoOutput ["Message from samtools: ", errmsg]
+    liftIO $ hClose hout
     case exitCode of
        ExitSuccess -> return newfp
        ExitFailure err -> throwSystemError ("Failure on converting sam to bam" ++ show err)
