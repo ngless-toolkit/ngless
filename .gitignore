@@ -5,14 +5,16 @@
 /samtools-1.0/
 /samtools-1.0.tar.bz2
 /bwa-0.7.7/
-/NGLess.cabal
 *.o
 *.hi
 Html/fonts/
 Html/htmllibs/
+ngless-locks/
+ngless-partials/
+*.output_ngless/
+/testing_tmp_dir/
 
 # Generated as part of build
 NGLess/Dependencies/bwa_data.c
 NGLess/Dependencies/samtools_data.c
-*.output_ngless/
-/testing_tmp_dir/
+/NGLess.cabal
