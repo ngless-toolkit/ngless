@@ -23,7 +23,7 @@ Example
 
     mapped = map(input,
                     reference='hg19')
-    write(count(mapped, features={gene}),
+    write(count(mapped, features=['gene']),
             ofile='gene_counts.csv',
             format={csv})
 
@@ -36,6 +36,7 @@ Example
    Organisms
    Language
    Functions
+   stdlib
    methods
    modules
    faq
