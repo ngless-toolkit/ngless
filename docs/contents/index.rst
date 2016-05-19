@@ -8,6 +8,8 @@ processing.
 only. Please [get in touch](mailto:coelho@embl.de) if you want to use it in
 your work.
 
+This is best illustrated by an example:
+
 Example
 -------
 
@@ -32,12 +34,12 @@ Example
 
    introduction
    install
-   GettingStarted
-   Organisms
+   tutorial
    Language
    Functions
    stdlib
    methods
    modules
+   Organisms
    faq
    advanced

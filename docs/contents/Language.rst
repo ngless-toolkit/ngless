@@ -9,19 +9,8 @@ This is a semi-formal definition of the NGLess language.
 Basics
 ------
 
-Tokenization follows the standard C-family rules. A word is anything that
-matches ``[A-Za-z_]``. The language is case-sensitive. All files are UTF-8.
-
 Script-style (# to EOL), C-style (/* to \*/) and C++-style (// to EOL) comments
 are all recognised.
-
-Both LF and CRLF are accepted as line endings (Unix-style LF is preferred).
-
-A semicolon (;) can be used as an alternative to a new line. Any spaces (and
-only space characters) following a semi-colon are ignored. *This feature is
-intended for inline scripts at the command line (passed with the ``-e``
-option), its use for scripts is heavily discouraged and may trigger an error in
-the future.*
 
 Strings are denoted with single or double quotes and standard backslashed
 escapes apply (\\n for newline, ...).
@@ -118,9 +107,9 @@ Symbol
 ~~~~~~
 
 A symbol is denoted as a token surrounded by curly braces (e.g.. ``{symbol}``
-or ``{gene}``).
-
-Blocks are defined in multiples of 4 spaces. Tab characters are not allowed.
+or ``{drop}``). A symbol can be thought of as a nothing more than a string, but
+they are used for function arguments to indicate that there is only a limited
+set of allowed values for that argument.
 
 Variables
 ---------
@@ -202,7 +191,16 @@ parameter and a block. The block is passed using the using keyword: ::
     ...
     
 There is no possibility of defining new functions. Only the built-in functions
-are available.
+are available. The `|read|` syntax defines an unnamed (lambda) function, which
+takes a variable called `read`. The function body is the following block.
+
+Blocks
+------
+
+Blocks are defined by indentation in multiples of 4 spaces. Tab characters are
+not allowed (so that nobody ever mixes tabs and spaces, ever).
+
+Blocks are used for conditionals (if statements) and using statments.
 
 Pure functions
 ~~~~~~~~~~~~~~
@@ -231,3 +229,18 @@ A function of type ``A -> * -> B`` can be automatically used as ``[A] -> * ->
     in1,in2 = fastq(["in1.fq", "in2.fq"])
 
 This allows for a pipeline which runs in parallel over many input filenames.
+
+Encodings/Tokenization
+----------------------
+
+Tokenization follows the standard C-family rules. A word is anything that
+matches ``[A-Za-z_]``. The language is case-sensitive. All files are UTF-8.
+
+Both LF and CRLF are accepted as line endings (Unix-style LF is preferred).
+
+A semicolon (;) can be used as an alternative to a new line. Any spaces (and
+only space characters) following a semi-colon are ignored. *This feature is
+intended for inline scripts at the command line (passed with the ``-e``
+option), its use for scripts is heavily discouraged and may trigger an error in
+the future.*
+
