@@ -21,11 +21,14 @@ ReadSet
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
-+---------------+--------------+------------+----------------+
-| Name          | Type         | Required   | Default Value  |
-+===============+==============+============+================+
-| encoding      | Symbol       |  no        | {auto}         |
-+---------------+--------------+------------+----------------+
++---------------+----------------------+------------+----------------+
+| Name          | Type                 | Required   | Default Value  |
++===============+======================+============+================+
+| encoding      | Symbol               |  no        | {auto}         |
++               + ({auto}, {33}, {64}, +            +                +
++               + {sanger}, {solexa})  +            +                +
++               +                      +            +                +
++---------------+----------------------+------------+----------------+
 
 Possible values for ``encoding`` are:
 
@@ -56,7 +59,7 @@ Loads a SAM file::
 
     s = samfile('input.sam')
 
-This function takes no keyword arguments
+This function takes no keyword arguments. BAM files are also supported (determined by the filename), as are ``sam.gz`` files.
 
 Returns
 ~~~~~~~
@@ -132,8 +135,6 @@ discarded, while the other is kept). The default is to collect these into the
 singles pile. If ``keep_singles`` if false, however, they are discarded.
 
 This function also performs quality control on its output.
-
-
 
 Map
 ---
@@ -219,7 +220,11 @@ Arguments by value:
 | drop_if     | [Symbol]    | no         | -              |
 +-------------+-------------+------------+----------------+
 
-At least one of ``keep_if`` or ``drop_if`` should be passed, but not both.
+At least one of ``keep_if`` or ``drop_if`` should be passed, but not both. They accept the following symbols:
+
+- ``{mapped}``: the read mapped
+- ``{unmapped}``: the read did not map
+- ``{unique}``: the read mapped to a unique location
 
 If ``keep_if`` is used, then reads are kept if they pass **all the conditions**.
 If ``drop_if`` they are discarded if they fail to **any condition**.
@@ -255,15 +260,17 @@ Arguments by value:
 +-------------------+-----------------+------------+----------------+
 | functional\_map   | String          | no*        |  -             |
 +-------------------+-----------------+------------+----------------+
-| features          | [ Symbol ]      | no         | {gene}         |
+| features          | [ String ]      | no         | 'gene'         |
 +-------------------+-----------------+------------+----------------+
 | mode              | Symbol          | no         | {union}        |
 +-------------------+-----------------+------------+----------------+
 | keep\_ambiguous   | Bool            | no         | true           |
 +-------------------+-----------------+------------+----------------+
+| multiple          | Symbol          | no         | {dist1}        |
++-------------------+-----------------+------------+----------------+
 | strand            | Bool            | no         | false          |
 +-------------------+-----------------+------------+----------------+
-| min               | Integer         |  no        | 0              |
+| min               | Integer         | no         | 0              |
 +-------------------+-----------------+------------+----------------+
 
 
