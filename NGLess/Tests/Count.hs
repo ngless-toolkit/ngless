@@ -81,9 +81,8 @@ defCountOpts =
     { optFeatures = []
     , optIntersectMode = annotationRule IntersectUnion
     , optStrandSpecific = False
-    , optKeepAmbiguous = False
     , optMinCount = 0.0
-    , optMMMethod = MMCountAll
+    , optMMMethod = MMUniqueOnly
     , optDelim = "\t"
     , optNormSize = False
     }
@@ -204,27 +203,27 @@ case_gff_feature_partial_intersect = do
     c @?= M.fromList [("Gene100", 1), ("Gene300", 0)]
 
 case_gff_feature_ambiguous = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = True }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optMMMethod = MMCountAll }
     c @?= M.fromList [("Gene100", 1), ("Gene300", 1)]
 
 case_gff_feature_ambiguous_discard = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = False }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene] }
     c @?= M.fromList [("Gene100", 0), ("Gene300", 0)]
 
 case_gff_1OverN = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = True, optMMMethod = MM1OverN }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optMMMethod = MM1OverN }
     c @?= M.fromList [("Gene100", 0.5), ("Gene300", 0.5)]
 
 case_gff_dist1_fallback = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = True, optMMMethod = MMDist1 }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optMMMethod = MMDist1 }
     c @?= M.fromList [("Gene100", 0.5), ("Gene300", 0.5)]
 
 case_gff_dist1_dist = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous2 gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = True, optMMMethod = MMDist1 }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous2 gff1 defCountOpts { optFeatures  = [GffGene], optMMMethod = MMDist1 }
     c @?= M.fromList [("Gene100", 2.0), ("Gene300", 0.0)]
 
 case_gff_dist1_dist1_to_4 = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous3 gff1 defCountOpts { optFeatures  = [GffGene], optKeepAmbiguous = True, optMMMethod = MMDist1 }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous3 gff1 defCountOpts { optFeatures  = [GffGene], optMMMethod = MMDist1 }
     c @?= M.fromList [("Gene100", 3.75), ("Gene300", 1.25)]
 
 
