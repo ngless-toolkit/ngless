@@ -7,7 +7,9 @@ module Utils.LockFile
     ( withLockFile
     , LockParameters(..)
     , WhenExistsStrategy(..)
+    , acquireLock'
     , acquireLock
+    , fileAge
     ) where
 
 import System.Posix.Process
@@ -39,7 +41,6 @@ import Network.BSD (getHostName)
 import NGLess
 import Output
 import FileManagement
-import Utils.Utils (maybeM)
 
 
 data LockParameters = LockParameters
@@ -48,39 +49,21 @@ data LockParameters = LockParameters
                 , whenExistsStrategy :: WhenExistsStrategy
                 } deriving (Eq, Show)
 
-data WhenExistsStrategy = IfLockedThrow NGError | IfLockedRetry { nrLockRetries :: !Int, timeBetweenRetries :: !NominalDiffTime }
+data WhenExistsStrategy =
+                IfLockedNothing
+                | IfLockedThrow NGError
+                | IfLockedRetry { nrLockRetries :: !Int, timeBetweenRetries :: !NominalDiffTime }
             deriving (Eq, Show)
 
 withLockFile :: LockParameters -> NGLessIO a -> NGLessIO a
-withLockFile params@LockParameters{..} act =
-    acquireLock lockFname >>= \case
+withLockFile params act =
+    acquireLock' params >>= \case
         Just rk -> do
-            outputListLno' DebugOutput ["Acquired lock file ", lockFname]
             v <- act
             release rk
             return v
-        Nothing -> do
-            outputListLno' InfoOutput ["Lock file exists ", lockFname]
-            lockExists params act
+        Nothing -> throwSystemError "Could not acquire required lock file."
 
-
-lockExists params@LockParameters{..} act = liftIO (fileAge lockFname) >>= \case
-        Nothing -> do
-            outputListLno' InfoOutput ["Lock file ", lockFname, " existed but has been removed. Retrying."]
-            withLockFile params act
-        Just age | age > maxAge -> do
-            outputListLno' InfoOutput ["Lock file ", lockFname, " exists but is too old. Assuming it is stale and removing it."]
-            liftIO $ removeFileIfExists lockFname
-            withLockFile params act
-        _ -> case whenExistsStrategy of
-            IfLockedThrow err -> throwError err
-            IfLockedRetry{ .. }
-                | nrLockRetries > 0 -> do
-                        outputListLno' InfoOutput ["Lock file ", lockFname, " exists and seems current, sleeping for ", show timeBetweenRetries, "."]
-                        liftIO $ sleep timeBetweenRetries
-                        let lessOneTry = IfLockedRetry (nrLockRetries - 1) timeBetweenRetries
-                        lockExists params { whenExistsStrategy = lessOneTry } act
-                | otherwise -> throwSystemError ("Could not obtain lock " ++ lockFname ++ " even after waiting for its release.")
 
 sleep :: NominalDiffTime -> IO ()
 sleep = threadDelay . toMicroSeconds
@@ -89,17 +72,42 @@ sleep = threadDelay . toMicroSeconds
         toMicroSeconds = (1000000 *) . fromInteger . round
 
 acquireLock :: FilePath -> NGLessIO (Maybe ReleaseKey)
-acquireLock fname = liftIO (openLockFile fname) `maybeM` \h -> do
-    -- rkC is for the case where an exception is raised between this line and the release call below
-    rkC <- register (hClose h)
-    rk <- register (removeFileIfExists fname)
-    outputListLno' DebugOutput ["Acquired lock file ", fname]
-    liftIO $ do
-        pid <- getProcessID
-        hostname <- getHostName
-        hPutStrLn h ("Lock file created for PID " ++ show pid ++ " on hostname " ++ hostname)
-        release rkC
-        return (Just rk)
+acquireLock fname = acquireLock' LockParameters { lockFname = fname, whenExistsStrategy = IfLockedNothing, maxAge = fromInteger 0 }
+
+acquireLock' :: LockParameters -> NGLessIO (Maybe ReleaseKey)
+acquireLock' params@LockParameters{..} = liftIO (openLockFile lockFname) >>= \case
+    Just h -> do
+        -- rkC is for the case where an exception is raised between this line and the release call below
+        rkC <- register (hClose h)
+        rk <- register (removeFileIfExists lockFname)
+        outputListLno' DebugOutput ["Acquired lock file ", lockFname]
+        liftIO $ do
+            pid <- getProcessID
+            hostname <- getHostName
+            t <- getZonedTime
+            let tformat = "%a %d-%m-%Y %R"
+                tstr = formatTime defaultTimeLocale tformat t
+            hPutStrLn h ("Lock file created for PID " ++ show pid ++ " on hostname " ++ hostname ++ " at time " ++ tstr)
+            release rkC
+            return (Just rk)
+    Nothing -> liftIO (fileAge lockFname) >>= \case
+        Nothing -> do
+            outputListLno' InfoOutput ["Lock file ", lockFname, " existed but has been removed. Retrying."]
+            acquireLock' params
+        Just age | age > maxAge -> do
+            outputListLno' InfoOutput ["Lock file ", lockFname, " exists but is too old. Assuming it is stale and removing it."]
+            liftIO $ removeFileIfExists lockFname
+            acquireLock' params
+        _ -> case whenExistsStrategy of
+            IfLockedNothing -> return Nothing
+            IfLockedThrow err -> throwError err
+            IfLockedRetry{ .. }
+                | nrLockRetries > 0 -> do
+                    outputListLno' InfoOutput ["Lock file ", lockFname, " exists and seems current, sleeping for ", show timeBetweenRetries, "."]
+                    liftIO $ sleep timeBetweenRetries
+                    let lessOneTry = IfLockedRetry (nrLockRetries - 1) timeBetweenRetries
+                    acquireLock' (params { whenExistsStrategy = lessOneTry })
+                | otherwise -> throwSystemError ("Could not obtain lock " ++ lockFname ++ " even after waiting for its release.")
 
 -- This code is adapted from https://hackage.haskell.org/package/lock-file-0.5.0.2/docs/src/System-IO-LockFile-Internal.html
 openLockFile :: FilePath -> IO (Maybe Handle)

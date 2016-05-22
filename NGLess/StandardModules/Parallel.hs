@@ -29,6 +29,8 @@ import qualified Data.Conduit.TQueue as CA
 import           Control.Monad.ST
 import           Control.DeepSeq
 import           Data.Traversable
+import           Control.Concurrent (threadDelay)
+import           System.Posix.Files (touchFile)
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource
@@ -87,18 +89,28 @@ executeLock1 (NGOList entries) kwargs  = do
 
 executeLock1 arg _ = throwScriptError ("Wrong argument for lock1 (expected a list of strings, got `" ++ show arg ++ "`")
 
-
 getLock _ [] = do
    outputListLno' InfoOutput ["Could get a lock for any file."]
    throwGenericError "Could not obtain any lock"
 getLock basedir (x:xs) = do
     let fname = T.unpack x
+        lockname = basedir </> fname ++ ".lock"
     finished <- liftIO $ doesFileExist (basedir </> fname ++ ".finished")
     if finished
         then getLock basedir xs
-        else acquireLock (basedir </> fname ++ ".lock") >>= \case
+        else acquireLock' (LockParameters
+                            { lockFname = lockname
+                            , maxAge = fromInteger (60*60)
+                                -- one hour. Given that lock files are touched
+                                -- every ten minutes if things are good (see
+                                -- thread below), this is an indication that
+                                -- the process has crashed
+                            , whenExistsStrategy = IfLockedNothing}) >>= \case
             Nothing -> getLock basedir xs
-            Just rk -> return (x,rk)
+            Just rk -> do
+                let updateloop = threadDelay (10*60*1000*1000) >> touchFile lockname >> updateloop
+                liftIO . A.async $ updateloop
+                return (x,rk)
 
 executeCollect :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
 executeCollect (NGOCounts countfile) kwargs = do
