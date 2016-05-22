@@ -4,9 +4,13 @@ stdenv.mkDerivation {
 
   name = "nglessEnv";
 
-  buildInputs = with haskell.packages.lts-3_16; [
+  buildInputs = with haskell.packages.lts-5_12; [
+    ghc-mod
+    hoogle
+    hlint
+    stack
     ghc
-    zlib
+    m4
   ];
   propagatedBuildInputs = [
     zlib
@@ -14,15 +18,15 @@ stdenv.mkDerivation {
   ];
 
   STACK_IN_NIX_EXTRA_ARGS
-      = " --extra-lib-dirs=${zlib}/lib" 
-      + " --extra-include-dirs=${zlib}/include" 
+      = " --extra-lib-dirs=${zlib.out}/lib"
+      + " --extra-include-dirs=${zlib.out}/include"
   ;
   extraCmds = ''
-    export LD_LIBRARY_PATH+=:${zlib}/lib
-    export LD_LIBRARY_PATH+=:${bzip2}/lib
+    export LD_LIBRARY_PATH+=:${zlib.out}/lib
+    export LD_LIBRARY_PATH+=:${bzip2.out}/lib
   '';
   shellHook = ''
-    export LD_LIBRARY_PATH+=:${zlib}/lib
-    export LD_LIBRARY_PATH+=:${bzip2}/lib
+    export LD_LIBRARY_PATH+=:${zlib.out}/lib
+    export LD_LIBRARY_PATH+=:${bzip2.out}/lib
   '';
 }
