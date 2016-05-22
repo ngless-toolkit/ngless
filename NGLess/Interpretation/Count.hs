@@ -85,7 +85,7 @@ type GeneMapAnnotation = M.Map B8.ByteString [Int]
 
 type FeatureSizeMap = M.Map B.ByteString Double
 
-data MMMethod = MMCountAll | MM1OverN | MMDist1
+data MMMethod = MMCountAll | MM1OverN | MMDist1 | MMUniqueOnly
     deriving (Eq, Show)
 
 data CountOpts =
@@ -93,7 +93,6 @@ data CountOpts =
     { optFeatures :: [GffType] -- ^ list of features to condider
     , optIntersectMode :: AnnotationRule
     , optStrandSpecific :: !Bool
-    , optKeepAmbiguous :: !Bool
     , optMinCount :: !Double
     , optMMMethod :: !MMMethod
     , optDelim :: !B.ByteString
@@ -169,6 +168,7 @@ annSize ann = length (annEnumerate ann)
 methodFor "1overN" = return MM1OverN
 methodFor "dist1" = return MMDist1
 methodFor "all1" = return MMCountAll
+methodFor "unique-only" = return MMUniqueOnly
 methodFor other = throwShouldNotOccur ("Unexpected multiple method " ++ T.unpack other)
 
 executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -179,7 +179,6 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
     minCount <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
     method <- methodFor =<< lookupSymbolOrScriptErrorDef (return "dist1")
                                     "multiple argument to count " "multiple" args
-    ambiguity <- lookupBoolOrScriptErrorDef (return False) "annotation function" "ambiguity" args
     strand_specific <- lookupBoolOrScriptErrorDef (return False) "annotation function" "strand" args
     mocatMap <- lookupFilePath "functional_map argument to count()" "functional_map" args
     gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
@@ -198,7 +197,6 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
             { optFeatures = map matchingFeature fs
             , optIntersectMode = m
             , optStrandSpecific = strand_specific
-            , optKeepAmbiguous = ambiguity
             , optMinCount = fromInteger minCount
             , optMMMethod = method
             , optDelim = delim
@@ -217,6 +215,9 @@ loadAnnotator (AnnotateFunctionalMap mm) opts = loadFunctionalMap mm (map getFea
 
 
 performCount1Pass :: VUM.IOVector Double -> MMMethod -> C.Sink (VU.Vector Int, IG.IntGroups) NGLessIO [IG.IntGroups]
+performCount1Pass mcounts MMUniqueOnly = do
+    C.awaitForever $ \(singles, _) -> liftIO (incrementAll mcounts singles)
+    return []
 performCount1Pass mcounts MMCountAll = do
     C.awaitForever $ \(singles, mms) -> liftIO $ do
         incrementAll mcounts singles
@@ -587,8 +588,7 @@ loadGFF gffFp opts = do
 annotateSamLine :: CountOpts -> GFFAnnotationMap -> SamLine -> [Int]
 annotateSamLine opts amap samline = case M.lookup rname amap of
         Nothing -> []
-        Just im ->  map snd . (if optKeepAmbiguous opts then id else filterAmbiguous)
-                    $ (optIntersectMode opts) im asStrand (sStart, sEnd)
+        Just im ->  snd <$> (optIntersectMode opts) im asStrand (sStart, sEnd)
     where
         rname = samRName samline
         sStart = samPos samline
@@ -597,13 +597,6 @@ annotateSamLine opts amap samline = case M.lookup rname amap of
         asStrand = if optStrandSpecific opts
                         then if isPositive samline then GffPosStrand else GffNegStrand
                         else GffUnStranded
-
-
-filterAmbiguous  :: [AnnotationInfo] -> [AnnotationInfo]
-filterAmbiguous [] = []
-filterAmbiguous ms
-    | allSame (snd <$> ms) = [head ms]
-    | otherwise = [] -- ambiguous: discard
 
 filterStrand :: GffStrand -> IM.IntervalMap Int [AnnotationInfo] -> IM.IntervalMap Int [AnnotationInfo]
 filterStrand GffUnStranded = id
