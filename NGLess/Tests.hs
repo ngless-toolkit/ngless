@@ -226,23 +226,18 @@ case_preprocess_script = case parsetest preprocess_s >>= checktypes [] of
         (length $ B.lines res') @?= (16 :: Int)
         removeFile "test_samples/sample20_post.fq"
 
-case_map_script = case parsetest map_s >>= checktypes [] of
-    Left err -> assertFailure (show err)
-    Right expr -> do
-        sam <- testNGLessIO $ do
-            (interpret []) . nglBody $ expr
-            _samStats "test_samples/sample20_mapped.sam"
+case_sam20 = do
+        sam <- testNGLessIO $ asTempFile sam20 "sam"  >>= _samStats
         sam @?= (5,0,0)
-        removeFile "test_samples/sample20_mapped.sam"
-
-map_s = [here|
-ngless '0.0'
-input = fastq('test_samples/sample20.fq')
-preprocess(input) using |read|:
-    if len(read) < 20:
-        discard
-mapped = map(input,reference='sacCer3')
-write(mapped, ofile='test_samples/sample20_mapped.sam',format={sam})
+    where
+        sam20 = [here|
+@SQ	SN:I	LN:230218
+@PG	ID:bwa	PN:bwa	VN:0.7.7-r441	CL:/home/luispedro/.local/share/ngless/bin/ngless-0.0.0-bwa mem -t 1 /home/luispedro/.local/share/ngless/data/sacCer3/Sequence/BWAIndex/reference.fa.gz /tmp/preprocessed_sample20.fq1804289383846930886.gz
+IRIS:7:1:17:394#0	4	*	0	0	*	*	0	0	GTCAGGACAAGAAAGACAANTCCAATTNACATT	aaabaa`]baaaaa_aab]D^^`b`aYDW]aba	AS:i:0	XS:i:0
+IRIS:7:1:17:800#0	4	*	0	0	*	*	0	0	GGAAACACTACTTAGGCTTATAAGATCNGGTTGCGG	ababbaaabaaaaa`]`ba`]`aaaaYD\\_a``XT	AS:i:0	XS:i:0
+IRIS:7:1:17:1757#0	4	*	0	0	*	*	0	0	TTTTCTCGACGATTTCCACTCCTGGTCNAC	aaaaaa``aaa`aaaa_^a```]][Z[DY^	AS:i:0	XS:i:0
+IRIS:7:1:17:1479#0	4	*	0	0	*	*	0	0	CATATTGTAGGGTGGATCTCGAAAGATATGAAAGAT	abaaaaa`a```^aaaaa`_]aaa`aaa__a_X]``	AS:i:0	XS:i:0
+IRIS:7:1:17:150#0	4	*	0	0	*	*	0	0	TGATGTACTATGCATATGAACTTGTATGCAAAGTGG	abaabaa`aaaaaaa^ba_]]aaa^aaaaa_^][aa	AS:i:0	XS:i:0
 |]
 
 
