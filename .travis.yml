@@ -1,0 +1,27 @@
+sudo: false
+cache:
+  directories:
+    - $HOME/.ghc
+    - $HOME/.cabal
+    - $HOME/.stack
+
+language: c
+
+before_install:
+  - mkdir -p ~/.local/bin
+  - export PATH=$HOME/.local/bin:$PATH
+  - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+  - export PATH=/opt/ghc/7.10.3/bin:$PATH
+  - stack --no-terminal setup
+
+
+addons:
+  apt:
+    packages:
+      - samtools
+      - libgmp
+      - libgmp-dev
+
+script:
+  - make
+  - make check
