@@ -163,7 +163,7 @@ checkbop BOpAdd a b = do
     t <- liftM2 (<|>)
         (softCheckInteger a *> softCheckInteger b)
         (softCheckString  a *> softCheckString b)
-    when (t == Nothing) $
+    when (isNothing t) $
         errorInLineC ["Addition operator (+) must be applied to a pair of strings or integers"]
     return t
 checkbop BOpMul a b = checkinteger a *> checkinteger b
@@ -252,7 +252,7 @@ checkFuncUnnamed f arg = do
                 | allowAutoComp -> checkfunctype etype t *> return (Just (NGList rtype))
             Just t -> checkfunctype etype t *> return (Just rtype)
             Nothing -> do
-                errorInLineC ["While checking types for function ", show f, "Could not infer type of argument (saw :", show arg, ")"]
+                errorInLineC ["While checking types for function ", show f, ".\n\tCould not infer type of argument (saw :", show arg, ")"]
                 cannotContinue
     where
         checkfunctype NGLAny NGLVoid = errorInLineC

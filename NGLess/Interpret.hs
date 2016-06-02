@@ -224,7 +224,7 @@ interpretTopValue e = runInROEnvIO (interpretExpr e)
 
 interpretExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretExpr (Lookup (Variable v)) = lookupVariable v >>= \case
-        Nothing -> throwScriptError "Variable lookup error"
+        Nothing -> throwScriptError ("Could not lookup variable `"++show v++"`")
         Just r' -> return r'
 interpretExpr (BuiltinConstant (Variable "STDIN")) = return (NGOString "/dev/stdin")
 interpretExpr (BuiltinConstant (Variable "STDOUT")) = return (NGOString "/dev/stdout")

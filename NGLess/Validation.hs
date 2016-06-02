@@ -13,6 +13,7 @@ module Validation
 import qualified Data.Text as T
 import           Control.Monad.Extra (whenJust)
 import           Control.Monad.Writer.Strict
+import           Control.Monad.RWS
 import Data.Maybe
 import Data.List
 
@@ -32,6 +33,7 @@ validate mods expr = case errors of
             [validate_symbol_lists
             ,validate_version
             ,validate_pure_function
+            ,validate_variables
             ,validateFunctionReqArgs -- check for the existence of required arguments in functions.
             ,validate_symbol_in_args
             ,validate_STDIN_only_used_once
@@ -105,6 +107,23 @@ validateFunctionReqArgs mods (Script _ es) = checkRecursiveScript validateFuncti
                             then Nothing
                             else Just (T.concat ["Function ", T.pack . show $ f, " requires argument ", argName ainfo, "."])
         validateFunctionReqArgs' _ = Nothing
+
+validate_variables :: [Module] -> Script -> Maybe T.Text
+validate_variables _ (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e of
+        Assignment (Variable v) e' -> do
+            err <- recursiveAnalyse checkVarUsage e
+            (v:) <$> get >>= put
+            return err
+        _ -> recursiveAnalyse checkVarUsage e
+    where
+        runChecker :: RWS () [Maybe T.Text] [T.Text] () -> Maybe T.Text
+        runChecker c = errors_from_list . snd . evalRWS c () $ []
+        checkVarUsage :: Expression -> RWS () [Maybe T.Text] [T.Text] ()
+        checkVarUsage (Lookup (Variable v)) = do
+                used <- get
+                when (v `notElem` used) $
+                    tell [Just (T.concat ["Could not find variable `", T.pack . show $v, "`. ", suggestionMessage v used])]
+        checkVarUsage _ = return ()
 
 validate_symbol_in_args :: [Module] -> Script -> Maybe T.Text
 validate_symbol_in_args mods (Script _ es) = checkRecursiveScript validate_symbol_in_args' es
