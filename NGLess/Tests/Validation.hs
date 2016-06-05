@@ -28,27 +28,22 @@ case_bad_function_attr_count = isValidateError
     "ngless '0.0'\n\
     \count(annotated, features='gene')\n"
 
-case_good_function_attr_count_1 = isValidateOk
-    "ngless '0.0'\n\
-    \write(count(annotated, features=['gene']),ofile='gene_counts.csv',format={csv})"
-
-case_good_function_attr_count_2 = isValidateOk
-    "ngless '0.0'\n\
-    \counts = count(annotated, features=['gene'])"
-
 case_map_not_assigned = isValidateError
-    "ngless '0.0'\n\
-    \map(input,reference='sacCer3')\n"
+    [here|
+ngless '0.0'
+input = fasq('input.fq.gz')
+map(input,reference='sacCer3')
+|]
 
-case_good_function_attr_map_1 = isValidateOk
-    "ngless '0.0'\n\
-    \write(map(input,reference='sacCer3'),ofile='result.sam',format={sam})"
-
-case_good_function_attr_map_2 = isValidateOk
-    "ngless '0.0'\n\
-    \counts = map(input,reference='sacCer3')"
-
-
+case_good_function_attr_map = isValidateOk
+    [here|
+ngless '0.0'
+input = fastq('input.fq.gz')
+write(
+    map(input, reference='sacCer3'),
+            ofile='result.sam',
+            format={sam})
+|]
 
 
 -- Validate IO
