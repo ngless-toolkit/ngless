@@ -109,20 +109,29 @@ validateFunctionReqArgs mods (Script _ es) = checkRecursiveScript validateFuncti
         validateFunctionReqArgs' _ = Nothing
 
 validate_variables :: [Module] -> Script -> Maybe T.Text
-validate_variables _ (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e of
+validate_variables mods (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e of
         Assignment (Variable v) e' -> do
-            err <- recursiveAnalyse checkVarUsage e
-            (v:) <$> get >>= put
+            vs <- get
+            err <- recursiveAnalyse checkVarUsage e'
+            put (v:vs)
             return err
         _ -> recursiveAnalyse checkVarUsage e
     where
         runChecker :: RWS () [Maybe T.Text] [T.Text] () -> Maybe T.Text
-        runChecker c = errors_from_list . snd . evalRWS c () $ []
+        runChecker c = errors_from_list . snd . evalRWS c () $ (fst <$> concatMap modConstants mods)
         checkVarUsage :: Expression -> RWS () [Maybe T.Text] [T.Text] ()
         checkVarUsage (Lookup (Variable v)) = do
                 used <- get
                 when (v `notElem` used) $
                     tell [Just (T.concat ["Could not find variable `", T.pack . show $v, "`. ", suggestionMessage v used])]
+        checkVarUsage (FunctionCall _ _ _ (Just block)) = do
+            vs <- get
+            let unVariable (Variable v) = v
+                vs' = unVariable <$> blockVariable block
+            put (vs' ++ vs)
+        checkVarUsage (Assignment (Variable v) _) = do
+            vs <- get
+            put (v:vs)
         checkVarUsage _ = return ()
 
 validate_symbol_in_args :: [Module] -> Script -> Maybe T.Text
