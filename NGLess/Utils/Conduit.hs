@@ -181,6 +181,8 @@ asyncGzipFromFile fname = C.bracketP
     asyncGzipFrom
 
 zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
+
+zipSink2 :: (Monad m) => C.Sink i m a -> C.Sink i m b -> C.Sink i m (a,b)
 zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
 
 conduitPossiblyCompressedFile fname
