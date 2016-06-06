@@ -1,8 +1,7 @@
 {- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
-
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Interpretation.Map
     ( executeMap
@@ -14,14 +13,16 @@ import qualified Data.Text as T
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy.Char8 as BL8
-import qualified Data.Vector as V
 import           Control.Monad
+import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.Except
 import           Control.Monad.Trans.Resource
 
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Process as CP
 import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit.Internal as C
 import           Data.Conduit (($$), (=$=))
 
 import GHC.Conc     (getNumCapabilities)
@@ -29,8 +30,6 @@ import GHC.Conc     (getNumCapabilities)
 import System.Process
 import System.IO
 import System.Exit
-
-import Control.Monad.IO.Class (liftIO)
 
 import Language
 import FileManagement
@@ -44,6 +43,7 @@ import Utils.Utils
 import Utils.Bwa
 import Utils.LockFile
 import Utils.Conduit
+import Utils.Samtools (samBamConduit)
 
 data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
 
@@ -88,11 +88,12 @@ mergeSams name sam0 sam1 = do
 
 hoursToDiffTime h = fromInteger (h * 3600)
 
-mapToReference :: FilePath -> [FilePath] -> [String] -> NGLessIO FilePath
+mapToReference :: FilePath -> [FilePath] -> [String] -> NGLessIO (FilePath, (Int, Int, Int))
 mapToReference refIndex [fp1,fp2, fp3] extraArgs = do
-    out0 <- mapToReference refIndex [fp1, fp2] extraArgs
-    out1 <- mapToReference refIndex [fp3] extraArgs
-    mergeSams refIndex out0 out1
+    (out0,(t0,a0,u0)) <- mapToReference refIndex [fp1, fp2] extraArgs
+    (out1,(t1,a1,u1)) <- mapToReference refIndex [fp3] extraArgs
+    out <- mergeSams refIndex out0 out1
+    return (out, (t0+t1,a0+a1, u0+u1))
 
 mapToReference refIndex fps extraArgs = do
     (rk, (newfp, hout)) <- openNGLTempFile' refIndex "mapped_" ".sam"
@@ -103,17 +104,20 @@ mapToReference refIndex fps extraArgs = do
     let cmdargs =  concat [["mem", "-t", show numCapabilities, refIndex], extraArgs, fps]
     outputListLno' TraceOutput ["Calling binary ", bwaPath, " with args: ", unwords cmdargs]
     let cp = proc bwaPath cmdargs
-    (exitCode, (), err) <- liftIO $
+    (exitCode, ((),statsE), err) <- liftIO $
             CP.sourceProcessWithStreams cp
                 (return ()) -- stdin
-                (C.sinkHandle hout) --stdout
+                (C.toConsumer (zipSink2 --stdout
+                    (C.sinkHandle hout)
+                    samStatsC))
                 CL.consume -- stderr
     liftIO $ hClose hout
+    stats <- runNGLess statsE
     outputListLno' DebugOutput ["BWA info: ", BL8.unpack $ BL8.fromChunks err]
     case exitCode of
         ExitSuccess -> do
             outputListLno' InfoOutput ["Done mapping to ", refIndex]
-            return newfp
+            return (newfp, stats)
         ExitFailure code -> do
             release rk
             throwSystemError $ concat (["Failed mapping\nCommand line was::\n\t",
@@ -123,8 +127,8 @@ mapToReference refIndex fps extraArgs = do
 interpretMapOp :: ReferenceInfo -> T.Text -> [FilePath] -> [String] -> NGLessIO NGLessObject
 interpretMapOp ref name fps extraArgs = do
     (ref', defGen') <- indexReference ref
-    samPath' <- mapToReference ref' fps extraArgs
-    printMappingStats ref' samPath'
+    (samPath', (total, aligned, unique)) <- mapToReference ref' fps extraArgs
+    outputMapStatistics samPath' ref' total aligned unique
     return $ NGOMappedReadSet name samPath' defGen'
     where
         indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)
@@ -136,12 +140,14 @@ interpretMapOp ref name fps extraArgs = do
                 Nothing -> throwScriptError ("Could not find reference '" ++ T.unpack r ++ "'.")
 
 _samStats :: FilePath -> NGLessIO (Int, Int, Int)
-_samStats fname = do
+_samStats fname = samBamConduit fname $$ samStatsC >>= runNGLess
+
+samStatsC :: (MonadIO m) => C.Sink B.ByteString m (NGLess (Int, Int, Int))
+samStatsC = do
     let add1if !v True = v+1
         add1if !v False = v
-        summarize = V.foldl summarize' (0, 0, 0)
-        summarize' _ [] = error "This is a bug in ngless"
-        summarize' (!t, !al, !u) g = let
+        summarize _ [] = error "This is a bug in ngless"
+        summarize (!t, !al, !u) g = let
                     aligned = any isAligned g
                     sameRName = allSame (samRName <$> g)
                     unique = aligned && sameRName
@@ -150,20 +156,26 @@ _samStats fname = do
                 ,add1if al aligned
                 ,add1if  u unique
                 )
-        update (!a, !b, !c) (!a', !b', !c') = (a+a', b + b', c + c')
+    runExceptC $
+        linesC
+        =$= readSamGroupsC
+        =$= CL.fold summarize (0, 0, 0)
 
-    nthreads <- liftIO getNumCapabilities
-    (t, al, u) <- conduitPossiblyCompressedFile fname
-        =$= linesC
-        =$= readSamGroupsC' nthreads
-        =$= asyncMapC 1 summarize
-        $$ CL.fold update (0, 0, 0)
-    return (t, al, u)
-
-printMappingStats :: String -> FilePath -> NGLessIO ()
-printMappingStats ref fname = do
-    (total,aligned,unique) <- _samStats fname
-    outputMapStatistics fname ref total aligned unique
+-- | this is copied from runErrorC, using ExceptT as we do not want to have to
+-- make `e` be of class `Error`.
+runExceptC :: (Monad m) => C.Sink i (ExceptT e m) r -> C.Sink i m (Either e r)
+runExceptC (C.ConduitM c0) =
+    C.ConduitM $ \rest ->
+        let go (C.Done r) = rest (Right r)
+            go (C.PipeM mp) = C.PipeM $ do
+                eres <- runExceptT mp
+                return $! case eres of
+                    Left e -> rest $ Left e
+                    Right p -> go p
+            go (C.Leftover p i) = C.Leftover (go p) i
+            go (C.HaveOutput p f o) = C.HaveOutput (go p) (runExceptT f >> return ()) o
+            go (C.NeedInput x y) = C.NeedInput (go . x) (go . y)
+         in go (c0 C.Done)
 
 executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMap fps args = do
