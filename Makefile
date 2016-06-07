@@ -12,9 +12,9 @@ BWA_DIR = bwa-0.7.7
 BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
 BWA_TAR = bwa-0.7.7.tar.bz2
 
-SAM_DIR = samtools-1.0
-SAM_URL = http://sourceforge.net/projects/samtools/files/samtools/1.0/samtools-1.0.tar.bz2
-SAM_TAR = samtools-1.0.tar.bz2
+SAM_DIR = samtools-1.3.1
+SAM_URL = https://github.com/samtools/samtools/releases/download/1.3.1/samtools-1.3.1.tar.bz2
+SAM_TAR = samtools-1.3.1.tar.bz2
 
 NGLESS_BUILD_BINARIES := NGLess/Dependencies/samtools_data.c NGLess/Dependencies/bwa_data.c
 
