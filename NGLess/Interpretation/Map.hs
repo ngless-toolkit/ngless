@@ -14,7 +14,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Control.Monad
-import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Except
 import           Control.Monad.Trans.Resource
 
@@ -128,7 +127,7 @@ interpretMapOp :: ReferenceInfo -> T.Text -> [FilePath] -> [String] -> NGLessIO 
 interpretMapOp ref name fps extraArgs = do
     (ref', defGen') <- indexReference ref
     (samPath', (total, aligned, unique)) <- mapToReference ref' fps extraArgs
-    outputMapStatistics samPath' ref' total aligned unique
+    outputMapStatistics (MappingInfo samPath' ref' total aligned unique)
     return $ NGOMappedReadSet name samPath' defGen'
     where
         indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)

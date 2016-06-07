@@ -5,6 +5,7 @@
 
 module Output
     ( OutputType(..)
+    , MappingInfo(..)
     , outputLno'
     , outputListLno
     , outputListLno'
@@ -20,7 +21,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import Data.Maybe
 import Data.IORef
 import Data.Aeson
-import Data.Aeson.TH (deriveToJSON, defaultOptions)
+import Data.Aeson.TH (deriveToJSON, defaultOptions, Options(..))
 import Data.Time (getZonedTime, ZonedTime(..))
 import Data.Time.Format (formatTime, defaultTimeLocale)
 import System.Console.ANSI
@@ -81,14 +82,14 @@ data FQInfo = FQInfo
 $(deriveToJSON defaultOptions ''FQInfo)
 
 data MappingInfo = MappingInfo
-                { inputFile :: FilePath
-                , reference :: String
-                , totalReads :: !Int
-                , totalAligned :: !Int
-                , totalUnique :: !Int
+                { mi_inputFile :: FilePath
+                , mi_reference :: String
+                , mi_totalReads :: !Int
+                , mi_totalAligned :: !Int
+                , mi_totalUnique :: !Int
                 } deriving (Show)
 
-$(deriveToJSON defaultOptions ''MappingInfo)
+$(deriveToJSON defaultOptions{fieldLabelModifier = drop 3} ''MappingInfo)
 
 curLine :: IORef (Maybe Int)
 {-# NOINLINE curLine #-}
@@ -191,20 +192,15 @@ outputFQStatistics fname stats enc = do
     p "Number of sequences: "   (show $ FQ.nSeq stats)
     liftIO $ modifyIORef savedFQOutput (binfo:)
 
-outputMapStatistics :: String -- ^ input file
-                        -> String -- ^ mapping reference
-                        -> Int -- ^ total nr read
-                        -> Int -- ^ total aligned
-                        -> Int -- ^ total unique
-                        -> NGLessIO ()
-outputMapStatistics fname ref total aligned unique = do
+outputMapStatistics :: MappingInfo -> NGLessIO ()
+outputMapStatistics mi@(MappingInfo fname ref total aligned unique) = do
         lno' <- liftIO $ readIORef curLine
         let out = outputListLno' ResultOutput
         out ["Total reads: ", show total]
         out ["Total reads aligned: ", showNumAndPercentage aligned total]
         out ["Total reads Unique map: ", showNumAndPercentage unique total]
         out ["Total reads Non-Unique map: ", showNumAndPercentage (aligned - unique) total]
-        liftIO $ modifyIORef savedMapOutput (MappingInfo fname ref total aligned unique:)
+        liftIO $ modifyIORef savedMapOutput (mi:)
     where
         showNumAndPercentage :: Int  -> Int  -> String
         showNumAndPercentage v 0 = showNumAndPercentage v 1 -- same output & avoid division by zero
