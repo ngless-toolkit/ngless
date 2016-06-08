@@ -257,9 +257,9 @@ findLoad modname version = do
     found <- flip findFirstM [".", globalDir, userDir] $ \basedir -> do
         let fname = basedir </> modpath </> modfile
         exists <- liftIO $ doesFileExist fname
-        outputListLno' TraceOutput ["Looking for module ", T.unpack modname, "at ", fname, if exists then "and found it." else "and did not find it."]
+        outputListLno' TraceOutput ["Looking for module ", T.unpack modname, "at `", fname, if exists then "` and found it." else "` and did not find it."]
         return $ if exists
-            then Just basedir
+            then Just (basedir </> modpath)
             else Nothing
     case found of
         Just mdir -> decodeEither <$> liftIO (B.readFile (mdir </> modfile)) >>= \case
