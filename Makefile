@@ -8,9 +8,9 @@ deps=$(prefix)/share/$(progname)
 exec=$(prefix)/bin
 
 
-BWA_DIR = bwa-0.7.7
-BWA_URL = http://sourceforge.net/projects/bio-bwa/files/bwa-0.7.7.tar.bz2
-BWA_TAR = bwa-0.7.7.tar.bz2
+BWA_DIR = bwa-0.7.15
+BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.15/bwa-0.7.15.tar.bz2
+BWA_TAR = bwa-0.7.15.tar.bz2
 
 SAM_DIR = samtools-1.3.1
 SAM_URL = https://github.com/samtools/samtools/releases/download/1.3.1/samtools-1.3.1.tar.bz2

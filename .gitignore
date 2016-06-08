@@ -2,9 +2,9 @@
 /.stack-work/
 /cabal.sandbox.config
 /dist/
-/samtools-1.0/
-/samtools-1.0.tar.bz2
-/bwa-0.7.7/
+/samtools-1.3.1/
+/samtools-1.3.1.tar.bz2
+/bwa-0.7.15/
 *.o
 *.hi
 Html/fonts/
