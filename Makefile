@@ -125,7 +125,7 @@ $(BWA_DIR):
 	rm $(BWA_TAR)
 
 $(BWA_DIR)/ngless-bwa-static: $(BWA_DIR)
-	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static" && cp -p bwa ngless-bwa-static
+	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"  LIBS="-lbwa -lm -lz -lrt -lpthread" && cp -p bwa ngless-bwa-static
 
 $(SAM_DIR):
 	wget $(SAM_URL)
@@ -133,7 +133,7 @@ $(SAM_DIR):
 	rm $(SAM_TAR)
 
 $(SAM_DIR)/samtools: $(SAM_DIR)
-	cd $(SAM_DIR) && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC" "LIBCURSES=$$LIBCURSES"
+	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC"
 
 
 NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/samtools
