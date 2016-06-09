@@ -1,5 +1,4 @@
 from collections import defaultdict
-import gzip
 import os
 import argparse
 
@@ -43,14 +42,14 @@ for i,line in enumerate(open(args.input_counts)):
     if i == 0:
         headers = tokens[1:]
     else:
-        counts = [float(v) for v in tokens[2:]]
-        percog[tokens[1]] = counts
+        counts = [float(v) for v in tokens[1:]]
+        percog[tokens[0]] = counts
 
 summary = defaultdict(list)
 
 workdir = os.environ.get('NGLESS_MODULE_DIR', '.')
 
-for i,line in enumerate(gzip.open(workdir + '/mOTU.nr.padded.motu.linkage.map.gz', 'r')):
+for i,line in enumerate(open(workdir + '/data/mOTU.v1.padded.motu.linkage.map', 'r')):
     if i == 0:
         continue
     tokens = line.rstrip('\n').split('\t')

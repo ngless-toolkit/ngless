@@ -12,6 +12,11 @@ function:
             name: 'ofile'
             def: ''
             required: true
+references:
+    -
+        name: 'motus'
+        fasta-file: 'data/mOTU.v1.padded'
+        gtf-file: 'data/motus.gtf.gz'
 
 init:
     init_cmd: './run-python.sh'
