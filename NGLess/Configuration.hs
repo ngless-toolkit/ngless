@@ -240,29 +240,29 @@ findBin fname = do
             then Just userpath
             else Nothing
 
-writeBin :: FilePath -> B.ByteString -> NGLessIO FilePath
+writeBin :: FilePath -> IO B.ByteString -> NGLessIO FilePath
 writeBin fname bindata = do
     userBinPath <- binPath User
     liftIO $ do
         createDirectoryIfMissing True userBinPath
         let fname' = userBinPath </> fname
-        B.writeFile fname' bindata
+        B.writeFile fname' =<< bindata
         p <- getPermissions fname'
         setPermissions fname' (setOwnerExecutable True p)
         return fname'
 
-findOrCreateBin :: FilePath -> B.ByteString -> NGLessIO FilePath
+findOrCreateBin :: FilePath -> IO B.ByteString -> NGLessIO FilePath
 findOrCreateBin fname bindata = do
     path <- findBin fname
     maybe (writeBin fname bindata) return path
 
 bwaBin :: NGLessIO FilePath
-bwaBin = findOrCreateBin bwaFname =<< liftIO bwaData
+bwaBin = findOrCreateBin bwaFname bwaData
     where
         bwaFname = "ngless-" ++ versionStr ++ "-bwa"
 
 samtoolsBin :: NGLessIO FilePath
-samtoolsBin = findOrCreateBin samtoolsFname =<< liftIO samtoolsData
+samtoolsBin = findOrCreateBin samtoolsFname samtoolsData
     where
         samtoolsFname = "ngless-" ++ versionStr ++ "-samtools"
 
