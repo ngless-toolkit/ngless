@@ -1,3 +1,6 @@
+{- Copyright 2015-2016 NGLess Authors
+ - License: MIT
+ -}
 module Dependencies.Embedded
     ( samtoolsData
     , bwaData

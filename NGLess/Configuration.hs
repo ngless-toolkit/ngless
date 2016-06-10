@@ -224,7 +224,7 @@ canExecute bin = do
 binPath :: InstallMode -> NGLessIO FilePath
 binPath Root = do
     nglessBinDirectory <- takeDirectory <$> liftIO getExecutablePath
-    return (nglessBinDirectory </> "../share/bin")
+    return (nglessBinDirectory </> "../share/ngless/bin")
 binPath User = (</> "bin") <$> userNglessDirectory
 
 findBin :: FilePath -> NGLessIO (Maybe FilePath)

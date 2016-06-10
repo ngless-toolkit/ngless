@@ -12,6 +12,10 @@ build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.18.0.3
 
+Flag embed
+    Description: Embed bwa/samtools
+    Default: True
+
 define(`BUILD_DEPENDS',
     `aeson == 0.9.*,
     ansi-terminal == 0.6.*,
@@ -74,7 +78,10 @@ define(`BASE_CONFIG',
   default-extensions:  BangPatterns, OverloadedStrings, LambdaCase, TupleSections
   other-extensions:    DeriveDataTypeable, TemplateHaskell
   hs-source-dirs: NGLess/
-  default-language:    Haskell2010')
+  default-language:    Haskell2010
+  if !flag(Embed)
+      CC-Options: -DNO_EMBED_SAMTOOLS_BWA
+')
 
 executable ngless
   main-is: Main.hs

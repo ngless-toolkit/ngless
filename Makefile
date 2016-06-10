@@ -67,6 +67,9 @@ NGLess.cabal: NGLess.cabal.m4
 ngless: $(PREBUILD)
 	stack build
 
+ngless-no-embed: NGLess.cabal
+	stack build --flag NGLess:-embed
+
 static: $(PREBUILD)
 	stack build --ghc-options='-optl-static -optl-pthread' --force-dirty
 
