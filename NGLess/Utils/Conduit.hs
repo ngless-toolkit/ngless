@@ -23,6 +23,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI -- not a fully kosher import
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
+import           Control.Concurrent.STM (atomically)
 
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
@@ -39,7 +40,7 @@ import           Control.Monad (unless)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.Resource (MonadResource)
-import           Control.Exception (evaluate)
+import           Control.Exception (finally, evaluate)
 import           Control.DeepSeq
 import           Foreign.ForeignPtr
 import           System.IO
@@ -170,7 +171,10 @@ asyncGzipFrom h = do
     -- `src` and `sink` end up with different underlying monads (sink is a
     -- conduit over IO, while we are in m)
     q <- liftIO $ TQ.newTBMQueueIO 4
-    producer <- liftIO $ A.async (C.sourceHandle h =$= CZ.multiple CZ.ungzip $$ CA.sinkTBMQueue q True)
+    producer <- liftIO . A.async $
+                (C.sourceHandle h =$= CZ.multiple CZ.ungzip $$ CA.sinkTBMQueue q False)
+                `finally`
+                atomically (TQ.closeTBMQueue q)
     CA.sourceTBMQueue q
     liftIO (A.cancel producer)
 

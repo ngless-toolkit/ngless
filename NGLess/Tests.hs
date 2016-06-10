@@ -349,3 +349,9 @@ case_async_gzip_to_from = do
             $$ CL.consume
     result @?= testdata
 
+case_async_gzip_from_not_gzip = do
+    -- this is a regression test.
+    _ <- testNGLessIO $ (asyncGzipFromFile "Makefile" $$ CL.consume)
+    return ()
+
+
