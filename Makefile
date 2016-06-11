@@ -64,11 +64,14 @@ all: NGLess.cabal ngless
 NGLess.cabal: NGLess.cabal.m4
 	m4 $< > $@
 
-ngless: $(PREBUILD)
+ngless: $(PREBUILD) modules
 	stack build
 
-ngless-no-embed: NGLess.cabal
+ngless-no-embed: NGLess.cabal modules
 	stack build --flag NGLess:-embed
+
+modules:
+	cd Modules && $(MAKE)
 
 static: $(PREBUILD)
 	stack build --ghc-options='-optl-static -optl-pthread' --force-dirty
@@ -179,4 +182,4 @@ ngless-${VERSION}.tar.gz: ngless
 	tar -zcvf $(distdir).tar.gz $(distdir)
 	rm -rf $(distdir)
 
-.PHONY: all build clean check tests distclean dist static fast fastcheck
+.PHONY: all build clean check tests distclean dist static fast fastcheck modules
