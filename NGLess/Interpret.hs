@@ -36,6 +36,7 @@ import           Data.Conduit (($=), (=$=), (=$), ($$+), ($$+-))
 import           Data.Conduit.Async ((=$=&), ($$&))
 import qualified Data.Vector as V
 import           Control.DeepSeq (NFData(..))
+import           Data.Strict.Tuple (Pair(..))
 
 import Data.IORef
 import System.IO
@@ -409,7 +410,7 @@ executePreprocess (NGOReadSet name (ReadSet3 enc fp1 fp2 fp3)) args (Block [Vari
                     (C.concat :: C.Conduit (V.Vector ShortRead) InterpretationEnvIO ShortRead)
                     =$= snd <$> (zipSink2
                         (fqEncodeC enc =$= asyncGzipTo h)
-                        (CL.map (\(ShortRead _ bps qs) -> (ByteLine bps, ByteLine qs)) =$= C.transPipe runNGLessIO fqStatsC))
+                        (CL.map (\(ShortRead _ bps qs) -> (ByteLine bps :!: ByteLine qs)) =$= C.transPipe runNGLessIO fqStatsC))
 
         env <- gets id
         numCapabilities <- liftIO getNumCapabilities

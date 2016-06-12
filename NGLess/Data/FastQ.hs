@@ -26,6 +26,7 @@ import qualified Data.ByteString as B
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import           Control.DeepSeq (NFData(..))
+import           Data.Strict.Tuple (Pair(..))
 import Data.Conduit         (($$), (=$=))
 import Control.Monad
 import Control.Monad.Except
@@ -120,10 +121,10 @@ statsFromFastQ fp =
         =$= getPairedLines
         $$ fqStatsC
 
-getPairedLines :: C.Conduit ByteLine NGLessIO (ByteLine,ByteLine)
+getPairedLines :: C.Conduit ByteLine NGLessIO (Pair ByteLine ByteLine)
 getPairedLines = groupC 4 =$= CL.mapM getPairedLines'
     where
-        getPairedLines' [_, bps, _, qs] = return (bps, qs)
+        getPairedLines' [_, bps, _, qs] = return $! bps :!: qs
         getPairedLines' _ = throwDataError "fastq lines are not a multiple of 4"
 
 encodingFor :: FilePath -> NGLessIO FastQEncoding
@@ -145,7 +146,7 @@ encodingFor fp = do
     guessEncoding m
 
 
-fqStatsC :: C.Sink (ByteLine,ByteLine) NGLessIO FQStatistics
+fqStatsC :: C.Sink (Pair ByteLine ByteLine) NGLessIO FQStatistics
 fqStatsC = do
         -- This is pretty ugly code, but threading the state through a foldM
         -- was >2x slower. In any case, all the ugliness is well hidden.
@@ -171,8 +172,8 @@ fqStatsC = do
             return (FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq))
     where
 
-        update :: VUM.IOVector Int -> VUM.IOVector Int -> IORef (VM.IOVector (VUM.IOVector Int)) -> (ByteLine, ByteLine) -> NGLessIO ()
-        update charCounts stats qcs (ByteLine bps,ByteLine qs) = liftIO $ do
+        update :: VUM.IOVector Int -> VUM.IOVector Int -> IORef (VM.IOVector (VUM.IOVector Int)) -> Pair ByteLine ByteLine -> NGLessIO ()
+        update charCounts stats qcs (ByteLine bps :!: ByteLine qs) = liftIO $ do
             let convert8 :: Word8 -> Int
                 convert8 = fromEnum
             forM_ [0 .. B.length bps - 1] $ \i -> do
