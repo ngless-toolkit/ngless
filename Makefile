@@ -64,17 +64,17 @@ all: NGLess.cabal ngless
 NGLess.cabal: NGLess.cabal.m4
 	m4 $< > $@
 
-ngless: $(PREBUILD) modules
-	stack build
+ngless-embed: $(PREBUILD) modules
+	stack build --flag NGLess:embed
 
-ngless-no-embed: NGLess.cabal modules
-	stack build --flag NGLess:-embed
+ngless: NGLess.cabal modules
+	stack build
 
 modules:
 	cd Modules && $(MAKE)
 
 static: $(PREBUILD)
-	stack build --ghc-options='-optl-static -optl-pthread' --force-dirty
+	stack build --ghc-options='-optl-static -optl-pthread' --force-dirty --flag NGLess:embed
 
 fast: $(PREBUILD)
 	stack build  --ghc-options=-O0

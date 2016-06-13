@@ -14,7 +14,7 @@ cabal-version:       >=1.18.0.3
 
 Flag embed
     Description: Embed bwa/samtools
-    Default: True
+    Default: False
 
 define(`BUILD_DEPENDS',
     `aeson >= 0.9,
