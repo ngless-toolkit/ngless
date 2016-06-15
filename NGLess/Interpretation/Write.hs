@@ -15,10 +15,9 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 import qualified Data.Conduit.Combinators as C
-import           Data.Conduit (($$))
+import           Data.Conduit ((=$=), runConduit)
 import System.Process
 import System.Exit
-import System.Directory
 import System.IO
 import Data.String.Utils
 import Data.List (isInfixOf)
@@ -29,7 +28,39 @@ import Configuration
 import NGLess
 import Output
 import Utils.Utils
-import Utils.Conduit (conduitPossiblyCompressedFile)
+import Utils.Conduit (conduitPossiblyCompressedFile, asyncGzipToFile)
+
+{- A few notes:
+    There is a transform pass which adds the argument __can_move to write() calls.
+    If canMove is True, then we can move the input instead of copying as it
+    will no longer be used in the script.
+
+    Decisions on whether to use compression are based on the filenames.
+-}
+
+moveOrCopyCompress :: Bool -> FilePath -> FilePath -> NGLessIO ()
+moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
+    where
+        moveOrCopyCompress' :: FilePath -> FilePath -> NGLessIO ()
+        moveOrCopyCompress'
+            | igz && ogz = moveIfCan
+            | igz = uncompressTo
+            | ogz = compressTo
+            | otherwise = moveIfCan
+
+        moveIfCan :: FilePath -> FilePath -> NGLessIO ()
+        moveIfCan = if canMove
+                       then liftIO2 moveOrCopy
+                       else nglMaybeCopyFile
+
+        liftIO2 f = \a b -> liftIO (f a b)
+        isGZ = endswith ".gz"
+        igz = isGZ orig
+        ogz = isGZ fname
+        uncompressTo oldfp newfp = runConduit $
+            conduitPossiblyCompressedFile oldfp =$= C.sinkFile newfp
+        compressTo oldfp newfp = runConduit $
+            C.sourceFile oldfp =$= asyncGzipToFile newfp
 
 removeEnd :: String -> String -> String
 removeEnd base suffix = take (length base - length suffix) base
@@ -51,41 +82,36 @@ getOFile args = do
         _ -> throwShouldNotOccur "getOFile cannot decode file path"
 
 
-writeRSToFile enc path newfp =
-    conduitPossiblyCompressedFile path $$ C.sinkFile newfp
-
-
 executeWrite :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
 executeWrite (NGOList el) args = do
     templateFP <- getOFile args
     let args' = filter (\(a,_) -> (a /= "ofile")) args
         fps = map ((\fname -> replace "{index}" fname templateFP) . show) [1..length el]
-    res <- zipWithM (\e fp -> executeWrite e (("ofile", NGOFilename fp):args')) el fps
-    return (NGOList res)
+    zipWithM_ (\e fp -> executeWrite e (("ofile", NGOFilename fp):args')) el fps
+    return NGOVoid
 
-executeWrite (NGOReadSet name rs) args = do
+executeWrite (NGOReadSet _ rs) args = do
     ofile <- getOFile args
+    canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
     case rs of
-        ReadSet1 enc r -> do
-            writeRSToFile enc r ofile
-            return (NGOReadSet name $ ReadSet1 enc ofile)
-        ReadSet2 enc r1 r2 -> do
+        ReadSet1 _ r -> do
+            moveOrCopyCompress canMove r ofile
+            return NGOVoid
+        ReadSet2 _ r1 r2 -> do
             fname1 <- _formatFQOname ofile "pair.1"
             fname2 <- _formatFQOname ofile "pair.2"
-            writeRSToFile enc r1 fname1
-            writeRSToFile enc r2 fname2
-            return (NGOReadSet name $ ReadSet2 enc fname1 fname2)
-        ReadSet3 enc r1 r2 r3 -> do
+            moveOrCopyCompress canMove r1 fname1
+            moveOrCopyCompress canMove r2 fname2
+            return NGOVoid
+        ReadSet3 _ r1 r2 r3 -> do
             fname1 <- _formatFQOname ofile "pair.1"
             fname2 <- _formatFQOname ofile "pair.2"
             fname3 <- _formatFQOname ofile "singles"
-            writeRSToFile enc r1 fname1
-            writeRSToFile enc r2 fname2
-            writeRSToFile enc r3 fname3
-            return (NGOReadSet name $ ReadSet3 enc fname1 fname2 fname3)
-
-
-executeWrite el@(NGOMappedReadSet name fp defGen) args = do
+            moveOrCopyCompress canMove r1 fname1
+            moveOrCopyCompress canMove r2 fname2
+            moveOrCopyCompress canMove r3 fname3
+            return NGOVoid
+executeWrite el@(NGOMappedReadSet _ fp _) args = do
     newfp <- getOFile args
     canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
     let guess :: String -> T.Text
@@ -98,14 +124,15 @@ executeWrite el@(NGOMappedReadSet name fp defGen) args = do
         "sam" -> return fp
         "bam" -> convertSamToBam fp
         s -> throwScriptError ("write does not accept format {" ++ T.unpack s ++ "} with input type " ++ show el)
-    liftIO $ (if canMove then moveOrCopy else copyFile) orig newfp
-    return (NGOMappedReadSet name newfp defGen)
+    moveOrCopyCompress canMove orig newfp
+    return NGOVoid
 
 executeWrite (NGOCounts fp) args = do
     newfp <- getOFile args
+    canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
     outputListLno' InfoOutput ["Writing counts to: ", newfp]
-    nglMaybeCopyFile fp newfp
-    return $ NGOCounts newfp
+    moveOrCopyCompress canMove fp newfp
+    return NGOVoid
 
 executeWrite v _ = throwShouldNotOccur ("Error: executeWrite of " ++ show v ++ " not implemented yet.")
 
