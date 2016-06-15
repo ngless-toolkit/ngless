@@ -18,7 +18,7 @@ import Data.Maybe
 import System.Process
 import System.Environment (getEnvironment, getExecutablePath)
 import System.Exit
-import System.Directory
+import System.Directory (doesFileExist, doesDirectoryExist, canonicalizePath)
 import System.FilePath.Posix
 import Data.Aeson
 import Data.Yaml
@@ -164,6 +164,7 @@ asArgInfo (CommandOption name _ allowed) = ArgInformation name False NGLSymbol [
 asArgInfo (CommandInteger name _) = ArgInformation name False NGLInteger []
 asArgInfo (CommandString name _ req) = ArgInformation name req NGLString []
 
+{- | Environment to expose to module processes -}
 nglessEnv :: FilePath -> NGLessIO [(String,String)]
 nglessEnv basedir = liftIO $ do
     env <- getEnvironment
@@ -193,6 +194,7 @@ asfilePaths (NGOReadSet _ (ReadSet3 _ fp1 fp2 fp3)) = return [fp1, fp2, fp3]
 asfilePaths (NGOCounts fp) = return [fp]
 asfilePaths invalid = throwShouldNotOccur ("AsFile path got "++show invalid)
 
+argsArguments :: Command -> KwArgsValues -> NGLessIO [String]
 argsArguments cmd args = catMaybes <$> forM (additional cmd) a1
     where
         a1 :: CommandArgument -> NGLessIO (Maybe String)
@@ -243,14 +245,15 @@ validateModule  ExternalModule{..} = do
 
 
 findFirstM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
-findFirstM f [] = return Nothing
+findFirstM _ [] = return Nothing
 findFirstM f (x:xs) = f x >>= \case
     Nothing -> findFirstM f xs
     other -> return other
 
 findLoad :: T.Text -> T.Text -> NGLessIO ExternalModule
 findLoad modname version = do
-    let modpath = "Modules" </> T.unpack modname <.> "ngm" </> T.unpack version
+    let modpath' = "Modules" </> T.unpack modname <.> "ngm"
+        modpath = modpath' </> T.unpack version
         modfile = "module.yaml"
     globalDir <- globalDataDirectory
     userDir <- userDataDirectory
@@ -258,14 +261,26 @@ findLoad modname version = do
         let fname = basedir </> modpath </> modfile
         exists <- liftIO $ doesFileExist fname
         outputListLno' TraceOutput ["Looking for module ", T.unpack modname, "at `", fname, if exists then "` and found it." else "` and did not find it."]
-        return $ if exists
+        return $! if exists
             then Just (basedir </> modpath)
             else Nothing
     case found of
         Just mdir -> decodeEither <$> liftIO (B.readFile (mdir </> modfile)) >>= \case
                     Right v -> return $ addPathToRep mdir v
                     Left err -> throwSystemError ("Could not load module file "++ mdir </> modfile ++ ". Error was `" ++ err ++ "`")
-        Nothing -> throwSystemError ("Could not find external module '" ++ T.unpack modname)
+        Nothing -> do
+            other <- flip findFirstM [".", globalDir, userDir] $ \basedir -> do
+                let dname = basedir </> modpath'
+                exists <- liftIO $ doesDirectoryExist dname
+                return $! if exists
+                    then Just dname
+                    else Nothing
+            throwSystemError
+                ("Could not find external module '" ++ T.unpack modname ++
+                    (case other of
+                        Just _ -> "' version " ++ T.unpack version ++ ".\n"
+                                        ++ "Please check the version number."
+                        Nothing -> "'."))
 
 loadModule :: T.Text -> T.Text -> NGLessIO Module
 loadModule m version = asInternalModule =<< findLoad m version
