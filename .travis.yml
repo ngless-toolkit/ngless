@@ -24,4 +24,6 @@ addons:
 
 script:
   - make
-  - make check
+  - export NGLESS_SAMTOOLS_BIN=$PWD/samtools-1.3.1/samtools
+  - export NGLESS_BWA_BIN=$PWD/bwa-0.7.15/bwa
+  - ./run-tests.sh
