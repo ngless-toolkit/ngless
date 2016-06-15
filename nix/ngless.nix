@@ -12,6 +12,7 @@
 , vector-algorithms, yaml, zlib
 # , fetchurl
 , fetchFromGitHub
+, makeWrapper
 , pkgs
 }:
 mkDerivation {
@@ -20,8 +21,8 @@ mkDerivation {
   src = fetchFromGitHub {
     owner = "luispedro";
     repo = "ngless";
-    rev = "af5fa8be22e4da563004807bee4d92e806df6394";
-    sha256 = "185jyg1462issnl6xv8v0f396bmmpvg22p53637pyrf9bck4gv39";
+    rev = "e5591a9084bdb45fdf5583cb47edd7bec1a6c9fb";
+    sha256 = "1g1fli2ihkfnnjsvdygc50kqncmrw1yajy6ph8x9brzr4wblcpn8";
   };
   isLibrary = false;
   isExecutable = true;
@@ -39,6 +40,7 @@ mkDerivation {
     pkgs.m4
     pkgs.samtools
     pkgs.bwa
+    makeWrapper
   ];
   testHaskellDepends = [
     aeson ansi-terminal async base bytestring bzlib bzlib-conduit
@@ -66,9 +68,9 @@ mkDerivation {
   postInstall = ''
     mkdir -p $out/share/ngless/data
     mkdir -p $out/share/ngless/bin
-    cp -pr ${pkgs.samtools}/bin/samtools $out/share/ngless/bin/ngless-0.0.0-samtools
-    cp -pr ${pkgs.bwa}/bin/bwa $out/share/ngless/bin/ngless-0.0.0-bwa
     cp -pr Modules $out/share/ngless/data
+    wrapProgram $out/bin/ngless \
+        --set NGLESS_SAMTOOLS_BIN ${pkgs.samtools}/bin/samtools \
+        --set NGLESS_BWA_BIN ${pkgs.bwa}/bin/bwa
   '';
-  
 }
