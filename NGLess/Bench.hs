@@ -71,7 +71,6 @@ basicCountOpts = CountOpts
         { optFeatures = []
         , optIntersectMode = annotationRule IntersectStrict
         , optStrandSpecific = False
-        , optKeepAmbiguous = True
         , optMinCount = 0.0
         , optMMMethod = MMDist1
         , optDelim = "\t"
