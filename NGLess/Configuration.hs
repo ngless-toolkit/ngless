@@ -204,14 +204,14 @@ userNglessDirectory = nConfUserDirectory <$> nglConfiguration
 userDataDirectory :: NGLessIO FilePath
 userDataDirectory = (</> "data") <$> userNglessDirectory
 
-check_executable :: String -> FilePath -> IO FilePath
-check_executable name bin = do
-    exists <- doesFileExist bin
+checkExecutable :: String -> FilePath -> NGLessIO FilePath
+checkExecutable name bin = do
+    exists <- liftIO $ doesFileExist bin
     unless exists
-        (error $ concat [name, " binary not found!\n","Expected it at ", bin])
-    is_executable <- executable <$> getPermissions bin
+        (throwSystemError $ concat [name, " binary not found!\n","Expected it at ", bin])
+    is_executable <- executable <$> liftIO (getPermissions bin)
     unless is_executable
-        (error $ concat [name, " binary found at ", bin, ".\nHowever, it is not an executable file!"])
+        (throwSystemError $ concat [name, " binary found at ", bin, ".\nHowever, it is not an executable file!"])
     return bin
 
 canExecute bin = do
@@ -251,18 +251,20 @@ writeBin fname bindata = do
         setPermissions fname' (setOwnerExecutable True p)
         return fname'
 
-findOrCreateBin :: FilePath -> IO B.ByteString -> NGLessIO FilePath
-findOrCreateBin fname bindata = do
-    path <- findBin fname
-    maybe (writeBin fname bindata) return path
+findOrCreateBin :: String -> FilePath -> IO B.ByteString -> NGLessIO FilePath
+findOrCreateBin envvar fname bindata = liftIO (lookupEnv envvar) >>= \case
+    Just bin -> checkExecutable envvar bin
+    Nothing -> do
+        path <- findBin fname
+        maybe (writeBin fname bindata) return path
 
 bwaBin :: NGLessIO FilePath
-bwaBin = findOrCreateBin bwaFname bwaData
+bwaBin = findOrCreateBin "NGLESS_BWA_BIN" bwaFname bwaData
     where
         bwaFname = "ngless-" ++ versionStr ++ "-bwa"
 
 samtoolsBin :: NGLessIO FilePath
-samtoolsBin = findOrCreateBin samtoolsFname samtoolsData
+samtoolsBin = findOrCreateBin "NGLESS_SAMTOOLS_BIN" samtoolsFname samtoolsData
     where
         samtoolsFname = "ngless-" ++ versionStr ++ "-samtools"
 
