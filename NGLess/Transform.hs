@@ -19,6 +19,13 @@ import Output
 import NGLess
 
 
+{- Before interpretation, scripts are transformed to allow for several
+    optimizations.
+
+    This is implemented by adding hidden arguments to functions and by
+    replacing expressions by Optimized instances.
+-}
+
 transform :: [Module] -> Script -> NGLessIO Script
 transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
     where
@@ -63,12 +70,27 @@ isVarUsed1 v expr = evalCont $ callCC $ \exit -> do
             | v == v' = exit True
         isVarUsed1' _ _ = return ()
 
+{- If a variable is not used after a call to write(), we can destroy it.
+    This is implemented by adding the argument __can_move=True to
+    write() calls -}
 writeToMove :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
-writeToMove = return . writeToMove'
-writeToMove' [] = []
-writeToMove' ((lno,expr):rest) = (lno, addMove toRemove expr):writeToMove' rest
+writeToMove = return . writeToMove' []
+writeToMove' _ [] = []
+writeToMove' blocked ((lno,expr):rest) = (lno, addMove toRemove expr):writeToMove' blocked' rest
     where
-        toRemove = filter (not . flip isVarUsed rest) $ functionVars "write" expr
+        toRemove = filter (`notElem` blocked) unused
+        unused = filter (not . flip isVarUsed rest) $ functionVars "write" expr
+        blocked' = blockhere ++ blocked
+        blockhere = case expr of
+                      Assignment var (FunctionCall (FuncName fname) _ _ _)
+                        | fname `elem` ["fastq", "paired", "samfile"] -> [var]
+                      _ -> []
+        addMove :: [Variable] -> Expression -> Expression
+        addMove dead = pureRecursiveTransform addMove'
+            where
+                addMove' (FunctionCall f@(FuncName "write") e@(Lookup v) args b)
+                    | v `elem` dead = FunctionCall f e ((Variable "__can_move", ConstBool True):args) b
+                addMove' e = e
 
 -- | Variables used in calling the function func
 functionVars :: T.Text -- ^ function name
@@ -80,12 +102,6 @@ functionVars fname expr = execWriter (recursiveAnalyse fvars expr)
         fvars (FunctionCall (FuncName fname') (Lookup v) _ _)
             | fname' == fname = tell [v]
         fvars _ = return ()
-
-addMove :: [Variable] -> Expression -> Expression
-addMove dead (Assignment v e) = Assignment v (addMove dead e)
-addMove dead (FunctionCall f@(FuncName "write") e@(Lookup v) args b)
-    | v `elem` dead = FunctionCall f e ((Variable "__can_move", ConstBool True):args) b
-addMove _ expr = expr
 
 qcInPreprocess :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 qcInPreprocess [] = return []
