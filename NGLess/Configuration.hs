@@ -243,10 +243,13 @@ findBin fname = do
 writeBin :: FilePath -> IO B.ByteString -> NGLessIO FilePath
 writeBin fname bindata = do
     userBinPath <- binPath User
+    bindata' <- liftIO bindata
+    when (B.null bindata') $
+        throwSystemError ("Cannot find " ++ fname ++ " on the system and this is a build without embedded dependencies.")
     liftIO $ do
         createDirectoryIfMissing True userBinPath
         let fname' = userBinPath </> fname
-        B.writeFile fname' =<< bindata
+        B.writeFile fname' bindata'
         p <- getPermissions fname'
         setPermissions fname' (setOwnerExecutable True p)
         return fname'
