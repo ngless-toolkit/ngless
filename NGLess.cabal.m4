@@ -10,7 +10,7 @@ maintainer:          luis@luispedro.org
 category:            Domain Specific Language
 build-type:          Simple
 -- extra-source-files:
-cabal-version:       >=1.18.0.3
+cabal-version:       >=1.22
 
 Flag embed
     Description: Embed bwa/samtools
@@ -73,12 +73,15 @@ define(`BUILD_DEPENDS',
     zlib')
 
 define(`BASE_CONFIG',
-  `ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m -n4m -H -qg"
-  C-sources: NGLess/Dependencies/embedded.c
+  `C-sources: NGLess/Dependencies/embedded.c
   default-extensions:  BangPatterns, OverloadedStrings, LambdaCase, TupleSections
   other-extensions:    DeriveDataTypeable, TemplateHaskell
   hs-source-dirs: NGLess/
   default-language:    Haskell2010
+  if impl(ghc >= 8.0)
+    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m -n4m -H"
+  else
+    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m -n4m -H -qg"
   if !flag(Embed)
       CC-Options: -DNO_EMBED_SAMTOOLS_BWA
 ')

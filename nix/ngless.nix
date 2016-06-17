@@ -10,11 +10,15 @@
 , test-framework, test-framework-hunit, test-framework-quickcheck2
 , test-framework-th, text, time, transformers, unix, vector
 , vector-algorithms, yaml, zlib
+, ghc
 # , fetchurl
 , fetchFromGitHub
 , makeWrapper
 , pkgs
 }:
+let
+  isGHC8 = stdenv.lib.versionOlder "8.0" ghc.version;
+in
 mkDerivation {
   pname = "NGLess";
   version = "0.0.0";
@@ -56,8 +60,9 @@ mkDerivation {
   ];
   configureFlags = "-f-embed";
   license = stdenv.lib.licenses.mit;
+  jailbreak = isGHC8;
 
-  preConfigure = ''
+  prePatch = ''
     m4 NGLess.cabal.m4 > NGLess.cabal
   '';
 
