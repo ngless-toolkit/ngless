@@ -25,8 +25,8 @@ mkDerivation {
   src = fetchFromGitHub {
     owner = "luispedro";
     repo = "ngless";
-    rev = "e5591a9084bdb45fdf5583cb47edd7bec1a6c9fb";
-    sha256 = "1g1fli2ihkfnnjsvdygc50kqncmrw1yajy6ph8x9brzr4wblcpn8";
+    rev = "9c21913ee710119dfa1cb07098a00019dc35e98e";
+    sha256 = "12dqm5pa101vxn492b88j9an8la52l8m4sih2w1fsrgn1cz6aad8";
   };
   isLibrary = false;
   isExecutable = true;
@@ -60,11 +60,16 @@ mkDerivation {
   ];
   configureFlags = "-f-embed";
   license = stdenv.lib.licenses.mit;
+
   jailbreak = isGHC8;
+  # Work around a bug in jailbreak: https://github.com/peti/jailbreak-cabal/issues/11
+  patches = if isGHC8 then [ ./jailbreak-workaround.patch ] else null;
+
 
   prePatch = ''
     m4 NGLess.cabal.m4 > NGLess.cabal
   '';
+
 
   postBuild = ''
     make modules

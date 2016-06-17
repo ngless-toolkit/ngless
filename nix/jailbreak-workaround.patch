@@ -1,0 +1,38 @@
+--- a/NGLess.cabal	2016-06-17 15:34:07.397433882 +0200
++++ b/NGLess.cabal	2016-06-17 15:35:08.169231307 +0200
+@@ -28,9 +28,9 @@
+   hs-source-dirs: NGLess/
+   default-language:    Haskell2010
+   if impl(ghc >= 8.0)
+-    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m -n4m -H"
++    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m"
+   else
+-    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m -n4m -H -qg"
++    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m"
+   if !flag(Embed)
+       CC-Options: -DNO_EMBED_SAMTOOLS_BWA
+ 
+@@ -99,9 +99,9 @@
+   hs-source-dirs: NGLess/
+   default-language:    Haskell2010
+   if impl(ghc >= 8.0)
+-    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m -n4m -H"
++    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m"
+   else
+-    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m -n4m -H -qg"
++    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m"
+   if !flag(Embed)
+       CC-Options: -DNO_EMBED_SAMTOOLS_BWA
+ 
+@@ -176,9 +176,9 @@
+   hs-source-dirs: NGLess/
+   default-language:    Haskell2010
+   if impl(ghc >= 8.0)
+-    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m -n4m -H"
++    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m"
+   else
+-    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m -n4m -H -qg"
++    ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m"
+   if !flag(Embed)
+       CC-Options: -DNO_EMBED_SAMTOOLS_BWA
+ 
