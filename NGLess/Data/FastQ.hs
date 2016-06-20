@@ -18,7 +18,6 @@ module Data.FastQ
     , fqStatsC
     , getPairedLines
     , calculateStatistics
-    , calcPercentile
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -218,13 +217,6 @@ gcFraction res = gcCount / allBpCount
         allBpCount = fromIntegral $ bpA + bpC + bpG + bpT
 
 
--- accUntilLim :: given lim, each position of the array is added until lim.
--- Is returned the elem of the array in that position.
-accUntilLim :: V.Vector Int -> Int -> Int
-accUntilLim bps lim = case V.findIndex (>= lim) $ V.postscanl (+) 0 bps of
-      Just v -> v
-      Nothing -> error ("ERROR: Must exist a index with a accumulated value larger than " ++ show lim)
-
 
 calculateStatistics :: FQStatistics -> FastQEncoding -> [(Int, Int, Int, Int)]
 calculateStatistics FQStatistics{qualCounts=qCounts} enc = Prelude.map statistics qCounts
@@ -235,17 +227,25 @@ calculateStatistics FQStatistics{qualCounts=qCounts} enc = Prelude.map statistic
                                 , calcPercentile' 0.50
                                 , calcPercentile' 0.25
                                 , calcPercentile' 0.75)
-            where bpSum = calcBPSum bps encOffset
-                  elemTotal = V.sum bps
-                  calcPercentile' :: Double -> Int
-                  calcPercentile' p = calcPercentile bps elemTotal p - encOffset
+            where
+                bpSum = calcBPSum bps encOffset
+                elemTotal = V.sum bps
+                calcPercentile' :: Double -> Int
+                calcPercentile' p = calcPercentile p - encOffset
+
+                calcPercentile :: Double -> Int
+                calcPercentile perc = accUntilLim val'
+                    where
+                        val' = ceiling (fromIntegral elemTotal * perc)
+                        accUntilLim :: Int -> Int
+                        accUntilLim lim = case V.findIndex (>= lim) $ V.postscanl (+) 0 bps of
+                              Just v -> v
+                              Nothing -> error "ERROR: Logical impossibility in calcPercentile function"
+
 
 -- Calculates [('a',1), ('b',2)] = 0 + 'a' * 1 + 'b' * 2.
 -- 'a' and 'b' minus encoding.
 calcBPSum :: V.Vector Int -> Int -> Int
 calcBPSum qs offset = V.ifoldl' (\n i q -> (n + (i - offset) * q)) 0 qs
 
-calcPercentile :: V.Vector Int -> Int -> Double -> Int
-calcPercentile bps elemTotal perc = accUntilLim bps val'
-    where val' = ceiling (fromIntegral elemTotal * perc)
 

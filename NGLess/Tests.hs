@@ -296,20 +296,6 @@ case_unique_2 = make_unique_test 2
 case_unique_3 = make_unique_test 3
 case_unique_4 = make_unique_test 4
 case_unique_5 = make_unique_test 5
--- PerBaseQualityScores 
-
-case_calc_perc_med = calcPercentile bps eT 0.5 @?= 4
-    where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
-          eT  = V.sum bps -- 21 -> mul: 0,5  +- 11 in arr = 13 index 4
-
-case_calc_perc_lq = calcPercentile bps eT 0.25 @?= 2
-    where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
-          eT  = V.sum bps -- 21 -> mul: 0,25 -> 6 in arr = 6 index 2
-
-case_calc_perc_uq = calcPercentile bps eT 0.75 @?= 5
-    where bps = V.fromList [3,1,2,3,4,5,1,2] -- [3,4,6,9,13,18,19,21] -> arr
-          eT  = V.sum bps -- 8 -> mul: 0,75 -> 16 in arr = 18 index 5
-
 
 simpleStats s = case calculateStatistics s <$> guessEncoding (lc s) of
     Left e -> error (show e)
