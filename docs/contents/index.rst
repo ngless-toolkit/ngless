@@ -5,10 +5,10 @@ NGLess is a domain-specific language for NGS (next-generation sequencing data)
 processing.
 
 **Note**: This is *pre-release* software, currently available as a preview
-only. Please [get in touch](mailto:coelho@embl.de) if you want to use it in
+only. Please `get in touch <mailto:coelho@embl.de>`__ if you want to use it in
 your work.
 
-This is best illustrated by an example:
+NGLess is best illustrated by an example:
 
 Example
 -------

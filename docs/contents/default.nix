@@ -8,7 +8,7 @@ let
     pyp = pkgs.python27Packages;
 in
 
-buildPythonPackage { 
+buildPythonPackage {
   name = "${envname}-env";
   buildInputs = with pyp; [
      python
