@@ -23,8 +23,8 @@ dependencies. After this ngless is ready to use!
 
 ## With Nix
 
-If you use [nix](http://nixos.org), you easily build and install ngless using
-it:
+If you use [nix](http://nixos.org), you can easily build and install ngless
+using it (these scripts also install all necessary dependencies):
 
     nix-env -i -f https://github.com/luispedro/ngless-nix/archive/master.tar.gz
 
