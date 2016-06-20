@@ -36,7 +36,7 @@ import           Data.Conduit ((=$=), ($$))
 
 import qualified Data.Sequence as Seq
 import           Data.Sequence ((|>), ViewL(..))
-import           Control.Monad (unless)
+import           Control.Monad (unless, forM_)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.Resource (MonadResource)
@@ -48,6 +48,7 @@ import           Data.Word
 import           Foreign.Ptr
 import           Data.List (isSuffixOf)
 
+-- | This just signals that a "line" is expected.
 newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
 
 linesC :: (Monad m) => C.Conduit B.ByteString m ByteLine
@@ -76,7 +77,7 @@ asyncMapC maxSize f = initLoop (0 :: Int) (Seq.empty :: Seq.Seq (A.Async b))
         yAll :: Seq.Seq (A.Async b) -> C.Conduit a m b
         yAll q = case Seq.viewl q of
             EmptyL -> return ()
-            v :< rest -> (liftIO (A.wait v) >>= C.yield) >> yAll rest
+            v :< rest -> (liftIO (A.wait v) >>= yieldOrCleanup rest) >> yAll rest
 
         loop :: Seq.Seq (A.Async b) -> C.Conduit a m b
         loop q = C.await >>= \case
@@ -85,14 +86,18 @@ asyncMapC maxSize f = initLoop (0 :: Int) (Seq.empty :: Seq.Seq (A.Async b))
                     v' <- sched v
                     case Seq.viewl q of
                         (r :< rest) -> do
-                            C.yield =<< liftIO (A.wait r)
+                            yieldOrCleanup rest =<< liftIO (A.wait r)
                             loop (rest |> v')
                         _ -> error "should never happen"
+        cleanup :: Seq.Seq (A.Async b) -> m ()
+        cleanup q = liftIO $ forM_ q A.cancel
+        yieldOrCleanup q = flip C.yieldOr (cleanup q)
 
 -- | asyncMapC with error handling. The inner function can now return an error
 -- (as a 'Left'). When the first error is seen, it 'throwError's in the main
--- monad. Note that if 'f' is not pure, then 'f' may be evaluated for arguments
--- beyond the first error (as this is being performed in a separate thread.
+-- monad. Note that 'f' may be evaluated for arguments beyond the first error
+-- (as some threads may be running in the background and already processing
+-- elements after the first error).
 asyncMapEitherC :: forall a m b e . (MonadIO m, NFData b, NFData e, MonadError e m) => Int -> (a -> Either e b) -> C.Conduit a m b
 asyncMapEitherC maxSize f = asyncMapC maxSize f =$= (C.awaitForever $ \case
                                 Right v -> C.yield v
@@ -115,7 +120,14 @@ awaitJust f = C.await >>= \case
         Nothing -> return ()
         Just v -> f v
 
-bsConcatTo :: (Monad m, MonadIO m) => Int -> C.Conduit B.ByteString m B.ByteString
+-- | concatenates input into larger chunks and yields it. Its indended use is
+-- to build up larger blocks from smaller ones so that they can be sent across
+-- thread barriers with little overhead.
+--
+-- the chunkSize parameter is a hint, not an exact element. In particular,
+-- larger chunks are not split up and smaller chunks can be yielded too.
+bsConcatTo :: (Monad m, MonadIO m) => Int -- ^ chunk hint
+                            -> C.Conduit B.ByteString m B.ByteString
 bsConcatTo chunkSize = awaitJust start
     where
         start v
