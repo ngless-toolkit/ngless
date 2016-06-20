@@ -43,8 +43,8 @@ _parseConditions args = do
         keep_if' <- mapM asSC keep_if
         drop_if' <- mapM asSC drop_if
         case (keep_if', drop_if') of
-            (cs, []) -> return (KeepIf cs)
-            ([], cs) -> return (DropIf cs)
+            (cs, []) -> return $! KeepIf cs
+            ([], cs) -> return $! DropIf cs
             (_, _) -> throwScriptError "To select, you cannot use both keep_if and drop_if"
     where
         asSC :: NGLessObject -> NGLessIO SelectCondition
@@ -57,8 +57,9 @@ _matchConditions :: MatchCondition -> [(SamLine,B.ByteString)] -> [B.ByteString]
 _matchConditions _ [(SamHeader _,line)] = [line]
 _matchConditions (DropIf []) slines = map snd slines
 _matchConditions (DropIf (c:cs)) slines = _matchConditions (DropIf cs) (_drop1 c slines)
+
 _matchConditions (KeepIf []) slines = map snd slines
-_matchConditions (KeepIf (c:cs)) slines = _matchConditions (DropIf cs) (_keep1 c slines)
+_matchConditions (KeepIf (c:cs)) slines = _matchConditions (KeepIf cs) (_keep1 c slines)
 
 _drop1 SelectUnmapped = filter (isAligned . fst)
 _drop1 SelectMapped = filter (not . isAligned . fst)
