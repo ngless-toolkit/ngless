@@ -349,7 +349,7 @@ executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePrepr
 executePreprocess (NGOReadSet name (ReadSet1 enc file)) args (Block [Variable var] block) = do
         runNGLessIO $ outputListLno' DebugOutput ["Preprocess on ", file]
         (newfp, h) <- runNGLessIO $ openNGLTempFile file "preprocessed_" "fq.gz"
-        qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__qc_input" args
+        qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__input_qc" args
         qcPre <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
         qcPost <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
 
@@ -380,7 +380,7 @@ executePreprocess (NGOReadSet name (ReadSet1 enc file)) args (Block [Variable va
 executePreprocess (NGOReadSet name (ReadSet2 enc fp1 fp2)) _args block = executePreprocess (NGOReadSet name (ReadSet3 enc fp1 fp2 "")) _args block
 executePreprocess (NGOReadSet name (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable var] block) = do
         keepSingles <- runNGLessIO $ lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args
-        qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__qc_input" args
+        qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__input_qc" args
 
         runNGLessIO $ outputListLno' DebugOutput (["Preprocess on paired end ",
                                                 fp1, " + ", fp2] ++ (if fp3 /= ""
