@@ -38,7 +38,7 @@
                         <tbody>
                             <tr>
                                 <td> %GC: </td>
-                                <td ng-repeat="fq in fqStats">{{fq.gcContent}}</td>
+                                <td ng-repeat="fq in fqStats">{{fq.gcContent*100. | number : 1}}%</td>
                             </tr>
                             <tr>
                                 <td> Encoding: </td>
@@ -50,7 +50,7 @@
                             </tr>
                             <tr>
                                 <td> Sequence length:  </td>
-                                <td ng-repeat="fq in fqStats">{{fq.seqLength[0]}}--{{fq.seqLength[1]}}</td>
+                                <td ng-repeat="fq in fqStats">{{fq.seqLength[0]}}&ndash;{{fq.seqLength[1]}}</td>
                             </tr>
                             <tr>
                                 <td>Plot below</td>
@@ -88,9 +88,9 @@
                     }
                     return newData;
                 }
-                var chart = nv.models.scatterChart()
-                        .showDistX(true)
-                        .showDistY(true)
+                var chart = nv.models.lineChart()
+                        .showYAxis(true)
+                        .showXAxis(true)
                         .useVoronoi(false)
                         .color(d3.scale.category10().range())
                         .transitionDuration(300)
