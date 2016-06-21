@@ -22,6 +22,7 @@ module Data.FastQ
 
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Unsafe as B
+import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString as B
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
@@ -37,6 +38,7 @@ import qualified Data.Vector.Storable.Mutable as VSM
 import qualified Data.Vector.Unboxed.Mutable as VUM
 
 import Foreign.Ptr
+import Foreign.Storable (poke)
 import Foreign.C.Types
 import Foreign.C.String
 
@@ -108,10 +110,19 @@ fqEncodeC :: (Monad m) => FastQEncoding -> C.Conduit ShortRead m B.ByteString
 fqEncodeC enc = CL.map (fqEncode enc)
 
 fqEncode :: FastQEncoding -> ShortRead -> B.ByteString
-fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", encodeQual c, "\n"]
+fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", encodedQuals, "\n"]
     where
+        cn = B.length c
+        -- Using B.map makes this loop be one of the functions with the highest
+        -- memory allocation in ngless.
+        encodedQuals = BI.unsafeCreate cn $ \p -> copyAddLoop p 0
+        copyAddLoop p i
+            | i == cn = return ()
+            | otherwise = do
+                poke (p `plusPtr` i) (B.index c i + offset)
+                copyAddLoop p (i + 1)
+        offset :: Word8
         offset = encodingOffset enc
-        encodeQual = B.map (offset +)
 
 fqConduitR :: (Monad m, MonadError NGError m) => FastQEncoding -> C.Conduit ByteLine m ShortRead
 fqConduitR enc = groupC 4 =$= CL.mapM parseShortReads
