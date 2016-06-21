@@ -20,13 +20,13 @@ import Configuration (setupTestConfiguration)
 
 import Interpretation.Map (_samStats)
 import Interpretation.Count (performCount, MMMethod(..), loadAnnotator, loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), AnnotationMode(..), Annotator(..))
+import Interpretation.Substrim (substrim)
 import Interpret (interpret)
 import Parse (parsengless)
 import Language (Script(..))
 import Data.Sam (readSamLine, readSamGroupsC)
 import Data.FastQ (statsFromFastQ, parseFastQ, FastQEncoding(..), ShortRead(..))
 import Utils.Conduit (linesC)
-import Substrim (substrim)
 import Transform (transform)
 
 nfNGLessIO :: (NFData a) => NGLessIO a -> Benchmarkable

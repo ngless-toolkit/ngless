@@ -36,7 +36,6 @@ import Language
 import Interpret
 import Tokens
 import Types
-import Substrim
 import FileManagement
 import CmdArgs
 import Configuration
@@ -44,6 +43,7 @@ import NGLess
 
 import Interpretation.Map
 import Interpretation.Unique
+import Interpretation.Substrim
 
 import Data.FastQ
 import Utils.Conduit

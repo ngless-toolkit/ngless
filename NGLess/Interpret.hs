@@ -44,7 +44,6 @@ import System.Directory
 import Data.List (find)
 import GHC.Conc                 (getNumCapabilities)
 
-import Substrim
 import Language
 import FileManagement
 import Output
@@ -59,6 +58,7 @@ import Interpretation.FastQ
 import Interpretation.Write
 import Interpretation.Select
 import Interpretation.Unique
+import Interpretation.Substrim
 import Utils.Samtools
 import Utils.Utils
 import Utils.Conduit
