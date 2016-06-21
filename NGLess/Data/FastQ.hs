@@ -172,13 +172,19 @@ fqStatsC = do
     where
 
         update :: VUM.IOVector Int -> VUM.IOVector Int -> IORef (VM.IOVector (VUM.IOVector Int)) -> Pair ByteLine ByteLine -> NGLessIO ()
-        update charCounts stats qcs (ByteLine bps :!: ByteLine qs) = liftIO $ do
+        update !charCounts !stats qcs (ByteLine bps :!: ByteLine qs) = liftIO $ do
             let convert8 :: Word8 -> Int
                 convert8 = fromEnum
-            forM_ [0 .. B.length bps - 1] $ \i -> do
-                let bi = convert8 (B.index bps i)
-                unsafeIncrement charCounts bi
-            let len = B.length bps
+                len = B.length bps
+                loopCC :: Int -> IO ()
+                loopCC i
+                    | i == len = return ()
+                    | otherwise = do
+                        let bi = convert8 (B.index bps i)
+                        cur <- VUM.read charCounts bi
+                        VUM.write charCounts bi $! cur + 1
+                        loopCC (i + 1)
+            loopCC 0
             prevLen <- VM.length <$> readIORef qcs
             when (len > prevLen) $ do
                 pqcs <- readIORef qcs
@@ -188,10 +194,16 @@ fqStatsC = do
                     VM.write nqcs i nv
                 writeIORef qcs nqcs
             qcs' <- readIORef qcs
-            forM_ [0 .. B.length qs - 1] $ \i -> do
-                let qi = convert8 (B.index qs i)
-                qv <- VM.read qcs' i
-                unsafeIncrement qv qi
+            let loopQ :: Int -> IO ()
+                loopQ i
+                    | i == len = return ()
+                    | otherwise = do
+                        let qi = convert8 (B.index qs i)
+                        qv <- VM.read qcs' i
+                        cur <- VUM.read qv qi
+                        VUM.write qv qi $! cur + 1
+                        loopQ (i + 1)
+            loopQ 0
             unsafeIncrement stats 0
             VUM.unsafeModify stats (min len) 1
             VUM.unsafeModify stats (max len) 2
