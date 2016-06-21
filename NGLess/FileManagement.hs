@@ -46,6 +46,7 @@ openNGLTempFile' base prefix ext = do
     outputListLno' DebugOutput ["Created & opened temporary file ", fp]
     return (key,(fp,h))
 
+-- | See openNGLTempFile'
 openNGLTempFile :: FilePath -> String -> String -> NGLessIO (FilePath, Handle)
 openNGLTempFile base pre ext = snd <$> openNGLTempFile' base pre ext
 
@@ -60,28 +61,26 @@ deleteTempFile (fp, h) = do
 
 takeBaseNameNoExtensions = dropExtensions . takeBaseName
 
-createTempDir :: FilePath -> NGLessIO (ReleaseKey,FilePath)
-createTempDir dst = do
-    t <- liftIO getTemporaryDirectory
-    allocate
-        (do
-            fp <- createTempDirectory t (takeBaseNameNoExtensions dst)
-            createDirectory fp
-            return fp)
-        removeDirectoryRecursive
 
-createTempDirectory :: FilePath -> String -> IO FilePath
-createTempDirectory dir t = do
-  pid <- c_getpid
-  findTempName pid
-  where
-    findTempName x = do
-      let dirpath = dir </> t <.> show x
-      r <- doesDirectoryExist (dirpath ++ "$temp")
-      if r
-          then findTempName (x + 1)
-          else return dirpath
+-- | create a temporary directory as a sub-directory of the user-specified
+-- temporary directory. Releasing deletes the directory and all its contents.
+createTempDir :: String -> NGLessIO (ReleaseKey,FilePath)
+createTempDir template = do
+        tbase <- temporaryFileDirectory
+        allocate
+            (c_getpid >>= createFirst tbase template)
+            removeDirectoryRecursive
+    where
+        createFirst :: (Num a, Show a) => FilePath -> String -> a -> IO FilePath
+        createFirst dirbase t n = do
+            let dirpath = dirbase </> t <.> "tmp" ++ show n
+            try (createDirectory dirpath) >>= \case
+                Right () -> return dirpath
+                Left e
+                    | isAlreadyExistsError e -> createFirst dirbase t (n + 1)
+                    | otherwise -> ioError e
 
+-- This is in IO because it is run after NGLessIO has finished.
 setupHtmlViewer :: FilePath -> IO ()
 setupHtmlViewer dst = do
     exists <- doesFileExist (dst </> "index.html")
@@ -104,6 +103,7 @@ copyDir src dst = do
         else copyFile (src </> n) (dst </> n)
 
 
+-- | copy file unless its the same file.
 nglMaybeCopyFile :: FilePath -> FilePath -> NGLessIO ()
 nglMaybeCopyFile old new
     | new == old = return()
