@@ -10,7 +10,6 @@ module Utils.Conduit
     , linesC
     , groupC
     , awaitJust
-    , bsConcatTo
     , asyncGzipTo
     , asyncGzipToFile
     , asyncGzipFrom
@@ -20,7 +19,6 @@ module Utils.Conduit
     ) where
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Internal as BI -- not a fully kosher import
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
 import           Control.Concurrent.STM (atomically)
@@ -42,10 +40,7 @@ import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.Resource (MonadResource)
 import           Control.Exception (finally, evaluate)
 import           Control.DeepSeq
-import           Foreign.ForeignPtr
 import           System.IO
-import           Data.Word
-import           Foreign.Ptr
 import           Data.List (isSuffixOf)
 
 -- | This just signals that a "line" is expected.
@@ -127,33 +122,17 @@ awaitJust f = C.await >>= \case
 -- the chunkSize parameter is a hint, not an exact element. In particular,
 -- larger chunks are not split up and smaller chunks can be yielded too.
 bsConcatTo :: (Monad m, MonadIO m) => Int -- ^ chunk hint
-                            -> C.Conduit B.ByteString m B.ByteString
+                            -> C.Conduit B.ByteString m [B.ByteString]
 bsConcatTo chunkSize = awaitJust start
     where
         start v
-            | B.length v >= chunkSize = C.yield v >> bsConcatTo chunkSize
-            | otherwise = do
-                buff <- liftIO $ allocateBuffer chunkSize
-                liftIO $ copyTo buff 0 v
-                continue buff (B.length v)
-        continue buff nextPos = C.await >>= \case
-            Nothing -> C.yield (freeze buff nextPos)
+            | B.length v >= chunkSize = C.yield [v] >> bsConcatTo chunkSize
+            | otherwise = continue [v] (B.length v)
+        continue chunks s = C.await >>= \case
+            Nothing -> C.yield chunks
             Just v
-                | B.length v + nextPos > chunkSize -> C.yield (freeze buff nextPos) >> start v
-                | otherwise -> do
-                    liftIO $ copyTo buff nextPos v
-                    continue buff (nextPos + B.length v)
-
-        allocateBuffer :: Int -> IO (ForeignPtr Word8)
-        allocateBuffer n = mallocForeignPtrBytes n
-
-        copyTo :: (ForeignPtr Word8) -> Int -> B.ByteString -> IO ()
-        copyTo fp offset src = let (src_fp,src_off,src_size) = BI.toForeignPtr src in
-                 withForeignPtr fp $ \p -> withForeignPtr src_fp $ \src_p ->
-                    BI.memcpy (p `plusPtr` offset) (src_p `plusPtr` src_off) src_size
-
-        freeze :: (ForeignPtr Word8) -> Int -> B.ByteString
-        freeze p size = BI.fromForeignPtr p 0 size
+                | B.length v + s > chunkSize -> C.yield chunks >> start v
+                | otherwise -> continue (v:chunks) (s + B.length v)
 
 -- | A simple sink which performs gzip in a separate thread and writes the results to `h`.
 asyncGzipTo :: forall m. (MonadIO m) => Handle -> C.Sink B.ByteString m ()
@@ -162,9 +141,9 @@ asyncGzipTo h = do
     -- `src` and `sink` end up with different underlying monads (src is a
     -- conduit over IO, while sink is over m):
     q <- liftIO $ TQ.newTBMQueueIO 4
-    let src :: C.Source IO B.ByteString
+    let src :: C.Source IO [B.ByteString]
         src = CA.sourceTBMQueue q
-    consumer <- liftIO $ A.async (src $$ CZ.gzip =$= C.sinkHandle h)
+    consumer <- liftIO $ A.async (src $$ CL.map (B.concat . reverse) =$= CZ.gzip =$= C.sinkHandle h)
     bsConcatTo ((2 :: Int) ^ (15 :: Int)) =$= CA.sinkTBMQueue q True
     liftIO (A.wait consumer)
 
