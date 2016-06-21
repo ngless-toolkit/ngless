@@ -59,6 +59,7 @@ deleteTempFile (fp, h) = do
     hClose h
     removeFileIfExists fp
 
+-- takeBaseName only takes out the first extension
 takeBaseNameNoExtensions = dropExtensions . takeBaseName
 
 
@@ -67,8 +68,9 @@ takeBaseNameNoExtensions = dropExtensions . takeBaseName
 createTempDir :: String -> NGLessIO (ReleaseKey,FilePath)
 createTempDir template = do
         tbase <- temporaryFileDirectory
+        liftIO $ createDirectoryIfMissing True tbase
         allocate
-            (c_getpid >>= createFirst tbase template)
+            (c_getpid >>= createFirst tbase (takeBaseNameNoExtensions template))
             removeDirectoryRecursive
     where
         createFirst :: (Num a, Show a) => FilePath -> String -> a -> IO FilePath
