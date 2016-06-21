@@ -73,7 +73,7 @@ define(`BUILD_DEPENDS',
     zlib')
 
 define(`BASE_CONFIG',
-  `C-sources: NGLess/Dependencies/embedded.c
+  `C-sources: NGLess/Dependencies/embedded.c NGLess/Data/FastQ.c
   default-extensions:  BangPatterns, OverloadedStrings, LambdaCase, TupleSections
   other-extensions:    DeriveDataTypeable, TemplateHaskell
   hs-source-dirs: NGLess/

@@ -21,6 +21,7 @@ module Data.FastQ
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.ByteString.Unsafe as B
 import qualified Data.ByteString as B
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
@@ -30,11 +31,14 @@ import Data.Conduit         (($$), (=$=))
 import Control.Monad
 import Control.Monad.Except
 
-import qualified Data.Vector as VB
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Unboxed as V
-import qualified Data.Vector.Mutable as VM
+import qualified Data.Vector.Storable.Mutable as VSM
 import qualified Data.Vector.Unboxed.Mutable as VUM
+
+import Foreign.Ptr
+import Foreign.C.Types
+import Foreign.C.String
 
 import Data.IORef
 import Data.Maybe
@@ -43,7 +47,10 @@ import Data.Word
 
 import NGLess.NGError
 import Utils.Conduit
-import Utils.Vector (zeroVec, unsafeIncrement)
+import Utils.Vector (unsafeIncrement)
+
+foreign import ccall "updateCharCount" c_updateCharCount :: CUInt -> CString -> Ptr Int -> IO ()
+foreign import ccall "updateQualityCounts" c_updateQualityCounts :: CUInt -> CString -> Ptr Int -> IO ()
 
 data ShortRead = ShortRead
         { srHeader :: !B.ByteString
@@ -52,7 +59,7 @@ data ShortRead = ShortRead
         } deriving (Eq, Show, Ord)
 
 instance NFData ShortRead where
-    rnf (ShortRead _ _ _) = ()
+    rnf ShortRead{} = ()
 
 data FastQEncoding = SangerEncoding | SolexaEncoding deriving (Eq, Bounded, Enum, Show, Ord)
 
@@ -150,11 +157,11 @@ fqStatsC = do
         -- This is pretty ugly code, but threading the state through a foldM
         -- was >2x slower. In any case, all the ugliness is well hidden.
         (charCounts,stats,qualVals) <- liftIO $ do
-            charCounts <- zeroVec 256
+            charCounts <- VSM.replicate 256 (0 :: Int)
             -- stats is [ Nr-sequences minSequenceSize maxSequenceSize ]
             stats <- VUM.replicate 3 0
             VUM.write stats 1 maxBound
-            qualVals <- newIORef =<< VM.new 0
+            qualVals <- newIORef =<< VSM.new 0
             return (charCounts, stats, qualVals)
         CL.mapM_ (update charCounts stats qualVals)
         liftIO $ do
@@ -162,7 +169,12 @@ fqStatsC = do
             n <- VUM.read stats 0
             minSeq <- VUM.read stats 1
             maxSeq <- VUM.read stats 2
-            qcs' <- mapM VU.unsafeFreeze =<< VB.toList <$> VB.unsafeFreeze qcs
+            qcs' <- forM [0 .. maxSeq - 1] $ \i -> do
+                v <- VUM.new 256
+                let base = i * 256
+                forM_ [0 .. 255] $ \j ->
+                    VSM.read qcs (base + j) >>= VUM.write v j
+                VU.unsafeFreeze v
             let lcT = findMinQValue qcs'
             aCount <- getNoCaseV charCounts 'a'
             cCount <- getNoCaseV charCounts 'c'
@@ -171,48 +183,32 @@ fqStatsC = do
             return (FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq))
     where
 
-        update :: VUM.IOVector Int -> VUM.IOVector Int -> IORef (VM.IOVector (VUM.IOVector Int)) -> Pair ByteLine ByteLine -> NGLessIO ()
+        update :: VSM.IOVector Int -> VUM.IOVector Int -> IORef (VSM.IOVector Int) -> Pair ByteLine ByteLine -> NGLessIO ()
         update !charCounts !stats qcs (ByteLine bps :!: ByteLine qs) = liftIO $ do
-            let convert8 :: Word8 -> Int
-                convert8 = fromEnum
-                len = B.length bps
-                loopCC :: Int -> IO ()
-                loopCC i
-                    | i == len = return ()
-                    | otherwise = do
-                        let bi = convert8 (B.index bps i)
-                        cur <- VUM.read charCounts bi
-                        VUM.write charCounts bi $! cur + 1
-                        loopCC (i + 1)
-            loopCC 0
-            prevLen <- VM.length <$> readIORef qcs
-            when (len > prevLen) $ do
+            let len = B.length bps
+                qlen = 256*len
+            prevLen <- VSM.length <$> readIORef qcs
+            when (qlen > prevLen) $ do
                 pqcs <- readIORef qcs
-                nqcs <- VM.grow pqcs (len - prevLen)
-                forM_ [prevLen .. len - 1] $ \i -> do
-                    nv <- zeroVec 256
-                    VM.write nqcs i nv
+                nqcs <- VSM.grow pqcs (qlen - prevLen)
+                forM_ [prevLen .. qlen - 1] $ \i ->
+                    VSM.write nqcs i 0
                 writeIORef qcs nqcs
             qcs' <- readIORef qcs
-            let loopQ :: Int -> IO ()
-                loopQ i
-                    | i == len = return ()
-                    | otherwise = do
-                        let qi = convert8 (B.index qs i)
-                        qv <- VM.read qcs' i
-                        cur <- VUM.read qv qi
-                        VUM.write qv qi $! cur + 1
-                        loopQ (i + 1)
-            loopQ 0
+            B.unsafeUseAsCString bps $ \bps' ->
+                VSM.unsafeWith charCounts $ \charCounts' ->
+                    c_updateCharCount (toEnum len) bps' charCounts'
+            B.unsafeUseAsCString qs $ \qs' ->
+                VSM.unsafeWith qcs' $ \qsc'' ->
+                    c_updateQualityCounts (toEnum len) qs' qsc''
             unsafeIncrement stats 0
             VUM.unsafeModify stats (min len) 1
             VUM.unsafeModify stats (max len) 2
             return ()
 
-
         getNoCaseV c p = do
-            lower <- VUM.read c (ord p)
-            upper <- VUM.read c (ord . toUpper $ p)
+            lower <- VSM.read c (ord p)
+            upper <- VSM.read c (ord . toUpper $ p)
             return (lower + upper)
         findMinQValue :: [VU.Vector Int] -> Int
         findMinQValue = minimum . map findMinQValue'
