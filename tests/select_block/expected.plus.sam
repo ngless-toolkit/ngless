@@ -15,5 +15,5 @@
 @SQ	SN:XIV	LN:784333
 @SQ	SN:XV	LN:1091291
 @SQ	SN:XVI	LN:948066
-@PG	ID:bwa	PN:bwa	VN:0.7.7-r441	CL:/home/luispedro/.local/share/ngless/bin/ngless-0.0.0-bwa mem -t 1 /home/luispedro/.local/share/ngless/data/sacCer3/Sequence/BWAIndex/reference.fa.gz sample.fq
-MATCH_YEAST	0	I	1	36	60M	*	0	0	CCACACCACACCCACACACCCACACACCACACCACACACCACACCACACCCACACACACA	ccacaccacacccacacacccacacaccacaccacacaccacaccacacccacacacaca	NM:i:0	MD:Z:60	AS:i:60	XS:i:49
+@PG	ID:bwa	PN:bwa	VN:0.7.15-r1140	CL:/home/luispedro/.local/share/ngless/bin/ngless-0.0.0-bwa mem -t 1 /home/luispedro/.local/share/ngless/data/sacCer3/Sequence/BWAIndex/reference.fa.gz sample.fq
+MATCH_YEAST	0	I	1	36	60M	*	0	0	CCACACCACACCCACACACCCACACACCACACCACACACCACACCACACCCACACACACA	ccacaccacacccacacacccacacaccacaccacacaccacaccacacccacacacaca	NM:i:0	MD:Z:60	AS:i:60	XS:i:49	XA:Z:VIII,-562549,3M1D19M1I37M,2;
