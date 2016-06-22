@@ -18,7 +18,7 @@ import Data.Maybe
 import System.Process
 import System.Environment (getEnvironment, getExecutablePath)
 import System.Exit
-import System.Directory (doesFileExist, doesDirectoryExist, canonicalizePath)
+import System.Directory (getDirectoryContents, doesFileExist, doesDirectoryExist, canonicalizePath)
 import System.FilePath.Posix
 import Data.Aeson
 import Data.Yaml
@@ -269,18 +269,20 @@ findLoad modname version = do
                     Right v -> return $ addPathToRep mdir v
                     Left err -> throwSystemError ("Could not load module file "++ mdir </> modfile ++ ". Error was `" ++ err ++ "`")
         Nothing -> do
-            other <- flip findFirstM [".", globalDir, userDir] $ \basedir -> do
+            others <- forM [".", globalDir, userDir] $ \basedir -> do
                 let dname = basedir </> modpath'
+                    listDirectory d = filter (`notElem` [".", ".."]) <$> getDirectoryContents d
                 exists <- liftIO $ doesDirectoryExist dname
-                return $! if exists
-                    then Just dname
-                    else Nothing
+                if not exists
+                     then return []
+                     else liftIO (listDirectory dname)
             throwSystemError
                 ("Could not find external module '" ++ T.unpack modname ++
-                    (case other of
-                        Just _ -> "' version " ++ T.unpack version ++ ".\n"
-                                        ++ "Please check the version number."
-                        Nothing -> "'."))
+                    (case concat others of
+                        [] -> "'."
+                        foundVersions -> "' version " ++ T.unpack version ++ ".\n"
+                                        ++ "Please check the version number. I found the following versions:" ++
+                                            concat ["\n\t- " ++ show v | v <- uniq foundVersions]))
 
 loadModule :: T.Text -> T.Text -> NGLessIO Module
 loadModule m version = asInternalModule =<< findLoad m version

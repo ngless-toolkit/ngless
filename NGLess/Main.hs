@@ -113,14 +113,30 @@ headerStr = "NGLess v"++versionStr++" (C) NGLess authors\n"++
             "http://luispedro.github.io/ngless\n"++
             "\n"
 
+formatCitation :: T.Text -> String
+formatCitation citation = T.unpack . T.unlines . map T.unwords $ citationLines
+    where
+        lineMax = 90
+        wordsWithPrefix = "-":T.words citation
+        citationLines :: [[T.Text]]
+        citationLines = groupLines wordsWithPrefix
+        groupLines :: [T.Text] -> [[T.Text]]
+        groupLines [] = []
+        groupLines (w:ws) = groupLines' [w,"\t"] (2 + T.length w) ws
+        groupLines' acc _ [] = [reverse acc]
+        groupLines' acc n rest@(w:ws)
+            | T.length w + n > lineMax = reverse acc:groupLines rest
+            | otherwise = groupLines' (w:acc) (n + T.length w) ws
+
+
 printHeader :: [Module] -> NGLessIO ()
 printHeader mods = liftIO $ do
     let citations = mapMaybe modCitation mods
     putStr headerStr
     unless (null citations) $ do
-        putStr "When publishing results from this script, please cite the following works:\n"
+        putStr "When publishing results from this script, please cite the following references:\n\n"
         forM_ citations $ \c ->
-            putStr ("\t - " ++ T.unpack c ++ "\n")
+            putStrLn (formatCitation c)
         putStr "\n"
 
 loadScript :: NGLessInput -> IO (Either String T.Text)
