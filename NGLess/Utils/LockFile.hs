@@ -72,7 +72,7 @@ sleep = threadDelay . toMicroSeconds
         toMicroSeconds = (1000000 *) . fromInteger . round
 
 acquireLock :: FilePath -> NGLessIO (Maybe ReleaseKey)
-acquireLock fname = acquireLock' LockParameters { lockFname = fname, whenExistsStrategy = IfLockedNothing, maxAge = fromInteger 0 }
+acquireLock fname = acquireLock' LockParameters { lockFname = fname, whenExistsStrategy = IfLockedNothing, maxAge = 0 }
 
 acquireLock' :: LockParameters -> NGLessIO (Maybe ReleaseKey)
 acquireLock' params@LockParameters{..} = liftIO (openLockFile lockFname) >>= \case

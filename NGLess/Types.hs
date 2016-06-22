@@ -77,7 +77,7 @@ inferBlock (FuncName f) (Just (Block vars es)) = case f of
         "select" -> inferBlock' NGLMappedRead
         _ -> do
             errorInLineC ["Function '", T.unpack f, "' does not accept blocks"]
-            void $ cannotContinue
+            void cannotContinue
     where
         inferBlock' btype = do
             forM_ vars $ \(Variable v) ->

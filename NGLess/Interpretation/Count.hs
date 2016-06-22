@@ -351,7 +351,7 @@ performCount samfp gname annotator0 opts = do
     raw_counts <- if method == MMDist1
                     then liftIO (VUM.clone mcounts)
                     else return mcounts
-    when (optNormSize opts || method == MMDist1) $ do
+    when (optNormSize opts || method == MMDist1) $
         normalizeCounts mcounts sizes
     counts <- liftIO $ VU.unsafeFreeze mcounts
 
@@ -361,7 +361,7 @@ performCount samfp gname annotator0 opts = do
             else do
                 outputListLno' TraceOutput ["Counts (second pass)..."]
                 distributeMM toDistribute counts raw_counts False
-                when (optNormSize opts) $ do
+                when (optNormSize opts) $
                     normalizeCounts raw_counts sizes
                 liftIO $ VU.unsafeFreeze raw_counts
 
@@ -481,7 +481,7 @@ loadFunctionalMap fname columns = do
         lookUpColumns' colmap col = note notfounderror $ M.lookup col colmap
             where
                 notfounderror = NGError DataError errormsg
-                errormsg = concat (["Could not find column '", B8.unpack $ col, "'."]
+                errormsg = concat (["Could not find column '", B8.unpack col, "'."]
                                 ++ case findSuggestion (T.pack $ B8.unpack col) (map (T.pack . B8.unpack) $ M.keys colmap) of
                                         Just (Suggestion valid reason) -> [" Did you mean '", T.unpack valid, "' (", T.unpack reason, ")?"]
                                         Nothing -> [])

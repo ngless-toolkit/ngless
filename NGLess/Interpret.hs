@@ -125,7 +125,7 @@ lookupVariable !k = (liftM2 (<|>))
 
 lookupConstant :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
 lookupConstant !k = do
-    constants <- concat . map modConstants . ieModules <$> ask
+    constants <- concatMap modConstants . ieModules <$> ask
     case filter ((==k) . fst) constants of
         [] -> return Nothing
         [(_,v)] -> return (Just v)
@@ -151,7 +151,7 @@ findFunction fname = do
             [] -> throwShouldNotOccur . T.unpack $ T.concat ["Function '", getName fname, "' not found (not builtin and not in any loaded module)"]
             ms -> throwShouldNotOccur . T.unpack $ T.concat (["Function '", T.pack $ show fname, "' found in multiple modules! ("] ++ [T.concat [modname, ":"] | modname <- modName . modInfo <$> ms])
     where
-        hasF m = (fname `elem` (funcName `fmap` modFunctions m))
+        hasF m = fname `elem` (funcName `fmap` modFunctions m)
 
 runInterpretationRO :: NGLInterpretEnv -> InterpretationROEnv a -> Either NGError a
 runInterpretationRO env act = runReader (runExceptT act) env

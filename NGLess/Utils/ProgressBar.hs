@@ -20,7 +20,7 @@ updateProgressBar :: ProgressBar -> Rational -> IO ProgressBar
 updateProgressBar bar _
     | not (pbarActive bar) = return bar
 updateProgressBar bar progress = do
-    when ((percent progress) /= percent (cur bar)) $ do
+    when (percent progress /= percent (cur bar)) $ do
         let s = drawProgressBar (width bar) progress ++ " " ++ printPercentage progress
         putStr s
         putStr "\r"

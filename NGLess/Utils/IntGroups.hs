@@ -35,7 +35,7 @@ toList (IntGroups values indices) = go 0
     where
         go ix
             | ix == VU.length indices - 1 = []
-            | otherwise = (VU.toList (VU.slice st n values)):go (ix+1)
+            | otherwise = VU.toList (VU.slice st n values):go (ix+1)
                 where
                     st = indices VU.! ix
                     e = indices VU.! (ix + 1)
@@ -48,6 +48,6 @@ null (IntGroups values _) = VU.null values
 {-# INLINE null #-}
 
 forM_ :: (Monad m) => IntGroups -> ([Int] -> m ()) -> m ()
-forM_ vs f = Control.Monad.forM_ (toList vs) f
+forM_ vs = Control.Monad.forM_ (toList vs)
 {-# INLINE forM_ #-}
 

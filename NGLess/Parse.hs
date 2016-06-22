@@ -57,7 +57,7 @@ buildErrorMessage input err = T.concat $ ["Parsing error on file '", T.pack fnam
         preLines n = withNLTAB $ sliceList (max 0 (line - n)) line sourceLines
         postLines n = withNLTAB $ sliceList line (line +  n) sourceLines
         withNLTAB [] = []
-        withNLTAB (ell:ls) = ("\n\t":ell:withNLTAB ls)
+        withNLTAB (ell:ls) = "\n\t":ell:withNLTAB ls
         indicatorLine = T.pack (['-' | _ <- [1..col+8]] ++ "^")
 
 

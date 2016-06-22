@@ -61,7 +61,7 @@ lookupStringOrScriptError = requiredLookup lookupStringOrScriptErrorDef
 lookupStringListOrScriptErrorDef :: (MonadError NGError m) => m [T.Text] -> String -> T.Text -> KwArgsValues -> m [T.Text]
 lookupStringListOrScriptErrorDef defval context name args = case lookup name args of
     Nothing -> defval
-    Just (NGOList ss) -> (stringOrTypeError context) `mapM` ss
+    Just (NGOList ss) -> stringOrTypeError context `mapM` ss
     Just other -> throwScriptError ("Expected a string in argument " ++ T.unpack name ++ " in context '" ++ context ++ "', instead saw " ++ show other)
 
 lookupStringListOrScriptError :: (MonadError NGError m) => String -> T.Text -> KwArgsValues -> m [T.Text]
