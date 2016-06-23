@@ -27,7 +27,33 @@ your work.
 
 ## Installing
 
-If you use [nix](http://nixos.org), you can easily build and install ngless using
+At the moment, there is no binary download available yet, but ngless can be
+esily obtained with either *brew*, *nix*, or compiled from source.
+
+### Brew
+
+If you use [homebrew](http://brew.sh/), you easily build and install
+[ngless](http://ngless.readthedocs.io/) using this repository.
+
+First install the two required dependencies:
+
+    brew install homebrew/science/bwa
+    brew install homebrew/science/samtools
+
+
+Now install ngless:
+
+    brew tap luispedro/ngless
+    brew install ngless
+
+This should download the brew formula and build ngless.
+
+This has been tested to work on both Mac OS X and Linux (using
+[linuxbrew](http://linuxbrew.sh/)).
+
+### Nix
+
+If you use [nix](http://nixos.org), you can easily build and install ngless
 using it (these scripts also install all necessary dependencies):
 
     nix-env -i -f https://github.com/luispedro/ngless-nix/archive/master.tar.gz
@@ -42,7 +68,12 @@ If you prefer, you can also first clone the repository:
     nix-env -i -f .
 
 
-### Dependencies
+### From Source
+
+Installing/compiling from source is also possible. Clone
+[http://github.com/luispedro/ngless](http://github.com/luispedro/ngless)
+
+#### Dependencies
 
 [stack](http://docs.haskellstack.org/en/stable/README/) is highly recommended.
 Install it and running `make` should (1) download all dependencies with the
