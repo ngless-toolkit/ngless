@@ -122,7 +122,9 @@ executeWrite el@(NGOMappedReadSet _ fp _) args = do
     format <- lookupSymbolOrScriptErrorDef (return $ guess newfp) "format for mappedreadset" "format" args
     orig <- case format of
         "sam" -> return fp
-        "bam" -> convertSamToBam fp
+        "bam"
+            | endswith ".bam" fp -> return fp -- We already have a BAM
+            | otherwise -> convertSamToBam fp
         s -> throwScriptError ("write does not accept format {" ++ T.unpack s ++ "} with input type " ++ show el)
     moveOrCopyCompress canMove orig newfp
     return NGOVoid

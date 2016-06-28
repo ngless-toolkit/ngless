@@ -5,6 +5,8 @@
 module Transform
     ( transform
     , pureTransform
+    , isVarUsed
+    , isVarUsed1
     ) where
 
 import qualified Data.Text as T
