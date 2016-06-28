@@ -15,7 +15,6 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Control.Monad
 import           Control.Monad.Except
-import           Control.Monad.Trans.Resource
 
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
@@ -74,30 +73,33 @@ ensureIndexExists refPath = do
     return refPath
 
 
-mergeSams name sam0 sam1 = do
-    (newfp, hout) <- openNGLTempFile name "mapped_concat_" ".sam"
-    CB.sourceFile sam0 $$ CB.sinkHandle hout
-    CB.sourceFile sam1
-        =$= CB.lines
-        =$= CL.filter (\line -> not (B.null line) &&  B8.head line /= '@')
-        =$= C.unlinesAscii
-        $$ CB.sinkHandle hout
-    liftIO $ hClose hout
-    return newfp
 
 hoursToDiffTime h = fromInteger (h * 3600)
 
 mapToReference :: FilePath -> [FilePath] -> [String] -> NGLessIO (FilePath, (Int, Int, Int))
 mapToReference refIndex [fp1,fp2, fp3] extraArgs = do
-    (out0,(t0,a0,u0)) <- mapToReference refIndex [fp1, fp2] extraArgs
-    (out1,(t1,a1,u1)) <- mapToReference refIndex [fp3] extraArgs
-    out <- mergeSams refIndex out0 out1
+    (out, hout) <- openNGLTempFile refIndex "mapped_concat_" ".sam"
+    let out1 = CB.sinkHandle hout
+        out2 :: C.Sink B.ByteString IO ()
+        out2 = CB.lines
+                =$= CL.filter (\line -> not (B.null line) &&  B8.head line /= '@')
+                =$= C.unlinesAscii
+                =$= CB.sinkHandle hout
+    (t0,a0,u0) <- mapToReference' refIndex [fp1, fp2] extraArgs out1
+    (t1,a1,u1) <- mapToReference' refIndex [fp3] extraArgs out2
+
+    liftIO $ hClose hout
     return (out, (t0+t1,a0+a1, u0+u1))
 
 mapToReference refIndex fps extraArgs = do
-    (rk, (newfp, hout)) <- openNGLTempFile' refIndex "mapped_" ".sam"
-    outputListLno' InfoOutput ["Starting mapping to ", refIndex]
+    (newfp, hout) <- openNGLTempFile refIndex "mapped_" ".sam"
     outputListLno' DebugOutput ["Write .sam file to: ", newfp]
+    stats <- mapToReference' refIndex fps extraArgs (C.sinkHandle hout)
+    liftIO $ hClose hout
+    return (newfp, stats)
+
+mapToReference' refIndex fps extraArgs outC = do
+    outputListLno' InfoOutput ["Starting mapping to ", refIndex]
     bwaPath <- bwaBin
     numCapabilities <- liftIO getNumCapabilities
     let cmdargs =  concat [["mem", "-t", show numCapabilities, refIndex], extraArgs, fps]
@@ -107,18 +109,16 @@ mapToReference refIndex fps extraArgs = do
             CP.sourceProcessWithStreams cp
                 (return ()) -- stdin
                 (C.toConsumer (zipSink2 --stdout
-                    (C.sinkHandle hout)
+                    outC
                     samStatsC))
                 CL.consume -- stderr
-    liftIO $ hClose hout
     stats <- runNGLess statsE
     outputListLno' DebugOutput ["BWA info: ", BL8.unpack $ BL8.fromChunks err]
     case exitCode of
         ExitSuccess -> do
             outputListLno' InfoOutput ["Done mapping to ", refIndex]
-            return (newfp, stats)
-        ExitFailure code -> do
-            release rk
+            return stats
+        ExitFailure code ->
             throwSystemError $ concat (["Failed mapping\nCommand line was::\n\t",
                             bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '"] ++ fps ++ ["'\n",
                             "Bwa error code was ", show code, "."])
