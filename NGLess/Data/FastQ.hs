@@ -100,27 +100,28 @@ parseFastQ enc contents = parse' . map BL.toStrict . BL.lines $ contents
         parse' (lid:lseq:_:lqs:xs) = (createRead enc lid lseq lqs) : parse' xs
         parse' xs = error ("Number of lines is not multiple of 4! EOF:" ++ show xs)
 
-createRead enc rid rseq rqs = ShortRead rid rseq (decodeQual rqs)
+createRead enc rid rseq rqs = ShortRead rid rseq (bsAdd rqs (-offset))
     where
-        decodeQual = B.map sub
         offset = encodingOffset enc
-        sub v = v - offset
 
 fqEncodeC :: (Monad m) => FastQEncoding -> C.Conduit ShortRead m B.ByteString
 fqEncodeC enc = CL.map (fqEncode enc)
 
-fqEncode :: FastQEncoding -> ShortRead -> B.ByteString
-fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", encodedQuals, "\n"]
+-- Using B.map instead of this function makes this loop be one of the functions
+-- with the highest memory allocation in ngless.
+bsAdd :: B.ByteString -> Word8 -> B.ByteString
+bsAdd c delta = BI.unsafeCreate cn $ \p -> copyAddLoop p 0
     where
         cn = B.length c
-        -- Using B.map makes this loop be one of the functions with the highest
-        -- memory allocation in ngless.
-        encodedQuals = BI.unsafeCreate cn $ \p -> copyAddLoop p 0
         copyAddLoop p i
             | i == cn = return ()
             | otherwise = do
-                poke (p `plusPtr` i) (B.index c i + offset)
+                poke (p `plusPtr` i) (B.index c i + delta)
                 copyAddLoop p (i + 1)
+
+fqEncode :: FastQEncoding -> ShortRead -> B.ByteString
+fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, "\n"]
+    where
         offset :: Word8
         offset = encodingOffset enc
 
