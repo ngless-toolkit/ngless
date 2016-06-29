@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts, ScopedTypeVariables #-}
 
 module Data.FastQ
     ( ShortRead(..)
@@ -163,7 +163,7 @@ encodingFor fp = do
     guessEncoding m
 
 
-fqStatsC :: C.Sink (Pair ByteLine ByteLine) NGLessIO FQStatistics
+fqStatsC :: forall m. (MonadIO m) => C.Sink (Pair ByteLine ByteLine) m FQStatistics
 fqStatsC = do
         -- This is pretty ugly code, but threading the state through a foldM
         -- was >2x slower. In any case, all the ugliness is well hidden.
@@ -194,7 +194,7 @@ fqStatsC = do
             return (FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq))
     where
 
-        update :: VSM.IOVector Int -> VUM.IOVector Int -> IORef (VSM.IOVector Int) -> Pair ByteLine ByteLine -> NGLessIO ()
+        update :: VSM.IOVector Int -> VUM.IOVector Int -> IORef (VSM.IOVector Int) -> Pair ByteLine ByteLine -> m ()
         update !charCounts !stats qcs (ByteLine bps :!: ByteLine qs) = liftIO $ do
             let len = B.length bps
                 qlen = 256*len
@@ -225,8 +225,6 @@ fqStatsC = do
         findMinQValue = minimum . map findMinQValue'
         findMinQValue' :: VU.Vector Int -> Int
         findMinQValue' qs = fromMaybe 256 (VU.findIndex (/= 0) qs)
-
-
 
 gcFraction :: FQStatistics -> Double
 gcFraction res = gcCount / allBpCount

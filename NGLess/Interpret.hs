@@ -30,15 +30,17 @@ import qualified Data.Text.IO as T
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import qualified Data.Conduit.Zlib as C
 import qualified Data.Conduit as C
-import           Data.Conduit (($=), (=$=), (=$), ($$+), ($$+-))
-import           Data.Conduit.Async ((=$=&), ($$&))
-import qualified Data.Vector as V
+import           Data.Conduit ((=$=), ($$+), ($$+-), ($$))
+import           Data.Conduit.Async (($$&))
+import qualified Control.Concurrent.Async as A
+import qualified Control.Concurrent.STM.TBMQueue as TQ
+import qualified Data.Conduit.TQueue as CA
+import           Control.Concurrent.STM (atomically)
 import           Control.DeepSeq (NFData(..))
 import           Data.Strict.Tuple (Pair(..))
+import qualified Data.Vector as V
 
-import Data.IORef
 import System.IO
 import System.Directory
 import Data.List (find)
@@ -303,19 +305,19 @@ executeSamfile expr@(NGOString fname) args = do
     return $ NGOMappedReadSet gname (T.unpack fname) Nothing
 executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show args)
 
-data PreprocessPairOutput = Pair !ShortRead !ShortRead | Single !ShortRead
+data PreprocessPairOutput = Paired !ShortRead !ShortRead | Single !ShortRead
 instance NFData PreprocessPairOutput where
-    rnf (Pair _ _) = ()
+    rnf (Paired _ _) = ()
     rnf (Single _) = ()
 
 splitPreprocessPair :: V.Vector PreprocessPairOutput -> (V.Vector ShortRead, V.Vector ShortRead, V.Vector ShortRead)
 splitPreprocessPair input = (vMapMaybe extract1 input, vMapMaybe extract2 input, vMapMaybe extractS input)
     where
         extract1 = \case
-            Pair sr _ -> Just sr
+            Paired sr _ -> Just sr
             _ -> Nothing
         extract2 = \case
-            Pair _ sr -> Just sr
+            Paired _ sr -> Just sr
             _ -> Nothing
         extractS = \case
             Single sr -> Just sr
@@ -341,124 +343,113 @@ vMapMaybeLifted f v = sequence $ V.unfoldr loop 0
                                 Left err -> Just (Left err, V.length v) -- early exit: we are done
             | otherwise = Nothing
 
-inlineQCIf False _ = C.awaitForever C.yield -- identity conduit
-inlineQCIf True resVar = C.passthroughSink (C.transPipe runNGLessIO (getPairedLines $= fqStatsC)) (liftIO . writeIORef resVar . Just)
+shortReadVectorStats = do
+    q <- liftIO $ TQ.newTBMQueueIO 8
+    let getPairs :: C.Conduit (V.Vector ShortRead) IO (Pair ByteLine ByteLine)
+        getPairs = C.awaitForever $ \ells ->
+            V.forM_ ells (C.yield . toPair)
+        toPair (ShortRead _ bps qs) = ByteLine bps :!: ByteLine qs
+    p <- liftIO . A.async $
+        CA.sourceTBMQueue q
+            =$= getPairs
+            $$ fqStatsC
+    return (q,p)
+
+writeAndContinue :: MonadIO m => TQ.TBMQueue (V.Vector ShortRead) -> C.Conduit (V.Vector ShortRead) m (V.Vector ShortRead)
+writeAndContinue q = C.mapM $ \v -> do
+    liftIO . atomically $ TQ.writeTBMQueue q v
+    return v
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
-executePreprocess (NGOReadSet name (ReadSet1 enc file)) args (Block [Variable var] block) = do
-        runNGLessIO $ outputListLno' DebugOutput ["Preprocess on ", file]
-        (newfp, h) <- runNGLessIO $ openNGLTempFile file "preprocessed_" "fq.gz"
-        qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__input_qc" args
-        qcPre <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
-        qcPost <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
+executePreprocess (NGOReadSet name rs) args (Block [Variable var] block) = do
+        -- This is a bit complex, but preprocess was slow at first and we try
+        -- to take full advantage of parallelism.
+        --
+        -- Pipeline is
+        --    [read file *] -> [decode in blocks] -> [pre QC *] -> [preproc*] -> [post QC*] -> [encode & write *]
+        -- where the starred (*) elements are done in a separate thread
+        -- for the QC threads, this is done by using a queue & writing data there
 
-        env <-gets id
-        numCapabilities <- liftIO getNumCapabilities
-        let mapthreads = max 1 (numCapabilities - 1)
-        (conduitPossiblyCompressedFile file
-            =$= linesC
-            =$= inlineQCIf qcInput qcPre
-            =$= fqConduitR enc
-            =$= C.conduitVector 8192)
-            =$=& (asyncMapEitherC mapthreads (vMapMaybeLifted ((liftM (liftM $ fqEncode enc)) . runInterpretationRO env . interpretPBlock1 block var))
-                    =$= (C.concat :: C.Conduit (V.Vector B.ByteString) InterpretationEnvIO B.ByteString)
-                    =$= C.passthroughSink (C.transPipe runNGLessIO (linesC =$= getPairedLines =$= fqStatsC)) (liftIO . writeIORef qcPost . Just)
-                    =$= C.conduitVector 4000
-                    )
-                $$& (
-                    (C.concat :: C.Conduit (V.Vector B.ByteString) InterpretationEnvIO B.ByteString)
-                    =$= C.gzip =$ C.sinkHandle h)
-        liftIO (hClose h)
-        when qcInput $ do
-            Just qcPreStats <- liftIO $ readIORef qcPre
-            runNGLessIO $ outputFQStatistics (T.unpack name) qcPreStats enc
-        Just qcPostStats <- liftIO $ readIORef qcPost
-        runNGLessIO $ outputFQStatistics (T.unpack name ++ "-preprocessed") qcPostStats enc
-        return (NGOReadSet name $ ReadSet1 enc newfp)
-
-executePreprocess (NGOReadSet name (ReadSet2 enc fp1 fp2)) _args block = executePreprocess (NGOReadSet name (ReadSet3 enc fp1 fp2 "")) _args block
-executePreprocess (NGOReadSet name (ReadSet3 enc fp1 fp2 fp3)) args (Block [Variable var] block) = do
         keepSingles <- runNGLessIO $ lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args
         qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__input_qc" args
 
-        runNGLessIO $ outputListLno' DebugOutput (["Preprocess on paired end ",
-                                                fp1, " + ", fp2] ++ (if fp3 /= ""
-                                                                    then [" with singles ", fp3]
-                                                                    else []))
+        (enc, fp1, fp2, fp3) <- case rs of
+            (ReadSet1 enc fp) -> do
+                runNGLessIO $ outputListLno' DebugOutput ["Preprocessing single end ", fp]
+                return (enc, "", "", fp)
+            (ReadSet2 enc fp1 fp2) -> do
+                runNGLessIO $ outputListLno' DebugOutput ["Preprocess paired end ", fp1, " + ", fp2]
+                return (enc, fp1, fp2, "")
+            (ReadSet3 enc fp1 fp2 fp3) -> do
+                runNGLessIO $ outputListLno' DebugOutput ["Preprocess paired end ", fp1, " + ", fp2, " with singles ", fp3]
+                return (enc, fp1, fp2, fp3)
         (fp1', out1) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.1." ".fq.gz"
         (fp2', out2) <- runNGLessIO $ openNGLTempFile fp2 "preprocessed.2." ".fq.gz"
-        (fps, out3) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.singles." ".fq.gz"
+        (fp3', out3) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.singles." ".fq.gz"
 
-        qcPre1 <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
-        qcPre2 <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
-        qcPre3 <- liftIO $ newIORef (Nothing :: Maybe FQStatistics)
+        [(q1, s1) ,(q2, s2) ,(q3, s3)
+            ,(pq1, ps1) ,(pq2, ps2) ,(pq3, ps3)] <- replicateM 6 shortReadVectorStats
 
-        let rs1 :: C.Source InterpretationEnvIO ShortRead
-            rs1 = conduitPossiblyCompressedFile fp1 =$= linesC =$= inlineQCIf qcInput qcPre1 =$= fqConduitR enc
 
-            rs2 :: C.Source InterpretationEnvIO ShortRead
-            rs2 = conduitPossiblyCompressedFile fp2 =$= linesC =$= inlineQCIf qcInput qcPre2 =$= fqConduitR enc
+        let asSource "" _ = C.yieldMany []
+            asSource fp q =
+                    let input = conduitPossiblyCompressedFile fp
+                            =$= linesC
+                            =$= fqConduitR enc
+                            =$= C.conduitVector 4096
+                    in if qcInput
+                            then input =$= writeAndContinue q
+                            else input
 
-            rs3 :: C.Source InterpretationEnvIO ShortRead
-            rs3 = if fp3 /= ""
-                    then conduitPossiblyCompressedFile fp3 =$= linesC =$= inlineQCIf qcInput qcPre3 =$= fqConduitR enc
-                    else C.yieldMany []
-
-            write :: Handle -> C.Sink (V.Vector ShortRead) InterpretationEnvIO FQStatistics
-            write h =
-                    (C.concat :: C.Conduit (V.Vector ShortRead) InterpretationEnvIO ShortRead)
-                    =$= snd <$> (zipSink2
-                        (fqEncodeC enc =$= asyncGzipTo h)
-                        (CL.map (\(ShortRead _ bps qs) -> (ByteLine bps :!: ByteLine qs)) =$= C.transPipe runNGLessIO fqStatsC))
+            write h q = writeAndContinue q
+                        =$= ((C.concat :: C.Conduit (V.Vector ShortRead) InterpretationEnvIO ShortRead)
+                                =$= fqEncodeC enc =$= asyncGzipTo h)
 
         env <- gets id
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 2)
-        [_, _, s3] <-
-            (zipSource2 rs1 rs2
-                =$= C.conduitVector 8192
-                =$= asyncMapEitherC mapthreads (liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles))
-                $$& C.sequenceSinks
-                        [CL.map (\(a,_,_) -> a) =$= write out1
-                        ,CL.map (\(_,a,_) -> a) =$= write out2
-                        ,CL.map (\(_,_,a) -> a) =$= write out3
-                        ])
-        s3' <- rs3
-                =$= preprocBlock
-                =$= CL.mapMaybe (\case
-                                Single r -> Just r
-                                _ -> Nothing)
-                =$= C.conduitVector 4096
-                $$& write out3
-        let n3 = nSeq s3
-            n3' = nSeq s3'
-            anySingle = n3 > 0 || n3' > 0
+        zipSource2 (asSource fp1 q1) (asSource fp2 q2)
+            =$= asyncMapEitherC mapthreads (liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles) . uncurry V.zip)
+            $$& void $ C.sequenceSinks
+                    [CL.map (\(a,_,_) -> a) =$= write out1 q1
+                    ,CL.map (\(_,a,_) -> a) =$= write out2 q2
+                    ,CL.map (\(_,_,a) -> a) =$= write out3 q3
+                    ]
+
+        asSource fp3 q3
+            =$= asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . interpretPBlock1 block var))
+            $$& void (write out3 q3)
+
+        forM_ [q1,q2,q3, pq1, pq2, pq3] (liftIO . atomically . TQ.closeTBMQueue)
         liftIO $ forM_ [out1, out2, out3] hClose
-        unless anySingle
-            (liftIO $ removeFile fps)
-        forM_ (zip [qcPre1, qcPre2, qcPre3] [fp1, fp2, fp3]) $ \(q,fp) ->
-            liftIO (readIORef q) >>= \case
-                Nothing -> return ()
-                Just qcPreStats -> runNGLessIO $ outputFQStatistics fp qcPreStats enc
+        forM_ (zip [ps1, ps2, ps3] [fp1, fp2, fp3]) $ \(p,fp) ->
+            if qcInput && fp /= ""
+                then do
+                    qcPreStats <- liftIO $ A.wait p
+                    runNGLessIO $ outputFQStatistics fp qcPreStats enc
+                else liftIO . A.cancel $ p
+
+        [_,_,s3'] <- forM [s1,s2,s3] (liftIO . A.wait)
 
         runNGLessIO $ outputLno' DebugOutput "Preprocess finished"
-        return . NGOReadSet name $ if anySingle
-                    then ReadSet3 enc fp1' fp2' fps
-                    else ReadSet2 enc fp1' fp2'
+
+        let isRS1 ReadSet1{} = True
+            isRS1 _ = False
+        unless (nSeq s3' > 0 || isRS1 rs)
+            (liftIO $ removeFile fp3')
+        return . NGOReadSet name $ case rs of
+                        ReadSet1{} -> ReadSet1 enc fp3'
+                        _
+                            | nSeq s3' > 0 -> ReadSet3 enc fp1' fp2' fp3'
+                            | otherwise -> ReadSet2 enc fp1' fp2'
     where
-        preprocBlock :: C.Conduit ShortRead InterpretationEnvIO PreprocessPairOutput
-        preprocBlock = CL.mapMaybeM $ \r -> do
-            r' <- runInROEnvIO $ interpretPBlock1 block var r
-            return (Single <$> r')
-
-
         intercalate :: Bool -> (ShortRead, ShortRead) -> InterpretationROEnv (Maybe PreprocessPairOutput)
         intercalate keepSingles (r1, r2) = do
                 r1' <- interpretPBlock1 block var r1
                 r2' <- interpretPBlock1 block var r2
                 return $ case (r1',r2') of
-                    (Just r1'', Just r2'') -> Just (Pair r1'' r2'')
+                    (Just r1'', Just r2'') -> Just (Paired r1'' r2'')
                     (Just r, Nothing) -> if keepSingles
                                                 then Just (Single r)
                                                 else Nothing
