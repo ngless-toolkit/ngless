@@ -68,6 +68,7 @@ for testdir in tests/*; do
         fi
         rm -rf temp
         rm -rf *.output_ngless
+        rm -f output.*
         cd $basedir
     fi
 done
