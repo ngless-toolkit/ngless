@@ -9,8 +9,8 @@ module Data.FastQ
     , guessEncoding
     , encodingOffset
     , encodingName
-    , parseFastQ
-    , fqConduitR
+    , fqDecode
+    , fqDecodeC
     , fqEncode
     , fqEncodeC
     , gcFraction
@@ -54,10 +54,11 @@ import Utils.Vector (unsafeIncrement)
 foreign import ccall "updateCharCount" c_updateCharCount :: CUInt -> CString -> Ptr Int -> IO ()
 foreign import ccall "updateQualityCounts" c_updateQualityCounts :: CUInt -> CString -> Ptr Int -> IO ()
 
+    -- | Represents a short read
 data ShortRead = ShortRead
         { srHeader :: !B.ByteString
         , srSequence :: !B.ByteString
-        , srQualities :: !B.ByteString
+        , srQualities :: !B.ByteString -- ^ these have been decoded
         } deriving (Eq, Show, Ord)
 
 instance NFData ShortRead where
@@ -66,11 +67,11 @@ instance NFData ShortRead where
 data FastQEncoding = SangerEncoding | SolexaEncoding deriving (Eq, Bounded, Enum, Show, Ord)
 
 data FQStatistics = FQStatistics
-                { bpCounts :: (Int, Int, Int, Int)
-                , lc :: Word8
-                , qualCounts ::  [V.Vector Int]
-                , nSeq :: Int
-                , seqSize :: (Int,Int)
+                { bpCounts :: (Int, Int, Int, Int) -- ^ number of (A, C, T, G)
+                , lc :: Word8 -- ^ lowest quality value
+                , qualCounts ::  [V.Vector Int] -- ^ quality counts by position
+                , nSeq :: Int -- ^ number of sequences
+                , seqSize :: (Int,Int) -- ^ min and max
                 } deriving(Eq,Show)
 
 instance NFData FQStatistics where
@@ -92,18 +93,7 @@ guessEncoding lowC
     | lowC < 58 = return SangerEncoding
     | otherwise = return SolexaEncoding
 
-
-parseFastQ :: FastQEncoding -> BL.ByteString -> [ShortRead]
-parseFastQ enc contents = parse' . map BL.toStrict . BL.lines $ contents
-    where
-        parse' [] = []
-        parse' (lid:lseq:_:lqs:xs) = (createRead enc lid lseq lqs) : parse' xs
-        parse' xs = error ("Number of lines is not multiple of 4! EOF:" ++ show xs)
-
-createRead enc rid rseq rqs = ShortRead rid rseq (bsAdd rqs (-offset))
-    where
-        offset = encodingOffset enc
-
+-- | encode as a string
 fqEncodeC :: (Monad m) => FastQEncoding -> C.Conduit ShortRead m B.ByteString
 fqEncodeC enc = CL.map (fqEncode enc)
 
@@ -125,12 +115,27 @@ fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, 
         offset :: Word8
         offset = encodingOffset enc
 
-fqConduitR :: (Monad m, MonadError NGError m) => FastQEncoding -> C.Conduit ByteLine m ShortRead
-fqConduitR enc = groupC 4 =$= CL.mapM parseShortReads
+fqDecodeC :: (Monad m, MonadError NGError m) => FastQEncoding -> C.Conduit ByteLine m ShortRead
+fqDecodeC enc = groupC 4 =$= CL.mapM parseShortReads
     where
-        parseShortReads [ByteLine rid, ByteLine rseq, _, ByteLine rqs] = return (createRead enc rid rseq rqs)
+        offset = encodingOffset enc
+        parseShortReads [ByteLine rid, ByteLine rseq, _, ByteLine rqs] = return $! ShortRead rid rseq (bsAdd rqs (-offset))
         parseShortReads _ = throwDataError "Number of lines in FastQ file is not multiple of 4! EOF found"
 
+-- | reads a sequence of short reads.
+-- returns an error if there are any problems.
+--
+-- Note that the result of this function is not lazy! It will consume the whole
+-- input before it produces the first output (because it needs to determine
+-- whether an error occurred).
+--
+-- See 'fqDecodeC'
+fqDecode :: FastQEncoding -> BL.ByteString -> NGLess [ShortRead]
+fqDecode enc s = C.runConduit $
+    CL.sourceList (BL.toChunks s)
+        =$= linesC
+        =$= fqDecodeC enc
+        =$= CL.consume
 
 statsFromFastQ :: FilePath -> NGLessIO FQStatistics
 statsFromFastQ fp =
@@ -139,12 +144,15 @@ statsFromFastQ fp =
         =$= getPairedLines
         $$ fqStatsC
 
+
+-- | Useful for use with fqStatsC
 getPairedLines :: C.Conduit ByteLine NGLessIO (Pair ByteLine ByteLine)
 getPairedLines = groupC 4 =$= CL.mapM getPairedLines'
     where
         getPairedLines' [_, bps, _, qs] = return $! bps :!: qs
         getPairedLines' _ = throwDataError "fastq lines are not a multiple of 4"
 
+-- | Guess the encoding of a file
 encodingFor :: FilePath -> NGLessIO FastQEncoding
 encodingFor fp = do
     let countMin :: (Int, Word8) -> Word8 -> (Int, Word8)
@@ -192,7 +200,7 @@ fqStatsC = do
             cCount <- getNoCaseV charCounts 'c'
             gCount <- getNoCaseV charCounts 'g'
             tCount <- getNoCaseV charCounts 't'
-            return (FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq))
+            return $! FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq)
     where
 
         update :: VSM.IOVector Int -> VUM.IOVector Int -> IORef (VSM.IOVector Int) -> Pair ByteLine ByteLine -> m ()
@@ -233,7 +241,6 @@ gcFraction res = gcCount / allBpCount
         (bpA,bpC,bpG,bpT) = bpCounts res
         gcCount = fromIntegral $ bpC + bpG
         allBpCount = fromIntegral $ bpA + bpC + bpG + bpT
-
 
 
 calculateStatistics :: FQStatistics -> FastQEncoding -> [(Int, Int, Int, Int)]

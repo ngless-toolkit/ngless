@@ -25,7 +25,7 @@ import Interpret (interpret)
 import Parse (parsengless)
 import Language (Script(..))
 import Data.Sam (readSamLine, readSamGroupsC)
-import Data.FastQ (statsFromFastQ, parseFastQ, FastQEncoding(..), ShortRead(..))
+import Data.FastQ (statsFromFastQ, FastQEncoding(..), ShortRead(..), fqDecode)
 import Utils.Conduit (linesC)
 import Transform (transform)
 
@@ -54,7 +54,7 @@ countRights = loop (0 :: Int)
             Just (Left !_) -> loop i
 
 exampleSR :: ShortRead
-exampleSR = head . parseFastQ SangerEncoding $ BL.fromChunks
+exampleSR = head . fqDecode SangerEncoding $ BL.fromChunks
                 ["@SRR867735.1 HW-ST997:253:C16APACXX:7:1101:2971:1948/1\n"
                 ,"NCCGCTGCTCGGGATCAAGACATACCGCGGGGGGAGGGGAGCGGGACCAC\n"
                 ,"+\n"

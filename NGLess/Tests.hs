@@ -286,7 +286,7 @@ make_unique_test n = let enc = SolexaEncoding in do
         newfp <- performUnique "test_samples/data_set_repeated.fq" enc n
         conduitPossiblyCompressedFile newfp
                 =$= linesC
-                =$= fqConduitR enc
+                =$= fqDecodeC enc
                 $$ countC
     let n' = min n 4
     nuniq @?=  (n' * 54)

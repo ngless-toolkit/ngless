@@ -13,10 +13,10 @@ import Data.FastQ
 
 tgroup_FastQ = $(testGroupGenerator)
 
-case_parse_encode_sanger = encodeRecover SangerEncoding @?= reads3
-case_parse_encode_solexa = encodeRecover SolexaEncoding @?= reads3
+case_parse_encode_sanger = encodeRecover SangerEncoding @?= Right reads3
+case_parse_encode_solexa = encodeRecover SolexaEncoding @?= Right reads3
 
-encodeRecover enc = parseFastQ enc . BL.fromChunks $ map (fqEncode enc) reads3
+encodeRecover enc = fqDecode enc . BL.fromChunks $ map (fqEncode enc) reads3
 reads3 =
     [ShortRead "x" "acttg" "\x23\x10\x22\x22\x18"
     ,ShortRead "y" "catgt" "\x21\x11\x19\x25\x12"

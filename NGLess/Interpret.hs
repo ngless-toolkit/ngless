@@ -396,7 +396,7 @@ executePreprocess (NGOReadSet name rs) args (Block [Variable var] block) = do
             asSource fp q =
                     let input = conduitPossiblyCompressedFile fp
                             =$= linesC
-                            =$= fqConduitR enc
+                            =$= fqDecodeC enc
                             =$= C.conduitVector 4096
                     in if qcInput
                             then input =$= writeAndContinue q

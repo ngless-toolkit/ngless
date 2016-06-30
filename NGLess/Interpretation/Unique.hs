@@ -53,7 +53,7 @@ performUnique fname enc mc = do
         fhs  <- liftIO $ openKFileHandles k dest
         conduitPossiblyCompressedFile fname
             =$= linesC
-            =$= fqConduitR enc
+            =$= fqDecodeC enc
             $$ CL.mapM_ (multiplex k fhs)
         V.mapM_ (liftIO . hClose) fhs
         outputLno' DebugOutput ("Wrote N Files to: " ++ dest)
@@ -81,7 +81,7 @@ readUniqueFile :: Int -> FastQEncoding -> FilePath -> C.Source NGLessIO ShortRea
 readUniqueFile k enc fname = do
     rs <- C.sourceFile fname
         =$= linesC
-        =$= fqConduitR enc
+        =$= fqDecodeC enc
         $$ CL.consume
     CL.sourceList (getk k rs)
 
