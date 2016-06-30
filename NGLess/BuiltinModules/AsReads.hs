@@ -12,10 +12,12 @@ module BuiltinModules.AsReads
 import qualified Data.ByteString as B
 import qualified Data.Text as T
 import qualified Data.Conduit.List as CL
+import Control.Monad.Trans.Resource (release)
 import Data.Conduit ((=$=), ($$))
 import Control.Monad.Except
 import System.IO
 import Data.Default
+import Data.IORef
 
 import Language
 import FileManagement
@@ -34,19 +36,36 @@ executeReads arg _ = throwShouldNotOccur ("executeReads called with argument: " 
 
 samToFastQ :: FilePath -> NGLessIO ReadSet
 samToFastQ fpsam = do
-    (oname1,ohand1) <- openNGLTempFile fpsam "reads_" ".1.fq"
-    (oname2,ohand2) <- openNGLTempFile fpsam "reads_" ".2.fq"
-    (oname3,ohand3) <- openNGLTempFile fpsam "reads_" ".singles.fq"
+    (rk1, (oname1,ohand1)) <- openNGLTempFile' fpsam "reads_" ".1.fq"
+    (rk2, (oname2,ohand2)) <- openNGLTempFile' fpsam "reads_" ".2.fq"
+    (rk3, (oname3,ohand3)) <- openNGLTempFile' fpsam "reads_" ".singles.fq"
+    hasPaired <- liftIO (newIORef False)
+    hasSingle <- liftIO (newIORef False)
     samBamConduit fpsam
         =$= linesC
         =$= readSamGroupsC
         =$= CL.map asFQ
         $$ CL.mapM_ (liftIO . \case
-            Left r -> B.hPut ohand3 r
-            Right (r1,r2) -> B.hPut ohand1 r1 >> B.hPut ohand2 r2)
+            Left r -> writeIORef hasSingle True >> B.hPut ohand3 r
+            Right (r1,r2) -> writeIORef hasPaired True >> B.hPut ohand1 r1 >> B.hPut ohand2 r2)
     outputListLno' TraceOutput ["Finished as_reads"]
     liftIO $ forM_ [ohand1, ohand2, ohand3] hClose
-    return $! ReadSet3 SolexaEncoding oname1 oname2 oname3
+    hasPaired' <- liftIO $ readIORef hasPaired
+    hasSingle' <- liftIO $ readIORef hasSingle
+    case (hasPaired', hasSingle') of
+        (True, True) -> return $! ReadSet3 SolexaEncoding oname1 oname2 oname3
+        (False, True) -> do
+            release rk1
+            release rk2
+            return $! ReadSet1 SolexaEncoding oname3
+        (True, False) -> do
+            release rk3
+            return $! ReadSet2 SolexaEncoding oname1 oname2
+        (False, False) -> do
+            -- the input is empty
+            release rk3
+            outputListLno' WarningOutput ["as_reads returning an empty read set"]
+            return $! ReadSet2 SolexaEncoding oname1 oname2
 
 
 asFQ :: [SamLine] -> Either B.ByteString (B.ByteString,B.ByteString)
