@@ -113,8 +113,8 @@ instance FromJSON Command where
 data ExternalModule = ExternalModule
     { emInfo :: ModInfo
     , modulePath :: FilePath
-    , command :: Command
-    , initCmd :: FilePath
+    , command :: Maybe Command
+    , initCmd :: Maybe FilePath
     , initArgs :: [String]
     , references :: [ExternalReference]
     , emCitation :: Maybe T.Text
@@ -122,15 +122,19 @@ data ExternalModule = ExternalModule
 
 instance FromJSON ExternalModule where
     parseJSON = withObject "module" $ \o -> do
-        initO <- o .: "init"
-        ExternalModule
-            <$> (ModInfo <$> o .: "name" <*> o .: "version")
-            <*> pure undefined
-            <*> o .: "function"
-            <*> initO .: "init_cmd"
-            <*> initO .:? "init_args" .!= []
-            <*> o .:? "references" .!= []
-            <*> o .:? "citation"
+        initO <- o .:? "init"
+        (initCmd, initArgs) <- case initO of
+            Nothing -> return (Nothing, [])
+            Just initO -> do
+                init_cmd <- initO .: "init_cmd"
+                init_args <- initO .:? "init_args" .!= []
+                return (init_cmd, init_args)
+        references <- o .:? "references" .!= []
+        command <- o .:? "function"
+        emCitation <- o .:? "citation"
+        emInfo <- ModInfo <$> o .: "name" <*> o .: "version"
+        let modulePath = undefined
+        return ExternalModule{..}
 
 addPathToRep :: FilePath -> ExternalModule -> ExternalModule
 addPathToRep mpath m = m { modulePath = mpath, references = map (addPathToRef mpath) (references m) }
@@ -221,24 +225,26 @@ asInternalModule em@ExternalModule{..} = do
         { modInfo = emInfo
         , modCitation = emCitation
         , modReferences = references
-        , modFunctions = [asFunction command]
-        , runFunction = const (executeCommand modulePath command)
+        , modFunctions = maybe [] ((:[]) . asFunction) command
+        , runFunction = const (maybe (\_ _ -> return NGOVoid) (executeCommand modulePath) command)
         }
 
 validateModule :: ExternalModule -> NGLessIO ()
-validateModule  ExternalModule{..} = do
-    outputListLno' TraceOutput ("Running initialization for module ":show emInfo:" ":initCmd:" ":initArgs)
-    env <- nglessEnv modulePath
-    (exitCode, out, err) <- liftIO $
-        readCreateProcessWithExitCode (proc (modulePath </> initCmd) initArgs) { env = Just env } ""
-    case (exitCode,out,err) of
-        (ExitSuccess, "", "") -> return ()
-        (ExitSuccess, msg, "") -> outputListLno' TraceOutput ["Module OK. information: ", msg]
-        (ExitSuccess, mout, merr) -> outputListLno' TraceOutput ["Module OK. information: ", mout, ". Warning: ", merr]
-        (ExitFailure code, _,_) -> do
-            outputListLno' WarningOutput ["Module loading failed for module ", show emInfo]
-            throwSystemError .concat $ ["Error loading module ", show emInfo, "\n",
-                    "When running the validation command (", initCmd, " with arguments ", show initArgs, ")\n",
+validateModule  ExternalModule{..} = case initCmd of
+    Nothing -> return ()
+    Just initCmd' -> do
+        outputListLno' TraceOutput ("Running initialization for module ":show emInfo:" ":initCmd':" ":initArgs)
+        env <- nglessEnv modulePath
+        (exitCode, out, err) <- liftIO $
+            readCreateProcessWithExitCode (proc (modulePath </> initCmd') initArgs) { env = Just env } ""
+        case (exitCode,out,err) of
+            (ExitSuccess, "", "") -> return ()
+            (ExitSuccess, msg, "") -> outputListLno' TraceOutput ["Module OK. information: ", msg]
+            (ExitSuccess, mout, merr) -> outputListLno' TraceOutput ["Module OK. information: ", mout, ". Warning: ", merr]
+            (ExitFailure code, _,_) -> do
+                outputListLno' WarningOutput ["Module loading failed for module ", show emInfo]
+                throwSystemError .concat $ ["Error loading module ", show emInfo, "\n",
+                    "When running the validation command (", initCmd', " with arguments ", show initArgs, ")\n",
                     "\texit code = ", show code,"\n",
                     "\tstdout='", out, "'\n",
                     "\tstderr='", err, "'"]
