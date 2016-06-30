@@ -22,6 +22,7 @@ import System.Directory (getDirectoryContents, doesFileExist, doesDirectoryExist
 import System.FilePath.Posix
 import Data.Aeson
 import Data.Yaml
+import Data.List (find)
 import Data.Default (def)
 
 import Configuration
@@ -114,15 +115,15 @@ instance FromJSON Command where
             <$> o .: "nglName"
             <*> o .: "arg0"
             <*> o .: "arg1"
-            <*> o .: "additional"
+            <*> o .:? "additional" .!= []
             <*> o .:? "ret"
 
 data ExternalModule = ExternalModule
     { emInfo :: ModInfo
     , modulePath :: FilePath
-    , command :: Maybe Command
     , initCmd :: Maybe FilePath
     , initArgs :: [String]
+    , commands :: [Command]
     , references :: [ExternalReference]
     , emCitation :: Maybe T.Text
     } deriving (Eq, Show)
@@ -137,7 +138,7 @@ instance FromJSON ExternalModule where
                 init_args <- initO' .:? "init_args" .!= []
                 return (init_cmd, init_args)
         references <- o .:? "references" .!= []
-        command <- o .:? "function"
+        commands <- o .:? "functions" .!= []
         emCitation <- o .:? "citation"
         emInfo <- ModInfo <$> o .: "name" <*> o .: "version"
         let modulePath = undefined
@@ -180,8 +181,12 @@ nglessEnv basedir = liftIO $ do
                 :("NGLESS_MODULE_DIR", basedir)
                 :env
 
-executeCommand :: FilePath -> Command -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeCommand basedir cmd input args = do
+executeCommand :: FilePath -> [Command] -> T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeCommand basedir cmds funcname input args = do
+    cmd <- maybe
+                (throwShouldNotOccur ("Call to undefined function "++T.unpack funcname++"."))
+                return
+                (find ((== funcname) . nglName) cmds)
     paths <- asfilePaths input
     paths' <- liftIO $ mapM canonicalizePath paths
     args' <- argsArguments cmd args
@@ -230,8 +235,8 @@ asInternalModule em@ExternalModule{..} = do
         { modInfo = emInfo
         , modCitation = emCitation
         , modReferences = references
-        , modFunctions = maybe [] ((:[]) . asFunction) command
-        , runFunction = const (maybe (\_ _ -> return NGOVoid) (executeCommand modulePath) command)
+        , modFunctions = map asFunction commands
+        , runFunction = executeCommand modulePath commands
         }
 
 validateModule :: ExternalModule -> NGLessIO ()

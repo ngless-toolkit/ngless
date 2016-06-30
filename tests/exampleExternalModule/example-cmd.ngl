@@ -1,0 +1,13 @@
+ngless '0.0'
+import "example-cmd" version "0.0"
+
+input = fastq('sample.fq')
+
+testing(input)
+
+testing(input, verbose=true)
+
+testing(input, verbose=true, testing={one})
+
+testing2(input)
+

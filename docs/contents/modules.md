@@ -64,8 +64,8 @@ files inside your module, ngless sets the environmental variable
 
 #### Functions
 
-To add a function, use a ``function`` section. This function has a few required
-arguments:
+To add new functions, use a `functions` section, which should contain a list of
+functions. Each function has a few required arguments:
 
 ``nglName``: the name by which the function will be called **inside** of an
 ngless script.
@@ -76,9 +76,10 @@ see this.
 
 For example::
 
-    function:
-        nglName: "test"
-        argName: "./run-test.sh"
+    functions:
+        -
+            nglName: "test"
+            argName: "./run-test.sh"
 
 will enable the user to call a function ``test()`` which will translate into a
 call to the ``run-test.sh`` script (see the note above about paths).
@@ -87,18 +88,18 @@ You can also add arguments to your function, naturally. Remember that ngless
 functions can have only one unnamed argument and any number of named arguments.
 To specify the unnamed argument add a ``arg1`` section::
 
-    arg1:
-        filetype: <one of "tsv"/"fq1"/"fq2"/"fq3"/"sam"/"bam"/"sam_or_bam"/"tsv">
-        can_gzip: true/false
+            arg1:
+                filetype: <one of "tsv"/"fq1"/"fq2"/"fq3"/"sam"/"bam"/"sam_or_bam"/"tsv">
+                can_gzip: true/false
 
 Finally, additional modules are a list under ``additional``:
 
-    additional:
-        -
-            name: <name>
-            atype: <one of 'str'/'flag'/'int'/'option'>
-            def: <default value>
-            required: true/false
+            additional:
+                -
+                    name: <name>
+                    atype: <one of 'str'/'flag'/'int'/'option'>
+                    def: <default value>
+                    required: true/false
 
 Arguments of type ``flag`` will be passed to your script using the form
 ``--name`` if their value is true.
@@ -111,15 +112,15 @@ additional field ``allowed`` specifying the universe of allowed symbols. Ngless
 will check that the user specifies arguments from the allowable universe. For
 example::
 
-    additional:
-        -
-            atype: 'option'
-            name: 'verbosity'
-            def: 'quiet'
-            allowed:
-                - 'quiet'
-                - 'normal'
-                - 'loud'
+            additional:
+                -
+                    atype: 'option'
+                    name: 'verbosity'
+                    def: 'quiet'
+                    allowed:
+                        - 'quiet'
+                        - 'normal'
+                        - 'loud'
 
 If you do not have a fixed universe for your argument, then it should be a
 ``str`` argument.
