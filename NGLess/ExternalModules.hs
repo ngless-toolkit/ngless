@@ -31,33 +31,40 @@ import Modules
 import Output
 import NGLess
 
-data CommandArgument =
-        CommandFlag T.Text Bool
-        | CommandOption T.Text (Maybe T.Text) [T.Text]
-        | CommandInteger T.Text (Maybe Integer)
-        | CommandString T.Text (Maybe T.Text) !Bool
+
+-- | Just ArgInformation with a possible default value
+data CommandArgument = CommandArgument
+        { cargInfo :: ArgInformation
+        , cargDef :: Maybe NGLessObject
+        }
     deriving (Eq, Show)
 
 instance FromJSON CommandArgument where
     parseJSON = withObject "command argument" $ \o -> do
+        argName <- o .: "name"
+        argRequired <- o .:? "required" .!= False
         atype <- o .: "atype"
-        name <- o .: "name"
-        case atype of
+        (argType, cargDef) <- case atype of
             "flag" -> do
-                defVal <- o .: "def"
-                return (CommandFlag name defVal)
+                defVal <- o .:? "def"
+                return (NGLBool, NGOBool <$> defVal)
             "option" -> do
                 defVal <- o .:? "def"
-                allowed <- o .: "allowed"
-                return (CommandOption name defVal allowed)
+                return (NGLSymbol, NGOSymbol <$> defVal)
             "int" -> do
                 defVal <- o .:? "def"
-                return (CommandInteger name defVal)
+                return (NGLInteger, NGOInteger <$> defVal)
             "str" -> do
                 defVal <- o .:? "def"
-                required <- o .: "required"
-                return (CommandString name defVal required)
+                return (NGLString, NGOString <$> defVal)
             _ -> fail ("unknown argument type "++atype)
+        argChecks <- if atype == "option"
+                then do
+                    allowed <- o .: "allowed"
+                    return [ArgCheckSymbol allowed]
+                else return []
+        let cargInfo = ArgInformation{..}
+        return CommandArgument{..}
 
 data FileTypeBase =
     FastqFileSingle
@@ -125,9 +132,9 @@ instance FromJSON ExternalModule where
         initO <- o .:? "init"
         (initCmd, initArgs) <- case initO of
             Nothing -> return (Nothing, [])
-            Just initO -> do
-                init_cmd <- initO .: "init_cmd"
-                init_args <- initO .:? "init_args" .!= []
+            Just initO' -> do
+                init_cmd <- initO' .: "init_cmd"
+                init_args <- initO' .:? "init_args" .!= []
                 return (init_cmd, init_args)
         references <- o .:? "references" .!= []
         command <- o .:? "function"
@@ -152,7 +159,7 @@ addPathToRef mpath er@ExternalReference{..} = er
 addPathToRef _ er = er
 
 
-asFunction Command{..} = Function (FuncName nglName) (Just $ asNGLType arg1) [] (fromMaybe NGLVoid $ asNGLType <$> ret) (map asArgInfo additional) False
+asFunction Command{..} = Function (FuncName nglName) (Just $ asNGLType arg1) [] (fromMaybe NGLVoid $ asNGLType <$> ret) (map cargInfo additional) False
 
 asNGLType = asNGLType' . fileTypeBase
 asNGLType' FastqFileSingle = NGLReadSet
@@ -163,10 +170,6 @@ asNGLType' BamFile = NGLMappedReadSet
 asNGLType' SamOrBamFile = NGLMappedReadSet
 asNGLType' TSVFile = NGLCounts
 
-asArgInfo (CommandFlag name _) = ArgInformation name False NGLBool []
-asArgInfo (CommandOption name _ allowed) = ArgInformation name False NGLSymbol [ArgCheckSymbol allowed]
-asArgInfo (CommandInteger name _) = ArgInformation name False NGLInteger []
-asArgInfo (CommandString name _ req) = ArgInformation name req NGLString []
 
 {- | Environment to expose to module processes -}
 nglessEnv :: FilePath -> NGLessIO [(String,String)]
@@ -199,24 +202,26 @@ asfilePaths (NGOCounts fp) = return [fp]
 asfilePaths invalid = throwShouldNotOccur ("AsFile path got "++show invalid)
 
 argsArguments :: Command -> KwArgsValues -> NGLessIO [String]
-argsArguments cmd args = catMaybes <$> forM (additional cmd) a1
+argsArguments cmd args = catMaybes <$> forM (additional cmd) (\(CommandArgument ai mdef) -> a1 mdef ai)
     where
-        a1 :: CommandArgument -> NGLessIO (Maybe String)
-        a1 (CommandFlag name defVal) = do
-                isSet <- boolOrTypeError "in command module" $ lookupWithDefault (NGOBool defVal) name args
-                return (if isSet then Just ("--"++T.unpack name) else Nothing)
-        a1 (CommandOption name defVal _) = case lookup name args of
-                Nothing -> case defVal of
-                    Nothing -> return Nothing
-                    Just s -> return . Just $ ("--"++T.unpack name ++"="++T.unpack s)
-                Just v -> symbolOrTypeError "in command module" v >>= \s -> return . Just $ ("--"++T.unpack name++"="++T.unpack s)
-        a1 (CommandInteger name defVal) = case lookup name args <|> (NGOInteger <$> defVal) of
-                Nothing -> return Nothing
-                Just (NGOInteger v) -> return . Just $ "--"++T.unpack name++"="++show v
-                _ -> throwShouldNotOccur "in command module, int expected"
-        a1 (CommandString name defVal req) = case lookup name args <|> (NGOString <$> defVal) of
-                Just (NGOString v) -> return . Just $ "--"++T.unpack name++"="++T.unpack v
-                _ -> throwShouldNotOccur "in command module, string expected"
+        a1 :: Maybe NGLessObject -> ArgInformation -> NGLessIO (Maybe String)
+        a1 mdef ArgInformation{..} = case lookup argName args <|> mdef of
+                Nothing
+                    | not argRequired -> return Nothing
+                    | otherwise -> throwScriptError $ concat ["Missing value for required argument ", T.unpack argName, "."]
+                Just v
+                    | argType == NGLBool -> do
+                        val <- boolOrTypeError "in command module" v
+                        return $! if val
+                            then Just $ "--" ++ T.unpack argName
+                            else Nothing
+                    | otherwise -> do
+                        asStr <- case argType of
+                            NGLString -> T.unpack <$> stringOrTypeError "in external module" v
+                            NGLSymbol -> T.unpack <$> symbolOrTypeError "in external module" v
+                            NGLInteger -> show <$> integerOrTypeError "in external module" v
+                            other -> throwShouldNotOccur ("Unexpected type tag in external module " ++ show other)
+                        return . Just $ concat ["--", T.unpack argName, "=", asStr]
 
 asInternalModule :: ExternalModule -> NGLessIO Module
 asInternalModule em@ExternalModule{..} = do

@@ -13,6 +13,7 @@ module NGLess
     , boolOrTypeError
     , symbolOrTypeError
     , stringOrTypeError
+    , integerOrTypeError
     , lookupBoolOrScriptError
     , lookupBoolOrScriptErrorDef
     , lookupStringOrScriptError
@@ -48,6 +49,11 @@ symbolOrTypeError context val = throwScriptError ("Expected a symbol (received "
 stringOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m T.Text
 stringOrTypeError _ (NGOString s) = return s
 stringOrTypeError context val = throwScriptError ("Expected a string (received " ++ show val ++ ") in context '" ++ context ++ "'")
+
+-- | If argument is an NGOInteger, then unwraps it; else it raises a type error
+integerOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m Integer
+integerOrTypeError _ (NGOInteger i) = return i
+integerOrTypeError context val = throwScriptError ("Expected an integer (received " ++ show val ++ ") in context '" ++ context ++ "'")
 
 lookupStringOrScriptErrorDef :: (MonadError NGError m) => m T.Text -> String -> T.Text -> KwArgsValues -> m T.Text
 lookupStringOrScriptErrorDef defval context name args = case lookup name args of
