@@ -1,0 +1,9 @@
+ngless "0.0"
+import "motus" version "0.0"
+
+input = paired('input.1.fq.gz', 'input.2.fq.gz')
+
+mapped = map(input, reference='motus')
+counted = count(mapped, norm=False)
+motus(counted, ofile='output.motus.txt')
+
