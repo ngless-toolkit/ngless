@@ -19,6 +19,17 @@ functions:
                     - 'one'
                     - 'two'
                     - 'three'
+            -
+                atype: 'flag'
+                name: 'alternative'
+                def: true
+                when-true: "--alternative=yes"
+            -
+                atype: 'flag'
+                name: 'alternative2'
+                when-true:
+                    - "--alternative2=yes"
+                    - "--other"
     -
         nglName: "testing2"
         arg0: '/bin/echo'

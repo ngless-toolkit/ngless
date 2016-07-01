@@ -79,7 +79,7 @@ For example:
     functions:
         -
             nglName: "test"
-            argName: "./run-test.sh"
+            arg0: "./run-test.sh"
 
 will enable the user to call a function ``test()`` which will translate into a
 call to the ``run-test.sh`` script (see the note above about paths).
@@ -101,8 +101,11 @@ Finally, additional argument are specified by a list called ``additional``:
                     def: <default value>
                     required: true/false
 
-Arguments of type ``flag`` will be passed to your script using the form
-``--name`` if their value is true.
+Arguments of type ``flag`` have an optional extra argument, ``when-true`` which
+is a list of strings which will be passed as extra arguments when the flag is
+true. You can also just specify a single string. If ``when-true`` is missing,
+ngless will pass an option of the form ``--name`` (i.e., a double-dash then the
+name used).
 
 All other argument types are passed to your script using the syntax
 ``--name=value`` if they are present or if a default has been provided.
@@ -127,7 +130,7 @@ If you do not have a fixed universe for your argument, then it should be a
 
 The ``required`` flag determines whether the argument is required. Note that
 arguments with a default argument are automatically optional (ngless may
-trigger a warning about this anomalous situation).
+trigger a warning if you mark an argument with a default as required).
 
 ### References
 

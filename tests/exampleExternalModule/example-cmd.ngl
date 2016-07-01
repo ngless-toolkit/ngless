@@ -9,5 +9,7 @@ testing(input, verbose=true)
 
 testing(input, verbose=true, testing={one})
 
+testing(input, alternative=true, alternative2=true)
+
 testing2(input)
 
