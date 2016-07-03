@@ -108,7 +108,8 @@ getLock basedir (x:xs) = do
                             , whenExistsStrategy = IfLockedNothing}) >>= \case
             Nothing -> getLock basedir xs
             Just rk -> do
-                let updateloop = threadDelay (10*60*1000*1000) >> touchFile lockname >> updateloop
+                let updateloop :: IO ()
+                    updateloop = threadDelay (10*60*1000*1000) >> touchFile lockname >> updateloop
                 liftIO . A.async $ updateloop
                 return (x,rk)
 

@@ -1,0 +1,4 @@
+NGLess v0.0.0 (C) NGLess authors
+http://luispedro.github.io/ngless
+
+Should print

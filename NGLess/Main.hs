@@ -42,8 +42,9 @@ import StandardModules.NGLStdlib
 import Network
 import Hooks
 
-import qualified BuiltinModules.AsReads as ModAsReads
 import qualified BuiltinModules.Argv as ModArgv
+import qualified BuiltinModules.Checks as Checks
+import qualified BuiltinModules.AsReads as ModAsReads
 import qualified BuiltinModules.Readlines as Readlines
 
 -- | wrapPrint transforms the script by transforming the last expression <expr>
@@ -104,8 +105,11 @@ loadModules mods  = do
     mA <- ModAsReads.loadModule ("" :: T.Text)
     mArgv <- ModArgv.loadModule ("" :: T.Text)
     mReadlines <- Readlines.loadModule ("" :: T.Text)
+    mChecks <- Checks.loadModule ("" :: T.Text)
     imported <- loadStdlibModules mods
-    return (mReadlines:mArgv:mA:imported)
+    let loaded = (mReadlines:mArgv:mA:mChecks:imported)
+    forM_ loaded registerModule
+    return loaded
 
 
 headerStr :: String

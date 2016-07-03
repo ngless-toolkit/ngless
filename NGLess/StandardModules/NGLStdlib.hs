@@ -16,12 +16,11 @@ import qualified StandardModules.Mocat as Mocat
 import qualified StandardModules.Parallel as Parallel
 import qualified ExternalModules as Ext
 
-import Utils.Utils
 import Modules
 import NGLess
 
 loadStdlibModules :: [ModInfo] -> NGLessIO [Module]
-loadStdlibModules = mapM (\m -> loadModules1 m >>= passthrough registerModule)
+loadStdlibModules = mapM loadModules1
 
 externalModules =
         ["example-cmd"

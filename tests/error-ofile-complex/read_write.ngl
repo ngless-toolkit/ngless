@@ -1,0 +1,7 @@
+ngless '0.0'
+input = fastq('short.fq')
+print("Should print\n")
+dir = 'output-dir-does-not-exist'
+
+print("Should not print\n")
+write(input, ofile='outputs/' + dir + '/output.fq')

@@ -1,6 +1,7 @@
 {- Copyright 2016 NGLess Authors
  - License: MIT
  -}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Transform
     ( transform
@@ -11,14 +12,16 @@ module Transform
 
 import qualified Data.Text as T
 import Control.Monad.Trans.Cont
+import Control.Monad.Except
 import Control.Monad.Writer
 import Control.Arrow (second)
-import Control.Monad.Identity (runIdentity)
+import Control.Monad.Identity (Identity(..), runIdentity)
 
 import Language
 import Modules
 import Output
 import NGLess
+import BuiltinFunctions
 
 
 {- Before interpretation, scripts are transformed to allow for several
@@ -40,6 +43,7 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , qcInPreprocess
                 , ifLenDiscardSpecial
                 , substrimReassign
+                , addOFileChecks
                 ]
 
 pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression
@@ -154,3 +158,71 @@ substrimReassign = pureTransform $ \case
         (Assignment v (FunctionCall (FuncName "substrim") (Lookup v') [(Variable "min_quality", ConstInt mq)] Nothing))
             | v == v' -> Optimized (SubstrimReassign v (fromInteger mq))
         e -> e
+
+
+-- | This makes the following transformation
+--
+-- variable = <non constant expression>
+--
+-- <code>
+--
+-- write(input, ofile="output/"+variable+".sam")
+--
+-- into
+--
+-- variable = <non constant expression>
+-- __check_ofile("output/"+variable+".sam")
+--
+-- <code>
+--
+-- write(input, ofile="output/"+variable+".sam")
+addOFileChecks :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
+addOFileChecks sc = reverse <$> addOFileChecks' (reverse sc) -- this is easier to do on the reversed script
+addOFileChecks' :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
+addOFileChecks' [] = return []
+addOFileChecks' ((lno,e):rest) = do
+        mods <- loadedModules
+        vars <- runNGLess $ execWriterT (recursiveAnalyse (getOFileExpressions mods) e)
+        rest' <- addOFileChecks' (maybeAddChecks vars rest)
+        return ((lno,e):rest')
+
+     where
+        maybeAddChecks :: [(Variable,Expression)] -> [(Int, Expression)] -> [(Int, Expression)]
+        maybeAddChecks _ [] = []
+        maybeAddChecks vars@[(v,complete)] ((lno',e'):rest') = case e' of
+            Assignment v' _
+                | v' == v -> ((lno', checkExpression complete):(lno', e'):rest')
+            _ -> (lno',e') : maybeAddChecks vars rest'
+        maybeAddChecks _ rest' = rest'
+
+        checkExpression complete = FunctionCall
+                            (FuncName "__check_ofile")
+                            complete
+                            [(Variable "original_lno", ConstInt (toInteger lno))]
+                            Nothing
+
+        -- returns the variables used and expressions that depend on them
+        getOFileExpressions :: [Module] -> Expression -> (WriterT [(Variable,Expression)] NGLess) ()
+        getOFileExpressions mods (FunctionCall f expr args _) = case findFunction mods f of
+            Just finfo -> do
+                when (ArgCheckFileWritable `elem` funcArgChecks finfo) $
+                    extractExpressions (Just expr)
+                forM_ (funcKwArgs finfo) $ \ainfo ->
+                    when (ArgCheckFileWritable `elem` argChecks ainfo) $
+                        extractExpressions (lookup (Variable $ argName ainfo) args)
+            Nothing -> throwShouldNotOccur ("Transform.getOFileExpressions: Unknown function: " ++ show f ++ ". This should have been caught before")
+        getOFileExpressions _ _ = return ()
+
+        extractExpressions :: (MonadWriter [(Variable, Expression)] m) =>  Maybe Expression -> m ()
+        extractExpressions (Just ofile) = case ofile of
+            BinaryOp _ re le -> case validVariables re ++ validVariables le of
+                [v] -> tell [(v, ofile)]
+                _ -> return ()
+            _ -> return ()
+        extractExpressions Nothing = return ()
+
+        validVariables (Lookup v) = [v]
+        validVariables (BinaryOp _ re le) = validVariables re ++ validVariables le
+        validVariables (ConstStr _) = []
+        validVariables _ = [Variable "this", Variable "wont", Variable "work"] -- this causes the caller to bailout
+

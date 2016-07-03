@@ -6,8 +6,10 @@ module BuiltinFunctions
     , MethodInfo(..)
     , builtinFunctions
     , builtinMethods
+    , findFunction
     ) where
 
+import Data.List (find)
 import Modules
 import Language
 
@@ -19,6 +21,9 @@ data MethodInfo = MethodInfo
     , methodKwargsInfo :: [ArgInformation]
     , methodIsPure :: Bool
     } deriving (Eq, Show)
+
+findFunction :: [Module] -> FuncName -> Maybe Function
+findFunction mods fn = find ((==fn) . funcName) $ builtinFunctions ++ concat (modFunctions <$> mods)
 
 builtinFunctions =
     [Function (FuncName "fastq") (Just NGLString) [ArgCheckFileReadable] NGLReadSet fastqArgs False
@@ -41,7 +46,7 @@ groupArgs =
     ]
 
 writeArgs =
-    [ArgInformation "ofile" True NGLString []
+    [ArgInformation "ofile" True NGLString [ArgCheckFileWritable]
     ,ArgInformation "format" False NGLSymbol [ArgCheckSymbol ["tsv", "csv", "bam", "sam"]]
     ,ArgInformation "verbose" False NGLBool []
     ]

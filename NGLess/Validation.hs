@@ -7,7 +7,6 @@
 module Validation
     ( validate
     , uses_STDOUT
-    , findFunction
     ) where
 
 import qualified Data.Text as T
@@ -92,8 +91,6 @@ validate_pure_function _ (Script _ es) = check_toplevel validate_pure_function' 
                     , "select"
                     , "as_reads"
                     ]
-findFunction :: [Module] -> FuncName -> Maybe Function
-findFunction mods fn = find ((==fn) . funcName) $ builtinFunctions ++ concat (modFunctions <$> mods)
 
 validateFunctionReqArgs :: [Module] -> Script -> Maybe T.Text
 validateFunctionReqArgs mods (Script _ es) = checkRecursiveScript validateFunctionReqArgs' es

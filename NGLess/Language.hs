@@ -20,13 +20,14 @@ module Language
     , NGLessObject(..)
     , recursiveAnalyse
     , recursiveTransform
+    , usedVariables
     , typeOfConstant
     ) where
 
 {- This module defines the internal representation the language -}
 import qualified Data.Text as T
 import           Control.Monad.Extra (whenJust)
-import Control.Monad
+import           Control.Monad.Writer
 
 import Data.FastQ
 import Data.Sam
@@ -176,6 +177,9 @@ instance Show Expression where
     show (Sequence e) = "Sequence " ++ show e
     show (Optimized se) = "Optimized (" ++ show se ++ ")"
 
+showArgs [] = ""
+showArgs ((Variable v, e):args) = "; "++T.unpack v++"="++show e++showArgs args
+
 -- 'recursiveAnalyse f e' will call the function 'f' for all the subexpression inside 'e'
 recursiveAnalyse :: (Monad m) => (Expression -> m ()) -> Expression -> m ()
 recursiveAnalyse f e = f e >> recursiveAnalyse' e
@@ -217,9 +221,10 @@ recursiveTransform f e = f =<< recursiveTransform' e
         recursiveTransform' (Sequence es) = Sequence <$> mapM rf es
         recursiveTransform' esimple = return esimple
 
-
-showArgs [] = ""
-showArgs ((Variable v, e):args) = "; "++T.unpack v++"="++show e++showArgs args
+usedVariables :: Expression -> [Variable]
+usedVariables expr = execWriter . flip recursiveAnalyse expr $ \case
+    (Lookup v) -> tell [v]
+    _ -> return ()
 
 data ModInfo = ModInfo
     { modName :: !T.Text

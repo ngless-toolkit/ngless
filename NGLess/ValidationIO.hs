@@ -18,12 +18,13 @@ import Control.Monad.Trans.Writer
 import qualified Data.Text as T
 import           Control.Monad.Extra (whenJust)
 
-import Validation
+import NGLess
 import Modules
 import Language
-import NGLess
+import BuiltinFunctions
 import Utils.Suggestion
 import ReferenceDatabases
+import BuiltinModules.Checks
 
 
 type ValidateIO = WriterT [T.Text] (ReaderT [Module] NGLessIO)
@@ -145,20 +146,14 @@ validateOFile (Script _ es) = checkRecursive validateOFile' es
         validateOFile' (FunctionCall f expr args _) = do
             finfo <- findFunctionIO f
             when (ArgCheckFileWritable `elem` funcArgChecks finfo) $
-                validateStrVal checkOFile es expr
+                validateStrVal checkOFileV es expr
             forM_ (funcKwArgs finfo) $ \ainfo ->
                 when (ArgCheckFileWritable `elem` argChecks ainfo) $
-                   validateStrArg checkOFile (argName ainfo) args es
+                   validateStrArg checkOFileV (argName ainfo) args es
         validateOFile' _ = return ()
 
-checkOFile :: T.Text -> ValidateIO ()
-checkOFile ofile = do
-    let dirname = takeDirectory (T.unpack ofile)
-    exists <- liftIO $ doesDirectoryExist dirname
-    if not exists
-        then tell1 $ T.concat ["File name '", ofile, "' used as output, but directory ", T.pack dirname, " does not exist."]
-        else do
-            canWrite <- liftIO $ writable <$> getPermissions dirname
-            unless canWrite $
-                tell1 (T.concat ["write call to file ", ofile, ", but directory ", T.pack dirname, " is not writable."])
+checkOFileV :: T.Text -> ValidateIO ()
+checkOFileV ofile = do
+    errors <- liftIO (checkOFile ofile)
+    whenJust errors tell1
 
