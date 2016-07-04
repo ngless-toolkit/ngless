@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, CPP #-}
 {- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
@@ -12,7 +12,10 @@ module Utils.LockFile
     , fileAge
     ) where
 
+#ifndef WINDOWS
 import System.Posix.Process
+#endif
+
 import System.IO.Error (isDoesNotExistError)
 import System.Directory
 import Data.Time
@@ -55,6 +58,13 @@ data WhenExistsStrategy =
                 | IfLockedRetry { nrLockRetries :: !Int, timeBetweenRetries :: !NominalDiffTime }
             deriving (Eq, Show)
 
+pidAsStr :: IO String
+#ifndef WINDOWS
+pidAsStr = show <$> getProcessID
+#else
+pidAsStr = return "(PID is not available on Windows)"
+#endif
+
 withLockFile :: LockParameters -> NGLessIO a -> NGLessIO a
 withLockFile params act =
     acquireLock' params >>= \case
@@ -82,12 +92,12 @@ acquireLock' params@LockParameters{..} = liftIO (openLockFile lockFname) >>= \ca
         rk <- register (removeFileIfExists lockFname)
         outputListLno' DebugOutput ["Acquired lock file ", lockFname]
         liftIO $ do
-            pid <- getProcessID
+            pid <- pidAsStr
             hostname <- getHostName
             t <- getZonedTime
             let tformat = "%a %d-%m-%Y %R"
                 tstr = formatTime defaultTimeLocale tformat t
-            hPutStrLn h ("Lock file created for PID " ++ show pid ++ " on hostname " ++ hostname ++ " at time " ++ tstr)
+            hPutStrLn h ("Lock file created for PID " ++ pid ++ " on hostname " ++ hostname ++ " at time " ++ tstr)
             release rkC
             return (Just rk)
     Nothing -> liftIO (fileAge lockFname) >>= \case

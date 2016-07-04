@@ -2,7 +2,7 @@
  - License: MIT
  -}
 
-{-# LANGUAGE TupleSections, OverloadedStrings #-}
+{-# LANGUAGE TupleSections, CPP #-}
 
 module StandardModules.Parallel
     ( loadModule
@@ -18,8 +18,14 @@ import qualified Data.Vector.Mutable as VM
 import           Data.Time (getZonedTime)
 import           Data.Time.Format (formatTime, defaultTimeLocale)
 import           Data.List.Extra (snoc, chunksOf)
+
+#ifndef WINDOWS
 import           System.Posix.Unistd (fileSynchronise)
 import           System.Posix.IO (openFd, defaultFileFlags, closeFd, OpenMode(..), handleToFd)
+import           System.Posix.Files (touchFile)
+#endif
+
+
 import           System.FilePath.Posix
 import           GHC.Conc (getNumCapabilities, atomically)
 import qualified Control.Concurrent.Async as A
@@ -30,7 +36,6 @@ import           Control.Monad.ST
 import           Control.DeepSeq
 import           Data.Traversable
 import           Control.Concurrent (threadDelay)
-import           System.Posix.Files (touchFile)
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource
@@ -58,6 +63,7 @@ import Utils.Conduit
 import Utils.LockFile
 
 syncFile :: FilePath -> IO ()
+#ifndef WINDOWS
 syncFile fname = do
     withFile fname ReadWriteMode $ handleToFd >=> fileSynchronise
     -- withFile does not support directories
@@ -65,6 +71,14 @@ syncFile fname = do
     fd <- openFd (takeDirectory fname) ReadOnly Nothing defaultFileFlags
     fileSynchronise fd
     closeFd fd
+
+#else
+syncFile _ = return ()
+#endif
+
+#ifdef WINDOWS
+touchFile fname = writeFile fname "lock file"
+#endif
 
 setupHashDirectory :: FilePath -> T.Text -> NGLessIO FilePath
 setupHashDirectory basename hash = do

@@ -66,7 +66,6 @@ define(`BUILD_DEPENDS',
     text >= 1.2,
     time >= 1.5,
     transformers,
-    unix >= 2.7,
     vector >= 0.11,
     vector-algorithms,
     yaml,
@@ -82,8 +81,12 @@ define(`BASE_CONFIG',
     ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m -n4m -H"
   else
     ghc-options: -Wall -fwarn-tabs -fno-warn-missing-signatures -threaded -O2 -rtsopts "-with-rtsopts=-A64m -n4m -H -qg"
+  if os(windows)
+    cpp-options: -DWINDOWS
+  if !os(windows)
+    build-depends: unix
   if !flag(Embed)
-      CC-Options: -DNO_EMBED_SAMTOOLS_BWA
+    CC-Options: -DNO_EMBED_SAMTOOLS_BWA
 ')
 
 executable ngless
