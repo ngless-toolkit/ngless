@@ -50,7 +50,15 @@ import           Data.List (isSuffixOf)
 newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
 
 linesC :: (Monad m) => C.Conduit B.ByteString m ByteLine
-linesC = CB.lines =$= CL.map ByteLine
+linesC =
+    CB.lines
+#ifdef WINDOWS
+        =$= CL.map (\line ->
+                        if not (B.null line) && B.index line (B.length line - 1) == 13
+                            then B.take (B.length line - 1) line
+                            else line)
+#endif
+        =$= CL.map ByteLine
 {-# INLINE linesC #-}
 
 -- | This is like Data.Conduit.List.map, except that each element is processed
