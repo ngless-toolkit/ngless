@@ -1,7 +1,7 @@
 {- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, CPP #-}
 module Configuration
     ( NGLessConfiguration(..)
     , InstallMode(..)
@@ -38,6 +38,15 @@ import qualified Data.Configurator as CF
 import NGLess
 import Dependencies.Embedded
 import CmdArgs
+
+
+binaryExtension :: String
+#ifdef WINDOWS
+binaryExtension = ".exe"
+#else
+binaryExtension = ""
+#endif
+
 
 versionStr :: String
 versionStr = "0.0.0"
@@ -224,7 +233,11 @@ canExecute bin = do
 binPath :: InstallMode -> NGLessIO FilePath
 binPath Root = do
     nglessBinDirectory <- takeDirectory <$> liftIO getExecutablePath
+#ifndef WINDOWS
     return (nglessBinDirectory </> "../share/ngless/bin")
+#else
+    return nglessBinDirectory
+#endif
 binPath User = (</> "bin") <$> userNglessDirectory
 
 findBin :: FilePath -> NGLessIO (Maybe FilePath)
@@ -264,12 +277,12 @@ findOrCreateBin envvar fname bindata = liftIO (lookupEnv envvar) >>= \case
 bwaBin :: NGLessIO FilePath
 bwaBin = findOrCreateBin "NGLESS_BWA_BIN" bwaFname bwaData
     where
-        bwaFname = "ngless-" ++ versionStr ++ "-bwa"
+        bwaFname = "ngless-" ++ versionStr ++ "-bwa" ++ binaryExtension
 
 samtoolsBin :: NGLessIO FilePath
 samtoolsBin = findOrCreateBin "NGLESS_SAMTOOLS_BIN" samtoolsFname samtoolsData
     where
-        samtoolsFname = "ngless-" ++ versionStr ++ "-samtools"
+        samtoolsFname = "ngless-" ++ versionStr ++ "-samtools" ++ binaryExtension
 
 
 
