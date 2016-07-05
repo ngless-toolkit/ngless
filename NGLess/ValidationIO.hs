@@ -8,7 +8,7 @@ module ValidationIO
     ) where
 
 import System.Directory
-import System.FilePath.Posix (takeDirectory)
+import System.FilePath (takeDirectory)
 import System.IO.Error
 import Data.Maybe
 import Control.Monad

@@ -8,7 +8,7 @@ module StandardModules.Samtools
     ( loadModule
     ) where
 
-import System.FilePath.Posix
+import System.FilePath
 
 import qualified Data.Text as T
 import Control.Monad.Trans.Resource

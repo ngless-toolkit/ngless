@@ -15,7 +15,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 
-import System.FilePath.Posix
+import System.FilePath
 import System.Directory
 import System.IO.Error
 import Data.Foldable

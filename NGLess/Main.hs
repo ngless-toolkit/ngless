@@ -10,7 +10,7 @@ import Control.Monad
 import Control.Monad.IO.Class (liftIO, MonadIO(..))
 import Control.Concurrent
 import Options.Applicative
-import System.FilePath.Posix
+import System.FilePath
 import System.Directory
 import System.IO (stderr, hPutStrLn)
 import System.Console.ANSI

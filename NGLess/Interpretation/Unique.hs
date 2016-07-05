@@ -15,7 +15,7 @@ import Control.Monad.IO.Class (liftIO)
 
 import System.IO
 import Data.Hashable
-import System.FilePath.Posix
+import System.FilePath
 import System.Directory
 import qualified Data.Vector as V
 

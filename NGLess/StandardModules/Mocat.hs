@@ -16,7 +16,7 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit ((=$=), ($$))
 import           System.IO
-import System.FilePath.Posix
+import System.FilePath
 import System.FilePath.Glob
 import Data.String.Utils
 import Control.Monad.IO.Class (liftIO)

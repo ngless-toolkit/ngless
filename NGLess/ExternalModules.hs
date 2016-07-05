@@ -19,7 +19,7 @@ import System.Process
 import System.Environment (getEnvironment, getExecutablePath)
 import System.Exit
 import System.Directory (getDirectoryContents, doesFileExist, doesDirectoryExist, canonicalizePath)
-import System.FilePath.Posix
+import System.FilePath
 import Data.Aeson
 import Data.Yaml
 import Data.List (find)

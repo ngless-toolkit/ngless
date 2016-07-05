@@ -27,7 +27,7 @@ import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import System.Environment (getExecutablePath, lookupEnv)
 import System.Directory
-import System.FilePath.Posix
+import System.FilePath
 import Data.Maybe
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef

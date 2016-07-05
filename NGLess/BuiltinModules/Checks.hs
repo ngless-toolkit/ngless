@@ -13,7 +13,7 @@ import qualified Data.Text as T
 import Control.Monad.Except
 import Data.Default
 import System.Directory
-import System.FilePath.Posix (takeDirectory)
+import System.FilePath (takeDirectory)
 
 
 import Language

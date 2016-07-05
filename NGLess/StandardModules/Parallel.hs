@@ -26,7 +26,7 @@ import           System.Posix.Files (touchFile)
 #endif
 
 
-import           System.FilePath.Posix
+import           System.FilePath
 import           GHC.Conc (getNumCapabilities, atomically)
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
