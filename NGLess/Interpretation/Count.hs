@@ -1,7 +1,7 @@
 {- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE LambdaCase, FlexibleContexts, TupleSections #-}
+{-# LANGUAGE FlexibleContexts, CPP #-}
 module Interpretation.Count
     ( executeCount
     , Annotator(..)
@@ -22,7 +22,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.Double.Conversion.ByteString as D
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
@@ -71,6 +70,15 @@ import Utils.Samtools
 import Utils.Suggestion
 import qualified Utils.IntGroups as IG
 
+#ifndef WINDOWS
+import Data.Double.Conversion.ByteString (toShortest)
+#else
+-- On Windows, double-conversion is problematic, so fall back on a basic
+-- implementation
+-- See https://github.com/bos/double-conversion/issues/7
+toShortest :: Double -> B.ByteString
+toShortest = B8.pack . show
+#endif
 
 -- GFFAnnotationMap maps from `References` (e.g., chromosomes) to positions to (strand/feature-id)
 type AnnotationInfo = (GffStrand, Int)
@@ -382,7 +390,7 @@ performCount samfp gname annotator0 opts = do
                         hn = (V.!) headers i
                         v = (VU.!) result i
                     in if v >= optMinCount opts
-                                then mconcat [BB.byteString hn, tabB, BB.byteString (D.toShortest v), nlB]
+                                then mconcat [BB.byteString hn, tabB, BB.byteString (toShortest v), nlB]
                                 else mempty
 
             n = VU.length result

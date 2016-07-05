@@ -22,8 +22,6 @@ define(`BUILD_DEPENDS',
     async,
     base,
     bytestring,
-    bzlib,
-    bzlib-conduit,
     optparse-applicative,
     conduit,
     conduit-extra >= 1.1.12,
@@ -31,7 +29,6 @@ define(`BUILD_DEPENDS',
     configurator,
     containers,
     convertible,
-    double-conversion,
     data-default,
     deepseq >= 1.3,
     directory,
@@ -84,7 +81,11 @@ define(`BASE_CONFIG',
   if os(windows)
     cpp-options: -DWINDOWS
   if !os(windows)
-    build-depends: unix
+    build-depends:
+      bzlib,
+      bzlib-conduit,
+      double-conversion,
+      unix
   if !flag(Embed)
     CC-Options: -DNO_EMBED_SAMTOOLS_BWA
 ')

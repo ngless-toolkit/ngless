@@ -1,6 +1,6 @@
 {- Copyright 2013-2016 NGLess Authors
  - License: MIT -}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, CPP #-}
 
 module Utils.Conduit
     ( ByteLine(..)
@@ -28,7 +28,10 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.TQueue as CA
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Zlib as CZ
+#ifndef WINDOWS
+-- bzlib cannot compile on Windows (as of 2016/07/05)
 import qualified Data.Conduit.BZlib as CZ
+#endif
 import qualified Data.Conduit as C
 import           Data.Conduit ((=$=), ($$))
 
@@ -182,6 +185,10 @@ zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
 
 conduitPossiblyCompressedFile fname
     | ".gz" `isSuffixOf` fname = asyncGzipFromFile fname
+#ifndef WINDOWS
     | ".bz2" `isSuffixOf` fname = C.sourceFile fname =$= CZ.bunzip2
+#else
+    | ".bz2" `isSuffixOf` fname = error "bzip2 decompression is not available on Windows"
+#endif
     | otherwise = C.sourceFile fname
 
