@@ -14,13 +14,16 @@ course, you can also compile from source.
 Download and run the [Windows
 Installer](https://dl.dropboxusercontent.com/u/68453937/NGLess-0.0.0-install.exe).
 The result is a command line utility, so you need to run it on the command
-line (running `ngless` should work after running the installer, although you
-may have to start a new CMD terminal.
+line. After running the installer, typing `ngless` on the terminal should work
+as the installer will add the right directories to the path variable; you may
+have to start a new terminal, though. It should also work under Cygwin (but
+Cygwin is **not** a dependency).
 
-The Windows package includes bwa and samtools. The bwa and samtools executables
-are available as `ngless-0.0.0-bwa` and `ngless-0.0.0-samtools`, respectively.
-It has been tested on Windows 10, but this has not had as intensitive testing
-as the Linux/Mac OS X versions so any [bug
+The Windows package includes [bwa](http://bio-bwa.sourceforge.net/) and
+[samtools](http://www.htslib.org/). The bwa and samtools executables are
+available as `ngless-0.0.0-bwa` and `ngless-0.0.0-samtools`, respectively.  It
+has been tested on Windows 10, but this has not had as intensitive testing as
+the Linux/Mac OS X versions so any [bug
 reports](https://github.com/luispedro/ngless/issues) are appreciated.
 
 
@@ -60,8 +63,15 @@ If you prefer, you can also first clone the repository:
 
 The following are targets in the Makefile.
 
-make - compiles NGLess and haskell dependencies
-clean - remove local generated files by compilation
-check - run tests
-bench - run benchmarks
+make
+    compiles NGLess and haskell dependencies
+
+clean
+    remove local generated files by compilation
+
+check
+    run tests
+
+bench
+    run benchmarks
 
