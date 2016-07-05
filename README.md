@@ -27,8 +27,9 @@ your work.
 
 ## Installing
 
-At the moment, there is no binary download available yet, but ngless can be
-esily obtained with either *brew*, *nix*, or compiled from source.
+At the moment, ngless can be esily obtained in binary form for Windows
+(experimental) and with either *brew* or *nix* (for Mac OS X or Linux). Of
+course, you can also compile from source.
 
 ### Brew
 
@@ -68,6 +69,20 @@ If you prefer, you can also first clone the repository:
     nix-env -i -f .
 
 
+### Windows
+
+Download and run the [Windows
+Installer](https://dl.dropboxusercontent.com/u/68453937/NGLess-0.0.0-install.exe).
+The result is a command line utility, so you need to run it on the command
+line (running `ngless` should work after running the installer, although you
+may have to start a new CMD terminal.
+
+The Windows package includes bwa and samtools. The bwa and samtools executables
+are available as `ngless-0.0.0-bwa` and `ngless-0.0.0-samtools`, respectively.
+It has been tested on Windows 10, but this has not had as intensitive testing
+as the Linux/Mac OS X versions so any [bug
+reports](https://github.com/luispedro/ngless/issues) are appreciated.
+
 ### From Source
 
 Installing/compiling from source is also possible. Clone
@@ -79,6 +94,14 @@ Installing/compiling from source is also possible. Clone
 Install it and running `make` should (1) download all dependencies with the
 correct versions and (2) build ngless. It will perform this task in its own
 sandbox so it will not interfere with any other work.
+
+You should also have `gcc` installed (or another C-compiler).
+
+The following sequence of commands should download and build the software
+
+    git clone https://github.com/luispedro/ngless
+    cd ngless
+    make
 
 ## More information
 

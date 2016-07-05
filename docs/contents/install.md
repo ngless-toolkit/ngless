@@ -1,9 +1,28 @@
 # Installation
 
-**NOTE**: As of Apr 2016, ngless is available only as a pre-release to allow
+**NOTE**: As of July 2016, ngless is available only as a pre-release to allow
 for testing of early versions by fellow scientists. We do not recommend use in
 production. Please [get in touch](mailto:coelho@embl.de) if you are interested
 in using ngless in your projects.
+
+At the moment, ngless can be esily obtained in binary form for Windows
+(experimental) and with either *brew* or *nix* (for Mac OS X or Linux). Of
+course, you can also compile from source.
+
+## Windows
+
+Download and run the [Windows
+Installer](https://dl.dropboxusercontent.com/u/68453937/NGLess-0.0.0-install.exe).
+The result is a command line utility, so you need to run it on the command
+line (running `ngless` should work after running the installer, although you
+may have to start a new CMD terminal.
+
+The Windows package includes bwa and samtools. The bwa and samtools executables
+are available as `ngless-0.0.0-bwa` and `ngless-0.0.0-samtools`, respectively.
+It has been tested on Windows 10, but this has not had as intensitive testing
+as the Linux/Mac OS X versions so any [bug
+reports](https://github.com/luispedro/ngless/issues) are appreciated.
+
 
 ## From source
 
