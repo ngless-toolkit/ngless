@@ -5,6 +5,7 @@ functions:
         nglName: "testing"
         arg0: '/bin/echo'
         arg1:
+            atype: 'readset'
             filetype: "fq1"
             can_gzip: true
         additional:
@@ -34,6 +35,7 @@ functions:
         nglName: "testing2"
         arg0: '/bin/echo'
         arg1:
+            atype: 'readset'
             filetype: "fq1"
             can_gzip: true
 init:

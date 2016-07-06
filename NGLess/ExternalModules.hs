@@ -12,62 +12,31 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
 import qualified Data.ByteString as B
 import qualified Data.List.Utils as LU
+import qualified Data.Conduit.Combinators as C
+import           Data.Conduit (($$))
+import           Control.Monad.Extra (whenJust)
 import Control.Applicative
 import Control.Monad
-import Data.Maybe
 import System.Process
 import System.Environment (getEnvironment, getExecutablePath)
-import System.Exit
 import System.Directory (getDirectoryContents, doesFileExist, doesDirectoryExist, canonicalizePath)
+import System.Exit
+import System.IO
 import System.FilePath
 import Data.Aeson
 import Data.Yaml
-import Data.List (find)
+import Data.List (find, isSuffixOf)
 import Data.Default (def)
 
 import Configuration
+import Utils.Samtools
+import Utils.Conduit
 import Utils.Utils
+import FileManagement
 import Language
 import Modules
 import Output
 import NGLess
-
-
--- | Just ArgInformation with a possible default value
-data CommandArgument = CommandArgument
-        { cargInfo :: ArgInformation
-        , cargDef :: Maybe NGLessObject
-        , cargPayload :: Maybe [T.Text]
-        }
-    deriving (Eq, Show)
-
-instance FromJSON CommandArgument where
-    parseJSON = withObject "command argument" $ \o -> do
-        argName <- o .: "name"
-        argRequired <- o .:? "required" .!= False
-        atype <- o .: "atype"
-        (argType, cargDef) <- case atype of
-            "flag" -> do
-                defVal <- o .:? "def"
-                return (NGLBool, NGOBool <$> defVal)
-            "option" -> do
-                defVal <- o .:? "def"
-                return (NGLSymbol, NGOSymbol <$> defVal)
-            "int" -> do
-                defVal <- o .:? "def"
-                return (NGLInteger, NGOInteger <$> defVal)
-            "str" -> do
-                defVal <- o .:? "def"
-                return (NGLString, NGOString <$> defVal)
-            _ -> fail ("unknown argument type "++atype)
-        argChecks <- if atype == "option"
-                then do
-                    allowed <- o .: "allowed"
-                    return [ArgCheckSymbol allowed]
-                else return []
-        let cargInfo = ArgInformation{..}
-        cargPayload <- (Just . (:[]) <$> o .: "when-true") <|> o .:? "when-true"
-        return CommandArgument{..}
 
 data FileTypeBase =
     FastqFileSingle
@@ -94,6 +63,7 @@ data FileType = FileType
     { fileTypeBase :: !FileTypeBase
     , canGzip :: !Bool
     , canBzip2 :: !Bool
+    , canStream :: !Bool
     } deriving (Eq, Show)
 
 instance FromJSON FileType where
@@ -102,13 +72,61 @@ instance FromJSON FileType where
             <$> o .: "filetype"
             <*> o .:? "can_gzip" .!= False
             <*> o .:? "can_bzip2" .!= False
+            <*> o .:? "can_stream" .!= False
+
+data CommandExtra = FlagInfo [T.Text]
+            | FileInfo FileType
+            deriving (Eq, Show)
+
+data CommandArgument = CommandArgument
+        { cargInfo :: ArgInformation
+        , cargDef :: Maybe NGLessObject
+        , cargPayload :: Maybe CommandExtra
+        }
+    deriving (Eq, Show)
+
+instance FromJSON CommandArgument where
+    parseJSON = withObject "command argument" $ \o -> do
+        argName <- o .:? "name" .!= ""
+        argRequired <- o .:? "required" .!= False
+        atype <- o .: "atype"
+        (argType, cargDef) <- case atype of
+            "flag" -> do
+                defVal <- o .:? "def"
+                return (NGLBool, NGOBool <$> defVal)
+            "option" -> do
+                defVal <- o .:? "def"
+                return (NGLSymbol, NGOSymbol <$> defVal)
+            "int" -> do
+                defVal <- o .:? "def"
+                return (NGLInteger, NGOInteger <$> defVal)
+            "str" -> do
+                defVal <- o .:? "def"
+                return (NGLString, NGOString <$> defVal)
+            "readset" -> return (NGLReadSet, Nothing)
+            "counts" -> return (NGLCounts, Nothing)
+            "mappedreadset" -> return (NGLMappedReadSet, Nothing)
+            _ -> fail ("unknown argument type "++atype)
+        argChecks <- if atype == "option"
+                then do
+                    allowed <- o .: "allowed"
+                    return [ArgCheckSymbol allowed]
+                else return []
+        let cargInfo = ArgInformation{..}
+        cargPayload <- case atype of
+            "option" -> liftM FlagInfo <$> ((Just . (:[]) <$> o .: "when-true") <|> o .:? "when-true")
+            _
+                | atype `elem` ["readset", "counts", "mappedreadset"] -> (Just . FileInfo <$> parseJSON (Object o)) <|> return Nothing
+                | otherwise -> return Nothing
+        return CommandArgument{..}
+
 
 data Command = Command
     { nglName :: T.Text
     , arg0 :: FilePath
-    , arg1 :: FileType
+    , arg1 :: CommandArgument
     , additional :: [CommandArgument]
-    , ret :: Maybe FileType
+    , ret :: NGLType
     } deriving (Eq, Show)
 
 instance FromJSON Command where
@@ -118,14 +136,19 @@ instance FromJSON Command where
             <*> o .: "arg0"
             <*> o .: "arg1"
             <*> o .:? "additional" .!= []
-            <*> o .:? "ret"
+            <*> (((o .:? "ret" .!= "void") :: Parser T.Text) >>= \case
+                    "void" -> return NGLVoid
+                    "counts" -> return NGLCounts
+                    "readset" -> return NGLReadSet
+                    "mappedreadset" -> return NGLMappedReadSet
+                    other -> fail ("Cannot parse unknown type '"++T.unpack other++"'"))
 
 data ExternalModule = ExternalModule
     { emInfo :: ModInfo
     , modulePath :: FilePath
     , initCmd :: Maybe FilePath
     , initArgs :: [String]
-    , commands :: [Command]
+    , emFunctions :: [Command]
     , references :: [ExternalReference]
     , emCitation :: Maybe T.Text
     } deriving (Eq, Show)
@@ -140,7 +163,7 @@ instance FromJSON ExternalModule where
                 init_args <- initO' .:? "init_args" .!= []
                 return (init_cmd, init_args)
         references <- o .:? "references" .!= []
-        commands <- o .:? "functions" .!= []
+        emFunctions <- o .:? "functions" .!= []
         emCitation <- o .:? "citation"
         emInfo <- ModInfo <$> o .: "name" <*> o .: "version"
         let modulePath = undefined
@@ -162,17 +185,7 @@ addPathToRef mpath er@ExternalReference{..} = er
 addPathToRef _ er = er
 
 
-asFunction Command{..} = Function (FuncName nglName) (Just $ asNGLType arg1) [] (fromMaybe NGLVoid $ asNGLType <$> ret) (map cargInfo additional) False
-
-asNGLType = asNGLType' . fileTypeBase
-asNGLType' FastqFileSingle = NGLReadSet
-asNGLType' FastqFilePair = NGLReadSet
-asNGLType' FastqFileTriplet = NGLReadSet
-asNGLType' SamFile = NGLMappedReadSet
-asNGLType' BamFile = NGLMappedReadSet
-asNGLType' SamOrBamFile = NGLMappedReadSet
-asNGLType' TSVFile = NGLCounts
-
+asFunction Command{..} = Function (FuncName nglName) (Just . argType . cargInfo $ arg1) [] ret (map cargInfo additional) False
 
 {- | Environment to expose to module processes -}
 nglessEnv :: FilePath -> NGLessIO [(String,String)]
@@ -208,27 +221,74 @@ asfilePaths (NGOReadSet _ (ReadSet3 _ fp1 fp2 fp3)) = return [fp1, fp2, fp3]
 asfilePaths (NGOCounts fp) = return [fp]
 asfilePaths invalid = throwShouldNotOccur ("AsFile path got "++show invalid)
 
+encodeArgument :: CommandArgument -> Maybe NGLessObject -> NGLessIO [String]
+encodeArgument (CommandArgument ai Nothing _) Nothing
+    | not (argRequired ai) = return []
+    | otherwise = throwScriptError $ concat ["Missing value for required argument ", T.unpack (argName ai), "."]
+encodeArgument ca@(CommandArgument _ v _) Nothing = encodeArgument ca v
+encodeArgument (CommandArgument ai _ payload) (Just v)
+    | argType ai == NGLBool = do
+        val <- boolOrTypeError "in command module" v
+        return $! if not val
+            then []
+            else case payload of
+                Just (FlagInfo flags) -> map T.unpack flags
+                _ -> ["--" ++ T.unpack (argName ai)]
+    | argType ai == NGLReadSet = case v of
+        NGOReadSet _ (ReadSet1 _ fq) -> return [fq]
+        NGOReadSet _ (ReadSet2 _ fq1 fq2) -> return [fq1, fq2]
+        NGOReadSet _ (ReadSet3 _ fq1 fq2 fq3) -> return [fq1, fq2, fq3]
+        _ -> throwScriptError ("Expected readset for argument in function call, got " ++ show v)
+    | otherwise = do
+        asStr <- case argType ai of
+            NGLString -> T.unpack <$> stringOrTypeError "in external module" v
+            NGLSymbol -> T.unpack <$> symbolOrTypeError "in external module" v
+            NGLInteger ->  show <$> integerOrTypeError "in external module" v
+            NGLMappedReadSet -> case v of
+                NGOMappedReadSet _ filepath _ -> case payload of
+                    Nothing -> return filepath
+                    Just (FileInfo (FileType fb gz bz2 _)) -> case fb of
+                        SamFile -> asSamFile filepath gz bz2
+                        BamFile -> asBamFile filepath
+                        SamOrBamFile -> return filepath
+                        _ -> throwScriptError "Unexpected combination of arguments"
+                    Just other -> throwShouldNotOccur ("encodeArgument: unexpected payload: "++show other)
+                _ -> throwScriptError ("Expected mappedreadset for argument in function call, got " ++ show v)
+            NGLCounts -> case v of
+                NGOCounts filepath -> return filepath
+                _ -> throwScriptError ("Expected counts for argument in function call, got " ++ show v)
+            other -> throwShouldNotOccur ("Unexpected type tag in external module " ++ show other)
+        return $! if argName ai == ""
+                    then [asStr]
+                    else [concat ["--", T.unpack (argName ai), "=", asStr]]
+
+asSamFile fname gz bz2
+    | ".sam" `isSuffixOf` fname = return fname
+    | ".sam.gz" `isSuffixOf` fname = if gz
+        then return fname
+        else uncompressFile fname
+    | ".sam.bz2" `isSuffixOf` fname = if bz2
+        then return fname
+        else uncompressFile fname
+    | ".bam" `isSuffixOf` fname = convertBamToSam fname
+    | otherwise = return fname
+
+asBamFile fname
+    | ".bam" `isSuffixOf` fname = return fname
+    | ".sam" `isSuffixOf` fname = convertSamToBam fname
+    | otherwise = return fname
+
+uncompressFile :: FilePath -> NGLessIO FilePath
+uncompressFile f = do
+    (newfp, hout) <- openNGLTempFile f "uncompress_" (takeBaseName f)
+    conduitPossiblyCompressedFile f $$ C.sinkHandle hout
+    liftIO $ hClose hout
+    return newfp
+
 argsArguments :: Command -> KwArgsValues -> NGLessIO [String]
-argsArguments cmd args = concat <$> forM (additional cmd) (\(CommandArgument ai mdef payload) -> a1 mdef ai payload)
+argsArguments cmd args = concat <$> forM (additional cmd) a1
     where
-        a1 :: Maybe NGLessObject -> ArgInformation -> Maybe [T.Text] -> NGLessIO [String]
-        a1 mdef ArgInformation{..} payload = case lookup argName args <|> mdef of
-                Nothing
-                    | not argRequired -> return []
-                    | otherwise -> throwScriptError $ concat ["Missing value for required argument ", T.unpack argName, "."]
-                Just v
-                    | argType == NGLBool -> do
-                        val <- boolOrTypeError "in command module" v
-                        return $! if val
-                            then fromMaybe ["--" ++ T.unpack argName] (map T.unpack <$> payload)
-                            else []
-                    | otherwise -> do
-                        asStr <- case argType of
-                            NGLString -> T.unpack <$> stringOrTypeError "in external module" v
-                            NGLSymbol -> T.unpack <$> symbolOrTypeError "in external module" v
-                            NGLInteger -> show <$> integerOrTypeError "in external module" v
-                            other -> throwShouldNotOccur ("Unexpected type tag in external module " ++ show other)
-                        return [concat ["--", T.unpack argName, "=", asStr]]
+        a1 ci@(CommandArgument ai _ _) = encodeArgument ci (lookup (argName ai) args)
 
 asInternalModule :: ExternalModule -> NGLessIO Module
 asInternalModule em@ExternalModule{..} = do
@@ -237,14 +297,14 @@ asInternalModule em@ExternalModule{..} = do
         { modInfo = emInfo
         , modCitation = emCitation
         , modReferences = references
-        , modFunctions = map asFunction commands
-        , runFunction = executeCommand modulePath commands
+        , modFunctions = map asFunction emFunctions
+        , runFunction = executeCommand modulePath emFunctions
         }
 
 validateModule :: ExternalModule -> NGLessIO ()
-validateModule  ExternalModule{..} = case initCmd of
-    Nothing -> return ()
-    Just initCmd' -> do
+validateModule  em@ExternalModule{..} = do
+    checkSyntax em
+    whenJust initCmd $ \initCmd' -> do
         outputListLno' TraceOutput ("Running initialization for module ":show emInfo:" ":initCmd':" ":initArgs)
         env <- nglessEnv modulePath
         (exitCode, out, err) <- liftIO $
@@ -260,6 +320,39 @@ validateModule  ExternalModule{..} = case initCmd of
                     "\texit code = ", show code,"\n",
                     "\tstdout='", out, "'\n",
                     "\tstderr='", err, "'"]
+
+checkSyntax :: ExternalModule -> NGLessIO ()
+checkSyntax ExternalModule{..} = forM_ emFunctions $ \f -> do
+        checkArg1NoName f
+        checkArgsTypes (arg1 f)
+        forM_ (additional f) $ \a -> do
+            checkArgsAllNamed1 a
+            checkArgsTypes a
+    where
+        checkArg1NoName :: Command -> NGLessIO ()
+        checkArg1NoName Command{..} =
+            when ((argName . cargInfo $ arg1) /= "") $
+                throwScriptError "Error in module.yaml: `arg1` cannot have a 'name' attribute"
+        checkArgsAllNamed1 :: CommandArgument -> NGLessIO ()
+        checkArgsAllNamed1 (CommandArgument ai _ _) =
+            when (argName ai == "") $
+                throwScriptError "Error in module.yaml: `additional` argument is missing a name"
+        checkArgsTypes :: CommandArgument -> NGLessIO ()
+        checkArgsTypes (CommandArgument ai _ (Just (FileInfo (FileType ft _ _ _)))) = do
+                let atype = argType ai
+                when ((atype, ft) `notElem` legalNGLTypeFileTypeCombos) $
+                    throwScriptError "Illegal combination of options for atype/filetype"
+        checkArgsTypes _ = return ()
+
+        legalNGLTypeFileTypeCombos = [
+                (NGLReadSet, FastqFileSingle)
+                ,(NGLReadSet, FastqFilePair)
+                ,(NGLReadSet, FastqFileTriplet)
+                ,(NGLMappedReadSet, SamFile)
+                ,(NGLMappedReadSet, BamFile)
+                ,(NGLMappedReadSet, SamOrBamFile)
+                ,(NGLCounts, TSVFile)
+                ]
 
 
 findFirstM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m (Maybe b)

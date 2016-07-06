@@ -5,6 +5,7 @@ functions:
         nglName: "motus"
         arg0: './run-python.sh'
         arg1:
+            atype: 'counts'
             filetype: "tsv"
             can_gzip: true
         additional:

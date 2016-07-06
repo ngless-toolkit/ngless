@@ -86,18 +86,46 @@ call to the ``run-test.sh`` script (see the note above about paths).
 
 You can also add arguments to your function, naturally. Remember that ngless
 functions can have only one unnamed argument and any number of named arguments.
-To specify the unnamed argument add a ``arg1`` section:
+To specify the unnamed argument add a ``arg1`` section, with the key ``atype``
+(argument type):
 
             arg1:
+                atype: <one of 'readset'/'mappedreadset'/'counts'/'str'/'flag'/'int'/'option'>
+
+The arguments of type *readset*, *mappedreadset*, and *counts* are passed as
+paths to a file on disk. **Your command is assumed to not change these, but
+make a copy if necessary. Bad things will happen if you change the files.**.
+You can specify more details on which kind of file you expect with the
+following optional arguments:
+
                 filetype: <one of "tsv"/"fq1"/"fq2"/"fq3"/"sam"/"bam"/"sam_or_bam"/"tsv">
                 can_gzip: true/false
+                can_bzip2: true/false
+                can_stream: true/false
 
-Finally, additional argument are specified by a list called ``additional``:
+For example, if your tool wants a SAM file (and never a BAM file), you can write:
+
+            arg1:
+                atype: mappedreadset
+                filetype: sam
+
+The flags ``can_gzip``/``can_bzip2`` indicate whether your script can accept
+compressed files (default: False) and ``can_stream`` whether the input can be a
+pipe (default: False, an intermediate file will always be used).
+
+Now, ``ngless`` will ensure that your tool does receive a SAM file (including
+converting SAM to BAM if needed).
+
+
+Finally, additional argument are specified by a list called ``additional``.
+These have exactly the same format as the ``arg1`` entry, except that they have
+a few extra fields. The extra field ``name`` is mandatory, while everything
+else is optional:
 
             additional:
                 -
                     name: <name>
-                    atype: <one of 'str'/'flag'/'int'/'option'>
+                    atype: <as for arg1: 'readset'/'mappedreadset'/...>
                     def: <default value>
                     required: true/false
 
@@ -105,7 +133,22 @@ Arguments of type ``flag`` have an optional extra argument, ``when-true`` which
 is a list of strings which will be passed as extra arguments when the flag is
 true. You can also just specify a single string. If ``when-true`` is missing,
 ngless will pass an option of the form ``--name`` (i.e., a double-dash then the
-name used).
+name used). For example:
+
+            additional:
+                -
+                    name: verbose
+                    atype: bool
+                    def: false
+                    when-true: "-v"
+                -
+                    name: complete
+                    atype: bool
+                    def: false
+                    when-true:
+                        - "--output=complete"
+                        - "--no-filter"
+
 
 All other argument types are passed to your script using the syntax
 ``--name=value`` if they are present or if a default has been provided.
