@@ -94,7 +94,7 @@ To specify the unnamed argument add a ``arg1`` section, with the key ``atype``
 
 The arguments of type *readset*, *mappedreadset*, and *counts* are passed as
 paths to a file on disk. **Your command is assumed to not change these, but
-make a copy if necessary. Bad things will happen if you change the files.**.
+make a copy if necessary. Bad things will happen if you change the files.**
 You can specify more details on which kind of file you expect with the
 following optional arguments:
 
@@ -103,24 +103,24 @@ following optional arguments:
                 can_bzip2: true/false
                 can_stream: true/false
 
+The flags ``can_gzip``/``can_bzip2`` indicate whether your script can accept
+compressed files (default: *False*). ``can_stream`` indicates whether the input
+can be a pipe (default: *False*, which means that an intermediate file will
+always be used).
+
 For example, if your tool wants a SAM file (and never a BAM file), you can write:
 
             arg1:
                 atype: mappedreadset
                 filetype: sam
 
-The flags ``can_gzip``/``can_bzip2`` indicate whether your script can accept
-compressed files (default: False) and ``can_stream`` whether the input can be a
-pipe (default: False, an intermediate file will always be used).
-
-Now, ``ngless`` will ensure that your tool does receive a SAM file (including
-converting SAM to BAM if needed).
-
+``ngless`` will ensure that your tool does receive a SAM file (including
+converting BAM to SAM if necessary).
 
 Finally, additional argument are specified by a list called ``additional``.
-These have exactly the same format as the ``arg1`` entry, except that they have
-a few extra fields. The extra field ``name`` is mandatory, while everything
-else is optional:
+Entries in this list have exactly the same format as the ``arg1`` entry, except
+that they have a few extra fields. The extra field ``name`` is mandatory, while
+everything else is optional:
 
             additional:
                 -
