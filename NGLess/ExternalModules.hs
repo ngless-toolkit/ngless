@@ -211,7 +211,16 @@ executeCommand basedir cmds funcname input args = do
     outputListLno' TraceOutput ["executing command: ", arg0 cmd, " ", LU.join " " cmdline]
     (exitCode, out, err) <- liftIO $
         readCreateProcessWithExitCode process ""
-    outputListLno' TraceOutput ["Processing results: (STDOUT=", out, ", STDERR=", err,")"]
+    outputListLno' TraceOutput ["Processing results: (STDOUT=", out, ", STDERR=", err,") with exitCode: ", show exitCode]
+    case (exitCode,out,err) of
+        (ExitSuccess, "", "") -> return ()
+        (ExitSuccess, msg, "") -> outputListLno' TraceOutput ["Module OK. information: ", msg]
+        (ExitSuccess, mout, merr) -> outputListLno' TraceOutput ["Module OK. information: ", mout, ". Warning: ", merr]
+        (ExitFailure code, _,_) ->
+            throwSystemError .concat $ ["Error running command for function ", show funcname, "\n",
+                "\texit code = ", show code,"\n",
+                "\tstdout='", out, "'\n",
+                "\tstderr='", err, "'"]
     return NGOVoid
 
 asfilePaths :: NGLessObject -> NGLessIO  [FilePath]
