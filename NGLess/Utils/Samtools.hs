@@ -6,6 +6,8 @@
 
 module Utils.Samtools
     ( samBamConduit
+    , convertSamToBam
+    , convertBamToSam
     ) where
 
 import Control.Monad
@@ -24,12 +26,14 @@ import           Control.Monad.Trans.Resource (runResourceT)
 import           Control.Monad.Except
 import           Control.Concurrent (getNumCapabilities)
 import           Data.List (isSuffixOf)
-import           System.Process (proc)
+import           System.Process (proc, CreateProcess(..), StdStream(..))
 
 import Configuration
+import FileManagement
 import Output
 import NGLess
 
+import Utils.Utils (readProcessErrorWithExitCode)
 import Utils.Conduit
 
 -- | reads a SAM (possibly compressed) or BAM file (in the latter case by using
@@ -57,3 +61,25 @@ samBamConduit samfp
           ExitSuccess -> return ()
           ExitFailure exitError -> throwSystemError ("Samtools view failed with errorcode '" ++ show exitError ++ "'.\nError message was:\n "++errout)
     | otherwise = conduitPossiblyCompressedFile samfp
+
+
+convertSamToBam :: FilePath -> NGLessIO FilePath
+convertSamToBam samfile = do
+    samPath <- samtoolsBin
+    (newfp, hout) <- openNGLTempFile samfile "converted_" "bam"
+    outputListLno' DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
+    (errmsg, exitCode) <- liftIO $ readProcessErrorWithExitCode
+                                    (proc samPath ["view", "-bS", samfile]) { std_out = UseHandle hout }
+    outputListLno' InfoOutput ["Message from samtools: ", errmsg]
+    liftIO $ hClose hout
+    case exitCode of
+       ExitSuccess -> return newfp
+       ExitFailure err -> throwSystemError ("Failure on converting sam to bam" ++ show err)
+
+convertBamToSam :: FilePath -> NGLessIO FilePath
+convertBamToSam bamfile = do
+    (newfp, hout) <- openNGLTempFile bamfile "converted_" "sam"
+    outputListLno' DebugOutput ["BAM->SAM Conversion start ('", bamfile, "' -> '", newfp, "')"]
+    samBamConduit bamfile $$ C.sinkHandle hout
+    liftIO $ hClose hout
+    return newfp

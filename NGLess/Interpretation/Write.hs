@@ -28,6 +28,7 @@ import Configuration
 import NGLess
 import Output
 import Utils.Utils
+import Utils.Samtools (convertSamToBam)
 import Utils.Conduit (conduitPossiblyCompressedFile, asyncGzipToFile)
 
 {- A few notes:
@@ -123,7 +124,7 @@ executeWrite el@(NGOMappedReadSet _ fp _) args = do
     orig <- case format of
         "sam" -> return fp
         "bam"
-            | endswith ".bam" fp -> return fp -- We already have a BAM
+            | endswith ".bam" fp -> return fp -- We already have a BAM, so just copy it
             | otherwise -> convertSamToBam fp
         s -> throwScriptError ("write does not accept format {" ++ T.unpack s ++ "} with input type " ++ show el)
     moveOrCopyCompress canMove orig newfp
@@ -144,14 +145,3 @@ getDelimiter (NGOSymbol "tsv") = return "\t"
 getDelimiter (NGOSymbol f) = throwScriptError ("Invalid format in write: {"++T.unpack f++"}")
 getDelimiter v =  throwShouldNotOccur ("Type of 'format' in 'write' must be NGOSymbol, got " ++ show v)
 
-convertSamToBam samfile = do
-    samPath <- samtoolsBin
-    (newfp, hout) <- openNGLTempFile samfile "converted_" "bam"
-    outputListLno' DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
-    (errmsg, exitCode) <- liftIO $ readProcessErrorWithExitCode
-                                    (proc samPath ["view", "-bS", samfile]) { std_out = UseHandle hout }
-    outputListLno' InfoOutput ["Message from samtools: ", errmsg]
-    liftIO $ hClose hout
-    case exitCode of
-       ExitSuccess -> return newfp
-       ExitFailure err -> throwSystemError ("Failure on converting sam to bam" ++ show err)
