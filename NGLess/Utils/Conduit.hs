@@ -167,18 +167,22 @@ asyncGzipToFile fname = C.bracketP
 -- | A source which ungzipped from the the given handle. Note that this "reads
 -- ahead" so if you do not use all the input, the Handle will probably be left
 -- at an undefined position in the file.
-asyncGzipFrom :: forall m. (MonadIO m) => Handle -> C.Source m B.ByteString
+asyncGzipFrom :: forall m. (MonadIO m, MonadResource m) => Handle -> C.Source m B.ByteString
 asyncGzipFrom h = do
-    -- We allocate the queue separately (instead of using CA.paired*) so that
-    -- `src` and `sink` end up with different underlying monads (sink is a
-    -- conduit over IO, while we are in m)
-    q <- liftIO $ TQ.newTBMQueueIO 4
-    producer <- liftIO . A.async $
-                (C.sourceHandle h =$= CZ.multiple CZ.ungzip $$ CA.sinkTBMQueue q False)
-                `finally`
-                atomically (TQ.closeTBMQueue q)
-    CA.sourceTBMQueue q
-    liftIO (A.cancel producer)
+    let allocate = do
+            -- We allocate the queue separately (instead of using CA.paired*) so that
+            -- `src` and `sink` end up with different underlying monads (sink is a
+            -- conduit over IO, while we are in m)
+            q <- TQ.newTBMQueueIO 4
+            producer <- A.async $
+                    (C.sourceHandle h =$= CZ.multiple CZ.ungzip $$ CA.sinkTBMQueue q False)
+                    `finally`
+                    atomically (TQ.closeTBMQueue q)
+            return (q, producer)
+    C.bracketP
+        allocate
+        (liftIO . A.cancel . snd)
+        (CA.sourceTBMQueue . fst)
 
 asyncGzipFromFile :: forall m. (MonadIO m, MonadResource m) => FilePath -> C.Source m B.ByteString
 asyncGzipFromFile fname = C.bracketP
