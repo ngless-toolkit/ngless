@@ -54,6 +54,9 @@ versionStr = "0.0.0"
 dateStr :: String
 dateStr = "not released"
 
+defaultBaseURL :: FilePath
+defaultBaseURL = "http://vm-lux.embl.de/~coelho/ngless-data/"
+
 data InstallMode = User | Root deriving (Eq, Show)
 
 data NGLessConfiguration = NGLessConfiguration
@@ -91,7 +94,7 @@ guessConfiguration = do
     nglessBinDirectory <- takeDirectory <$> getExecutablePath
     defaultUserNglessDirectory <- getDefaultUserNglessDirectory
     return NGLessConfiguration
-        { nConfDownloadBaseURL = "http://127.0.0.1/"
+        { nConfDownloadBaseURL = defaultBaseURL
         , nConfGlobalDataDirectory = nglessBinDirectory </> "../share/ngless/data"
         , nConfUserDirectory = defaultUserNglessDirectory
         , nConfCreateOutputDirectory = True

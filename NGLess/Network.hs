@@ -31,7 +31,8 @@ downloadFile url destPath = do
     outputListLno' TraceOutput ["Downloading ", url]
     req <- HTTP.parseUrl url
     manager <- liftIO $ HTTP.newManager HTTP.defaultManagerSettings
-    res <- HTTP.http req manager
+    let req' = req { HTTP.decompress = const False }
+    res <- HTTP.http req' manager
 
     case lookup "Content-Length" (HTTP.responseHeaders res) of
         Nothing -> throwSystemError "HTTP Response does not contain Content-Length header"

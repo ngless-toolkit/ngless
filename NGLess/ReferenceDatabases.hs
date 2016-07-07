@@ -89,7 +89,8 @@ createReferencePack oname reference gtf = do
                                         ,".bwt"
                                         ,".pac"
                                         ,".sa"]]
-    liftIO $ Tar.create oname tmpdir filelist
+    liftIO $
+        BL.writeFile oname . GZip.compress . Tar.write =<< Tar.pack tmpdir filelist
     outputListLno' ResultOutput ["Created reference package in file ", oname]
     release rk
 
@@ -153,9 +154,10 @@ installData (Just mode) refname = do
         Nothing -> throwScriptError ("Could not find reference '" ++ T.unpack refname ++ "'. It is not builtin nor in one of the loaded modules.")
     liftIO $ createDirectoryIfMissing True basedir
     downloadReference ref tarName
+    let destdir = basedir </> T.unpack refname
     liftIO $
-        Tar.unpack basedir . Tar.read . GZip.decompress =<< BL.readFile tarName
-    return (basedir </> T.unpack refname)
+        Tar.unpack destdir . Tar.read . GZip.decompress =<< BL.readFile tarName
+    return destdir
 
 
 
