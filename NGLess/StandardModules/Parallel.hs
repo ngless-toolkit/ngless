@@ -57,6 +57,7 @@ import Modules
 import Language
 import Transform
 import FileManagement
+import Configuration
 
 import Utils.Utils
 import Utils.Conduit
@@ -264,17 +265,19 @@ collectFunction = Function
     }
 
 addHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
-addHash script = pureTransform addHash' script
+addHash script = do
+        isSubsample <- nConfSubsample <$> nglConfiguration
+        pureTransform (addHash' isSubsample) script
     where
-        addHash' :: Expression -> Expression
-        addHash' (FunctionCall (FuncName fn) expr kwargs block)
+        addHash' :: Bool -> Expression -> Expression
+        addHash' isSubsample (FunctionCall (FuncName fn) expr kwargs block)
             | fn `elem` ["lock1", "collect"] = FunctionCall (FuncName fn) expr ((Variable "__hash", ConstStr h):kwargs) block
             where
-                h = T.pack . MD5.md5s . MD5.Str . show $
+                h = T.pack . (++ (if isSubsample then "-subsample" else "")) . MD5.md5s . MD5.Str . show $
                         case fn of
-                            "lock1" -> map snd $ script
+                            "lock1" -> map snd script
                             "collect" -> expr:map snd script
-        addHash' e = e
+        addHash' _ e = e
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
