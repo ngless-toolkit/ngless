@@ -216,9 +216,9 @@ modeExec (InstallGenMode ref)
     | otherwise =
         error (concat ["Reference ", T.unpack ref, " is not a known reference."])
 
-modeExec (CreateReferencePackMode ofile gen gtf) = runNGLessIO "creating reference package" $ do
+modeExec (CreateReferencePackMode ofile gen mgtf mfunc) = runNGLessIO "creating reference package" $ do
         outputLno' InfoOutput "Starting packaging (will download and index genomes)..."
-        createReferencePack ofile gen gtf
+        createReferencePack ofile gen mgtf mfunc
 
 modeExec (DownloadFileMode url local) = runNGLessIO "download a file" $
     downloadFile url local

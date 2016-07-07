@@ -519,10 +519,12 @@ annotationMode _ _ (Just r) _ = return (AnnotateFunctionalMap r)
 annotationMode _ _ _ (Just g) = return (AnnotateGFF g)
 annotationMode _ (Just ref) Nothing Nothing = do
     outputListLno' InfoOutput ["Annotate with default GFF: ", show ref]
-    ReferenceFilePaths _ mgffpath _ <- ensureDataPresent ref
-    case mgffpath of
-        Just gffpath -> return $! AnnotateGFF gffpath
-        Nothing -> throwScriptError ("Could not find annotation file for '" ++ T.unpack ref ++ "'")
+    ReferenceFilePaths _ mgffpath mfuncpath <- ensureDataPresent ref
+    case (mgffpath, mfuncpath) of
+        (Just gffpath, Nothing) -> return $! AnnotateGFF gffpath
+        (Nothing, Just fmpath) -> return $! AnnotateFunctionalMap fmpath
+        (Nothing, Nothing) -> throwScriptError ("Could not find annotation file for '" ++ T.unpack ref ++ "'")
+        (Just _, Just _) -> throwDataError ("Reference " ++ T.unpack ref ++ " has both a GFF and a functional map file. Cannot figure out what to do.")
 annotationMode _ _ _ _ =
             throwShouldNotOccur "For counting, you must do one of\n1. use seqname mode\n2. pass in a GFF file using the argument 'gff_file'\n3. pass in a gene map using the argument 'functional_map'"
 

@@ -14,6 +14,7 @@ import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
+import           Control.Monad.Extra (whenJust)
 
 import System.FilePath
 import System.Directory
@@ -64,31 +65,41 @@ moduleDirectReference rname = do
             | eref == rname -> return . Just $! ReferenceFilePaths (Just fafile) gtffile mapfile
         _ -> return Nothing
 
-genomePATH = "Sequence/BWAIndex/reference.fa.gz"
-gffPATH = "Annotation/annotation.gtf.gz"
+referencePath = "Sequence/BWAIndex/reference.fa.gz"
+gffPath = "Annotation/annotation.gtf.gz"
+functionalMapPath = "Annotation/functional.map.gz"
 
 buildFaFilePath :: FilePath -> FilePath
-buildFaFilePath = (</> genomePATH)
+buildFaFilePath = (</> referencePath)
+
 buildGFFPath :: FilePath -> FilePath
-buildGFFPath = (</> gffPATH)
+buildGFFPath = (</> gffPath)
+
+buildFunctionalMapPath :: FilePath -> FilePath
+buildFunctionalMapPath = (</> functionalMapPath)
 
 
-createReferencePack :: FilePath -> FilePath -> FilePath -> NGLessIO ()
-createReferencePack oname reference gtf = do
+createReferencePack :: FilePath -> FilePath -> Maybe FilePath -> Maybe FilePath -> NGLessIO ()
+createReferencePack oname reference mgtf mfunc = do
     (rk,tmpdir) <- createTempDir "ngless_ref_creator_"
     outputListLno' DebugOutput ["Working with temporary directory: ", tmpdir]
     liftIO $ do
         createDirectoryIfMissing True (tmpdir ++ "/Sequence/BWAIndex/")
         createDirectoryIfMissing True (tmpdir ++ "/Annotation/")
     downloadOrCopyFile reference (buildFaFilePath tmpdir)
-    downloadOrCopyFile gtf (buildGFFPath tmpdir)
+    whenJust mgtf $ \gtf ->
+        downloadOrCopyFile gtf (buildGFFPath tmpdir)
+    whenJust mfunc $ \func ->
+        downloadOrCopyFile func (buildFunctionalMapPath tmpdir)
     Bwa.createIndex (buildFaFilePath tmpdir)
-    let filelist = gffPATH:[genomePATH ++ ext | ext <- [""
+    let referencefiles = [referencePath ++ ext |
+                                    ext <- [""
                                         ,".amb"
                                         ,".ann"
                                         ,".bwt"
                                         ,".pac"
                                         ,".sa"]]
+        filelist = referencefiles ++ [gffPath | isJust mgtf] ++ [functionalMapPath | isJust mfunc]
     liftIO $
         BL.writeFile oname . GZip.compress . Tar.write =<< Tar.pack tmpdir filelist
     outputListLno' ResultOutput ["Created reference package in file ", oname]

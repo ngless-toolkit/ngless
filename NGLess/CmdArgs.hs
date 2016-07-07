@@ -66,7 +66,8 @@ data NGLessMode =
         | CreateReferencePackMode
               { oname :: FilePath
               , genome_url :: String
-              , gtf_url :: String
+              , gtf_url :: Maybe String
+              , functional_map_url :: Maybe String
               }
         | DownloadFileMode
               { origUrl :: String
@@ -118,10 +119,11 @@ installArgs = (flag' InstallGenMode (long "install-reference-data"))
                 <*> (T.pack <$> strArgument (help "Name of reference to install" <> metavar "REF"))
         -- += details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
 
-createRefArgs = (flag' CreateReferencePackMode (long "create-reference-pack"))
+createRefArgs = flag' CreateReferencePackMode (long "create-reference-pack")
                         <*> strOption (long "output-name")
                         <*> strOption (long "genome-url")
-                        <*> strOption (long "gtf-url")
+                        <*> optional (strOption $ long "gtf-url")
+                        <*> optional (strOption $ long "functional-map-url")
         -- += details ["Example:", "ngless --create-reference-pack ref.tar.gz -g http://...genome.fa.gz -a http://...gtf.fa.gz"]
 
 downloadFileArgs = (flag' DownloadFileMode (long "download-file"))
