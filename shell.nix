@@ -4,11 +4,9 @@ stdenv.mkDerivation {
 
   name = "nglessEnv";
 
-  buildInputs = with haskell.packages.lts-5_12; [
-    ghc-mod
-    hoogle
-    hlint
+  buildInputs = with haskell.packages.ghc7103; [
     stack
+    wget
     ghc
     m4
   ];
@@ -19,7 +17,9 @@ stdenv.mkDerivation {
 
   STACK_IN_NIX_EXTRA_ARGS
       = " --extra-lib-dirs=${zlib.out}/lib"
+      + " --extra-lib-dirs=${bzip2.out}/lib"
       + " --extra-include-dirs=${zlib.out}/include"
+      + " --extra-include-dirs=${bzip2.out}/include"
   ;
   extraCmds = ''
     export LD_LIBRARY_PATH+=:${zlib.out}/lib
