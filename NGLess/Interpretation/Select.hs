@@ -7,6 +7,7 @@
 module Interpretation.Select
     ( executeSelect
     , executeMappedReadMethod
+    , asSamStream
     ) where
 
 import qualified Data.ByteString.Char8 as B
@@ -16,19 +17,21 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import Data.Bits (Bits(..))
-import Data.Conduit (($=), ($$), (=$=))
+import Data.Conduit (($$), (=$=))
 import System.IO
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Maybe
 
-import Language
 import FileManagement
+import FileOrStream
+import Language
 import NGLess
 
-import Utils.Samtools
-import Utils.Utils
 import Data.Sam
+import Utils.Utils
+import Utils.Conduit
+import Utils.Samtools
 
 data SelectCondition = SelectMapped | SelectUnmapped | SelectUnique
     deriving (Eq, Show)
@@ -69,15 +72,17 @@ _keep1 SelectMapped = filter (isAligned . fst)
 _keep1 SelectUnmapped = filter (not . isAligned . fst)
 _keep1 SelectUnique = \g -> if isGroupUnique (map fst g) then g else []
 
--- readSamGroupsAsConduit :: (MonadIO m, MonadResource m) => FilePath -> C.Producer m [(SamLine, B.ByteString)]
+asSamStream (File fname) = (fname, samBamConduit fname =$= linesC)
+asSamStream (Stream fname istream) = (fname, istream)
+
+-- readSamGroupsAsConduit :: (MonadIO m, MonadResource m) => FileOrStream -> C.Producer m [(SamLine, B.ByteString)]
 -- The reason we cannot just use readSamGroupsC is that we want to get the unparsed ByteString on the side
-readSamGroupsAsConduit fname =
-        samBamConduit fname
-            $= CB.lines
+readSamGroupsAsConduit istream =
+        snd (asSamStream istream)
             =$= readSamLineOrDie
             =$= CL.groupBy groupLine
     where
-        readSamLineOrDie = C.awaitForever $ \line ->
+        readSamLineOrDie = C.awaitForever $ \(ByteLine line) ->
             case readSamLine line of
                 Left err -> throwError err
                 Right parsed -> C.yield (parsed,line)
@@ -87,20 +92,30 @@ readSamGroupsAsConduit fname =
 
 
 executeSelect :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeSelect (NGOMappedReadSet name fpsam ref) args = do
+executeSelect (NGOMappedReadSet name istream ref) args = do
+    returnStream <- lookupBoolOrScriptErrorDef (return False) "hidden_stream argument to select" "__return_stream" args
     conditions <- _parseConditions args
-    (oname,ohandle) <- case lookup "__oname" args of
-        Just (NGOString fname) -> let fname' = T.unpack fname in
-                                    (fname',) <$> liftIO (openBinaryFile fname' WriteMode)
-        Nothing -> openNGLTempFile fpsam "selected_" "sam"
-        _ -> throwShouldNotOccur "Non-string argument in __oname variable"
-    readSamGroupsAsConduit fpsam
-        $= CL.map (_matchConditions conditions)
-        =$= CL.concat
-        =$= C.unlinesAscii
-        $$ CB.sinkHandle ohandle
-    liftIO (hClose ohandle)
-    return (NGOMappedReadSet name oname ref)
+    let stream =
+            readSamGroupsAsConduit istream
+                =$= CL.map (_matchConditions conditions)
+                =$= CL.concat
+        fpsam = case istream of
+                    File f -> f
+                    Stream f _ -> f
+    out <- if returnStream
+        then return $! Stream ("selected_" ++ takeBaseNameNoExtensions fpsam ++ ".sam") (stream =$= CL.map ByteLine)
+        else do
+            (oname,ohandle) <- case lookup "__oname" args of
+                Just (NGOString fname) -> let fname' = T.unpack fname in
+                                            (fname',) <$> liftIO (openBinaryFile fname' WriteMode)
+                Nothing -> openNGLTempFile fpsam "selected_" "sam"
+                _ -> throwShouldNotOccur "Non-string argument in __oname variable"
+            stream
+                =$= C.unlinesAscii
+                $$ CB.sinkHandle ohandle
+            liftIO (hClose ohandle)
+            return $! File oname
+    return $! NGOMappedReadSet name out ref
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
 executeMappedReadMethod :: MethodName -> [SamLine] -> Maybe NGLessObject -> KwArgsValues -> NGLess NGLessObject

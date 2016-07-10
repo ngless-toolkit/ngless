@@ -48,6 +48,7 @@ import GHC.Conc                 (getNumCapabilities)
 
 import Language
 import FileManagement
+import FileOrStream
 import Output
 import Modules
 import NGLess
@@ -61,7 +62,6 @@ import Interpretation.Write
 import Interpretation.Select
 import Interpretation.Unique
 import Interpretation.Substrim
-import Utils.Samtools
 import Utils.Utils
 import Utils.Conduit
 
@@ -302,7 +302,7 @@ interpretFunction' f _ _ _ = throwShouldNotOccur . concat $ ["Interpretation of 
 executeSamfile expr@(NGOString fname) args = do
     traceExpr "samfile" expr
     gname <- lookupStringOrScriptErrorDef (return fname) "samfile group name" "name" args
-    return $ NGOMappedReadSet gname (T.unpack fname) Nothing
+    return $ NGOMappedReadSet gname (File . T.unpack $ fname) Nothing
 executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show args)
 
 data PreprocessPairOutput = Paired !ShortRead !ShortRead | Single !ShortRead
@@ -480,15 +480,15 @@ executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
 executePrint err  _ = throwScriptError ("Cannot print " ++ show err)
 
 executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
-executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = samfp} [] (Block [Variable var] body) = do
+executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} [] (Block [Variable var] body) = do
+        let (samfp, istream) = asSamStream isam
         runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", samfp]
         (oname, ohandle) <- runNGLessIO $ openNGLTempFile samfp "block_selected_" "sam"
         env <- gets id
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 2)
         (samcontent, ()) <-
-            C.transPipe runNGLessIO (samBamConduit samfp)
-                =$= linesC
+            C.transPipe runNGLessIO istream
                 $$+ C.takeWhile ((=='@') . B8.head . unwrapByteLine)
                 =$= CL.map unwrapByteLine
                 =$= C.unlinesAscii
@@ -498,7 +498,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = samfp} [] (Block [Varia
             =$= asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . filterGroup))
             =$= CB.sinkHandle ohandle
         liftIO $ hClose ohandle
-        return input { nglSamFile = oname }
+        return input { nglSamFile = File oname }
     where
         concatLines :: V.Vector [B.ByteString] -> B.ByteString
         concatLines = B8.unlines . concat . V.toList

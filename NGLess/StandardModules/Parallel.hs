@@ -56,8 +56,9 @@ import NGLess
 import Modules
 import Language
 import Transform
-import FileManagement
+import FileOrStream
 import Configuration
+import FileManagement
 
 import Utils.Utils
 import Utils.Conduit
@@ -129,13 +130,14 @@ getLock basedir (x:xs) = do
                 return (x,rk)
 
 executeCollect :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
-executeCollect (NGOCounts countfile) kwargs = do
+executeCollect (NGOCounts istream) kwargs = do
     current <- lookupStringOrScriptError "collect arguments" "current" kwargs
     allentries <- lookupStringListOrScriptError "collect arguments" "allneeded" kwargs
     ofile <- lookupStringOrScriptError "collect arguments" "ofile" kwargs
     canMove <- lookupBoolOrScriptErrorDef (return False) "collect hidden argument" "__can_move" kwargs
     hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
     hashdir <- setupHashDirectory "ngless-partials" hash
+    countfile <- asFile istream
     let partialfile entry = hashdir </> T.unpack entry <.> "part"
     liftIO $ syncFile countfile
     liftIO $ (if canMove then moveOrCopy else copyFile) countfile (partialfile current)

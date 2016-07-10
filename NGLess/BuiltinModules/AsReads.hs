@@ -12,6 +12,7 @@ module BuiltinModules.AsReads
 import qualified Data.ByteString as B
 import qualified Data.Text as T
 import qualified Data.Conduit.List as CL
+import qualified Data.Conduit as C
 import Control.Monad.Trans.Resource (release)
 import Data.Conduit ((=$=), ($$))
 import Control.Monad.Except
@@ -27,22 +28,24 @@ import Data.FastQ
 import Modules
 import Output
 import NGLess
-import Utils.Samtools
+import FileOrStream
 import Utils.Conduit
+import Utils.Samtools
 
 executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeReads (NGOMappedReadSet name fpsam _) _ = NGOReadSet name <$> samToFastQ fpsam
+executeReads (NGOMappedReadSet name istream _) _ = NGOReadSet name <$> uncurry samToFastQ (case istream of
+                                                                        Stream fpsam s -> (fpsam, s)
+                                                                        File fpsam -> (fpsam, samBamConduit fpsam =$= linesC))
 executeReads arg _ = throwShouldNotOccur ("executeReads called with argument: " ++ show arg)
 
-samToFastQ :: FilePath -> NGLessIO ReadSet
-samToFastQ fpsam = do
+samToFastQ :: FilePath -> C.Source NGLessIO ByteLine -> NGLessIO ReadSet
+samToFastQ fpsam stream = do
     (rk1, (oname1,ohand1)) <- openNGLTempFile' fpsam "reads_" ".1.fq"
     (rk2, (oname2,ohand2)) <- openNGLTempFile' fpsam "reads_" ".2.fq"
     (rk3, (oname3,ohand3)) <- openNGLTempFile' fpsam "reads_" ".singles.fq"
     hasPaired <- liftIO (newIORef False)
     hasSingle <- liftIO (newIORef False)
-    samBamConduit fpsam
-        =$= linesC
+    stream
         =$= readSamGroupsC
         =$= CL.map asFQ
         $$ CL.mapM_ (liftIO . \case

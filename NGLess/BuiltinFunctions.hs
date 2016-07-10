@@ -66,6 +66,7 @@ selectArgs =
     [ArgInformation "keep_if" False (NGList NGLSymbol) [ArgCheckSymbol ["mapped", "unmapped", "unique"]]
     ,ArgInformation "drop_if" False (NGList NGLSymbol) [ArgCheckSymbol ["mapped", "unmapped", "unique"]]
     ,ArgInformation "__oname" False NGLString []
+    ,ArgInformation "__return_stream" False NGLBool []
     ]
 
 fastqArgs =

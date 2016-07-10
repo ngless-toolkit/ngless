@@ -25,6 +25,7 @@ import Data.List (isInfixOf)
 import Language
 import FileManagement
 import Configuration
+import FileOrStream
 import NGLess
 import Output
 import Utils.Utils
@@ -112,7 +113,7 @@ executeWrite (NGOReadSet _ rs) args = do
             moveOrCopyCompress canMove r2 fname2
             moveOrCopyCompress canMove r3 fname3
             return NGOVoid
-executeWrite el@(NGOMappedReadSet _ fp _) args = do
+executeWrite el@(NGOMappedReadSet _ (File fp) _) args = do
     newfp <- getOFile args
     canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
     let guess :: String -> T.Text
@@ -130,7 +131,7 @@ executeWrite el@(NGOMappedReadSet _ fp _) args = do
     moveOrCopyCompress canMove orig newfp
     return NGOVoid
 
-executeWrite (NGOCounts fp) args = do
+executeWrite (NGOCounts (File fp)) args = do
     newfp <- getOFile args
     canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
     outputListLno' InfoOutput ["Writing counts to: ", newfp]

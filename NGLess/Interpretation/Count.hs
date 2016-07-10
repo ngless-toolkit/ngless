@@ -59,6 +59,7 @@ import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamGroupsC')
 import FileManagement (openNGLTempFile)
 import ReferenceDatabases
 import NGLess.NGError
+import FileOrStream
 import Language
 import Output
 import NGLess
@@ -181,7 +182,7 @@ methodFor other = throwShouldNotOccur ("Unexpected multiple method " ++ T.unpack
 
 executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
-executeCount (NGOMappedReadSet rname samfp refinfo) args = do
+executeCount (NGOMappedReadSet rname istream refinfo) args = do
     let c = lookup "counts" args
         c' = GffGene
     minCount <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
@@ -194,12 +195,13 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
 
     delim <- T.encodeUtf8 <$> lookupStringOrScriptErrorDef (return "\t") "count hidden argument (should always be valid)" "__delim" args
 
+
     fs <- case lookup "features" args of
         Nothing -> return ["gene"]
         Just (NGOSymbol f) -> return [f]
         Just (NGOList feats') -> mapM (stringOrTypeError "annotation features argument") feats'
         _ -> throwShouldNotOccur "executeAnnotation: TYPE ERROR"
-
+    samfp <- asFile istream
     m <- annotationRule <$> parseAnnotationMode args
     let opts = CountOpts
             { optFeatures = map matchingFeature fs
@@ -212,7 +214,7 @@ executeCount (NGOMappedReadSet rname samfp refinfo) args = do
             }
     amode <- annotationMode (optFeatures opts) refinfo (T.unpack <$> mocatMap) (T.unpack <$> gffFile)
     annotator <- loadAnnotator amode opts
-    NGOCounts <$> performCount samfp rname annotator opts
+    NGOCounts . File <$> performCount samfp rname annotator opts
 executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
 

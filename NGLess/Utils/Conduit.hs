@@ -4,6 +4,7 @@
 
 module Utils.Conduit
     ( ByteLine(..)
+    , byteLineSinkHandle
     , conduitPossiblyCompressedFile
     , asyncMapC
     , asyncMapEitherC
@@ -60,6 +61,10 @@ linesC =
 #endif
         =$= CL.map ByteLine
 {-# INLINE linesC #-}
+
+byteLineSinkHandle :: (MonadIO m) => Handle -> C.Sink ByteLine m ()
+byteLineSinkHandle h = CL.map unwrapByteLine =$= C.sinkHandle h
+
 
 -- | This is like Data.Conduit.List.map, except that each element is processed
 -- in a separate thread (up to maxSize can be queued up at any one time).

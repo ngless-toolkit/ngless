@@ -37,10 +37,11 @@ import Output
 import NGLess
 
 import Data.Sam
-import Utils.Utils
 import Utils.Bwa
-import Utils.LockFile
+import Utils.Utils
+import FileOrStream
 import Utils.Conduit
+import Utils.LockFile
 import Utils.Samtools (samBamConduit)
 
 data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
@@ -128,7 +129,7 @@ interpretMapOp ref name fps extraArgs = do
     (ref', defGen') <- indexReference ref
     (samPath', (total, aligned, unique)) <- mapToReference ref' fps extraArgs
     outputMapStatistics (MappingInfo samPath' ref' total aligned unique)
-    return $ NGOMappedReadSet name samPath' defGen'
+    return $ NGOMappedReadSet name (File samPath') defGen'
     where
         indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)
         indexReference (FaFile fa) = (,Nothing) <$> ensureIndexExists fa
@@ -188,7 +189,7 @@ executeMap fps args = do
     executeMap' fps
 
 executeMapStats :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeMapStats (NGOMappedReadSet name sampf _) _ = do
+executeMapStats (NGOMappedReadSet name (File sampf) _) _ = do
     outputListLno' TraceOutput ["Computing mapstats on ", sampf]
     (t,al,u) <- _samStats sampf
     (countfp, hout) <- openNGLTempFile sampf "sam_stats_" ".stats"
@@ -199,5 +200,5 @@ executeMapStats (NGOMappedReadSet name sampf _) _ = do
         ,"unique\t",  show  u, "\n"
         ]
     liftIO $ hClose hout
-    return $! NGOCounts countfp
+    return $! NGOCounts (File countfp)
 executeMapStats other _ = throwScriptError ("Wrong argument for mapstats: "++show other)

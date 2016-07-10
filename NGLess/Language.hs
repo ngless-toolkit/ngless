@@ -31,6 +31,7 @@ import           Control.Monad.Writer
 
 import Data.FastQ
 import Data.Sam
+import FileOrStream
 
 newtype Variable = Variable T.Text
     deriving (Eq, Ord, Show)
@@ -112,15 +113,15 @@ data NGLessObject =
         | NGOReadSet T.Text ReadSet
         | NGOMappedReadSet
                     { nglgroupName :: T.Text
-                    , nglSamFile :: FilePath
+                    , nglSamFile :: FileOrStream
                     , nglReference :: Maybe T.Text
                     }
         | NGOMappedRead [SamLine]
-        | NGOCounts FilePath
+        | NGOCounts FileOrStream
         | NGOVoid
         | NGOList [NGLessObject]
         | NGOExpression Expression
-    deriving (Eq, Show, Ord)
+    deriving (Eq, Show)
 
 
 -- | 'Expression' is the main type for holding the AST.

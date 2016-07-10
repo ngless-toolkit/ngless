@@ -28,11 +28,12 @@ import Data.Yaml
 import Data.List (find, isSuffixOf)
 import Data.Default (def)
 
-import Configuration
-import Utils.Samtools
-import Utils.Conduit
-import Utils.Utils
 import FileManagement
+import Utils.Samtools
+import Configuration
+import Utils.Conduit
+import FileOrStream
+import Utils.Utils
 import Language
 import Modules
 import Output
@@ -227,7 +228,7 @@ asfilePaths :: NGLessObject -> NGLessIO  [FilePath]
 asfilePaths (NGOReadSet _ (ReadSet1 _ fp)) = return [fp]
 asfilePaths (NGOReadSet _ (ReadSet2 _ fp1 fp2)) = return [fp1, fp2]
 asfilePaths (NGOReadSet _ (ReadSet3 _ fp1 fp2 fp3)) = return [fp1, fp2, fp3]
-asfilePaths (NGOCounts fp) = return [fp]
+asfilePaths (NGOCounts input) = (:[]) <$> asFile input
 asfilePaths invalid = throwShouldNotOccur ("AsFile path got "++show invalid)
 
 encodeArgument :: CommandArgument -> Maybe NGLessObject -> NGLessIO [String]
@@ -254,17 +255,19 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
             NGLSymbol -> T.unpack <$> symbolOrTypeError "in external module" v
             NGLInteger ->  show <$> integerOrTypeError "in external module" v
             NGLMappedReadSet -> case v of
-                NGOMappedReadSet _ filepath _ -> case payload of
-                    Nothing -> return filepath
-                    Just (FileInfo (FileType fb gz bz2 _)) -> case fb of
-                        SamFile -> asSamFile filepath gz bz2
-                        BamFile -> asBamFile filepath
-                        SamOrBamFile -> return filepath
-                        _ -> throwScriptError "Unexpected combination of arguments"
-                    Just other -> throwShouldNotOccur ("encodeArgument: unexpected payload: "++show other)
+                NGOMappedReadSet _ input _ -> do
+                    filepath <- asFile input
+                    case payload of
+                        Nothing -> return filepath
+                        Just (FileInfo (FileType fb gz bz2 _)) -> case fb of
+                            SamFile -> asSamFile filepath gz bz2
+                            BamFile -> asBamFile filepath
+                            SamOrBamFile -> return filepath
+                            _ -> throwScriptError "Unexpected combination of arguments"
+                        Just other -> throwShouldNotOccur ("encodeArgument: unexpected payload: "++show other)
                 _ -> throwScriptError ("Expected mappedreadset for argument in function call, got " ++ show v)
             NGLCounts -> case v of
-                NGOCounts filepath -> return filepath
+                NGOCounts icounts  -> asFile icounts
                 _ -> throwScriptError ("Expected counts for argument in function call, got " ++ show v)
             other -> throwShouldNotOccur ("Unexpected type tag in external module " ++ show other)
         return $! if argName ai == ""

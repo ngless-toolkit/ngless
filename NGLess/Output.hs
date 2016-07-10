@@ -37,7 +37,7 @@ import           Data.FastQ (FastQEncoding(..), encodingName)
 import qualified Data.FastQ as FQ
 import Configuration
 import CmdArgs (Verbosity(..))
-import NGLess
+import NGLess.NGError
 
 data OutputType = TraceOutput | DebugOutput | InfoOutput | ResultOutput | WarningOutput | ErrorOutput
     deriving (Eq, Ord)

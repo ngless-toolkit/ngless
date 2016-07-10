@@ -23,6 +23,7 @@ import Data.Default
 
 import FileManagement
 import Configuration
+import FileOrStream
 import Transform
 import Language
 import Modules
@@ -32,10 +33,11 @@ import Utils.Utils
 
 
 executeSort :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeSort (NGOMappedReadSet name fpsam rinfo) args = do
+executeSort (NGOMappedReadSet name istream rinfo) args = do
     outBam <- lookupBoolOrScriptErrorDef (return False) "samtools_sort" "__output_bam" args
     let oformat = if outBam then "bam" else "sam"
 
+    fpsam <- asFile istream
     (rk, (newfp, hout)) <- openNGLTempFile' fpsam "sorted_" ("." ++ oformat)
     (trk, tdirectory) <- createTempDir "samtools_sort_temp"
 
@@ -50,7 +52,7 @@ executeSort (NGOMappedReadSet name fpsam rinfo) args = do
     case exitCode of
         ExitSuccess -> do
             outputListLno' InfoOutput ["Done samtools sort"]
-            return (NGOMappedReadSet name newfp rinfo)
+            return (NGOMappedReadSet name (File newfp) rinfo)
         ExitFailure code -> do
             release rk
             throwSystemError $ concat ["Failed samtools sort\nCommand line was::\n\t",

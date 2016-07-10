@@ -35,7 +35,7 @@ import qualified Data.Text as T
 import qualified Data.ByteString as B
 import qualified Data.Configurator as CF
 
-import NGLess
+import NGLess.NGError
 import Dependencies.Embedded
 import CmdArgs
 
