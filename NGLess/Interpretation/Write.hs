@@ -16,9 +16,6 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 import qualified Data.Conduit.Combinators as C
 import           Data.Conduit ((=$=), runConduit)
-import System.Process
-import System.Exit
-import System.IO
 import Data.String.Utils
 import Data.List (isInfixOf)
 

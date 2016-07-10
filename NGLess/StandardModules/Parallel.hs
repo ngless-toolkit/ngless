@@ -126,7 +126,7 @@ getLock basedir (x:xs) = do
             Just rk -> do
                 let updateloop :: IO ()
                     updateloop = threadDelay (10*60*1000*1000) >> touchFile lockname >> updateloop
-                liftIO . A.async $ updateloop
+                void . liftIO . A.async $ updateloop
                 return (x,rk)
 
 executeCollect :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
@@ -279,6 +279,7 @@ addHash script = do
                         case fn of
                             "lock1" -> map snd script
                             "collect" -> expr:map snd script
+                            _ -> error "impossible case"
         addHash' _ e = e
 
 loadModule :: T.Text -> NGLessIO Module
