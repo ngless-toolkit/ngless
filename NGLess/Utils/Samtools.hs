@@ -31,7 +31,7 @@ import           System.Process (proc, CreateProcess(..), StdStream(..))
 import Configuration
 import FileManagement
 import Output
-import NGLess
+import NGLess.NGError
 
 import Utils.Utils (readProcessErrorWithExitCode)
 import Utils.Conduit

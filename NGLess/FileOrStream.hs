@@ -6,6 +6,7 @@ module FileOrStream
     ( FileOrStream(..)
     , asFile
     , asStream
+    , asSamStream
     ) where
 
 import           Control.Monad.Writer
@@ -17,6 +18,7 @@ import System.FilePath
 
 import NGLess.NGError
 import Utils.Conduit
+import Utils.Samtools
 import FileManagement
 
 
@@ -43,4 +45,6 @@ asStream :: FileOrStream -> (FilePath, C.Source NGLessIO ByteLine)
 asStream (Stream fp istream) = (fp, istream)
 asStream (File fp) = (fp, C.sourceFile fp =$= linesC)
 
+asSamStream (File fname) = (fname, samBamConduit fname =$= linesC)
+asSamStream (Stream fname istream) = (fname, istream)
 

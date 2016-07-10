@@ -31,11 +31,10 @@ import NGLess
 import FileOrStream
 import Utils.Conduit
 import Utils.Samtools
+import Interpretation.Select
 
 executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeReads (NGOMappedReadSet name istream _) _ = NGOReadSet name <$> uncurry samToFastQ (case istream of
-                                                                        Stream fpsam s -> (fpsam, s)
-                                                                        File fpsam -> (fpsam, samBamConduit fpsam =$= linesC))
+executeReads (NGOMappedReadSet name istream _) _ = NGOReadSet name <$> uncurry samToFastQ (asSamStream istream)
 executeReads arg _ = throwShouldNotOccur ("executeReads called with argument: " ++ show arg)
 
 samToFastQ :: FilePath -> C.Source NGLessIO ByteLine -> NGLessIO ReadSet

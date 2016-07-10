@@ -7,7 +7,6 @@
 module Interpretation.Select
     ( executeSelect
     , executeMappedReadMethod
-    , asSamStream
     ) where
 
 import qualified Data.ByteString.Char8 as B
@@ -72,13 +71,10 @@ _keep1 SelectMapped = filter (isAligned . fst)
 _keep1 SelectUnmapped = filter (not . isAligned . fst)
 _keep1 SelectUnique = \g -> if isGroupUnique (map fst g) then g else []
 
-asSamStream (File fname) = (fname, samBamConduit fname =$= linesC)
-asSamStream (Stream fname istream) = (fname, istream)
-
 -- readSamGroupsAsConduit :: (MonadIO m, MonadResource m) => FileOrStream -> C.Producer m [(SamLine, B.ByteString)]
 -- The reason we cannot just use readSamGroupsC is that we want to get the unparsed ByteString on the side
 readSamGroupsAsConduit istream =
-        snd (asSamStream istream)
+        istream
             =$= readSamLineOrDie
             =$= CL.groupBy groupLine
     where
@@ -93,28 +89,13 @@ readSamGroupsAsConduit istream =
 
 executeSelect :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSelect (NGOMappedReadSet name istream ref) args = do
-    returnStream <- lookupBoolOrScriptErrorDef (return False) "hidden_stream argument to select" "__return_stream" args
     conditions <- _parseConditions args
-    let stream =
-            readSamGroupsAsConduit istream
+    let (fpsam, istream') = asSamStream istream
+        stream =
+            readSamGroupsAsConduit istream'
                 =$= CL.map (_matchConditions conditions)
                 =$= CL.concat
-        fpsam = case istream of
-                    File f -> f
-                    Stream f _ -> f
-    out <- if returnStream
-        then return $! Stream ("selected_" ++ takeBaseNameNoExtensions fpsam ++ ".sam") (stream =$= CL.map ByteLine)
-        else do
-            (oname,ohandle) <- case lookup "__oname" args of
-                Just (NGOString fname) -> let fname' = T.unpack fname in
-                                            (fname',) <$> liftIO (openBinaryFile fname' WriteMode)
-                Nothing -> openNGLTempFile fpsam "selected_" "sam"
-                _ -> throwShouldNotOccur "Non-string argument in __oname variable"
-            stream
-                =$= C.unlinesAscii
-                $$ CB.sinkHandle ohandle
-            liftIO (hClose ohandle)
-            return $! File oname
+        out = Stream ("selected_" ++ takeBaseNameNoExtensions fpsam ++ ".sam") (stream =$= CL.map ByteLine)
     return $! NGOMappedReadSet name out ref
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 

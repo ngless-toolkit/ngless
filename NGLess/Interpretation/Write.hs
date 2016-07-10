@@ -110,7 +110,8 @@ executeWrite (NGOReadSet _ rs) args = do
             moveOrCopyCompress canMove r2 fname2
             moveOrCopyCompress canMove r3 fname3
             return NGOVoid
-executeWrite el@(NGOMappedReadSet _ (File fp) _) args = do
+executeWrite el@(NGOMappedReadSet _ iout  _) args = do
+    fp <- asFile iout
     newfp <- getOFile args
     canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
     let guess :: String -> T.Text
@@ -128,7 +129,8 @@ executeWrite el@(NGOMappedReadSet _ (File fp) _) args = do
     moveOrCopyCompress canMove orig newfp
     return NGOVoid
 
-executeWrite (NGOCounts (File fp)) args = do
+executeWrite (NGOCounts iout) args = do
+    fp <- asFile iout
     newfp <- getOFile args
     canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
     outputListLno' InfoOutput ["Writing counts to: ", newfp]

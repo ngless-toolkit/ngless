@@ -63,7 +63,7 @@ linesC =
 {-# INLINE linesC #-}
 
 byteLineSinkHandle :: (MonadIO m) => Handle -> C.Sink ByteLine m ()
-byteLineSinkHandle h = CL.map unwrapByteLine =$= C.sinkHandle h
+byteLineSinkHandle h = CL.map unwrapByteLine =$= C.unlinesAscii =$= C.sinkHandle h
 
 
 -- | This is like Data.Conduit.List.map, except that each element is processed
