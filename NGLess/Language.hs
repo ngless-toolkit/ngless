@@ -42,14 +42,8 @@ newtype FuncName = FuncName { unwrapFuncName :: T.Text }
 instance Show FuncName where
     show (FuncName f) = T.unpack f
 
-data MethodName =
-        Mflag
-        | Mfilter
-        | Msome_match
-        | Mpe_filter
-        | Munique
+newtype MethodName = MethodName { unwrapMethodName :: T.Text }
     deriving (Eq, Ord, Show)
-
 
 typeOfConstant :: T.Text -> Maybe NGLType
 typeOfConstant "STDIN"        = Just NGLString

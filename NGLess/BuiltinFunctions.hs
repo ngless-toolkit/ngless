@@ -105,10 +105,10 @@ substrimArgs =
 
 
 builtinMethods =
-    [MethodInfo Mflag   NGLMappedRead (Just NGLSymbol) NGLBool [] True
-    ,MethodInfo Mfilter NGLMappedRead Nothing NGLMappedRead filterArgs True
-    ,MethodInfo Msome_match NGLMappedRead (Just NGLString) NGLBool [] True
-    ,MethodInfo Munique NGLMappedRead Nothing NGLMappedRead [] True
+    [MethodInfo (MethodName "flag")   NGLMappedRead (Just NGLSymbol) NGLBool [] True
+    ,MethodInfo (MethodName "filter") NGLMappedRead Nothing NGLMappedRead filterArgs True
+    ,MethodInfo (MethodName "some_match") NGLMappedRead (Just NGLString) NGLBool [] True
+    ,MethodInfo (MethodName "unique") NGLMappedRead Nothing NGLMappedRead [] True
     ]
 filterArgs =
     [ArgInformation "min_identity_pc" False NGLInteger []

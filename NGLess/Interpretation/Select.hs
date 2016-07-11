@@ -11,13 +11,10 @@ module Interpretation.Select
 
 import qualified Data.ByteString.Char8 as B
 import Control.Monad.Except
-import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
-import qualified Data.Conduit.Binary as CB
 import Data.Bits (Bits(..))
-import Data.Conduit (($$), (=$=))
-import System.IO
+import Data.Conduit ((=$=))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Maybe
@@ -30,7 +27,6 @@ import NGLess
 import Data.Sam
 import Utils.Utils
 import Utils.Conduit
-import Utils.Samtools
 
 data SelectCondition = SelectMapped | SelectUnmapped | SelectUnique
     deriving (Eq, Show)
@@ -100,7 +96,7 @@ executeSelect (NGOMappedReadSet name istream ref) args = do
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
 executeMappedReadMethod :: MethodName -> [SamLine] -> Maybe NGLessObject -> KwArgsValues -> NGLess NGLessObject
-executeMappedReadMethod Mflag samlines (Just (NGOSymbol flag)) [] = do
+executeMappedReadMethod (MethodName "flag") samlines (Just (NGOSymbol flag)) [] = do
         f <- getFlag flag
         return (NGOBool $ f samlines)
     where
@@ -108,14 +104,14 @@ executeMappedReadMethod Mflag samlines (Just (NGOSymbol flag)) [] = do
         getFlag "mapped" = return (any isAligned)
         getFlag "unmapped" = return (not . any isAligned)
         getFlag ferror = throwScriptError ("Flag " ++ show ferror ++ " is unknown for method flag")
-executeMappedReadMethod Msome_match samlines (Just (NGOString target)) [] = return . NGOBool $ any ismatch samlines
+executeMappedReadMethod (MethodName "some_match") samlines (Just (NGOString target)) [] = return . NGOBool $ any ismatch samlines
     where
         ismatch :: SamLine -> Bool
         ismatch = (==target') . samRName
         target' = TE.encodeUtf8 target
 
-executeMappedReadMethod Mpe_filter samlines Nothing [] = return . NGOMappedRead . filterPE $ samlines
-executeMappedReadMethod Mfilter samlines Nothing kwargs = do
+executeMappedReadMethod (MethodName "pe_filter") samlines Nothing [] = return . NGOMappedRead . filterPE $ samlines
+executeMappedReadMethod (MethodName "filter") samlines Nothing kwargs = do
     minID <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_identity_pc" kwargs
     minMatchSize <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_match_size" kwargs
     action <- lookupSymbolOrScriptErrorDef (return "drop") "filter method" "action" kwargs
@@ -143,7 +139,7 @@ executeMappedReadMethod Mfilter samlines Nothing kwargs = do
             | action == "unmatch" = map (unmatchWhen acceptSamLine) samlines
             | otherwise = error "Unknown action in filter()"
     return (NGOMappedRead samlines')
-executeMappedReadMethod Munique samlines Nothing [] = return . NGOMappedRead . mUnique $ samlines
+executeMappedReadMethod (MethodName "unique") samlines Nothing [] = return . NGOMappedRead . mUnique $ samlines
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 filterPE :: [SamLine] -> [SamLine]

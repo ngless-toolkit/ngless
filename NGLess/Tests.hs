@@ -30,8 +30,6 @@ import           Data.Conduit ((=$=), ($$))
 
 import Data.Convertible
 
-import qualified Data.Vector.Unboxed as V
-
 import Language
 import Interpret
 import Tokens

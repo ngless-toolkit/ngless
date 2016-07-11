@@ -165,19 +165,8 @@ paired = FunctionCall
             <*> pairedKwArgs
             <*> pure Nothing
 
-funcname = FuncName <$> word <?> "function name"
-
-methodName = methodName' <?> "method name"
-    where
-        methodName' = do
-            mname <- word
-            case mname of
-                "filter" -> pure Mfilter
-                "flag" -> pure Mflag
-                "some_match" -> pure Msome_match
-                "pe_filter" -> pure Mpe_filter
-                "unique" -> pure Munique
-                _ -> fail "Method name not found"
+funcname = FuncName   <$> word <?> "function name"
+method   = MethodName <$> word <?> "method name"
 
 pairedKwArgs = (++) <$> (wrap <$> expression) <*> (kwargs <* operator ')')
     where wrap e = [(Variable "second", e)]
@@ -192,7 +181,7 @@ assignment = try assignment'
 
 method_call = try $ do
     self <- base_expression <* operator '.'
-    met <- methodName <* operator '('
+    met <- method <* operator '('
     a <- optionMaybe $ try (innerexpression <* notFollowedBy (operator '='))
     optional (operator ',')
     kws <- kwarg `sepBy` (operator ',')
