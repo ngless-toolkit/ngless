@@ -128,7 +128,7 @@ interpretMapOp :: ReferenceInfo -> T.Text -> [FilePath] -> [String] -> NGLessIO 
 interpretMapOp ref name fps extraArgs = do
     (ref', defGen') <- indexReference ref
     (samPath', (total, aligned, unique)) <- mapToReference ref' fps extraArgs
-    outputMapStatistics (MappingInfo samPath' ref' total aligned unique)
+    outputMapStatistics (MappingInfo undefined samPath' ref' total aligned unique)
     return $ NGOMappedReadSet name (File samPath') defGen'
     where
         indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)

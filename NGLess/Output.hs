@@ -82,7 +82,8 @@ data FQInfo = FQInfo
 $(deriveToJSON defaultOptions ''FQInfo)
 
 data MappingInfo = MappingInfo
-                { mi_inputFile :: FilePath
+                { mi_lno :: Int
+                , mi_inputFile :: FilePath
                 , mi_reference :: String
                 , mi_totalReads :: !Int
                 , mi_totalAligned :: !Int
@@ -193,14 +194,14 @@ outputFQStatistics fname stats enc = do
     liftIO $ modifyIORef savedFQOutput (binfo:)
 
 outputMapStatistics :: MappingInfo -> NGLessIO ()
-outputMapStatistics mi@(MappingInfo fname ref total aligned unique) = do
-        lno' <- liftIO $ readIORef curLine
+outputMapStatistics mi@(MappingInfo _ fname ref total aligned unique) = do
+        lno <- liftIO $ readIORef curLine
         let out = outputListLno' ResultOutput
         out ["Total reads: ", show total]
         out ["Total reads aligned: ", showNumAndPercentage aligned total]
         out ["Total reads Unique map: ", showNumAndPercentage unique total]
         out ["Total reads Non-Unique map: ", showNumAndPercentage (aligned - unique) total]
-        liftIO $ modifyIORef savedMapOutput (mi:)
+        liftIO $ modifyIORef savedMapOutput (mi { mi_lno = fromMaybe 0 lno }:)
     where
         showNumAndPercentage :: Int  -> Int  -> String
         showNumAndPercentage v 0 = showNumAndPercentage v 1 -- same output & avoid division by zero
@@ -209,10 +210,15 @@ outputMapStatistics mi@(MappingInfo fname ref total aligned unique) = do
 
 
 data InfoLink = HasQCInfo !Int
+                | HasStatsInfo !Int
     deriving (Eq, Show)
 instance ToJSON InfoLink where
     toJSON (HasQCInfo lno) = object
                                 [ "info_type" .= ("has_QCInfo" :: String)
+                                , "lno" .= show lno
+                                ]
+    toJSON (HasStatsInfo lno) = object
+                                [ "info_type" .= ("has_StatsInfo" :: String)
                                 , "lno" .= show lno
                                 ]
 
@@ -222,13 +228,14 @@ instance ToJSON ScriptInfo where
                                             "time" .= b,
                                             "script" .= toJSON c ]
 
-wrapScript :: [(Int, T.Text)] -> [FQInfo] -> [(Maybe InfoLink, T.Text)]
-wrapScript script tags = first annotate <$> script
+wrapScript :: [(Int, T.Text)] -> [FQInfo] -> [Int] -> [(Maybe InfoLink, T.Text)]
+wrapScript script tags stats = first annotate <$> script
     where
         getLno (FQInfo _ lno _ _ _ _ _) = lno
-        lnos = map getLno tags
+        fqLnos = map getLno tags
         annotate i
-            | i `elem` lnos = Just (HasQCInfo i)
+            | i `elem` fqLnos = Just (HasQCInfo i)
+            | i `elem` stats = Just (HasStatsInfo i)
             | otherwise =  Nothing
 
 writeOutput :: FilePath -> FilePath -> T.Text -> IO ()
@@ -238,7 +245,7 @@ writeOutput fname scriptName script = do
     mapStats <- reverse <$> readIORef savedMapOutput
     t <- getZonedTime
     let script' = zip [1..] (T.lines script)
-        sInfo = ScriptInfo fname (show t) (wrapScript script' fqStats)
+        sInfo = ScriptInfo fname (show t) (wrapScript script' fqStats (mi_lno <$> mapStats))
     BL.writeFile fname (BL.concat
                     ["var output = "
                     , encode $ object

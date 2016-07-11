@@ -32,7 +32,7 @@
                 <div class="panel-body">
                     <h2>Script</h2>
                     <div ng-repeat="line in output.processed.script" style="position: relative">
-                        <p style="white-space: pre-wrap"><span ng-if="line[0]" style="position: absolute; left: -4em"><a href="nglessQC.html#{{line[0].lno}}">QC!</a> </span>{{line[1]}}</p>
+                        <p style="white-space: pre-wrap"><span ng-if="line[0] && line[0].info_type == 'has_QCInfo'" style="position: absolute; left: -4em"><a href="nglessQC.html#{{line[0].lno}}">QC</a> </span><span ng-if="line[0] && line[0].info_type == 'has_StatsInfo'" style="position: absolute; left: -4em"><a href="nglessMapStats.html#{{line[0].lno}}">Stats</a> </span> {{line[1]}}</p>
                     </div>
                 </div>
             </div>
