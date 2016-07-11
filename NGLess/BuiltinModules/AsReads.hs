@@ -19,6 +19,7 @@ import Control.Monad.Except
 import System.IO
 import Data.Default
 import Data.IORef
+import Data.Either.Combinators
 
 import Language
 import FileManagement
@@ -30,8 +31,6 @@ import Output
 import NGLess
 import FileOrStream
 import Utils.Conduit
-import Utils.Samtools
-import Interpretation.Select
 
 executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeReads (NGOMappedReadSet name istream _) _ = NGOReadSet name <$> uncurry samToFastQ (asSamStream istream)
@@ -39,17 +38,28 @@ executeReads arg _ = throwShouldNotOccur ("executeReads called with argument: " 
 
 samToFastQ :: FilePath -> C.Source NGLessIO ByteLine -> NGLessIO ReadSet
 samToFastQ fpsam stream = do
-    (rk1, (oname1,ohand1)) <- openNGLTempFile' fpsam "reads_" ".1.fq"
-    (rk2, (oname2,ohand2)) <- openNGLTempFile' fpsam "reads_" ".2.fq"
-    (rk3, (oname3,ohand3)) <- openNGLTempFile' fpsam "reads_" ".singles.fq"
+    (rk1, (oname1,ohand1)) <- openNGLTempFile' fpsam "reads_" ".1.fq.gz"
+    (rk2, (oname2,ohand2)) <- openNGLTempFile' fpsam "reads_" ".2.fq.gz"
+    (rk3, (oname3,ohand3)) <- openNGLTempFile' fpsam "reads_" ".singles.fq.gz"
     hasPaired <- liftIO (newIORef False)
     hasSingle <- liftIO (newIORef False)
-    stream
+    let writer sel var out =
+            CL.mapMaybe sel
+                =$= (do
+                        awaitJust $ \val -> do
+                            liftIO (writeIORef var True)
+                            C.yield val
+                        C.awaitForever C.yield)
+                =$= asyncGzipTo out
+    void $
+        stream
         =$= readSamGroupsC
         =$= CL.map asFQ
-        $$ CL.mapM_ (liftIO . \case
-            Left r -> writeIORef hasSingle True >> B.hPut ohand3 r
-            Right (r1,r2) -> writeIORef hasPaired True >> B.hPut ohand1 r1 >> B.hPut ohand2 r2)
+        $$ C.sequenceSinks
+            [writer (liftM fst . rightToMaybe)  hasPaired ohand1
+            ,writer (liftM snd . rightToMaybe)  hasPaired ohand2
+            ,writer leftToMaybe                 hasSingle ohand3
+            ]
     outputListLno' TraceOutput ["Finished as_reads"]
     liftIO $ forM_ [ohand1, ohand2, ohand3] hClose
     hasPaired' <- liftIO $ readIORef hasPaired
