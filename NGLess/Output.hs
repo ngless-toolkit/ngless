@@ -64,12 +64,12 @@ instance ToJSON OutputLine where
 
 
 data BPosInfo = BPosInfo
-                    { mean :: !Int
-                    , median :: !Int
-                    , lowerQuartile :: !Int
-                    , upperQuartile :: !Int
+                    { _mean :: !Int
+                    , _median :: !Int
+                    , _lowerQuartile :: !Int
+                    , _upperQuartile :: !Int
                     } deriving (Show)
-$(deriveToJSON defaultOptions ''BPosInfo)
+$(deriveToJSON defaultOptions{fieldLabelModifier = drop 1} ''BPosInfo)
 
 data FQInfo = FQInfo
                 { fileName :: String
@@ -196,19 +196,19 @@ outputFQStatistics fname stats enc = do
     liftIO $ modifyIORef savedFQOutput (binfo:)
 
 outputMapStatistics :: MappingInfo -> NGLessIO ()
-outputMapStatistics mi@(MappingInfo _ fname ref total aligned unique) = do
+outputMapStatistics mi@(MappingInfo _ _ ref total aligned unique) = do
         lno <- liftIO $ readIORef curLine
         let out = outputListLno' ResultOutput
+        out ["Finished mapping to ", ref]
         out ["Total reads: ", show total]
-        out ["Total reads aligned: ", showNumAndPercentage aligned total]
-        out ["Total reads Unique map: ", showNumAndPercentage unique total]
-        out ["Total reads Non-Unique map: ", showNumAndPercentage (aligned - unique) total]
+        out ["Total reads aligned: ", showNumAndPercentage aligned]
+        out ["Total reads Unique map: ", showNumAndPercentage unique]
+        out ["Total reads Non-Unique map: ", showNumAndPercentage (aligned - unique)]
         liftIO $ modifyIORef savedMapOutput (mi { mi_lno = fromMaybe 0 lno }:)
     where
-        showNumAndPercentage :: Int  -> Int  -> String
-        showNumAndPercentage v 0 = showNumAndPercentage v 1 -- same output & avoid division by zero
-        showNumAndPercentage v total =
-            concat [show v, " [", showFFloat (Just 2) ((fromIntegral (100*v) / fromIntegral total) :: Double) "", "%]"]
+        showNumAndPercentage :: Int -> String
+        showNumAndPercentage v = concat [show v, " [", showFFloat (Just 2) ((fromIntegral (100*v) / fromIntegral total') :: Double) "", "%]"]
+        total' = if total /= 0 then total else 1
 
 
 data InfoLink = HasQCInfo !Int
@@ -233,10 +233,8 @@ instance ToJSON ScriptInfo where
 wrapScript :: [(Int, T.Text)] -> [FQInfo] -> [Int] -> [(Maybe InfoLink, T.Text)]
 wrapScript script tags stats = first annotate <$> script
     where
-        getLno (FQInfo _ lno _ _ _ _ _) = lno
-        fqLnos = map getLno tags
         annotate i
-            | i `elem` fqLnos = Just (HasQCInfo i)
+            | i `elem` (scriptLno <$> tags) = Just (HasQCInfo i)
             | i `elem` stats = Just (HasStatsInfo i)
             | otherwise =  Nothing
 
@@ -255,6 +253,7 @@ writeOutput fname scriptName script = do
                         , "processed" .= sInfo
                         , "fqStats" .= fqStats
                         , "mapStats" .= mapStats
+                        , "scriptName" .= scriptName
                         ]
                     ,";\n"])
 

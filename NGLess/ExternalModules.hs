@@ -61,10 +61,10 @@ instance FromJSON FileTypeBase where
         ft -> fail ("unknown file type '"++T.unpack ft++"'")
 
 data FileType = FileType
-    { fileTypeBase :: !FileTypeBase
-    , canGzip :: !Bool
-    , canBzip2 :: !Bool
-    , canStream :: !Bool
+    { _fileTypeBase :: !FileTypeBase
+    , _canGzip :: !Bool
+    , _canBzip2 :: !Bool
+    , _canStream :: !Bool
     } deriving (Eq, Show)
 
 instance FromJSON FileType where
