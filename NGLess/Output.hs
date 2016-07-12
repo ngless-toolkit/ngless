@@ -1,7 +1,7 @@
 {- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, RecordWildCards #-}
 
 module Output
     ( OutputType(..)
@@ -13,6 +13,7 @@ module Output
     , outputFQStatistics
     , outputMapStatistics
     , writeOutput
+    , writeOutputTSV
     ) where
 
 import Text.Printf (printf)
@@ -30,6 +31,7 @@ import Control.Monad.IO.Class (liftIO)
 import           Numeric (showFFloat)
 import           Control.Arrow (first)
 import qualified Data.Text as T
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.ByteString.Lazy as BL
 
 
@@ -256,3 +258,20 @@ writeOutput fname scriptName script = do
                         ]
                     ,";\n"])
 
+
+writeOutputTSV :: FilePath -> FilePath -> IO ()
+writeOutputTSV fqStatsFp mapStatsFp = do
+        fqStats <- reverse <$> readIORef savedFQOutput
+        mapStats <- reverse <$> readIORef savedMapOutput
+        BL.writeFile fqStatsFp  . formatTSV fqHeaders $ encodeFQStats <$> fqStats
+        BL.writeFile mapStatsFp . formatTSV msHeaders $ encodeMapStats <$> mapStats
+    where
+        formatTSV :: [String] -> [[String]] -> BL.ByteString
+        formatTSV header contents = BL.concat [BL8.intercalate "\t" (BL8.pack <$> header), "\n",
+                                    BL8.intercalate "\n" (asTSVline <$> contents), "\n"]
+        asTSVline = BL8.intercalate "\t" . map BL8.pack
+        fqHeaders                = ["file"  , "encoding", "numSeqs",    "minSeqLen",         "maxSeqLen",        "gcContent"]
+        encodeFQStats FQInfo{..} = [fileName,  encoding, show numSeqs, show (fst seqLength), show (snd seqLength), show gcContent]
+
+        msHeaders                      = ["inputFile",    "reference",       "totalReads",       "totalAligned",       "totalUnique"]
+        encodeMapStats MappingInfo{..} = [mi_inputFile, mi_reference, show mi_totalReads, show mi_totalAligned, show mi_totalUnique]
