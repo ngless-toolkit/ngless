@@ -1,0 +1,8 @@
+ngless '0.0'
+mapped = samfile('input.sam')
+mapped_filtered_97 = select(mapped) using |mread|:
+    mread = mread.filter(min_identity_pc=97, action={drop})
+mapped_filtered_not_97 = select(mapped) using |mread|:
+    mread = mread.filter(min_identity_pc=97, action={keep})
+write(mapped_filtered_97, ofile='output.filtered97.sam')
+write(mapped_filtered_not_97, ofile='output.filtered_not_97.sam')

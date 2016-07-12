@@ -17,6 +17,7 @@ import Data.Bits (Bits(..))
 import Data.Conduit ((=$=))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import           Data.Either.Combinators
 import Data.Maybe
 
 import FileManagement
@@ -95,6 +96,9 @@ executeSelect (NGOMappedReadSet name istream ref) args = do
     return $! NGOMappedReadSet name out ref
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
+data FilterAction = FADrop | FAUnmatch | FAKeep
+    deriving (Eq)
+
 executeMappedReadMethod :: MethodName -> [SamLine] -> Maybe NGLessObject -> KwArgsValues -> NGLess NGLessObject
 executeMappedReadMethod (MethodName "flag") samlines (Just (NGOSymbol flag)) [] = do
         f <- getFlag flag
@@ -110,34 +114,33 @@ executeMappedReadMethod (MethodName "some_match") samlines (Just (NGOString targ
         ismatch = (==target') . samRName
         target' = TE.encodeUtf8 target
 
+
 executeMappedReadMethod (MethodName "pe_filter") samlines Nothing [] = return . NGOMappedRead . filterPE $ samlines
 executeMappedReadMethod (MethodName "filter") samlines Nothing kwargs = do
     minID <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_identity_pc" kwargs
     minMatchSize <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_match_size" kwargs
-    action <- lookupSymbolOrScriptErrorDef (return "drop") "filter method" "action" kwargs
+    action <- lookupSymbolOrScriptErrorDef (return "drop") "filter method" "action" kwargs >>= \case
+        "drop" -> return FADrop
+        "unmatch" -> return FAUnmatch
+        "keep" -> return FAKeep
+        other -> throwScriptError ("unknown action in filter(): `" ++ T.unpack other ++"`.\nAllowed values are:\n\tdrop\n\tunmatch\n\tkeep\n")
     let minIDD :: Double
         minIDD = fromInteger minID / 100.0
-        matchIdentity' s = case matchIdentity s of
-            Right v -> v
-            Left _ -> 0.0
-        matchSize' s = case matchSize s of
-            Right v -> v
-            Left _ -> 0
-        okID s
-            | minID == -1 = True
-            | otherwise = matchIdentity' s >= minIDD
-        okSize s
-            | minMatchSize == -1 = True
-            | otherwise = matchSize' s >= fromInteger minMatchSize
-        acceptSamLine s = okID s && okSize s
+        okID
+            | minID == -1 = const True
+            | otherwise = \s -> fromRight 0.0 (matchIdentity s) >= minIDD
+        okSize
+            | minMatchSize == -1 = const True
+            | otherwise = \s -> fromRight 0 (matchSize s) >= fromInteger minMatchSize
+        passTest s = okID s && okSize s
         unmatchWhen c s
             | c s = unmatch s
             | otherwise = s
         unmatch samline = samline { samFlag = (samFlag samline .|. 4) `clearBit` 1, samRName = "*", samCigar = "*" }
-        samlines'
-            | action == "drop" = filter acceptSamLine samlines
-            | action == "unmatch" = map (unmatchWhen acceptSamLine) samlines
-            | otherwise = error "Unknown action in filter()"
+        samlines' = case action of
+            FADrop -> filter passTest samlines
+            FAUnmatch -> map (unmatchWhen passTest) samlines
+            FAKeep -> filter (not . passTest) samlines
     return (NGOMappedRead samlines')
 executeMappedReadMethod (MethodName "unique") samlines Nothing [] = return . NGOMappedRead . mUnique $ samlines
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
