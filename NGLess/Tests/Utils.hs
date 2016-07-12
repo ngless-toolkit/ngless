@@ -3,7 +3,6 @@ module Tests.Utils
     , isErrorMsg
     , isOk
     , isOkMsg
-    , isRight
     , parsetest
     , fromRight
     , asTempFile
@@ -36,18 +35,14 @@ parsetest :: T.Text -> Either T.Text Script
 parsetest = parsengless "test" True
 
 fromRight (Right r) = r
-fromRight (Left e) = error (concat ["Unexpected Left: ",show e])
-
-isRight (Right _) = True
-isRight (Left _) = False
-
+fromRight (Left e) = error ("Unexpected Left: " ++ show e)
 
 asTempFile :: B.ByteString -> FilePath -> NGLessIO FilePath
 asTempFile sf ext = do
     (fp, h) <- openNGLTempFile "testing" "heredoc" ext
     liftIO $ do
         B.hPut h sf
-        (hClose h)
+        hClose h
     return fp
 
 

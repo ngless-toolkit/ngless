@@ -7,6 +7,7 @@ import Test.Framework.TH
 import Test.Framework.Providers.HUnit
 import Test.HUnit
 import Control.Monad
+import Data.Either.Combinators (isRight)
 import qualified Data.Text as T
 
 import Tests.Utils
