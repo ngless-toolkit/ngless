@@ -34,6 +34,7 @@ import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.TQueue as CA
 import           Control.Monad.ST
+import           Control.Monad.Extra (allM)
 import           Control.DeepSeq
 import           Data.Traversable
 import           Control.Concurrent (threadDelay)
@@ -143,10 +144,13 @@ executeCollect (NGOCounts istream) kwargs = do
     let partialfile entry = hashdir </> T.unpack entry <.> "part"
     liftIO $ syncFile countfile
     liftIO $ (if canMove then moveOrCopy else copyFile) countfile (partialfile current)
-    canCollect <- and <$> forM allentries (liftIO . doesFileExist . partialfile)
-    when canCollect $ do
-        newfp <- concatCounts allentries (map partialfile allentries)
-        liftIO $ moveOrCopy newfp (T.unpack ofile)
+    canCollect <- liftIO $ allM (doesFileExist . partialfile)  (reverse allentries)
+                         -- ^ checking in reverse order makes it more likely that ngless notices a missing file early on
+    if canCollect
+        then do
+            newfp <- concatCounts allentries (map partialfile allentries)
+            liftIO $ moveOrCopy newfp (T.unpack ofile)
+        else outputListLno' TraceOutput ["Cannot collect yet."]
     return NGOVoid
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)
 
@@ -264,6 +268,7 @@ collectFunction = Function
         [ArgInformation "current" True NGLString []
         ,ArgInformation "allneeded" True (NGList NGLString) []
         ,ArgInformation "ofile" True NGLString []
+        ,ArgInformation "__can_move" False NGLBool []
         ]
     , funcAllowsAutoComprehension = False
     }
