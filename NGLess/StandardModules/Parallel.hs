@@ -21,8 +21,9 @@ import           Data.List.Extra (snoc, chunksOf)
 
 #ifndef WINDOWS
 import           System.Posix.Unistd (fileSynchronise)
-import           System.Posix.IO (openFd, defaultFileFlags, closeFd, OpenMode(..), handleToFd)
+import           System.Posix.IO (openFd, defaultFileFlags, closeFd, OpenMode(..))
 import           System.Posix.Files (touchFile)
+import           Control.Exception (bracket)
 #endif
 
 
@@ -67,12 +68,13 @@ import Utils.LockFile
 syncFile :: FilePath -> IO ()
 #ifndef WINDOWS
 syncFile fname = do
-    withFile fname ReadWriteMode $ handleToFd >=> fileSynchronise
-    -- withFile does not support directories
-    -- The code below will also not work on Windows
-    fd <- openFd (takeDirectory fname) ReadOnly Nothing defaultFileFlags
-    fileSynchronise fd
-    closeFd fd
+    bracket (openFd fname ReadWrite Nothing defaultFileFlags)
+        closeFd
+        fileSynchronise
+    -- The code below will not work on Windows
+    bracket (openFd (takeDirectory fname) ReadOnly Nothing defaultFileFlags)
+        closeFd
+        fileSynchronise
 
 #else
 syncFile _ = return ()
