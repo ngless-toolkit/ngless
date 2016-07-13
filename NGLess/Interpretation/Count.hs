@@ -97,6 +97,10 @@ type FeatureSizeMap = M.Map B.ByteString Double
 data MMMethod = MMCountAll | MM1OverN | MMDist1 | MMUniqueOnly
     deriving (Eq, Show)
 
+
+minDouble :: Double
+minDouble = (2.0 :: Double) ^^ fst (floatRange (1.0 :: Double))
+
 data CountOpts =
     CountOpts
     { optFeatures :: [GffType] -- ^ list of features to condider
@@ -192,7 +196,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
     mocatMap <- lookupFilePath "functional_map argument to count()" "functional_map" args
     gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
     normSize <- lookupBoolOrScriptErrorDef (return False) "count function" "norm" args
-
+    discardZeros <- lookupBoolOrScriptErrorDef (return False) "count argument parsing" "discard_zeros" args
     delim <- T.encodeUtf8 <$> lookupStringOrScriptErrorDef (return "\t") "count hidden argument (should always be valid)" "__delim" args
 
 
@@ -207,7 +211,9 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
             { optFeatures = map matchingFeature fs
             , optIntersectMode = m
             , optStrandSpecific = strand_specific
-            , optMinCount = fromInteger minCount
+            , optMinCount = if discardZeros
+                                then minDouble
+                                else fromInteger minCount
             , optMMMethod = method
             , optDelim = delim
             , optNormSize = normSize

@@ -272,6 +272,8 @@ Arguments by value:
 +-------------------+-----------------+------------+----------------+
 | min               | Integer         | no         | 0              |
 +-------------------+-----------------+------------+----------------+
+| discard_zero      | Bool            | no         | false          |
++-------------------+-----------------+------------+----------------+
 
 
 
@@ -301,7 +303,9 @@ opposite strand. For strand-specific data, the read has to be mapped to the
 same strand as the feature.
 
 ``min`` defines the minimum amount of overlaps a given feature must have, at
-least, to be kept (default: 0, i.e., keep all counts).
+least, to be kept (default: 0, i.e., keep all counts). If you just want to
+discard features that are exactly zero, you should set the ``discard_zero``
+argument to True.
 
 Substrim
 --------

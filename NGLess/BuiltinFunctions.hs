@@ -60,6 +60,7 @@ countArgs =
     ,ArgInformation "functional_map" False NGLString [ArgCheckFileReadable]
     ,ArgInformation "strand" False NGLBool []
     ,ArgInformation "norm" False NGLBool []
+    ,ArgInformation "discard_zeros" False NGLBool []
     ]
 
 selectArgs =
