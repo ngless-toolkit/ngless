@@ -96,6 +96,7 @@ executeLock1 (NGOList entries) kwargs  = do
     hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
     lockdir <- setupHashDirectory "ngless-locks" hash
     (e,rk) <- getLock lockdir entries'
+    outputListLno' InfoOutput ["lock1: Obtained lock file: '", lockdir </> T.unpack e ++ ".lock", "'"]
     registerHook FinishOkHook $ do
         let receiptfile = lockdir </> T.unpack e ++ ".finished"
         liftIO $ withFile receiptfile WriteMode $ \h -> do
@@ -117,14 +118,14 @@ getLock basedir (x:xs) = do
     finished <- liftIO $ doesFileExist (basedir </> fname ++ ".finished")
     if finished
         then getLock basedir xs
-        else acquireLock' (LockParameters
+        else acquireLock' LockParameters
                             { lockFname = lockname
                             , maxAge = fromInteger (60*60)
                                 -- one hour. Given that lock files are touched
                                 -- every ten minutes if things are good (see
                                 -- thread below), this is an indication that
                                 -- the process has crashed
-                            , whenExistsStrategy = IfLockedNothing}) >>= \case
+                            , whenExistsStrategy = IfLockedNothing} >>= \case
             Nothing -> getLock basedir xs
             Just rk -> do
                 let updateloop :: IO ()
@@ -150,7 +151,7 @@ executeCollect (NGOCounts istream) kwargs = do
         then do
             newfp <- concatCounts allentries (map partialfile allentries)
             liftIO $ moveOrCopy newfp (T.unpack ofile)
-        else outputListLno' TraceOutput ["Cannot collect yet."]
+        else outputListLno' TraceOutput ["Cannot collect (not all files present yet), wrote partial file to ", partialfile current]
     return NGOVoid
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)
 

@@ -10,6 +10,9 @@ obtain a lock file so that if multiple processes are running at once, each one
 will return a different element. Ngless also marks results as *finished* once
 you have run a script to completion.
 
+The intended usage is that you simply run as many processes as inputs that you
+have and ngless will figure everything out.
+
 For example
 
     ngless "0.0"
@@ -50,6 +53,30 @@ counts together into a single table, for convenience:
 
 Now, only when all the samples in the `allneeded` argument have been processed,
 does ngless collect all the results into a single table.
+
+### Parallel internals
+
+Normally this should be invisible to you, but if you are curious or want to
+debug an issue, here are the gory details:
+
+The function `lock1()` will create a lock file in a sub-directory of
+`ngless-locks`. This directory will be the hash value of the script. Thus, any
+change to the script will force all data to be recomputed. This can lead to
+over-computation but it ensures that you will always have the most up to date
+results (ngless' first priority is correctness, performance is important, but
+not at the risk of correctness). Similarly, `collect()` will use hashed values
+which encode both the script and the position within the script (so that if you
+have more than one `collect()` call, they will not clash).
+
+Lock files have their modification times updated once every 10 minutes while
+ngless is running. This allows the programme to easily identify stale files.
+The software is very conservative, but any lock file with a modification time
+older than one hour is considered stale and removed. Note that because ngless
+is extremely careful about how writing its outputs atomically, the worse that
+can happen from mis-identifying a stale lock (for example, you had a compute
+node which lost network connectivity, but it comes back online after an hour
+and resumes processing) is that extra computation is wasted, **the processes
+will never interfere in a way that you get erroneous results**.
 
 ## Mocat module
 
