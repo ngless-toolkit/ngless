@@ -8,15 +8,21 @@ module StandardModules.Samtools
     ( loadModule
     ) where
 
-import System.FilePath
+import Control.Monad.Trans.Resource
+import Control.Exception
+import Control.Concurrent
+import Control.Monad
 
 import qualified Data.Text as T
-import Control.Monad.Trans.Resource
+import qualified Control.Concurrent.Async as A
+import           Data.Conduit (($$))
+import           Data.List.Extra (snoc)
 
-import GHC.Conc (getNumCapabilities)
 
+import System.FilePath
 import System.Process
 import System.Exit
+import System.IO
 
 import Control.Monad.IO.Class (liftIO)
 import Data.Default
@@ -29,6 +35,8 @@ import Language
 import Modules
 import Output
 import NGLess
+
+import Utils.Conduit
 import Utils.Utils
 
 
@@ -36,18 +44,39 @@ executeSort :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSort (NGOMappedReadSet name istream rinfo) args = do
     outBam <- lookupBoolOrScriptErrorDef (return False) "samtools_sort" "__output_bam" args
     let oformat = if outBam then "bam" else "sam"
-
-    fpsam <- asFile istream
-    (rk, (newfp, hout)) <- openNGLTempFile' fpsam "sorted_" ("." ++ oformat)
+        fname = case istream of
+                    File f -> f
+                    Stream f _ -> f
+    (rk, (newfp, hout)) <- openNGLTempFile' fname "sorted_" ("." ++ oformat)
     (trk, tdirectory) <- createTempDir "samtools_sort_temp"
 
     numCapabilities <- liftIO getNumCapabilities
-    let cmdargs = ["sort", "-@", show numCapabilities, "-O", oformat, "-T", tdirectory </> "samruntmp", fpsam]
+    let cmdargs = ["sort", "-@", show numCapabilities, "-O", oformat, "-T", tdirectory </> "samruntmp"]
     samtoolsPath <- samtoolsBin
     outputListLno' TraceOutput ["Calling binary ", samtoolsPath, " with args: ", unwords cmdargs]
-    let cp = (proc samtoolsPath cmdargs) { std_out = UseHandle hout }
-    (err, exitCode) <- liftIO $ readProcessErrorWithExitCode cp
+    (err, exitCode) <- case istream of
+        File fpsam -> do
+            let cp = (proc samtoolsPath (snoc cmdargs fpsam)) { std_out = UseHandle hout }
+            liftIO $ readProcessErrorWithExitCode cp
+        Stream _ istream' -> do
+            let cp = (proc samtoolsPath cmdargs) { std_in = CreatePipe, std_out = UseHandle hout, std_err = CreatePipe }
+            (Just pipe_out, Nothing, Just herr, jHandle) <- liftIO $ createProcess cp
+            samP <- liftIO . A.async $ waitForProcess jHandle
+            err <- liftIO . A.async $ do
+                        -- In a separate thread, consume all the error input.
+                        -- the same pattern is used in the implementation of
+                        -- readProcessWithErrorCode (which cannot be used here
+                        -- as we want control over stdin/stdout)
+                        err <- hGetContents herr
+                        void (evaluate (length err))
+                        hClose herr
+                        return err
+            istream' $$ byteLineSinkHandle pipe_out
+            liftIO $ do
+                hClose pipe_out
+                A.waitBoth err samP
     outputListLno' DebugOutput ["Samtools err output: ", err]
+    liftIO $ hClose hout
     release trk
     case exitCode of
         ExitSuccess -> do
