@@ -1,4 +1,4 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
 
@@ -70,7 +70,9 @@ convertSamToBam samfile = do
     outputListLno' DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
     (errmsg, exitCode) <- liftIO $ readProcessErrorWithExitCode
                                     (proc samPath ["view", "-bS", samfile]) { std_out = UseHandle hout }
-    outputListLno' InfoOutput ["Message from samtools: ", errmsg]
+    if null errmsg
+        then outputListLno' DebugOutput ["No output from samtools."]
+        else outputListLno' InfoOutput ["Message from samtools: ", errmsg]
     liftIO $ hClose hout
     case exitCode of
        ExitSuccess -> return newfp
