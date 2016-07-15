@@ -44,7 +44,7 @@ import Control.Monad.Trans.Resource
 import System.IO
 import Data.Default
 import Control.Monad
-import System.Directory (createDirectoryIfMissing, doesFileExist, copyFile)
+import System.Directory (createDirectoryIfMissing, doesFileExist, copyFile, getDirectoryContents)
 
 import qualified Data.Hash.MD5 as MD5
 import qualified Data.Conduit as C
@@ -109,15 +109,31 @@ executeLock1 (NGOList entries) kwargs  = do
 
 executeLock1 arg _ = throwScriptError ("Wrong argument for lock1 (expected a list of strings, got `" ++ show arg ++ "`")
 
-getLock _ [] = do
-   outputListLno' InfoOutput ["Could get a lock for any file."]
-   throwGenericError "Could not obtain any lock"
-getLock basedir (x:xs) = do
-    let fname = T.unpack x
-        lockname = basedir </> fname ++ ".lock"
-    finished <- liftIO $ doesFileExist (basedir </> fname ++ ".finished")
+
+lockName = (++ ".lock") . T.unpack
+finishedName = (++ ".finished") . T.unpack
+getLock basedir fs = do
+    existing <- liftIO $ getDirectoryContents basedir
+    let notfinished = flip filter fs $ \fname -> finishedName fname `notElem` existing
+        notlocked = flip filter notfinished $ \fname -> lockName fname `notElem` existing
+
+    outputListLno' TraceOutput ["Looking for a lock in ", basedir, ". Total number of elements is ", show (length fs), " (not locked: ", show (length notlocked), "; not finished: ", show (length notfinished), ")."]
+    -- first try all the elements that are not locked
+    -- if that fails, try the locked elements in the hope that some may be stale
+    getLock' basedir notlocked >>= \case
+        Just v -> return v
+        Nothing -> (outputListLno' TraceOutput ["NOT locked failed."] >> getLock' basedir notfinished) >>= \case
+            Just v -> return v
+            Nothing -> do
+                outputListLno' InfoOutput ["Could get a lock for any file."]
+                throwGenericError "Could not obtain any lock"
+
+getLock' _ [] = return Nothing
+getLock' basedir (f:fs) = do
+    let lockname = basedir </> lockName f
+    finished <- liftIO $ doesFileExist (basedir </> finishedName f)
     if finished
-        then getLock basedir xs
+        then getLock' basedir fs
         else acquireLock' LockParameters
                             { lockFname = lockname
                             , maxAge = fromInteger (60*60)
@@ -126,12 +142,12 @@ getLock basedir (x:xs) = do
                                 -- thread below), this is an indication that
                                 -- the process has crashed
                             , whenExistsStrategy = IfLockedNothing} >>= \case
-            Nothing -> getLock basedir xs
+            Nothing -> getLock' basedir fs
             Just rk -> do
                 let updateloop :: IO ()
                     updateloop = threadDelay (10*60*1000*1000) >> touchFile lockname >> updateloop
                 void . liftIO . A.async $ updateloop
-                return (x,rk)
+                return $ Just (f,rk)
 
 executeCollect :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
 executeCollect (NGOCounts istream) kwargs = do
