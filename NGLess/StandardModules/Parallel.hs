@@ -207,14 +207,12 @@ splitLines = mapM splitLine1 >=> groupLines
 groupLines :: [(V.Vector B.ByteString, V.Vector B.ByteString)] -> NGLess (V.Vector B.ByteString, V.Vector B.ByteString)
 groupLines [] = return (V.empty, V.empty)
 groupLines groups
-    | allSame (fst <$> groups) = return (fst . head $ groups, V.unfoldr catContent 0)
+    | allSame (fst <$> groups) = return (fst . head $ groups, V.generate n catContent)
     | otherwise = throwDataError "Headers do not match"
     where
         n = V.length (head contents)
         contents = snd <$> groups
-        catContent ix
-            | ix == n = Nothing
-            | otherwise = Just (B.concat (map (V.! ix) contents), ix + 1)
+        catContent ix = B.concat (map (V.! ix) contents)
 
 concatPartials :: [(V.Vector B.ByteString, V.Vector B.ByteString)] -> NGLess BL.ByteString
 concatPartials [] = throwShouldNotOccur "concatPartials of empty set"
