@@ -181,46 +181,48 @@ nChunks n xs = chunksOf p xs
         p = 1 + (length xs `div` n)
 
 splitLines :: [V.Vector B.ByteString] -> NGLess (V.Vector B.ByteString, V.Vector B.ByteString)
-splitLines = mapM splitLine1 >=> groupLines
+splitLines [] = throwShouldNotOccur "splitLines called with empty vector"
+splitLines (first_ell:ells) = runST $ do
+        indices <- VM.new n
+        contents <- VM.new n
+        ok <- fillData 0 indices contents
+        case ok of
+            Left err -> return $ Left err
+            Right () -> do
+                indices' <- V.unsafeFreeze indices
+                contents' <- V.unsafeFreeze contents
+                return . Right $ (indices', contents')
     where
-        splitLine1 :: V.Vector B.ByteString -> NGLess (V.Vector B.ByteString, V.Vector B.ByteString)
-        splitLine1 ells = runST $ do
-            let n = V.length ells
-            headers <- VM.new n
-            contents <- VM.new n
-            let split1 False _ _ = return False
-                split1 _ ix line = case B.elemIndex 9 line of -- 9 is TAB
-                            Nothing -> return False
-                            Just p -> do
-                                let (!h, !c) = B.splitAt p line
-                                VM.write headers ix h
-                                VM.write contents ix c
-                                return True
-            isOk <- V.ifoldM' split1 True ells
-            if isOk
-               then do
-                   headers' <- V.unsafeFreeze headers
-                   contents' <- V.unsafeFreeze contents
-                   return . Right $ (headers', contents')
-               else return $ throwDataError "Line does not have a TAB character"
-
-groupLines :: [(V.Vector B.ByteString, V.Vector B.ByteString)] -> NGLess (V.Vector B.ByteString, V.Vector B.ByteString)
-groupLines [] = return (V.empty, V.empty)
-groupLines [g] = return g
-groupLines groups
-    | allSame (fst <$> groups) = return (fst . head $ groups, V.generate n catContent)
-    | otherwise = throwDataError "Headers do not match"
-    where
-        n = V.length (head contents)
-        contents = snd <$> groups
-        catContent ix = B.concat (map (V.! ix) contents)
+        n = V.length first_ell
+        splitAtTab :: B.ByteString -> NGLess (B.ByteString, B.ByteString)
+        splitAtTab ell = case B.elemIndex 9 ell of -- 9 is TAB
+            Nothing -> throwDataError "Line does not have a TAB character"
+            Just tix -> return $ B.splitAt tix ell
+        fillData !ix indices contents
+            | ix == n = return $ Right ()
+            | otherwise = case splitAtTab (first_ell V.! ix) of
+                    Left err -> return $ Left err
+                    Right (!h,!c) -> do
+                        let splitCheck :: V.Vector B.ByteString -> NGLess B.ByteString
+                            splitCheck e
+                                | B.isPrefixOf h (e V.! ix) = return $! B.drop (B.length h) (e V.! ix)
+                                | otherwise = throwDataError $
+                                                    "Inconsistent index in files for collect() [expected index entry '"++B8.unpack h++"', saw '"++B8.unpack (e V.! ix)++"']."
+                        case forM ells splitCheck of
+                            Left err -> return $ Left err
+                            Right cs -> do
+                                VM.write indices ix h
+                                VM.write contents ix $! B.concat (c:cs)
+                                fillData (ix + 1) indices contents
 
 concatPartials :: [(V.Vector B.ByteString, V.Vector B.ByteString)] -> NGLess BL.ByteString
 concatPartials [] = throwShouldNotOccur "concatPartials of empty set"
-concatPartials input = do
-    (header, contents) <- groupLines input
-    return . BL.fromChunks $ concatMap (\ix -> [header V.! ix, contents V.! ix, "\n"]) [0 .. V.length header - 1]
-
+concatPartials groups
+    | not (allSame (fst <$> groups)) = throwDataError "indices do not match"
+    | otherwise = do
+        let contents = snd <$> groups
+            header = fst (head groups)
+        return . BL.fromChunks $ concatMap (\ix -> (header V.! ix):(map (V.! ix) contents ++ ["\n"])) [0 .. V.length header - 1]
 
 -- | strict variation of sinkTBMQueue
 sinkTBMQueue' q shouldClose = do
