@@ -158,7 +158,7 @@ executeCollect (NGOCounts istream) kwargs = do
     hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
     hashdir <- setupHashDirectory "ngless-partials" hash
     countfile <- asFile istream
-    let partialfile entry = hashdir </> T.unpack entry <.> "part"
+    let partialfile entry = hashdir </> "partial." ++ T.unpack entry
     liftIO $ syncFile countfile
     liftIO $ (if canMove then moveOrCopy else copyFile) countfile (partialfile current)
     canCollect <- liftIO $ allM (doesFileExist . partialfile)  (reverse allentries)
@@ -189,14 +189,14 @@ splitLines = mapM splitLine1 >=> groupLines
             headers <- VM.new n
             contents <- VM.new n
             let split1 False _ _ = return False
-                split1 _ ix line = case B8.elemIndex '\t' line of
+                split1 _ ix line = case B.elemIndex 9 line of -- 9 is TAB
                             Nothing -> return False
                             Just p -> do
-                                let (h, c) = B.splitAt p line
+                                let (!h, !c) = B.splitAt p line
                                 VM.write headers ix h
                                 VM.write contents ix c
                                 return True
-            isOk <- V.ifoldM split1 True ells
+            isOk <- V.ifoldM' split1 True ells
             if isOk
                then do
                    headers' <- V.unsafeFreeze headers
@@ -206,6 +206,7 @@ splitLines = mapM splitLine1 >=> groupLines
 
 groupLines :: [(V.Vector B.ByteString, V.Vector B.ByteString)] -> NGLess (V.Vector B.ByteString, V.Vector B.ByteString)
 groupLines [] = return (V.empty, V.empty)
+groupLines [g] = return g
 groupLines groups
     | allSame (fst <$> groups) = return (fst . head $ groups, V.generate n catContent)
     | otherwise = throwDataError "Headers do not match"
