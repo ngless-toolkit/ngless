@@ -180,11 +180,13 @@ runExceptC (C.ConduitM c0) =
 executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMap fps args = do
     ref <- lookupReference args
+    oAll <- lookupBoolOrScriptErrorDef (return False) "map() call" "mode_all" args
     extraArgs <- map T.unpack <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
-    let executeMap' (NGOList es) = NGOList <$> forM es executeMap'
-        executeMap' (NGOReadSet name (ReadSet1 _enc file))   = interpretMapOp ref name [file] extraArgs
-        executeMap' (NGOReadSet name (ReadSet2 _enc fp1 fp2)) = interpretMapOp ref name [fp1,fp2] extraArgs
-        executeMap' (NGOReadSet name (ReadSet3 _enc fp1 fp2 fp3)) = interpretMapOp ref name [fp1,fp2,fp3] extraArgs
+    let bwaArgs = extraArgs ++ ["-a" | oAll]
+        executeMap' (NGOList es) = NGOList <$> forM es executeMap'
+        executeMap' (NGOReadSet name (ReadSet1 _enc file))   = interpretMapOp ref name [file] bwaArgs
+        executeMap' (NGOReadSet name (ReadSet2 _enc fp1 fp2)) = interpretMapOp ref name [fp1,fp2] bwaArgs
+        executeMap' (NGOReadSet name (ReadSet3 _enc fp1 fp2 fp3)) = interpretMapOp ref name [fp1,fp2,fp3] bwaArgs
         executeMap' v = throwShouldNotOccur ("map expects ReadSet, got " ++ show v ++ "")
     executeMap' fps
 
