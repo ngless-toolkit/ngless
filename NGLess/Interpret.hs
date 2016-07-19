@@ -288,6 +288,7 @@ interpretFunction' (FuncName "map")       expr args Nothing = runNGLessIO (execu
 interpretFunction' (FuncName "mapstats")  expr args Nothing = runNGLessIO (executeMapStats expr args)
 interpretFunction' (FuncName "select")    expr args Nothing = runNGLessIO (executeSelect expr args)
 interpretFunction' (FuncName "count")     expr args Nothing = runNGLessIO (executeCount expr args)
+interpretFunction' (FuncName "countfile") expr args Nothing = runNGLessIO (executeCountFile expr args)
 interpretFunction' (FuncName "print")     expr args Nothing = executePrint expr args
 interpretFunction' (FuncName "paired")   mate1 args Nothing = runNGLessIO (executePaired mate1 args)
 interpretFunction' (FuncName "select")    expr args (Just b) = executeSelectWBlock expr args b

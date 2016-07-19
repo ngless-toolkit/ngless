@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleContexts, CPP #-}
 module Interpretation.Count
     ( executeCount
+    , executeCountFile
     , Annotator(..)
     , CountOpts(..)
     , AnnotationMode(..)
@@ -183,6 +184,10 @@ methodFor "dist1" = return MMDist1
 methodFor "all1" = return MMCountAll
 methodFor "unique-only" = return MMUniqueOnly
 methodFor other = throwShouldNotOccur ("Unexpected multiple method " ++ T.unpack other)
+
+executeCountFile :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeCountFile (NGOString st) _ = return $ NGOCounts (File (T.unpack st))
+executeCountFile other _ = throwScriptError ("Unexpected argument to countfile(): expected str, got " ++ show other)
 
 executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
