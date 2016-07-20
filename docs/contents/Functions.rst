@@ -67,6 +67,22 @@ Returns
 MappedReadSet
 
 Unique
+
+countfile
+---------
+
+Loads a TSV file::
+
+    c = countfile('table.tsv')
+
+This function takes no keyword arguments. If the filename ends with ".gz", it is assumed to be a gzipped file.
+
+Returns
+~~~~~~~
+
+CountTable
+
+Unique
 ------
 
 Function that given a set of reads, returns another which only retains a
@@ -179,7 +195,7 @@ NGLess provides the following builtin datasets:
 +-----------+-----------------------------+-------------+
 | dm3       | drosophila\_melanogaster    | BDGP5       |
 +-----------+-----------------------------+-------------+
-| `-`       | gallus\_gallus              | Galgal4     |
+| gg4       | gallus\_gallus              | Galgal4     |
 +-----------+-----------------------------+-------------+
 | canFam2   | canis\_familiaris           | CanFam3.1   |
 +-----------+-----------------------------+-------------+
@@ -191,6 +207,13 @@ NGLess provides the following builtin datasets:
 +-----------+-----------------------------+-------------+
 | hg19      | homo\_sapiens               | GRCh38      |
 +-----------+-----------------------------+-------------+
+
+To use any of these, pass in the name as the reference value::
+
+    mapped_hg19 = map(input, reference='hg19')
+
+Ngless does not ship with any of these datasets, but they are downloaded
+lazily: i.e., the first time you use them, ngless will download and cache them.
 
 select
 ------

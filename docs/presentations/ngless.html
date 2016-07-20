@@ -145,10 +145,8 @@ preprocess(input) using |read|:
     if len(read) &lt; 31:
         discard
 mapped = map(input, reference='hg19')
-annotated = annotate(mapped, features=[{gene}])
-write(count(annotated, count={gene}),
-        ofile='gene_counts.csv',
-        format={csv})
+write(count(mapped, features=[{gene}]),
+        ofile='gene_counts.csv')
     </pre>
   </div>
 
@@ -193,7 +191,7 @@ write(count(annotated, count={gene}),
   <div class="slide">
     <h2>Types Are Domain Types</h2>
     <ul>
-        <li>Reads, chromosomes, genes...</li>
+        <li>Reads, references, mapped reads...</li>
         <li>Allows for fast error detection &amp; good error messages.</li>
         <li>Bad error messages can be a huge barrier to adoption.</li>
         <li>Alternative solutions (workflow engines) work great, but fail badly.</li>
@@ -218,7 +216,7 @@ write(count(annotated, count={gene}),
         <li>Human (and other model organisms) are built-in.</li>
     <pre>
 mapped = map(input, reference='hg19')
-annotated = annotate(mapped, features=[{gene}])
+annotated = count(mapped, features=[{gene}])
 </pre>
         <li>The user does not need to specify which annotation database to use
         in the second line, <em>as the reads had been mapped to hg19</em>.</li>

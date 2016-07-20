@@ -89,7 +89,7 @@ parseColor = optional $ option (eitherReader readColor) (long "color" <> help co
         readColor "no" = Right NoColor
         readColor "yes" = Right ForceColor
         readColor "force" = Right ForceColor
-        readColor _ = Left "Could not parse color option"
+        readColor _ = Left "Could not parse color option (valid options are 'auto', 'force', and 'no')"
         colorHelp = "Color settings, one of 'auto' (color if writing to a terminal, this is the default), 'force' (always color), 'no' (no color)."
 
 parseInput :: Parser NGLessInput

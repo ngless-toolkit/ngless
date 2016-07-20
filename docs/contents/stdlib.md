@@ -1,5 +1,8 @@
 # Standard library
 
+The standard library in ngless are a set of modules which are built in to the
+language.
+
 ## Parallel module
 
 This module allows you to run several parallel computations. It provides two

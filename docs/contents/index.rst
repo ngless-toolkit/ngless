@@ -41,5 +41,6 @@ Example
    methods
    modules
    Organisms
+   configuration
    faq
    advanced
