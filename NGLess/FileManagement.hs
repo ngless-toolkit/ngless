@@ -26,7 +26,7 @@ import Control.Exception
 import Control.Monad.Trans.Resource
 import Control.Monad.IO.Class (liftIO)
 
-import Configuration (temporaryFileDirectory, nConfKeepTemporaryFiles, nglConfiguration)
+import Configuration (nConfTemporaryDirectory, nConfKeepTemporaryFiles, nglConfiguration)
 import NGLess.NGError
 
 -- | open a temporary file
@@ -34,7 +34,7 @@ import NGLess.NGError
 -- directory and deleting the file when necessary)
 openNGLTempFile' :: FilePath -> String -> String -> NGLessIO (ReleaseKey, (FilePath, Handle))
 openNGLTempFile' base prefix ext = do
-    tdir <- temporaryFileDirectory
+    tdir <- nConfTemporaryDirectory <$> nglConfiguration
     liftIO $ createDirectoryIfMissing True tdir
     keepTempFiles <- nConfKeepTemporaryFiles <$> nglConfiguration
     let cleanupAction = if not keepTempFiles
@@ -67,7 +67,7 @@ takeBaseNameNoExtensions = dropExtensions . takeBaseName
 -- temporary directory. Releasing deletes the directory and all its contents.
 createTempDir :: String -> NGLessIO (ReleaseKey,FilePath)
 createTempDir template = do
-        tbase <- temporaryFileDirectory
+        tbase <- nConfTemporaryDirectory <$> nglConfiguration
         liftIO $ createDirectoryIfMissing True tbase
         allocate
             (c_getpid >>= createFirst tbase (takeBaseNameNoExtensions template))

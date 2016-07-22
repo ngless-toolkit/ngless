@@ -7,20 +7,13 @@ module Configuration
     , InstallMode(..)
     , ColorSetting(..)
     , nglConfiguration
-    , nglessDataBaseURL
     , initConfiguration
     , setupTestConfiguration
-    , globalDataDirectory
-    , userDataDirectory
     , samtoolsBin
     , bwaBin
-    , outputDirectory
-    , temporaryFileDirectory
-    , traceFlag
     , versionStr
     , dateStr
-    , setVerbosity
-    , getVerbosity
+    , setQuiet
     ) where
 
 import Control.Monad
@@ -63,6 +56,7 @@ data NGLessConfiguration = NGLessConfiguration
     { nConfDownloadBaseURL :: FilePath
     , nConfGlobalDataDirectory :: FilePath
     , nConfUserDirectory :: FilePath
+    , nConfUserDataDirectory :: FilePath
     , nConfTemporaryDirectory :: FilePath
     , nConfKeepTemporaryFiles :: Bool
     , nConfTrace :: Bool
@@ -72,16 +66,8 @@ data NGLessConfiguration = NGLessConfiguration
     , nConfPrintHeader :: Bool
     , nConfSubsample :: Bool
     , nConfArgv :: [T.Text]
+    , nConfVerbosity :: Verbosity
     } deriving (Eq, Show)
-
-verbosityRef :: IORef Verbosity
-{-# NOINLINE verbosityRef #-}
-verbosityRef = unsafePerformIO (newIORef Normal)
-
-setVerbosity :: Verbosity -> IO ()
-setVerbosity = writeIORef verbosityRef
-getVerbosity :: IO Verbosity
-getVerbosity = readIORef verbosityRef
 
 getDefaultUserNglessDirectory :: IO FilePath
 getDefaultUserNglessDirectory = liftM2 fromMaybe
@@ -97,6 +83,7 @@ guessConfiguration = do
         { nConfDownloadBaseURL = defaultBaseURL
         , nConfGlobalDataDirectory = nglessBinDirectory </> "../share/ngless/data"
         , nConfUserDirectory = defaultUserNglessDirectory
+        , nConfUserDataDirectory = defaultUserNglessDirectory </> "data"
         , nConfCreateOutputDirectory = True
         , nConfTemporaryDirectory = tmp
         , nConfKeepTemporaryFiles = False
@@ -106,6 +93,7 @@ guessConfiguration = do
         , nConfPrintHeader = True
         , nConfSubsample = False
         , nConfArgv = []
+        , nConfVerbosity = Normal
         }
 
 updateConfiguration :: NGLessConfiguration -> [FilePath] -> IO NGLessConfiguration
@@ -121,6 +109,7 @@ updateConfiguration NGLessConfiguration{..} cfiles = do
     nConfDownloadBaseURL' <- CF.lookupDefault nConfDownloadBaseURL cp "download-url"
     nConfGlobalDataDirectory' <- CF.lookupDefault nConfGlobalDataDirectory cp "global-data-directory"
     nConfUserDirectory' <- CF.lookupDefault nConfUserDirectory cp "user-directory"
+    nConfUserDataDirectory' <- CF.lookupDefault nConfUserDataDirectory cp "user-data-directory"
     nConfTemporaryDirectory' <- CF.lookupDefault nConfTemporaryDirectory cp "temporary-directory"
     nConfKeepTemporaryFiles' <- CF.lookupDefault nConfKeepTemporaryFiles cp "keep-temporary-files"
     nConfColor' <- CF.lookupDefault AutoColor cp "color"
@@ -129,6 +118,7 @@ updateConfiguration NGLessConfiguration{..} cfiles = do
         { nConfDownloadBaseURL = nConfDownloadBaseURL'
         , nConfGlobalDataDirectory = nConfGlobalDataDirectory'
         , nConfUserDirectory = nConfUserDirectory'
+        , nConfUserDataDirectory = nConfUserDataDirectory'
         , nConfTemporaryDirectory = nConfTemporaryDirectory'
         , nConfKeepTemporaryFiles = nConfKeepTemporaryFiles'
         , nConfTrace = nConfTrace
@@ -138,14 +128,14 @@ updateConfiguration NGLessConfiguration{..} cfiles = do
         , nConfPrintHeader = nConfPrintHeader'
         , nConfSubsample = nConfSubsample
         , nConfArgv = nConfArgv
+        , nConfVerbosity = nConfVerbosity
         }
 
 
 setupTestConfiguration :: IO ()
 setupTestConfiguration = do
-    setVerbosity Quiet
     config <- guessConfiguration
-    writeIORef nglConfigurationRef $ config { nConfTemporaryDirectory = "testing_tmp_dir", nConfKeepTemporaryFiles = True }
+    writeIORef nglConfigurationRef $ config { nConfTemporaryDirectory = "testing_tmp_dir", nConfKeepTemporaryFiles = True, nConfVerbosity = Quiet }
 
 initConfiguration :: NGLessArgs -> IO ()
 initConfiguration opts = do
@@ -155,9 +145,17 @@ initConfiguration opts = do
         _ -> [])
     writeIORef nglConfigurationRef (updateConfigurationOpts opts config')
 
+setQuiet :: NGLessIO ()
+setQuiet = do
+    c <- nglConfiguration
+    liftIO $ writeIORef nglConfigurationRef $ c { nConfVerbosity = Quiet }
+
 updateConfigurationOpts NGLessArgs{..} config =
         updateConfigurationOptsMode mode $
-            config { nConfColor = fromMaybe (nConfColor config) color }
+            config
+                { nConfColor = fromMaybe (nConfColor config) color
+                , nConfVerbosity = if quiet then Quiet else verbosity
+                }
 
 updateConfigurationOptsMode DefaultMode{..} config =
     let trace = fromMaybe
@@ -196,26 +194,6 @@ nglConfigurationRef = unsafePerformIO (newIORef (error "Configuration not yet se
 nglConfiguration :: NGLessIO NGLessConfiguration
 nglConfiguration = liftIO $ readIORef nglConfigurationRef
 
-outputDirectory :: NGLessIO FilePath
-outputDirectory = nConfOutputDirectory <$> nglConfiguration
-
-temporaryFileDirectory :: NGLessIO FilePath
-temporaryFileDirectory = nConfTemporaryDirectory <$> nglConfiguration
-
-traceFlag :: NGLessIO Bool
-traceFlag = nConfTrace <$> nglConfiguration
-
-nglessDataBaseURL :: NGLessIO FilePath
-nglessDataBaseURL = nConfDownloadBaseURL <$> nglConfiguration
-globalDataDirectory :: NGLessIO FilePath
-globalDataDirectory = nConfGlobalDataDirectory <$> nglConfiguration
-
-userNglessDirectory :: NGLessIO FilePath
-userNglessDirectory = nConfUserDirectory <$> nglConfiguration
-
-userDataDirectory :: NGLessIO FilePath
-userDataDirectory = (</> "data") <$> userNglessDirectory
-
 checkExecutable :: String -> FilePath -> NGLessIO FilePath
 checkExecutable name bin = do
     exists <- liftIO $ doesFileExist bin
@@ -241,7 +219,7 @@ binPath Root = do
 #else
     return nglessBinDirectory
 #endif
-binPath User = (</> "bin") <$> userNglessDirectory
+binPath User = ((</> "bin") . nConfUserDirectory) <$> nglConfiguration
 
 findBin :: FilePath -> NGLessIO (Maybe FilePath)
 findBin fname = do

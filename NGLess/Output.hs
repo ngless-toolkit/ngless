@@ -138,8 +138,8 @@ shouldPrint True  ot Normal = ot >= InfoOutput
 output :: OutputType -> Int -> String -> NGLessIO ()
 output !ot !lno !msg = do
     isTerm <- liftIO $ hIsTerminalDevice stdout
-    verb <- liftIO getVerbosity
-    traceSet <- traceFlag
+    verb <- nConfVerbosity <$> nglConfiguration
+    traceSet <- nConfTrace <$> nglConfiguration
     colorOpt <- nConfColor <$> nglConfiguration
     let sp = traceSet || shouldPrint isTerm ot verb
         doColor = case colorOpt of

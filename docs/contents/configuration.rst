@@ -3,10 +3,10 @@ Configuration
 =============
 
 .. note:: ngless' results do not change because of configuration or command
-    line options. **The ngless protocol always has the complete information on
-    what is computed**. What configuration options change are details of _how_
-    the results are computed such as where to store intermediate files and how
-    many CPU cores to use.
+    line options. **The ngless script always has complete information on what
+    is computed**. What configuration options change are details of _how_ the
+    results are computed such as where to store intermediate files and how many
+    CPU cores to use.
 
 Ngless gets its configuration options from the following sources:
 
@@ -32,6 +32,14 @@ if the output is a terminal), ``no`` (never use color), ``force`` (use color eve
 if writing to a file or pipe), ``yes`` (synonym of ``force``).
 
 ``print-header``: whether to print ngless banner (version info...).
+
+``user-directory``: user writable directory to cache downloads (default is
+system dependent, on Linux, typically ``$HOME/.local/share/ngless/``.
+
+``user-data-directory``: user writable directory to cache data (default is a
+``data`` directory inside the ``user-directory`` [see above]).
+
+``global-data-directory``: global data directory.
 
 Debug options
 ~~~~~~~~~~~~~

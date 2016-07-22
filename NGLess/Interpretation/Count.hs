@@ -192,8 +192,6 @@ executeCountFile other _ = throwScriptError ("Unexpected argument to countfile()
 executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
 executeCount (NGOMappedReadSet rname istream refinfo) args = do
-    let c = lookup "counts" args
-        c' = GffGene
     minCount <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
     method <- methodFor =<< lookupSymbolOrScriptErrorDef (return "dist1")
                                     "multiple argument to count " "multiple" args

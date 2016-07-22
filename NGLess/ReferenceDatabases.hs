@@ -42,6 +42,10 @@ data ReferenceFilePaths = ReferenceFilePaths
     , rfpFunctionalMap :: Maybe FilePath
     } deriving (Eq, Show)
 
+
+dataDirectory Root = nConfGlobalDataDirectory <$> nglConfiguration
+dataDirectory User = nConfUserDataDirectory   <$> nglConfiguration
+
 builtinReferences :: [Reference]
 builtinReferences = [Reference rn (T.concat [rn, "-0.0.0"]) Nothing True False | rn <-
                 [ "hg19" -- Homo_sapiens
@@ -112,7 +116,7 @@ downloadReference ref destPath = do
         Just u -> return u
         Nothing
             | isDefaultReference (refName ref) -> do
-                    baseURL <- nglessDataBaseURL
+                    baseURL <- nConfDownloadBaseURL <$> nglConfiguration
                     return $ baseURL </> T.unpack (refName ref) <.> "tar.gz"
             | otherwise ->
                 throwScriptError ("Expected reference data, got "++T.unpack (refName ref))
@@ -142,7 +146,7 @@ ensureDataPresent rname = moduleDirectReference rname >>= \case
 -- installs it in the user directory
 installData :: Maybe InstallMode -> T.Text -> NGLessIO FilePath
 installData Nothing refname = do
-    p' <- globalDataDirectory
+    p' <- nConfGlobalDataDirectory <$> nglConfiguration
     canInstallGlobal <- liftIO $ do
         created <- (createDirectoryIfMissing False p' >> return True) `catchIOError` (\_ -> return False)
         if created
@@ -152,9 +156,7 @@ installData Nothing refname = do
         then installData (Just Root) refname
         else installData (Just User) refname
 installData (Just mode) refname = do
-    basedir <- if mode == Root
-                then globalDataDirectory
-                else userDataDirectory
+    basedir <- dataDirectory mode
     let tarName = basedir </> T.unpack refname <.> "tar.gz"
     mods <- loadedModules
     let unpackRef (ExternalPackagedReference r) = Just r
@@ -182,9 +184,7 @@ findDataFiles ref = liftM2 (<|>)
 
 findDataFilesIn :: FilePath -> InstallMode -> NGLessIO (Maybe FilePath)
 findDataFilesIn ref mode = do
-    basedir <- if mode == Root
-                    then globalDataDirectory
-                    else userDataDirectory
+    basedir <- dataDirectory mode
     let refdir = basedir </> ref
     hasIndex <- hasValidIndex (buildFaFilePath refdir)
     outputListLno' TraceOutput ["Looked for ", ref, " in directory ", refdir, if hasIndex then " (and found it)" else " (and did not find it)"]

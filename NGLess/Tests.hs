@@ -35,7 +35,6 @@ import Interpret
 import Tokens
 import Types
 import FileManagement
-import CmdArgs
 import Configuration
 import NGLess
 
@@ -69,10 +68,9 @@ test_Vector     = [tgroup_Vector]
 test_IntGroups  = [tgroup_IntGroups]
 test_Select  = [tgroup_Select]
 
--- The main test driver sets verbosity to Quiet to avoid extraneous output and
--- then uses the automatically generated function
+-- The main test driver sets up the config options then uses the automatically
+-- generated function
 main = do
-    setVerbosity Quiet
     setupTestConfiguration
     $(defaultMainGenerator)
     removeDirectoryRecursive "testing_directory_tmp"

@@ -76,7 +76,7 @@ fatalError err = do
     exitFailure
 
 whenStrictlyNormal act = do
-    v <- liftIO $ getVerbosity
+    v <- nConfVerbosity <$> nglConfiguration
     when (v == Normal) act
 
 runNGLessIO :: String -> NGLessIO a -> IO a
@@ -179,8 +179,8 @@ modeExec opts@DefaultMode{} = do
         modules <- loadModules (fromMaybe [] (nglModules <$> nglHeader sc'))
         sc <- rightOrDie $ checktypes modules sc' >>= validate modules
         when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
-            whenStrictlyNormal (liftIO $ setVerbosity Quiet)
-        odir <- outputDirectory
+            whenStrictlyNormal setQuiet
+        odir <- nConfOutputDirectory <$> nglConfiguration
         shouldOutput <- nConfCreateOutputDirectory <$> nglConfiguration
         shouldPrintHeader <- nConfPrintHeader <$> nglConfiguration
         outputLno' DebugOutput "Validating script..."
@@ -235,7 +235,6 @@ main = do
             <*>
             (infoOption dateStr (long "date-short" <> help "print just release date string (useful for scripting)"))
     args <- execParser (info (versioner <*> helper <*> nglessArgs) metainfo)
-    setVerbosity (if quiet args then Quiet else verbosity args)
     initConfiguration args
     modeExec (mode args)
 

@@ -378,8 +378,8 @@ findLoad modname version = do
     let modpath' = "Modules" </> T.unpack modname <.> "ngm"
         modpath = modpath' </> T.unpack version
         modfile = "module.yaml"
-    globalDir <- globalDataDirectory
-    userDir <- userDataDirectory
+    globalDir <- nConfGlobalDataDirectory <$> nglConfiguration
+    userDir <- nConfUserDataDirectory <$> nglConfiguration
     found <- flip findFirstM [".", globalDir, userDir] $ \basedir -> do
         let fname = basedir </> modpath </> modfile
         exists <- liftIO $ doesFileExist fname
