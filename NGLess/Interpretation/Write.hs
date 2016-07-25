@@ -69,7 +69,7 @@ _formatFQOname base insert
     | base `isInfixOf` "{index}" = return (replace base "{index}" ("." ++ insert ++ "."))
     | endswith ".fq" base = return $ removeEnd base ".fq" ++ "." ++ insert ++ ".fq"
     | endswith ".fq.gz" base = return $ removeEnd base ".fq" ++ "." ++ insert ++ ".fq.gz"
-    | otherwise = throwScriptError ("Cannot handle " ++ base)
+    | otherwise = throwScriptError ("Cannot handle filename " ++ base ++ " (expected extension .fq/.fq.gz/.fq.bz2).")
 
 getOFile :: KwArgsValues -> NGLessIO FilePath
 getOFile args = do
