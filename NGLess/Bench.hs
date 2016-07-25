@@ -53,8 +53,10 @@ countRights = loop (0 :: Int)
             Just (Right !_) -> loop (i+1)
             Just (Left !_) -> loop i
 
+rightOrDie (Right r) = r
+rightOrDie err = error $ "Expected Right, got: " ++ show err
 exampleSR :: ShortRead
-exampleSR = head . fqDecode SangerEncoding $ BL.fromChunks
+exampleSR = head . rightOrDie . fqDecode SangerEncoding $ BL.fromChunks
                 ["@SRR867735.1 HW-ST997:253:C16APACXX:7:1101:2971:1948/1\n"
                 ,"NCCGCTGCTCGGGATCAAGACATACCGCGGGGGGAGGGGAGCGGGACCAC\n"
                 ,"+\n"

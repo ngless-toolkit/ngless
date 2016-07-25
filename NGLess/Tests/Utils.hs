@@ -31,7 +31,7 @@ isOk _ (Right _) = return ()
 
 isOkMsg = isOk
 
-parsetest :: T.Text -> Either T.Text Script
+parsetest :: T.Text -> NGLess Script
 parsetest = parsengless "test" True
 
 fromRight (Right r) = r

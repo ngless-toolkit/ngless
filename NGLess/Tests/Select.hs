@@ -7,8 +7,6 @@ import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
 
-import Data.Maybe
-
 import Data.Sam
 import Tests.Utils
 import Utils.Here

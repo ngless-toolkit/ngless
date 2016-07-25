@@ -22,7 +22,7 @@ tgroup_Validation = $(testGroupGenerator)
 
 isValidateOk ftext = case parsetest ftext >>= validate [] of
     Right _ -> return ()
-    Left err -> assertFailure ("Validation should have passed for script "++T.unpack ftext++"; instead picked up error: '"++T.unpack err++"'")
+    Left err -> assertFailure ("Validation should have passed for script "++T.unpack ftext++"; instead picked up error: '"++show err++"'")
 isValidateError ftext = isErrorMsg ("Validation should have picked error for script '"++T.unpack ftext++"'") (parsetest ftext >>= validate [])
 
 case_bad_function_attr_count = isValidateError

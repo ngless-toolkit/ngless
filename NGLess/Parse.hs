@@ -11,9 +11,6 @@ module Parse
     , _listexpr
     ) where
 
-import Language
-import Tokens
-
 import Control.Monad
 import Control.Monad.Identity ()
 import qualified Data.Text as T
@@ -21,6 +18,11 @@ import Text.ParserCombinators.Parsec.Prim hiding (Parser)
 import Text.Parsec.Combinator
 import Text.Parsec.Pos
 import Text.Parsec.Error
+
+import NGLess.NGError
+import Language
+import Tokens
+
 
 sliceList :: Int -> Int -> [a] -> [a]
 sliceList st e = take (e - st) . drop st
@@ -32,33 +34,33 @@ sliceList st e = take (e - st) . drop st
 parsengless :: String -- ^ input filename (for error messages)
             -> Bool -- ^ whether the version statement is mandatory
             -> T.Text -- ^ input data
-            -> Either T.Text Script -- ^ either error message or parsed 'Script'
+            -> NGLess Script -- ^ either error message or parsed 'Script'
 parsengless inputname reqversion input = tokenize inputname input >>= parsetoks input inputname reqversion
 
-parsetoks :: T.Text -> String -> Bool -> [(SourcePos,Token)] -> Either T.Text Script
+parsetoks :: T.Text -> String -> Bool -> [(SourcePos,Token)] -> NGLess Script
 parsetoks input inputname reqversion toks = case parse (nglparser reqversion) inputname (_cleanupindents toks) of
-            Right val -> Right val
-            Left err -> Left $ buildErrorMessage input err
+            Right val -> return val
+            Left err -> throwScriptError $ buildErrorMessage input err
 
 
-buildErrorMessage :: T.Text -> ParseError -> T.Text
-buildErrorMessage input err = T.concat $ ["Parsing error on file '", T.pack fname, "' on line ", T.pack . show $ line, " (column ", T.pack . show $ col, ")\n\n"]
+buildErrorMessage :: T.Text -> ParseError -> String
+buildErrorMessage input err = concat $ ["Parsing error on file '", fname, "' on line ", show line, " (column ", show col, ")\n\n"]
                     ++ preLines 3
                     ++ ["\n\t", indicatorLine]
                     ++ postLines 2
-                    ++ ["\n\n", T.pack . show $ err, "\n"]
+                    ++ ["\n\n", show err, "\n"]
     where
         pos = errorPos err
         fname = sourceName pos
         line = sourceLine pos
         col = sourceColumn pos
-        sourceLines = T.lines input
-        preLines :: Int -> [T.Text]
+        sourceLines = T.unpack <$> T.lines input
+        preLines :: Int -> [String]
         preLines n = withNLTAB $ sliceList (max 0 (line - n)) line sourceLines
         postLines n = withNLTAB $ sliceList line (line +  n) sourceLines
         withNLTAB [] = []
         withNLTAB (ell:ls) = "\n\t":ell:withNLTAB ls
-        indicatorLine = T.pack (['-' | _ <- [1..col+8]] ++ "^")
+        indicatorLine = ['-' | _ <- [1..col+8]] ++ "^"
 
 
 -- | '_cleanupindents' removes spaces that do not follow new lines as well as

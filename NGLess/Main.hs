@@ -49,22 +49,20 @@ import qualified BuiltinModules.Readlines as Readlines
 
 -- | wrapPrint transforms the script by transforming the last expression <expr>
 -- into write(<expr>, ofile=STDOUT)
-wrapPrint (Script v sc) = wrap sc >>= Right . Script v
+wrapPrint :: Script -> NGLess Script
+wrapPrint (Script v sc) = Script v <$> wrap sc
     where
-        wrap [] = Right []
+        wrap :: [(Int,Expression)] -> NGLess [(Int,Expression)]
+        wrap [] = return []
         wrap [(lno,e)]
-            | wrapable e = Right [(lno,addPrint e)]
-            | otherwise = Left "Cannot add write() statement at the end of script (the script cannot terminate with a print/write call)"
-        wrap (e:es) = wrap es >>= Right . (e:)
+            | wrapable e = return [(lno,addPrint e)]
+            | otherwise = throwScriptError "Cannot add write() statement at the end of script (the script cannot terminate with a print/write call)"
+        wrap (e:es) = wrap es >>= return . (e:)
         addPrint e = FunctionCall (FuncName "write") e [(Variable "ofile", BuiltinConstant (Variable "STDOUT"))] Nothing
 
         wrapable (FunctionCall (FuncName f) _ _ _)
             | f `elem` ["print", "write"] = False
         wrapable _ = True
-
-rightOrDie :: (MonadIO m) => Either T.Text a -> m a
-rightOrDie (Left err) = liftIO $ fatalError (T.unpack err)
-rightOrDie (Right v) = return v
 
 redColor = setSGRCode [SetColor Foreground Dull Red]
 
@@ -167,14 +165,13 @@ modeExec opts@DefaultMode{} = do
     ngltext <- loadScript (input opts) >>= \case
         Right t -> return t
         Left err ->  fatalError err
-    let maybe_add_print = (if print_last opts then wrapPrint else Right)
-    let parsed = parsengless fname reqversion ngltext >>= maybe_add_print
-    sc' <- rightOrDie parsed
-    when (debug_mode opts == "ast") $ do
-        forM_ (nglBody sc') $ \(lno,e) ->
-            putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)
-        exitSuccess
-    (shouldOutput,odir) <- runNGLessIO "running script" $ do
+    let maybe_add_print = (if print_last opts then wrapPrint else return)
+    (shouldOutput,odir) <- runNGLessIO "loading and running script" $ do
+        sc' <- runNGLess $ parsengless fname reqversion ngltext >>= maybe_add_print
+        when (debug_mode opts == "ast") $ liftIO $ do
+            forM_ (nglBody sc') $ \(lno,e) ->
+                putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)
+            exitSuccess
         outputLno' DebugOutput "Loading modules..."
         modules <- loadModules (fromMaybe [] (nglModules <$> nglHeader sc'))
         sc <- runNGLess $ checktypes modules sc' >>= validate modules

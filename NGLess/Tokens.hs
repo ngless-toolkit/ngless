@@ -16,6 +16,7 @@ import Text.Parsec.Text ()
 import Text.Parsec.Combinator
 import Text.Parsec
 
+import NGLess.NGError
 import Language
 
 -- | Token datatype
@@ -35,10 +36,10 @@ data Token =
 -- file)
 tokenize :: String -- ^ input filename (for error messages)
         -> T.Text -- ^ input text
-        -> Either T.Text [(SourcePos,Token)] -- ^ either error message or tokens
+        -> NGLess [(SourcePos,Token)]
 tokenize inname input = case parse tokenizer inname input of
-        Right val -> Right val
-        Left err -> Left (T.pack . show $ err)
+        Right val -> return val
+        Left err -> throwScriptError $ show err
 
 tokenizer = many ngltoken' <* eof
 ngltoken' = (,) <$> getPosition <*> ngltoken
