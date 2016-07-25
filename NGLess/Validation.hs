@@ -13,6 +13,7 @@ import qualified Data.Text as T
 import           Control.Monad.Extra (whenJust)
 import           Control.Monad.Writer.Strict
 import           Control.Monad.RWS
+import           Data.String.Utils (endswith)
 import Data.Maybe
 import Data.List
 
@@ -38,6 +39,7 @@ validate mods expr = case errors of
             ,validate_symbol_in_args
             ,validate_STDIN_only_used_once
             ,validate_map_ref_input
+            ,validateWriteOName
             ]
 
 {- Each checking function has the type
@@ -94,7 +96,7 @@ validate_pure_function _ (Script _ es) = check_toplevel validate_pure_function' 
                     ]
 
 validateFunctionReqArgs :: [Module] -> Script -> Maybe T.Text
-validateFunctionReqArgs mods (Script _ es) = checkRecursiveScript validateFunctionReqArgs' es
+validateFunctionReqArgs mods = checkRecursiveScript validateFunctionReqArgs'
     where
         validateFunctionReqArgs' (FunctionCall f _ args _) = case findFunction mods f of
                 Nothing -> Just (T.concat ["Function ", T.pack . show $ f, " not found."])
@@ -133,7 +135,7 @@ validate_variables mods (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e
         checkVarUsage _ = return ()
 
 validate_symbol_in_args :: [Module] -> Script -> Maybe T.Text
-validate_symbol_in_args mods (Script _ es) = checkRecursiveScript validate_symbol_in_args' es
+validate_symbol_in_args mods = checkRecursiveScript validate_symbol_in_args'
     where
         validate_symbol_in_args' (Assignment  _ fc) = validate_symbol_in_args' fc
         validate_symbol_in_args' (FunctionCall f _ args _) = check_symbol_val_in_arg mods f args
@@ -142,7 +144,7 @@ validate_symbol_in_args mods (Script _ es) = checkRecursiveScript validate_symbo
 
 
 validate_map_ref_input :: [Module] -> Script -> Maybe T.Text
-validate_map_ref_input _ (Script _ es) = checkRecursiveScript validate_map_ref_input' es
+validate_map_ref_input _ = checkRecursiveScript validate_map_ref_input'
     where
         validate_map_ref_input' (FunctionCall (FuncName "map") _ args _) =
             case (lookup (Variable "reference") args, lookup (Variable "fafile") args) of
@@ -150,6 +152,23 @@ validate_map_ref_input _ (Script _ es) = checkRecursiveScript validate_map_ref_i
                 (Just _, Just _) -> Just "You cannot specify both fafile and reference in arguments to map function"
                 _ -> Nothing
         validate_map_ref_input' _ = Nothing
+
+validateWriteOName :: [Module] -> Script -> Maybe T.Text
+validateWriteOName _ = checkRecursiveScript validateWriteOName'
+    where
+        validateWriteOName' (FunctionCall (FuncName "write") (Lookup (Just t) _) args _) = case lookup (Variable "oname") args of
+            Just (ConstStr oname) -> case lookup (Variable "format") args of
+                Just _ -> Nothing
+                Nothing -> checkType t (T.unpack oname)
+            _ -> Nothing
+        validateWriteOName' _ = Nothing
+        checkType NGLReadSet oname
+            | endswith ".fa" oname = Just "Cannot save data in FASTA format."
+            | endswith ".fq" oname = Nothing
+            | endswith ".fq.gz" oname = Nothing
+            | otherwise = Just . T.concat $ ["Cannot determine output format from filename '", T.pack oname, "'"]
+        checkType _ _ = Nothing
+
 
 validate_STDIN_only_used_once :: [Module] -> Script -> Maybe T.Text
 validate_STDIN_only_used_once _ (Script _ code) = check_use Nothing code
@@ -215,8 +234,8 @@ check_toplevel f ((lno,e):es) = case f e of
         Nothing -> check_toplevel f es
         Just m -> Just (T.concat ["Line ", T.pack (show lno), ": ", m])
 
-checkRecursiveScript :: (Expression -> Maybe T.Text) -> [(Int, Expression)] -> Maybe T.Text
-checkRecursiveScript f es = check_toplevel (checkRecursive f) es
+checkRecursiveScript :: (Expression -> Maybe T.Text) -> Script -> Maybe T.Text
+checkRecursiveScript f (Script _ es) = check_toplevel (checkRecursive f) es
 
 checkRecursive :: (Expression -> Maybe T.Text) -> Expression -> Maybe T.Text
 checkRecursive f e = case execWriter (recursiveAnalyse f' e) of
