@@ -30,9 +30,9 @@ import Utils.Conduit
 import Utils.Utils
 import NGLess
 
-drop100 = loop (0 :: Int)
+drop10 = loop (0 :: Int)
     where
-        loop 400 = loop 0
+        loop 40 = loop 0
         loop !n = awaitJust $ \line -> do
                 when (n < 4) (C.yield line)
                 loop (n+1)
@@ -42,7 +42,8 @@ performSubsample f h = do
     runResourceT $
             conduitPossiblyCompressedFile f
                 =$= CB.lines
-                =$= drop100
+                =$= drop10
+                =$= C.take 100000
                 =$= C.unlinesAscii
                 $$  asyncGzipTo h
     hClose h
