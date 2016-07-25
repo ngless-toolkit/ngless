@@ -22,6 +22,7 @@ module Language
     , recursiveTransform
     , usedVariables
     , typeOfConstant
+    , staticValue
     ) where
 
 {- This module defines the internal representation the language -}
@@ -175,6 +176,20 @@ instance Show Expression where
 
 showArgs [] = ""
 showArgs ((Variable v, e):args) = "; "++T.unpack v++"="++show e++showArgs args
+
+staticValue :: Expression -> Maybe NGLessObject
+staticValue (ConstStr s) = Just $ NGOString s
+staticValue (ConstInt v) = Just $ NGOInteger v
+staticValue (ConstBool b) = Just $ NGOBool b
+staticValue (ConstSymbol s) = Just $ NGOSymbol s
+staticValue (BinaryOp BOpAdd e1 e2) = do
+    v1 <- staticValue e1
+    v2 <- staticValue e2
+    case (v1,v2) of
+        (NGOString s1, NGOString s2) -> return $ NGOString (T.concat [s1, s2])
+        (NGOInteger i1, NGOInteger i2) -> return $ NGOInteger (i1 + i2)
+        _ -> Nothing
+staticValue _ = Nothing
 
 -- 'recursiveAnalyse f e' will call the function 'f' for all the subexpression inside 'e'
 recursiveAnalyse :: (Monad m) => (Expression -> m ()) -> Expression -> m ()

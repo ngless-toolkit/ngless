@@ -156,11 +156,12 @@ validate_map_ref_input _ = checkRecursiveScript validate_map_ref_input'
 validateWriteOName :: [Module] -> Script -> Maybe T.Text
 validateWriteOName _ = checkRecursiveScript validateWriteOName'
     where
-        validateWriteOName' (FunctionCall (FuncName "write") (Lookup (Just t) _) args _) = case lookup (Variable "oname") args of
-            Just (ConstStr oname) -> case lookup (Variable "format") args of
-                Just _ -> Nothing
-                Nothing -> checkType t (T.unpack oname)
-            _ -> Nothing
+        validateWriteOName' (FunctionCall (FuncName "write") (Lookup (Just t) _) args _) =
+            lookup (Variable "oname") args >>= staticValue >>= \case
+                NGOString oname -> case lookup (Variable "format") args of
+                    Nothing -> checkType t (T.unpack oname)
+                    Just _ -> Nothing
+                _ -> Nothing
         validateWriteOName' _ = Nothing
         checkType NGLReadSet oname
             | endswith ".fa" oname = Just "Cannot save data in FASTA format."
@@ -236,12 +237,11 @@ check_toplevel f ((lno,e):es) = case f e of
 
 checkRecursiveScript :: (Expression -> Maybe T.Text) -> Script -> Maybe T.Text
 checkRecursiveScript f (Script _ es) = check_toplevel (checkRecursive f) es
-
-checkRecursive :: (Expression -> Maybe T.Text) -> Expression -> Maybe T.Text
-checkRecursive f e = case execWriter (recursiveAnalyse f' e) of
-        [] -> Nothing
-        errors -> Just $ T.concat errors
     where
+        checkRecursive :: (Expression -> Maybe T.Text) -> Expression -> Maybe T.Text
+        checkRecursive f e = case execWriter (recursiveAnalyse f' e) of
+                [] -> Nothing
+                errors -> Just $ T.concat errors
         f' :: Expression -> Writer [T.Text] ()
         f' e' = whenJust (f e') (tell . (:[]))
 

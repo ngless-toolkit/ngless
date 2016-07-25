@@ -101,14 +101,8 @@ tryConstValue var s = case mapMaybe (getAssignment . snd) s of
         _ -> Nothing
     where
         getAssignment :: Expression -> Maybe NGLessObject
-        getAssignment (Assignment v val) | v == var = getConst val
+        getAssignment (Assignment v val) | v == var = staticValue val
         getAssignment _ = Nothing
-        getConst (ConstStr t) = Just $ NGOString t
-        getConst (ConstSymbol t) = Just $ NGOSymbol t
-        getConst (ConstInt v) = Just $ NGOInteger v
-        getConst (ConstDouble v) = Just $ NGODouble v
-        getConst (ConstBool b) = Just $ NGOBool b
-        getConst _ = Nothing
 
 
 checkRecursive :: (Expression -> ValidateIO ()) -> [(Int,Expression)] -> ValidateIO ()
