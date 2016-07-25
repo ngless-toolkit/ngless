@@ -299,8 +299,12 @@ Arguments by value:
 +-------------------+-----------------+------------+----------------+
 
 
-
-The ``gff`` argument is required, unless a known reference was used for mapping.
+If the features to count are ``['seqname']``, then each read will be assigned
+to the name of reference it matched and only an input set of mapped reads is
+necessary. For other features, you will need extra information. This can be
+passed using the ``gff_file`` or ``functional_map`` arguments. If you had
+previously used a ``reference`` argument for the ``map()`` function, then
+you can also leave this argument empty and ngless will do the right thing.
 
 ``features``: which features to count.
 

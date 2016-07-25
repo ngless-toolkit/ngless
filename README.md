@@ -21,7 +21,7 @@ your work.
 
     mapped = map(input,
                     reference='hg19')
-    write(count(mapped, features={gene}),
+    write(count(mapped, features=['gene']),
             ofile='gene_counts.csv',
             format={csv})
 

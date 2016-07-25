@@ -23,6 +23,8 @@ priority: later options take precedence.
 Options
 -------
 
+``jobs``: number of CPUs to use.
+
 ``temporary-directory``: where to keep temporary files. By default, this is the
 system defined temporary directory (either ``/tmp`` or the value of the
 ``$TEMPDIR`` environment variable on Unix).
