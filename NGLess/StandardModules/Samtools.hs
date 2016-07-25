@@ -105,7 +105,7 @@ sortOFormat' ((lno,e):es) = (lno,e'):sortOFormat' es
             _ -> e
         outputBam _ [] = False
         outputBam v ((_,c):rest) = case c of
-            FunctionCall (FuncName "write") (Lookup v') args Nothing
+            FunctionCall (FuncName "write") (Lookup _ v') args Nothing
                 | v == v' -> isOBam args && not (isVarUsed v rest)
             _
                 | isVarUsed1 v c -> False

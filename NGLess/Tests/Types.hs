@@ -17,11 +17,11 @@ tgroup_Types = $(testGroupGenerator)
 isOkTypes :: Script -> IO ()
 isOkTypes script = case checktypes [] script of
     (Right _) -> return ()
-    (Left err) -> assertFailure ("Type error on good code (error was '"++T.unpack err++"'")
+    (Left err) -> assertFailure ("Type error on good code (error was '"++show err++"'")
 
 isOkTypesText scriptText = case parsetest scriptText >>= checktypes [] of
     (Right _) -> return ()
-    (Left err) -> assertFailure ("Type error on good code (error was '"++T.unpack err++"') for script: '"++T.unpack scriptText++"'")
+    (Left err) -> assertFailure ("Type error on good code (error was '"++show err++"') for script: '"++T.unpack scriptText++"'")
 
 isErrorText scriptText = isError $ parsetest scriptText>>= checktypes []
 

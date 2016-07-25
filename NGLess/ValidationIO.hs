@@ -90,7 +90,7 @@ validateStrArg f v args es = whenJust (lookup (Variable v) args) $ validateStrVa
 
 validateStrVal :: (T.Text -> ValidateIO ()) -> [(Int,Expression)] -> Expression -> ValidateIO ()
 validateStrVal f _ (ConstStr v) = f v
-validateStrVal f es (Lookup v) = case tryConstValue v es of
+validateStrVal f es (Lookup _ v) = case tryConstValue v es of
     Just (NGOString t)  -> f t
     _ -> return ()
 validateStrVal _ _ _ = return ()

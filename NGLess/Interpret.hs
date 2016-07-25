@@ -226,7 +226,7 @@ interpretTopValue (ListExpression es) = NGOList <$> mapM interpretTopValue es
 interpretTopValue e = runInROEnvIO (interpretExpr e)
 
 interpretExpr :: Expression -> InterpretationROEnv NGLessObject
-interpretExpr (Lookup (Variable v)) = lookupVariable v >>= \case
+interpretExpr (Lookup _ (Variable v)) = lookupVariable v >>= \case
         Nothing -> throwScriptError ("Could not lookup variable `"++show v++"`")
         Just r' -> return r'
 interpretExpr (BuiltinConstant (Variable "STDIN")) = return (NGOString "/dev/stdin")
@@ -266,7 +266,7 @@ maybeInterpretExpr :: Maybe Expression -> InterpretationROEnv (Maybe NGLessObjec
 maybeInterpretExpr = fmapMaybeM interpretExpr
 
 interpretFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
-interpretFunction (FuncName "preprocess") expr@(Lookup (Variable varName)) args (Just block) = do
+interpretFunction (FuncName "preprocess") expr@(Lookup _ (Variable varName)) args (Just block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- interpretArguments args
     res' <- executePreprocess expr' args' block

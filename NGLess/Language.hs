@@ -88,7 +88,7 @@ data NGLType =
         | NGLVoid
         | NGLAny
         | NGList !NGLType
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 data ReadSet =
         ReadSet1 FastQEncoding FilePath -- ^ encoding file_on_disk
@@ -121,7 +121,7 @@ data NGLessObject =
 -- | 'Expression' is the main type for holding the AST.
 
 data Expression =
-        Lookup Variable -- ^ This looks up the variable name
+        Lookup (Maybe NGLType) Variable -- ^ This looks up the variable name
         | ConstStr T.Text -- ^ constant string
         | ConstInt Integer -- ^ integer
         | ConstDouble Double -- ^ integer
@@ -148,7 +148,8 @@ data OptimizedExpression =
     deriving (Eq, Ord, Show)
 
 instance Show Expression where
-    show (Lookup (Variable v)) = "Lookup '"++T.unpack v++"'"
+    show (Lookup (Just t) (Variable v)) = "Lookup '"++T.unpack v++"' as "++show t
+    show (Lookup Nothing (Variable v)) = "Lookup '"++T.unpack v++"' (type unknown)"
     show (ConstStr t) = show t
     show (ConstInt n) = show n
     show (ConstDouble f) = show f
@@ -218,7 +219,7 @@ recursiveTransform f e = f =<< recursiveTransform' e
 
 usedVariables :: Expression -> [Variable]
 usedVariables expr = execWriter . flip recursiveAnalyse expr $ \case
-    (Lookup v) -> tell [v]
+    (Lookup _ v) -> tell [v]
     _ -> return ()
 
 data ModInfo = ModInfo

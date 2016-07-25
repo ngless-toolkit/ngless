@@ -119,7 +119,7 @@ base_expression = pexpression
                     <|> (funccall <?> "function call")
                     <|> _listexpr
                     <|> rawexpr
-                    <|> (Lookup <$> variable)
+                    <|> (Lookup Nothing <$> variable)
 
 pexpression = operator '(' *> expression <* operator ')'
 

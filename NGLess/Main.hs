@@ -177,7 +177,7 @@ modeExec opts@DefaultMode{} = do
     (shouldOutput,odir) <- runNGLessIO "running script" $ do
         outputLno' DebugOutput "Loading modules..."
         modules <- loadModules (fromMaybe [] (nglModules <$> nglHeader sc'))
-        sc <- rightOrDie $ checktypes modules sc' >>= validate modules
+        sc <- runNGLess $ checktypes modules sc' >>= validate modules
         when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
             whenStrictlyNormal setQuiet
         odir <- nConfOutputDirectory <$> nglConfiguration

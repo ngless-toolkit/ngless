@@ -18,14 +18,15 @@ import Data.List
 
 import Language
 import Modules
+import NGLess.NGError
 import BuiltinFunctions
 import Utils.Suggestion
 
 -- | Returns either an error message if it finds any errors or the input script unscathed
-validate :: [Module] -> Script -> Either T.Text Script
+validate :: [Module] -> Script -> NGLess Script
 validate mods expr = case errors of
         [] -> Right expr
-        _ -> Left (T.concat errors)
+        _ -> throwScriptError . T.unpack . T.concat $ errors
     where
         errors = mapMaybe (\f -> f mods expr) checks
         checks =
@@ -117,7 +118,7 @@ validate_variables mods (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e
         runChecker :: RWS () [Maybe T.Text] [T.Text] () -> Maybe T.Text
         runChecker c = errors_from_list . snd . evalRWS c () $ (fst <$> concatMap modConstants mods)
         checkVarUsage :: Expression -> RWS () [Maybe T.Text] [T.Text] ()
-        checkVarUsage (Lookup (Variable v)) = do
+        checkVarUsage (Lookup _ (Variable v)) = do
                 used <- get
                 when (v `notElem` used) $
                     tell [Just (T.concat ["Could not find variable `", T.pack . show $v, "`. ", suggestionMessage v used])]

@@ -72,7 +72,7 @@ isVarUsed1 v expr = evalCont $ callCC $ \exit -> do
                 return False
     where
         isVarUsed1' :: (Bool -> Cont Bool ()) -> Expression -> Cont Bool ()
-        isVarUsed1' exit (Lookup v')
+        isVarUsed1' exit (Lookup _ v')
             | v == v' = exit True
         isVarUsed1' _ _ = return ()
 
@@ -94,7 +94,7 @@ writeToMove' blocked ((lno,expr):rest) = (lno, addMove toRemove expr):writeToMov
         addMove :: [Variable] -> Expression -> Expression
         addMove dead = pureRecursiveTransform addMove'
             where
-                addMove' (FunctionCall f@(FuncName "write") e@(Lookup v) args b)
+                addMove' (FunctionCall f@(FuncName "write") e@(Lookup _ v) args b)
                     | v `elem` dead = FunctionCall f e ((Variable "__can_move", ConstBool True):args) b
                 addMove' e = e
 
@@ -105,7 +105,7 @@ functionVars :: T.Text -- ^ function name
 functionVars fname expr = execWriter (recursiveAnalyse fvars expr)
     where
         fvars :: Expression -> Writer [Variable] ()
-        fvars (FunctionCall (FuncName fname') (Lookup v) _ _)
+        fvars (FunctionCall (FuncName fname') (Lookup _ v) _ _)
             | fname' == fname = tell [v]
         fvars _ = return ()
 
@@ -123,7 +123,7 @@ qcInPreprocess ((lno,expr):rest) = case fastQVar expr of
 
 rewritePreprocess _ [] = [] -- this should never happen
 rewritePreprocess v ((lno,expr):rest) = case expr of
-    FunctionCall f@(FuncName "preprocess") e@(Lookup v') args b
+    FunctionCall f@(FuncName "preprocess") e@(Lookup _ v') args b
         | v == v' ->
                 let expr' = FunctionCall f e ((Variable "__input_qc", ConstBool True):args) b
                     in (lno,expr'):rest
@@ -138,7 +138,7 @@ fastQVar _ = Nothing
 -- 'v' is in a preproces call. Otherwise, it is not guaranteed to be safe
 canQCPreprocessTransform :: Variable -> [(Int, Expression)] -> Bool
 canQCPreprocessTransform _ [] = False
-canQCPreprocessTransform v ((_,FunctionCall (FuncName "preprocess") (Lookup v') _ _):_)
+canQCPreprocessTransform v ((_,FunctionCall (FuncName "preprocess") (Lookup _ v') _ _):_)
     | v' == v = True
 canQCPreprocessTransform v ((_, expr):rest)
     | isVarUsed1 v expr = False
@@ -147,7 +147,7 @@ canQCPreprocessTransform v ((_, expr):rest)
 
 ifLenDiscardSpecial :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 ifLenDiscardSpecial = pureTransform $ \case
-        (Condition (BinaryOp b (UnaryOp UOpLen (Lookup v)) (ConstInt thresh))
+        (Condition (BinaryOp b (UnaryOp UOpLen (Lookup _ v)) (ConstInt thresh))
                                     (Sequence [Discard])
                                     (Sequence []))
             | b `elem` [BOpLT, BOpLTE, BOpGT, BOpGTE] -> Optimized (LenThresholdDiscard v b (fromInteger thresh))
@@ -155,7 +155,7 @@ ifLenDiscardSpecial = pureTransform $ \case
 
 substrimReassign :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 substrimReassign = pureTransform $ \case
-        (Assignment v (FunctionCall (FuncName "substrim") (Lookup v') [(Variable "min_quality", ConstInt mq)] Nothing))
+        (Assignment v (FunctionCall (FuncName "substrim") (Lookup _ v') [(Variable "min_quality", ConstInt mq)] Nothing))
             | v == v' -> Optimized (SubstrimReassign v (fromInteger mq))
         e -> e
 
@@ -221,7 +221,7 @@ addOFileChecks' ((lno,e):rest) = do
             _ -> return ()
         extractExpressions Nothing = return ()
 
-        validVariables (Lookup v) = [v]
+        validVariables (Lookup _ v) = [v]
         validVariables (BinaryOp _ re le) = validVariables re ++ validVariables le
         validVariables (ConstStr _) = []
         validVariables _ = [Variable "this", Variable "wont", Variable "work"] -- this causes the caller to bailout

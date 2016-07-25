@@ -13,6 +13,7 @@ import Data.Maybe
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Trans.Maybe
+import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Applicative
@@ -21,6 +22,7 @@ import Data.List (find)
 
 import Modules
 import Language
+import NGLess.NGError
 import BuiltinFunctions
 import Utils.Suggestion
 
@@ -32,12 +34,13 @@ type TypeMSt = StateT (Int, TypeMap)        -- ^ Current line & current type map
                         (Writer [T.Text]))) -- ^ we write out error messages
 
 -- | checktypes will either return an error message or pass through the script
-checktypes :: [Module] -> Script -> Either T.Text Script
+checktypes :: [Module] -> Script -> NGLess Script
 checktypes mods script@(Script _ exprs) = let w = runMaybeT (runStateT (inferScriptM exprs) (0,Map.empty)) in
     case runWriter (runReaderT w mods) of
-        (Just _, []) -> Right script
-        (_, errs) -> Left (T.unlines errs)
+        (Just (_,(_, tmap)), []) -> return $ script { nglBody = decorate tmap exprs }
+        (_, errs) -> throwScriptError . T.unpack . T.unlines $ errs
 
+-- error in line concat
 errorInLineC :: [String] -> TypeMSt ()
 errorInLineC = errorInLine . T.concat . map fromString
 
@@ -61,7 +64,7 @@ inferScriptM ((lno,e):es) = modify (\(_,m) -> (lno,m)) >> inferM e >> inferScrip
 inferM :: Expression -> TypeMSt ()
 inferM (Sequence es) = inferM `mapM_` es
 inferM (Assignment (Variable v) expr) = do
-    ltype <- envLookup v
+    ltype <- envLookup Nothing v
     mrtype <- nglTypeOf expr
     check_assignment ltype mrtype
     case mrtype of
@@ -84,8 +87,18 @@ inferBlock (FuncName f) (Just (Block vars es)) = case f of
                 envInsert v btype
             inferM es
 
-envLookup :: T.Text -> TypeMSt (Maybe NGLType)
-envLookup v = liftM2 (<|>)
+envLookup :: Maybe NGLType -> T.Text -> TypeMSt (Maybe NGLType)
+envLookup Nothing v = envLookup' v
+envLookup mt@(Just t) v = envLookup' v >>= \case
+        Nothing -> return mt
+        Just t'
+            | t == t' -> return mt
+            | otherwise -> do
+                errorInLineC ["Incompatible types detected for variable '"
+                                , T.unpack v, "': previously assigned to type "
+                                , show t, ", now being detected as ", show t']
+                return mt
+envLookup' v = liftM2 (<|>)
                     (constantLookup v)
                     (Map.lookup v . snd <$> get)
 
@@ -113,7 +126,7 @@ check_assignment a b = when (a /= b)
 nglTypeOf :: Expression -> TypeMSt (Maybe NGLType)
 nglTypeOf (FunctionCall f arg args b) = inferBlock f b *> checkFuncKwArgs f args *> checkFuncUnnamed f arg
 nglTypeOf (MethodCall m self arg args) = checkmethodargs m args *> checkmethodcall m self arg
-nglTypeOf (Lookup (Variable v)) = envLookup v
+nglTypeOf (Lookup mt (Variable v)) = envLookup mt v
 nglTypeOf (BuiltinConstant (Variable v)) = return (typeOfConstant v)
 nglTypeOf (ConstStr _) = return (Just NGLString)
 nglTypeOf (ConstInt _) = return (Just NGLInteger)
@@ -214,8 +227,8 @@ checklist (ListExpression es) = do
     unless (all (==t) ts)
         (errorInLine "List of mixed type")
     return (Just t)
-checklist (Lookup (Variable v)) = do
-    vtype <- envLookup v
+checklist (Lookup mt (Variable v)) = do
+    vtype <- envLookup mt v
     case vtype of
         Just (NGList btype) -> return (Just btype)
         Just NGLRead -> return (Just NGLRead)
@@ -323,3 +336,9 @@ checkmethodargs m args = forM_ args (check1arg (concat ["method '", show m, "'"]
                 [] -> errorInLineC ["Required argument ", T.unpack (argName ai), " is missing in method call ", show m, "."]
                 _ -> error "This should never happen: multiple arguments with the same name should have been caught before"
 
+decorate :: TypeMap -> [(Int, Expression)] -> [(Int,Expression)]
+decorate tmap exprs = map decorate' exprs
+    where
+        decorate' (lno,e) = (lno, runIdentity $ recursiveTransform addTypes e)
+        addTypes (Lookup Nothing v@(Variable n)) = return $ Lookup (Map.lookup n tmap) v
+        addTypes e = return e
