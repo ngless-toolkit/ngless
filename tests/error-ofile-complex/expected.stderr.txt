@@ -1,4 +1,4 @@
-Exiting after fatal error while running script
+Exiting after fatal error while loading and running script
 System Error
 [31mFile name 'outputs/output-dir-does-not-exist/output.fq' used as output, but directory outputs/output-dir-does-not-exist does not exist. (used in line 7).
 [0m
