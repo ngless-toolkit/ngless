@@ -21,7 +21,6 @@ module Language
     , recursiveAnalyse
     , recursiveTransform
     , usedVariables
-    , typeOfConstant
     , staticValue
     ) where
 
@@ -45,11 +44,6 @@ instance Show FuncName where
 
 newtype MethodName = MethodName { unwrapMethodName :: T.Text }
     deriving (Eq, Ord, Show)
-
-typeOfConstant :: T.Text -> Maybe NGLType
-typeOfConstant "STDIN"        = Just NGLString
-typeOfConstant "STDOUT"       = Just NGLString
-typeOfConstant _              = Nothing
 
 -- | unary operators
 data UOp = UOpLen | UOpMinus | UOpNot

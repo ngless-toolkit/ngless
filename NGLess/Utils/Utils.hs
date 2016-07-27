@@ -1,8 +1,6 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
-
-{-# LANGUAGE OverloadedStrings #-}
 
 module Utils.Utils
     ( lookupWithDefault
@@ -15,6 +13,7 @@ module Utils.Utils
     , allSame
     , passthrough
     , moveOrCopy
+    , secondM
     ) where
 
 import Control.Monad
@@ -81,3 +80,6 @@ findM [] _ = return Nothing
 findM (x:xs) f = f x >>= \case
     Nothing -> findM xs f
     val -> return val
+
+secondM :: Monad m => (a -> m b) -> (c,a) -> m (c,b)
+secondM f (a,c) = (a,) <$> f c

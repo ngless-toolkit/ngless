@@ -1,19 +1,18 @@
 {- Copyright 2013-2016 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings, LambdaCase #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Types
     ( checktypes
     ) where
 
 import qualified Data.Text as T
 import qualified Data.Map as Map
+import           Control.Arrow
 import Data.Maybe
 import Control.Monad
 import Control.Monad.State.Strict
-import Control.Monad.Trans.Maybe
-import Control.Monad.Identity
+import Control.Monad.Trans.Either
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Applicative
@@ -25,19 +24,23 @@ import Language
 import NGLess.NGError
 import BuiltinFunctions
 import Utils.Suggestion
+import Utils.Utils
 
 
 type TypeMap = Map.Map T.Text NGLType
 type TypeMSt = StateT (Int, TypeMap)        -- ^ Current line & current type map (type map is inferred top-to-bottom)
-                (MaybeT                     -- ^ to enable early exit for certain types of error
+                (EitherT NGError            -- ^ to enable early exit for certain types of error
                     (ReaderT [Module]       -- ^ the modules passed in (fixed)
                         (Writer [T.Text]))) -- ^ we write out error messages
 
--- | checktypes will either return an error message or pass through the script
+-- | checktypes attempts to add types to all the Lookup Expression
 checktypes :: [Module] -> Script -> NGLess Script
-checktypes mods script@(Script _ exprs) = let w = runMaybeT (runStateT (inferScriptM exprs) (0,Map.empty)) in
+checktypes mods script@(Script _ exprs) = let w = runEitherT (runStateT (inferScriptM exprs) (0,Map.empty)) in
     case runWriter (runReaderT w mods) of
-        (Just (_,(_, tmap)), []) -> return $ script { nglBody = decorate tmap exprs }
+        (Right (_,(_, tmap)), []) -> do
+            typed <- addTypes tmap exprs
+            return $ script { nglBody = typed }
+        (Left err, []) -> Left err
         (_, errs) -> throwScriptError . T.unpack . T.unlines $ errs
 
 -- error in line concat
@@ -54,12 +57,12 @@ errorInLine e = do
 -- continuing): these get accumulated until the end of parsing. Some errors,
 -- however, trigger an immediate abort by calling 'cannotContinue'
 cannotContinue :: TypeMSt a
-cannotContinue = lift (MaybeT (return Nothing))
+cannotContinue = tell ["Cannot continue typechecking."] >> throwScriptError "Error in type checking"
 
 
 inferScriptM :: [(Int,Expression)] -> TypeMSt ()
 inferScriptM [] = return ()
-inferScriptM ((lno,e):es) = modify (\(_,m) -> (lno,m)) >> inferM e >> inferScriptM es
+inferScriptM ((lno,e):es) = modify (first (const lno)) >> inferM e >> inferScriptM es
 
 inferM :: Expression -> TypeMSt ()
 inferM (Sequence es) = inferM `mapM_` es
@@ -113,7 +116,7 @@ constantLookup v = do
             cannotContinue
 
 envInsert :: T.Text -> NGLType -> TypeMSt ()
-envInsert v t = modify (\(lno,m) -> (lno, Map.insert v t m))
+envInsert v t = modify $ second (Map.insert v t)
 
 check_assignment :: Maybe NGLType -> Maybe NGLType -> TypeMSt ()
 check_assignment _ (Just NGLVoid) = errorInLine "Assigning void value to variable"
@@ -148,6 +151,10 @@ nglTypeOf Optimized{}    = error "unexpected nglTypeOf(Optimized)"
 nglTypeOf Condition{}    = error "unexpected nglTypeOf(Condition)"
 nglTypeOf (Sequence _es) = error "unexpected nglTypeOf(Sequence)"
 
+typeOfConstant :: T.Text -> Maybe NGLType
+typeOfConstant "STDIN"        = Just NGLString
+typeOfConstant "STDOUT"       = Just NGLString
+typeOfConstant _              = Nothing
 
 typeOfObject :: NGLessObject -> Maybe NGLType
 typeOfObject (NGOString _) = Just NGLString
@@ -223,10 +230,13 @@ checkindex expr index = checkindex' index *> checklist expr
 checklist (ListExpression []) = return (Just NGLVoid)
 checklist (ListExpression es) = do
     types <- nglTypeOf `mapM` es
-    let (t:ts) = catMaybes types
-    unless (all (==t) ts)
-        (errorInLine "List of mixed type")
-    return (Just t)
+    let ts = catMaybes types
+    if null ts
+        then return Nothing
+        else do
+            unless (allSame ts)
+                (errorInLine "List of mixed type")
+            return (Just $ head ts)
 checklist (Lookup mt (Variable v)) = do
     vtype <- envLookup mt v
     case vtype of
@@ -252,9 +262,14 @@ funcInfo fn = do
             errorInLineC ["Too many matches for function '", show fn, "'"]
             cannotContinue
 
-findMethodInfo m = case filter ((==m) . methodName) builtinMethods of
-                     [mi] -> mi
-                     _ -> error ("Should have been able to find method '"++show m++"'")
+findMethodInfo m =  case filter ((==m) . methodName) builtinMethods of
+                     [mi] -> return mi
+                     _ -> do
+                        errorInLineC
+                                    ["Cannot find method `", T.unpack (unwrapMethodName m), "`."
+                                    ,T.unpack $ suggestionMessage (unwrapMethodName m) ((unwrapMethodName . methodName) <$> builtinMethods)
+                                    ]
+                        cannotContinue
 
 checkFuncUnnamed :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
 checkFuncUnnamed f arg = do
@@ -309,8 +324,8 @@ requireType def_t e = nglTypeOf e >>= \case
 
 checkmethodcall :: MethodName -> Expression -> Maybe Expression -> TypeMSt (Maybe NGLType)
 checkmethodcall m self arg = do
-    let minfo = findMethodInfo m
-        reqSelfType = methodSelfType minfo
+    minfo <- findMethodInfo m
+    let reqSelfType = methodSelfType minfo
         reqArgType = methodArgType minfo
     stype <- requireType reqSelfType self
     when (stype /= reqSelfType) (errorInLineC
@@ -325,20 +340,20 @@ checkmethodcall m self arg = do
     return . Just . methodReturnType $ minfo
 
 checkmethodargs :: MethodName -> [(Variable, Expression)] -> TypeMSt ()
-checkmethodargs m args = forM_ args (check1arg (concat ["method '", show m, "'"]) ainfo) *> findAllRequired
-    where
-        minfo = findMethodInfo m
-        ainfo = methodKwargsInfo minfo
-        requiredArgs = filter argRequired ainfo
-        findAllRequired = forM_ requiredArgs $ \ai ->
+checkmethodargs m args = do
+        ainfo <- methodKwargsInfo <$> findMethodInfo m
+        forM_ args (check1arg (concat ["method '", show m, "'"]) ainfo)
+        forM_ (filter argRequired ainfo) $ \ai ->
             case filter (\(Variable v,_) -> v == argName ai) args of
                 [_] -> return ()
                 [] -> errorInLineC ["Required argument ", T.unpack (argName ai), " is missing in method call ", show m, "."]
                 _ -> error "This should never happen: multiple arguments with the same name should have been caught before"
 
-decorate :: TypeMap -> [(Int, Expression)] -> [(Int,Expression)]
-decorate tmap exprs = map decorate' exprs
+addTypes :: TypeMap -> [(Int, Expression)] -> NGLess [(Int,Expression)]
+addTypes tmap exprs = mapM (secondM addTypes') exprs
     where
-        decorate' (lno,e) = (lno, runIdentity $ recursiveTransform addTypes e)
-        addTypes (Lookup Nothing v@(Variable n)) = return $ Lookup (Map.lookup n tmap) v
-        addTypes e = return e
+        addTypes' :: Expression -> NGLess Expression
+        addTypes' (Lookup Nothing v@(Variable n)) = case Map.lookup n tmap of
+            t@(Just _) -> return $ Lookup t v
+            Nothing -> throwScriptError ("Could not assign type to variable '" ++ show n ++ "'.")
+        addTypes' e = return e
