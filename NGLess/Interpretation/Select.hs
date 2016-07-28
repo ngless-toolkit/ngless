@@ -96,7 +96,7 @@ executeSelect (NGOMappedReadSet name istream ref) args = do
     return $! NGOMappedReadSet name out ref
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
-data FilterAction = FADrop | FAUnmatch | FAKeep
+data FilterAction = FADrop | FAUnmatch
     deriving (Eq)
 
 executeMappedReadMethod :: MethodName -> [SamLine] -> Maybe NGLessObject -> KwArgsValues -> NGLess NGLessObject
@@ -119,10 +119,10 @@ executeMappedReadMethod (MethodName "pe_filter") samlines Nothing [] = return . 
 executeMappedReadMethod (MethodName "filter") samlines Nothing kwargs = do
     minID <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_identity_pc" kwargs
     minMatchSize <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_match_size" kwargs
+    reverseTest <- lookupBoolOrScriptErrorDef (return False) "filter method" "reverse" kwargs
     action <- lookupSymbolOrScriptErrorDef (return "drop") "filter method" "action" kwargs >>= \case
         "drop" -> return FADrop
         "unmatch" -> return FAUnmatch
-        "keep" -> return FAKeep
         other -> throwScriptError ("unknown action in filter(): `" ++ T.unpack other ++"`.\nAllowed values are:\n\tdrop\n\tunmatch\n\tkeep\n")
     let minIDD :: Double
         minIDD = fromInteger minID / 100.0
@@ -132,15 +132,17 @@ executeMappedReadMethod (MethodName "filter") samlines Nothing kwargs = do
         okSize
             | minMatchSize == -1 = const True
             | otherwise = \s -> fromRight 0 (matchSize s) >= fromInteger minMatchSize
-        passTest s = okID s && okSize s
-        unmatchWhen c s
-            | c s = unmatch s
+        rawTest s = okID s && okSize s
+        passTest
+            | reverseTest = not . rawTest
+            | otherwise = rawTest
+        unmatchUnless c s
+            | not (c s) = unmatch s
             | otherwise = s
         unmatch samline = samline { samFlag = (samFlag samline .|. 4) `clearBit` 1, samRName = "*", samCigar = "*" }
         samlines' = case action of
             FADrop -> filter passTest samlines
-            FAUnmatch -> map (unmatchWhen passTest) samlines
-            FAKeep -> filter (not . passTest) samlines
+            FAUnmatch -> map (unmatchUnless passTest) samlines
     return (NGOMappedRead samlines')
 executeMappedReadMethod (MethodName "unique") samlines Nothing [] = return . NGOMappedRead . mUnique $ samlines
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")

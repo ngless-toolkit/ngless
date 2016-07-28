@@ -38,6 +38,9 @@ operation (i.e., all conditions have to be fulfilled for the test to be true).
 
 The default is to discard mappings that do not pass the test, but it can be
 changed with the `action` argument, which must be one of `{drop}` (default:
-the read is excluded from the output), `{unmatch}` (the read is changed so that
-it no longer reports matching), `{keep}` (the read is kept **only if** the test
-is true).
+the read is excluded from the output), or `{unmatch}` (the read is changed so
+that it no longer reports matching).
+
+You can pass the flag `reverse` (i.e., `reverse=True`) to reverse the sign of
+the test.
+

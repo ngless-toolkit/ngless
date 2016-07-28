@@ -116,6 +116,7 @@ builtinMethods =
 filterArgs =
     [ArgInformation "min_identity_pc" False NGLInteger []
     ,ArgInformation "min_match_size" False NGLInteger []
-    ,ArgInformation "action" False NGLSymbol [ArgCheckSymbol ["drop", "unmap", "keep"]]
+    ,ArgInformation "action" False NGLSymbol [ArgCheckSymbol ["drop", "unmatch"]]
+    ,ArgInformation "reverse" False NGLBool []
     ]
 
