@@ -236,10 +236,10 @@ check_toplevel f ((lno,e):es) = case f e of
         Just m -> Just (T.concat ["Line ", T.pack (show lno), ": ", m])
 
 checkRecursiveScript :: (Expression -> Maybe T.Text) -> Script -> Maybe T.Text
-checkRecursiveScript f (Script _ es) = check_toplevel (checkRecursive f) es
+checkRecursiveScript f (Script _ es) = check_toplevel checkRecursive es
     where
-        checkRecursive :: (Expression -> Maybe T.Text) -> Expression -> Maybe T.Text
-        checkRecursive f e = case execWriter (recursiveAnalyse f' e) of
+        checkRecursive :: Expression -> Maybe T.Text
+        checkRecursive e = case execWriter (recursiveAnalyse f' e) of
                 [] -> Nothing
                 errors -> Just $ T.concat errors
         f' :: Expression -> Writer [T.Text] ()
