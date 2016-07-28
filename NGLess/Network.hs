@@ -3,17 +3,24 @@
 module Network
     ( downloadFile
     , downloadOrCopyFile
+    , downloadExpandTar
     ) where
 
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Conduit as C
 import           Data.Conduit (($$+-), (=$=))
-import Data.Conduit.Binary (sinkFile)
-import System.Directory (copyFile)
-import Data.List (isPrefixOf)
+
+import qualified Data.ByteString.Lazy as BL
+import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString.Char8 as B
 import qualified Network.HTTP.Conduit as HTTP
 import qualified Network.HTTP.Client as HTTP
+
+import Data.Conduit.Binary (sinkFile)
+import System.Directory (copyFile, createDirectoryIfMissing, removeFile)
+import Data.List (isPrefixOf)
+import System.FilePath
 
 import Output
 import NGLess
@@ -40,6 +47,16 @@ downloadFile url destPath = do
             HTTP.responseBody res
                 $$+- printProgress (read (B.unpack csize))
                 =$= sinkFile destPath
+
+downloadExpandTar :: FilePath -> FilePath -> NGLessIO ()
+downloadExpandTar url destdir = do
+    let tarName = destdir <.> "tar.gz"
+
+    liftIO $ createDirectoryIfMissing True destdir
+    downloadFile url tarName
+    liftIO $ do
+        Tar.unpack destdir . Tar.read . GZip.decompress =<< BL.readFile tarName
+        removeFile tarName
 
 printProgress :: Int -> C.Conduit B.ByteString NGLessIO B.ByteString
 printProgress csize = liftIO (mkProgressBar 40) >>= loop 0

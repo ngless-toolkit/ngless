@@ -13,6 +13,7 @@ ngless-locks/
 ngless-partials/
 *.output_ngless/
 /testing_tmp_dir/
+/Modules/packages/
 
 # Generated as part of build
 NGLess/Dependencies/bwa_data.c

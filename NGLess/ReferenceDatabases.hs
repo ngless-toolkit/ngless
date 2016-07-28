@@ -27,7 +27,7 @@ import Control.Applicative ((<|>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource(release)
 
-import Network (downloadFile, downloadOrCopyFile)
+import Network (downloadExpandTar, downloadOrCopyFile)
 import FileManagement (createTempDir)
 import Utils.Bwa as Bwa
 import Utils.Utils
@@ -110,20 +110,6 @@ createReferencePack oname reference mgtf mfunc = do
     release rk
 
 
-downloadReference :: Reference  -> FilePath -> NGLessIO ()
-downloadReference ref destPath = do
-    url <- case refUrl ref of
-        Just u -> return u
-        Nothing
-            | isDefaultReference (refName ref) -> do
-                    baseURL <- nConfDownloadBaseURL <$> nglConfiguration
-                    return $ baseURL </> T.unpack (refName ref) <.> "tar.gz"
-            | otherwise ->
-                throwScriptError ("Expected reference data, got "++T.unpack (refName ref))
-    outputListLno' InfoOutput ["Starting download from ", url]
-    downloadFile url destPath
-    outputLno' InfoOutput "Reference download completed!"
-
 
 -- | Make sure that the passed reference is present, downloading it if
 -- necessary.
@@ -157,7 +143,6 @@ installData Nothing refname = do
         else installData (Just User) refname
 installData (Just mode) refname = do
     basedir <- dataDirectory mode
-    let tarName = basedir </> T.unpack refname <.> "tar.gz"
     mods <- loadedModules
     let unpackRef (ExternalPackagedReference r) = Just r
         unpackRef _ = Nothing
@@ -165,11 +150,18 @@ installData (Just mode) refname = do
     ref  <- case find ((==refname) . refName) (refs ++ builtinReferences) of
         Just ref -> return ref
         Nothing -> throwScriptError ("Could not find reference '" ++ T.unpack refname ++ "'. It is not builtin nor in one of the loaded modules.")
-    liftIO $ createDirectoryIfMissing True basedir
-    downloadReference ref tarName
-    let destdir = basedir </> T.unpack refname
-    liftIO $
-        Tar.unpack destdir . Tar.read . GZip.decompress =<< BL.readFile tarName
+    url <- case refUrl ref of
+        Just u -> return u
+        Nothing
+            | isDefaultReference (refName ref) -> do
+                    baseURL <- nConfDownloadBaseURL <$> nglConfiguration
+                    return $ baseURL </> "References" </> T.unpack (refName ref) <.> "tar.gz"
+            | otherwise ->
+                throwScriptError ("Expected reference data, got "++T.unpack (refName ref))
+    outputListLno' InfoOutput ["Starting download from ", url]
+    let destdir = basedir </> "References" </> T.unpack refname
+    downloadExpandTar url destdir
+    outputLno' InfoOutput "Reference download completed!"
     return destdir
 
 
@@ -185,7 +177,7 @@ findDataFiles ref = liftM2 (<|>)
 findDataFilesIn :: FilePath -> InstallMode -> NGLessIO (Maybe FilePath)
 findDataFilesIn ref mode = do
     basedir <- dataDirectory mode
-    let refdir = basedir </> ref
+    let refdir = basedir </> "References" </> ref
     hasIndex <- hasValidIndex (buildFaFilePath refdir)
     outputListLno' TraceOutput ["Looked for ", ref, " in directory ", refdir, if hasIndex then " (and found it)" else " (and did not find it)"]
     return $! (if hasIndex

@@ -2,7 +2,7 @@
  - License: MIT
  -}
 
-{-# LANGUAGE TupleSections, OverloadedStrings, LambdaCase, RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts #-}
 
 module ExternalModules
     ( loadModule
@@ -35,6 +35,7 @@ import Utils.Conduit
 import FileOrStream
 import Utils.Utils
 import Language
+import Network
 import Modules
 import Output
 import NGLess
@@ -373,6 +374,21 @@ findFirstM f (x:xs) = f x >>= \case
     Nothing -> findFirstM f xs
     other -> return other
 
+downloadableModules =
+    [("example-cmd", "0.0")
+    ,("motus", "0.0")
+    ]
+
+downloadModule :: T.Text -> T.Text -> NGLessIO FilePath
+downloadModule modname modversion = do
+    dataDirectory <- nConfUserDataDirectory <$> nglConfiguration
+    baseUrl <- nConfDownloadBaseURL <$> nglConfiguration
+    let nameversion = T.unpack modname <.> "ngm" </> T.unpack modversion
+        destdir = dataDirectory </> "Modules" </> nameversion
+        url = baseUrl </> "Modules" </> nameversion <.> "tar.gz"
+    downloadExpandTar url dataDirectory
+    return destdir
+
 findLoad :: T.Text -> T.Text -> NGLessIO ExternalModule
 findLoad modname version = do
     let modpath' = "Modules" </> T.unpack modname <.> "ngm"
@@ -387,25 +403,29 @@ findLoad modname version = do
         return $! if exists
             then Just (basedir </> modpath)
             else Nothing
-    case found of
+    found' <- case found of
+        Nothing
+            | (modname, version) `elem` downloadableModules -> Just <$> downloadModule modname version
+        _ -> return found
+    case found' of
         Just mdir -> decodeEither <$> liftIO (B.readFile (mdir </> modfile)) >>= \case
-                    Right v -> return $ addPathToRep mdir v
-                    Left err -> throwSystemError ("Could not load module file "++ mdir </> modfile ++ ". Error was `" ++ err ++ "`")
+                        Right v -> return $ addPathToRep mdir v
+                        Left err -> throwSystemError ("Could not load module file "++ mdir </> modfile ++ ". Error was `" ++ err ++ "`")
         Nothing -> do
-            others <- forM [".", globalDir, userDir] $ \basedir -> do
-                let dname = basedir </> modpath'
-                    listDirectory d = filter (`notElem` [".", ".."]) <$> getDirectoryContents d
-                exists <- liftIO $ doesDirectoryExist dname
-                if not exists
-                     then return []
-                     else liftIO (listDirectory dname)
-            throwSystemError
-                ("Could not find external module '" ++ T.unpack modname ++
-                    (case concat others of
-                        [] -> "'."
-                        foundVersions -> "' version " ++ T.unpack version ++ ".\n"
-                                        ++ "Please check the version number. I found the following versions:" ++
-                                            concat ["\n\t- " ++ show v | v <- uniq foundVersions]))
+                others <- forM [".", globalDir, userDir] $ \basedir -> do
+                    let dname = basedir </> modpath'
+                        listDirectory d = filter (`notElem` [".", ".."]) <$> getDirectoryContents d
+                    exists <- liftIO $ doesDirectoryExist dname
+                    if not exists
+                         then return []
+                         else liftIO (listDirectory dname)
+                throwSystemError
+                    ("Could not find external module '" ++ T.unpack modname ++
+                        (case concat others of
+                            [] -> "'."
+                            foundVersions -> "' version " ++ T.unpack version ++ ".\n"
+                                            ++ "Please check the version number. I found the following versions:" ++
+                                                concat ["\n\t- " ++ show v | v <- uniq foundVersions]))
 
 loadModule :: T.Text -> T.Text -> NGLessIO Module
 loadModule m version = asInternalModule =<< findLoad m version
