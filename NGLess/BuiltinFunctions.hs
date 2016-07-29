@@ -18,7 +18,7 @@ data MethodInfo = MethodInfo
     , methodSelfType :: NGLType
     , methodArgType :: Maybe NGLType
     , methodReturnType :: NGLType
-    , methodKwargsInfo :: [ArgInformation]
+    , methodKwargsInfo :: [ArgInformation] -- Unnamed argument is called "__0"
     , methodIsPure :: Bool
     } deriving (Eq, Show)
 
@@ -108,7 +108,7 @@ substrimArgs =
 
 
 builtinMethods =
-    [MethodInfo (MethodName "flag")   NGLMappedRead (Just NGLSymbol) NGLBool [] True
+    [MethodInfo (MethodName "flag")   NGLMappedRead (Just NGLSymbol) NGLBool flagArgs True
     ,MethodInfo (MethodName "filter") NGLMappedRead Nothing NGLMappedRead filterArgs True
     ,MethodInfo (MethodName "some_match") NGLMappedRead (Just NGLString) NGLBool [] True
     ,MethodInfo (MethodName "unique") NGLMappedRead Nothing NGLMappedRead [] True
@@ -120,3 +120,6 @@ filterArgs =
     ,ArgInformation "reverse" False NGLBool []
     ]
 
+flagArgs =
+    [ArgInformation "__0" False NGLSymbol [ArgCheckSymbol ["mapped", "unmapped"]]
+    ]

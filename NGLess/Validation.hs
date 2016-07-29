@@ -138,8 +138,60 @@ validate_symbol_in_args :: [Module] -> Script -> Maybe T.Text
 validate_symbol_in_args mods = checkRecursiveScript validate_symbol_in_args'
     where
         validate_symbol_in_args' (Assignment  _ fc) = validate_symbol_in_args' fc
-        validate_symbol_in_args' (FunctionCall f _ args _) = check_symbol_val_in_arg mods f args
+        validate_symbol_in_args' (FunctionCall f _ args _) = checkFunction f args
+        validate_symbol_in_args' (MethodCall m _ arg0 args) = checkMethod m arg0 args
         validate_symbol_in_args' _ = Nothing
+
+        checkFunction :: FuncName -> [(Variable, Expression)]-> Maybe T.Text
+        checkFunction f args = case findFunction mods f of
+                Nothing -> Just (T.concat ["Function '", T.pack . show $ f, "' not found"])
+                Just finfo -> errors_from_list $ map (check1 finfo) args
+            where
+                check1 finfo (Variable v, expr) = let legal = allowedFunction finfo v in case expr of
+                        ConstSymbol s
+                            | s `elem` legal -> Nothing
+                            | otherwise -> Just . T.concat $ case findSuggestion s legal of
+                                    Nothing ->
+                                        ["Argument: `", v, "` (for function ", T.pack (show f), ") expects one of ", showA legal, " but got {", s, "}"]
+                                    Just (Suggestion valid reason) ->
+                                        ["Argument `", v, "` for function ", T.pack (show f), ", got {", s, "}.\n\tDid you mean {", valid, "} (", reason, ")\n\nAllowed arguments are: [", showA legal, "]"]
+                        ListExpression es   -> errors_from_list $ map (\e -> check1 finfo (Variable v, e)) es
+                        _                   -> Nothing
+
+        allowedFunction :: Function -> T.Text -> [T.Text]
+        allowedFunction finfo v = fromMaybe [] $ do
+            argInfo <- find ((==v) . argName) (funcKwArgs finfo)
+            ArgCheckSymbol ss <- find (\case { ArgCheckSymbol{} -> True; _ -> False }) (argChecks argInfo)
+            return ss
+
+        findMethod :: MethodName -> Maybe MethodInfo
+        findMethod m = find ((==m) . methodName) builtinMethods
+
+        allowedMethod minfo v = fromMaybe [] $ do
+            argInfo <- find ((==v) . argName) (methodKwargsInfo minfo)
+            ArgCheckSymbol ss <- find (\case { ArgCheckSymbol{} -> True; _ -> False}) (argChecks argInfo)
+            return ss
+
+        checkMethod m (Just a) args = checkMethod m Nothing ((Variable "__0", a):args)
+        checkMethod m Nothing args = case findMethod m of
+                Nothing -> Just (T.concat ["Method'", T.pack . show $ m, "' not found"])
+                Just minfo -> errors_from_list $ map (check1m minfo) args
+            where
+                check1m minfo (Variable v, expr) = let legal = allowedMethod minfo v in case expr of
+                    ConstSymbol s
+                        | s `elem` legal ->  Nothing
+                        | otherwise -> Just . T.concat $ case findSuggestion s legal of
+                                Nothing ->
+                                    (if v /= "__0" then ["Argument `", v, "` "] else ["Unnamed argument "]) ++ ["(for method ", unwrapMethodName m, ") expects one of ", showA legal, " but got {", s, "}"]
+                                Just (Suggestion valid reason) ->
+                                    (if v /= "__0" then ["Argument `", v, "` "] else ["Unnamed argument "]) ++ ["(for method ", unwrapMethodName m, ") got {", s, "}"] ++
+                                        ["\n\tDid you mean {", valid, "} (", reason, ")\n\nAllowed arguments are: [", showA legal, "]"]
+                    ListExpression es   -> errors_from_list $ map (\e -> check1m minfo (Variable v, e)) es
+                    _                   -> Nothing
+
+        showA [] = ""
+        showA [e] = T.concat ["{", e, "}"]
+        showA (e:es) = T.concat ["{", e, "}, ", showA es]
 
 
 
@@ -202,32 +254,6 @@ constant_used_block _ _ = False
 
 uses_STDOUT :: Expression -> Bool
 uses_STDOUT = constant_used "STDOUT"
-
-check_symbol_val_in_arg :: [Module] -> FuncName -> [(Variable, Expression)]-> Maybe T.Text
-check_symbol_val_in_arg mods f args = case findFunction mods f of
-        Nothing -> Just (T.concat ["Function '", T.pack . show $ f, "' not found"])
-        Just finfo -> errors_from_list $ map (check1 finfo) args
-    where
-        allowed :: Function -> T.Text -> [T.Text]
-        allowed finfo v = fromMaybe [] $ do
-            argInfo <- find ((==v) . argName) (funcKwArgs finfo)
-            ArgCheckSymbol ss <- find (\case { ArgCheckSymbol{} -> True; _ -> False }) (argChecks argInfo)
-            return ss
-
-        allowedStr finfo v = T.concat ["[", showA (allowed finfo v), "]"]
-        showA [] = ""
-        showA [e] = T.concat ["{", e, "}"]
-        showA (e:es) = T.concat ["{", e, "}, ", showA es]
-        check1 finfo (Variable v, expr) = case expr of
-                ConstSymbol s
-                    | s `elem` allowed finfo v -> Nothing
-                    | otherwise -> Just . T.concat $ case findSuggestion s (allowed finfo v) of
-                            Nothing ->
-                                ["Argument: `", v, "` (for function ", T.pack (show f), ") expects one of ", allowedStr finfo v, " but got {", s, "}"]
-                            Just (Suggestion valid reason) ->
-                                ["Argument `", v, "` for function ", T.pack (show f), ", got {", s, "}.\n\tDid you mean {", valid, "} (", reason, ")\n\nAllowed arguments are: ", allowedStr finfo v]
-                ListExpression es   -> errors_from_list $ map (\e -> check1 finfo (Variable v, e)) es
-                _                   -> Nothing
 
 check_toplevel :: (Expression -> Maybe T.Text) -> [(Int, Expression)] -> Maybe T.Text
 check_toplevel _ [] = Nothing
