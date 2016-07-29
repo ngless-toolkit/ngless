@@ -9,7 +9,7 @@ packages/example-cmd-0.0.tar.gz:
 	mkdir -p packages
 	cd .. && tar cfz Modules/packages/example-cmd-0.0.tar.gz Modules/example-cmd.ngm/0.0
 
-packages/motus-0.0.tar.gz: motus
+packages/motus-0.0.tar.gz:
 	cd .. && tar cfz Modules/packages/motus-0.0.tar.gz Modules/motus.ngm/0.0
 
 .PHONY: MODULES packages motus
