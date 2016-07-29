@@ -6,8 +6,9 @@ processing.
 
 **Note**: This is *pre-release* software, currently available as a preview
 only. Please `get in touch <mailto:coelho@embl.de>`__ if you want to use it in
-your work.
-
+your work.For questions, you can also use the `ngless mailing list
+<https://groups.google.com/forum/#!forum/ngless>`__.
+ 
 NGLess is best illustrated by an example:
 
 Example

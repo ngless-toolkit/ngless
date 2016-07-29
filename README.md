@@ -2,12 +2,15 @@
 
 [![Join the chat at https://gitter.im/luispedro/ngless](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/luispedro/ngless?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
+[![Build Status](https://travis-ci.org/luispedro/ngless.svg?branch=master)](https://travis-ci.org/luispedro/ngless)
+
 Ngless is a domain-specific language for NGS (next-generation sequencing data)
 processing.
 
 **Note**: This is *pre-release* software, currently available as a preview
 only. Please [get in touch](mailto:coelho@embl.de) if you want to use it in
-your work.
+your work. For questions, you can also use the [ngless mailing
+list](https://groups.google.com/forum/#!forum/ngless).
 
 ## Example
 
@@ -108,6 +111,7 @@ The following sequence of commands should download and build the software
 - [Full documentation](http://ngless.readthedocs.org/en/latest/)
 - [Frequently Asked Questions (FAQ)](http://ngless.readthedocs.org/en/latest/faq.html)
 - [ngless webpage](http://luispedro.github.io/ngless/)
+- [ngless mailing list](https://groups.google.com/forum/#!forum/ngless)
 
 ## Authors
 
