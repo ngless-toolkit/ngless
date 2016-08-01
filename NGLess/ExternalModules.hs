@@ -15,6 +15,8 @@ import qualified Data.List.Utils as LU
 import qualified Data.Conduit.Combinators as C
 import           Data.Conduit (($$))
 import           Control.Monad.Extra (whenJust)
+import GHC.Conc  (getNumCapabilities)
+
 import Control.Applicative
 import Control.Monad
 import System.Process
@@ -25,6 +27,7 @@ import System.IO
 import System.FilePath
 import Data.Aeson
 import Data.Yaml
+import Data.Maybe
 import Data.List (find, isSuffixOf)
 import Data.Default (def)
 
@@ -122,13 +125,37 @@ instance FromJSON CommandArgument where
                 | otherwise -> return Nothing
         return CommandArgument{..}
 
+newtype ReadNGLType = ReadNGLType { unwrapReadNGLType :: NGLType }
+
+instance FromJSON ReadNGLType where
+    parseJSON = withText "ngltype" $ \rtype -> do
+        ReadNGLType <$> case rtype of
+            "void" -> return NGLVoid
+            "counts" -> return NGLCounts
+            "readset" -> return NGLReadSet
+            "mappedreadset" -> return NGLMappedReadSet
+            other -> fail ("Cannot parse unknown type '"++T.unpack other++"'")
+
+data CommandReturn = CommandReturn
+                        { commandReturnType :: !NGLType
+                        , _commandReturnName :: !T.Text
+                        , _commandReturnExt :: FilePath
+                        }
+    deriving (Eq, Show)
+
+instance FromJSON CommandReturn where
+    parseJSON = withObject "hidden argument" $ \o ->
+        CommandReturn
+            <$> (unwrapReadNGLType <$> o .: "rtype")
+            <*> o .: "name"
+            <*> o .: "extension"
 
 data Command = Command
     { nglName :: T.Text
     , arg0 :: FilePath
     , arg1 :: CommandArgument
     , additional :: [CommandArgument]
-    , ret :: NGLType
+    , ret :: CommandReturn
     } deriving (Eq, Show)
 
 instance FromJSON Command where
@@ -138,12 +165,7 @@ instance FromJSON Command where
             <*> o .: "arg0"
             <*> o .: "arg1"
             <*> o .:? "additional" .!= []
-            <*> (((o .:? "ret" .!= "void") :: Parser T.Text) >>= \case
-                    "void" -> return NGLVoid
-                    "counts" -> return NGLCounts
-                    "readset" -> return NGLReadSet
-                    "mappedreadset" -> return NGLMappedReadSet
-                    other -> fail ("Cannot parse unknown type '"++T.unpack other++"'"))
+            <*> o .:? "return" .!=  CommandReturn NGLVoid "" ""
 
 data ExternalModule = ExternalModule
     { emInfo :: ModInfo
@@ -187,15 +209,17 @@ addPathToRef mpath er@ExternalReference{..} = er
 addPathToRef _ er = er
 
 
-asFunction Command{..} = Function (FuncName nglName) (Just . argType . cargInfo $ arg1) [] ret (map cargInfo additional) False
+asFunction Command{..} = Function (FuncName nglName) (Just . argType . cargInfo $ arg1) [] (commandReturnType ret) (map cargInfo additional) False
 
 {- | Environment to expose to module processes -}
 nglessEnv :: FilePath -> NGLessIO [(String,String)]
 nglessEnv basedir = liftIO $ do
     env <- getEnvironment
+    ncpu <- getNumCapabilities
     nglessPath <- getExecutablePath
     return $ ("NGLESS_NGLESS_BIN", nglessPath)
                 :("NGLESS_MODULE_DIR", basedir)
+                :("NGLESS_NR_CORES", show ncpu)
                 :env
 
 executeCommand :: FilePath -> [Command] -> T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -207,8 +231,15 @@ executeCommand basedir cmds funcname input args = do
     paths <- asfilePaths input
     paths' <- liftIO $ mapM canonicalizePath paths
     args' <- argsArguments cmd args
+    moarg <- case ret cmd of
+        CommandReturn NGLVoid _ _ -> return Nothing
+        CommandReturn _ name ext -> do
+            (newfp, hout) <- openNGLTempFile "external" "eout_" ext
+            liftIO $ hClose hout
+            let oarg = "--"++T.unpack name++"="++newfp
+            return $ Just (newfp, [oarg])
     env <- nglessEnv basedir
-    let cmdline = paths' ++ args'
+    let cmdline = paths' ++ args' ++ (fromMaybe [] (snd <$> moarg))
         process = (proc (basedir </> arg0 cmd) cmdline) { env = Just env }
     outputListLno' TraceOutput ["executing command: ", arg0 cmd, " ", LU.join " " cmdline]
     (exitCode, out, err) <- liftIO $
@@ -223,7 +254,15 @@ executeCommand basedir cmds funcname input args = do
                 "\texit code = ", show code,"\n",
                 "\tstdout='", out, "'\n",
                 "\tstderr='", err, "'"]
-    return NGOVoid
+    let groupName (NGOMappedReadSet g _ _) = g
+        groupName (NGOReadSet g _) = g
+        groupName _ = ""
+    return $ case moarg of
+        Nothing -> NGOVoid
+        Just (newfp, _) -> case commandReturnType $ ret cmd of
+            NGLCounts -> NGOCounts (File newfp)
+            NGLMappedReadSet -> NGOMappedReadSet (groupName input) (File newfp) Nothing
+            _ -> error "NOT IMPLEMENTED"
 
 asfilePaths :: NGLessObject -> NGLessIO  [FilePath]
 asfilePaths (NGOReadSet _ (ReadSet1 _ fp)) = return [fp]

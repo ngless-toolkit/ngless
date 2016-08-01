@@ -175,6 +175,20 @@ The ``required`` flag determines whether the argument is required. Note that
 arguments with a default argument are automatically optional (ngless may
 trigger a warning if you mark an argument with a default as required).
 
+To return a value, you must request that ngless generate a new temporary file
+for the script to generate output to. Therefore, you need to specify a
+``return`` section, with three parameters: ``rtype`` (return type, see below),
+``name`` the name of the argument to use, and ``extension`` the file extension
+of the output type.
+
+        return:
+            rtype: "counts"
+            name: "ofile"
+            extension: "sam"
+
+``rtype`` must be one of ``"void"``, ``"counts"``, ``"readset"``, or
+``"mappedreadset"``.
+
 ### References
 
 References are added with a *references* section, which is a list of
