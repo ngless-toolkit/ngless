@@ -1,0 +1,6 @@
+ngless '0.0'
+
+input = samfile('input.bam')
+input = select(input, keep_if=[{mapped}])
+write(input, ofile='output.sam')
+write(input, ofile='output.reused.sam')
