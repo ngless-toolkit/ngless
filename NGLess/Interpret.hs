@@ -39,7 +39,9 @@ import qualified Data.Conduit.TQueue as CA
 import           Control.Concurrent.STM (atomically)
 import           Control.DeepSeq (NFData(..))
 import           Data.Strict.Tuple (Pair(..))
+import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector as V
+import           Data.Int
 
 import System.IO
 import System.Directory
@@ -346,10 +348,10 @@ vMapMaybeLifted f v = sequence $ V.unfoldr loop 0
 
 shortReadVectorStats = do
     q <- liftIO $ TQ.newTBMQueueIO 8
-    let getPairs :: C.Conduit (V.Vector ShortRead) IO (Pair ByteLine ByteLine)
+    let getPairs :: C.Conduit (V.Vector ShortRead) IO (Pair ByteLine (VU.Vector Int8))
         getPairs = C.awaitForever $ \ells ->
             V.forM_ ells (C.yield . toPair)
-        toPair (ShortRead _ bps qs) = ByteLine bps :!: ByteLine qs
+        toPair (ShortRead _ bps qs) = ByteLine bps :!: qs
     p <- liftIO . A.async $
         CA.sourceTBMQueue q
             =$= getPairs
@@ -591,16 +593,12 @@ _evalUnary op v = nglTypeError ("invalid unary operation ("++show op++") on valu
 _evalIndex :: NGLessObject -> [Maybe NGLessObject] -> Either NGError NGLessObject
 _evalIndex (NGOList elems) [Just (NGOInteger ix)] = return (elems !! fromInteger ix)
 _evalIndex sr index@[Just (NGOInteger a)] = _evalIndex sr $ (Just $ NGOInteger (a + 1)) : index
-_evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Nothing] =
-    return . NGOShortRead $ ShortRead rId (B.drop (fromIntegral s) rSeq) (B.drop (fromIntegral s) rQual)
-_evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Nothing, Just (NGOInteger e)] =
-    return . NGOShortRead $ ShortRead rId (B.take (fromIntegral e) rSeq) (B.take (fromIntegral e) rQual)
-
-_evalIndex (NGOShortRead (ShortRead rId rSeq rQual)) [Just (NGOInteger s), Just (NGOInteger e)] = do
-    let e' = fromIntegral e
-        s' = fromIntegral s
-        e'' = e'- s'
-    return $ NGOShortRead (ShortRead rId (B.take e'' . B.drop s' $ rSeq) (B.take e'' . B.drop s' $ rQual))
+_evalIndex (NGOShortRead sr) [Just (NGOInteger s), Nothing] = let s' = fromInteger s in
+    return . NGOShortRead $ srSlice s' (srLength sr - s') sr
+_evalIndex (NGOShortRead sr) [Nothing, Just (NGOInteger e)] =
+    return . NGOShortRead $ srSlice 0 (fromInteger e) sr
+_evalIndex (NGOShortRead sr) [Just (NGOInteger s), Just (NGOInteger e)] =
+    return . NGOShortRead $ srSlice (fromInteger s) (fromInteger $ e - s) sr
 _evalIndex _ _ = nglTypeError ("_evalIndex: invalid operation" :: String)
 
 

@@ -8,6 +8,7 @@ import Test.HUnit
 import Test.Framework.Providers.HUnit
 
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Vector.Unboxed as VU
 import Tests.Utils
 import Data.FastQ
 
@@ -18,9 +19,10 @@ case_parse_encode_solexa = encodeRecover SolexaEncoding @?= Right reads3
 
 encodeRecover enc = fqDecode enc . BL.fromChunks $ map (fqEncode enc) reads3
 reads3 =
-    [ShortRead "x" "acttg" "\x23\x10\x22\x22\x18"
-    ,ShortRead "y" "catgt" "\x21\x11\x19\x25\x12"
-    ,ShortRead "z" "ccggg" "\x20\x10\x14\x20\x11"]
+    [ShortRead "x" "acttg" (VU.fromList [35,16,34,34,24])
+    ,ShortRead "y" "catgt" (VU.fromList [33,17,25,37,18])
+    ,ShortRead "z" "ccggg" (VU.fromList [32,16,20,32,17])
+    ]
 
 case_calculateEncoding_sanger = fromRight (guessEncoding 55) @?= SangerEncoding
 case_calculateEncoding_illumina_1 = fromRight (guessEncoding 65) @?= SolexaEncoding

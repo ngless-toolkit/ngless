@@ -20,6 +20,7 @@ import System.Directory (removeFile
                         ,removeDirectoryRecursive
                         ,doesFileExist
                         )
+import qualified Data.Vector.Unboxed as VU
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Char8 as B8
 
@@ -100,38 +101,6 @@ case_tok_word_ = tokenize' "test" "word_with_underscore" @?= Right expected
 
 
 
---- SETUP to reduce imports.
--- test array: "\n\v\f{zo\n\v\NUL" -> [10,11,12,123,122,111,10,11,0]
--- test cutoff: chr 20 -> '\DC4'
-
---Property 1: For every s, the size must be always smaller than the input
-prop_substrim_maxsize s = st >= 0 && e <= B.length (B.pack s)
-    where (st,e) = subtrimPos (B.pack s) '\DC4'
-
--- Property 2: substrim should be idempotent
-prop_substrim_idempotent s = st == 0 && e == B.length s1
-    where
-        s1 = cutByteString (B.pack s) (subtrimPos (B.pack s) '\DC4')
-        (st,e) = subtrimPos s1 '\DC4'
-
-data SplitByteString = SplitByteString B.ByteString Int Int
-    deriving (Show)
-
-instance Arbitrary SplitByteString where
-    arbitrary = do
-        qs <- B.pack <$> listOf1 arbitrary
-        st <- elements [0 .. B.length qs - 1]
-        n <- elements [0 .. B.length qs - st]
-        return $! SplitByteString qs st n
-
-prop_substrim_no_better (SplitByteString qs s n) = not valid || n' >= n
-    where
-        valid = all (> 'a') (B8.unpack . B.take n . B.drop s $ qs)
-        (_, n') = subtrimPos qs 'a'
-
-case_substrim_normal_exec =  subtrimPos "\n\v\f{zo\n\v\NUL" '\DC4' @?= (3,3)
-case_substrim_empty_quals = subtrimPos "" '\DC4' @?= (0,0)
-
 -- Test Types
 case_indent_comment = isOk "ParseFailed" $ parsetest indent_comment
 case_indent_space = isOk "ParseFailed" $ parsetest indent_space
@@ -150,7 +119,7 @@ indent_space  = "ngless '0.0'\n\
 
 
 -- Type Validate pre process operations
-sr i s q = NGOShortRead (ShortRead i s q)
+sr i s q = NGOShortRead (ShortRead i s $ VU.generate (B.length q) (convert . B.index q))
 
 case_pre_process_indexation_1 = _evalIndex' (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 5), Nothing] @?= (sr "@IRIS" "CAA" "aaa")
 case_pre_process_indexation_2 = _evalIndex' (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [Nothing, Just (NGOInteger 3)] @?= (sr "@IRIS" "AGT" "aa`")

@@ -4,6 +4,7 @@ module Data.FastQ
     ( ShortRead(..)
     , FastQEncoding(..)
     , FQStatistics(..)
+    , srSlice
     , encodingFor
     , srLength
     , guessEncoding
@@ -44,6 +45,7 @@ import Foreign.C.String
 
 import Data.IORef
 import Data.Maybe
+import Data.Int
 import Data.Char
 import Data.Word
 
@@ -52,13 +54,12 @@ import Utils.Conduit
 import Utils.Vector (unsafeIncrement)
 
 foreign import ccall "updateCharCount" c_updateCharCount :: CUInt -> CString -> Ptr Int -> IO ()
-foreign import ccall "updateQualityCounts" c_updateQualityCounts :: CUInt -> CString -> Ptr Int -> IO ()
 
     -- | Represents a short read
 data ShortRead = ShortRead
         { srHeader :: !B.ByteString
         , srSequence :: !B.ByteString
-        , srQualities :: !B.ByteString -- ^ these have been decoded
+        , srQualities :: !(VU.Vector Int8) -- ^ these have been decoded
         } deriving (Eq, Show, Ord)
 
 instance NFData ShortRead where
@@ -78,6 +79,9 @@ instance NFData FQStatistics where
     rnf (FQStatistics (!_,!_,!_,!_) !_ qv !_ (!_,!_)) = rnf qv
 
 srLength = B.length . srSequence
+
+srSlice :: Int -> Int -> ShortRead -> ShortRead
+srSlice s n (ShortRead rId rS rQ) = ShortRead rId (B.take n $ B.drop s rS) (VU.slice s n rQ)
 
 encodingOffset :: Num a => FastQEncoding -> a
 encodingOffset SangerEncoding = 33
@@ -99,27 +103,31 @@ fqEncodeC enc = CL.map (fqEncode enc)
 
 -- Using B.map instead of this function makes this loop be one of the functions
 -- with the highest memory allocation in ngless.
-bsAdd :: B.ByteString -> Word8 -> B.ByteString
+bsAdd :: VU.Vector Int8 -> Int8 -> B.ByteString
 bsAdd c delta = BI.unsafeCreate cn $ \p -> copyAddLoop p 0
     where
-        cn = B.length c
+        cn = VU.length c
         copyAddLoop p i
             | i == cn = return ()
             | otherwise = do
-                poke (p `plusPtr` i) (B.index c i + delta)
+                poke (p `plusPtr` i) ((fromIntegral $ c VU.! i + delta) :: Word8)
                 copyAddLoop p (i + 1)
+
+vAdd :: B.ByteString -> Int8 -> VU.Vector Int8
+vAdd qs delta = VU.generate (B.length qs) $ \i -> delta + fromIntegral (B.index qs i)
 
 fqEncode :: FastQEncoding -> ShortRead -> B.ByteString
 fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, "\n"]
     where
-        offset :: Word8
+        offset :: Int8
         offset = encodingOffset enc
 
 fqDecodeC :: (Monad m, MonadError NGError m) => FastQEncoding -> C.Conduit ByteLine m ShortRead
 fqDecodeC enc = groupC 4 =$= CL.mapM parseShortReads
     where
+        offset :: Int8
         offset = encodingOffset enc
-        parseShortReads [ByteLine rid, ByteLine rseq, _, ByteLine rqs] = return $! ShortRead rid rseq (bsAdd rqs (-offset))
+        parseShortReads [ByteLine rid, ByteLine rseq, _, ByteLine rqs] = return $! ShortRead rid rseq (vAdd rqs (-offset))
         parseShortReads _ = throwDataError "Number of lines in FastQ file is not multiple of 4! EOF found"
 
 -- | reads a sequence of short reads.
@@ -146,10 +154,10 @@ statsFromFastQ fp =
 
 
 -- | Useful for use with fqStatsC
-getPairedLines :: C.Conduit ByteLine NGLessIO (Pair ByteLine ByteLine)
+getPairedLines :: C.Conduit ByteLine NGLessIO (Pair ByteLine (VU.Vector Int8))
 getPairedLines = groupC 4 =$= CL.mapM getPairedLines'
     where
-        getPairedLines' [_, bps, _, qs] = return $! bps :!: qs
+        getPairedLines' [_, bps, _, ByteLine qs] = return $! bps :!: vAdd qs 0
         getPairedLines' _ = throwDataError "fastq lines are not a multiple of 4"
 
 -- | Guess the encoding of a file
@@ -172,7 +180,7 @@ encodingFor fp = do
     guessEncoding m
 
 
-fqStatsC :: forall m. (MonadIO m) => C.Sink (Pair ByteLine ByteLine) m FQStatistics
+fqStatsC :: forall m. (MonadIO m) => C.Sink (Pair ByteLine (VU.Vector Int8)) m FQStatistics
 fqStatsC = do
         -- This is pretty ugly code, but threading the state through a foldM
         -- was >2x slower. In any case, all the ugliness is well hidden.
@@ -203,8 +211,8 @@ fqStatsC = do
             return $! FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq)
     where
 
-        update :: VSM.IOVector Int -> VUM.IOVector Int -> IORef (VSM.IOVector Int) -> Pair ByteLine ByteLine -> m ()
-        update !charCounts !stats qcs (ByteLine bps :!: ByteLine qs) = liftIO $ do
+        update :: VSM.IOVector Int -> VUM.IOVector Int -> IORef (VSM.IOVector Int) -> Pair ByteLine (VU.Vector Int8) -> m ()
+        update !charCounts !stats qcs (ByteLine bps :!: qs) = liftIO $ do
             let len = B.length bps
                 qlen = 256*len
             prevLen <- VSM.length <$> readIORef qcs
@@ -218,9 +226,14 @@ fqStatsC = do
             B.unsafeUseAsCString bps $ \bps' ->
                 VSM.unsafeWith charCounts $ \charCounts' ->
                     c_updateCharCount (toEnum len) bps' charCounts'
-            B.unsafeUseAsCString qs $ \qs' ->
-                VSM.unsafeWith qcs' $ \qsc'' ->
-                    c_updateQualityCounts (toEnum len) qs' qsc''
+            let updateQCounts :: Int -> Int -> IO ()
+                updateQCounts n i
+                    | i == n = return ()
+                    | otherwise = do
+                        let qi = 256*i + fromIntegral (qs VU.! i)
+                        VSM.unsafeModify qcs' (+ 1) qi
+                        updateQCounts n (i+1)
+            updateQCounts (toEnum len) 0
             unsafeIncrement stats 0
             VUM.unsafeModify stats (min len) 1
             VUM.unsafeModify stats (max len) 2
