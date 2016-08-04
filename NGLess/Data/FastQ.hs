@@ -256,6 +256,7 @@ gcFraction res = gcCount / allBpCount
         allBpCount = fromIntegral $ bpA + bpC + bpG + bpT
 
 
+
 calculateStatistics :: FQStatistics -> FastQEncoding -> [(Int, Int, Int, Int)]
 calculateStatistics FQStatistics{qualCounts=qCounts} enc = Prelude.map statistics qCounts
     where

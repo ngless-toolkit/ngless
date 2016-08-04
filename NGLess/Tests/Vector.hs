@@ -8,12 +8,9 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 import Test.HUnit
 import Test.QuickCheck
-import Test.QuickCheck.Gen
 import qualified Data.Vector as V
-import qualified Data.Vector.Unboxed as VU
 import System.IO.Unsafe (unsafePerformIO)
 
-import Control.Monad
 import Utils.Vector
 
 tgroup_Vector = $(testGroupGenerator)

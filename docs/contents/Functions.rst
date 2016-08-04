@@ -338,11 +338,9 @@ Substrim
 --------
 
 Given a read, returns another that is the biggest sub-sequence with a
-given minimum quality. Example:
+given minimum quality. For example::
 
-::
-
-    read = substrim(read, min_quality=5)
+    read = substrim(read, min_quality=25)
 
 Argument:
 ~~~~~~~~~
@@ -354,17 +352,46 @@ Return:
 
 ShortRead
 
-Arguments by value:
-~~~~~~~~~~~~~~~~~~~
+Arguments
+~~~~~~~~~
 
 +-------------------------+--------------+------------+----------------+
 | Name                    | Type         | Required   | Default Value  |
 +=========================+==============+============+================+
-| min_quality             | Integer      |  no        |	0              |
+| min_quality             | Integer      |  yes       |	               |
 +-------------------------+--------------+------------+----------------+
 
-**Min_quality** parameter defines the minimum quality
-accepted for the sub-sequence (default: 0).
+**Min_quality** parameter defines the minimum quality accepted for the
+sub-sequence.
+
+endstrim
+--------
+
+Given a read, trim from both ends (5' and 3') all bases below a minimal
+quality. For example::
+
+    read = endstrim(read, min_quality=25)
+
+Argument:
+~~~~~~~~~
+
+ShortRead
+
+Return:
+~~~~~~~
+
+ShortRead
+
+Arguments
+~~~~~~~~~
+
++-------------------------+--------------+------------+----------------+
+| Name                    | Type         | Required   | Default Value  |
++=========================+==============+============+================+
+| min_quality             | Integer      |  yes       |	               |
++-------------------------+--------------+------------+----------------+
+
+**min_quality** parameter defines the minimum quality value.
 
 Write
 -----

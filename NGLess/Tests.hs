@@ -10,9 +10,6 @@ import Test.Framework
 import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2
-import Test.QuickCheck.Arbitrary
-import Test.QuickCheck.Gen
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
 
@@ -41,7 +38,6 @@ import NGLess
 
 import Interpretation.Map
 import Interpretation.Unique
-import Interpretation.Substrim
 
 import Data.FastQ
 import Utils.Conduit
@@ -188,7 +184,7 @@ case_preprocess_script = case parsetest preprocess_s >>= checktypes [] of
     Right expr -> do
         testNGLessIO $ (interpret []) . nglBody $ expr
         res' <- B.readFile "test_samples/sample20_post.fq"
-        (length $ B.lines res') @?= (16 :: Int)
+        (length $ B8.lines res') @?= (16 :: Int)
         removeFile "test_samples/sample20_post.fq"
 
 case_sam20 = do

@@ -464,6 +464,7 @@ executePreprocess v _ _ = unreachable ("executePreprocess: Cannot handle this in
 
 executeMethod :: MethodName -> NGLessObject -> Maybe NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationROEnv NGLessObject
 executeMethod method (NGOMappedRead samline) arg kwargs = runNGLess (executeMappedReadMethod method samline arg kwargs)
+executeMethod method (NGOShortRead sr) arg kwargs = runNGLess (executeShortReadsMethod method sr arg kwargs)
 executeMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 
@@ -581,6 +582,19 @@ interpretPreProcessExpr (FunctionCall (FuncName "substrim") var args _) = do
         return (v, e')
     mq <- fromInteger <$> lookupIntegerOrScriptErrorDef (return 0) "substrim argument" "min_quality" args'
     return . NGOShortRead $ substrim mq r
+interpretPreProcessExpr (FunctionCall (FuncName "endstrim") var args _) = do
+    NGOShortRead r <- interpretExpr var
+    args' <- forM args $ \(Variable v, e) -> do
+        e' <- interpretExpr e
+        return (v, e')
+    mq <- fromInteger <$> lookupIntegerOrScriptErrorDef (return 0) "endstrim argument" "min_quality" args'
+    ends <- lookupSymbolOrScriptErrorDef (return "both") "endstrim argument" "from_ends" args'
+    ends' <- case ends of
+        "both" -> return EndstrimBoth
+        "3" -> return Endstrim3
+        "5" -> return Endstrim5
+        other -> throwScriptError ("Illegal argument for `from_ends`: "++show other)
+    return . NGOShortRead $ endstrim ends' mq r
 
 interpretPreProcessExpr expr = interpretExpr expr
 
@@ -602,16 +616,30 @@ _evalIndex (NGOShortRead sr) [Just (NGOInteger s), Just (NGOInteger e)] =
 _evalIndex _ _ = nglTypeError ("_evalIndex: invalid operation" :: String)
 
 
+asDouble :: NGLessObject -> NGLess Double
+asDouble (NGODouble d) = return d
+asDouble (NGOInteger i) = return $ fromIntegral i
+asDouble other = throwScriptError ("Expected numeric value, got: " ++ show other)
+
+
 -- Binary Evaluation
 _evalBinary :: BOp ->  NGLessObject -> NGLessObject -> Either NGError NGLessObject
-_evalBinary BOpLT (NGOInteger a) (NGOInteger b) = Right $ NGOBool (a < b)
-_evalBinary BOpGT (NGOInteger a) (NGOInteger b) = Right $ NGOBool (a > b)
-_evalBinary BOpLTE (NGOInteger a) (NGOInteger b) = Right $ NGOBool (a <= b)
-_evalBinary BOpGTE (NGOInteger a) (NGOInteger b) = Right $ NGOBool (a >= b)
-_evalBinary BOpEQ lexpr rexpr = Right . NGOBool $ lexpr == rexpr
-_evalBinary BOpNEQ lexpr rexpr = Right . NGOBool $ lexpr /= rexpr
 _evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a + b)
 _evalBinary BOpAdd (NGOString a) (NGOString b) = Right $ NGOString (T.concat [a, b])
+_evalBinary BOpAdd a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
 _evalBinary BOpMul (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a * b)
-_evalBinary op a b = throwScriptError (concat ["_evalBinary: ", show op, " ", show a, " ", show b])
+_evalBinary BOpMul a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
+_evalBinary op a b = do
+        a' <- asDouble a
+        b' <- asDouble b
+        return . NGOBool $ cmp op a' b'
+    where
+        cmp BOpLT = (<)
+        cmp BOpGT = (>)
+        cmp BOpLTE = (<=)
+        cmp BOpGTE = (>=)
+        cmp BOpEQ = (==)
+        cmp BOpNEQ = (/=)
+        cmp _ = error "should never occur"
+
 

@@ -36,7 +36,7 @@ Example
    introduction
    install
    tutorial
-   Language
+   preprocess
    Functions
    stdlib
    methods
@@ -45,3 +45,4 @@ Example
    configuration
    faq
    advanced
+   Language

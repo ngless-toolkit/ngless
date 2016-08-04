@@ -175,7 +175,7 @@ typeOfObject (NGOExpression _) = error "unexpected typeOfObject(NGOExpression)"
 
 
 checkuop UOpLen e = checklist e *> return (Just NGLInteger)
-checkuop UOpMinus e = checkinteger e
+checkuop UOpMinus e = checknum e
 checkuop UOpNot e = checkBool e
 
 checkbop :: BOp -> Expression -> Expression -> TypeMSt (Maybe NGLType)
@@ -186,14 +186,14 @@ checkbop BOpAdd a b = do
     when (isNothing t) $
         errorInLineC ["Addition operator (+) must be applied to a pair of strings or integers"]
     return t
-checkbop BOpMul a b = checkinteger a *> checkinteger b
+checkbop BOpMul a b = checknum a *> checknum b
 
-checkbop BOpGT  a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
-checkbop BOpGTE a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
-checkbop BOpLT  a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
-checkbop BOpLTE a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
-checkbop BOpEQ  a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
-checkbop BOpNEQ a b = checkinteger a *> checkinteger b *> return (Just NGLBool)
+checkbop BOpGT  a b = checknum a *> checknum b *> return (Just NGLBool)
+checkbop BOpGTE a b = checknum a *> checknum b *> return (Just NGLBool)
+checkbop BOpLT  a b = checknum a *> checknum b *> return (Just NGLBool)
+checkbop BOpLTE a b = checknum a *> checknum b *> return (Just NGLBool)
+checkbop BOpEQ  a b = checknum a *> checknum b *> return (Just NGLBool)
+checkbop BOpNEQ a b = checknum a *> checknum b *> return (Just NGLBool)
 
 
 softCheck :: NGLType -> Expression -> TypeMSt (Maybe NGLType)
@@ -219,6 +219,14 @@ checkinteger expr = do
     when (t /= Just NGLInteger) $
         errorInLineC ["Expected integer expression, got ", show t, " for expression ", show expr]
     return (Just NGLInteger)
+
+checknum e = do
+    t <- nglTypeOf e
+    if t `elem` [Just NGLInteger, Just NGLDouble, Nothing]
+        then return t
+        else do
+            errorInLineC ["Expected numeric expression, got ", show t, " for expression ", show e]
+            return $ Just NGLDouble -- a decent guess most of the time
 
 checkindex expr index = checkindex' index *> checklist expr
     where

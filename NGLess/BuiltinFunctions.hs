@@ -33,6 +33,7 @@ builtinFunctions =
     ,Function (FuncName "unique") (Just NGLReadSet) [] NGLReadSet uniqueArgs False
     ,Function (FuncName "preprocess") (Just NGLReadSet) [] NGLVoid preprocessArgs False
     ,Function (FuncName "substrim") (Just NGLRead) [] NGLRead substrimArgs False
+    ,Function (FuncName "endstrim") (Just NGLRead) [] NGLRead endstrimArgs False
     ,Function (FuncName "map") (Just NGLReadSet) [] NGLMappedReadSet mapArgs False
     ,Function (FuncName "mapstats") (Just NGLMappedReadSet) [] NGLCounts mapStatsArgs False
     ,Function (FuncName "select") (Just NGLMappedReadSet) [] NGLMappedReadSet selectArgs False
@@ -106,13 +107,21 @@ substrimArgs =
     [ArgInformation "min_quality" True NGLInteger []
     ]
 
+endstrimArgs =
+    [ArgInformation "min_quality" True NGLInteger []
+    ,ArgInformation "from_ends" False NGLSymbol [ArgCheckSymbol ["both", "3", "5"]]
+    ]
+
 
 builtinMethods =
     [MethodInfo (MethodName "flag")   NGLMappedRead (Just NGLSymbol) NGLBool flagArgs True
     ,MethodInfo (MethodName "filter") NGLMappedRead Nothing NGLMappedRead filterArgs True
     ,MethodInfo (MethodName "some_match") NGLMappedRead (Just NGLString) NGLBool [] True
     ,MethodInfo (MethodName "unique") NGLMappedRead Nothing NGLMappedRead [] True
+    ,MethodInfo (MethodName "avg_quality") NGLRead Nothing NGLDouble [] True
+    ,MethodInfo (MethodName "fraction_above") NGLRead (Just NGLInteger) NGLDouble [] True
     ]
+
 filterArgs =
     [ArgInformation "min_identity_pc" False NGLInteger []
     ,ArgInformation "min_match_size" False NGLInteger []
