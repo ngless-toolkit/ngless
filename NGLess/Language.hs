@@ -92,13 +92,13 @@ data ReadSet =
         deriving (Eq, Show, Ord)
 
 data NGLessObject =
-        NGOString T.Text
-        | NGOBool Bool
-        | NGOInteger Integer
-        | NGODouble Double
-        | NGOSymbol T.Text
-        | NGOFilename FilePath
-        | NGOShortRead ShortRead
+        NGOString !T.Text
+        | NGOBool !Bool
+        | NGOInteger !Integer
+        | NGODouble !Double
+        | NGOSymbol !T.Text
+        | NGOFilename !FilePath
+        | NGOShortRead !ShortRead
         | NGOReadSet T.Text ReadSet
         | NGOMappedReadSet
                     { nglgroupName :: T.Text
