@@ -36,6 +36,7 @@ Example
    introduction
    install
    tutorial
+   one-liners
    preprocess
    Functions
    stdlib
