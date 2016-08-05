@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, OverloadedStrings, TupleSections #-}
+{-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
 module Tests.FastQ
     ( tgroup_FastQ
     ) where
@@ -30,9 +30,24 @@ reads3 =
     ,ShortRead "z" "ccggg" (VU.fromList [32,16,20,32,17])
     ]
 
-case_calculateEncoding_sanger = fromRight (guessEncoding 55) @?= SangerEncoding
-case_calculateEncoding_illumina_1 = fromRight (guessEncoding 65) @?= SolexaEncoding
-case_calculateEncoding_illumina_1_5 = fromRight (guessEncoding 100) @?= SolexaEncoding
+simpleStats f = testNGLessIO $ do
+    enc <- encodingFor f
+    qualityPercentiles <$> statsFromFastQ f enc
+
+-- negative tests quality on value 60 char ';'. Value will be 60 - 64 which is -4
+case_calc_statistics_negative = do
+    s <- simpleStats "test_samples/sample_low_qual.fq"
+    head s @?= (-4,-4,-4,-4)
+
+-- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
+case_calc_statistics_low_positive = do
+    s <- simpleStats "test_samples/sample_low_qual.fq"
+    last s @?= (1,1,1,1)
+
+case_calc_statistics_normal = do
+    s <- simpleStats "test_samples/data_set_repeated.fq"
+    head s @?= (25,33,31,33)
+
 
 data Method = MSubstrim | MEndstrim EndstrimEnds
     deriving (Show)

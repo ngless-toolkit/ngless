@@ -67,10 +67,8 @@ doQC1 :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
                 -> FilePath         -- ^ FastQ file
                 -> NGLessIO ReadSet
 doQC1 enc f = do
-        fd <- statsFromFastQ f
-        enc' <- case enc of
-                Just e -> return e
-                Nothing -> guessEncoding (lc fd)
+        enc' <- maybe (encodingFor f) return enc
+        fd <- statsFromFastQ f enc'
         outputFQStatistics f fd enc'
         return (ReadSet1 enc' f)
 
@@ -214,5 +212,5 @@ getEncArgument fname args =
             other -> throwScriptError ("Unkown encoding for fastq " ++ T.unpack other)
 
 executeShortReadsMethod (MethodName "avg_quality") (ShortRead _ _ rQ) Nothing _ = return $! NGODouble $ fromIntegral (VU.foldl' (\acc n -> acc + toInteger n) (0 :: Integer) rQ) / fromIntegral (VU.length rQ)
-executeShortReadsMethod (MethodName "fraction_above") (ShortRead _ _ rQ) (Just (NGOInteger minq)) _ = return $! NGODouble $ fromIntegral (VU.foldl' (\acc q -> acc + fromEnum (q >= fromInteger minq)) (0 :: Int) rQ) / fromIntegral (VU.length rQ)
+executeShortReadsMethod (MethodName "fraction_at_least") (ShortRead _ _ rQ) (Just (NGOInteger minq)) _ = return $! NGODouble $ fromIntegral (VU.foldl' (\acc q -> acc + fromEnum (q >= fromInteger minq)) (0 :: Int) rQ) / fromIntegral (VU.length rQ)
 executeShortReadsMethod (MethodName other) _ _ _ = throwShouldNotOccur ("Unknown short read method: " ++ show other)

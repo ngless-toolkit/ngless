@@ -174,8 +174,8 @@ colorFor WarningOutput = Yellow
 colorFor ErrorOutput = Red
 
 
-encodeBPStats :: FQ.FQStatistics -> FastQEncoding -> [BPosInfo]
-encodeBPStats res enc = map encode1 (FQ.calculateStatistics res enc)
+encodeBPStats :: FQ.FQStatistics -> [BPosInfo]
+encodeBPStats res = map encode1 (FQ.qualityPercentiles res)
     where encode1 (mean, median, lq, uq) = BPosInfo mean median lq uq
 
 outputFQStatistics :: FilePath -> FQ.FQStatistics -> FastQEncoding -> NGLessIO ()
@@ -185,7 +185,7 @@ outputFQStatistics fname stats enc = do
         sSize'  = FQ.seqSize stats
         nSeq'   = FQ.nSeq stats
         gc'     = FQ.gcFraction stats
-        st      = encodeBPStats stats enc
+        st      = encodeBPStats stats
         lno     = fromMaybe 0 lno'
         binfo   = FQInfo fname lno gc' enc' nSeq' sSize' st
     let p s0 s1  = outputListLno' DebugOutput [s0, s1]

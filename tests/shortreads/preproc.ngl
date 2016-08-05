@@ -1,0 +1,7 @@
+ngless "0.0"
+
+input = fastq('input.fq')
+preprocess(input) using |r|:
+    if r.fraction_at_least(20) < 0.50:
+        discard
+write(input, ofile='output.fq')

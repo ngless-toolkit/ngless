@@ -200,14 +200,6 @@ IRIS:7:1:17:1757#0	4	*	0	0	*	*	0	0	TTTTCTCGACGATTTCCACTCCTGGTCNAC	aaaaaa``aaa`aa
 IRIS:7:1:17:1479#0	4	*	0	0	*	*	0	0	CATATTGTAGGGTGGATCTCGAAAGATATGAAAGAT	abaaaaa`a```^aaaaa`_]aaa`aaa__a_X]``	AS:i:0	XS:i:0
 IRIS:7:1:17:150#0	4	*	0	0	*	*	0	0	TGATGTACTATGCATATGAACTTGTATGCAAAGTGG	abaabaa`aaaaaaa^ba_]]aaa^aaaaa_^][aa	AS:i:0	XS:i:0
 |]
-
-
--- Test compute stats
-
-case_compute_stats_lc = do
-    r <- testNGLessIO $ statsFromFastQ "test_samples/sample_small.fq"
-    (convert . lc $ r) @?= ']'
-
 -- Parse GFF lines
 
 gff_line = "chrI\tunknown\texon\t4124\t4358\t.\t-\t.\tgene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
@@ -257,25 +249,6 @@ case_unique_2 = make_unique_test 2
 case_unique_3 = make_unique_test 3
 case_unique_4 = make_unique_test 4
 case_unique_5 = make_unique_test 5
-
-simpleStats s = case calculateStatistics s <$> guessEncoding (lc s) of
-    Left e -> error (show e)
-    Right v -> v
-
--- negative tests quality on value 60 char ';'. Value will be 60 - 64 which is -4
-case_calc_statistics_negative = do
-    s <- testNGLessIO $ statsFromFastQ "test_samples/sample_low_qual.fq"
-    head (simpleStats s) @?= (-4,-4,-4,-4)
-
--- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
-case_calc_statistics_low_positive = do
-    s <- testNGLessIO $ statsFromFastQ "test_samples/sample_low_qual.fq"
-    last (simpleStats s) @?= (1,1,1,1)
-
-
-case_calc_statistics_normal = do
-    s <- testNGLessIO $ statsFromFastQ "test_samples/data_set_repeated.fq"
-    head (simpleStats s) @?= (25,33,31,33)
 
 case_test_setup_html_view = do
     setupHtmlViewer "testing_tmp_dir_html"

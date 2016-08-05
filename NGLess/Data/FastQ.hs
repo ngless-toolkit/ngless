@@ -7,7 +7,6 @@ module Data.FastQ
     , srSlice
     , encodingFor
     , srLength
-    , guessEncoding
     , encodingOffset
     , encodingName
     , fqDecode
@@ -17,8 +16,7 @@ module Data.FastQ
     , gcFraction
     , statsFromFastQ
     , fqStatsC
-    , getPairedLines
-    , calculateStatistics
+    , qualityPercentiles
     ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -32,6 +30,7 @@ import           Data.Strict.Tuple (Pair(..))
 import Data.Conduit         (($$), (=$=))
 import Control.Monad
 import Control.Monad.Except
+import Control.Exception
 
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Unboxed as V
@@ -69,7 +68,7 @@ data FastQEncoding = SangerEncoding | SolexaEncoding deriving (Eq, Bounded, Enum
 
 data FQStatistics = FQStatistics
                 { bpCounts :: (Int, Int, Int, Int) -- ^ number of (A, C, T, G)
-                , lc :: Word8 -- ^ lowest quality value
+                , lc :: Int8 -- ^ lowest quality value
                 , qualCounts ::  [V.Vector Int] -- ^ quality counts by position
                 , nSeq :: Int -- ^ number of sequences
                 , seqSize :: (Int,Int) -- ^ min and max
@@ -78,18 +77,21 @@ data FQStatistics = FQStatistics
 instance NFData FQStatistics where
     rnf (FQStatistics (!_,!_,!_,!_) !_ qv !_ (!_,!_)) = rnf qv
 
+minQualityValue :: Num a => a
+minQualityValue = -5
+
 srLength = B.length . srSequence
 
 srSlice :: Int -> Int -> ShortRead -> ShortRead
-srSlice s n (ShortRead rId rS rQ) = ShortRead rId (B.take n $ B.drop s rS) (VU.slice s n rQ)
+srSlice s n (ShortRead rId rS rQ) = assert (B.length rS >= s + n) $ ShortRead rId (B.take n $ B.drop s rS) (VU.slice s n rQ)
 
 encodingOffset :: Num a => FastQEncoding -> a
 encodingOffset SangerEncoding = 33
 encodingOffset SolexaEncoding = 64
 
 encodingName :: FastQEncoding -> String
-encodingName SangerEncoding = "Sanger (also recent Illumina)"
-encodingName SolexaEncoding = "Solexa (older Illumina)"
+encodingName SangerEncoding = "Sanger (33 offset)"
+encodingName SolexaEncoding = "Solexa (64 offset)"
 
 guessEncoding :: (MonadError NGError m) => Word8 -> m FastQEncoding
 guessEncoding lowC
@@ -113,8 +115,8 @@ bsAdd c delta = BI.unsafeCreate cn $ \p -> copyAddLoop p 0
                 poke (p `plusPtr` i) ((fromIntegral $ c VU.! i + delta) :: Word8)
                 copyAddLoop p (i + 1)
 
-vAdd :: B.ByteString -> Int8 -> VU.Vector Int8
-vAdd qs delta = VU.generate (B.length qs) $ \i -> delta + fromIntegral (B.index qs i)
+vSub :: B.ByteString -> Int8 -> VU.Vector Int8
+vSub qs delta = VU.generate (B.length qs) $ \i -> fromIntegral (B.index qs i) - delta
 
 fqEncode :: FastQEncoding -> ShortRead -> B.ByteString
 fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, "\n"]
@@ -127,7 +129,7 @@ fqDecodeC enc = groupC 4 =$= CL.mapM parseShortReads
     where
         offset :: Int8
         offset = encodingOffset enc
-        parseShortReads [ByteLine rid, ByteLine rseq, _, ByteLine rqs] = return $! ShortRead rid rseq (vAdd rqs (-offset))
+        parseShortReads [ByteLine rid, ByteLine rseq, _, ByteLine rqs] = return $! ShortRead rid rseq (vSub rqs offset)
         parseShortReads _ = throwDataError "Number of lines in FastQ file is not multiple of 4! EOF found"
 
 -- | reads a sequence of short reads.
@@ -145,20 +147,19 @@ fqDecode enc s = C.runConduit $
         =$= fqDecodeC enc
         =$= CL.consume
 
-statsFromFastQ :: FilePath -> NGLessIO FQStatistics
-statsFromFastQ fp =
-    conduitPossiblyCompressedFile fp
-        =$= linesC
-        =$= getPairedLines
-        $$ fqStatsC
-
-
--- | Useful for use with fqStatsC
-getPairedLines :: C.Conduit ByteLine NGLessIO (Pair ByteLine (VU.Vector Int8))
-getPairedLines = groupC 4 =$= CL.mapM getPairedLines'
+statsFromFastQ :: FilePath -> FastQEncoding -> NGLessIO FQStatistics
+statsFromFastQ fp enc =
+        conduitPossiblyCompressedFile fp
+            =$= linesC
+            =$= getPairedLines
+            $$ fqStatsC
     where
-        getPairedLines' [_, bps, _, ByteLine qs] = return $! bps :!: vAdd qs 0
-        getPairedLines' _ = throwDataError "fastq lines are not a multiple of 4"
+        offset = encodingOffset enc
+        getPairedLines :: C.Conduit ByteLine NGLessIO (Pair ByteLine (VU.Vector Int8))
+        getPairedLines = groupC 4 =$= CL.mapM getPairedLines'
+            where
+                getPairedLines' [_, bps, _, ByteLine qs] = return $! bps :!: vSub qs offset
+                getPairedLines' _ = throwDataError "fastq lines are not a multiple of 4"
 
 -- | Guess the encoding of a file
 encodingFor :: FilePath -> NGLessIO FastQEncoding
@@ -175,8 +176,8 @@ encodingFor fp = do
         =$= CL.isolate 100
         =$= CL.mapM minLc
         $$ CL.fold countMin (0,maxBound :: Word8)
-    when (c < 2) $
-        throwDataError ("Cannot determine encoding for input file '" ++ fp ++ "'. File is too short [ngless requires at least 2 sequences]")
+    when (c < 1) $
+        throwDataError ("Cannot determine encoding for input file '" ++ fp ++ "'. File is empty.")
     guessEncoding m
 
 
@@ -230,7 +231,7 @@ fqStatsC = do
                 updateQCounts n i
                     | i == n = return ()
                     | otherwise = do
-                        let qi = 256*i + fromIntegral (qs VU.! i)
+                        let qi = 256*i - minQualityValue + fromIntegral (qs VU.! i)
                         VSM.unsafeModify qcs' (+ 1) qi
                         updateQCounts n (i+1)
             updateQCounts (toEnum len) 0
@@ -244,7 +245,7 @@ fqStatsC = do
             upper <- VSM.read c (ord . toUpper $ p)
             return (lower + upper)
         findMinQValue :: [VU.Vector Int] -> Int
-        findMinQValue = minimum . map findMinQValue'
+        findMinQValue = (flip (-) minQualityValue) . minimum . map findMinQValue'
         findMinQValue' :: VU.Vector Int -> Int
         findMinQValue' qs = fromMaybe 256 (VU.findIndex (/= 0) qs)
 
@@ -257,34 +258,29 @@ gcFraction res = gcCount / allBpCount
 
 
 
-calculateStatistics :: FQStatistics -> FastQEncoding -> [(Int, Int, Int, Int)]
-calculateStatistics FQStatistics{qualCounts=qCounts} enc = Prelude.map statistics qCounts
+qualityPercentiles :: FQStatistics -> [(Int, Int, Int, Int)]
+qualityPercentiles FQStatistics{qualCounts=qCounts} = Prelude.map statistics qCounts
     where
-        encOffset = encodingOffset enc
         statistics :: V.Vector Int -> (Int, Int, Int, Int)
-        statistics bps = (bpSum `div` elemTotal
-                                , calcPercentile' 0.50
-                                , calcPercentile' 0.25
-                                , calcPercentile' 0.75)
+        statistics qs = (bpSum `div` elemTotal + minQualityValue
+                                , calcPercentile 0.50 + minQualityValue
+                                , calcPercentile 0.25 + minQualityValue
+                                , calcPercentile 0.75 + minQualityValue)
             where
-                bpSum = calcBPSum bps encOffset
-                elemTotal = V.sum bps
-                calcPercentile' :: Double -> Int
-                calcPercentile' p = calcPercentile p - encOffset
+                -- Calculates [('a',1), ('b',2)] = 0 + 'a' * 1 + 'b' * 2.
+                -- 'a' and 'b' minus encoding.
+                bpSum = V.ifoldl' (\n i q -> n + i * q) 0 qs
+                elemTotal = V.sum qs
 
                 calcPercentile :: Double -> Int
                 calcPercentile perc = accUntilLim val'
                     where
                         val' = ceiling (fromIntegral elemTotal * perc)
                         accUntilLim :: Int -> Int
-                        accUntilLim lim = case V.findIndex (>= lim) $ V.postscanl (+) 0 bps of
+                        accUntilLim lim = case V.findIndex (>= lim) $ V.postscanl (+) 0 qs of
                               Just v -> v
                               Nothing -> error "ERROR: Logical impossibility in calcPercentile function"
 
 
--- Calculates [('a',1), ('b',2)] = 0 + 'a' * 1 + 'b' * 2.
--- 'a' and 'b' minus encoding.
-calcBPSum :: V.Vector Int -> Int -> Int
-calcBPSum qs offset = V.ifoldl' (\n i q -> (n + (i - offset) * q)) 0 qs
 
 

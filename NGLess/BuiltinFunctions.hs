@@ -119,7 +119,7 @@ builtinMethods =
     ,MethodInfo (MethodName "some_match") NGLMappedRead (Just NGLString) NGLBool [] True
     ,MethodInfo (MethodName "unique") NGLMappedRead Nothing NGLMappedRead [] True
     ,MethodInfo (MethodName "avg_quality") NGLRead Nothing NGLDouble [] True
-    ,MethodInfo (MethodName "fraction_above") NGLRead (Just NGLInteger) NGLDouble [] True
+    ,MethodInfo (MethodName "fraction_at_least") NGLRead (Just NGLInteger) NGLDouble [] True
     ]
 
 filterArgs =

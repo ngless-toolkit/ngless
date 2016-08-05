@@ -48,7 +48,7 @@ recreated as::
 
     preprocess(input) using |r|:
         r = endstrim(r, min_quality=20)
-        if r.avg_quality() < 20:
+        if r.fraction_at_least(20) < 0.5:
             discard
         if len(r) < 45:
             discard

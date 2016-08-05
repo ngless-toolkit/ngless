@@ -6,6 +6,7 @@ module Tests.Utils
     , parsetest
     , fromRight
     , asTempFile
+    , testNGLessIO
     ) where
 import Test.HUnit
 import qualified Data.Text as T
