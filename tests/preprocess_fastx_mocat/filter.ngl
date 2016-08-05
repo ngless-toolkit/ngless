@@ -1,0 +1,12 @@
+ngless "0.0"
+
+input = paired('input.1.fq.gz', 'input.2.fq.gz')
+
+preprocess(input) using |read|:
+    read = endstrim(read, min_quality=20, from_ends={3})
+    if len(read) < 45:
+        discard
+    if read.fraction_above(20) <= 0.50:
+        discard
+
+write(input, ofile='output.fq')
