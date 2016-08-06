@@ -10,5 +10,15 @@ write(counted, ofile='output.ko.normed.txt')
 counted = count(mapped, features=['pfamA'], multiple={all1}, functional_map='122_DCM_0d2-0d45_scaffold97490_1_gene122702.map')
 write(counted, ofile='output.pfamA.raw.txt')
 
+counted = count(mapped, features=['ko', 'pfamA'], multiple={all1}, functional_map='122_DCM_0d2-0d45_scaffold97490_1_gene122702.map')
+write(counted, ofile='output.ko.pfamA.raw.txt')
+
 counted = count(mapped, features=['pfamA'], multiple={all1}, functional_map='122_DCM_0d2-0d45_scaffold97490_1_gene122702.map', norm=True)
 write(counted, ofile='output.pfamA.normed.txt')
+
+counted = count(mapped, features=['pfamA'], multiple={dist1}, functional_map='122_DCM_0d2-0d45_scaffold97490_1_gene122702.map')
+write(counted, ofile='output.pfamA.dist1.txt')
+
+counted = count(mapped, features=['ko'], multiple={dist1}, functional_map='122_DCM_0d2-0d45_scaffold97490_1_gene122702.map')
+write(counted, ofile='output.ko.dist1.txt')
+

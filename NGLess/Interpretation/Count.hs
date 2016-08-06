@@ -46,7 +46,7 @@ import           Data.Conduit.Async (($$&))
 import Control.Monad
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
-import Data.List                (foldl1', unfoldr)
+import Data.List                (foldl1', foldl')
 import GHC.Conc                 (getNumCapabilities)
 import Control.DeepSeq          (NFData(..))
 import Control.Error            (note)
@@ -208,6 +208,8 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
         Just (NGOSymbol f) -> return [f]
         Just (NGOList feats') -> mapM (stringOrTypeError "annotation features argument") feats'
         _ -> throwShouldNotOccur "executeAnnotation: TYPE ERROR"
+    when (length fs > 1 && method /= MMCountAll) $
+        outputListLno' WarningOutput ["Distribution mode when using multiple features is probably incorrect"]
     samfp <- asFile istream
     m <- annotationRule <$> parseAnnotationMode args
     let opts = CountOpts
@@ -447,6 +449,10 @@ distributeMM indices normed ncounts fractionResult = liftIO $ do
     when fractionResult $
         toFractions ncounts
 
+data LoadFunctionalMapState = LoadFunctionalMapState
+                                        !Int -- ^ next free index
+                                        !(M.Map B.ByteString [Int]) -- ^ gene -> [feature-ID]
+                                        !(M.Map B.ByteString Int) -- ^ feature -> feature-ID
 
 loadFunctionalMap :: FilePath -> [B.ByteString] -> NGLessIO Annotator
 loadFunctionalMap fname columns = do
@@ -456,10 +462,10 @@ loadFunctionalMap fname columns = do
         cis <- runNGLess $ lookUpColumns headers
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
-        (_,gmap,namemap) <- resume
+        LoadFunctionalMapState _ gmap namemap <- resume
                 $$+- C.conduitVector 8192
-                =$= asyncMapEitherC mapthreads (V.mapM (selectColumns cis . B8.split '\t'))
-                =$ CL.fold (V.foldl' inserts1) (0, M.empty,M.empty)
+                =$= asyncMapEitherC mapthreads (V.mapM (selectColumns cis . B8.split '\t')) -- after this we have vectors of (<gene name>, [<feature-name>])
+                =$ CL.fold (V.foldl' inserts1) (LoadFunctionalMapState 0 M.empty M.empty)
         outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
         return $ GeneMapAnnotator (reindex gmap namemap) (V.fromList [RefSeqInfo n 0.0 | n <- M.keys namemap])
     where
@@ -469,28 +475,17 @@ loadFunctionalMap fname columns = do
                 reindex1 :: Int -> Int
                 reindex1 = fromJust . flip M.lookup remap
                 remap = M.fromList (zip (M.elems namemap) [0..])
-        inserts1 :: (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int) -> (B.ByteString, [B.ByteString]) -> (Int, M.Map B.ByteString [Int], M.Map B.ByteString Int)
-        inserts1 (next, gmap, namemap) (name, ids) = (next', gmap', namemap')
+
+        inserts1 :: LoadFunctionalMapState -> (B.ByteString, [B.ByteString]) -> LoadFunctionalMapState
+        inserts1 (LoadFunctionalMapState first gmap namemap) (name, ids) = LoadFunctionalMapState first' gmap' namemap'
             where
-                (next', ids', namemap') = mapnames next (flattenIds ids) namemap
-
-                flattenIds = flatten . map (B8.split ',')
-
-                flatten :: [[a]] -> [a]
-                flatten = unfoldr flatten'
-                    where
-                        flatten' [] = Nothing
-                        flatten' ([]:xs) = flatten' xs
-                        flatten' ((v:vs):xs) = Just (v, vs:xs)
-
-                mapnames next [] curmap = (next, [], curmap)
-                mapnames next (n:ns) curmap = case M.lookup n curmap of
-                    Nothing -> let  nextmap = M.insert n next curmap
-                                    (next', ns', finalmap) = mapnames (next+1) ns nextmap
-                                in (next', next:ns', finalmap)
-                    Just ix -> let (next', ns', nextmap) = mapnames next ns curmap
-                                in (next', ix:ns', nextmap)
+                (first', namemap', ids') = foldl' insertname (first,namemap,[]) ids
                 gmap' = M.insert name ids' gmap
+
+                insertname :: (Int, M.Map B.ByteString Int, [Int]) -> B.ByteString -> (Int, M.Map B.ByteString Int, [Int])
+                insertname (!next, !curmap, ns') n = case M.lookup n curmap of
+                    Just ix -> (next, curmap, ix:ns')
+                    Nothing -> (next + 1, M.insert n next curmap, next:ns')
 
 
         lookUpColumns :: [B.ByteString] -> NGLess [Int]
@@ -505,8 +500,13 @@ loadFunctionalMap fname columns = do
                                         Just (Suggestion valid reason) -> [" Did you mean '", T.unpack valid, "' (", T.unpack reason, ")?"]
                                         Nothing -> [])
         selectColumns :: [Int] -> [B.ByteString] -> NGLess (B.ByteString, [B.ByteString])
-        selectColumns cols (gene:mapped) = (gene,) <$> selectIds cols (zip [0..] mapped)
+        selectColumns cols (gene:mapped) = (gene,) . addTags columns <$> selectIds cols (zip [0..] mapped)
         selectColumns _ [] = throwDataError ("Loading functional map file '" ++ fname ++ "': empty line.")
+
+        addTags :: [B.ByteString] -> [B.ByteString] -> [B.ByteString]
+        addTags [] _ = error "impossible"
+        addTags [_] [v] = B8.split ',' v -- do not tag single features
+        addTags fs vss = flip concatMap (zip fs vss) $ \(f,vs) -> (flip map (B8.split ',' vs) $ \v -> B.concat [f, ":", v])
 
         selectIds :: [Int] -> [(Int, B.ByteString)] -> NGLess [B.ByteString]
         selectIds [] _ = return []
