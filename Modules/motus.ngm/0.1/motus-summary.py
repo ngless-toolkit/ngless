@@ -1,6 +1,9 @@
 from collections import defaultdict
 import os
-import argparse
+try:
+    import argparse
+except ImportError: # Python 2.6
+    import old_argparse as argparse
 
 parser = argparse.ArgumentParser(description='Summarize motus table')
 parser.add_argument('input_counts',

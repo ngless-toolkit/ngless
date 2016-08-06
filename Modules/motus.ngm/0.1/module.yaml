@@ -8,12 +8,10 @@ functions:
             atype: 'counts'
             filetype: "tsv"
             can_gzip: true
-        additional:
-            -
-                atype: 'str'
-                name: 'ofile'
-                def: ''
-                required: true
+        return:
+            rtype: 'counts'
+            name: 'ofile'
+            extension: 'tsv'
 references:
     -
         name: 'motus'
