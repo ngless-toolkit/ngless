@@ -1,0 +1,25 @@
+ngless "0.0"
+import "motus" version "0.1"
+
+
+input = paired('input.1.fq.gz', 'input.2.fq.gz')
+
+preprocess(input, keep_singles=False) using |read|:
+    read = substrim(read, min_quality=25)
+    if len(read) < 45:
+        discard
+mapped = map(input, reference='hg19')
+
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=90, action={unmatch})
+    if mr.flag({mapped}):
+        discard
+mapped = map(as_reads(mapped), reference='motus', mode_all=True)
+
+mapped = select(mapped) using |mread|:
+    mread = mread.filter(min_identity_pc=97, min_match_size=45)
+
+counted = count(mapped, features=['gene'], multiple={dist1})
+write(motus(counted), ofile='motus-counts.txt')
+
+

@@ -43,6 +43,7 @@ Example
    methods
    modules
    Organisms
+   motus
    configuration
    faq
    advanced
