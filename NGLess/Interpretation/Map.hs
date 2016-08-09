@@ -111,7 +111,7 @@ mapToReference' refIndex fps extraArgs outC = do
                 (return ()) -- stdin
                 (C.toConsumer (zipSink2 --stdout
                     outC
-                    samStatsC))
+                    (linesC =$= samStatsC)))
                 CL.consume -- stderr
     stats <- runNGLess statsE
     outputListLno' DebugOutput ["BWA info: ", BL8.unpack $ BL8.fromChunks err]
@@ -140,9 +140,9 @@ interpretMapOp ref name fps extraArgs = do
                 Nothing -> throwScriptError ("Could not find reference '" ++ T.unpack r ++ "'.")
 
 _samStats :: FilePath -> NGLessIO (Int, Int, Int)
-_samStats fname = samBamConduit fname $$ samStatsC >>= runNGLess
+_samStats fname = samBamConduit fname $$ linesC =$= samStatsC >>= runNGLess
 
-samStatsC :: (MonadIO m) => C.Sink B.ByteString m (NGLess (Int, Int, Int))
+samStatsC :: (MonadIO m) => C.Sink ByteLine m (NGLess (Int, Int, Int))
 samStatsC = do
     let add1if !v True = v+1
         add1if !v False = v
@@ -157,8 +157,7 @@ samStatsC = do
                 ,add1if  u unique
                 )
     runExceptC $
-        linesC
-        =$= readSamGroupsC
+        readSamGroupsC
         =$= CL.fold summarize (0, 0, 0)
 
 -- | this is copied from runErrorC, using ExceptT as we do not want to have to
@@ -191,10 +190,11 @@ executeMap fps args = do
     executeMap' fps
 
 executeMapStats :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeMapStats (NGOMappedReadSet name (File sampf) _) _ = do
-    outputListLno' TraceOutput ["Computing mapstats on ", sampf]
-    (t,al,u) <- _samStats sampf
-    (countfp, hout) <- openNGLTempFile sampf "sam_stats_" ".stats"
+executeMapStats (NGOMappedReadSet name sami _) _ = do
+    outputListLno' TraceOutput ["Computing mapstats on ", show sami]
+    let (samfp, stream) = asSamStream sami
+    (t, al, u) <- stream $$ samStatsC >>= runNGLess
+    (countfp, hout) <- openNGLTempFile samfp "sam_stats_" ".stats"
     liftIO . hPutStr hout . concat $
         [     "\t",  T.unpack name, "\n"
         ,"total\t",   show  t, "\n"
