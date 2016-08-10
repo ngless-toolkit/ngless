@@ -63,13 +63,13 @@ Normally this should be invisible to you, but if you are curious or want to
 debug an issue, here are the gory details:
 
 The function `lock1()` will create a lock file in a sub-directory of
-`ngless-locks`. This directory will be the hash value of the script. Thus, any
-change to the script will force all data to be recomputed. This can lead to
-over-computation but it ensures that you will always have the most up to date
-results (ngless' first priority is correctness, performance is important, but
-not at the risk of correctness). Similarly, `collect()` will use hashed values
-which encode both the script and the position within the script (so that if you
-have more than one `collect()` call, they will not clash).
+`ngless-locks`. This directory will be named by the hash value of the script.
+Thus, any change to the script will force all data to be recomputed. This can
+lead to over-computation but it ensures that you will always have the most up
+to date results (ngless' first priority is correctness, performance is
+important, but not at the risk of correctness). Similarly, `collect()` will use
+hashed values which encode both the script and the position within the script
+(so that if you have more than one `collect()` call, they will not clash).
 
 Lock files have their modification times updated once every 10 minutes while
 ngless is running. This allows the programme to easily identify stale files.

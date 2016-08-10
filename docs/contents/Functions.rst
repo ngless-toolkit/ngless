@@ -4,7 +4,10 @@
 Functions
 =========
 
-Fastq
+These are the built-in ngless functions. Make sure to check the `standard
+library <stdlib.html>`__ as well.
+
+fastq
 -----
 
 Function to load, one or more, FastQ files, for example::
@@ -66,8 +69,6 @@ Returns
 
 MappedReadSet
 
-Unique
-
 countfile
 ---------
 
@@ -82,7 +83,15 @@ Returns
 
 CountTable
 
-Unique
+as_reads
+--------
+
+Converts from a ``MappedReadSet`` to a ``ReadSet``::
+
+    reads = as_reads(samfile('input.sam'))
+
+
+unique
 ------
 
 Function that given a set of reads, returns another which only retains a
@@ -116,7 +125,7 @@ copies (default: 2).
 Two short reads with the same nucleotide sequence are considered copies,
 independently of quality and identifiers.
 
-Preprocess
+preprocess
 ----------
 
 This function executes the given block for each read in the ReadSet.  Unless
@@ -152,7 +161,7 @@ singles pile. If ``keep_singles`` if false, however, they are discarded.
 
 This function also performs quality control on its output.
 
-Map
+map
 ---
 
 The function map, maps a ReadSet to reference. For example::
@@ -215,6 +224,20 @@ To use any of these, pass in the name as the reference value::
 Ngless does not ship with any of these datasets, but they are downloaded
 lazily: i.e., the first time you use them, ngless will download and cache them.
 
+mapstats
+--------
+
+Computes some basic statistics from a set of mapped reads (number of reads,
+number mapped, number uniquely mapped).
+
+Argument
+~~~~~~~~
+MappedReadSet
+
+Return
+~~~~~~
+CountTable
+
 select
 ------
 
@@ -255,7 +278,7 @@ If ``drop_if`` they are discarded if they fail to **any condition**.
 
 
 
-Count
+count
 -----
 
 Given a file with aligned sequencing reads (ReadSet), ``count()`` will produce
@@ -334,7 +357,7 @@ least, to be kept (default: 0, i.e., keep all counts). If you just want to
 discard features that are exactly zero, you should set the ``discard_zero``
 argument to True.
 
-Substrim
+substrim
 --------
 
 Given a read, returns another that is the biggest sub-sequence with a
@@ -393,7 +416,7 @@ Arguments
 
 **min_quality** parameter defines the minimum quality value.
 
-Write
+write
 -----
 
 Writes an object to disk.
@@ -473,7 +496,7 @@ elements::
 
 | would result in ``result1.txt``, ``result2.txt``,...
 
-Print
+print
 -----
 
 Print function allows to print a NGLessObject to IO.
@@ -489,3 +512,24 @@ Void
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 none
+
+readlines
+---------
+
+Reads a text file and returns a list with all the strings in the file
+
+Argumment
+~~~~~~~~~
+
+string: the filename
+
+Example
+~~~~~~~
+
+``readlines`` is useful in combination with the `parallel
+<stdlib.html#parallel-module>`__ module, where you can then use the ``lock1``
+function to process a large set of inputs::
+
+    sample = lock1(readlines('samplelist.txt'))
+
+
