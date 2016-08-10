@@ -5,3 +5,4 @@ write(mapstats(mapped), ofile="output.txt")
 
 write(mapstats(select(mapped, keep_if=[{mapped}])), ofile="output.mapped.txt")
 write(mapstats(select(mapped, keep_if=[{unique}])), ofile="output.unique.txt")
+write(mapstats(select(mapped, keep_if=[{unique}])), ofile=STDOUT)

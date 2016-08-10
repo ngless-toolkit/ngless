@@ -9,7 +9,6 @@ module FileManagement
     , removeFileIfExists
     , setupHtmlViewer
     , takeBaseNameNoExtensions
-    , nglMaybeCopyFile
     ) where
 
 import qualified Data.ByteString as BS
@@ -103,10 +102,3 @@ copyDir src dst = do
     if exists
         then copyDir  (src </> n) (dst </> n)
         else copyFile (src </> n) (dst </> n)
-
-
--- | copy file unless its the same file.
-nglMaybeCopyFile :: FilePath -> FilePath -> NGLessIO ()
-nglMaybeCopyFile old new
-    | new == old = return()
-    | otherwise = liftIO (copyFile old new)

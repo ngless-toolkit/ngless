@@ -15,7 +15,8 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 import qualified Data.Conduit.Combinators as C
-import           Data.Conduit ((=$=), runConduit)
+import           Data.Conduit ((=$=), runConduit, ($$))
+import           System.Directory (copyFile)
 import Data.String.Utils
 import Data.List (isInfixOf)
 
@@ -35,6 +36,8 @@ import Utils.Conduit (conduitPossiblyCompressedFile, asyncGzipToFile)
     will no longer be used in the script.
 
     Decisions on whether to use compression are based on the filenames.
+
+    The filepath "/dev/stdout" is special cased to print to stdout
 -}
 
 moveOrCopyCompress :: Bool -> FilePath -> FilePath -> NGLessIO ()
@@ -50,9 +53,9 @@ moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
         moveIfCan :: FilePath -> FilePath -> NGLessIO ()
         moveIfCan = if canMove
                        then liftIO2 moveOrCopy
-                       else nglMaybeCopyFile
+                       else maybeCopyFile
 
-        liftIO2 f = \a b -> liftIO (f a b)
+        liftIO2 f a b = liftIO (f a b)
         isGZ = endswith ".gz"
         igz = isGZ orig
         ogz = isGZ fname
@@ -60,6 +63,13 @@ moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
             conduitPossiblyCompressedFile oldfp =$= C.sinkFile newfp
         compressTo oldfp newfp = runConduit $
             C.sourceFile oldfp =$= asyncGzipToFile newfp
+
+        -- | copy file unless its the same file.
+        maybeCopyFile :: FilePath -> FilePath -> NGLessIO ()
+        maybeCopyFile old "/dev/stdout" = conduitPossiblyCompressedFile old $$ C.stdout
+        maybeCopyFile old new
+            | new == old = return()
+            | otherwise = liftIO (copyFile old new)
 
 removeEnd :: String -> String -> String
 removeEnd base suffix = take (length base - length suffix) base
