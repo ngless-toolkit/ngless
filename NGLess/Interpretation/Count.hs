@@ -29,7 +29,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Unboxed.Mutable as VUM
-import           Data.Vector.Algorithms.Intro (sort)
+import qualified Data.Vector.Algorithms.Intro as VA
 
 import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Map.Strict as M
@@ -45,7 +45,7 @@ import           Data.Conduit.Async (($$&))
 import Control.Monad
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
-import Data.List                (foldl1', foldl')
+import Data.List                (foldl1', foldl', sort)
 import GHC.Conc                 (getNumCapabilities)
 import Control.DeepSeq          (NFData(..))
 import Control.Error            (note)
@@ -242,7 +242,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
             }
     amode <- annotationMode (optFeatures opts) refinfo (T.unpack <$> mocatMap) (T.unpack <$> gffFile)
     annotator <- loadAnnotator amode opts
-    NGOCounts . File <$> performCount samfp rname annotator opts
+    NGOCounts . File <$> performCount samfp rname [annotator] opts
 executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
 
@@ -252,21 +252,21 @@ loadAnnotator (AnnotateGFF gf) opts = loadGFF gf opts
 loadAnnotator (AnnotateFunctionalMap mm) opts = loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
 
 
-performCount1Pass :: VUM.IOVector Double -> MMMethod -> C.Sink (VU.Vector Int, IG.IntGroups) NGLessIO [IG.IntGroups]
-performCount1Pass mcounts MMUniqueOnly = do
+performCount1Pass :: MMMethod -> VUM.IOVector Double -> C.Sink (VU.Vector Int, IG.IntGroups) NGLessIO [IG.IntGroups]
+performCount1Pass MMUniqueOnly mcounts = do
     C.awaitForever $ \(singles, _) -> liftIO (incrementAll mcounts singles)
     return []
-performCount1Pass mcounts MMCountAll = do
+performCount1Pass MMCountAll mcounts = do
     C.awaitForever $ \(singles, mms) -> liftIO $ do
         incrementAll mcounts singles
         IG.forM_ mms (incrementAll2 mcounts)
     return []
-performCount1Pass mcounts MM1OverN = do
+performCount1Pass MM1OverN mcounts = do
     C.awaitForever $ \(singles, mms) -> liftIO $ do
         incrementAll mcounts singles
         IG.forM_ mms (increment1OverN mcounts)
     return []
-performCount1Pass mcounts MMDist1 = loop []
+performCount1Pass MMDist1 mcounts = loop []
     where
         loop :: [IG.IntGroups] -> C.Sink (VU.Vector Int, IG.IntGroups) NGLessIO [IG.IntGroups]
         loop acc = C.await >>= \case
@@ -283,26 +283,24 @@ enumerate = loop 0
     where
         loop !n = awaitJust $ \v -> C.yield (n, v) >> loop (n+1)
 
-annSamHeaderParser :: Int -> Annotator -> CountOpts -> C.Sink ByteLine NGLessIO Annotator
-annSamHeaderParser mapthreads ann opts = case ann of
-        SeqNameAnnotator Nothing -> do
-            chunks <- lineGroups
-                =$= asyncMapEitherC mapthreads (V.mapM seqNameSize)
+annSamHeaderParser :: Int -> [Annotator] -> CountOpts -> C.Sink ByteLine NGLessIO [Annotator]
+annSamHeaderParser mapthreads anns opts = lineGroups =$= C.sequenceSinks (map annSamHeaderParser1 anns)
+    where
+        annSamHeaderParser1 (SeqNameAnnotator Nothing) = do
+            chunks <- asyncMapEitherC mapthreads (V.mapM seqNameSize)
                 =$= CL.fold (flip (:)) []
             vsorted <- liftIO $ do
                 v <- V.unsafeThaw (V.concat chunks)
                 sortParallel mapthreads v
                 V.unsafeFreeze v
             return $! SeqNameAnnotator (Just vsorted)
-        GeneMapAnnotator gmap isizes
-            | optNormSize opts -> do
+        annSamHeaderParser1 (GeneMapAnnotator gmap isizes)
+            | optNormSize opts = do
                 msizes <- liftIO $ V.thaw isizes
-                lineGroups
-                    =$= asyncMapEitherC mapthreads (liftM flattenVs . V.mapM (indexUpdates gmap))
+                asyncMapEitherC mapthreads (liftM flattenVs . V.mapM (indexUpdates gmap))
                     =$= CL.mapM_ (liftIO . updateSizes msizes)
                 GeneMapAnnotator gmap <$> liftIO (V.unsafeFreeze msizes)
-        _ -> C.sinkNull >> return ann
-    where
+        annSamHeaderParser1 ann = C.sinkNull >> return ann
         lineGroups = CL.filter (B.isPrefixOf "@SQ\tSN:" . unwrapByteLine)
                     =$= enumerate
                     =$= C.conduitVector 32768
@@ -349,7 +347,7 @@ splitSingletons method values = (singles, mms)
             -- sorting is completely unnecessary for correctness, but improves
             -- cache performance as close-by indices will be accessed together
             -- when this data is processed in the main thread.
-            sort v
+            VA.sort v
 
             return v
         getsingle1 :: Int -> Maybe (Int, Int)
@@ -366,58 +364,63 @@ splitSingletons method values = (singles, mms)
         larger1 _   = True
 
 
-performCount :: FilePath -> T.Text -> Annotator -> CountOpts -> NGLessIO FilePath
-performCount samfp gname annotator0 opts = do
+performCount :: FilePath -> T.Text -> [Annotator] -> CountOpts -> NGLessIO FilePath
+performCount samfp gname annotators0 opts = do
     outputListLno' TraceOutput ["Starting count..."]
     numCapabilities <- liftIO getNumCapabilities
     let mapthreads = max 1 (numCapabilities - 1)
         method = optMMMethod opts
         delim = optDelim opts
 
-    (samcontent, annotator) <-
+    (samcontent, annotators) <-
         samBamConduit samfp
             =$= linesC
             $$+ C.takeWhile ((=='@') . B8.head . unwrapByteLine)
-            =$= annSamHeaderParser mapthreads annotator0 opts
-    let n_entries = annSize annotator
+            =$= annSamHeaderParser mapthreads annotators0 opts
+    outputListLno' TraceOutput ["Loaded headers. Starting parsing/distribution."]
 
-    outputListLno' TraceOutput ["Loaded headers (", show n_entries, " headers); starting parsing/distribution."]
-    mcounts <- liftIO $ VUM.replicate n_entries (0.0 :: Double)
+    mcounts <- forM annotators $ \ann -> do
+        let n_entries = annSize ann
+        liftIO $ VUM.replicate n_entries (0.0 :: Double)
     toDistribute <-
             samcontent
                 $$+- readSamGroupsC' mapthreads
-                =$= asyncMapEitherC mapthreads (liftM (splitSingletons method) . V.mapM (annotateReadGroup opts annotator))
-                =$= performCount1Pass mcounts method
+                =$= asyncMapEitherC mapthreads (\samgroup -> forM annotators $ \ann -> do
+                                                                annotated <- V.mapM (annotateReadGroup opts ann) samgroup
+                                                                return $ splitSingletons method annotated)
+                =$= C.sequenceSinks [(CL.map (!! i) =$= performCount1Pass method mc) | (i,mc) <- zip [0..] mcounts]
     sizes <- if optNormSize opts || method == MMDist1
-                then do
+                then forM annotators $ \ann -> do
+                    let n_entries = annSize ann
                     sizes <- liftIO $ VUM.new n_entries
-                    forM_ (annEnumerate annotator) $ \(name,i) -> do
-                        s <- runNGLess $ annSizeOf annotator name
+                    forM_ (annEnumerate ann) $ \(name,i) -> do
+                        s <- runNGLess $ annSizeOf ann name
                         liftIO $ VUM.write sizes i s
                     return sizes
-                else liftIO $ VUM.new 0
+                else forM mcounts $ const (liftIO $ VUM.new 0)
 
     raw_counts <- if method == MMDist1
-                    then liftIO (VUM.clone mcounts)
+                    then forM mcounts (liftIO . VUM.clone)
                     else return mcounts
     when (optNormSize opts || method == MMDist1) $
-        normalizeCounts mcounts sizes
-    counts <- liftIO $ VU.unsafeFreeze mcounts
+        forM_ (zip mcounts sizes) (uncurry normalizeCounts)
+    counts <- forM mcounts (liftIO . VU.unsafeFreeze)
 
-    result <-
+    results <-
         if method /= MMDist1
             then return counts
             else do
                 outputListLno' TraceOutput ["Counts (second pass)..."]
-                distributeMM toDistribute counts raw_counts False
-                when (optNormSize opts) $
-                    normalizeCounts raw_counts sizes
-                liftIO $ VU.unsafeFreeze raw_counts
+                forM (zip4 counts raw_counts sizes toDistribute) $ \(c, r, s, t) -> do
+                    distributeMM t c r False
+                    when (optNormSize opts) $
+                        normalizeCounts r s
+                    liftIO $ VU.unsafeFreeze r
 
     (newfp,hout) <- openNGLTempFile samfp "counts." "txt"
-    liftIO $ do
-        mheaders <- VM.new n_entries
-        forM_ (annEnumerate annotator) $ \(v,i) ->
+    liftIO $ forM_ (zip annotators results) $ \(ann,result) -> do
+        mheaders <- VM.new (annSize ann)
+        forM_ (annEnumerate ann) $ \(v,i) ->
             VM.write mheaders i v
         headers <- V.unsafeFreeze mheaders
         BL.hPut hout (BL.fromChunks [delim, T.encodeUtf8 gname, "\n"])
@@ -439,6 +442,9 @@ performCount samfp gname annotator0 opts = do
         hClose hout
     return newfp
 
+zip4 :: [a] -> [b] -> [c] -> [d] -> [(a,b,c,d)]
+zip4 (a:ax) (b:bx) (c:cx) (d:dx) = (a,b,c,d):zip4 ax bx cx dx
+zip4 _ _ _ _ = []
 
 
 incrementAll :: VUM.IOVector Double -> VU.Vector Int -> IO ()
@@ -483,16 +489,17 @@ data LoadFunctionalMapState = LoadFunctionalMapState
                                         !(M.Map B.ByteString Int) -- ^ feature -> feature-ID
 
 loadFunctionalMap :: FilePath -> [B.ByteString] -> NGLessIO Annotator
+loadFunctionalMap fname [] = throwScriptError ("Loading annotation file '"++fname++"' but no features requested. This is probably a bug.")
 loadFunctionalMap fname columns = do
         outputListLno' InfoOutput ["Loading map file ", fname]
-        (resume, [headers]) <- (CB.sourceFile fname =$ CB.lines)
-                $$+ (CL.isolate 1 =$= CL.map (B8.split '\t') =$ CL.consume)
+        (resume, [headers]) <- (CB.sourceFile fname =$ CB.lines =$= enumerate)
+                $$+ (CL.isolate 1 =$= CL.map (B8.split '\t' . snd) =$ CL.consume)
         cis <- runNGLess $ lookUpColumns headers
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
         LoadFunctionalMapState _ gmap namemap <- resume
                 $$+- C.conduitVector 8192
-                =$= asyncMapEitherC mapthreads (V.mapM (selectColumns cis . B8.split '\t')) -- after this we have vectors of (<gene name>, [<feature-name>])
+                =$= asyncMapEitherC mapthreads (V.mapM (selectColumns cis)) -- after this we have vectors of (<gene name>, [<feature-name>])
                 =$ CL.fold (V.foldl' inserts1) (LoadFunctionalMapState 0 M.empty M.empty)
         outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
         return $ GeneMapAnnotator (reindex gmap namemap) (V.fromList [RefSeqInfo n 0.0 | n <- M.keys namemap])
@@ -518,7 +525,7 @@ loadFunctionalMap fname columns = do
 
         lookUpColumns :: [B.ByteString] -> NGLess [Int]
         lookUpColumns [] = throwDataError ("Loading functional map file '" ++ fname ++ "': Header line missing!")
-        lookUpColumns headers = mapM (lookUpColumns' $ M.fromList (zip (tail headers) [0..])) columns
+        lookUpColumns headers = sort <$> mapM (lookUpColumns' $ M.fromList (zip (tail headers) [0..])) columns
         lookUpColumns' :: M.Map B8.ByteString Int -> B8.ByteString -> NGLess Int
         lookUpColumns' colmap col = note notfounderror $ M.lookup col colmap
             where
@@ -527,21 +534,22 @@ loadFunctionalMap fname columns = do
                                 ++ case findSuggestion (T.pack $ B8.unpack col) (map (T.pack . B8.unpack) $ M.keys colmap) of
                                         Just (Suggestion valid reason) -> [" Did you mean '", T.unpack valid, "' (", T.unpack reason, ")?"]
                                         Nothing -> [])
-        selectColumns :: [Int] -> [B.ByteString] -> NGLess (B.ByteString, [B.ByteString])
-        selectColumns cols (gene:mapped) = (gene,) . addTags columns <$> selectIds cols (zip [0..] mapped)
-        selectColumns _ [] = throwDataError ("Loading functional map file '" ++ fname ++ "': empty line.")
+        selectColumns :: [Int] -> (Int, B.ByteString) -> NGLess (B.ByteString, [B.ByteString])
+        selectColumns cols (line_nr, line) = case B8.split '\t' line of
+                    (gene:mapped) -> (gene,) . addTags columns <$> selectIds line_nr cols (zip [0..] mapped)
+                    [] -> throwDataError ("Loading functional map file '" ++ fname ++ "' [line " ++ show (line_nr + 1)++ "]: empty line.")
 
         addTags :: [B.ByteString] -> [B.ByteString] -> [B.ByteString]
         addTags [] _ = error "impossible"
         addTags [_] [v] = B8.split ',' v -- do not tag single features
         addTags fs vss = flip concatMap (zip fs vss) $ \(f,vs) -> (flip map (B8.split ',' vs) $ \v -> B.concat [f, ":", v])
 
-        selectIds :: [Int] -> [(Int, B.ByteString)] -> NGLess [B.ByteString]
-        selectIds [] _ = return []
-        selectIds fs@(fi:rest) ((ci,v):vs)
-            | fi == ci = (v:) <$> selectIds rest vs
-            | otherwise = selectIds fs vs
-        selectIds _ _ = throwDataError ("Loading functional map file '" ++ fname ++ "': wrong number of columns")
+        selectIds :: Int -> [Int] -> [(Int, B.ByteString)] -> NGLess [B.ByteString]
+        selectIds _ [] _ = return []
+        selectIds line_nr fs@(fi:rest) ((ci,v):vs)
+            | fi == ci = (v:) <$> selectIds line_nr rest vs
+            | otherwise = selectIds line_nr fs vs
+        selectIds line_nr _ _ = throwDataError ("Loading functional map file '" ++ fname ++ "' [line " ++ show (line_nr + 1)++ "]: wrong number of columns") -- humans count lines in 1-based systems
 
 
 annotationMode :: [GffType] -> Maybe T.Text -> Maybe FilePath -> Maybe FilePath -> NGLessIO AnnotationMode

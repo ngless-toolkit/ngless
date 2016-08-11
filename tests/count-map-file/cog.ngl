@@ -22,3 +22,8 @@ write(counted, ofile='output.pfamA.dist1.txt')
 counted = count(mapped, features=['ko'], multiple={dist1}, functional_map='122_DCM_0d2-0d45_scaffold97490_1_gene122702.map')
 write(counted, ofile='output.ko.dist1.txt')
 
+# Regression test: this used to trigger an error:
+counted = count(mapped,
+                features=['pfamA', 'ko'],
+                multiple={all1},
+                functional_map='122_DCM_0d2-0d45_scaffold97490_1_gene122702.map')

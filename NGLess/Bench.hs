@@ -19,7 +19,7 @@ import Configuration (setupTestConfiguration)
 
 
 import Interpretation.Map (_samStats)
-import Interpretation.Count (performCount, MMMethod(..), loadAnnotator, loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), AnnotationMode(..), Annotator(..))
+import Interpretation.Count (performCount, MMMethod(..), loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), Annotator(..))
 import Interpretation.Substrim (substrim)
 import Interpret (interpret)
 import Parse (parsengless)
@@ -84,7 +84,7 @@ main = setupTestConfiguration >> defaultMain [
         [ bench "sample" $ nfNGLessIO (_samStats "test_samples/sample.sam")
         ]
     ,bgroup "fastq"
-        [ bench "fastqStats" $ nfNGLessIO (statsFromFastQ "test_samples/sample.fq.gz")
+        [ bench "fastqStats" $ nfNGLessIO (statsFromFastQ "test_samples/sample.fq.gz" SangerEncoding)
         , bench "preprocess" $ nfNGLessScript "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
         , bench "preprocess-transformed" $ nfNGLessScriptWithTransform "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
         , bench "preprocess-pair" $ nfNGLessScript
@@ -97,9 +97,9 @@ main = setupTestConfiguration >> defaultMain [
         ]
     ,bgroup "count"
         [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap "test_samples/functional.map" ["ko", "cog"])
-        , bench "annotate-seqname" . nfNGLessIO $ performCount "test_samples/sample.sam" "testing" (SeqNameAnnotator Nothing) basicCountOpts
+        , bench "annotate-seqname" . nfNGLessIO $ performCount "test_samples/sample.sam" "testing" [SeqNameAnnotator Nothing] basicCountOpts
         , bench "annotate-functionalmap" . nfNGLessIO $ do
-                    amap <- loadAnnotator (AnnotateFunctionalMap "test_samples/functional.map") basicCountOpts
-                    performCount "test_samples/sample.sam" "testing" amap basicCountOpts
+                    amap <- loadFunctionalMap "test_samples/functional.map" ["ko", "cog"]
+                    performCount "test_samples/sample.sam" "testing" [amap] basicCountOpts
         ]
     ]
