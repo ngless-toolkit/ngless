@@ -281,8 +281,16 @@ enumerate = loop 0
     where
         loop !n = awaitJust $ \v -> C.yield (n, v) >> loop (n+1)
 
+
+-- | This is a version of C.sequenceSinks which optimizes the case where a
+-- single element is passed (it makes a small, but noticeable difference in
+-- benchmarking)
+sequenceSinks :: (Monad m) => [C.Sink a m b] -> C.Sink a m [b]
+sequenceSinks [s] = (:[]) <$> s
+sequenceSinks ss = C.sequenceSinks ss
+
 annSamHeaderParser :: Int -> [Annotator] -> CountOpts -> C.Sink ByteLine NGLessIO [Annotator]
-annSamHeaderParser mapthreads anns opts = lineGroups =$= C.sequenceSinks (map annSamHeaderParser1 anns)
+annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annSamHeaderParser1 anns)
     where
         annSamHeaderParser1 (SeqNameAnnotator Nothing) = do
             chunks <- asyncMapEitherC mapthreads (V.mapM seqNameSize)
@@ -386,7 +394,7 @@ performCount samfp gname annotators0 opts = do
                 =$= asyncMapEitherC mapthreads (\samgroup -> forM annotators $ \ann -> do
                                                                 annotated <- V.mapM (annotateReadGroup opts ann) samgroup
                                                                 return $ splitSingletons method annotated)
-                =$= C.sequenceSinks [(CL.map (!! i) =$= performCount1Pass method mc) | (i,mc) <- zip [0..] mcounts]
+                =$= sequenceSinks [CL.map (!! i) =$= performCount1Pass method mc | (i,mc) <- zip [0..] mcounts]
     sizes <- if optNormSize opts || method == MMDist1
                 then forM annotators $ \ann -> do
                     let n_entries = annSize ann
@@ -494,7 +502,7 @@ loadFunctionalMap fname columns = do
         anns <- map finishFunctionalMap <$> (resume
                 $$+- C.conduitVector 8192
                 =$= asyncMapEitherC mapthreads (V.mapM (selectColumns cis)) -- after this we have vectors of (<gene name>, [<feature-name>])
-                =$ C.sequenceSinks
+                =$ sequenceSinks
                     [CL.fold (V.foldl' (inserts1 c)) (LoadFunctionalMapState 0 M.empty M.empty) | c <- [0 .. length cis - 1]])
         outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
         return anns
@@ -575,7 +583,7 @@ loadGFF gffFp opts = do
                 $= CB.lines)
                 $$& (readAnnotationOrDie
                 =$= CL.filter (matchFeatures $ optFeatures opts)
-                =$= C.sequenceSinks
+                =$= sequenceSinks
                     [CL.fold (insertg f) (0, M.empty, M.empty, M.empty) | f <- optFeatures opts])
 
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "' complete."]
