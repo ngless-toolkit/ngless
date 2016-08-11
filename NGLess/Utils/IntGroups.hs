@@ -8,6 +8,7 @@ module Utils.IntGroups
     , fromList
     , toList
 
+    , empty
     , length
     , null
 
@@ -46,6 +47,8 @@ length (IntGroups _ indices) = VU.length indices - 1
 
 null (IntGroups values _) = VU.null values
 {-# INLINE null #-}
+
+empty = IntGroups VU.empty VU.empty
 
 forM_ :: (Monad m) => IntGroups -> ([Int] -> m ()) -> m ()
 forM_ vs = Control.Monad.forM_ (toList vs)

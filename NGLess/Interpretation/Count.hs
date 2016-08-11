@@ -10,7 +10,6 @@ module Interpretation.Count
     , AnnotationMode(..)
     , AnnotationIntersectionMode(..)
     , MMMethod(..)
-    , annotateSamLine
     , annotationRule
     , loadAnnotator
     , loadFunctionalMap
@@ -88,9 +87,6 @@ type GffIMMap = IM.IntervalMap Int [AnnotationInfo]
 type GFFAnnotationMap = M.Map B.ByteString GffIMMap
 type AnnotationRule = GffIMMap -> GffStrand -> (Int, Int) -> [(GffStrand,Int)]
 
-data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
-    deriving (Eq, Show)
-
 type GeneMapAnnotation = M.Map B8.ByteString [Int]
 
 type FeatureSizeMap = M.Map B.ByteString Double
@@ -125,15 +121,16 @@ instance NFData RefSeqInfo where
     rnf !_ = ()
 
 instance Ord RefSeqInfo where
-    compare (RefSeqInfo s0 _) (RefSeqInfo s1 _) = compare s0 s1
+    compare RefSeqInfo{ rsiName = n0 } RefSeqInfo{ rsiName = n1 } = compare n0 n1
+
 
 compareShortLong  :: RefSeqInfo -> B.ByteString -> Ordering
 compareShortLong (RefSeqInfo short _) long = compare short long
 
 data Annotator =
-                SeqNameAnnotator (Maybe (V.Vector RefSeqInfo))
-                | GFFAnnotator GFFAnnotationMap [B.ByteString] FeatureSizeMap
-                | GeneMapAnnotator GeneMapAnnotation (V.Vector RefSeqInfo)
+                SeqNameAnnotator (Maybe (V.Vector RefSeqInfo)) -- ^ Just annotate by sequence names
+                | GFFAnnotator GFFAnnotationMap [B.ByteString] FeatureSizeMap -- ^ map reference regions to features + feature sizes
+                | GeneMapAnnotator GeneMapAnnotation (V.Vector RefSeqInfo) -- ^ map reference (gene names) to indices, indexing into the vector of refseqinfo
     deriving (Eq, Show)
 instance NFData Annotator where
     rnf (SeqNameAnnotator m) = rnf m
@@ -174,6 +171,7 @@ annEnumerate (GeneMapAnnotator _ ix)      = enumerateRSVector ix
 annEnumerate (GFFAnnotator _ headers _)   = zip headers [0..]
 enumerateRSVector ix = V.toList . flip V.imap ix $ \i rs -> (rsiName rs, i)
 
+-- Number of elements
 annSize :: Annotator -> Int
 annSize (SeqNameAnnotator (Just ix)) = V.length ix
 annSize (GeneMapAnnotator _ ix) = V.length ix
@@ -184,6 +182,26 @@ methodFor "dist1" = return MMDist1
 methodFor "all1" = return MMCountAll
 methodFor "unique-only" = return MMUniqueOnly
 methodFor other = throwShouldNotOccur ("Unexpected multiple method " ++ T.unpack other)
+
+
+{- We define the type AnnotationIntersectionMode mainly to facilitate tests,
+ - which depend on being able to write code such as
+ -
+ -      annotationRule IntersectUnion
+ -}
+data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
+    deriving (Eq, Show)
+
+annotationRuleFor "union" = return IntersectUnion
+annotationRuleFor "intersection_strict" = return IntersectUnion
+annotationRuleFor "intersection_non_empty" = return IntersectNonEmpty
+annotationRuleFor m = throwScriptError (concat ["Unexpected annotation mode (", show m, ")."])
+
+annotationRule :: AnnotationIntersectionMode -> AnnotationRule
+annotationRule IntersectUnion = union
+annotationRule IntersectStrict = intersection_strict
+annotationRule IntersectNonEmpty = intersection_non_empty
+
 
 executeCountFile :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCountFile (NGOString st) _ = return $ NGOCounts (File (T.unpack st))
@@ -200,8 +218,8 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
     gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
     normSize <- lookupBoolOrScriptErrorDef (return False) "count function" "norm" args
     discardZeros <- lookupBoolOrScriptErrorDef (return False) "count argument parsing" "discard_zeros" args
+    m <- (liftM annotationRule . annotationRuleFor) =<< lookupSymbolOrScriptErrorDef (return "union") "mode argument to count" "mode" args
     delim <- T.encodeUtf8 <$> lookupStringOrScriptErrorDef (return "\t") "count hidden argument (should always be valid)" "__delim" args
-
 
     fs <- case lookup "features" args of
         Nothing -> return ["gene"]
@@ -211,7 +229,6 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
     when (length fs > 1 && method /= MMCountAll) $
         outputListLno' WarningOutput ["Distribution mode when using multiple features is probably incorrect"]
     samfp <- asFile istream
-    m <- annotationRule <$> parseAnnotationMode args
     let opts = CountOpts
             { optFeatures = map matchingFeature fs
             , optIntersectMode = m
@@ -280,7 +297,7 @@ annSamHeaderParser mapthreads ann opts = case ann of
         GeneMapAnnotator gmap isizes
             | optNormSize opts -> do
                 msizes <- liftIO $ V.thaw isizes
-                chunks <- lineGroups
+                lineGroups
                     =$= asyncMapEitherC mapthreads (liftM flattenVs . V.mapM (indexUpdates gmap))
                     =$= CL.mapM_ (liftIO . updateSizes msizes)
                 GeneMapAnnotator gmap <$> liftIO (V.unsafeFreeze msizes)
@@ -301,14 +318,14 @@ annSamHeaderParser mapthreads ann opts = case ann of
         updateSizes msizes updates =
             VU.forM_ updates $ \(ix,val) ->
                 VM.modify msizes (rsiAdd val) ix
-        rsiAdd !val (RefSeqInfo n cur) = RefSeqInfo n (cur + val)
-        indexUpdates :: GeneMapAnnotation -> (Int, ByteLine) -> Either NGError [(Int, Double)]
+        rsiAdd !val rsi@RefSeqInfo{ rsiSize = cur } = rsi { rsiSize = cur + val }
+
+        indexUpdates :: GeneMapAnnotation -> (Int, ByteLine) -> NGLess [(Int, Double)]
         indexUpdates gmap line = do
             RefSeqInfo seqid val <- seqNameSize line
-            case M.lookup seqid gmap of
-                Nothing -> return []
-                Just ixs -> return [(ix,val) | ix <- ixs]
-        seqNameSize :: (Int, ByteLine) -> Either NGError RefSeqInfo
+            let ixs = fromMaybe [] $ M.lookup seqid gmap
+            return [(ix,val) | ix <- ixs]
+        seqNameSize :: (Int, ByteLine) -> NGLess RefSeqInfo
         seqNameSize (n, ByteLine h) = case B8.split '\t' h of
                 [_,seqname,sizestr] -> case B8.readInt (B.drop 3 sizestr) of
                     Just (size, _) -> return $! RefSeqInfo (B.drop 3 seqname) (convert size)
@@ -319,12 +336,21 @@ annSamHeaderParser mapthreads ann opts = case ann of
 listNub :: (Ord a) => [a] -> [a]
 listNub = S.toList . S.fromList
 
-splitSingles :: MMMethod -> V.Vector [Int] -> (VU.Vector Int, IG.IntGroups)
-splitSingles method values = (singles, mms)
+
+-- Takes a vector of [Int] and splits into singletons (which can be represented
+-- as `VU.Vector Int` and the rest (represented as `IG.IntGroups`)
+splitSingletons :: MMMethod -> V.Vector [Int] -> (VU.Vector Int, IG.IntGroups)
+splitSingletons method values = (singles, mms)
     where
         singles = VU.create $ do
             v <- VU.unsafeThaw $ VU.unfoldr getsingle1 0
-            sort v -- sorting is completely unnecessary for correctness, but improves cache performance as close-by indices will be accessed together
+            -- We want to maximize the work performed in this function as it is
+            -- being done in a worker thread:
+            -- sorting is completely unnecessary for correctness, but improves
+            -- cache performance as close-by indices will be accessed together
+            -- when this data is processed in the main thread.
+            sort v
+
             return v
         getsingle1 :: Int -> Maybe (Int, Int)
         getsingle1 ix = do
@@ -332,7 +358,9 @@ splitSingles method values = (singles, mms)
             case vs of
                 [v] -> return (v, ix + 1)
                 _ -> getsingle1 (ix + 1)
-        mms = IG.fromList (filter larger1 (V.toList values))
+        mms -- if we are only using unique hits, then we do not need to care about non-singletons
+            | method == MMUniqueOnly = IG.empty
+            | otherwise = IG.fromList (filter larger1 (V.toList values))
         larger1 []  = False
         larger1 [_] = False
         larger1 _   = True
@@ -358,7 +386,7 @@ performCount samfp gname annotator0 opts = do
     toDistribute <-
             samcontent
                 $$+- readSamGroupsC' mapthreads
-                =$= asyncMapEitherC mapthreads (liftM (splitSingles method) . V.mapM (annotateReadGroup opts annotator))
+                =$= asyncMapEitherC mapthreads (liftM (splitSingletons method) . V.mapM (annotateReadGroup opts annotator))
                 =$= performCount1Pass mcounts method
     sizes <- if optNormSize opts || method == MMDist1
                 then do
@@ -515,13 +543,6 @@ loadFunctionalMap fname columns = do
             | otherwise = selectIds fs vs
         selectIds _ _ = throwDataError ("Loading functional map file '" ++ fname ++ "': wrong number of columns")
 
-parseAnnotationMode :: KwArgsValues -> NGLessIO AnnotationIntersectionMode
-parseAnnotationMode args = case lookupWithDefault (NGOSymbol "union") "mode" args of
-    (NGOSymbol "union") -> return  IntersectUnion
-    (NGOSymbol "intersection_strict") -> return IntersectUnion
-    (NGOSymbol "intersection_non_empty") -> return IntersectNonEmpty
-    m -> throwScriptError (concat ["Unexpected annotation mode (", show m, ")."])
-
 
 annotationMode :: [GffType] -> Maybe T.Text -> Maybe FilePath -> Maybe FilePath -> NGLessIO AnnotationMode
 annotationMode _ _ (Just _) (Just _) = throwScriptError "Cannot simmultaneously pass a gff_file and an annotation_file for annotate() function"
@@ -538,11 +559,6 @@ annotationMode _ (Just ref) Nothing Nothing = do
         (Just _, Just _) -> throwDataError ("Reference " ++ T.unpack ref ++ " has both a GFF and a functional map file. Cannot figure out what to do.")
 annotationMode _ _ _ _ =
             throwShouldNotOccur "For counting, you must do one of\n1. use seqname mode\n2. pass in a GFF file using the argument 'gff_file'\n3. pass in a gene map using the argument 'functional_map'"
-
-annotationRule :: AnnotationIntersectionMode -> AnnotationRule
-annotationRule IntersectUnion = union
-annotationRule IntersectStrict = intersection_strict
-annotationRule IntersectNonEmpty = intersection_non_empty
 
 getFeatureName (GffOther s) = s
 getFeatureName _ = error "getFeatureName called for non-GffOther input"
