@@ -45,7 +45,7 @@ import           Data.Conduit.Async (($$&))
 import Control.Monad
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
-import Data.List                (foldl1', foldl', sort)
+import Data.List                (foldl1', foldl', sort, zip4)
 import GHC.Conc                 (getNumCapabilities)
 import Control.DeepSeq          (NFData(..))
 import Control.Error            (note)
@@ -226,8 +226,6 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
         Just (NGOSymbol f) -> return [f]
         Just (NGOList feats') -> mapM (stringOrTypeError "annotation features argument") feats'
         _ -> throwShouldNotOccur "executeAnnotation: TYPE ERROR"
-    when (length fs > 1 && method /= MMCountAll) $
-        outputListLno' WarningOutput ["Distribution mode when using multiple features is probably incorrect"]
     samfp <- asFile istream
     let opts = CountOpts
             { optFeatures = map matchingFeature fs
@@ -241,13 +239,13 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
             , optNormSize = normSize
             }
     amode <- annotationMode (optFeatures opts) refinfo (T.unpack <$> mocatMap) (T.unpack <$> gffFile)
-    annotator <- loadAnnotator amode opts
-    NGOCounts . File <$> performCount samfp rname [annotator] opts
+    annotators <- loadAnnotator amode opts
+    NGOCounts . File <$> performCount samfp rname annotators opts
 executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
 
-loadAnnotator :: AnnotationMode -> CountOpts -> NGLessIO Annotator
-loadAnnotator AnnotateSeqName _ = return $ SeqNameAnnotator Nothing
+loadAnnotator :: AnnotationMode -> CountOpts -> NGLessIO [Annotator]
+loadAnnotator AnnotateSeqName _ = return [SeqNameAnnotator Nothing]
 loadAnnotator (AnnotateGFF gf) opts = loadGFF gf opts
 loadAnnotator (AnnotateFunctionalMap mm) opts = loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
 
@@ -418,34 +416,30 @@ performCount samfp gname annotators0 opts = do
                     liftIO $ VU.unsafeFreeze r
 
     (newfp,hout) <- openNGLTempFile samfp "counts." "txt"
-    liftIO $ forM_ (zip annotators results) $ \(ann,result) -> do
-        mheaders <- VM.new (annSize ann)
-        forM_ (annEnumerate ann) $ \(v,i) ->
-            VM.write mheaders i v
-        headers <- V.unsafeFreeze mheaders
+    liftIO $ do
         BL.hPut hout (BL.fromChunks [delim, T.encodeUtf8 gname, "\n"])
+        forM_ (zip annotators results) $ \(ann,result) -> do
+            mheaders <- VM.new (annSize ann)
+            forM_ (annEnumerate ann) $ \(v,i) ->
+                VM.write mheaders i v
+            headers <- V.unsafeFreeze mheaders
 
-        let nlB :: BB.Builder
-            nlB = BB.word8 10
-            tabB :: BB.Builder
-            tabB = BB.word8 9
-            encode1 :: Int -> BB.Builder
-            encode1 !i = let
-                        hn = (V.!) headers i
-                        v = (VU.!) result i
-                    in if v >= optMinCount opts
-                                then mconcat [BB.byteString hn, tabB, BB.byteString (toShortest v), nlB]
-                                else mempty
+            let nlB :: BB.Builder
+                nlB = BB.word8 10
+                tabB :: BB.Builder
+                tabB = BB.word8 9
+                encode1 :: Int -> BB.Builder
+                encode1 !i = let
+                            hn = (V.!) headers i
+                            v = (VU.!) result i
+                        in if v >= optMinCount opts
+                                    then mconcat [BB.byteString hn, tabB, BB.byteString (toShortest v), nlB]
+                                    else mempty
 
-            n = VU.length result
-        mapM_ (BB.hPutBuilder hout. encode1) [0 .. n - 1]
+                n = VU.length result
+            mapM_ (BB.hPutBuilder hout. encode1) [0 .. n - 1]
         hClose hout
     return newfp
-
-zip4 :: [a] -> [b] -> [c] -> [d] -> [(a,b,c,d)]
-zip4 (a:ax) (b:bx) (c:cx) (d:dx) = (a,b,c,d):zip4 ax bx cx dx
-zip4 _ _ _ _ = []
-
 
 incrementAll :: VUM.IOVector Double -> VU.Vector Int -> IO ()
 incrementAll counts vis = VU.forM_ vis $ \vi -> unsafeIncrement counts vi
@@ -488,7 +482,7 @@ data LoadFunctionalMapState = LoadFunctionalMapState
                                         !(M.Map B.ByteString [Int]) -- ^ gene -> [feature-ID]
                                         !(M.Map B.ByteString Int) -- ^ feature -> feature-ID
 
-loadFunctionalMap :: FilePath -> [B.ByteString] -> NGLessIO Annotator
+loadFunctionalMap :: FilePath -> [B.ByteString] -> NGLessIO [Annotator]
 loadFunctionalMap fname [] = throwScriptError ("Loading annotation file '"++fname++"' but no features requested. This is probably a bug.")
 loadFunctionalMap fname columns = do
         outputListLno' InfoOutput ["Loading map file ", fname]
@@ -497,13 +491,15 @@ loadFunctionalMap fname columns = do
         cis <- runNGLess $ lookUpColumns headers
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
-        LoadFunctionalMapState _ gmap namemap <- resume
+        anns <- map finishFunctionalMap <$> (resume
                 $$+- C.conduitVector 8192
                 =$= asyncMapEitherC mapthreads (V.mapM (selectColumns cis)) -- after this we have vectors of (<gene name>, [<feature-name>])
-                =$ CL.fold (V.foldl' inserts1) (LoadFunctionalMapState 0 M.empty M.empty)
+                =$ C.sequenceSinks
+                    [CL.fold (V.foldl' (inserts1 c)) (LoadFunctionalMapState 0 M.empty M.empty) | c <- [0 .. length cis - 1]])
         outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
-        return $ GeneMapAnnotator (reindex gmap namemap) (V.fromList [RefSeqInfo n 0.0 | n <- M.keys namemap])
+        return anns
     where
+        finishFunctionalMap (LoadFunctionalMapState _ gmap namemap) = GeneMapAnnotator (reindex gmap namemap) (V.fromList [RefSeqInfo n 0.0 | n <- M.keys namemap])
         reindex :: M.Map B.ByteString [Int] -> M.Map B.ByteString Int -> M.Map B.ByteString [Int]
         reindex gmap namemap = M.map (map reindex1) gmap
             where
@@ -511,10 +507,10 @@ loadFunctionalMap fname columns = do
                 reindex1 = fromJust . flip M.lookup remap
                 remap = M.fromList (zip (M.elems namemap) [0..])
 
-        inserts1 :: LoadFunctionalMapState -> (B.ByteString, [B.ByteString]) -> LoadFunctionalMapState
-        inserts1 (LoadFunctionalMapState first gmap namemap) (name, ids) = LoadFunctionalMapState first' gmap' namemap'
+        inserts1 :: Int -> LoadFunctionalMapState -> (B.ByteString, [[B.ByteString]]) -> LoadFunctionalMapState
+        inserts1 c (LoadFunctionalMapState first gmap namemap) (name, ids) = LoadFunctionalMapState first' gmap' namemap'
             where
-                (first', namemap', ids') = foldl' insertname (first,namemap,[]) ids
+                (first', namemap', ids') = foldl' insertname (first,namemap,[]) (ids !! c)
                 gmap' = M.insert name ids' gmap
 
                 insertname :: (Int, M.Map B.ByteString Int, [Int]) -> B.ByteString -> (Int, M.Map B.ByteString Int, [Int])
@@ -534,15 +530,16 @@ loadFunctionalMap fname columns = do
                                 ++ case findSuggestion (T.pack $ B8.unpack col) (map (T.pack . B8.unpack) $ M.keys colmap) of
                                         Just (Suggestion valid reason) -> [" Did you mean '", T.unpack valid, "' (", T.unpack reason, ")?"]
                                         Nothing -> [])
-        selectColumns :: [Int] -> (Int, B.ByteString) -> NGLess (B.ByteString, [B.ByteString])
+        selectColumns :: [Int] -> (Int, B.ByteString) -> NGLess (B.ByteString, [[B.ByteString]])
         selectColumns cols (line_nr, line) = case B8.split '\t' line of
                     (gene:mapped) -> (gene,) . addTags columns <$> selectIds line_nr cols (zip [0..] mapped)
                     [] -> throwDataError ("Loading functional map file '" ++ fname ++ "' [line " ++ show (line_nr + 1)++ "]: empty line.")
 
-        addTags :: [B.ByteString] -> [B.ByteString] -> [B.ByteString]
+        addTags :: [B.ByteString] -> [B.ByteString] -> [[B.ByteString]]
         addTags [] _ = error "impossible"
-        addTags [_] [v] = B8.split ',' v -- do not tag single features
-        addTags fs vss = flip concatMap (zip fs vss) $ \(f,vs) -> (flip map (B8.split ',' vs) $ \v -> B.concat [f, ":", v])
+        addTags [_] [v] = [B8.split ',' v] -- do not tag single features
+        addTags fs vss = [[B.concat [f, ":", v] | v <- B8.split ',' vs]
+                                    | (f,vs) <- zip fs vss]
 
         selectIds :: Int -> [Int] -> [(Int, B.ByteString)] -> NGLess [B.ByteString]
         selectIds _ [] _ = return []
@@ -571,18 +568,18 @@ annotationMode _ _ _ _ =
 getFeatureName (GffOther s) = s
 getFeatureName _ = error "getFeatureName called for non-GffOther input"
 
-loadGFF :: FilePath -> CountOpts -> NGLessIO Annotator
+loadGFF :: FilePath -> CountOpts -> NGLessIO [Annotator]
 loadGFF gffFp opts = do
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "'..."]
-        (_, amap,namemap,szmap) <- (conduitPossiblyCompressedFile gffFp
+        partials <- (conduitPossiblyCompressedFile gffFp
                 $= CB.lines)
                 $$& (readAnnotationOrDie
                 =$= CL.filter (matchFeatures $ optFeatures opts)
-                =$= (CL.fold insertg (0, M.empty, M.empty, M.empty)))
+                =$= C.sequenceSinks
+                    [CL.fold (insertg f) (0, M.empty, M.empty, M.empty) | f <- optFeatures opts])
 
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "' complete."]
-        let (amap',headers) = reindex amap namemap
-        return (GFFAnnotator amap' headers szmap)
+        return $! map finishGffAnnotator partials
     where
         singleFeature = length (optFeatures opts) == 1
         readAnnotationOrDie :: C.Conduit B.ByteString NGLessIO GffLine
@@ -591,8 +588,13 @@ loadGFF gffFp opts = do
                 case readGffLine line of
                     Right g -> C.yield g
                     Left err -> throwError err
-        insertg :: (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double) -> GffLine -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
-        insertg (next, gmap, namemap, szmap) gline = (next', gmap', namemap', szmap')
+        finishGffAnnotator ::  (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double) -> Annotator
+        finishGffAnnotator (_, amap,namemap,szmap) = GFFAnnotator amap' headers szmap
+            where (amap',headers) = reindex amap namemap
+        insertg :: GffType -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double) -> GffLine -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
+        insertg f cur@(next, gmap, namemap, szmap) gline
+                | gffType gline /= f = cur
+                | otherwise = (next', gmap', namemap', szmap')
             where
                 header = if singleFeature
                                 then gffId gline

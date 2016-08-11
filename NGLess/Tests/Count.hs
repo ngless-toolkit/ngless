@@ -52,7 +52,7 @@ runSamGffAnnotation sam_content gff_content opts = do
     sam_fp <- asTempFile sam_content "sam"
     gff_fp <- asTempFile gff_content "gff"
     ann <- loadAnnotator (AnnotateGFF gff_fp) opts
-    p <- performCount sam_fp "testing" [ann] opts
+    p <- performCount sam_fp "testing" ann opts
     liftIO $ readCountFile p
 
 
@@ -90,7 +90,7 @@ defCountOpts =
 
 very_short_gff = "test_samples/very_short.gtf"
 case_load_very_short = do
-    GFFAnnotator immap headers szmap <- testNGLessIO
+    [GFFAnnotator immap headers szmap] <- testNGLessIO
                 $ loadAnnotator (AnnotateGFF very_short_gff) defCountOpts  { optFeatures = [GffGene] }
     let usedIDs = map snd $ concat $ concatMap IM.elems $ M.elems immap
     length (listNub usedIDs ) @?= length headers
@@ -110,7 +110,7 @@ X	protein_coding	gene	632	733	.	+	.	gene_id "WBGene00000526"; gene_name "clc-5";
 -- this is a regression test
 case_load_gff_order = do
     fp <- testNGLessIO $ asTempFile short3 "gtf"
-    GFFAnnotator immap headers szmap <- testNGLessIO
+    [GFFAnnotator immap headers szmap] <- testNGLessIO
                 $ loadAnnotator (AnnotateGFF fp) defCountOpts  { optFeatures = [GffGene] }
     let [h] = map snd . concat . IM.elems  . fromJust $ M.lookup "V" immap
     (headers !! h) @?= "WBGene00008825"
@@ -135,7 +135,7 @@ case_count_two = do
         gff <- asTempFile short1 "gff"
         samf <- asTempFile short_sam "sam"
         ann <- loadAnnotator (AnnotateGFF gff) opts
-        cfp <- performCount samf "testing" [ann] opts
+        cfp <- performCount samf "testing" ann opts
         liftIO (readCountFile cfp)
     c @?= M.fromList [("WBGene00002254", 2)]
 
@@ -234,7 +234,7 @@ gene2	COG2813	K00564	NA
 |]
 
 case_load_map = do
-    GeneMapAnnotator nmap names <- testNGLessIO $ do
+    [GeneMapAnnotator nmap names] <- testNGLessIO $ do
         map_fp <- asTempFile simple_map "map"
         loadFunctionalMap map_fp ["ko"]
     let Just [ix] = M.lookup "gene1" nmap

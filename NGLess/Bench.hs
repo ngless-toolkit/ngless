@@ -100,6 +100,6 @@ main = setupTestConfiguration >> defaultMain [
         , bench "annotate-seqname" . nfNGLessIO $ performCount "test_samples/sample.sam" "testing" [SeqNameAnnotator Nothing] basicCountOpts
         , bench "annotate-functionalmap" . nfNGLessIO $ do
                     amap <- loadFunctionalMap "test_samples/functional.map" ["ko", "cog"]
-                    performCount "test_samples/sample.sam" "testing" [amap] basicCountOpts
+                    performCount "test_samples/sample.sam" "testing" amap basicCountOpts
         ]
     ]
