@@ -14,7 +14,8 @@ import qualified Data.Text as T
 import Control.Monad.Trans.Cont
 import Control.Monad.Except
 import Control.Monad.Writer
-import Control.Arrow (second)
+import Control.Monad.RWS
+import Control.Arrow (first, second)
 import Control.Monad.Identity (Identity(..), runIdentity)
 
 import Language
@@ -39,7 +40,8 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
         transforms = modTransforms ++ builtinTransforms
         modTransforms = map modTransform mods
         builtinTransforms =
-                [ writeToMove
+                [ addTemporaries
+                , writeToMove
                 , qcInPreprocess
                 , ifLenDiscardSpecial
                 , substrimReassign
@@ -90,6 +92,8 @@ writeToMove' blocked ((lno,expr):rest) = (lno, addMove toRemove expr):writeToMov
         blockhere = case expr of
                       Assignment var (FunctionCall (FuncName fname) _ _ _)
                         | fname `elem` ["fastq", "paired", "samfile"] -> [var]
+                      Assignment var (Lookup _ prev)
+                        | prev `elem` blocked -> [var]
                       _ -> []
         addMove :: [Variable] -> Expression -> Expression
         addMove dead = pureRecursiveTransform addMove'
@@ -226,3 +230,47 @@ addOFileChecks' ((lno,e):rest) = do
         validVariables (ConstStr _) = []
         validVariables _ = [Variable "this", Variable "wont", Variable "work"] -- this causes the caller to bailout
 
+addTemporaries = addTemporaries' 0
+    where
+        addTemporaries' :: Int -> [(Int,Expression)] -> NGLessIO [(Int,Expression)]
+        addTemporaries' _ [] = return []
+        addTemporaries' next ((lno,e):rest) = do
+                mods <- loadedModules
+                let (next', es) = addTemporaries1 mods next e
+                rest' <- addTemporaries' next' rest
+                let lno_e' = (lno,) <$> es
+                return $ lno_e' ++ rest'
+
+        {- This is incomplete:
+         - The transformation should also process the expressions inside blocks
+         -}
+        addTemporaries1 :: [Module] -> Int -> Expression -> (Int, [Expression])
+        addTemporaries1 _ next e@(FunctionCall _ _ _ (Just _)) = (next, [e])
+        addTemporaries1 _ next e@(Assignment _ (FunctionCall _ _ _ (Just _))) = (next, [e])
+        addTemporaries1 mods next expr = let (e', next', pre) = runRWS (recursiveTransform functionCallTemp expr) () next in
+                                                    (next', combineExpr pre e')
+            where
+                isAssignTo v (Assignment v' _) = v == v'
+                isAssignTo _ _ = False
+
+                findDrop :: [a] -> (a -> Bool) -> Maybe ([a], a)
+                findDrop [] _ = Nothing
+                findDrop (x:xs) f
+                    | f x = Just (xs, x)
+                    | otherwise = first (x:) <$> findDrop xs f
+
+                combineExpr :: [Expression] -> Expression -> [Expression]
+                combineExpr pre (Lookup _ v) = case findDrop pre (isAssignTo v) of
+                    Just (pre', Assignment _ e') -> combineExpr pre' e'
+                    _ -> error "This is impossible"
+                combineExpr pre e' = pre ++ [e']
+
+                functionCallTemp :: Expression -> RWS () [Expression] Int Expression
+                functionCallTemp e@(FunctionCall f _ _ _) = do
+                    n <- get
+                    let v = Variable (T.pack $ "temp$"++show n)
+                    put (n + 1)
+                    tell [Assignment v e]
+                    let t = funcRetType <$> findFunction mods f
+                    return (Lookup t v)
+                functionCallTemp e = return e

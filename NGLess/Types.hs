@@ -137,7 +137,7 @@ nglTypeOf (ConstDouble _) = return (Just NGLDouble)
 nglTypeOf (ConstBool _) = return (Just NGLBool)
 nglTypeOf (ConstSymbol _) = return (Just NGLSymbol)
 nglTypeOf e@(ListExpression _) = do
-    mt <- checklist e
+    mt <- checkindexable e
     case mt of
         Nothing -> return Nothing
         Just t -> return (Just (NGList t))
@@ -174,7 +174,7 @@ typeOfObject (NGOList (v:_)) = NGList <$> typeOfObject v
 typeOfObject (NGOExpression _) = error "unexpected typeOfObject(NGOExpression)"
 
 
-checkuop UOpLen e = checklist e *> return (Just NGLInteger)
+checkuop UOpLen e = checkindexable e *> return (Just NGLInteger)
 checkuop UOpMinus e = checknum e
 checkuop UOpNot e = checkBool e
 
@@ -228,15 +228,15 @@ checknum e = do
             errorInLineC ["Expected numeric expression, got ", show t, " for expression ", show e]
             return $ Just NGLDouble -- a decent guess most of the time
 
-checkindex expr index = checkindex' index *> checklist expr
+checkindex expr index = checkindex' index *> checkindexable expr
     where
         checkindex' (IndexOne e) = checkinteger e
         checkindex' (IndexTwo a b) = checkinteger' a *> checkinteger' b
         checkinteger' Nothing = return Nothing
         checkinteger' (Just v) = checkinteger v
 
-checklist (ListExpression []) = return (Just NGLVoid)
-checklist (ListExpression es) = do
+checkindexable (ListExpression []) = return (Just NGLVoid)
+checkindexable (ListExpression es) = do
     types <- nglTypeOf `mapM` es
     let ts = catMaybes types
     if null ts
@@ -245,15 +245,14 @@ checklist (ListExpression es) = do
             unless (allSame ts)
                 (errorInLine "List of mixed type")
             return (Just $ head ts)
-checklist (Lookup mt (Variable v)) = do
-    vtype <- envLookup mt v
-    case vtype of
-        Just (NGList btype) -> return (Just btype)
-        Just NGLRead -> return (Just NGLRead)
+checkindexable expr = do
+    t <- nglTypeOf expr
+    case t of
+        Just (NGList !btype) -> return $ Just btype
+        Just NGLRead -> return t
         e -> do
-            errorInLine $ T.concat ["List expected. Type ", T.pack . show $ e , " provided."]
-            return (Just NGLVoid)
-checklist _ = errorInLine "List expected" >> return (Just NGLVoid)
+            errorInLineC ["List expected. Type ", show e , " provided."]
+            return $ Just NGLVoid
 
 allFunctions = (builtinFunctions ++) <$> moduleFunctions
 moduleFunctions = concatMap modFunctions <$> ask

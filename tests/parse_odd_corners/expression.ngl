@@ -1,0 +1,5 @@
+ngless "0.0"
+
+line0 = readlines('input.txt')[0]
+print(line0)
+print("\n")

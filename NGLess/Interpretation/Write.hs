@@ -21,7 +21,6 @@ import Data.String.Utils
 import Data.List (isInfixOf)
 
 import Language
-import FileManagement
 import Configuration
 import FileOrStream
 import NGLess
@@ -41,6 +40,7 @@ import Utils.Conduit (conduitPossiblyCompressedFile, asyncGzipToFile)
 -}
 
 moveOrCopyCompress :: Bool -> FilePath -> FilePath -> NGLessIO ()
+moveOrCopyCompress _ orig "/dev/stdout" = conduitPossiblyCompressedFile orig $$ C.stdout
 moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
     where
         moveOrCopyCompress' :: FilePath -> FilePath -> NGLessIO ()
@@ -66,7 +66,6 @@ moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
 
         -- | copy file unless its the same file.
         maybeCopyFile :: FilePath -> FilePath -> NGLessIO ()
-        maybeCopyFile old "/dev/stdout" = conduitPossiblyCompressedFile old $$ C.stdout
         maybeCopyFile old new
             | new == old = return()
             | otherwise = liftIO (copyFile old new)
