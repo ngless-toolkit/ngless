@@ -213,14 +213,19 @@ asFunction Command{..} = Function (FuncName nglName) (Just . argType . cargInfo 
 
 {- | Environment to expose to module processes -}
 nglessEnv :: FilePath -> NGLessIO [(String,String)]
-nglessEnv basedir = liftIO $ do
-    env <- getEnvironment
-    ncpu <- getNumCapabilities
-    nglessPath <- getExecutablePath
-    return $ ("NGLESS_NGLESS_BIN", nglessPath)
+nglessEnv basedir = do
+    tmpdir <- nConfTemporaryDirectory <$> nglConfiguration
+    liftIO $ do
+        env <- getEnvironment
+        let env' = filter ((`notElem` ["TMP", "TMPDIR", "TEMP", "TEMPDIR"]) . fst) env
+        ncpu <- getNumCapabilities
+        nglessPath <- getExecutablePath
+        return $ ("NGLESS_NGLESS_BIN", nglessPath)
                 :("NGLESS_MODULE_DIR", basedir)
                 :("NGLESS_NR_CORES", show ncpu)
-                :env
+                :("TMPDIR", tmpdir) -- TMPDIR is the POSIX standard
+                :("TMP", tmpdir) -- TMP is also used on Windows
+                :env'
 
 executeCommand :: FilePath -> [Command] -> T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCommand basedir cmds funcname input args = do
