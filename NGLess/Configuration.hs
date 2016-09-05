@@ -12,6 +12,7 @@ module Configuration
     , samtoolsBin
     , bwaBin
     , versionStr
+    , compilationDateStr
     , dateStr
     , setQuiet
     ) where
@@ -46,6 +47,9 @@ versionStr = "0.0.0"
 
 dateStr :: String
 dateStr = "not released"
+
+compilationDateStr :: String
+compilationDateStr = __DATE__
 
 defaultBaseURL :: FilePath
 defaultBaseURL = "http://vm-lux.embl.de/~coelho/ngless-data/"

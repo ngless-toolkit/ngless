@@ -230,6 +230,9 @@ main = do
             <*>
             (infoOption versionStr (long "version-short" <> help "print just version string (useful for scripting)"))
             <*>
+            (infoOption ("ngless v" ++ versionStr ++ " (release date: " ++  dateStr ++ "; compilation date: " ++ compilationDateStr ++ ")")
+                (long "version-debug" <> help "print detailed version information"))
+            <*>
             (infoOption dateStr (long "date-short" <> help "print just release date string (useful for scripting)"))
     args <- execParser (info (versioner <*> helper <*> nglessArgs) metainfo)
     initConfiguration args
