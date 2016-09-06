@@ -81,6 +81,26 @@ node which lost network connectivity, but it comes back online after an hour
 and resumes processing) is that extra computation is wasted, **the processes
 will never interfere in a way that you get erroneous results**.
 
+## Samtools module
+
+This module exposes the samtools sorting functionality through the
+`samtools_sort` function.
+
+    ngless '0.0'
+    import "samtools" version "0.0"
+    to_sort = samfile('input.bam')
+    sorted = samtools_sort(to_sort)
+    write(sorted, ofile='input.sorted.bam')
+
+`samtools_sort :: mappedreadset -> mappedreadset` returns a sorted version of
+the dataset.
+
+Internally, this function calls ngless' version of samtools while respecting
+your settings for the use of threads and temporary disk space. When combined
+with other functionality, ngless can also often stream data into/from samtools
+instead of relying on intermediate files (these optimizations should not change
+the visible behaviour, only make the computation faster).
+
 ## Mocat module
 
     import "mocat" version "0.0"
