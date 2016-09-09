@@ -1,0 +1,4 @@
+	input.sam
+total	30
+aligned	30
+unique	17

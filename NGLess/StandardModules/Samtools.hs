@@ -2,7 +2,7 @@
  - License: MIT
  -}
 
-{-# LANGUAGE TupleSections, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module StandardModules.Samtools
     ( loadModule
@@ -134,7 +134,27 @@ sortOFormat' ((lno,e):es) = (lno,e'):sortOFormat' es
         stringWillEndWith _ _ = Nothing
 
 
-
+checkUnique :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+checkUnique = passthrough $ \sc ->
+        forM_ (headtails $ reverse sc) $ \((lno, e), rest) -> case e of
+            Assignment _ (FunctionCall (FuncName "select") (Lookup _ v) kwargs Nothing)
+                        | selectsUnique kwargs -> checkSorted lno v (map snd rest)
+            _ -> return ()
+    where
+        checkSorted _ _ [] = return ()
+        checkSorted lno v (r:rs) = case r of
+            Assignment v' expr
+                | v == v' -> case expr of
+                    FunctionCall (FuncName "samtools_sort") _ _ _ ->
+                            throwScriptError ("Cannot select unique reads from a sorted mappedreadset (at line " ++ show lno ++ ").\n\tConsider selecting, *then* sorting.")
+                    Lookup _ v'' -> checkSorted lno v'' rs
+                    _ -> return ()
+            _ -> checkSorted lno v rs
+        selectsUnique :: [(Variable, Expression)] -> Bool
+        selectsUnique = any $ \(Variable k,v) -> k == "keep_if" && hasUnique v
+        hasUnique (ConstSymbol "unique") = True
+        hasUnique (ListExpression vs) = any hasUnique vs
+        hasUnique _ = False
 
 samtools_sort_function = Function
     { funcName = FuncName "samtools_sort"
@@ -152,7 +172,7 @@ loadModule _ =
         { modInfo = ModInfo "stdlib.samtools" "0.0"
         , modCitation = Just citation
         , modFunctions = [samtools_sort_function]
-        , modTransform = sortOFormat
+        , modTransform = sortOFormat >=> checkUnique
         , runFunction = const executeSort
         }
     where

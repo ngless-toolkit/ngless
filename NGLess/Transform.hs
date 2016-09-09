@@ -37,11 +37,13 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
     where
         applyM [] e = return e
         applyM (t:ts) e = t e >>= applyM ts
-        transforms = modTransforms ++ builtinTransforms
+        transforms = preTransforms ++ modTransforms ++ builtinTransforms
         modTransforms = map modTransform mods
-        builtinTransforms =
+        preTransforms =
                 [ addTemporaries
-                , writeToMove
+                ]
+        builtinTransforms =
+                [ writeToMove
                 , qcInPreprocess
                 , ifLenDiscardSpecial
                 , substrimReassign

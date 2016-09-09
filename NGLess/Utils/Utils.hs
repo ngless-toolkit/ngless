@@ -14,6 +14,7 @@ module Utils.Utils
     , passthrough
     , moveOrCopy
     , secondM
+    , headtails
     ) where
 
 import Control.Monad
@@ -26,8 +27,8 @@ import System.IO.Error
 import Control.Exception
 import GHC.IO.Exception (IOErrorType(..))
 
-import Data.List (group)
-import Data.Maybe (fromMaybe, catMaybes)
+import Data.List (group, uncons, tails)
+import Data.Maybe (fromMaybe, catMaybes, mapMaybe)
 
 lookupWithDefault :: Eq b => a -> b -> [(b,a)] -> a
 lookupWithDefault def key values = fromMaybe def $ lookup key values
@@ -83,3 +84,6 @@ findM (x:xs) f = f x >>= \case
 
 secondM :: Monad m => (a -> m b) -> (c,a) -> m (c,b)
 secondM f (a,c) = (a,) <$> f c
+
+headtails :: [a] -> [(a,[a])]
+headtails = mapMaybe uncons . tails
