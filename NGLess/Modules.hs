@@ -87,13 +87,12 @@ data Module = Module
     , modConstants :: [(T.Text, NGLessObject)] -- ^ constants defined in this module
     , modReferences :: [ExternalReference]
     , modFunctions :: [Function] -- ^ functions defined by this module
-    , modTransform :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+    , modTransform :: [(Int, Expression)] -> NGLessIO [(Int, Expression)] -- ^ this is called before any interpretation. It can also perform validation by throwing exceptions on error
     , runFunction :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject -- ^ run a function defined by the module. The first argument is the name of the function
-    , validateFunction :: [(Int,Expression)] -> NGLessIO [T.Text] -- ^ this is called before any interpretation, should return a list of error messages (empty if no errors)
     }
 
 instance Show Module where
-    show (Module info _ cs fs _ _ _ _) = "Module["++show info++"; constants="++show cs++"; functions="++show fs++"]"
+    show (Module info _ cs fs _ _ _) = "Module["++show info++"; constants="++show cs++"; functions="++show fs++"]"
 
 instance Default Module where
     def = Module
@@ -104,7 +103,6 @@ instance Default Module where
         , modFunctions = []
         , modTransform = return
         , runFunction = \_ _ _ -> return NGOVoid
-        , validateFunction = const (return [])
         }
 
 
