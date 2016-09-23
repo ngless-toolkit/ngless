@@ -12,22 +12,25 @@ module Interpretation.Write
 
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
-import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
+import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Combinators as C
 import           Data.Conduit ((=$=), runConduit, ($$))
 import           System.Directory (copyFile)
+import           System.IO (hClose)
 import Data.String.Utils
 import Data.List (isInfixOf)
 
 import Language
 import Configuration
 import FileOrStream
+import FileManagement (openNGLTempFile)
 import NGLess
 import Output
 import Utils.Utils
 import Utils.Samtools (convertSamToBam)
-import Utils.Conduit (conduitPossiblyCompressedFile, asyncGzipToFile)
+import Utils.Conduit
 
 {- A few notes:
     There is a transform pass which adds the argument __can_move to write() calls.
@@ -139,18 +142,27 @@ executeWrite el@(NGOMappedReadSet _ iout  _) args = do
     return NGOVoid
 
 executeWrite (NGOCounts iout) args = do
-    fp <- asFile iout
     newfp <- getOFile args
     canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
+    format <- lookupSymbolOrScriptErrorDef (return "tsv") "internal write arg" "format" args
     outputListLno' InfoOutput ["Writing counts to: ", newfp]
-    moveOrCopyCompress canMove fp newfp
+    case format of
+        "tsv" -> do
+            fp <- asFile iout
+            moveOrCopyCompress canMove fp newfp
+        "csv" -> do
+            let (fp,istream) = asStream iout
+            (comma,ohand) <- openNGLTempFile fp "wcomma" "csv"
+            runConduit $
+                istream =$= CL.map tabToComma =$= byteLineSinkHandle ohand
+            liftIO $ hClose ohand
+            moveOrCopyCompress True comma newfp
+        _ -> throwScriptError ("Invalid format in write: {"++T.unpack format++"}.\n\tWhen writing counts, only accepted values are {tsv} (TAB separated values; default) or {csv} (COMMA separated values).")
     return NGOVoid
+  where
+    tabToComma :: ByteLine -> ByteLine
+    tabToComma (ByteLine line) = ByteLine $ B8.map (\case { '\t' -> ','; c -> c }) line
 
 executeWrite v _ = throwShouldNotOccur ("Error: executeWrite of " ++ show v ++ " not implemented yet.")
 
-getDelimiter :: NGLessObject -> NGLessIO B.ByteString
-getDelimiter (NGOSymbol "csv") = return ","
-getDelimiter (NGOSymbol "tsv") = return "\t"
-getDelimiter (NGOSymbol f) = throwScriptError ("Invalid format in write: {"++T.unpack f++"}")
-getDelimiter v =  throwShouldNotOccur ("Type of 'format' in 'write' must be NGOSymbol, got " ++ show v)
 
