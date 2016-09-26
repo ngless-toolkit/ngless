@@ -421,6 +421,7 @@ findFirstM f (x:xs) = f x >>= \case
 downloadableModules =
     [("example-cmd", "0.0")
     ,("motus", "0.0")
+    ,("motus", "0.1")
     ]
 
 downloadModule :: T.Text -> T.Text -> NGLessIO FilePath
@@ -443,7 +444,7 @@ findLoad modname version = do
     found <- flip findFirstM [".", globalDir, userDir] $ \basedir -> do
         let fname = basedir </> modpath </> modfile
         exists <- liftIO $ doesFileExist fname
-        outputListLno' TraceOutput ["Looking for module ", T.unpack modname, "at `", fname, if exists then "` and found it." else "` and did not find it."]
+        outputListLno' TraceOutput ["Looking for module ", T.unpack modname, " at `", fname, if exists then "` and found it." else "` and did not find it."]
         return $! if exists
             then Just (basedir </> modpath)
             else Nothing
@@ -453,7 +454,9 @@ findLoad modname version = do
         _ -> return found
     case found' of
         Just mdir -> decodeEither <$> liftIO (B.readFile (mdir </> modfile)) >>= \case
-                        Right v -> return $ addPathToRep mdir v
+                        Right v -> do
+                            checkCompatible modname version (emInfo v)
+                            return (addPathToRep mdir v)
                         Left err -> throwSystemError ("Could not load module file "++ mdir </> modfile ++ ". Error was `" ++ err ++ "`")
         Nothing -> do
                 others <- forM [".", globalDir, userDir] $ \basedir -> do
@@ -470,6 +473,18 @@ findLoad modname version = do
                             foundVersions -> "' version " ++ T.unpack version ++ ".\n"
                                             ++ "Please check the version number. I found the following versions:" ++
                                                 concat ["\n\t- " ++ show v | v <- uniq foundVersions]))
+
+checkCompatible :: T.Text -> T.Text -> ModInfo -> NGLessIO ()
+checkCompatible modname version ModInfo{ modVersion = version' } = do
+        nversion <- norm version
+        nversion' <- norm version'
+        when (nversion' /= nversion) $
+            throwSystemError (concat ["Mismatched version information when loading module `", T.unpack modname, "`.\n\t"
+                            ,"Expected ", T.unpack version, " but file contains '", T.unpack version', "'."])
+    where
+        norm ver = case T.split (== '.') ver of
+            (majv:minv:_) -> return (majv, minv)
+            _ -> throwScriptError ("Cannot parse version string '"++T.unpack ver++"'.")
 
 loadModule :: T.Text -> T.Text -> NGLessIO Module
 loadModule m version = asInternalModule =<< findLoad m version

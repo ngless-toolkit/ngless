@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 if ! which python >/dev/null ; then
     echo "python command not found"
