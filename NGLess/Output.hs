@@ -146,12 +146,13 @@ output !ot !lno !msg = do
             ForceColor -> True
             NoColor -> False
             AutoColor -> isTerm
+    c <- colorFor ot
     liftIO $ do
         t <- getZonedTime
         modifyIORef savedOutput (OutputLine lno ot t msg:)
         when sp $ do
             let st = if doColor
-                        then setSGRCode [SetColor Foreground Dull (colorFor ot)]
+                        then setSGRCode [SetColor Foreground Dull c]
                         else ""
                 rst = if doColor
                         then setSGRCode [Reset]
@@ -165,13 +166,15 @@ output !ot !lno !msg = do
                                 else "" :: String
             putStrLn $ printf "%s[%s]%s: %s%s" st tstr lineStr msg rst
 
-colorFor :: OutputType -> Color
-colorFor TraceOutput = White
-colorFor DebugOutput = White
-colorFor InfoOutput = Blue
-colorFor ResultOutput = Black
-colorFor WarningOutput = Yellow
-colorFor ErrorOutput = Red
+colorFor :: OutputType -> NGLessIO Color
+colorFor = return . colorFor'
+    where
+        colorFor' TraceOutput = White
+        colorFor' DebugOutput = White
+        colorFor' InfoOutput = Blue
+        colorFor' ResultOutput = Black
+        colorFor' WarningOutput = Yellow
+        colorFor' ErrorOutput = Red
 
 
 encodeBPStats :: FQ.FQStatistics -> [BPosInfo]
