@@ -12,7 +12,7 @@ module Output
     , setOutputLno
     , outputFQStatistics
     , outputMapStatistics
-    , writeOutput
+    , writeOutputJS
     , writeOutputTSV
     ) where
 
@@ -241,8 +241,8 @@ wrapScript script tags stats = first annotate <$> script
             | i `elem` stats = Just (HasStatsInfo i)
             | otherwise =  Nothing
 
-writeOutput :: FilePath -> FilePath -> T.Text -> IO ()
-writeOutput fname scriptName script = do
+writeOutputJS :: FilePath -> FilePath -> T.Text -> IO ()
+writeOutputJS fname scriptName script = do
     fullOutput <- reverse <$> readIORef savedOutput
     fqStats <- reverse <$> readIORef savedFQOutput
     mapStats <- reverse <$> readIORef savedMapOutput

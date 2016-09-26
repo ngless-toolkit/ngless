@@ -20,6 +20,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.Resource
 
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as B
 
@@ -203,7 +204,8 @@ modeExec opts@DefaultMode{} = do
     when shouldOutput $ do
         createDirectoryIfMissing False odir
         setupHtmlViewer odir
-        writeOutput (odir </> "output.js") fname ngltext
+        T.writeFile (odir </> "script.ngl") ngltext
+        writeOutputJS (odir </> "output.js") fname ngltext
         writeOutputTSV (odir </> "fq.tsv") (odir </> "mappings.tsv")
     exitSuccess
 
