@@ -30,9 +30,23 @@ list](https://groups.google.com/forum/#!forum/ngless).
 
 ## Installing
 
-At the moment, ngless can be esily obtained in binary form for Windows
+At the moment, ngless can be esily obtained in binary form for Linux/Windows
 (experimental) and with either *brew* or *nix* (for Mac OS X or Linux). Of
 course, you can also compile from source.
+
+### Linux
+
+You can get a [statically linked version of
+NGless](https://dl.dropboxusercontent.com/u/68453937/ngless-0.0.0-Linux64-static).
+This should work across a wide range of Linux versions (please
+[report](https://github.com/luispedro/ngless/issues) any issues you
+encounter):
+
+    wget https://dl.dropboxusercontent.com/u/68453937/ngless-0.0.0-Linux64-static
+    chmod +x ngless-0.0.0-Linux64-static
+    ./ngless-0.0.0-Linux64-static
+
+This download bundles bwa and samtools (also statically linked).
 
 ### Brew
 
