@@ -129,6 +129,8 @@ $(BWA_DIR):
 	wget $(BWA_URL)
 	tar xvfj $(BWA_TAR)
 	rm $(BWA_TAR)
+	cd $(BWA_DIR) && curl https://patch-diff.githubusercontent.com/raw/lh3/bwa/pull/90.diff | patch -p1
+
 
 $(BWA_DIR)/ngless-bwa-static: $(BWA_DIR)
 	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"  LIBS="-lbwa -lm -lz -lrt -lpthread" && cp -p bwa ngless-bwa-static
