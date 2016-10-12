@@ -36,6 +36,7 @@ import ReferenceDatabases
 import Output
 import NGLess
 import NGLess.NGError
+import NGLess.NGLEnvironment
 import Modules
 import CmdArgs
 import FileManagement (setupHtmlViewer)
@@ -168,6 +169,7 @@ modeExec opts@DefaultMode{} = do
         Left err ->  fatalError err
     let maybe_add_print = (if print_last opts then wrapPrint else return)
     (shouldOutput,odir) <- runNGLessIO "loading and running script" $ do
+        updateNglEnvironment (\e -> e { ngleScriptText = ngltext })
         sc' <- runNGLess $ parsengless fname reqversion ngltext >>= maybe_add_print
         when (debug_mode opts == "ast") $ liftIO $ do
             forM_ (nglBody sc') $ \(lno,e) ->
