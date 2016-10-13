@@ -34,7 +34,7 @@ import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.TQueue as CA
 import           Control.Monad.ST
-import           Control.Monad.Extra (allM)
+import           Control.Monad.Extra (allM, unlessM)
 import           Control.DeepSeq
 import           Data.Traversable
 import           Control.Concurrent (threadDelay)
@@ -61,6 +61,7 @@ import Transform
 import FileOrStream
 import Configuration
 import FileManagement
+import NGLess.NGLEnvironment
 
 import Utils.Utils
 import Utils.Conduit
@@ -88,7 +89,10 @@ touchFile fname = writeFile fname "lock file"
 setupHashDirectory :: FilePath -> T.Text -> NGLessIO FilePath
 setupHashDirectory basename hash = do
     let actiondir = basename </> take 8 (T.unpack hash)
+        scriptfile = actiondir </> "script.ngl"
     liftIO $ createDirectoryIfMissing True actiondir
+    unlessM (liftIO $ doesFileExist scriptfile) $
+        writeAnnotatedScriptTo scriptfile
     return actiondir
 
 executeLock1 (NGOList entries) kwargs  = do
