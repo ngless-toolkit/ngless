@@ -180,7 +180,7 @@ annSize ann = length (annEnumerate ann)
 methodFor "1overN" = return MM1OverN
 methodFor "dist1" = return MMDist1
 methodFor "all1" = return MMCountAll
-methodFor "unique-only" = return MMUniqueOnly
+methodFor "unique_only" = return MMUniqueOnly
 methodFor other = throwShouldNotOccur ("Unexpected multiple method " ++ T.unpack other)
 
 
