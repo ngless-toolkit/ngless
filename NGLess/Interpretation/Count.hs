@@ -39,8 +39,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit (($=), (=$), (=$=), ($$+), ($$+-))
-import           Data.Conduit.Async (($$&))
+import           Data.Conduit ((=$), (=$=), ($$+), ($$+-))
 
 import Control.Monad
 import Control.Monad.IO.Class   (liftIO)
@@ -579,12 +578,13 @@ getFeatureName _ = error "getFeatureName called for non-GffOther input"
 loadGFF :: FilePath -> CountOpts -> NGLessIO [Annotator]
 loadGFF gffFp opts = do
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "'..."]
-        partials <- (conduitPossiblyCompressedFile gffFp
-                $= CB.lines)
-                $$& (readAnnotationOrDie
+        partials <- C.runConduit $
+                conduitPossiblyCompressedFile gffFp
+                =$= CB.lines
+                =$= readAnnotationOrDie
                 =$= CL.filter (matchFeatures $ optFeatures opts)
                 =$= sequenceSinks
-                    [CL.fold (insertg f) (0, M.empty, M.empty, M.empty) | f <- optFeatures opts])
+                    [CL.fold (insertg f) (0, M.empty, M.empty, M.empty) | f <- optFeatures opts]
 
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "' complete."]
         return $! map finishGffAnnotator partials
