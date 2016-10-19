@@ -25,6 +25,7 @@ loadStdlibModules = mapM loadModules1
 externalModules =
         ["example-cmd"
         ,"motus"
+        ,"specI"
         ]
 
 loadModules1 :: ModInfo -> NGLessIO Module
@@ -35,5 +36,5 @@ loadModules1 (ModInfo "mocat" version) = Mocat.loadModule version
 loadModules1 (ModInfo "parallel" version) = Parallel.loadModule version
 loadModules1 (ModInfo mname version)
     | mname `elem` externalModules = Ext.loadModule mname version
-loadModules1 (ModInfo modname version) = throwScriptError ("Could not load module '" ++ T.unpack modname ++ "' version " ++ T.unpack version ++ ".")
+loadModules1 (ModInfo modname _) = throwScriptError ("Unknown module '" ++ T.unpack modname ++ "'.")
 

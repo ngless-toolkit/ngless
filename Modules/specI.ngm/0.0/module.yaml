@@ -1,0 +1,7 @@
+version: '0.0.0'
+name: 'refmg'
+references:
+    -
+        name: 'refmg'
+        fasta-file: 'data/RefMG.v1.padded'
+        gtf-file: './RefMG.v1.padded.gtf'

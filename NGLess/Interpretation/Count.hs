@@ -563,7 +563,7 @@ annotationMode [GffOther "seqname"] _ _ _ = return AnnotateSeqName
 annotationMode _ _ (Just r) _ = return (AnnotateFunctionalMap r)
 annotationMode _ _ _ (Just g) = return (AnnotateGFF g)
 annotationMode _ (Just ref) Nothing Nothing = do
-    outputListLno' InfoOutput ["Annotate with default GFF: ", show ref]
+    outputListLno' InfoOutput ["Annotate with reference: ", show ref]
     ReferenceFilePaths _ mgffpath mfuncpath <- ensureDataPresent ref
     case (mgffpath, mfuncpath) of
         (Just gffpath, Nothing) -> return $! AnnotateGFF gffpath

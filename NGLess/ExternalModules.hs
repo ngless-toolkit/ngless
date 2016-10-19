@@ -422,6 +422,7 @@ downloadableModules =
     [("example-cmd", "0.0")
     ,("motus", "0.0")
     ,("motus", "0.1")
+    ,("specI", "0.0")
     ]
 
 downloadModule :: T.Text -> T.Text -> NGLessIO FilePath
