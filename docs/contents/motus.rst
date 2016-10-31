@@ -1,6 +1,6 @@
-============================================
-Taxonomic progfiling using mOTUs with ngless
-============================================
+===========================================
+Taxonomic profiling using mOTUs with ngless
+===========================================
 
 
 You can use ngless to compute `mOTU profiles
