@@ -8,10 +8,10 @@ language.
 This module allows you to run several parallel computations. It provides two
 functions: `lock1` and `collect`.
 
-`lock1` takes a list and returns a single element. It uses the filesystem to
-obtain a lock file so that if multiple processes are running at once, each one
-will return a different element. Ngless also marks results as *finished* once
-you have run a script to completion.
+`lock1 :: [string] -> string` takes a list of strings and returns a single
+element. It uses the filesystem to obtain a lock file so that if multiple
+processes are running at once, each one will return a different element. Ngless
+also marks results as *finished* once you have run a script to completion.
 
 The intended usage is that you simply run as many processes as inputs that you
 have and ngless will figure everything out.
@@ -56,6 +56,23 @@ counts together into a single table, for convenience:
 
 Now, only when all the samples in the `allneeded` argument have been processed,
 does ngless collect all the results into a single table.
+
+
+#### Full "parallel" example
+
+    ngless "0.0"
+    import "parallel" version "0.0"
+
+    sample = lock1(readlines('input.txt'))
+    input = fastq(sample)
+    mapped = map(input, reference='hg19')
+    collect(count(mapped, features=['seqname']),
+        current=sample,
+        allneeded=readlines('input.txt'),
+        ofile='output.tsv')
+
+Now, you can run multiple `ngless` jobs in parallel and each will work on a
+different line of `input.txt`.
 
 ### Parallel internals
 
