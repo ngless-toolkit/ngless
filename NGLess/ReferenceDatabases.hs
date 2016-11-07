@@ -27,9 +27,9 @@ import Control.Applicative ((<|>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource(release)
 
+import qualified StandardModules.Mappers.Bwa as Bwa
 import Network (downloadExpandTar, downloadOrCopyFile)
 import FileManagement (createTempDir)
-import Utils.Bwa as Bwa
 import Utils.Utils
 import Configuration
 import Modules
@@ -178,7 +178,7 @@ findDataFilesIn :: FilePath -> InstallMode -> NGLessIO (Maybe FilePath)
 findDataFilesIn ref mode = do
     basedir <- dataDirectory mode
     let refdir = basedir </> "References" </> ref
-    hasIndex <- hasValidIndex (buildFaFilePath refdir)
+    hasIndex <- Bwa.hasValidIndex (buildFaFilePath refdir)
     outputListLno' TraceOutput ["Looked for ", ref, " in directory ", refdir, if hasIndex then " (and found it)" else " (and did not find it)"]
     return $! (if hasIndex
                 then Just refdir

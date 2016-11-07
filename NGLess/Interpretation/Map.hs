@@ -2,6 +2,7 @@
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Interpretation.Map
     ( executeMap
@@ -12,32 +13,28 @@ module Interpretation.Map
 import qualified Data.Text as T
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
-import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Control.Monad
 import           Control.Monad.Except
 
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
-import qualified Data.Conduit.Process as CP
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Internal as C
 import           Data.Conduit (($$), (=$=))
+import           Control.Monad.Extra (unlessM)
 
-import GHC.Conc     (getNumCapabilities)
 
-import System.Process
 import System.IO
-import System.Exit
 
 import Language
 import FileManagement
 import ReferenceDatabases
-import Configuration
 import Output
 import NGLess
 
+import qualified StandardModules.Mappers.Bwa as Bwa
+
 import Data.Sam
-import Utils.Bwa
 import Utils.Utils
 import FileOrStream
 import Utils.Conduit
@@ -45,6 +42,33 @@ import Utils.LockFile
 import Utils.Samtools (samBamConduit)
 
 data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
+
+data Mapper = Mapper
+    { createIndex :: FilePath -> NGLessIO ()
+    , hasValidIndex :: FilePath -> NGLessIO Bool
+    , callMapper :: forall a. FilePath -> [FilePath] -> [String] -> C.Consumer B.ByteString IO a -> NGLessIO a
+    }
+
+bwa = Mapper Bwa.createIndex Bwa.hasValidIndex Bwa.callMapper
+
+ensureIndexExists :: Mapper -> FilePath -> NGLessIO FilePath
+ensureIndexExists mapper refPath = do
+    hasIndex <- hasValidIndex mapper refPath
+    if hasIndex
+        then outputListLno' DebugOutput ["Index for ", refPath, " already exists."]
+        else withLockFile LockParameters
+                            { lockFname = refPath ++ ".ngless-index.lock"
+                            , maxAge = hoursToDiffTime 36
+                            , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
+                            } $
+                -- recheck if index exists with the lock in place
+                -- it may have been created in the meanwhile (especially if we slept waiting for the lock)
+                unlessM (hasValidIndex mapper refPath) $
+                    createIndex mapper refPath
+    return refPath
+  where
+    hoursToDiffTime h = fromInteger (h * 3600)
+
 
 lookupReference :: KwArgsValues -> NGLessIO ReferenceInfo
 lookupReference args = do
@@ -56,29 +80,9 @@ lookupReference args = do
         (Just r, Nothing) -> PackagedReference <$> stringOrTypeError "reference in map argument" r
         (Nothing, Just fa) -> (FaFile . T.unpack) <$> stringOrTypeError "fafile in map argument" fa
 
-ensureIndexExists :: FilePath -> NGLessIO FilePath
-ensureIndexExists refPath = do
-    hasIndex <- hasValidIndex refPath
-    if hasIndex
-        then outputListLno' DebugOutput ["Index for ", refPath, " already exists."]
-        else withLockFile LockParameters
-                            { lockFname = refPath ++ ".ngless-index.lock"
-                            , maxAge = hoursToDiffTime 36
-                            , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
-                            } $ do
-                -- recheck if index exists with the lock in place
-                -- it may have been created in the meanwhile (especially if we slept waiting for the lock)
-                hasIndex' <- hasValidIndex refPath
-                unless hasIndex' $
-                    createIndex refPath
-    return refPath
 
-
-
-hoursToDiffTime h = fromInteger (h * 3600)
-
-mapToReference :: FilePath -> [FilePath] -> [String] -> NGLessIO (FilePath, (Int, Int, Int))
-mapToReference refIndex [fp1,fp2, fp3] extraArgs = do
+mapToReference :: Mapper -> FilePath -> ReadSet -> [String] -> NGLessIO (FilePath, (Int, Int, Int))
+mapToReference mapper refIndex (ReadSet3 _ fp1 fp2 fp3) extraArgs = do
     (out, hout) <- openNGLTempFile refIndex "mapped_concat_" ".sam"
     let out1 = CB.sinkHandle hout
         out2 :: C.Sink B.ByteString IO ()
@@ -86,57 +90,37 @@ mapToReference refIndex [fp1,fp2, fp3] extraArgs = do
                 =$= CL.filter (\line -> not (B.null line) &&  B8.head line /= '@')
                 =$= C.unlinesAscii
                 =$= CB.sinkHandle hout
-    (t0,a0,u0) <- mapToReference' refIndex [fp1, fp2] extraArgs out1
-    (t1,a1,u1) <- mapToReference' refIndex [fp3] extraArgs out2
+    (t0,a0,u0) <- runNGLess =<< callMapper mapper refIndex [fp1, fp2] extraArgs (zipToStats out1)
+    (t1,a1,u1) <- runNGLess =<< callMapper mapper refIndex [fp3] extraArgs (zipToStats out2)
 
     liftIO $ hClose hout
     return (out, (t0+t1,a0+a1, u0+u1))
 
-mapToReference refIndex fps extraArgs = do
+mapToReference mapper refIndex refs extraArgs = do
     (newfp, hout) <- openNGLTempFile refIndex "mapped_" ".sam"
     outputListLno' DebugOutput ["Write .sam file to: ", newfp]
-    stats <- mapToReference' refIndex fps extraArgs (C.sinkHandle hout)
+    let fps = case refs of
+            ReadSet1 _ fp -> [fp]
+            ReadSet2 _ fp1 fp2 -> [fp1, fp2]
+            _ -> error "This case should never happen: mapToReference"
+    stats <- runNGLess =<< callMapper mapper refIndex fps extraArgs (zipToStats (C.sinkHandle hout))
     liftIO $ hClose hout
     return (newfp, stats)
+zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesC =$= samStatsC))
 
-mapToReference' refIndex fps extraArgs outC = do
-    outputListLno' InfoOutput ["Starting mapping to ", refIndex]
-    bwaPath <- bwaBin
-    numCapabilities <- liftIO getNumCapabilities
-    let cmdargs =  concat [["mem", "-t", show numCapabilities, refIndex], extraArgs, fps]
-    outputListLno' TraceOutput ["Calling binary ", bwaPath, " with args: ", unwords cmdargs]
-    let cp = proc bwaPath cmdargs
-    (exitCode, ((),statsE), err) <- liftIO $
-            CP.sourceProcessWithStreams cp
-                (return ()) -- stdin
-                (C.toConsumer (zipSink2 --stdout
-                    outC
-                    (linesC =$= samStatsC)))
-                CL.consume -- stderr
-    stats <- runNGLess statsE
-    outputListLno' DebugOutput ["BWA info: ", BL8.unpack $ BL8.fromChunks err]
-    case exitCode of
-        ExitSuccess -> do
-            outputListLno' InfoOutput ["Done mapping to ", refIndex]
-            return stats
-        ExitFailure code ->
-            throwSystemError $ concat (["Failed mapping\nCommand line was::\n\t",
-                            bwaPath, " mem -t ", show numCapabilities, " '", refIndex, "' '"] ++ fps ++ ["'\n",
-                            "Bwa error code was ", show code, "."])
-
-interpretMapOp :: ReferenceInfo -> T.Text -> [FilePath] -> [String] -> NGLessIO NGLessObject
-interpretMapOp ref name fps extraArgs = do
+performMap :: Mapper -> ReferenceInfo -> T.Text -> ReadSet -> [String] -> NGLessIO NGLessObject
+performMap mapper ref name rs extraArgs = do
     (ref', defGen') <- indexReference ref
-    (samPath', (total, aligned, unique)) <- mapToReference ref' fps extraArgs
+    (samPath', (total, aligned, unique)) <- mapToReference mapper ref' rs extraArgs
     outputMapStatistics (MappingInfo undefined samPath' ref' total aligned unique)
     return $ NGOMappedReadSet name (File samPath') defGen'
     where
         indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)
-        indexReference (FaFile fa) = (,Nothing) <$> ensureIndexExists fa
+        indexReference (FaFile fa) = (,Nothing) <$> ensureIndexExists mapper fa
         indexReference (PackagedReference r) = do
             ReferenceFilePaths fafile _ _ <- ensureDataPresent r
             case fafile of
-                Just fp -> (, Just r) <$> ensureIndexExists fp
+                Just fp -> (, Just r) <$> ensureIndexExists mapper fp
                 Nothing -> throwScriptError ("Could not find reference '" ++ T.unpack r ++ "'.")
 
 _samStats :: FilePath -> NGLessIO (Int, Int, Int)
@@ -182,10 +166,8 @@ executeMap fps args = do
     oAll <- lookupBoolOrScriptErrorDef (return False) "map() call" "mode_all" args
     extraArgs <- map T.unpack <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
     let bwaArgs = extraArgs ++ ["-a" | oAll]
-        executeMap' (NGOList es) = NGOList <$> forM es executeMap'
-        executeMap' (NGOReadSet name (ReadSet1 _enc file))   = interpretMapOp ref name [file] bwaArgs
-        executeMap' (NGOReadSet name (ReadSet2 _enc fp1 fp2)) = interpretMapOp ref name [fp1,fp2] bwaArgs
-        executeMap' (NGOReadSet name (ReadSet3 _enc fp1 fp2 fp3)) = interpretMapOp ref name [fp1,fp2,fp3] bwaArgs
+        executeMap' (NGOList es)            = NGOList <$> forM es executeMap'
+        executeMap' (NGOReadSet name rs)    = performMap bwa ref name rs bwaArgs
         executeMap' v = throwShouldNotOccur ("map expects ReadSet, got " ++ show v ++ "")
     executeMap' fps
 
