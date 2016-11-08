@@ -31,8 +31,10 @@ import FileManagement
 import ReferenceDatabases
 import Output
 import NGLess
+import NGLess.NGLEnvironment
 
 import qualified StandardModules.Mappers.Bwa as Bwa
+import qualified StandardModules.Mappers.Soap as Soap
 
 import Data.Sam
 import Utils.Utils
@@ -50,6 +52,13 @@ data Mapper = Mapper
     }
 
 bwa = Mapper Bwa.createIndex Bwa.hasValidIndex Bwa.callMapper
+soap = Mapper Soap.createIndex Soap.hasValidIndex Soap.callMapper
+
+getMapper :: NGLessIO Mapper
+getMapper = getMapper' . ngleMapperToUse <$> nglEnvironment
+    where
+        getMapper' "soap" = soap
+        getMapper' _ = bwa
 
 ensureIndexExists :: Mapper -> FilePath -> NGLessIO FilePath
 ensureIndexExists mapper refPath = do
@@ -165,9 +174,10 @@ executeMap fps args = do
     ref <- lookupReference args
     oAll <- lookupBoolOrScriptErrorDef (return False) "map() call" "mode_all" args
     extraArgs <- map T.unpack <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
+    mapper <- getMapper
     let bwaArgs = extraArgs ++ ["-a" | oAll]
         executeMap' (NGOList es)            = NGOList <$> forM es executeMap'
-        executeMap' (NGOReadSet name rs)    = performMap bwa ref name rs bwaArgs
+        executeMap' (NGOReadSet name rs)    = performMap mapper ref name rs bwaArgs
         executeMap' v = throwShouldNotOccur ("map expects ReadSet, got " ++ show v ++ "")
     executeMap' fps
 

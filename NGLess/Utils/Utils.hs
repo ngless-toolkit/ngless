@@ -15,6 +15,7 @@ module Utils.Utils
     , moveOrCopy
     , secondM
     , headtails
+    , dropEnd
     ) where
 
 import Control.Monad
@@ -87,3 +88,7 @@ secondM f (a,c) = (a,) <$> f c
 
 headtails :: [a] -> [(a,[a])]
 headtails = mapMaybe uncons . tails
+
+dropEnd :: Int -> [a] -> [a]
+dropEnd v a = take (length a - v) a -- take of a negative is the empty sequence, which is correct in this case
+

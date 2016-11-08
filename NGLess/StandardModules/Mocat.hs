@@ -30,9 +30,7 @@ import Modules
 import Language
 import FileManagement
 import Utils.Conduit
-
-dropEnd :: Int -> [a] -> [a]
-dropEnd v a = take (length a - v) a -- take of a negative is the empty sequence, which is correct in this case
+import Utils.Utils (dropEnd)
 
 replaceEnd :: String -> String -> String -> Maybe String
 replaceEnd end newEnd str

@@ -18,12 +18,13 @@ import Data.IORef
 import NGLess
 
 data NGLEnvironment = NGLEnvironment
-                    { ngleScriptText :: !T.Text
+                    { ngleScriptText :: !T.Text -- ^ The original text of the script
+                    , ngleMapperToUse :: !T.Text -- ^ which mapper to use
                     } deriving (Show, Eq)
 
 ngle :: IORef NGLEnvironment
 {-# NOINLINE ngle #-}
-ngle = unsafePerformIO (newIORef $ NGLEnvironment "")
+ngle = unsafePerformIO (newIORef $ NGLEnvironment "" "bwa")
 
 nglEnvironment :: NGLessIO NGLEnvironment
 nglEnvironment = liftIO $ readIORef ngle
