@@ -265,6 +265,10 @@ addTemporaries = addTemporaries' 0
                 combineExpr pre (Lookup _ v) = case findDrop pre (isAssignTo v) of
                     Just (pre', Assignment _ e') -> combineExpr pre' e'
                     _ -> error "This is impossible"
+                combineExpr pre (Assignment v' (Lookup _ vt@(Variable t)))
+                    | T.isPrefixOf "temp$" t = case findDrop pre (isAssignTo vt) of
+                        Just (pre', Assignment _ e) -> pre' ++ [Assignment v' e]
+                        _ -> error "Impossible [combineExpr2]"
                 combineExpr pre e' = pre ++ [e']
 
                 functionCallTemp :: Expression -> RWS () [Expression] Int Expression
