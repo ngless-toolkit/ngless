@@ -54,11 +54,15 @@ data Mapper = Mapper
 bwa = Mapper Bwa.createIndex Bwa.hasValidIndex Bwa.callMapper
 soap = Mapper Soap.createIndex Soap.hasValidIndex Soap.callMapper
 
-getMapper :: NGLessIO Mapper
-getMapper = getMapper' . ngleMapperToUse <$> nglEnvironment
-    where
-        getMapper' "soap" = soap
-        getMapper' _ = bwa
+getMapper :: T.Text -> NGLessIO Mapper
+getMapper request = do
+        mappers <- ngleMappersActive <$> nglEnvironment
+        if request `elem` mappers
+            then return $! case request of
+                "soap" -> soap
+                "bwa" -> bwa
+                _ -> error "should not be possible map:getMapper"
+            else throwScriptError ("Requested mapper '"++T.unpack request ++"' is not active.")
 
 ensureIndexExists :: Mapper -> FilePath -> NGLessIO FilePath
 ensureIndexExists mapper refPath = do
@@ -174,7 +178,8 @@ executeMap fps args = do
     ref <- lookupReference args
     oAll <- lookupBoolOrScriptErrorDef (return False) "map() call" "mode_all" args
     extraArgs <- map T.unpack <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
-    mapper <- getMapper
+    mapperName <- lookupStringOrScriptErrorDef (return "bwa") "map() call" "mapper" args
+    mapper <- getMapper mapperName
     let bwaArgs = extraArgs ++ ["-a" | oAll]
         executeMap' (NGOList es)            = NGOList <$> forM es executeMap'
         executeMap' (NGOReadSet name rs)    = performMap mapper ref name rs bwaArgs

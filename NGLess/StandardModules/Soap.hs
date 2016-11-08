@@ -16,7 +16,7 @@ import NGLess.NGLEnvironment
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ = do
     -- TODO: Add check for SOAP binaries in PATH
-    updateNglEnvironment $ \e -> e { ngleMapperToUse = "soap" }
+    updateNglEnvironment addSoap
     return def
         { modInfo = ModInfo "stdlib.soap" "0.0"
         , modCitation = Just citation
@@ -24,6 +24,7 @@ loadModule _ = do
         , runFunction = \_ _ _ -> throwShouldNotOccur "soap has no functions!"
         }
     where
+        addSoap e@NGLEnvironment { ngleMappersActive = p } = e { ngleMappersActive = "soap":p }
         citation = T.concat
                     ["Li, Ruiqiang, Yingrui Li, Karsten Kristiansen, and Jun Wang. \n"
                     ,"\"SOAP: short oligonucleotide alignment program.\"\n"
