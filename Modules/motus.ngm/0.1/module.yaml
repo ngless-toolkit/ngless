@@ -7,7 +7,7 @@ functions:
         arg1:
             atype: 'counts'
             filetype: "tsv"
-            can_gzip: true
+            can_gzip: false
         return:
             rtype: 'counts'
             name: 'ofile'

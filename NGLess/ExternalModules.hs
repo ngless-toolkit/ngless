@@ -233,7 +233,7 @@ executeCommand basedir cmds funcname input args = do
                 (throwShouldNotOccur ("Call to undefined function "++T.unpack funcname++"."))
                 return
                 (find ((== funcname) . nglName) cmds)
-    paths <- asfilePaths input
+    paths <- asfilePaths input (cargPayload $ arg1 cmd)
     paths' <- liftIO $ mapM canonicalizePath paths
     args' <- argsArguments cmd args
     moarg <- case ret cmd of
@@ -269,13 +269,28 @@ executeCommand basedir cmds funcname input args = do
             NGLMappedReadSet -> NGOMappedReadSet (groupName input) (File newfp) Nothing
             _ -> error "NOT IMPLEMENTED"
 
-asfilePaths :: NGLessObject -> NGLessIO  [FilePath]
-asfilePaths (NGOReadSet _ (ReadSet1 _ fp)) = return [fp]
-asfilePaths (NGOReadSet _ (ReadSet2 _ fp1 fp2)) = return [fp1, fp2]
-asfilePaths (NGOReadSet _ (ReadSet3 _ fp1 fp2 fp3)) = return [fp1, fp2, fp3]
-asfilePaths (NGOCounts input) = (:[]) <$> asFile input
-asfilePaths invalid = throwShouldNotOccur ("AsFile path got "++show invalid)
+asfilePaths :: NGLessObject -> Maybe CommandExtra -> NGLessIO  [FilePath]
+asfilePaths (NGOReadSet _ (ReadSet1 _ fp)) _ = return [fp]
+asfilePaths (NGOReadSet _ (ReadSet2 _ fp1 fp2)) _ = return [fp1, fp2]
+asfilePaths (NGOReadSet _ (ReadSet3 _ fp1 fp2 fp3)) _ = return [fp1, fp2, fp3]
+asfilePaths input@(NGOCounts _) argOptions = (:[]) <$> asCountsFile input argOptions
+asfilePaths invalid _ = throwShouldNotOccur ("AsFile path got "++show invalid)
 
+asCountsFile :: NGLessObject -> Maybe CommandExtra -> NGLessIO String
+asCountsFile (NGOCounts icounts) Nothing = asFile icounts
+asCountsFile (NGOCounts icounts) (Just (FileInfo (FileType _ gz bz2 _))) = do
+    icounts' <- asFile icounts
+    let igz = ".gz" `isSuffixOf` icounts'
+        ibz2 = ".bz2" `isSuffixOf` icounts'
+    if (igz && not gz) || (ibz2 && not bz2)
+        then uncompressFile icounts'
+        else return icounts'
+asCountsFile v a = throwScriptError ("Expected counts for argument in function call, got " ++ show v ++ ". " ++ show a)
+
+-- Encodes the argument for the command line, performing any necessary
+-- transforms (e.g., unzipping).
+--
+-- The code is not as complex as it seems, but there are a lot of special cases.
 encodeArgument :: CommandArgument -> Maybe NGLessObject -> NGLessIO [String]
 encodeArgument (CommandArgument ai Nothing _) Nothing
     | not (argRequired ai) = return []
@@ -311,14 +326,13 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
                             _ -> throwScriptError "Unexpected combination of arguments"
                         Just other -> throwShouldNotOccur ("encodeArgument: unexpected payload: "++show other)
                 _ -> throwScriptError ("Expected mappedreadset for argument in function call, got " ++ show v)
-            NGLCounts -> case v of
-                NGOCounts icounts  -> asFile icounts
-                _ -> throwScriptError ("Expected counts for argument in function call, got " ++ show v)
+            NGLCounts -> asCountsFile v payload
             other -> throwShouldNotOccur ("Unexpected type tag in external module " ++ show other)
         return $! if argName ai == ""
                     then [asStr]
                     else [concat ["--", T.unpack (argName ai), "=", asStr]]
 
+-- As (possibly compressed) sam file
 asSamFile fname gz bz2
     | ".sam" `isSuffixOf` fname = return fname
     | ".sam.gz" `isSuffixOf` fname = if gz

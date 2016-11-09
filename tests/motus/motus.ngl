@@ -8,4 +8,6 @@ counted = count(mapped, norm=False)
 counted_motus = motus(counted)
 write(counted_motus, ofile='output.motus.txt')
 
+write(motus(countfile('mOTU.COG.gz')),
+    ofile='output.from-counts.txt')
 

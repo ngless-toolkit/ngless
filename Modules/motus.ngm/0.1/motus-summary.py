@@ -1,5 +1,6 @@
 from collections import defaultdict
 import os
+import math
 try:
     import argparse
 except ImportError: # Python 2.6
@@ -45,7 +46,7 @@ for i,line in enumerate(open(args.input_counts)):
     if i == 0:
         headers = tokens[1:]
     else:
-        counts = [float(v) for v in tokens[1:]]
+        counts = [math.floor(float(v)) for v in tokens[1:]]
         percog[tokens[0]] = counts
 
 summary = defaultdict(list)
