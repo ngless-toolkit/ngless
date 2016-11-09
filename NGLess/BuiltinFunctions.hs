@@ -38,7 +38,7 @@ builtinFunctions =
     ,Function (FuncName "mapstats") (Just NGLMappedReadSet) [] NGLCounts mapStatsArgs False
     ,Function (FuncName "select") (Just NGLMappedReadSet) [] NGLMappedReadSet selectArgs False
     ,Function (FuncName "count") (Just NGLMappedReadSet) [] NGLCounts countArgs False
-    ,Function (FuncName "countfile") (Just NGLString) [] NGLCounts [] False
+    ,Function (FuncName "countfile") (Just NGLString) [ArgCheckFileReadable] NGLCounts [] False
     ,Function (FuncName "write") (Just NGLAny) [] NGLVoid writeArgs False
     ,Function (FuncName "print") (Just NGLAny) [] NGLVoid [] False
     ]
