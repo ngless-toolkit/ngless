@@ -99,7 +99,7 @@ minDouble = (2.0 :: Double) ^^ fst (floatRange (1.0 :: Double))
 
 data CountOpts =
     CountOpts
-    { optFeatures :: [GffType] -- ^ list of features to condider
+    { optFeatures :: [B.ByteString] -- ^ list of features to condider
     , optIntersectMode :: AnnotationRule
     , optStrandSpecific :: !Bool
     , optMinCount :: !Double
@@ -227,7 +227,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
         _ -> throwShouldNotOccur "executeAnnotation: TYPE ERROR"
     samfp <- asFile istream
     let opts = CountOpts
-            { optFeatures = map matchingFeature fs
+            { optFeatures = map (B8.pack . T.unpack) fs
             , optIntersectMode = m
             , optStrandSpecific = strand_specific
             , optMinCount = if discardZeros
@@ -246,7 +246,7 @@ executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or 
 loadAnnotator :: AnnotationMode -> CountOpts -> NGLessIO [Annotator]
 loadAnnotator AnnotateSeqName _ = return [SeqNameAnnotator Nothing]
 loadAnnotator (AnnotateGFF gf) opts = loadGFF gf opts
-loadAnnotator (AnnotateFunctionalMap mm) opts = loadFunctionalMap mm (map getFeatureName $ optFeatures opts)
+loadAnnotator (AnnotateFunctionalMap mm) opts = loadFunctionalMap mm (optFeatures opts)
 
 
 performCount1Pass :: MMMethod -> VUM.IOVector Double -> C.Sink (VU.Vector Int, IG.IntGroups) NGLessIO [IG.IntGroups]
@@ -556,9 +556,9 @@ loadFunctionalMap fname columns = do
         selectIds line_nr _ _ = throwDataError ("Loading functional map file '" ++ fname ++ "' [line " ++ show (line_nr + 1)++ "]: wrong number of columns") -- humans count lines in 1-based systems
 
 
-annotationMode :: [GffType] -> Maybe T.Text -> Maybe FilePath -> Maybe FilePath -> NGLessIO AnnotationMode
+annotationMode :: [B.ByteString] -> Maybe T.Text -> Maybe FilePath -> Maybe FilePath -> NGLessIO AnnotationMode
 annotationMode _ _ (Just _) (Just _) = throwScriptError "Cannot simmultaneously pass a gff_file and an annotation_file for annotate() function"
-annotationMode [GffOther "seqname"] _ _ _ = return AnnotateSeqName
+annotationMode ["seqname"] _ _ _ = return AnnotateSeqName
 annotationMode _ _ (Just r) _ = return (AnnotateFunctionalMap r)
 annotationMode _ _ _ (Just g) = return (AnnotateGFF g)
 annotationMode _ (Just ref) Nothing Nothing = do
@@ -571,9 +571,6 @@ annotationMode _ (Just ref) Nothing Nothing = do
         (Just _, Just _) -> throwDataError ("Reference " ++ T.unpack ref ++ " has both a GFF and a functional map file. Cannot figure out what to do.")
 annotationMode _ _ _ _ =
             throwShouldNotOccur "For counting, you must do one of\n1. use seqname mode\n2. pass in a GFF file using the argument 'gff_file'\n3. pass in a gene map using the argument 'functional_map'"
-
-getFeatureName (GffOther s) = s
-getFeatureName _ = error "getFeatureName called for non-GffOther input"
 
 loadGFF :: FilePath -> CountOpts -> NGLessIO [Annotator]
 loadGFF gffFp opts = do
@@ -599,7 +596,7 @@ loadGFF gffFp opts = do
         finishGffAnnotator ::  (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double) -> Annotator
         finishGffAnnotator (_, amap,namemap,szmap) = GFFAnnotator amap' headers szmap
             where (amap',headers) = reindex amap namemap
-        insertg :: GffType -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double) -> GffLine -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
+        insertg :: B.ByteString -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double) -> GffLine -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
         insertg f cur@(next, gmap, namemap, szmap) gline
                 | gffType gline /= f = cur
                 | otherwise = (next', gmap', namemap', szmap')
@@ -680,14 +677,7 @@ intersection' :: [GffIMMap] -> [AnnotationInfo]
 intersection' [] = []
 intersection' im = concat . IM.elems $ foldl1' IM.intersection im
 
-matchingFeature :: T.Text -> GffType
-matchingFeature "gene" = GffGene
-matchingFeature "exon" = GffExon
-matchingFeature "cds"  = GffCDS
-matchingFeature "CDS"  = GffCDS
-matchingFeature s      = GffOther (B8.pack . T.unpack $ s)
-
-matchFeatures :: [GffType] -> GffLine -> Bool
+matchFeatures :: [B.ByteString] -> GffLine -> Bool
 matchFeatures fs gf = gffType gf `elem` fs
 
 lookupFilePath context name args = case lookup name args of

@@ -204,7 +204,7 @@ IRIS:7:1:17:150#0	4	*	0	0	*	*	0	0	TGATGTACTATGCATATGAACTTGTATGCAAAGTGG	abaabaa`a
 
 gff_line = "chrI\tunknown\texon\t4124\t4358\t.\t-\t.\tgene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
 gff_attributes = "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-gff_structure  = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.GffNegStrand (-1) "Y74C9A.3"
+gff_structure  = GFF.GffLine "chrI" "unknown" "exon" 4124 4358 Nothing GFF.GffNegStrand (-1) "Y74C9A.3"
 
 
 case_trim_attrs_1  = GFF._trimString " x = 10" @?= "x = 10"

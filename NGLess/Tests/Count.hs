@@ -26,7 +26,6 @@ import Data.Maybe
 import qualified Data.GFF as GFF
 import Interpretation.Count
 import Tests.Utils
-import Data.GFF
 import Utils.Here
 import NGLess
 
@@ -56,19 +55,19 @@ runSamGffAnnotation sam_content gff_content opts = do
     liftIO $ readCountFile p
 
 
-gff_structure_Exon = GFF.GffLine "chrI" "unknown" GFF.GffExon 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-gff_structure_CDS = GFF.GffLine "chrI" "unknown" GFF.GffCDS 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-gff_structure_Gene = GFF.GffLine "chrI" "unknown" GFF.GffGene 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+gff_structure_Exon = GFF.GffLine "chrI" "unknown" "exon" 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+gff_structure_CDS = GFF.GffLine "chrI" "unknown" "CDS" 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+gff_structure_Gene = GFF.GffLine "chrI" "unknown" "gene" 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
 
 
-gff_features_all = [GFF.GffGene, GFF.GffCDS, GFF.GffExon]
-gff_features_gene = [GFF.GffGene]
-gff_features_cds = [GFF.GffCDS]
+gff_features_all = ["gene", "CDS", "exon"]
+gff_features_gene = ["gene"]
+gff_features_cds = ["CDS"]
 
 gff_lines_ex = [gff_structure_Exon,gff_structure_CDS,gff_structure_Gene]
 
 case_filter_features_1 = filter (matchFeatures gff_features_all) gff_lines_ex @?= gff_lines_ex
-case_filter_features_2 = filter (matchFeatures [GFF.GffGene]) gff_lines_ex @?= [gff_structure_Gene]
+case_filter_features_2 = filter (matchFeatures ["gene"]) gff_lines_ex @?= [gff_structure_Gene]
 case_filter_features_3 = filter (matchFeatures gff_features_gene) gff_lines_ex @?= [gff_structure_Gene]
 case_filter_features_4 = filter (matchFeatures gff_features_cds) gff_lines_ex @?= [gff_structure_CDS]
 case_filter_features_5 = filter (matchFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
@@ -91,7 +90,7 @@ defCountOpts =
 very_short_gff = "test_samples/very_short.gtf"
 case_load_very_short = do
     [GFFAnnotator immap headers szmap] <- testNGLessIO
-                $ loadAnnotator (AnnotateGFF very_short_gff) defCountOpts  { optFeatures = [GffGene] }
+                $ loadAnnotator (AnnotateGFF very_short_gff) defCountOpts  { optFeatures = ["gene"] }
     let usedIDs = map snd $ concat $ concatMap IM.elems $ M.elems immap
     length (listNub usedIDs ) @?= length headers
     minimum usedIDs @?= 0
@@ -111,7 +110,7 @@ X	protein_coding	gene	632	733	.	+	.	gene_id "WBGene00000526"; gene_name "clc-5";
 case_load_gff_order = do
     fp <- testNGLessIO $ asTempFile short3 "gtf"
     [GFFAnnotator immap headers szmap] <- testNGLessIO
-                $ loadAnnotator (AnnotateGFF fp) defCountOpts  { optFeatures = [GffGene] }
+                $ loadAnnotator (AnnotateGFF fp) defCountOpts  { optFeatures = ["gene"] }
     let [h] = map snd . concat . IM.elems  . fromJust $ M.lookup "V" immap
     (headers !! h) @?= "WBGene00008825"
 
@@ -131,7 +130,7 @@ SRR070372.1334	2048	X	1053	60	7M3D32M1D26M241H	*	0	0	GTTCTACAACGTCCAGATCGGAAGCAA
 
 case_count_two = do
     c <- testNGLessIO $ do
-        let opts = defCountOpts { optFeatures = [GffGene] }
+        let opts = defCountOpts { optFeatures = ["gene"] }
         gff <- asTempFile short1 "gff"
         samf <- asTempFile short_sam "sam"
         ann <- loadAnnotator (AnnotateGFF gff) opts
@@ -179,51 +178,51 @@ X	protein_coding	gene	300	600	.	+	.	gene_id "Gene300"; gene_name "gene2"; gene_s
 |]
 
 case_gff_match = do
-    c <- testNGLessIO $ runSamGffAnnotation sam1 gff1 defCountOpts { optFeatures = [GffGene] }
+    c <- testNGLessIO $ runSamGffAnnotation sam1 gff1 defCountOpts { optFeatures = ["gene"] }
     c @?= M.fromList [("Gene100", 1), ("Gene300", 0)]
 
 case_gff_strand_check = do
-    c <- testNGLessIO $ runSamGffAnnotation sam1 gff1 defCountOpts { optFeatures = [GffGene], optStrandSpecific = True }
+    c <- testNGLessIO $ runSamGffAnnotation sam1 gff1 defCountOpts { optFeatures = ["gene"], optStrandSpecific = True }
     c @?= M.fromList [("Gene100", 1), ("Gene300", 0)]
 
 case_gff_strand_check_negstrand = do
-    c <- testNGLessIO $ runSamGffAnnotation sam1neg gff1 defCountOpts { optFeatures = [GffGene], optStrandSpecific = True }
+    c <- testNGLessIO $ runSamGffAnnotation sam1neg gff1 defCountOpts { optFeatures = ["gene"], optStrandSpecific = True }
     c @?= M.fromList [("Gene100", 0), ("Gene300", 0)]
 
 case_gff_feature_mismatch = do
-    c <- testNGLessIO $ runSamGffAnnotation sam1 gff1 defCountOpts { optFeatures  = [GffCDS] }
+    c <- testNGLessIO $ runSamGffAnnotation sam1 gff1 defCountOpts { optFeatures  = ["CDS"] }
     c @?= M.fromList []
 
 case_gff_feature_partial = do
-    c <- testNGLessIO $ runSamGffAnnotation samPartial gff1 defCountOpts { optFeatures  = [GffGene] }
+    c <- testNGLessIO $ runSamGffAnnotation samPartial gff1 defCountOpts { optFeatures  = ["gene"] }
     c @?= M.fromList [("Gene100", 1), ("Gene300", 0)]
 
 case_gff_feature_partial_intersect = do
-    c <- testNGLessIO $ runSamGffAnnotation samPartial gff1 defCountOpts { optFeatures  = [GffGene], optIntersectMode = annotationRule IntersectUnion }
+    c <- testNGLessIO $ runSamGffAnnotation samPartial gff1 defCountOpts { optFeatures  = ["gene"], optIntersectMode = annotationRule IntersectUnion }
     c @?= M.fromList [("Gene100", 1), ("Gene300", 0)]
 
 case_gff_feature_ambiguous = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optMMMethod = MMCountAll }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = ["gene"], optMMMethod = MMCountAll }
     c @?= M.fromList [("Gene100", 1), ("Gene300", 1)]
 
 case_gff_feature_ambiguous_discard = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene] }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = ["gene"] }
     c @?= M.fromList [("Gene100", 0), ("Gene300", 0)]
 
 case_gff_1OverN = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optMMMethod = MM1OverN }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = ["gene"], optMMMethod = MM1OverN }
     c @?= M.fromList [("Gene100", 0.5), ("Gene300", 0.5)]
 
 case_gff_dist1_fallback = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = [GffGene], optMMMethod = MMDist1 }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous gff1 defCountOpts { optFeatures  = ["gene"], optMMMethod = MMDist1 }
     c @?= M.fromList [("Gene100", 0.5), ("Gene300", 0.5)]
 
 case_gff_dist1_dist = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous2 gff1 defCountOpts { optFeatures  = [GffGene], optMMMethod = MMDist1 }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous2 gff1 defCountOpts { optFeatures  = ["gene"], optMMMethod = MMDist1 }
     c @?= M.fromList [("Gene100", 2.0), ("Gene300", 0.0)]
 
 case_gff_dist1_dist1_to_4 = do
-    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous3 gff1 defCountOpts { optFeatures  = [GffGene], optMMMethod = MMDist1 }
+    c <- testNGLessIO $ runSamGffAnnotation samAmbiguous3 gff1 defCountOpts { optFeatures  = ["gene"], optMMMethod = MMDist1 }
     c @?= M.fromList [("Gene100", 3.75), ("Gene300", 1.25)]
 
 
