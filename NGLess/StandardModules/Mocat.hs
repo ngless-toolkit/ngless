@@ -23,6 +23,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad
 import Control.Applicative
 import Data.Default
+import Data.List (sort)
 
 import Output
 import NGLess
@@ -40,21 +41,28 @@ replaceEnd end newEnd str
 mocatSamplePaired :: [FilePath] -> NGLessIO [Expression]
 mocatSamplePaired matched = do
     let matched1 = filter (\f -> endswith ".1.fq.gz" f || endswith "1.fq.bz2" f) matched
+        encodeStr = ConstStr . T.pack
     forM matched1 $ \m1 -> do
         let Just m2 = replaceEnd "1.fq.gz" "2.fq.gz" m1 <|> replaceEnd "1.fq.bz2" "2.fq.bz2" m1
+            Just singles = replaceEnd "pair.1.fq.gz" "singles.fq.gz" m1 <|> replaceEnd "pair.1.fq.bz2" "singles.fq.bz2" m1
         unless (m2 `elem` matched) $
             throwDataError ("Cannot find match for file: " ++ m1)
-        return (FunctionCall (FuncName "paired") (ConstStr . T.pack $ m1) [(Variable "second", ConstStr . T.pack $ m2)] Nothing)
+        let singlesArgs
+                | singles `elem` matched = [(Variable "singles", encodeStr singles)]
+                | otherwise = []
+        outputListLno' DebugOutput ["mocat_load_sample found ", m1, "/", m2, if singles `elem` matched then "/" ++ singles else ""]
+        return (FunctionCall (FuncName "paired") (encodeStr m1) ((Variable "second", encodeStr m2):singlesArgs) Nothing)
 
 
 executeLoad :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeLoad (NGOString samplename) [] = NGOExpression <$> do
     outputListLno' TraceOutput ["Executing mocat_load_sample transform"]
     let basedir = T.unpack samplename
-    matched <- liftIO $ liftM2 (++)
+    umatched <- liftIO $ liftM2 (++)
                 (namesMatching (basedir </> "*.fq.gz"))
                 (namesMatching (basedir </> "*.fq.bz2"))
-    let matched1 = filter (\f -> endswith ".1.fq.gz" f || endswith "1.fq.bz2" f) matched
+    let matched = sort umatched
+        matched1 = filter (\f -> endswith ".1.fq.gz" f || endswith "1.fq.bz2" f) matched
     args <- ListExpression <$> if null matched1
             then return [FunctionCall (FuncName "fastq") (ConstStr . T.pack $ f) [] Nothing | f <- matched]
             else mocatSamplePaired matched
