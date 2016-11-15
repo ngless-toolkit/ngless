@@ -7,6 +7,7 @@ module FileManagement
     , openNGLTempFile
     , openNGLTempFile'
     , removeFileIfExists
+    , removeIfTemporary
     , setupHtmlViewer
     , takeBaseNameNoExtensions
     ) where
@@ -26,6 +27,8 @@ import Control.Monad.Trans.Resource
 import Control.Monad.IO.Class (liftIO)
 
 import Configuration (nConfTemporaryDirectory, nConfKeepTemporaryFiles, nglConfiguration)
+
+import NGLess.NGLEnvironment
 import NGLess.NGError
 
 -- | open a temporary file
@@ -43,6 +46,7 @@ openNGLTempFile' base prefix ext = do
                 (openTempFile tdir (prefix ++ takeBaseNameNoExtensions base ++ "." ++ ext))
                 cleanupAction
     outputListLno' DebugOutput ["Created & opened temporary file ", fp]
+    updateNglEnvironment $ \e -> e { ngleTemporaryFilesCreated = fp:(ngleTemporaryFilesCreated e) }
     return (key,(fp,h))
 
 -- | See openNGLTempFile'
@@ -57,6 +61,18 @@ removeFileIfExists fp = removeFile fp `catch` ignoreDoesNotExistError
 deleteTempFile (fp, h) = do
     hClose h
     removeFileIfExists fp
+
+-- removeIfTemporary takes a file path and if this file was created as an
+-- ngless temporary file and unless the user requested that temporary files be
+-- kept, then the file is removed.
+removeIfTemporary :: FilePath -> NGLessIO ()
+removeIfTemporary fp = do
+    keepTempFiles <- nConfKeepTemporaryFiles <$> nglConfiguration
+    createdFiles <- ngleTemporaryFilesCreated <$> nglEnvironment
+    unless (keepTempFiles || fp `notElem` createdFiles) $ do
+        liftIO $ removeFileIfExists fp
+        updateNglEnvironment $ \e -> e { ngleTemporaryFilesCreated = filter (==fp) (ngleTemporaryFilesCreated e) }
+
 
 -- takeBaseName only takes out the first extension
 takeBaseNameNoExtensions = dropExtensions . takeBaseName
