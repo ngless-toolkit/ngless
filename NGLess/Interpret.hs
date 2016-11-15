@@ -140,10 +140,8 @@ lookupConstant !k = do
 setVariableValue :: T.Text -> NGLessObject -> InterpretationEnvIO ()
 setVariableValue !k !v = modify $ \(NGLInterpretEnv mods e) -> (NGLInterpretEnv mods (Map.insert k v e))
 
-getName (FuncName f) = f
-
 findFunction :: FuncName -> InterpretationEnvIO (NGLessObject -> KwArgsValues -> NGLessIO NGLessObject)
-findFunction fname = do
+findFunction fname@(FuncName fname') = do
         mods <- gets ieModules
         case filter hasF mods of
             [m] -> do
@@ -151,8 +149,8 @@ findFunction fname = do
                     wrap = if funcAllowsAutoComprehension func
                                 then autoComprehendNB
                                 else id
-                return $ wrap $ (runFunction m) (getName fname)
-            [] -> throwShouldNotOccur . T.unpack $ T.concat ["Function '", getName fname, "' not found (not builtin and not in any loaded module)"]
+                return $ wrap $ (runFunction m) fname'
+            [] -> throwShouldNotOccur . T.unpack $ T.concat ["Function '", fname', "' not found (not builtin and not in any loaded module)"]
             ms -> throwShouldNotOccur . T.unpack $ T.concat (["Function '", T.pack $ show fname, "' found in multiple modules! ("] ++ [T.concat [modname, ":"] | modname <- modName . modInfo <$> ms])
     where
         hasF m = fname `elem` (funcName `fmap` modFunctions m)
