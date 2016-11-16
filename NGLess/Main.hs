@@ -48,6 +48,7 @@ import qualified BuiltinModules.Argv as ModArgv
 import qualified BuiltinModules.Checks as Checks
 import qualified BuiltinModules.AsReads as ModAsReads
 import qualified BuiltinModules.Readlines as Readlines
+import qualified BuiltinModules.Remove as Remove
 
 -- | wrapPrint transforms the script by transforming the last expression <expr>
 -- into write(<expr>, ofile=STDOUT)
@@ -106,8 +107,9 @@ loadModules mods  = do
     mArgv <- ModArgv.loadModule ("" :: T.Text)
     mReadlines <- Readlines.loadModule ("" :: T.Text)
     mChecks <- Checks.loadModule ("" :: T.Text)
+    mRemove <- Remove.loadModule ("" :: T.Text)
     imported <- loadStdlibModules mods
-    let loaded = (mReadlines:mArgv:mA:mChecks:imported)
+    let loaded = (mReadlines:mArgv:mA:mChecks:mRemove:imported)
     forM_ loaded registerModule
     return loaded
 
