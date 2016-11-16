@@ -70,6 +70,7 @@ removeIfTemporary fp = do
     keepTempFiles <- nConfKeepTemporaryFiles <$> nglConfiguration
     createdFiles <- ngleTemporaryFilesCreated <$> nglEnvironment
     unless (keepTempFiles || fp `notElem` createdFiles) $ do
+        outputListLno' DebugOutput ["Removing temporary file: ", fp]
         liftIO $ removeFileIfExists fp
         updateNglEnvironment $ \e -> e { ngleTemporaryFilesCreated = filter (==fp) (ngleTemporaryFilesCreated e) }
 

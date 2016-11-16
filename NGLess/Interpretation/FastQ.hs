@@ -133,9 +133,11 @@ catFiles3 name rs@(r:_) = do
     forM_ rs $ \case
         ReadSet1 _ fp -> hCat h3 fp
         ReadSet2 _ fp1 fp2 -> do
+            outputListLno' TraceOutput ["Concatenating ", fp1, " # ", fp2]
             hCat h1 fp1
             hCat h2 fp2
         ReadSet3 _ fp1 fp2 fp3 -> do
+            outputListLno' TraceOutput ["Concatenating ", fp1, " # ", fp2, " # ", fp3]
             hCat h1 fp1
             hCat h2 fp2
             hCat h3 fp3
@@ -190,13 +192,13 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
     (ReadSet1 enc1 fp1) <- asReadSet1mayQC qcNeeded enc fp1'
     (ReadSet1 enc2 fp2) <- asReadSet1mayQC qcNeeded enc fp2'
     when (enc1 /= enc2) $
-        throwDataError "Mates do not seem to have the same quality encoding!"
+        throwDataError ("Mates do not seem to have the same quality encoding! (first mate [" ++ fp1 ++ "] had " ++ show enc1 ++ ", second one [" ++ fp2 ++ "] " ++ show enc2 ++ ").")
     case mate3 of
         Nothing -> return (ReadSet2 enc1 fp1 fp2)
         Just (NGOString f3) -> do
             (ReadSet1 enc3 fp3) <- optionalSubsample (T.unpack f3) >>= asReadSet1mayQC qcNeeded enc
             when (enc1 /= enc3) $
-                throwDataError "Mates do not seem to have the same quality encoding!"
+                throwDataError ("Mates do not seem to have the same quality encoding! (paired mates [" ++ fp1 ++ " had " ++ show enc1 ++ ", single one [" ++ fp3 ++ "] " ++ show enc3 ++ ").")
             return (ReadSet3 enc1 fp1 fp2 fp3)
         Just other -> throwScriptError ("Function paired expects a string for argument 'singles', got " ++ show other)
 executePaired expr _ = throwScriptError ("Function paired expects a string, got: " ++ show expr)

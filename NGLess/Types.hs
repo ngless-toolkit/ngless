@@ -281,14 +281,16 @@ findMethodInfo m =  case filter ((==m) . methodName) builtinMethods of
 checkFuncUnnamed :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
 checkFuncUnnamed f arg = do
         targ <- nglTypeOf arg
-        Function _ (Just etype) _ rtype _ allowAutoComp <- funcInfo f
-        case targ of
-            Just (NGList t)
-                | allowAutoComp -> checkfunctype etype t *> return (Just (NGList rtype))
-            Just t -> checkfunctype etype t *> return (Just rtype)
-            Nothing -> do
-                errorInLineC ["While checking types for function ", show f, ".\n\tCould not infer type of argument (saw :", show arg, ")"]
-                cannotContinue
+        Function _ metype _ rtype _ allowAutoComp <- funcInfo f
+        case metype of
+            Just etype -> case targ of
+                Just (NGList t)
+                    | allowAutoComp -> checkfunctype etype t *> return (Just (NGList rtype))
+                Just t -> checkfunctype etype t *> return (Just rtype)
+                Nothing -> do
+                    errorInLineC ["While checking types for function ", show f, ".\n\tCould not infer type of argument (saw :", show arg, ")"]
+                    cannotContinue
+            Nothing -> return Nothing
     where
         checkfunctype NGLAny NGLVoid = errorInLineC
                                     ["Function '", show f, "' can take any type, but the input is of illegal type Void."]
