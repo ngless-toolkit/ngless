@@ -42,8 +42,10 @@ import           Control.Concurrent (threadDelay)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource
 import System.IO
+import Data.IORef
 import Data.Default
 import Control.Monad
+import System.IO.Unsafe (unsafePerformIO)
 import System.Directory (createDirectoryIfMissing, doesFileExist, copyFile, getDirectoryContents)
 
 import qualified Data.Hash.MD5 as MD5
@@ -67,6 +69,10 @@ import Utils.Utils
 import Utils.Conduit
 import Utils.LockFile
 
+prefixRef :: IORef String
+{-# NOINLINE prefixRef #-}
+prefixRef = unsafePerformIO (newIORef "")
+
 syncFile :: FilePath -> IO ()
 #ifndef WINDOWS
 syncFile fname = do
@@ -88,7 +94,8 @@ touchFile fname = writeFile fname "lock file"
 
 setupHashDirectory :: FilePath -> T.Text -> NGLessIO FilePath
 setupHashDirectory basename hash = do
-    let actiondir = basename </> take 8 (T.unpack hash)
+    prefix <- liftIO $ readIORef prefixRef
+    let actiondir = basename </> prefix ++ take 8 (T.unpack hash)
         scriptfile = actiondir </> "script.ngl"
     liftIO $ createDirectoryIfMissing True actiondir
     unlessM (liftIO $ doesFileExist scriptfile) $
@@ -174,6 +181,12 @@ executeCollect (NGOCounts istream) kwargs = do
         else outputListLno' TraceOutput ["Cannot collect (not all files present yet), wrote partial file to ", partialfile current]
     return NGOVoid
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)
+
+executeSetTag :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
+executeSetTag (NGOString prefix) [] = do
+    liftIO $ writeIORef prefixRef $ T.unpack prefix ++ "-"
+    return NGOVoid
+executeSetTag arg _ = throwScriptError ("set_parallel_tag got unexpected argument: " ++ show arg)
 
 
 -- | split a list into a given number of (roughly) equally sized chunks
@@ -296,6 +309,15 @@ collectFunction = Function
     , funcAllowsAutoComprehension = False
     }
 
+setTagFunction = Function
+    { funcName = FuncName "set_parallel_tag"
+    , funcArgType = Just NGLCounts
+    , funcArgChecks = []
+    , funcRetType = NGLString
+    , funcKwArgs = []
+    , funcAllowsAutoComprehension = False
+    }
+
 addHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 addHash script = do
         isSubsample <- nConfSubsample <$> nglConfiguration
@@ -316,11 +338,12 @@ loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
         return def
         { modInfo = ModInfo "stdlib.parallel" "0.0"
-        , modFunctions = [lock1, collectFunction]
+        , modFunctions = [lock1, collectFunction, setTagFunction]
         , modTransform = addHash
         , runFunction = \case
             "lock1" -> executeLock1
             "collect" -> executeCollect
+            "set_parallel_tag" -> executeSetTag
             _ -> error "Bad function name"
         }
 
