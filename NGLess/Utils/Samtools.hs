@@ -51,6 +51,7 @@ samBamConduit samfp
                 ,herr
                 ,sp) <- CP.streamingProcess cp
             err <- A.async $ runResourceT (C.sourceHandle herr $$ CL.consume)
+            A.link err
             return (hout, herr, err, sp)
         C.sourceHandle hout
         exitCode <- CP.waitForStreamingProcess sp

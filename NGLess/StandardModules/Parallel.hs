@@ -263,6 +263,7 @@ concatCounts headers inputs
         channels <- liftIO $ forM sourcesplits $ \ss -> do
             ch <- TQ.newTBMQueueIO 4
             a <- A.async $ runResourceT (C.sequenceSources ss =$= CL.map (force . splitLines) $$ sinkTBMQueue' ch True)
+            A.link a
             return (CA.sourceTBMQueue ch, a)
         C.sequenceSources (fst <$> channels)
             =$= asyncMapEitherC mapthreads (sequence >=> concatPartials)
