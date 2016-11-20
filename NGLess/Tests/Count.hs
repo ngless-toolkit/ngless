@@ -18,12 +18,12 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
+import qualified Data.Strict.Tuple as TU
 import           Data.Conduit ((=$=), ($$))
 import           Control.Monad.Trans.Resource (runResourceT)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 
-import qualified Data.GFF as GFF
 import Interpretation.Count
 import Tests.Utils
 import Utils.Here
@@ -54,26 +54,8 @@ runSamGffAnnotation sam_content gff_content opts = do
     p <- performCount sam_fp "testing" ann opts
     liftIO $ readCountFile p
 
-
-gff_structure_Exon = GFF.GffLine "chrI" "unknown" "exon" 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-gff_structure_CDS = GFF.GffLine "chrI" "unknown" "CDS" 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-gff_structure_Gene = GFF.GffLine "chrI" "unknown" "gene" 4124 4358 Nothing GFF.GffNegStrand (-1) "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-
-
-gff_features_all = ["gene", "CDS", "exon"]
-gff_features_gene = ["gene"]
-gff_features_cds = ["CDS"]
-
-gff_lines_ex = [gff_structure_Exon,gff_structure_CDS,gff_structure_Gene]
-
-case_filter_features_1 = filter (matchFeatures gff_features_all) gff_lines_ex @?= gff_lines_ex
-case_filter_features_2 = filter (matchFeatures ["gene"]) gff_lines_ex @?= [gff_structure_Gene]
-case_filter_features_3 = filter (matchFeatures gff_features_gene) gff_lines_ex @?= [gff_structure_Gene]
-case_filter_features_4 = filter (matchFeatures gff_features_cds) gff_lines_ex @?= [gff_structure_CDS]
-case_filter_features_5 = filter (matchFeatures gff_features_cds) [gff_structure_Exon,gff_structure_Exon,gff_structure_Gene] @?= []
-
+listNub :: (Ord a) => [a] -> [a]
 listNub = S.toList . S.fromList
-
 
 defCountOpts =
     CountOpts
@@ -91,8 +73,8 @@ very_short_gff = "test_samples/very_short.gtf"
 case_load_very_short = do
     [GFFAnnotator immap headers szmap] <- testNGLessIO
                 $ loadAnnotator (AnnotateGFF very_short_gff) defCountOpts  { optFeatures = ["gene"] }
-    let usedIDs = map snd $ concat $ concatMap IM.elems $ M.elems immap
-    length (listNub usedIDs ) @?= length headers
+    let usedIDs = map TU.snd $ concat $ concatMap IM.elems $ M.elems immap
+    length (listNub usedIDs) @?= length headers
     minimum usedIDs @?= 0
     maximum usedIDs @?= length headers - 1
     M.size szmap @?= length headers
@@ -109,9 +91,9 @@ X	protein_coding	gene	632	733	.	+	.	gene_id "WBGene00000526"; gene_name "clc-5";
 -- this is a regression test
 case_load_gff_order = do
     fp <- testNGLessIO $ asTempFile short3 "gtf"
-    [GFFAnnotator immap headers szmap] <- testNGLessIO
+    [GFFAnnotator immap headers _] <- testNGLessIO
                 $ loadAnnotator (AnnotateGFF fp) defCountOpts  { optFeatures = ["gene"] }
-    let [h] = map snd . concat . IM.elems  . fromJust $ M.lookup "V" immap
+    let [h] = map TU.snd . concat . IM.elems  . fromJust $ M.lookup "V" immap
     (headers !! h) @?= "WBGene00008825"
 
 short1 :: B.ByteString
