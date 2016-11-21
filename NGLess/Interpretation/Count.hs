@@ -431,26 +431,15 @@ performCount samfp gname annotators0 opts = do
     (newfp,hout) <- openNGLTempFile samfp "counts." "txt"
     liftIO $ do
         BL.hPut hout (BL.fromChunks [delim, T.encodeUtf8 gname, "\n"])
-        forM_ (zip annotators results) $ \(ann,result) -> do
-            mheaders <- VM.new (annSize ann)
-            forM_ (annEnumerate ann) $ \(v,i) ->
-                VM.write mheaders i v
-            headers <- V.unsafeFreeze mheaders
-
-            let nlB :: BB.Builder
-                nlB = BB.word8 10
-                tabB :: BB.Builder
-                tabB = BB.word8 9
-                encode1 :: Int -> BB.Builder
-                encode1 !i = let
-                            hn = (V.!) headers i
-                            v = (VU.!) result i
-                        in if v >= optMinCount opts
-                                    then mconcat [BB.byteString hn, tabB, BB.byteString (toShortest v), nlB]
-                                    else mempty
-
-                n = VU.length result
-            mapM_ (BB.hPutBuilder hout. encode1) [0 .. n - 1]
+        forM_ (zip annotators results) $ \(ann,result) ->
+            forM_ (annEnumerate ann) $ \(h,i) -> do
+                let nlB :: BB.Builder
+                    nlB = BB.word8 10
+                    tabB :: BB.Builder
+                    tabB = BB.word8 9
+                    v = (VU.!) result i
+                when (v >= optMinCount opts) $
+                    BB.hPutBuilder hout $ mconcat [BB.byteString h, tabB, BB.byteString (toShortest v), nlB]
         hClose hout
     return newfp
 
