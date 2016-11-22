@@ -1,3 +1,7 @@
+
+# Ngless used to choke if first line was not "ngless"
+# Ignoring comments seems more natural & allows she-bang line
+
 ngless "0.0"
 
 line0 = readlines('input.txt')[0]
