@@ -4,7 +4,7 @@ stdenv.mkDerivation {
 
   name = "nglessEnv";
 
-  buildInputs = with haskell.packages.ghc7103; [
+  buildInputs = with haskell.packages.ghc801; [
     stack
     wget
     ghc
@@ -13,6 +13,8 @@ stdenv.mkDerivation {
   propagatedBuildInputs = [
     zlib
     bzip2
+    samtools
+    bwa
   ];
 
   STACK_IN_NIX_EXTRA_ARGS
@@ -28,5 +30,7 @@ stdenv.mkDerivation {
   shellHook = ''
     export LD_LIBRARY_PATH+=:${zlib.out}/lib
     export LD_LIBRARY_PATH+=:${bzip2.out}/lib
+    export NGLESS_SAMTOOLS_BIN=${samtools}/bin/samtools
+    export NGLESS_BWA_BIN=${bwa}/bin/bwa
   '';
 }
