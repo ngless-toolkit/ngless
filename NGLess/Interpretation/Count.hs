@@ -112,6 +112,7 @@ data CountOpts =
     , optMMMethod :: !MMMethod
     , optDelim :: !B.ByteString
     , optNormSize :: !Bool
+    , optIncludeMinus1 :: !Bool
     }
 
 data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctionalMap FilePath
@@ -143,12 +144,15 @@ instance NFData Annotator where
     rnf (GeneMapAnnotator amap szmap) = rnf amap `seq` rnf szmap
 
 annotateReadGroup :: CountOpts -> Annotator -> [SamLine] -> Either NGError [Int]
-annotateReadGroup opts ann samlines = listNub <$> case ann of
+annotateReadGroup opts ann samlines = add1 . listNub <$> case ann of
         SeqNameAnnotator Nothing -> throwShouldNotOccur "Incomplete annotator used"
         SeqNameAnnotator (Just szmap) -> mapMaybeM (getID szmap) samlines
         GFFAnnotator amap _ _ -> return . concatMap (annotateSamLineGFF opts amap) $ samlines
         GeneMapAnnotator amap _ -> return . concatMap (mapAnnotation1 amap) $ samlines
     where
+        -- this is because "unmatched" is -1
+        add1 [] = [0]
+        add1 vs = (+ 1) <$> vs
         getID :: V.Vector RefSeqInfo -> SamLine -> Either NGError (Maybe Int)
         getID szmap sr@SamLine{samRName = rname }
             | isAligned sr = case binarySearchByExact compareShortLong szmap rname of
@@ -159,11 +163,12 @@ annotateReadGroup opts ann samlines = listNub <$> case ann of
         mapAnnotation1 amap samline = fromMaybe [] $ M.lookup (samRName samline) amap
 
 annSizeOf :: Annotator -> B.ByteString -> Either NGError Double
+annSizeOf _ "-1" = return 0.0
 annSizeOf (SeqNameAnnotator Nothing) _ = throwShouldNotOccur "Using unloaded annotator"
 annSizeOf (SeqNameAnnotator (Just ix)) name = annSizeOfInRSVector name ix
 annSizeOf (GFFAnnotator _ _ szmap) name = annSizeOf' name szmap
 annSizeOf (GeneMapAnnotator _ ix) name = annSizeOfInRSVector name ix
-annSizeOfInRSVector name ix = rsiSize <$> note (NGError DataError "Could not find size of item") (binaryFindBy compareShortLong ix name)
+annSizeOfInRSVector name ix = rsiSize <$> note (NGError DataError $ "Could not find size of item ["++B8.unpack name++"]") (binaryFindBy compareShortLong ix name)
 annSizeOf' name ix = case M.lookup name ix of
     Just s -> return s
     Nothing -> throwShouldNotOccur ("Header does not exist in sizes: "++show name)
@@ -171,15 +176,15 @@ annSizeOf' name ix = case M.lookup name ix of
 
 annEnumerate :: Annotator -> [(B.ByteString, Int)]
 annEnumerate (SeqNameAnnotator Nothing)   = error "Using unfinished annotator"
-annEnumerate (SeqNameAnnotator (Just ix)) = enumerateRSVector ix
-annEnumerate (GeneMapAnnotator _ ix)      = enumerateRSVector ix
-annEnumerate (GFFAnnotator _ headers _)   = zip headers [0..]
-enumerateRSVector ix = V.toList . flip V.imap ix $ \i rs -> (rsiName rs, i)
+annEnumerate (SeqNameAnnotator (Just ix)) = ("-1",0):enumerateRSVector ix
+annEnumerate (GeneMapAnnotator _ ix)      = ("-1",0):enumerateRSVector ix
+annEnumerate (GFFAnnotator _ headers _)   = zip ("-1":headers) [0..]
+enumerateRSVector ix = V.toList . flip V.imap ix $ \i rs -> (rsiName rs, i + 1)
 
 -- Number of elements
 annSize :: Annotator -> Int
-annSize (SeqNameAnnotator (Just ix)) = V.length ix
-annSize (GeneMapAnnotator _ ix) = V.length ix
+annSize (SeqNameAnnotator (Just ix)) = V.length ix + 1
+annSize (GeneMapAnnotator _ ix) = V.length ix + 1
 annSize ann = length (annEnumerate ann)
 
 methodFor "1overN" = return MM1OverN
@@ -218,7 +223,8 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
     minCount <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
     method <- methodFor =<< lookupSymbolOrScriptErrorDef (return "dist1")
                                     "multiple argument to count " "multiple" args
-    strand_specific <- lookupBoolOrScriptErrorDef (return False) "annotation function" "strand" args
+    strand_specific <- lookupBoolOrScriptErrorDef (return False) "count function" "strand" args
+    include_minus1 <- lookupBoolOrScriptErrorDef (return False) "count function" "include_minus1" args
     mocatMap <- lookupFilePath "functional_map argument to count()" "functional_map" args
     gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
     normSize <- lookupBoolOrScriptErrorDef (return False) "count function" "norm" args
@@ -229,7 +235,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
     fs <- case lookup "features" args of
         Nothing -> return ["gene"]
         Just (NGOSymbol f) -> return [f]
-        Just (NGOList feats') -> mapM (stringOrTypeError "annotation features argument") feats'
+        Just (NGOList feats') -> mapM (stringOrTypeError "count features argument") feats'
         _ -> throwShouldNotOccur "executeAnnotation: TYPE ERROR"
     samfp <- asFile istream
     let opts = CountOpts
@@ -242,6 +248,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
             , optMMMethod = method
             , optDelim = delim
             , optNormSize = normSize
+            , optIncludeMinus1 = include_minus1
             }
     amode <- annotationMode (optFeatures opts) refinfo (T.unpack <$> mocatMap) (T.unpack <$> gffFile)
     annotators <- loadAnnotator amode opts
@@ -308,7 +315,7 @@ annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annS
         annSamHeaderParser1 (GeneMapAnnotator gmap isizes)
             | optNormSize opts = do
                 msizes <- liftIO $ V.thaw isizes
-                asyncMapEitherC mapthreads (liftM flattenVs . V.mapM (indexUpdates gmap))
+                asyncMapEitherC mapthreads (\headers -> flattenVs <$> V.mapM (indexUpdates gmap) headers)
                     =$= CL.mapM_ (liftIO . updateSizes msizes)
                 GeneMapAnnotator gmap <$> liftIO (V.unsafeFreeze msizes)
         annSamHeaderParser1 ann = C.sinkNull >> return ann
@@ -431,8 +438,11 @@ performCount samfp gname annotators0 opts = do
     (newfp,hout) <- openNGLTempFile samfp "counts." "txt"
     liftIO $ do
         BL.hPut hout (BL.fromChunks [delim, T.encodeUtf8 gname, "\n"])
+        let maybeSkipM1
+                | optIncludeMinus1 opts = id
+                | otherwise = tail
         forM_ (zip annotators results) $ \(ann,result) ->
-            forM_ (annEnumerate ann) $ \(h,i) -> do
+            forM_ (maybeSkipM1 $ annEnumerate ann) $ \(h,i) -> do
                 let nlB :: BB.Builder
                     nlB = BB.word8 10
                     tabB :: BB.Builder
@@ -647,9 +657,11 @@ annotateSamLineGFF opts amap samline = case M.lookup rname amap of
         sStart = samPos samline
         sEnd   = sStart + samLength samline - 1
         lineStrand :: GffStrand
-        lineStrand = if optStrandSpecific opts
-                        then if isPositive samline then GffPosStrand else GffNegStrand
-                        else GffUnStranded
+        lineStrand
+            | optStrandSpecific opts = if isPositive samline
+                                            then GffPosStrand
+                                            else GffNegStrand
+            | otherwise = GffUnStranded
 
 filterStrand :: GffStrand -> IM.IntervalMap Int [AnnotationInfo] -> IM.IntervalMap Int [AnnotationInfo]
 filterStrand GffUnStranded = id

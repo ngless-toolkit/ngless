@@ -1,5 +1,5 @@
 ngless '0.0'
 
 mapped = samfile('sample.sam.gz')
-counts = count(mapped, gff_file='short.gtf', features=['gene'], min=1, strand=True, mode={union})
+counts = count(mapped, gff_file='short.gtf', features=['gene'], min=1, strand=True, mode={union}, include_minus1=True)
 write(counts, ofile='output.txt')

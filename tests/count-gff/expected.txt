@@ -1,4 +1,5 @@
 	sample.sam.gz
+-1	2729
 WBGene00000510	1
 WBGene00000526	3
 WBGene00001461	1

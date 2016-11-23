@@ -66,6 +66,7 @@ defCountOpts =
     , optMMMethod = MMUniqueOnly
     , optDelim = "\t"
     , optNormSize = False
+    , optIncludeMinus1 = False
     }
 
 

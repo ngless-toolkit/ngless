@@ -63,6 +63,7 @@ countArgs =
     ,ArgInformation "strand" False NGLBool []
     ,ArgInformation "norm" False NGLBool []
     ,ArgInformation "discard_zeros" False NGLBool []
+    ,ArgInformation "include_minus1" False NGLBool []
     ]
 
 selectArgs =
