@@ -3,7 +3,7 @@ name: 'Test tool'
 functions:
     -
         nglName: "testing"
-        arg0: '/bin/echo'
+        arg0: './command.sh'
         arg1:
             atype: 'readset'
             filetype: "fq1"
@@ -33,13 +33,13 @@ functions:
                     - "--other"
     -
         nglName: "testing2"
-        arg0: '/bin/echo'
+        arg0: './command.sh'
         arg1:
             atype: 'readset'
             filetype: "fq1"
             can_gzip: true
 init:
-    init_cmd: '/bin/true'
+    init_cmd: './check.sh'
     init_args:
         - "one"
         - "two"
