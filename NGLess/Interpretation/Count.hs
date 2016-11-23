@@ -463,7 +463,8 @@ normalizeCounts counts sizes = do
         throwShouldNotOccur ("Counts vector is of size " ++ show n ++ ", but sizes if of size " ++ show n')
     forM_ [0 .. n - 1] $ \i -> liftIO $ do
         s <- VUM.read sizes i
-        VUM.unsafeModify counts (/ s) i
+        when (s > 0) $
+            VUM.unsafeModify counts (/ s) i
 
 distributeMM indices normed ncounts fractionResult = liftIO $ do
     forM_ indices $ \vss -> IG.forM_ vss $ \vs -> do
