@@ -77,6 +77,7 @@ basicCountOpts = CountOpts
         , optMMMethod = MMDist1
         , optDelim = "\t"
         , optNormSize = False
+        , optIncludeMinus1 = True
         }
 
 main = setupTestConfiguration >> defaultMain [
