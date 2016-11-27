@@ -65,7 +65,7 @@ defCountOpts =
     , optMinCount = 0.0
     , optMMMethod = MMUniqueOnly
     , optDelim = "\t"
-    , optNormSize = False
+    , optNormMode = NMRaw
     , optIncludeMinus1 = False
     }
 

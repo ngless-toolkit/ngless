@@ -10,6 +10,7 @@ module Interpretation.Count
     , AnnotationMode(..)
     , AnnotationIntersectionMode(..)
     , MMMethod(..)
+    , NMode(..)
     , annotationRule
     , loadAnnotator
     , loadFunctionalMap
@@ -99,6 +100,9 @@ type FeatureSizeMap = M.Map B.ByteString Double
 data MMMethod = MMCountAll | MM1OverN | MMDist1 | MMUniqueOnly
     deriving (Eq, Show)
 
+data NMode = NMRaw | NMNormed | NMScaled
+    deriving (Eq, Show)
+
 
 minDouble :: Double
 minDouble = (2.0 :: Double) ^^ fst (floatRange (1.0 :: Double))
@@ -111,7 +115,7 @@ data CountOpts =
     , optMinCount :: !Double
     , optMMMethod :: !MMMethod
     , optDelim :: !B.ByteString
-    , optNormSize :: !Bool
+    , optNormMode :: !NMode
     , optIncludeMinus1 :: !Bool
     }
 
@@ -247,7 +251,9 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
                                 else fromInteger minCount
             , optMMMethod = method
             , optDelim = delim
-            , optNormSize = normSize
+            , optNormMode = if normSize
+                                then NMNormed
+                                else NMRaw
             , optIncludeMinus1 = include_minus1
             }
     amode <- annotationMode (optFeatures opts) refinfo (T.unpack <$> mocatMap) (T.unpack <$> gffFile)
@@ -313,7 +319,7 @@ annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annS
                 V.unsafeFreeze v
             return $! SeqNameAnnotator (Just vsorted)
         annSamHeaderParser1 (GeneMapAnnotator gmap isizes)
-            | optNormSize opts = do
+            | optNormMode opts == NMNormed = do
                 msizes <- liftIO $ V.thaw isizes
                 asyncMapEitherC mapthreads (\headers -> flattenVs <$> V.mapM (indexUpdates gmap) headers)
                     =$= CL.mapM_ (liftIO . updateSizes msizes)
@@ -389,6 +395,7 @@ performCount samfp gname annotators0 opts = do
     let mapthreads = max 1 (numCapabilities - 1)
         method = optMMMethod opts
         delim = optDelim opts
+        isNormed = optNormMode opts == NMNormed
 
     (samcontent, annotators) <-
         samBamConduit samfp
@@ -407,7 +414,7 @@ performCount samfp gname annotators0 opts = do
                                                                 annotated <- V.mapM (annotateReadGroup opts ann) samgroup
                                                                 return $ splitSingletons method annotated)
                 =$= sequenceSinks [CL.map (!! i) =$= performCount1Pass method mc | (i,mc) <- zip [0..] mcounts]
-    sizes <- if optNormSize opts || method == MMDist1
+    sizes <- if isNormed || method == MMDist1
                 then forM annotators $ \ann -> do
                     let n_entries = annSize ann
                     sizes <- liftIO $ VUM.new n_entries
@@ -420,7 +427,7 @@ performCount samfp gname annotators0 opts = do
     raw_counts <- if method == MMDist1
                     then forM mcounts (liftIO . VUM.clone)
                     else return mcounts
-    when (optNormSize opts || method == MMDist1) $
+    when (isNormed || method == MMDist1) $
         forM_ (zip mcounts sizes) (uncurry normalizeCounts)
     counts <- forM mcounts (liftIO . VU.unsafeFreeze)
 
@@ -431,7 +438,7 @@ performCount samfp gname annotators0 opts = do
                 outputListLno' TraceOutput ["Counts (second pass)..."]
                 forM (zip4 counts raw_counts sizes toDistribute) $ \(c, r, s, t) -> do
                     distributeMM t c r False
-                    when (optNormSize opts) $
+                    when isNormed $
                         normalizeCounts r s
                     liftIO $ VU.unsafeFreeze r
 
