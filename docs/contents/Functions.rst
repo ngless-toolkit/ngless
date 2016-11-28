@@ -316,6 +316,8 @@ Arguments by value:
 +-------------------+-----------------+------------+----------------+
 | strand            | Bool            | no         | false          |
 +-------------------+-----------------+------------+----------------+
+| normalization     | Symbol          | no         | {raw}          |
++-------------------+-----------------+------------+----------------+
 | min               | Integer         | no         | 0              |
 +-------------------+-----------------+------------+----------------+
 | discard_zero      | Bool            | no         | false          |
@@ -356,6 +358,14 @@ same strand as the feature.
 least, to be kept (default: 0, i.e., keep all counts). If you just want to
 discard features that are exactly zero, you should set the ``discard_zero``
 argument to True.
+
+``normalization`` specifies if and how to normalize to take into account feature size:
+
+- ``{raw}`` (default) is no normalization
+- ``{normed}`` is the result of the ``{raw}`` mode divided by the size of the
+  feature
+- ``{scaled}`` is the result of the ``{normed}`` mode scaled up so that the
+  total number of counts is identical to the ``{raw}`` (within rounding error)
 
 substrim
 --------

@@ -46,7 +46,7 @@ import           Data.Strict.Tuple (Pair(..))
 import Control.Monad
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
-import Data.List                (foldl1', foldl', sort, zip4)
+import Data.List                (foldl1', foldl', sort)
 import GHC.Conc                 (getNumCapabilities)
 import Control.DeepSeq          (NFData(..))
 import Control.Error            (note)
@@ -231,11 +231,18 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
     include_minus1 <- lookupBoolOrScriptErrorDef (return False) "count function" "include_minus1" args
     mocatMap <- lookupFilePath "functional_map argument to count()" "functional_map" args
     gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
-    normSize <- lookupBoolOrScriptErrorDef (return False) "count function" "norm" args
     discardZeros <- lookupBoolOrScriptErrorDef (return False) "count argument parsing" "discard_zeros" args
     m <- (liftM annotationRule . annotationRuleFor) =<< lookupSymbolOrScriptErrorDef (return "union") "mode argument to count" "mode" args
     delim <- T.encodeUtf8 <$> lookupStringOrScriptErrorDef (return "\t") "count hidden argument (should always be valid)" "__delim" args
-
+    when ("norm" `elem` (fst <$> args) && "normalization" `elem` (fst <$> args)) $
+        outputListLno' WarningOutput ["In count() function: both `norm` and `normalization` used. `norm` is semi-deprecated and will be ignored in favor of `normalization`"]
+    normSize <- lookupBoolOrScriptErrorDef (return False) "count function" "norm" args
+    normalization <- lookupSymbolOrScriptErrorDef (return $! if normSize then "normed" else "raw") "count function" "normalization" args
+    normMode <- case normalization of
+            "raw" -> return NMRaw
+            "normed" -> return NMNormed
+            "scaled" -> return NMScaled
+            other -> throwShouldNotOccur ("Illegal symbol value for normalization: " ++ show other)
     fs <- case lookup "features" args of
         Nothing -> return ["gene"]
         Just (NGOSymbol f) -> return [f]
@@ -251,9 +258,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
                                 else fromInteger minCount
             , optMMMethod = method
             , optDelim = delim
-            , optNormMode = if normSize
-                                then NMNormed
-                                else NMRaw
+            , optNormMode = normMode
             , optIncludeMinus1 = include_minus1
             }
     amode <- annotationMode (optFeatures opts) refinfo (T.unpack <$> mocatMap) (T.unpack <$> gffFile)
@@ -395,7 +400,6 @@ performCount samfp gname annotators0 opts = do
     let mapthreads = max 1 (numCapabilities - 1)
         method = optMMMethod opts
         delim = optDelim opts
-        isNormed = optNormMode opts == NMNormed
 
     (samcontent, annotators) <-
         samBamConduit samfp
@@ -414,34 +418,8 @@ performCount samfp gname annotators0 opts = do
                                                                 annotated <- V.mapM (annotateReadGroup opts ann) samgroup
                                                                 return $ splitSingletons method annotated)
                 =$= sequenceSinks [CL.map (!! i) =$= performCount1Pass method mc | (i,mc) <- zip [0..] mcounts]
-    sizes <- if isNormed || method == MMDist1
-                then forM annotators $ \ann -> do
-                    let n_entries = annSize ann
-                    sizes <- liftIO $ VUM.new n_entries
-                    forM_ (annEnumerate ann) $ \(name,i) -> do
-                        s <- runNGLess $ annSizeOf ann name
-                        liftIO $ VUM.write sizes i s
-                    return sizes
-                else forM mcounts $ const (liftIO $ VUM.new 0)
 
-    raw_counts <- if method == MMDist1
-                    then forM mcounts (liftIO . VUM.clone)
-                    else return mcounts
-    when (isNormed || method == MMDist1) $
-        forM_ (zip mcounts sizes) (uncurry normalizeCounts)
-    counts <- forM mcounts (liftIO . VU.unsafeFreeze)
-
-    results <-
-        if method /= MMDist1
-            then return counts
-            else do
-                outputListLno' TraceOutput ["Counts (second pass)..."]
-                forM (zip4 counts raw_counts sizes toDistribute) $ \(c, r, s, t) -> do
-                    distributeMM t c r False
-                    when isNormed $
-                        normalizeCounts r s
-                    liftIO $ VU.unsafeFreeze r
-
+    results <- distributeScaleCounts (optNormMode opts) (optMMMethod opts) annotators mcounts toDistribute
     (newfp,hout) <- openNGLTempFile samfp "counts." "txt"
     liftIO $ do
         BL.hPut hout (BL.fromChunks [delim, T.encodeUtf8 gname, "\n"])
@@ -459,6 +437,53 @@ performCount samfp gname annotators0 opts = do
                     BB.hPutBuilder hout $ mconcat [BB.byteString h, tabB, BB.byteString (toShortest v), nlB]
         hClose hout
     return newfp
+
+
+distributeScaleCounts :: NMode -> MMMethod -> [Annotator] -> [VUM.IOVector Double] -> [[IG.IntGroups]] -> NGLessIO [VU.Vector Double]
+distributeScaleCounts NMRaw mmmethod _ counts _
+    | mmmethod /= MMDist1 = liftIO $ mapM VU.unsafeFreeze counts
+distributeScaleCounts norm mmmethod annotators mcountss toDistribute =
+    forM (zip3 annotators mcountss toDistribute) $ \(ann, mcounts, indices) -> do
+        let n_entries = annSize ann
+        sizes <- liftIO $ VUM.new n_entries
+        forM_ (annEnumerate ann) $ \(name,i) -> do
+            s <- runNGLess $ annSizeOf ann name
+            liftIO $ VUM.write sizes i s
+        redistribute mmmethod mcounts sizes indices
+        case norm of
+            NMNormed -> normalizeCounts mcounts sizes
+            NMScaled -> do
+                -- count vectors always include a -1 at this point (it is
+                -- ignored in output if the user does not request it, but
+                -- always computed). Thus, we compute the sum without it and do
+                -- not normalize it later:
+                let totalCounts v = withVector v (VU.sum . VU.tail)
+                initial <- totalCounts mcounts
+                normalizeCounts mcounts sizes
+                afternorm <- totalCounts mcounts
+                let factor = initial / afternorm
+                liftIO $ forM_ [1.. VUM.length mcounts - 1] (VUM.unsafeModify mcounts (* factor))
+            NMRaw -> return ()
+        liftIO $ VU.unsafeFreeze mcounts
+
+
+redistribute :: MMMethod -> VUM.IOVector Double -> VUM.IOVector Double -> [IG.IntGroups] -> NGLessIO ()
+redistribute MMDist1 ocounts sizes indices = do
+    outputListLno' TraceOutput ["Counts (second pass)..."]
+    fractCounts' <- liftIO $ VUM.clone ocounts
+    normalizeCounts fractCounts' sizes
+    fractCounts <- liftIO $ VU.unsafeFreeze fractCounts'
+    forM_ indices $ \vss -> IG.forM_ vss $ \vs -> do
+        let cs = map (VU.unsafeIndex fractCounts) vs
+            cs_sum = sum cs
+            n_cs = convert (length cs)
+            adjust :: Double -> Double
+            adjust = if cs_sum > 0.0
+                        then (/ cs_sum)
+                        else const  (1.0 / n_cs)
+        forM_ (zip vs cs) $ \(v,c) ->
+            liftIO $ unsafeIncrement' ocounts v (adjust c)
+redistribute _ _ _ _ = return ()
 
 incrementAll :: VUM.IOVector Double -> VU.Vector Int -> IO ()
 incrementAll counts vis = VU.forM_ vis $ \vi -> unsafeIncrement counts vi
@@ -482,20 +507,6 @@ normalizeCounts counts sizes = do
         s <- VUM.read sizes i
         when (s > 0) $
             VUM.unsafeModify counts (/ s) i
-
-distributeMM indices normed ncounts fractionResult = liftIO $ do
-    forM_ indices $ \vss -> IG.forM_ vss $ \vs -> do
-        let cs = map (VU.unsafeIndex normed) vs
-            cs_sum = sum cs
-            n_cs = convert (length cs)
-            adjust :: Double -> Double
-            adjust = if cs_sum > 0.0
-                        then (/ cs_sum)
-                        else const  (1.0 / n_cs)
-        forM_ (zip vs cs) $ \(v,c) ->
-            unsafeIncrement' ncounts v (adjust c)
-    when fractionResult $
-        toFractions ncounts
 
 data LoadFunctionalMapState = LoadFunctionalMapState
                                         !Int -- ^ next free index

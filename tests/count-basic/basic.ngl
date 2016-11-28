@@ -4,6 +4,9 @@ mapped = samfile('basic.sam')
 counted = count(mapped, features=['seqname'], multiple={all1})
 write(counted, ofile='output.all1.txt')
 
+counted = count(mapped, features=['seqname'], multiple={all1}, normalization={scaled})
+write(counted, ofile='output.all1.scaled.txt')
+
 counted = count(mapped, features=['seqname'], multiple={dist1})
 write(counted, ofile='output.dist1.txt')
 

@@ -13,10 +13,13 @@ module Utils.Vector
 
  , sortParallel
  , mergeSorted
+
+ , withVector
  ) where
 
 import Control.Monad
 import Control.Monad.Primitive
+import Control.Monad.IO.Class
 import qualified Control.Concurrent.Async as A
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
@@ -124,3 +127,8 @@ mergeSorted' vs = V.create $ do
         VUM.modify pos (+1) i
         VM.write r ri val
     return r
+
+withVector :: (MonadIO m, VUM.Unbox a) => VUM.IOVector a -> (VU.Vector a -> b) -> m b
+withVector v f = liftIO $ do
+    v' <- VU.unsafeFreeze v
+    return $! f v'
