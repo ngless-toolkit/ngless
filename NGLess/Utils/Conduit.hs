@@ -160,7 +160,6 @@ asyncGzipTo h = do
     let src :: C.Source IO [B.ByteString]
         src = CA.sourceTBMQueue q
     consumer <- liftIO $ A.async (src $$ CL.map (B.concat . reverse) =$= CZ.gzip =$= C.sinkHandle h)
-    liftIO $ A.link consumer
     bsConcatTo ((2 :: Int) ^ (15 :: Int)) =$= CA.sinkTBMQueue q True
     liftIO (A.wait consumer)
 
@@ -184,12 +183,13 @@ asyncGzipFrom h = do
                     (C.sourceHandle h =$= CZ.multiple CZ.ungzip $$ CA.sinkTBMQueue q False)
                     `finally`
                     atomically (TQ.closeTBMQueue q)
-            A.link producer
             return (q, producer)
     C.bracketP
         allocate
         (liftIO . A.cancel . snd)
-        (CA.sourceTBMQueue . fst)
+        $ \(q,pr) -> do
+            CA.sourceTBMQueue q
+            liftIO $ A.wait pr
 
 asyncGzipFromFile :: forall m. (MonadIO m, MonadResource m) => FilePath -> C.Source m B.ByteString
 asyncGzipFromFile fname = C.bracketP
