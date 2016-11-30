@@ -16,10 +16,8 @@ module Interpret
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Except
-import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
-import Control.Monad.Trans.Resource
 
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString as B
@@ -68,18 +66,11 @@ import Utils.Utils
 import Utils.Conduit
 
 
-{- Interpretation is done inside 3 and a half monads
+{- Interpretation is done inside two monads
  -  1. InterpretationEnvIO
  -      This is the NGLessIO monad with a variable environment on top
- -  2. InterpretationEnv
- -      This is the read-write variable environment
- -  3. InterpretationROEnv
- -      This is a read-only variable environment.
- -  3½. Either NGError
- -      Pure functions are in the 'Either NGError' monad
- - 
- - Monad (1) is a superset of (2) which is a superset of (3). runInEnv and
- - friends switch between the monads.
+ -  2. InterpretationROEnv
+ -      This is a read-only variable environment on top of NGLess
  -
  - For blocks, we have a special system where block-variables are read-write,
  - but others are read-only.
@@ -95,14 +86,21 @@ data NGLInterpretEnv = NGLInterpretEnv
     , ieVariableEnv :: Map.Map T.Text NGLessObject
     }
 
-type InterpretationEnvT m =
-                (StateT NGLInterpretEnv m)
 -- Monad 1: IO + read-write environment
-type InterpretationEnvIO = InterpretationEnvT NGLessIO
--- Monad 2: read-write environment
-type InterpretationEnv = InterpretationEnvT (ExceptT NGError Identity)
--- Monad 3: read-only environment
-type InterpretationROEnv = ExceptT NGError (Reader NGLInterpretEnv)
+type InterpretationEnvIO = StateT  NGLInterpretEnv NGLessIO
+-- Monad 2: pure read-only environment
+type InterpretationROEnv = ReaderT NGLInterpretEnv NGLess
+
+runInterpretationRO :: NGLInterpretEnv -> InterpretationROEnv a -> NGLess a
+runInterpretationRO env act = runReaderT act env
+
+runNGLessIO :: NGLessIO a -> InterpretationEnvIO a
+runNGLessIO = lift
+
+runInROEnvIO :: InterpretationROEnv a -> InterpretationEnvIO a
+runInROEnvIO act = do
+    env <- get
+    runNGLess $ runReaderT act env
 
 {- The result of a block is a status indicating why the block finished
  - and the value of all block variables.
@@ -123,7 +121,7 @@ setlno :: Int -> InterpretationEnvIO ()
 setlno !n = liftIO $ setOutputLno (Just n)
 
 lookupVariable :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
-lookupVariable !k = (liftM2 (<|>))
+lookupVariable !k = liftM2 (<|>)
     (lookupConstant k)
     (Map.lookup k . ieVariableEnv <$> ask)
 
@@ -134,7 +132,6 @@ lookupConstant !k = do
         [] -> return Nothing
         [(_,v)] -> return (Just v)
         _ -> throwShouldNotOccur ("Multiple hits found for constant " ++ T.unpack k)
-
 
 
 setVariableValue :: T.Text -> NGLessObject -> InterpretationEnvIO ()
@@ -155,39 +152,6 @@ findFunction fname@(FuncName fname') = do
     where
         hasF m = fname `elem` (funcName `fmap` modFunctions m)
 
-runInterpretationRO :: NGLInterpretEnv -> InterpretationROEnv a -> Either NGError a
-runInterpretationRO env act = runReader (runExceptT act) env
-
-runInEnv :: InterpretationEnv a -> InterpretationEnvIO a
-runInEnv act = do
-    env <- gets id
-    let Identity r = runExceptT (runStateT act env)
-    case r of
-        Left e -> throwError e
-        Right (v, env') -> do
-            put env'
-            return v
-
-runInROEnv :: InterpretationROEnv a -> InterpretationEnv a
-runInROEnv action = do
-    env <- gets id
-    case runInterpretationRO env action of
-        Left e -> throwError e
-        Right v -> return v
-
-runInROEnvIO :: InterpretationROEnv a -> InterpretationEnvIO a
-runInROEnvIO = runInEnv . runInROEnv
-
-runEitherInROEnv :: Either NGError a -> InterpretationROEnv a
-runEitherInROEnv (Right v) = return v
-runEitherInROEnv (Left err) = throwError err
-
-runNGLessIO :: NGLessIO a -> InterpretationEnvIO a
-runNGLessIO act = do
-    r <- liftResourceT (runExceptT act)
-    case r of
-        Right val -> return val
-        Left err -> throwError err
 
 -- | By necessity, this code has several unreachable corners
 
@@ -239,15 +203,15 @@ interpretExpr (ConstInt n) = return (NGOInteger n)
 interpretExpr (ConstDouble n) = return (NGODouble n)
 interpretExpr (UnaryOp op v) = do
     v' <- interpretExpr v
-    runEitherInROEnv (_evalUnary op v')
+    runNGLess (_evalUnary op v')
 interpretExpr (BinaryOp bop v1 v2) = do
     v1' <- interpretExpr v1
     v2' <- interpretExpr v2
-    runEitherInROEnv (_evalBinary bop v1' v2')
+    runNGLess (_evalBinary bop v1' v2')
 interpretExpr (IndexExpression expr ie) = do
     expr' <- interpretExpr expr
     ie' <- interpretIndex ie
-    runEitherInROEnv (_evalIndex expr' ie')
+    runNGLess (_evalIndex expr' ie')
 interpretExpr (ListExpression e) = NGOList <$> mapM interpretExpr e
 interpretExpr (MethodCall met self arg args) = do
     self' <- interpretExpr self
