@@ -160,6 +160,7 @@ asyncGzipTo h = do
     let src :: C.Source IO [B.ByteString]
         src = CA.sourceTBMQueue q
     consumer <- liftIO $ A.async (src $$ CL.map (B.concat . reverse) =$= CZ.gzip =$= C.sinkHandle h)
+    liftIO $ A.link consumer -- if there is an error in writing, then the queue would never be read from and we could deadlock
     bsConcatTo ((2 :: Int) ^ (15 :: Int)) =$= CA.sinkTBMQueue q True
     liftIO (A.wait consumer)
 
