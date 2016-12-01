@@ -64,7 +64,7 @@ countArgs =
     ,ArgInformation "norm" False NGLBool []
     ,ArgInformation "discard_zeros" False NGLBool []
     ,ArgInformation "include_minus1" False NGLBool []
-    ,ArgInformation "normalization" False NGLSymbol [ArgCheckSymbol ["raw", "norm", "scaled"]]
+    ,ArgInformation "normalization" False NGLSymbol [ArgCheckSymbol ["raw", "normed", "scaled"]]
     ]
 
 selectArgs =
