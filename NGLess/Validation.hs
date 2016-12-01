@@ -137,7 +137,6 @@ validate_variables mods (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e
 validate_symbol_in_args :: [Module] -> Script -> Maybe T.Text
 validate_symbol_in_args mods = checkRecursiveScript validate_symbol_in_args'
     where
-        validate_symbol_in_args' (Assignment  _ fc) = validate_symbol_in_args' fc
         validate_symbol_in_args' (FunctionCall f _ args _) = checkFunction f args
         validate_symbol_in_args' (MethodCall m _ arg0 args) = checkMethod m arg0 args
         validate_symbol_in_args' _ = Nothing
@@ -154,7 +153,8 @@ validate_symbol_in_args mods = checkRecursiveScript validate_symbol_in_args'
                                     Nothing ->
                                         ["Argument: `", v, "` (for function ", T.pack (show f), ") expects one of ", showA legal, " but got {", s, "}"]
                                     Just (Suggestion valid reason) ->
-                                        ["Argument `", v, "` for function ", T.pack (show f), ", got {", s, "}.\n\tDid you mean {", valid, "} (", reason, ")\n\nAllowed arguments are: [", showA legal, "]"]
+                                        ["Argument `", v, "` for function ", T.pack (show f), ", got {", s, "}.\n\tDid you mean {", valid, "} (", reason, ")\n\n",
+                                        "Legal arguments are: [", showA legal, "]\n"]
                         ListExpression es   -> errors_from_list $ map (\e -> check1 finfo (Variable v, e)) es
                         _                   -> Nothing
 

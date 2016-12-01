@@ -14,7 +14,6 @@ import Tests.Utils
 import Validation
 import ValidationIO
 import Utils.Here
-import NGLess
 
 tgroup_Validation = $(testGroupGenerator)
 

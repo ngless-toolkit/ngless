@@ -24,6 +24,7 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import           Data.Conduit ((=$=), ($$))
+import           Control.Monad.State.Strict
 
 
 import Data.Convertible
@@ -249,6 +250,21 @@ case_unique_2 = make_unique_test 2
 case_unique_3 = make_unique_test 3
 case_unique_4 = make_unique_test 4
 case_unique_5 = make_unique_test 5
+
+
+case_recursiveAnalyze = execState (recursiveAnalyse countFcalls expr) 0 @?= (1 :: Int)
+    where
+        countFcalls (FunctionCall  _ _ _ _) = modify' (+1)
+        countFcalls _ = return ()
+
+        expr = Assignment
+                    (Variable "varname")
+                    (FunctionCall (FuncName "count")
+                        (Lookup Nothing (Variable "mapped"))
+                        [(Variable "features", ListExpression [ConstStr "seqname"])
+                            ,(Variable "multiple", ConstSymbol "all1")]
+                        Nothing)
+
 
 case_test_setup_html_view = do
     setupHtmlViewer "testing_tmp_dir_html"
