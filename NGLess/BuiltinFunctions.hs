@@ -119,6 +119,7 @@ endstrimArgs =
 builtinMethods =
     [MethodInfo (MethodName "flag")   NGLMappedRead (Just NGLSymbol) NGLBool flagArgs True
     ,MethodInfo (MethodName "filter") NGLMappedRead Nothing NGLMappedRead filterArgs True
+    ,MethodInfo (MethodName "pe_filter") NGLMappedRead Nothing NGLMappedRead [] True
     ,MethodInfo (MethodName "some_match") NGLMappedRead (Just NGLString) NGLBool [] True
     ,MethodInfo (MethodName "unique") NGLMappedRead Nothing NGLMappedRead [] True
     ,MethodInfo (MethodName "avg_quality") NGLRead Nothing NGLDouble [] True
