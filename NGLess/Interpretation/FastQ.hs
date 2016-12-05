@@ -89,6 +89,8 @@ executeGroup (NGOList rs) args = do
 executeGroup other _ = throwScriptError ("Illegal argument to group(): " ++ show other)
 
 groupFiles :: T.Text -> [ReadSet] -> NGLessIO ReadSet
+groupFiles name [] = do
+    throwDataError ("Attempted to group sample '" ++ T.unpack name ++ "' but sample is empty (no read files).")
 groupFiles name rs = do
     let encs = map rsEncoding rs
     unless (allSame encs) $
