@@ -40,6 +40,8 @@ import           Data.Strict.Tuple (Pair(..))
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector as V
 import           Data.Int
+import           Safe (atMay)
+import           Control.Error (note)
 
 import System.IO
 import System.Directory
@@ -54,6 +56,7 @@ import Modules
 import NGLess
 import Data.Sam
 import Data.FastQ
+import NGLess.NGError
 
 import Interpretation.Map
 import Interpretation.Count
@@ -567,7 +570,8 @@ _evalUnary UOpNot (NGOBool v) = return $ NGOBool (not v)
 _evalUnary op v = nglTypeError ("invalid unary operation ("++show op++") on value " ++ show v)
 
 _evalIndex :: NGLessObject -> [Maybe NGLessObject] -> Either NGError NGLessObject
-_evalIndex (NGOList elems) [Just (NGOInteger ix)] = return (elems !! fromInteger ix)
+_evalIndex (NGOList elems) [Just (NGOInteger ix)] = note (NGError ScriptError errmsg) $ atMay elems (fromInteger ix)
+    where errmsg = "Accessing element "++show ix ++ " in list of size "++show (length elems) ++ "."
 _evalIndex sr index@[Just (NGOInteger a)] = _evalIndex sr $ (Just $ NGOInteger (a + 1)) : index
 _evalIndex (NGOShortRead sr) [Just (NGOInteger s), Nothing] = let s' = fromInteger s in
     return . NGOShortRead $ srSlice s' (srLength sr - s') sr
