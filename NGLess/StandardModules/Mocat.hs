@@ -41,11 +41,11 @@ replaceEnd end newEnd str
 
 mocatSamplePaired :: [FilePath] -> T.Text -> Bool -> NGLessIO [Expression]
 mocatSamplePaired matched encoding doQC = do
-    let matched1 = filter (\f -> endswith ".1.fq.gz" f || endswith "1.fq.bz2" f) matched
+    let matched1 = filter (\f -> endswith ".1.fq" f || endswith ".1.fq.gz" f || endswith ".1.fq.bz2" f) matched
         encodeStr = ConstStr . T.pack
     forM matched1 $ \m1 -> do
-        let Just m2 = replaceEnd "1.fq.gz" "2.fq.gz" m1 <|> replaceEnd "1.fq.bz2" "2.fq.bz2" m1
-            singles = fromMaybe "" (replaceEnd "pair.1.fq.gz" "single.fq.gz" m1 <|> replaceEnd "pair.1.fq.bz2" "single.fq.bz2" m1)
+        let Just m2 = replaceEnd "1.fq" "2.fq" m1 <|> replaceEnd "1.fq.gz" "2.fq.gz" m1 <|> replaceEnd "1.fq.bz2" "2.fq.bz2" m1
+            singles = fromMaybe "" (replaceEnd "pair.1.fq" "single.fq" m1 <|> replaceEnd "pair.1.fq.gz" "single.fq.gz" m1 <|> replaceEnd "pair.1.fq.bz2" "single.fq.bz2" m1)
         unless (m2 `elem` matched) $
             throwDataError ("Cannot find match for file: " ++ m1)
         let passthru = [(Variable "__perform_qc", ConstBool doQC), (Variable "encoding", ConstSymbol encoding)]
@@ -62,11 +62,10 @@ executeLoad (NGOString samplename) kwargs = NGOExpression <$> do
     encoding <- lookupSymbolOrScriptErrorDef (return "auto") "encoding passthru argument" "encoding" kwargs
     outputListLno' TraceOutput ["Executing mocat_load_sample transform"]
     let basedir = T.unpack samplename
-    umatched <- liftIO $ liftM2 (++)
-                (namesMatching (basedir </> "*.fq.gz"))
-                (namesMatching (basedir </> "*.fq.bz2"))
+    umatched <- fmap concat $ forM ["*.fq", "*.fq.gz", "*.fq.bz2"] $ \pat ->
+        liftIO $ namesMatching (basedir </> pat)
     let matched = sort umatched
-        matched1 = filter (\f -> endswith ".1.fq.gz" f || endswith "1.fq.bz2" f) matched
+        matched1 = filter (\f -> endswith ".1.fq" f || endswith ".1.fq.gz" f || endswith ".1.fq.bz2" f) matched
     args <- ListExpression <$> if null matched1
             then return [FunctionCall (FuncName "fastq") (ConstStr . T.pack $ f) [] Nothing | f <- matched]
             else mocatSamplePaired matched encoding qcNeeded
