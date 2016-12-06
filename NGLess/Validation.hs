@@ -14,8 +14,8 @@ import           Control.Monad.Extra (whenJust)
 import           Control.Monad.Writer.Strict
 import           Control.Monad.RWS
 import           Data.String.Utils (endswith)
-import Data.Maybe
-import Data.List
+import           Data.List (find)
+import           Data.Maybe
 
 import Language
 import Modules
@@ -31,8 +31,7 @@ validate mods expr = case errors of
     where
         errors = mapMaybe (\f -> f mods expr) checks
         checks =
-            [validate_symbol_lists
-            ,validate_version
+            [validateVersion
             ,validate_pure_function
             ,validate_variables
             ,validateFunctionReqArgs -- check for the existence of required arguments in functions.
@@ -52,33 +51,11 @@ validate mods expr = case errors of
  - error messages or passes the script unharmed on the Right side.
  -}
 
--- symbols that can be used directly
-symbols :: [T.Text]
-symbols = ["union", "intersection_strict", "intersection_non_empty", "allow", "deny", "yes", "no", "csv", "tsv", "bam", "sam"]
 
--- symbols that can be used inside a list.
-symbols_list :: [T.Text]
-symbols_list = ["gene", "cds", "exon"]
-
-
-validate_version :: [Module] -> Script -> Maybe T.Text
-validate_version _ sc = nglVersion  <$> nglHeader sc >>= \case
+validateVersion :: [Module] -> Script -> Maybe T.Text
+validateVersion _ sc = nglVersion  <$> nglHeader sc >>= \case
     "0.0" -> Nothing
     version -> Just (T.concat ["Version ", version, " is not supported (only version 0.0 is available)."])
-
-validate_symbol_lists :: [Module] -> Script -> Maybe T.Text
-validate_symbol_lists _ (Script _ es) = check_toplevel validate_symbol_lists' es
-    where
-        validate_symbol_lists' (Assignment _ e@(ConstSymbol _)) = check1 symbols e
-        validate_symbol_lists' (Assignment _ (ListExpression e@[ConstSymbol _])) = errors_from_list $ map (check1 symbols_list) e
-        validate_symbol_lists' _ = Nothing
-
-        check1 :: [T.Text] -> Expression -> Maybe T.Text
-        check1 s (ConstSymbol k)
-            | elem k s = Nothing
-            | otherwise = Just (T.concat ["Used symbol `", k, "` but possible symbols are: ", T.pack . show $ s])
-        check1 _ _ = Nothing
-
 
 -- | check whether results of calling pure functions are use
 validate_pure_function _ (Script _ es) = check_toplevel validate_pure_function' es

@@ -1,6 +1,8 @@
 ngless '0.0'
 
+MAPPED = {mapped}
+
 input = samfile('input.bam')
-input = select(input, keep_if=[{mapped}])
+input = select(input, keep_if=[MAPPED])
 write(input, ofile='output.sam')
 write(input, ofile='output.reused.sam')
