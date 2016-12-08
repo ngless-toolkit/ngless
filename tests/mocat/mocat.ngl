@@ -11,3 +11,12 @@ preprocess(input) using |read|:
 write(input, ofile='output.fq')
 
 
+input = load_mocat_sample('mocat_sample_no_gz')
+
+trim = 3
+preprocess(input) using |read|:
+   read = read[trim:]
+   if len(read) < 10:
+       discard
+write(input, ofile='output.uncompressed.fq')
+
