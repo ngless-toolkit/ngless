@@ -84,9 +84,10 @@ executeSort (NGOMappedReadSet name istream rinfo) args = do
             return (NGOMappedReadSet name (File newfp) rinfo)
         ExitFailure code -> do
             release rk
-            throwSystemError $ concat ["Failed samtools sort\nCommand line was::\n\t",
-                            samtoolsPath, " with args: ", unwords cmdargs,
-                            "\nexit code was ", show code, "."]
+            throwSystemError $ concat ["Failed samtools sort\n",
+                            "Executable used::\t", samtoolsPath,"\n",
+                            "Command line was::\n\t", unwords cmdargs, "\n",
+                            "Samtools exit code was ", show code, "."]
 executeSort _ _ = throwScriptError "Unexpected arguments for samtools_sort function"
 
 sortOFormat :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]

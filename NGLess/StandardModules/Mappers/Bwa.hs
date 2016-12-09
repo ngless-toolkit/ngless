@@ -70,7 +70,8 @@ callMapper refIndex fps extraArgs outC = do
             outputListLno' InfoOutput ["Done mapping to ", refIndex]
             return out
         ExitFailure code ->
-            throwSystemError $ concat ["Failed mapping\nCommand line was::\n\t",
-                            bwaPath, unwords cmdargs, "'\n",
+            throwSystemError $ concat ["Failed mapping\n",
+                            "Executable used::\t", bwaPath,"\n",
+                            "Command line was::\n\t", unwords cmdargs, "\n",
                             "Bwa error code was ", show code, "."]
 
