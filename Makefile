@@ -73,7 +73,7 @@ ngless: NGLess.cabal modules
 modules:
 	cd Modules && $(MAKE)
 
-static: $(PREBUILD)
+static: $(PREBUILD) modules
 	stack build --ghc-options='-optl-static -optl-pthread' --force-dirty --flag NGLess:embed
 
 fast: $(PREBUILD)
