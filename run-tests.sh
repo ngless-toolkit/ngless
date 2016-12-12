@@ -2,6 +2,13 @@
 
 shopt -s nullglob
 
+# This script is located on the root of the repository
+# where samtools and bwa are also compiled
+REPO="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+export NGLESS_SAMTOOLS_BIN=$REPO/samtools-1.3.1/samtools
+export NGLESS_BWA_BIN=$REPO/bwa-0.7.15/bwa
+
 ok="yes"
 
 make
