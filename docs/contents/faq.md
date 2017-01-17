@@ -2,6 +2,40 @@
 
 This is a list of questions we have regularly gotten on the project:
 
+## Why a new domain-specific language instead of a library in Python (or another existing language)?
+
+There are several advantages:
+
+1. Fast error checking which can speed up the development process. For example,
+   static type checking, which is known to many programmer. In general, we do a
+   lot of error checking before even starting interpretation. We perform syntax
+   and error checking, but we can also check some conditions that can be tricky
+   to express with simple types only (e.g., certain parameter combinations can
+   be illegal). We also pre-check all the input files (so even if you only use
+   a particular file in step 5 of your process, we check if it exists even
+   before running steps 1 through 4). We even do some things like: if you use
+   step 1 to compute to name of the input file that will be used in step 5, we
+   will check it immediately after step 1. Same for output files. If you issue
+   a `write()` call using `output/results.txt` as your output filename, we will
+   check if a directory named output exists and is writable. We also try to be
+   helpful in the error messages (mispelled a parameter value? Here's an error,
+   but also my best guess of what you meant + all legal values). I really care
+   about error messages.
+
+2. Another important advantage is that Haskell has a compiled implementation
+   and performance matters. I use Python all the time and like the ecosystem a
+   lot, but for some of the things that ngless does, it'd just be too slow (and
+   if using PyPy, I'd miss out on numpy, so that's not very feasible either).
+
+3. By controlling the environment more than would be typical with a Python
+   library (or any other language), we can also get some reproducibility
+   guarantees. Note too that we declare the version of every script so that we
+   can update the interpreter in the future without silently changing the
+   behaviour of older ones.
+
+4. Using a domain specific language makes the resulting scripts very readable
+   even for non-experts as there is little boilerplate.
+
 ## Is the language extensible?
 
 Yes.
@@ -14,6 +48,7 @@ Add new model organisms can similarly be done with simple YAML file.
 
 More advanced extensions can be done in Haskell, but this is considered a
 solution for advanced users.
+
 
 ## Couldn't you just use Docker/[Bioboxes](http://bioboxes.org/)?
 
