@@ -19,7 +19,7 @@ addons:
   apt:
     packages:
       - samtools
-      - libgmp
+      - libgmp10
       - libgmp-dev
 
 script:
