@@ -12,6 +12,7 @@ module StandardModules.Mappers.Bwa
 import System.Process
 import System.Exit
 import System.Directory
+import System.Posix.Types (FileOffset)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.Char8 as BL8
@@ -24,6 +25,7 @@ import           GHC.Conc (getNumCapabilities)
 import Output
 import Configuration
 import NGLess
+import FileManagement (getFileSize)
 
 -- | Checks whether all necessary files are present for a BWA index
 -- Does not change any file on disk.
@@ -38,13 +40,38 @@ hasValidIndex basepath = doAllFilesExist indexRequiredFormats
                 else return False
         indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
 
+-- BWA's default indexing parameters are quite conservative. This leads to
+-- a small memory footprint at the cost of more CPU hours.
+-- With large databases (~100GB) default settings require over 2 weeks of
+-- CPU time. Increasing the default blocksize will increase the memory
+-- footprint but will reduce indexing time 3 to 6 fold.
+--
+-- This patch increases the blocksize to roughly 1/10th of the filesize.
+-- The memory footprint should be about the size of the database.
+--
+-- As per https://github.com/lh3/bwa/issues/104 this patch may become
+-- obsolete once this functionality is built into bwa.
+--
+-- | Checks whether we should customize bwa's indexing blocksize
+customBlockSize :: FilePath -> IO [String]
+customBlockSize path = sizeAsParam <$> getFileSize path
+
+sizeAsParam :: FileOffset -> [String]
+sizeAsParam size =
+    if size > minimalsize
+       then ["-b", show $ div size factor]
+       else []
+    where minimalsize = 100*1000*1000 -- 100MB - if smaller, use software's default
+          factor = 10
+
 -- | Creates bwa index on disk
 createIndex :: FilePath -> NGLessIO ()
 createIndex fafile = do
     outputListLno' InfoOutput ["Start BWA index creation for ", fafile]
+    blocksize <- liftIO $ customBlockSize fafile
     bwaPath <- bwaBin
     (exitCode, out, err) <- liftIO $
-        readProcessWithExitCode bwaPath ["index", fafile] []
+        readProcessWithExitCode bwaPath (["index"] ++ blocksize ++ [fafile]) []
     outputListLno' DebugOutput ["BWA-index stderr: ", err]
     outputListLno' DebugOutput ["BWA-index stdout: ", out]
     case exitCode of

@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module FileManagement
     ( createTempDir
+    , getFileSize
     , openNGLTempFile
     , openNGLTempFile'
     , removeFileIfExists
@@ -16,6 +17,7 @@ import qualified Data.ByteString as BS
 import System.FilePath
 import Control.Monad
 import System.Posix.Internals (c_getpid)
+import System.Posix (getFileStatus, fileSize, FileOffset)
 
 import Data.FileEmbed (embedDir)
 import Output
@@ -119,3 +121,6 @@ copyDir src dst = do
     if exists
         then copyDir  (src </> n) (dst </> n)
         else copyFile (src </> n) (dst </> n)
+
+getFileSize :: FilePath -> IO FileOffset
+getFileSize path = fileSize <$> getFileStatus path
