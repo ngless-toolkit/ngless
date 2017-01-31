@@ -36,7 +36,7 @@ downloadOrCopyFile src dest
 downloadFile :: String -> FilePath -> NGLessIO ()
 downloadFile url destPath = do
     outputListLno' TraceOutput ["Downloading ", url]
-    req <- HTTP.parseUrl url
+    req <- HTTP.parseRequest url
     manager <- liftIO $ HTTP.newManager HTTP.defaultManagerSettings
     let req' = req { HTTP.decompress = const False }
     res <- HTTP.http req' manager
