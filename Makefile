@@ -65,19 +65,19 @@ NGLess.cabal: NGLess.cabal.m4
 	m4 $< > $@
 
 ngless-embed: $(PREBUILD) modules
-	stack build --flag NGLess:embed
+	stack build $(STACKOPTS) --flag NGLess:embed
 
 ngless: NGLess.cabal modules
-	stack build
+	stack build $(STACKOPTS)
 
 modules:
 	cd Modules && $(MAKE)
 
 static: $(PREBUILD) modules
-	stack build --ghc-options='-optl-static -optl-pthread' --force-dirty --flag NGLess:embed
+	stack build $(STACKOPTS) --ghc-options='-optl-static -optl-pthread' --force-dirty --flag NGLess:embed
 
 fast: $(PREBUILD)
-	stack build  --ghc-options=-O0
+	stack build $(STACKOPTS) --ghc-options=-O0
 
 
 dist: ngless-${VERSION}.tar.gz
@@ -89,16 +89,16 @@ test_samples/htseq-res/htseq_cds_noStrand_union.txt:
 	cd test_samples/htseq-res && ./generateHtseqFiles.sh
 
 check: $(PREBUILD)
-	stack test
+	stack test $(STACKOPTS)
 fastcheck: $(PREBUILD)
-	stack test --ghc-options=-O0
+	stack test $(STACKOPTS) --ghc-options=-O0
 tests: check
 
 bench: $(PREBUILD)
-	stack bench
+	stack bench $(STACKOPTS)
 
 profile:
-	stack build --executable-profiling --library-profiling --ghc-options="-fprof-auto -rtsopts"
+	stack build $(STACKOPTS) --executable-profiling --library-profiling --ghc-options="-fprof-auto -rtsopts"
 
 install:
 	mkdir -p $(exec)
@@ -112,7 +112,7 @@ nglessconf: $(SAM_DIR) $(BWA_DIR) $(reqhtmllibs) $(reqfonts)
 
 clean:
 	rm -f $(NGLESS_BUILD_BINARIES)
-	stack clean
+	stack clean $(STACKOPTS)
 
 distclean: clean
 	rm -rf $(HTML_FONTS_DIR) $(HTML_LIBS_DIR)
