@@ -56,6 +56,8 @@ if ! test -x $ngless_bin ; then
     exit 1
 fi
 
+echo "Running with: $($ngless_bin --version-debug)"
+
 basedir=$REPO
 for testdir in tests/*; do
     if test -d $testdir; then
