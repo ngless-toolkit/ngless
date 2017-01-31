@@ -11,6 +11,7 @@ function remove_ngless_bin {
 # This script is located on the root of the repository
 # where samtools and bwa are also compiled
 REPO="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+echo ">>> Using repository at $REPO <<<"
 
 if [[ "$0" == *-embedded.sh ]]; then
     echo ">>> Testing NGLess ( with embedded binaries ) <<<"
@@ -24,6 +25,8 @@ else
     echo ">>> Testing NGLess ( regular build ) <<<"
     export NGLESS_SAMTOOLS_BIN=$REPO/samtools-1.3.1/samtools
     export NGLESS_BWA_BIN=$REPO/bwa-0.7.15/bwa
+    echo ">> Will use samtools from '$NGLESS_SAMTOOLS_BIN' <<"
+    echo ">> Will use bwa from '$NGLESS_BWA_BIN' <<"
     MAKETARGET=""
 fi
 
@@ -48,6 +51,15 @@ if [ "$MAKETARGET" != "" ]; then
         echo "ERROR IN 'make $MAKETARGET'"
         ok=no
     fi
+else
+    if ! test -x $NGLESS_SAMTOOLS_BIN ; then
+        echo "ERROR: samtools not found at '$NGLESS_SAMTOOLS_BIN'"
+        exit 1
+    fi
+    if ! test -x $NGLESS_BWA_BIN ; then
+        echo "ERROR: bwa not found at '$NGLESS_BWA_BIN'"
+        exit 1
+    fi
 fi
 
 ngless_bin=$(stack path --local-install-root)/bin/ngless
@@ -56,7 +68,7 @@ if ! test -x $ngless_bin ; then
     exit 1
 fi
 
-echo "Running with: $($ngless_bin --version-debug)"
+echo ">>> Running with: $($ngless_bin --version-debug) <<<"
 
 basedir=$REPO
 for testdir in tests/*; do
