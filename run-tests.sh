@@ -112,6 +112,13 @@ for testdir in tests/*; do
                 ok=no
             fi
         fi
+
+        if test $ok = "no"; then
+            echo "ERROR: Output from from ngless was:"
+            cat output.stdout.txt
+            cat output.stderr.txt
+        fi
+
         if test -x ./cleanup.sh; then
             ./cleanup.sh
         fi
