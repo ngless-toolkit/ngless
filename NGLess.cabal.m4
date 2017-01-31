@@ -91,6 +91,7 @@ define(`BASE_CONFIG',
       unix
   if !flag(Embed)
     CC-Options: -DNO_EMBED_SAMTOOLS_BWA
+    cpp-options: -DNO_EMBED_SAMTOOLS_BWA
 ')
 
 executable ngless
