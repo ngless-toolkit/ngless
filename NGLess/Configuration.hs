@@ -13,6 +13,7 @@ module Configuration
     , bwaBin
     , versionStr
     , compilationDateStr
+    , embeddedStr
     , dateStr
     , setQuiet
     ) where
@@ -50,6 +51,13 @@ dateStr = "not released"
 
 compilationDateStr :: String
 compilationDateStr = __DATE__
+
+embeddedStr :: String
+#ifdef NO_EMBED_SAMTOOLS_BWA
+embeddedStr = "No"
+#else
+embeddedStr = "Yes"
+#endif
 
 defaultBaseURL :: FilePath
 defaultBaseURL = "http://vm-lux.embl.de/~coelho/ngless-data/"

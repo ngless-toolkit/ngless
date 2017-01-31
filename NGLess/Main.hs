@@ -229,14 +229,14 @@ modeExec (DownloadFileMode url local) = runNGLessIO "download a file" $
 
 main = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
-        foottext = concat ["ngless v", versionStr, "(C) NGLess Authors 2013-2016"]
+        foottext = concat ["ngless v", versionStr, "(C) NGLess Authors 2013-2017"]
         versioner =
             (infoOption ("ngless v" ++ versionStr ++ " (release date: " ++  dateStr ++ ")")
                 (long "version" <> short 'V' <> help "print version and exit"))
             <*>
             (infoOption versionStr (long "version-short" <> help "print just version string (useful for scripting)"))
             <*>
-            (infoOption ("ngless v" ++ versionStr ++ " (release date: " ++  dateStr ++ "; compilation date: " ++ compilationDateStr ++ ")")
+            (infoOption ("ngless v" ++ versionStr ++ " (release date: " ++  dateStr ++ "; compilation date: " ++ compilationDateStr ++ "; embedded binaries: " ++ embeddedStr ++ ")")
                 (long "version-debug" <> help "print detailed version information"))
             <*>
             (infoOption dateStr (long "date-short" <> help "print just release date string (useful for scripting)"))
