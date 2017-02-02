@@ -1,8 +1,8 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeFamilies, FlexibleContexts #-}
 module NGLess.NGError
     ( NGError(..)
     , NGErrorType(..)
-    , NGLessIO
+    , NGLessIO(..)
     , NGLess
     , runNGLess
     , testNGLessIO
@@ -16,6 +16,8 @@ module NGLess.NGError
 import           Control.DeepSeq
 import           Control.Monad.Except
 import           Control.Monad.Trans.Resource
+import           Control.Monad.Trans.Control
+import           Control.Monad.Base
 
 -- | An error in evaluating an ngless script
 -- Normally, it's easier to use the function interface of 'throwShouldNotOccur' and friends
@@ -37,8 +39,20 @@ data NGError = NGError !NGErrorType !String
 instance NFData NGError where
     rnf !_ = ()
 
-type NGLessIO = ExceptT NGError (ResourceT IO)
 type NGLess = Either NGError
+
+newtype NGLessIO a = NGLessIO { unwrapNGLessIO :: ExceptT NGError (ResourceT IO) a }
+                        deriving (Functor, Applicative, Monad, MonadIO,
+                        MonadError NGError, MonadResource, MonadThrow,
+                        MonadBase IO)
+
+
+newtype NGLessIOStM a = NGLessIOStM { unwrapNGLessIOStM :: StM (ExceptT NGError (ResourceT IO)) a }
+
+instance MonadBaseControl IO NGLessIO where
+    type StM NGLessIO a = NGLessIOStM a
+    liftBaseWith f =  NGLessIO $ liftBaseWith (\q -> f (fmap NGLessIOStM . q . unwrapNGLessIO))
+    restoreM = NGLessIO . restoreM . unwrapNGLessIOStM
 
 
 runNGLess :: (MonadError NGError m) => Either NGError a -> m a
@@ -46,7 +60,7 @@ runNGLess (Left err) = throwError err
 runNGLess (Right v) = return v
 
 testNGLessIO :: NGLessIO a -> IO a
-testNGLessIO act = do
+testNGLessIO (NGLessIO act) = do
         perr <- (runResourceT . runExceptT) act
         return (showError perr)
     where

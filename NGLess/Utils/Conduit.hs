@@ -137,7 +137,7 @@ awaitJust f = C.await >>= \case
 --
 -- the chunkSize parameter is a hint, not an exact element. In particular,
 -- larger chunks are not split up and smaller chunks can be yielded too.
-bsConcatTo :: (Monad m, MonadIO m) => Int -- ^ chunk hint
+bsConcatTo :: (MonadIO m) => Int -- ^ chunk hint
                             -> C.Conduit B.ByteString m [B.ByteString]
 bsConcatTo chunkSize = awaitJust start
     where

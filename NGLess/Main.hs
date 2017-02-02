@@ -81,7 +81,7 @@ whenStrictlyNormal act = do
     when (v == Normal) act
 
 runNGLessIO :: String -> NGLessIO a -> IO a
-runNGLessIO context act = runResourceT (runExceptT act) >>= \case
+runNGLessIO context (NGLessIO act) = runResourceT (runExceptT act) >>= \case
         Left (NGError NoErrorExit _) -> exitSuccess
         Left (NGError etype emsg) -> do
             hPutStrLn stderr ("Exiting after fatal error while " ++ context)
