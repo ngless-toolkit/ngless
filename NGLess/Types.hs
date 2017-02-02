@@ -181,8 +181,8 @@ checkuop UOpNot e = checkBool e
 checkbop :: BOp -> Expression -> Expression -> TypeMSt (Maybe NGLType)
 checkbop BOpAdd a b = do
     t <- liftM2 (<|>)
-        (softCheckInteger a *> softCheckInteger b)
-        (softCheckString  a *> softCheckString b)
+        (softCheckPair NGLInteger a b)
+        (softCheckPair NGLString a b)
     when (isNothing t) $
         errorInLineC ["Addition operator (+) must be applied to a pair of strings or integers"]
     return t
@@ -203,8 +203,12 @@ softCheck expected expr = do
         then Nothing
         else t
 
-softCheckInteger = softCheck NGLInteger
-softCheckString  = softCheck NGLString
+softCheckPair t a b = do
+    ta <- softCheck t a
+    tb <- softCheck t b
+    return $! if ta == tb && tb == Just t
+        then ta
+        else Nothing
 
 checkBool (ConstBool _) = return (Just NGLBool)
 checkBool expr = do

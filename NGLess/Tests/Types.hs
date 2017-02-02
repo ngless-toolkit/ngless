@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, OverloadedStrings, TupleSections #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Tests.Types
     ( tgroup_Types
     ) where
@@ -81,8 +81,6 @@ case_invalid_fsubstrim_mq = isErrorText
     \    read = read[5:]\n\
     \    read = substrim(read, min_quality='2')\n"
 
--- map
-
 case_invalid_fmap_ref = isErrorText
     "ngless '0.0'\n\
     \x = fastq('fq')\n\
@@ -154,3 +152,7 @@ case_invalid_fwrite_format = isErrorText
     \y = map(x, reference='xpto')\n\
     \z = count(y, features=[{gene}])\n\
     \write(count(z), format='tsv')"
+
+case_mixed_addition = isErrorText
+    "ngless '0.0'\n\
+    \nglessIsNotJS = 1 + '2'\n"
