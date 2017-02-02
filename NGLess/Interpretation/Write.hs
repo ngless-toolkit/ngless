@@ -127,6 +127,7 @@ executeWrite el@(NGOMappedReadSet _ iout  _) args = do
     newfp <- getOFile args
     canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
     let guess :: String -> T.Text
+        guess "/dev/stdout" = "sam"
         guess ofile
             | endswith ".sam" ofile = "sam"
             | endswith ".bam" ofile = "bam"
