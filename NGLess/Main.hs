@@ -1,4 +1,4 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
 module Main
@@ -43,6 +43,7 @@ import FileManagement (setupHtmlViewer)
 import StandardModules.NGLStdlib
 import Network
 import Hooks
+import Utils.Suggestion
 
 import qualified BuiltinModules.Argv as ModArgv
 import qualified BuiltinModules.Checks as Checks
@@ -154,11 +155,15 @@ loadScript (ScriptFilePath fname) =
         --which is locale aware.
         --We also assume that the text file is quite small and, therefore, loading
         --it in to memory is not resource intensive.
-        (showError . T.decodeUtf8') <$> (if fname == "-" then B.getContents else B.readFile fname)
+        if fname == "-"
+            then decodeUtf8'' <$> B.getContents
+            else checkFileReadable fname >>= \case
+                Nothing -> decodeUtf8'' <$> B.readFile fname
+                Just m -> return $! Left (T.unpack m)
     where
-        showError :: (Show e) => Either e a -> Either String a
-        showError (Left err) = Left (show err)
-        showError (Right r) = Right r
+        decodeUtf8'' s = case T.decodeUtf8' s of
+            Right r -> Right r
+            Left err -> Left (show err)
 
 modeExec :: NGLessMode -> IO ()
 modeExec opts@DefaultMode{} = do

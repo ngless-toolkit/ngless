@@ -1,4 +1,4 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
 
@@ -8,8 +8,6 @@ module ValidationIO
     ) where
 
 import System.Directory
-import System.FilePath (takeDirectory)
-import System.IO.Error
 import Data.Maybe
 import Control.Monad
 import Control.Monad.IO.Class
@@ -57,25 +55,15 @@ validateReadInputs (Script _ es) = checkRecursive validateReadInputs' es
         validateReadInputs' (FunctionCall f expr args _) = do
             finfo <- findFunctionIO f
             when (ArgCheckFileReadable `elem` funcArgChecks finfo) $
-                validateStrVal checkFileReadable es expr
+                validateStrVal checkFileReadable' es expr
             forM_ (funcKwArgs finfo) $ \ainfo ->
                 when (ArgCheckFileReadable `elem` argChecks ainfo) $
-                   validateStrArg checkFileReadable (argName ainfo) args es
+                   validateStrArg checkFileReadable' (argName ainfo) args es
         validateReadInputs' _ = return ()
 
-        checkFileReadable :: T.Text -> ValidateIO ()
-        checkFileReadable fname = do
-            let fname' = T.unpack fname
-            r <- liftIO $ doesFileExist fname'
-            if not r
-                then do
-                    existing <- liftIO $ getDirectoryContents (takeDirectory fname')
-                                            `catchIOError` (\_ -> return [])
-                    tell1 . T.concat $ ["File `", fname, "` does not exist. ", suggestionMessage fname (T.pack <$> existing)]
-                else do
-                    p <- liftIO $ getPermissions fname'
-                    unless (readable p) $
-                        tell1 (T.concat ["File `", fname, "` is not readable (permissions problem)."])
+        checkFileReadable' :: T.Text -> ValidateIO ()
+        checkFileReadable' fname = liftIO (checkFileReadable $ T.unpack fname) >>= flip whenJust tell1
+
 
 validate_def_genomes :: Script -> ValidateIO ()
 validate_def_genomes (Script _ es) = checkRecursive validate_def_genomes' es
