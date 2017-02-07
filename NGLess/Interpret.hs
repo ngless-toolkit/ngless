@@ -321,7 +321,6 @@ shortReadVectorStats = do
         CA.sourceTBMQueue q
             =$= getPairs
             $$ fqStatsC
-    liftIO $ A.link p
     k <- register (atomically . TQ.closeTBMQueue $ q)
     return (q, k, p)
 
