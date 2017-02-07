@@ -5,3 +5,8 @@ references:
         name: 'refmg'
         fasta-file: 'data/RefMG.v1.padded'
         gtf-file: './RefMG.v1.padded.gtf'
+citation: >
+    Accurate and universal delineation of prokaryotic species by
+    Daniel R Mende, Shinichi Sunagawa,  Georg Zeller, and Peer Bork
+    Nature Methods 10, 881–884 (2013) doi:10.1038/nmeth.2575
+
