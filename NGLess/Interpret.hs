@@ -363,7 +363,7 @@ executePreprocess (NGOReadSet name rs) args (Block [Variable var] block) = do
         let asSource "" _ = C.yieldMany []
             asSource fp q =
                     let input = conduitPossiblyCompressedFile fp
-                            =$= linesC
+                            =$= linesCBounded
                             =$= fqDecodeC enc
                             =$= C.conduitVector 4096
                     in if qcInput

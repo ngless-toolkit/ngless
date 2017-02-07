@@ -143,14 +143,14 @@ fqDecodeC enc = groupC 4 =$= CL.mapM parseShortReads
 fqDecode :: FastQEncoding -> BL.ByteString -> NGLess [ShortRead]
 fqDecode enc s = C.runConduit $
     CL.sourceList (BL.toChunks s)
-        =$= linesC
+        =$= linesCBounded
         =$= fqDecodeC enc
         =$= CL.consume
 
 statsFromFastQ :: FilePath -> FastQEncoding -> NGLessIO FQStatistics
 statsFromFastQ fp enc =
         conduitPossiblyCompressedFile fp
-            =$= linesC
+            =$= linesCBounded
             =$= getPairedLines
             $$ fqStatsC
     where
@@ -171,7 +171,7 @@ encodingFor fp = do
         minLc _ = throwDataError ("Malformed FASTQ file: '" ++ fp ++ "': number of lines is not a multiple of 4")
 
     (c,m) <- conduitPossiblyCompressedFile fp
-        =$= linesC
+        =$= linesCBounded
         =$= groupC 4
         =$= CL.isolate 100
         =$= CL.mapM minLc

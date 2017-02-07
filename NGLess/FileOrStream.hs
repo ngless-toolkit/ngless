@@ -1,4 +1,4 @@
-{- Copyright 2016 NGLess Authors
+{- Copyright 2016-2017 NGLess Authors
  - License: MIT
  -}
 
@@ -43,8 +43,8 @@ asFile (Stream fp istream) = do
 
 asStream :: FileOrStream -> (FilePath, C.Source NGLessIO ByteLine)
 asStream (Stream fp istream) = (fp, istream)
-asStream (File fp) = (fp, C.sourceFile fp =$= linesC)
+asStream (File fp) = (fp, C.sourceFile fp =$= linesCBounded)
 
-asSamStream (File fname) = (fname, samBamConduit fname =$= linesC)
+asSamStream (File fname) = (fname, samBamConduit fname =$= linesCBounded)
 asSamStream (Stream fname istream) = (fname, istream)
 

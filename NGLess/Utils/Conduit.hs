@@ -1,6 +1,6 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT -}
-{-# LANGUAGE ScopedTypeVariables, CPP #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, CPP #-}
 
 module Utils.Conduit
     ( ByteLine(..)
@@ -9,6 +9,7 @@ module Utils.Conduit
     , asyncMapC
     , asyncMapEitherC
     , linesC
+    , linesCBounded
     , groupC
     , awaitJust
     , asyncGzipTo
@@ -38,7 +39,7 @@ import           Data.Conduit ((=$=), ($$))
 
 import qualified Data.Sequence as Seq
 import           Data.Sequence ((|>), ViewL(..))
-import           Control.Monad (unless, forM_)
+import           Control.Monad (unless, forM_, when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.Resource (MonadResource)
@@ -47,8 +48,23 @@ import           Control.DeepSeq
 import           System.IO
 import           Data.List (isSuffixOf)
 
+import NGLess.NGError
+
 -- | This just signals that a "line" is expected.
 newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
+
+linesBounded maxLineSize = continue 0 []
+    where
+        continue n toks
+            | n > maxLineSize = throwDataError ("Line too long (longer than " ++ show maxLineSize ++ " characters.")
+            | otherwise = C.await >>= \case
+                    Nothing -> when (n > 0) $ C.yield (B.concat $ reverse toks)
+                    Just tok -> emit n toks tok
+        emit n toks tok = case B.elemIndex 10 tok of
+                Nothing -> continue (n + B.length tok) (tok:toks)
+                Just ix -> let (start,rest) = B.splitAt ix tok in do
+                                C.yield (B.concat $ reverse (start:toks))
+                                emit 0 [] (B.tail rest)
 
 linesC :: (Monad m) => C.Conduit B.ByteString m ByteLine
 linesC =
@@ -61,6 +77,18 @@ linesC =
 #endif
         =$= CL.map ByteLine
 {-# INLINE linesC #-}
+
+
+linesCBounded :: (MonadError NGError m) => C.Conduit B.ByteString m ByteLine
+linesCBounded =
+    linesBounded 8192
+#ifdef WINDOWS
+        =$= CL.map (\line ->
+                        if not (B.null line) && B.index line (B.length line - 1) == 13
+                            then B.take (B.length line - 1) line
+                            else line)
+#endif
+        =$= CL.map ByteLine
 
 byteLineSinkHandle :: (MonadIO m) => Handle -> C.Sink ByteLine m ()
 byteLineSinkHandle h = CL.map unwrapByteLine =$= C.unlinesAscii =$= C.sinkHandle h
