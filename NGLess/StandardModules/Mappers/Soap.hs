@@ -1,7 +1,7 @@
-{- Copyright 2016 NGLess Authors
+{- Copyright 2016-2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleContexts, RankNTypes #-}
 
 module StandardModules.Mappers.Soap
     ( hasValidIndex
@@ -140,7 +140,7 @@ callMapper refIndex fps extraArgs outC = do
                             "SOAP2SAM error code was ", show code, ".\n",
                             "Error output: ", B8.unpack (B8.intercalate "\n\t" err')]
 
-makeSAMHeader :: (MonadResource m) => FilePath -> C.Source m B.ByteString
+makeSAMHeader :: (MonadResource m, MonadBaseControl IO m) => FilePath -> C.Source m B.ByteString
 makeSAMHeader fafile = conduitPossiblyCompressedFile fafile =$= linesC =$= asSamHeader
     where
         -- asSamHeader :: C.Conduit ByteLine IO B.ByteString

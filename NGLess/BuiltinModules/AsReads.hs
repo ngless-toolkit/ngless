@@ -1,8 +1,8 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
 
-{-# LANGUAGE TupleSections, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module BuiltinModules.AsReads
     ( executeReads

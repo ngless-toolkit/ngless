@@ -22,11 +22,13 @@ module Utils.Conduit
 
 import qualified Data.ByteString as B
 import qualified Control.Concurrent.Async as A
+import qualified Control.Concurrent.STM.TBQueue as TQ
 import qualified Control.Concurrent.STM.TBMQueue as TQ
 import           Control.Concurrent.STM (atomically)
 
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.Async as CA
 import qualified Data.Conduit.TQueue as CA
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Zlib as CZ
@@ -42,7 +44,7 @@ import           Data.Sequence ((|>), ViewL(..))
 import           Control.Monad (unless, forM_, when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Trans.Resource (MonadResource)
+import           Control.Monad.Trans.Resource (MonadResource, MonadBaseControl)
 import           Control.Exception (finally, evaluate)
 import           Control.DeepSeq
 import           System.IO
@@ -178,21 +180,25 @@ bsConcatTo chunkSize = awaitJust start
                 | B.length v + s > chunkSize -> C.yield chunks >> start v
                 | otherwise -> continue (v:chunks) (s + B.length v)
 
+stopAtNothing :: forall m i. (Monad m) => C.Conduit (Maybe i) m i
+stopAtNothing = C.await >>= \case
+    Just (Just val) -> do
+        C.yield val
+        stopAtNothing
+    _ -> return ()
 -- | A simple sink which performs gzip in a separate thread and writes the results to `h`.
-asyncGzipTo :: forall m. (MonadIO m) => Handle -> C.Sink B.ByteString m ()
+asyncGzipTo :: forall m. (MonadIO m, MonadBaseControl IO m) => Handle -> C.Sink B.ByteString m ()
 asyncGzipTo h = do
-    -- We allocate the queue separately (instead of using CA.paired*) so that
-    -- `src` and `sink` end up with different underlying monads (src is a
-    -- conduit over IO, while sink is over m):
-    q <- liftIO $ TQ.newTBMQueueIO 4
-    let src :: C.Source IO [B.ByteString]
-        src = CA.sourceTBMQueue q
-    consumer <- liftIO $ A.async (src $$ CL.map (B.concat . reverse) =$= CZ.gzip =$= C.sinkHandle h)
-    liftIO $ A.link consumer -- if there is an error in writing, then the queue would never be read from and we could deadlock
-    bsConcatTo ((2 :: Int) ^ (15 :: Int)) =$= CA.sinkTBMQueue q True
-    liftIO (A.wait consumer)
+    let drain q = liftIO . C.runConduit $
+                CA.sourceTBQueue q
+                    =$= stopAtNothing
+                    =$= CL.map (B.concat . reverse)
+                    =$= CZ.gzip
+                    =$= C.sinkHandle h
+    bsConcatTo ((2 :: Int) ^ (15 :: Int))
+        =$= CA.drainTo 8 drain
 
-asyncGzipToFile :: forall m. (MonadIO m, MonadResource m) => FilePath -> C.Sink B.ByteString m ()
+asyncGzipToFile :: forall m. (MonadIO m, MonadResource m, MonadBaseControl IO m) => FilePath -> C.Sink B.ByteString m ()
 asyncGzipToFile fname = C.bracketP
     (openFile fname WriteMode)
     hClose
@@ -201,26 +207,19 @@ asyncGzipToFile fname = C.bracketP
 -- | A source which ungzipped from the the given handle. Note that this "reads
 -- ahead" so if you do not use all the input, the Handle will probably be left
 -- at an undefined position in the file.
-asyncGzipFrom :: forall m. (MonadIO m, MonadResource m) => Handle -> C.Source m B.ByteString
+asyncGzipFrom :: forall m. (MonadIO m, MonadResource m, MonadBaseControl IO m) => Handle -> C.Source m B.ByteString
 asyncGzipFrom h = do
-    let allocate = do
-            -- We allocate the queue separately (instead of using CA.paired*) so that
-            -- `src` and `sink` end up with different underlying monads (sink is a
-            -- conduit over IO, while we are in m)
-            q <- TQ.newTBMQueueIO 4
-            producer <- A.async $
-                    (C.sourceHandle h =$= CZ.multiple CZ.ungzip $$ CA.sinkTBMQueue q False)
-                    `finally`
-                    atomically (TQ.closeTBMQueue q)
-            return (q, producer)
-    C.bracketP
-        allocate
-        (liftIO . A.cancel . snd)
-        $ \(q,pr) -> do
-            CA.sourceTBMQueue q
-            liftIO $ A.wait pr
+    let prod q = liftIO $ do
+                    C.runConduit $
+                        C.sourceHandle h
+                            =$= CZ.multiple CZ.ungzip
+                            =$= CL.map Just
+                            =$= CA.sinkTBQueue q
+                    atomically (TQ.writeTBQueue q Nothing)
+    CA.gatherFrom 8 prod
+        =$= stopAtNothing
 
-asyncGzipFromFile :: forall m. (MonadIO m, MonadResource m) => FilePath -> C.Source m B.ByteString
+asyncGzipFromFile :: forall m. (MonadIO m, MonadResource m, MonadBaseControl IO m) => FilePath -> C.Source m B.ByteString
 asyncGzipFromFile fname = C.bracketP
     (openFile fname ReadMode)
     hClose

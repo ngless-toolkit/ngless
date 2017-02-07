@@ -1,8 +1,8 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
 
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Interpretation.Write
     ( executeWrite
