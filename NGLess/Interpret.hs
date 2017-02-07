@@ -18,6 +18,7 @@ import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Control.Monad.Trans.Resource
 
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString as B
@@ -321,7 +322,9 @@ shortReadVectorStats = do
         CA.sourceTBMQueue q
             =$= getPairs
             $$ fqStatsC
-    return (q,p)
+    liftIO $ A.link p
+    k <- register (atomically . TQ.closeTBMQueue $ q)
+    return (q, k, p)
 
 writeAndContinue :: MonadIO m => TQ.TBMQueue (V.Vector ShortRead) -> C.Conduit (V.Vector ShortRead) m (V.Vector ShortRead)
 writeAndContinue q = C.mapM $ \v -> do
@@ -356,8 +359,8 @@ executePreprocess (NGOReadSet name rs) args (Block [Variable var] block) = do
         (fp2', out2) <- runNGLessIO $ openNGLTempFile fp2 "preprocessed.2." ".fq.gz"
         (fp3', out3) <- runNGLessIO $ openNGLTempFile fp1 "preprocessed.singles." ".fq.gz"
 
-        [(q1, s1) ,(q2, s2) ,(q3, s3)
-            ,(pq1, ps1) ,(pq2, ps2) ,(pq3, ps3)] <- replicateM 6 shortReadVectorStats
+        [(q1, k1, s1) ,(q2, k2, s2) ,(q3, k3, s3)
+            ,(pq1, pk1, ps1) ,(pq2, pk2, ps2) ,(pq3, pk3, ps3)] <- replicateM 6 shortReadVectorStats
 
 
         let asSource "" _ = C.yieldMany []
@@ -389,7 +392,7 @@ executePreprocess (NGOReadSet name rs) args (Block [Variable var] block) = do
             =$= asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . interpretPBlock1 block var))
             $$& void (write out3 q3)
 
-        forM_ [q1,q2,q3, pq1, pq2, pq3] (liftIO . atomically . TQ.closeTBMQueue)
+        forM_ [k1, k2, k3, pk1, pk2, pk3] release
         liftIO $ forM_ [out1, out2, out3] hClose
         forM_ (zip [ps1, ps2, ps3] [fp1, fp2, fp3]) $ \(p,fp) ->
             if qcInput && fp /= ""
