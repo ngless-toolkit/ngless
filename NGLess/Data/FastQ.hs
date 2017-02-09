@@ -1,11 +1,10 @@
-{-# LANGUAGE FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, MultiWayIf #-}
 
 module Data.FastQ
     ( ShortRead(..)
     , FastQEncoding(..)
     , FQStatistics(..)
     , srSlice
-    , encodingFor
     , srLength
     , encodingOffset
     , encodingName
@@ -93,11 +92,6 @@ encodingName :: FastQEncoding -> String
 encodingName SangerEncoding = "Sanger (33 offset)"
 encodingName SolexaEncoding = "Solexa (64 offset)"
 
-guessEncoding :: (MonadError NGError m) => Word8 -> m FastQEncoding
-guessEncoding lowC
-    | lowC < 33 = throwDataError ("No known encodings with chars < 33 (Yours was "++ show lowC ++ ")")
-    | lowC < 58 = return SangerEncoding
-    | otherwise = return SolexaEncoding
 
 -- | encode as a string
 fqEncodeC :: (Monad m) => FastQEncoding -> C.Conduit ShortRead m B.ByteString
@@ -160,25 +154,6 @@ statsFromFastQ fp enc =
             where
                 getPairedLines' [_, bps, _, ByteLine qs] = return $! bps :!: vSub qs offset
                 getPairedLines' _ = throwDataError "fastq lines are not a multiple of 4"
-
--- | Guess the encoding of a file
-encodingFor :: FilePath -> NGLessIO FastQEncoding
-encodingFor fp = do
-    let countMin :: (Int, Word8) -> Word8 -> (Int, Word8)
-        countMin (!c,!m) m' = (c+1, min m m')
-        minLc :: (MonadError NGError m) => [ByteLine] -> m Word8
-        minLc [_,_,_,qs] = return . B.minimum . unwrapByteLine $ qs
-        minLc _ = throwDataError ("Malformed FASTQ file: '" ++ fp ++ "': number of lines is not a multiple of 4")
-
-    (c,m) <- conduitPossiblyCompressedFile fp
-        =$= linesCBounded
-        =$= groupC 4
-        =$= CL.isolate 100
-        =$= CL.mapM minLc
-        $$ CL.fold countMin (0,maxBound :: Word8)
-    when (c < 1) $
-        throwDataError ("Cannot determine encoding for input file '" ++ fp ++ "'. File is empty.")
-    guessEncoding m
 
 
 fqStatsC :: forall m. (MonadIO m) => C.Sink (Pair ByteLine (VU.Vector Int8)) m FQStatistics

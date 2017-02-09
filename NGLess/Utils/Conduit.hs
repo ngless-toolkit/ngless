@@ -23,7 +23,6 @@ module Utils.Conduit
 import qualified Data.ByteString as B
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBQueue as TQ
-import qualified Control.Concurrent.STM.TBMQueue as TQ
 import           Control.Concurrent.STM (atomically)
 
 import qualified Data.Conduit.Combinators as C
@@ -45,7 +44,7 @@ import           Control.Monad (unless, forM_, when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.Resource (MonadResource, MonadBaseControl)
-import           Control.Exception (finally, evaluate)
+import           Control.Exception (evaluate)
 import           Control.DeepSeq
 import           System.IO
 import           Data.List (isSuffixOf)
@@ -54,6 +53,7 @@ import NGLess.NGError
 
 -- | This just signals that a "line" is expected.
 newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
+                deriving (Show)
 
 linesBounded maxLineSize = continue 0 []
     where

@@ -14,6 +14,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector.Unboxed as VU
 import           Data.Int
 
+import Interpretation.FastQ
 import Interpretation.Substrim
 import Tests.Utils
 import Data.FastQ

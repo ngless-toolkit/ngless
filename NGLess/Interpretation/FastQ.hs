@@ -1,13 +1,15 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, MultiWayIf #-}
+{-# LANGUAGE FlexibleContexts, MultiWayIf #-}
 
 module Interpretation.FastQ
     ( executeFastq
     , executePaired
     , executeGroup
     , executeShortReadsMethod
+
+    , encodingFor
     ) where
 
 import System.IO
@@ -18,10 +20,14 @@ import qualified Data.Vector.Unboxed as VU
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.List as CL
+import qualified Data.ByteString as B
 import qualified Control.Concurrent.Async as A
 import Control.Monad.Trans.Resource
+import Control.Monad.Except
 import Data.Conduit (($$), (=$=))
 import Data.Maybe
+import Data.Word
 
 import FileManagement
 import Data.FastQ
@@ -32,12 +38,47 @@ import Utils.Conduit
 import Utils.Utils
 import NGLess
 
+
+
+-- | Guess the encoding of a file
+encodingFor :: FilePath -> NGLessIO FastQEncoding
+encodingFor fp = do
+    let countMin :: (Int, Word8) -> Word8 -> (Int, Word8)
+        countMin (!c,!m) m' = (c+1, min m m')
+        minLc :: (MonadError NGError m) => [ByteLine] -> m Word8
+        minLc [_,_,_,qs] = return . B.minimum . unwrapByteLine $ qs
+        minLc _ = throwDataError ("Malformed FASTQ file: '" ++ fp ++ "': number of lines is not a multiple of 4")
+
+    (c,m) <- conduitPossiblyCompressedFile fp
+        =$= linesCBounded
+        =$= groupC 4
+        =$= CL.isolate 100
+        =$= CL.mapM minLc
+        $$ CL.fold countMin (0,maxBound :: Word8)
+    if
+        | c < 1 -> do
+            outputListLno' WarningOutput ["Input file ", fp, " is empty."]
+            return SangerEncoding -- It does not matter
+        | m < 33 -> throwDataError ("No known encodings with chars < 33 (Yours was "++ show c ++ ")")
+        | m < 58 -> return SangerEncoding
+        | otherwise -> return SolexaEncoding
+
+-- | Checks if file has no content
+checkNoContent fp =
+    conduitPossiblyCompressedFile fp
+        =$= linesCBounded
+        =$= CL.isolate 1
+        $$ CL.fold (\_ _ -> False) True
+
+
+-- | Drop every tenth FastQ group
 drop10 = loop (0 :: Int)
     where
         loop 40 = loop 0
         loop !n = awaitJust $ \line -> do
                 when (n < 4) (C.yield line)
                 loop (n+1)
+
 
 performSubsample :: FilePath -> Handle -> IO ()
 performSubsample f h = do
@@ -75,9 +116,9 @@ doQC1 enc f = do
 executeGroup :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeGroup (NGOList rs) args = do
         name <- lookupStringOrScriptError "group call" "name" args
-        if length rs == 1
-            then addName name (rs !! 0)
-            else do
+        case rs of
+            [r] -> addName name r
+            _ -> do
                 rs' <- getRSOrError `mapM` rs
                 grouped <- groupFiles name rs'
                 return (NGOReadSet name grouped)
@@ -89,7 +130,7 @@ executeGroup (NGOList rs) args = do
 executeGroup other _ = throwScriptError ("Illegal argument to group(): " ++ show other)
 
 groupFiles :: T.Text -> [ReadSet] -> NGLessIO ReadSet
-groupFiles name [] = do
+groupFiles name [] =
     throwDataError ("Attempted to group sample '" ++ T.unpack name ++ "' but sample is empty (no read files).")
 groupFiles name rs = do
     let encs = map rsEncoding rs
@@ -176,7 +217,7 @@ executePaired :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
     enc <- getEncArgument "paired" args
     mate2 <- lookupStringOrScriptError "automatic argument" "second" args
-    let mate3 = lookup "singles" args
+    mate3 <- lookupStringOrScriptErrorDef (return "") "paired" "singles" args
     outputListLno' TraceOutput ["Executing paired on ", show mate1, show mate2, show mate3]
     qcNeeded <- lookupBoolOrScriptErrorDef (return True) "fastq hidden QC argument" "__perform_qc" args
 
@@ -196,13 +237,16 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
     when (enc1 /= enc2) $
         throwDataError ("Mates do not seem to have the same quality encoding! (first mate [" ++ fp1 ++ "] had " ++ show enc1 ++ ", second one [" ++ fp2 ++ "] " ++ show enc2 ++ ").")
     case mate3 of
-        Nothing -> return (ReadSet2 enc1 fp1 fp2)
-        Just (NGOString f3) -> do
+        "" -> return (ReadSet2 enc1 fp1 fp2)
+        f3 -> do
             (ReadSet1 enc3 fp3) <- optionalSubsample (T.unpack f3) >>= asReadSet1mayQC qcNeeded enc
-            when (enc1 /= enc3) $
-                throwDataError ("Mates do not seem to have the same quality encoding! (paired mates [" ++ fp1 ++ " had " ++ show enc1 ++ ", single one [" ++ fp3 ++ "] " ++ show enc3 ++ ").")
-            return (ReadSet3 enc1 fp1 fp2 fp3)
-        Just other -> throwScriptError ("Function paired expects a string for argument 'singles', got " ++ show other)
+            if (enc1 /= enc3)
+                then do
+                    is3empty <- checkNoContent fp3 -- this is a special case, but seen in the wild
+                    unless is3empty $
+                        throwDataError ("Mates do not seem to have the same quality encoding! (paired mates [" ++ fp1 ++ " had " ++ show enc1 ++ ", single one [" ++ fp3 ++ "] " ++ show enc3 ++ ").")
+                    return $! ReadSet2 enc1 fp1 fp2
+            else return $! ReadSet3 enc1 fp1 fp2 fp3
 executePaired expr _ = throwScriptError ("Function paired expects a string, got: " ++ show expr)
 
 getEncArgument fname args =
