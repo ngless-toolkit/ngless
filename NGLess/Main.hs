@@ -234,7 +234,13 @@ modeExec (DownloadFileMode url local) = runNGLessIO "download a file" $
 
 main = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
-        foottext = concat ["ngless v", versionStr, "(C) NGLess Authors 2013-2017"]
+        foottext = concat [
+                            "ngless v", versionStr, "(C) NGLess Authors 2013-2017\n",
+                            "For more information:\n",
+                            "\thttp://ngless.rtfd.io/\n",
+                            "For comments/discussion:\n",
+                            "\thttps://groups.google.com/forum/#!forum/ngless"
+                            ]
         versioner =
             (infoOption ("ngless v" ++ versionStr ++ " (release date: " ++  dateStr ++ ")")
                 (long "version" <> short 'V' <> help "print version and exit"))
