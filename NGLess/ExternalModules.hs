@@ -1,4 +1,4 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
 
@@ -274,6 +274,16 @@ asfilePaths (NGOReadSet _ (ReadSet1 _ fp)) _ = return [fp]
 asfilePaths (NGOReadSet _ (ReadSet2 _ fp1 fp2)) _ = return [fp1, fp2]
 asfilePaths (NGOReadSet _ (ReadSet3 _ fp1 fp2 fp3)) _ = return [fp1, fp2, fp3]
 asfilePaths input@(NGOCounts _) argOptions = (:[]) <$> asCountsFile input argOptions
+asfilePaths (NGOMappedReadSet _ input _) payload = (:[]) <$> do
+    filepath <- asFile input
+    case payload of
+        Nothing -> return filepath
+        Just (FileInfo (FileType fb gz bz2 _)) -> case fb of
+            SamFile -> asSamFile filepath gz bz2
+            BamFile -> asBamFile filepath
+            SamOrBamFile -> return filepath
+            _ -> throwScriptError "Unexpected combination of arguments"
+        Just other -> throwShouldNotOccur ("encodeArgument: unexpected payload: "++show other)
 asfilePaths invalid _ = throwShouldNotOccur ("AsFile path got "++show invalid)
 
 asCountsFile :: NGLessObject -> Maybe CommandExtra -> NGLessIO String
@@ -315,16 +325,7 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
             NGLSymbol -> T.unpack <$> symbolOrTypeError "in external module" v
             NGLInteger ->  show <$> integerOrTypeError "in external module" v
             NGLMappedReadSet -> case v of
-                NGOMappedReadSet _ input _ -> do
-                    filepath <- asFile input
-                    case payload of
-                        Nothing -> return filepath
-                        Just (FileInfo (FileType fb gz bz2 _)) -> case fb of
-                            SamFile -> asSamFile filepath gz bz2
-                            BamFile -> asBamFile filepath
-                            SamOrBamFile -> return filepath
-                            _ -> throwScriptError "Unexpected combination of arguments"
-                        Just other -> throwShouldNotOccur ("encodeArgument: unexpected payload: "++show other)
+                NGOMappedReadSet{} -> head <$> asfilePaths v payload
                 _ -> throwScriptError ("Expected mappedreadset for argument in function call, got " ++ show v)
             NGLCounts -> asCountsFile v payload
             other -> throwShouldNotOccur ("Unexpected type tag in external module " ++ show other)
