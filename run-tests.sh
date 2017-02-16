@@ -84,7 +84,11 @@ for testdir in tests/*; do
         if [[ $testdir == tests/error-validation-* ]] ; then
             validate_arg="-n"
         fi
-        $ngless_bin --quiet -t temp $validate_arg *.ngl > output.stdout.txt 2>output.stderr.txt
+        cmd_args=""
+        if test -f ${testdir}/cmdargs ; then
+            cmd_args="$(cat ${testdir}/cmdargs)"
+        fi
+        $ngless_bin --quiet -t temp $cmd_args $validate_arg *.ngl > output.stdout.txt 2>output.stderr.txt
         ngless_exit=$?
         if [[ $testdir == tests/error-* ]] ; then
             if test $ngless_exit -eq "0"; then
