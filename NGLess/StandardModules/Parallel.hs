@@ -1,4 +1,4 @@
-{- Copyright 2016 NGLess Authors
+{- Copyright 2016-2017 NGLess Authors
  - License: MIT
  -}
 
@@ -303,7 +303,7 @@ collectFunction = Function
     , funcKwArgs =
         [ArgInformation "current" True NGLString []
         ,ArgInformation "allneeded" True (NGList NGLString) []
-        ,ArgInformation "ofile" True NGLString []
+        ,ArgInformation "ofile" True NGLString [ArgCheckFileWritable]
         ,ArgInformation "__can_move" False NGLBool []
         ]
     , funcAllowsAutoComprehension = False
