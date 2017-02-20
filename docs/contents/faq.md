@@ -1,6 +1,7 @@
 # Frequently Asked Questions
 
-This is a list of questions we have regularly gotten on the project:
+This is a list of questions we have regularly gotten on the project. See below
+for questions about the ngless language.
 
 ## Why a new domain-specific language instead of a library in Python (or another existing language)?
 
@@ -50,6 +51,7 @@ More advanced extensions can be done in Haskell, but this is considered a
 solution for advanced users.
 
 
+
 ## Couldn't you just use Docker/[Bioboxes](http://bioboxes.org/)?
 
 Short answer: Bioboxes gets us part of the way there, but not all of it;
@@ -88,3 +90,24 @@ script and outputs a CWL one, which can be used to run the pipeline. In this
 analogy, CWL functions as a common assembly language, while ngless is the
 high-level language which compiles to CWL.
 
+
+## Questions about the ngless language
+
+## Can I pass command line arguments to a script?
+
+Yes, you can. Just add them as additional arguments and they will be available
+inside your script as `ARGV`.
+
+
+## What are symbols (in the ngless language)?
+
+If you are familiar with the concept, you can think of them as `enums` in other
+languages.
+
+Whenever a symbol is used in the argument to a function, this means that that
+function takes only one of a small number of possible symbols for that
+argument.
+
+## Does the select function work on inserts (considering both mates) or per-read (treating the data as single-ended)?
+
+Select works considering the insert as a whole.
