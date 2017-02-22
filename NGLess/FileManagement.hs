@@ -45,7 +45,7 @@ openNGLTempFile' base prefix ext = do
                 then deleteTempFile
                 else hClose . snd
     (key,(fp,h)) <- allocate
-                (openTempFile tdir (prefix ++ takeBaseNameNoExtensions base ++ "." ++ ext))
+                (openTempFileWithDefaultPermissions tdir (prefix ++ takeBaseNameNoExtensions base ++ "." ++ ext))
                 cleanupAction
     outputListLno' DebugOutput ["Created & opened temporary file ", fp]
     updateNglEnvironment $ \e -> e { ngleTemporaryFilesCreated = fp:(ngleTemporaryFilesCreated e) }
