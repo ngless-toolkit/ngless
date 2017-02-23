@@ -36,6 +36,7 @@ RUN cp crtbeginS.o crtbeginT.o
 # RUN git clone --depth=10 https://github.com/luispedro/ngless  /usr/src/ngless
 COPY ./ngless /usr/src/ngless
 WORKDIR /usr/src/ngless
+RUN m4 NGLess.cabal.m4 > NGLess.cabal
 RUN stack setup
 RUN stack --local-bin-path /usr/local/bin install --dependencies-only
 RUN make static
