@@ -18,6 +18,7 @@ import Interpretation.FastQ
 import Interpretation.Substrim
 import Tests.Utils
 import Data.FastQ
+import Utils.Here
 
 tgroup_FastQ = $(testGroupGenerator)
 
@@ -37,13 +38,27 @@ simpleStats f = testNGLessIO $ do
 
 -- negative tests quality on value 60 char ';'. Value will be 60 - 64 which is -4
 case_calc_statistics_negative = do
-    s <- simpleStats "test_samples/sample_low_qual.fq"
+    lowQ <- testNGLessIO $ asTempFile low_quality "fq"
+    s <- simpleStats lowQ
     head s @?= (-4,-4,-4,-4)
 
 -- low positive tests quality on 65 char 'A'. Value will be 65-64 which is 1.
 case_calc_statistics_low_positive = do
-    s <- simpleStats "test_samples/sample_low_qual.fq"
+    lowQ <- testNGLessIO $ asTempFile low_quality "fq"
+    s <- simpleStats lowQ
     last s @?= (1,1,1,1)
+
+
+low_quality = [here|
+@IRIS:7:1:17:394#0/1
+GTCAGGACAAT
++
+<=>?@ABCAWA
+@IRIS:7:1:17:800#0/1
+GGAAACACTA
++
+<=>?@ABCAA
+|]
 
 case_calc_statistics_normal = do
     s <- simpleStats "test_samples/data_set_repeated.fq"

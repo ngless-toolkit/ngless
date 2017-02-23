@@ -43,25 +43,32 @@ import NGLess
 -- | Guess the encoding of a file
 encodingFor :: FilePath -> NGLessIO FastQEncoding
 encodingFor fp = do
-    let countMin :: (Int, Word8) -> Word8 -> (Int, Word8)
-        countMin (!c,!m) m' = (c+1, min m m')
-        minLc :: (MonadError NGError m) => [ByteLine] -> m Word8
-        minLc [_,_,_,qs] = return . B.minimum . unwrapByteLine $ qs
-        minLc _ = throwDataError ("Malformed FASTQ file: '" ++ fp ++ "': number of lines is not a multiple of 4")
+    let update :: Word8 -> Word8 -> B.ByteString -> (Word8, Word8)
+        update minv maxv qs = (min minv $ B.minimum qs, max maxv $ B.maximum qs)
+        encodingC minv maxv =
+                C.await >>= \case
+                    Nothing
+                        | minv == 255 -> do
+                            lift $ outputListLno' WarningOutput ["Input file ", fp, " is empty."]
+                            return SangerEncoding -- It does not matter
+                        | otherwise -> do
+                            lift $ outputListLno' WarningOutput ["Heuristic for FastQ encoding determination for file ", show fp, " cannot be 100% confident. Guessing 33 offset (Sanger encoding, used by newer Illumina machines)."]
+                            return SangerEncoding
+                    Just [_, _, _, ByteLine qs] -> case update minv maxv qs of
+                            (minv', maxv')
+                                | minv' < 33 -> throwDataError ("No known encodings with chars < 33 (Yours was "++ show minv ++ ") for file '" ++ show fp ++ "'.")
+                                | minv' < 58 -> return SangerEncoding
+                                -- 33 + 45 should never happen with SangerEncoding, but it's quality 14 in SolexaEncoding, so should be common
+                                | maxv' >= (33+45) -> return SolexaEncoding
+                                | otherwise -> encodingC minv' maxv'
+                    _ -> throwDataError ("Malformed file '" ++ fp ++ "': number of lines is not a multiple of 4.")
 
-    (c,m) <- conduitPossiblyCompressedFile fp
+
+    C.runConduit $
+        conduitPossiblyCompressedFile fp
         =$= linesCBounded
         =$= groupC 4
-        =$= CL.isolate 100
-        =$= CL.mapM minLc
-        $$ CL.fold countMin (0,maxBound :: Word8)
-    if
-        | c < 1 -> do
-            outputListLno' WarningOutput ["Input file ", fp, " is empty."]
-            return SangerEncoding -- It does not matter
-        | m < 33 -> throwDataError ("No known encodings with chars < 33 (Yours was "++ show c ++ ")")
-        | m < 58 -> return SangerEncoding
-        | otherwise -> return SolexaEncoding
+        =$= encodingC 255 0
 
 -- | Checks if file has no content
 checkNoContent fp =
