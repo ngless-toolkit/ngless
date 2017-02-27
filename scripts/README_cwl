@@ -1,0 +1,19 @@
+In order to generate .cwl files from the python scripts I used:
+
+    https://github.com/erasche/argparse2tool
+
+Installed on a conda environment with python3.5.
+
+Run:
+
+    argparse2tool_check_path
+
+and follow instructions to setup the environment to use the tool.
+
+Once setup simply run:
+
+    ./mytool.py --generate_cwl_tool
+
+and a file called `mytool.cwl` should now exist in the current directory.
+
+NOTE: The '--debug' option was also left in as it may prove useful for debugging.
