@@ -284,7 +284,7 @@ count
 Given a file with aligned sequencing reads (ReadSet), ``count()`` will produce
 a counts table depending on the arguments passed. For example::
 
-    counts = count(mapped, min=2, mode={union}, keep_ambiguous=True, multiple={dist1})
+    counts = count(mapped, min=2, mode={union}, multiple={dist1})
 
 Argument:
 ~~~~~~~~~
@@ -310,17 +310,17 @@ Arguments by value:
 +-------------------+-----------------+------------+----------------+
 | mode              | Symbol          | no         | {union}        |
 +-------------------+-----------------+------------+----------------+
-| keep\_ambiguous   | Bool            | no         | true           |
-+-------------------+-----------------+------------+----------------+
 | multiple          | Symbol          | no         | {dist1}        |
 +-------------------+-----------------+------------+----------------+
 | strand            | Bool            | no         | false          |
 +-------------------+-----------------+------------+----------------+
 | normalization     | Symbol          | no         | {raw}          |
 +-------------------+-----------------+------------+----------------+
+| include_minus1    | Bool            | no         | false          |
++-------------------+-----------------+------------+----------------+
 | min               | Integer         | no         | 0              |
 +-------------------+-----------------+------------+----------------+
-| discard_zero      | Bool            | no         | false          |
+| discard_zeros     | Bool            | no         | false          |
 +-------------------+-----------------+------------+----------------+
 
 
@@ -343,10 +343,12 @@ modes are:
 -  ``{intersection-strict}`` the intersection of all the sets.
 -  ``{intersection-nonempty}`` the intersection of all non-empty sets.
 
-The ``keep_ambiguous`` argument is an opportunity to decide whether to count
-reads that overlap with more than one feature or that were multiply mapped to
-several genomic locations, which themselves correspond to more than one
-feature.
+How to handle multiple mappers is defined by the ``multiple`` argument:
+
+- ``{unique_only}``: only use uniquely mapped inserts
+- ``{all1}``: count all hits separately
+- ``{1overN}``: fractionaly distribute multiple mappers
+- ``{dist1}``: distribute multiple reads based on uniquely mapped reads
 
 Argument ``strand`` represents whether the data are from a strand-specific
 (default is ``false``). When the data is not strand-specific, a read is always
@@ -356,7 +358,7 @@ same strand as the feature.
 
 ``min`` defines the minimum amount of overlaps a given feature must have, at
 least, to be kept (default: 0, i.e., keep all counts). If you just want to
-discard features that are exactly zero, you should set the ``discard_zero``
+discard features that are exactly zero, you should set the ``discard_zeros``
 argument to True.
 
 ``normalization`` specifies if and how to normalize to take into account feature size:
@@ -366,6 +368,9 @@ argument to True.
   feature
 - ``{scaled}`` is the result of the ``{normed}`` mode scaled up so that the
   total number of counts is identical to the ``{raw}`` (within rounding error)
+
+Unmapped inserts are included in the output if ``{include_minus1}`` is true
+(default: ``False``).
 
 substrim
 --------
