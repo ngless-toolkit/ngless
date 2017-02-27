@@ -276,8 +276,6 @@ If ``keep_if`` is used, then reads are kept if they pass **all the conditions**.
 If ``drop_if`` they are discarded if they fail to **any condition**.
 
 
-
-
 count
 -----
 
@@ -399,7 +397,7 @@ Arguments
 | min_quality             | Integer      |  yes       |	               |
 +-------------------------+--------------+------------+----------------+
 
-**Min_quality** parameter defines the minimum quality accepted for the
+``min_quality`` parameter defines the minimum quality accepted for the
 sub-sequence.
 
 endstrim
@@ -429,7 +427,7 @@ Arguments
 | min_quality             | Integer      |  yes       |	               |
 +-------------------------+--------------+------------+----------------+
 
-**min_quality** parameter defines the minimum quality value.
+``min_quality`` parameter defines the minimum quality value.
 
 write
 -----
@@ -443,7 +441,7 @@ ReadSet
 Argument:
 #########
 
-ReadSet
+Any
 
 Return:
 #######
@@ -458,58 +456,17 @@ Arguments by value:
 +=========+=============+============+================+
 | ofile   | String      | yes        | -              |
 +---------+-------------+------------+----------------+
+| format  | String      | no         | -              |
++---------+-------------+------------+----------------+
 
-The argument **ofile** is a file path to where the content is written.
+The argument ``ofile`` is where to write the content.
 
-MappedReadSet
-~~~~~~~~~~~~~~~~~
+The output format is typically determined from the ``ofile`` extension, but the
+``format`` argument overrides this. Supported formats:
 
-Argument:
-##########
-
-MappedReadSet
-
-Return:
-##########
-
-Void
-
-Arguments by value:
-###################
-
-+----------+-------------+------------+----------------+
-| Name     | Type        | Required   | Default Value  |
-+==========+=============+============+================+
-| ofile    | String      |  yes       | -              |
-+----------+-------------+------------+----------------+
-| format   | String      |  no        | {sam}          |
-+----------+-------------+------------+----------------+
-
-**Format** can have value **{bam}** or **{sam}** (default: {sam}).
-
-Arguments by value:
-###################
-
-+----------+-------------+------------+----------------+
-| Name     | Type        | Required   | Default Value  |
-+==========+=============+============+================+
-| ofile    | String      |  yes       | -              |
-+----------+-------------+------------+----------------+
-| format   | String      |  no        | {tsv}          |
-+----------+-------------+------------+----------------+
-| verbose  | Bool        |  no        | false          |
-+----------+-------------+------------+----------------+
-
-**Format** can have value ``{csv}`` or ``{tsv}`` (default: ``{tsv}``).
-
-If a list of **any** of the previously mentioned data types is provided, the
-``ofile`` argument must use an **{index}** in the template name to
-differentiate between the files in the list. For example for a list with two
-elements::
-
-    ofile = "result{index}.txt"
-
-| would result in ``result1.txt``, ``result2.txt``,...
+- CountsTable: ``{tsv}`` (default) or ``{csv}``: use TAB or COMMA as a delimiter
+- MappedReadSet: ``{sam}`` (default) or ``{bam}``
+- ReadSet: FastQ format, optionally compressed (depending on the extension).
 
 print
 -----
