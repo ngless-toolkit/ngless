@@ -341,12 +341,13 @@ modes are:
 -  ``{intersection-strict}`` the intersection of all the sets.
 -  ``{intersection-nonempty}`` the intersection of all non-empty sets.
 
-How to handle multiple mappers is defined by the ``multiple`` argument:
+How to handle multiple mappers (inserts which have more than one "hit" in the
+reference) is defined by the ``multiple`` argument:
 
 - ``{unique_only}``: only use uniquely mapped inserts
-- ``{all1}``: count all hits separately
-- ``{1overN}``: fractionaly distribute multiple mappers
-- ``{dist1}``: distribute multiple reads based on uniquely mapped reads
+- ``{all1}``: count all hits separately. An insert mapping to 4 locations adds 1 to each location
+- ``{1overN}``: fractionally distribute multiple mappers. An insert mapping to 4 locations adds 0.25 to each location
+- ``{dist1}``: distribute multiple reads based on uniquely mapped reads. An insert mapping to 4 locations adds to these in proportion to how uniquely mapped inserts are distributed among these 4 locations.
 
 Argument ``strand`` represents whether the data are from a strand-specific
 (default is ``false``). When the data is not strand-specific, a read is always
