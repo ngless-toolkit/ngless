@@ -37,9 +37,12 @@ def ngl_prepare_payload(args, payload_tmpl):
     payload = payload_tmpl.format(**vars(args))
 
     if args.debug:
-        print(">>> NGLess will be called with the following script:")
+        print(">>> DEBUG mode active, ngless will not be launched")
+        print(">>> NGLess would have been called with the following script:")
         print(payload)
         print(">>> End of script")
+        import sys
+        sys.exit(0)
 
     return payload
 
