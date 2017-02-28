@@ -502,7 +502,7 @@ normalizeCounts counts sizes = do
     let n = VUM.length counts
         n' = VUM.length sizes
     unless (n == n') $
-        throwShouldNotOccur ("Counts vector is of size " ++ show n ++ ", but sizes if of size " ++ show n')
+        throwShouldNotOccur ("Counts vector is of size " ++ show n ++ ", but sizes is of size " ++ show n')
     forM_ [0 .. n - 1] $ \i -> liftIO $ do
         s <- VUM.read sizes i
         when (s > 0) $
