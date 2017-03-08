@@ -5,23 +5,20 @@ modules. External modules are the simplest option.
 
 ## External modules
 
-External scripts can perform two tasks:
+External modules can perform two tasks:
 
 1. Add new references to ngless
 2. Add functions to ngless
 
-### New references
-
-A module can add references to ngless which can then be used in the `map()`
-call using the `reference` argument.
+Adding references makes them available to the `map()` call using the
+`reference` argument and (optionally) allows for calls to `count()` without
+specifying any annotation file.
 
 Like everything else in ngless, these are versioned for reproducibility so that
 the resulting script implicitly encodes the exact version of the databases used.
 
-### New functions
-
-An external module is a way to have functions in ngless map to command line
-calls to your scripts.
+Functions in external modules map to command line calls to a script you
+provide.
 
 ## How to define an external module
 
@@ -38,7 +35,24 @@ Every module has a name and a version:
 
 Everything else is optional.
 
-An ``init`` section defines an initialization command. This will be run
+### References
+
+References are added with a *references* section, which is a list of
+references. A reference contains a ``fasta-file`` and (optionally) a
+``gtf-file``. For example:
+
+    references:
+        -
+            name: 'ref'
+            fasta-file: 'data/reference.fna'
+            gtf-file: 'data/reference.gtf.gz'
+
+Note that the paths are relative to the module directory. The GTF file may be
+gzipped.
+
+## Inialization
+
+An `init` section defines an initialization command. This will be run
 **before** anything else in any script which imports this module. The intention
 is that the module can check for any dependencies and provide the user with an
 early error message instead of failing later after. For example:
@@ -58,7 +72,8 @@ the module directory. However, the scripts are run with the current working
 directory of wherever the user is running the ngless protocol (so that any
 relative paths that the user specifies work as expected). To find your data
 files inside your module, ngless sets the environmental variable
-``NGLESS_MODULE_DIR`` to the module directory.
+``NGLESS_MODULE_DIR`` as the path to the module directory.
+
 
 ### Functions
 
@@ -189,21 +204,6 @@ of the output type.
 ``rtype`` must be one of ``"void"``, ``"counts"``, ``"readset"``, or
 ``"mappedreadset"``.
 
-### References
-
-References are added with a *references* section, which is a list of
-references. A reference contains a ``fasta-file`` and (optionally) a
-``gtf-file``. For example:
-
-    references:
-        -
-            name: 'ref'
-            fasta-file: 'data/reference.fna'
-            gtf-file: 'data/reference.gtf.gz'
-
-Note that the paths are relative to the module directory. The GTF file may be
-gzipped.
-
 ### Citation
 
 Finally, if you wish to, you can add a citation:
@@ -217,4 +217,10 @@ get exposure.
 
 This is very advanced as it requires writing Haskell code which can then
 interact very deeply with the rest of ngless.
+
+For an example, you can look at the [example internal
+module](https://github.com/luispedro/ngless/blob/master/NGLess/StandardModules/Example.hs).
+If you want to get started, you can ask about details on the [ngless user
+mailing list](https://groups.google.com/forum/#!forum/ngless).
+
 
