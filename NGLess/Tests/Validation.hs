@@ -158,3 +158,15 @@ case_valid_not_pure_annotate_gff_const2 = validateIO_Ok
 case_validate_internal_call = validate_Error
     "ngless '0.0'\n\
     \write(select(samfile('f.sam'), keep_if=[{matched}]), ofile=STDOUT)\n"
+
+case_validate_no_assign_constant = isValidateError [here|
+ngless '0.0'
+CONST = 1
+CONST = 2
+|]
+
+case_validate_assign_variable = isValidateOk [here|
+ngless '0.0'
+notConst = 1
+notConst = 2
+|]

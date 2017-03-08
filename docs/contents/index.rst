@@ -167,6 +167,7 @@ Authors
    methods
    stdlib
    modules
+   constants
    Organisms
    motus
    configuration

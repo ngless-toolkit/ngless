@@ -13,9 +13,11 @@ import qualified Data.Text as T
 import           Control.Monad.Extra (whenJust)
 import           Control.Monad.Writer.Strict
 import           Control.Monad.RWS
+import           Control.Monad (foldM_)
 import           Data.String.Utils (endswith)
 import           Data.List (find)
 import           Data.Maybe
+import           Data.Char (isUpper)
 
 import Language
 import Modules
@@ -29,7 +31,8 @@ validate mods expr = case errors of
         [] -> Right expr
         _ -> throwScriptError . T.unpack . T.concat $ errors
     where
-        errors = mapMaybe (\f -> f mods expr) checks
+        errors = mapMaybe (\f -> f mods expr) checks ++
+                concatMap (\f -> execWriter (f mods expr)) checks'
         checks =
             [validateVersion
             ,validate_pure_function
@@ -39,6 +42,12 @@ validate mods expr = case errors of
             ,validate_STDIN_only_used_once
             ,validate_map_ref_input
             ,validateWriteOName
+            ]
+        -- The interface below is better and the checks above should be
+        -- converted to this style:
+        checks' :: [[Module] -> Script -> Writer [T.Text] ()]
+        checks' =
+            [validateNoConstantAssignments
             ]
 
 {- Each checking function has the type
@@ -231,6 +240,22 @@ constant_used_block _ _ = False
 
 uses_STDOUT :: Expression -> Bool
 uses_STDOUT = constant_used "STDOUT"
+
+validateNoConstantAssignments :: [Module] -> Script -> Writer [T.Text] ()
+validateNoConstantAssignments mods (Script _ es) = foldM_ checkAssign builtins es
+    where
+        tell1lno :: Int -> T.Text -> Writer [T.Text] ()
+        tell1lno lno err = tell [T.concat ["Line ", T.pack (show lno), ": ", err]]
+        checkAssign active (lno,e) = case e of
+            Assignment (Variable v) _ -> do
+                when (v `elem` active) $
+                    tell1lno lno (T.concat ["assignment to constant `", v, "` is illegal."])
+                return $ if T.all isUpper v
+                            then v:active
+                            else active
+            _ -> return active
+        builtins = ["STDIN", "STDOUT"] ++ (fst <$> concatMap modConstants mods)
+
 
 check_toplevel :: (Expression -> Maybe T.Text) -> [(Int, Expression)] -> Maybe T.Text
 check_toplevel _ [] = Nothing
