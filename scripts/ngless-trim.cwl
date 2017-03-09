@@ -1,12 +1,12 @@
 #!/usr/bin/env cwl-runner
 # This tool description was generated automatically by argparse2tool ver. 0.4.3-2
-# To generate again: $ ./ngless-count.py -b ./ngless-count.py --generate_cwl_tool
+# To generate again: $ ./ngless-trim.py -b ./ngless-trim.py --generate_cwl_tool
 # Help: $ ./ngless --help_arg2cwl
 
 cwlVersion: "cwl:v1.0"
 
 class: CommandLineTool
-baseCommand: ['./ngless-count.py']
+baseCommand: ['./ngless-trim.py']
 
 doc: |
   None
@@ -16,7 +16,7 @@ inputs:
   input:
     type: str
   
-    doc: SAM/BAM/CRAM file to count reads on
+    doc: FastQ file with reads to trim
     inputBinding:
       prefix: --input 
 
@@ -27,20 +27,26 @@ inputs:
     inputBinding:
       prefix: --output 
 
-  features:
-    type: ["null", str]
-    doc: Feature to count
-    inputBinding:
-      prefix: --features 
-
-  multiple:
+  method:
     type:
-    - "null"
-    - type: enum
-      symbols: ['dist1', 'all1', '1overN', 'unique_only']
-    doc: How to handle multiple mappers
+      type: enum
+      symbols: ['substrim', 'endstrim']
+    doc: Which trimming method to use
     inputBinding:
-      prefix: --multiple 
+      prefix: --method 
+
+  min_quality:
+    type: ["null", int]
+    doc: Minimum quality value
+    inputBinding:
+      prefix: --min-quality 
+
+  discard:
+    type: ["null", int]
+    default: 50
+    doc: Discard if shorted than
+    inputBinding:
+      prefix: --discard 
 
   debug:
     type: ["null", boolean]

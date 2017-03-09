@@ -1,12 +1,12 @@
 #!/usr/bin/env cwl-runner
 # This tool description was generated automatically by argparse2tool ver. 0.4.3-2
-# To generate again: $ ./ngless-count.py -b ./ngless-count.py --generate_cwl_tool
+# To generate again: $ ./ngless-unique.py -b ./ngless-unique.py --generate_cwl_tool
 # Help: $ ./ngless --help_arg2cwl
 
 cwlVersion: "cwl:v1.0"
 
 class: CommandLineTool
-baseCommand: ['./ngless-count.py']
+baseCommand: ['./ngless-unique.py']
 
 doc: |
   None
@@ -16,7 +16,7 @@ inputs:
   input:
     type: str
   
-    doc: SAM/BAM/CRAM file to count reads on
+    doc: FastQ file to filter
     inputBinding:
       prefix: --input 
 
@@ -27,20 +27,11 @@ inputs:
     inputBinding:
       prefix: --output 
 
-  features:
+  max_copies:
     type: ["null", str]
-    doc: Feature to count
+    doc: Max number of duplicate copies to keep
     inputBinding:
-      prefix: --features 
-
-  multiple:
-    type:
-    - "null"
-    - type: enum
-      symbols: ['dist1', 'all1', '1overN', 'unique_only']
-    doc: How to handle multiple mappers
-    inputBinding:
-      prefix: --multiple 
+      prefix: --max-copies 
 
   debug:
     type: ["null", boolean]

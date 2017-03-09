@@ -1,12 +1,12 @@
 #!/usr/bin/env cwl-runner
 # This tool description was generated automatically by argparse2tool ver. 0.4.3-2
-# To generate again: $ ./ngless-count.py -b ./ngless-count.py --generate_cwl_tool
+# To generate again: $ ./ngless-select.py -b ./ngless-select.py --generate_cwl_tool
 # Help: $ ./ngless --help_arg2cwl
 
 cwlVersion: "cwl:v1.0"
 
 class: CommandLineTool
-baseCommand: ['./ngless-count.py']
+baseCommand: ['./ngless-select.py']
 
 doc: |
   None
@@ -16,7 +16,7 @@ inputs:
   input:
     type: str
   
-    doc: SAM/BAM/CRAM file to count reads on
+    doc: SAM/BAM/CRAM file filter
     inputBinding:
       prefix: --input 
 
@@ -27,20 +27,21 @@ inputs:
     inputBinding:
       prefix: --output 
 
-  features:
-    type: ["null", str]
-    doc: Feature to count
-    inputBinding:
-      prefix: --features 
-
-  multiple:
+  action:
     type:
-    - "null"
-    - type: enum
-      symbols: ['dist1', 'all1', '1overN', 'unique_only']
-    doc: How to handle multiple mappers
+      type: enum
+      symbols: ['keep_if', 'drop_if']
+    doc: Whether to keep or drop when condition are met
     inputBinding:
-      prefix: --multiple 
+      prefix: --action 
+
+  conditions:
+    type:
+      type: enum
+      symbols: ['mapped', 'unmapped', 'unique']
+    doc: One or more conditions to filter on
+    inputBinding:
+      prefix: --conditions 
 
   debug:
     type: ["null", boolean]
