@@ -11,11 +11,12 @@ def ngl_prepare_options(args, options):
             if category not in result:
                 result[category] = []
 
-            if cmd_line_args[opt] is not None:
-                if callable(options[category][opt]):
-                    result[category].append(options[category][opt](cmd_line_args, opt))
-                else:
-                    result[category].append(options[category][opt])
+            if opt in cmd_line_args:
+                if cmd_line_args[opt] is not None:
+                    if callable(options[category][opt]):
+                        result[category].append(options[category][opt](cmd_line_args, opt))
+                    else:
+                        result[category].append(options[category][opt])
 
     # Format list of options to string by joining options with commas
     for category in result.keys():
