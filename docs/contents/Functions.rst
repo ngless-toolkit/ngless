@@ -10,7 +10,7 @@ library <stdlib.html>`__ as well.
 fastq
 -----
 
-Function to load, one or more, FastQ files, for example::
+Function to load a FastQ file::
 
   in = fastq('input.fq')
 
@@ -39,7 +39,7 @@ Possible values for ``encoding`` are:
   format. This is appropriate for newer Illumina outputs.
 - ``{solexa}`` or ``{64}`` assumes that the file is encoded with a 64 offset.
   This is used for older Illumina/Solexa machines.
-- ``{auto}``: use auto detection
+- ``{auto}``: use auto detection. This is the default.
 
 When loading a data set, quality control is carried out and statistics can be
 visualised in a graphical user interface (GUI). Statistics calculated are:
@@ -54,6 +54,47 @@ If not specified, the encoding is guessed from the file.
 
 Gzip and bzip2 compressed files are transparently supported (determined by file
 extension, ``.gz`` and ``.bz2`` for gzip and bzip2 respectively).
+
+
+paired
+------
+
+Function to load a paired-end sample, from two FastQ files::
+
+  in = paired('input.1.fq', 'input.2.fq', singles='input.3.fq')
+
+``paired()`` is an exceptional function which takes **two** unnamed arguments,
+specifying the two read files (first mate and second mate) and an optional
+``singles`` file (which contains unpaired reads).
+
+Argument:
+~~~~~~~~~
+String, String
+
+Return:
+~~~~~~~
+ReadSet
+
+Arguments by value:
+~~~~~~~~~~~~~~~~~~~
++---------------+----------------------+------------+----------------+
+| Name          | Type                 | Required   | Default Value  |
++===============+======================+============+================+
+| encoding      | Symbol               |  no        | {auto}         |
++               + ({auto}, {33}, {64}, +            +                +
++               + {sanger}, {solexa})  +            +                +
++---------------+----------------------+------------+----------------+
+| singles       | String               | no         | -              |
++---------------+----------------------+------------+----------------+
+
+The ``encoding`` argument has the same meaning as for the ``fastq()`` function:
+
+- ``{sanger}`` or ``{33}`` assumes that the file is encoded using sanger
+  format. This is appropriate for newer Illumina outputs.
+- ``{solexa}`` or ``{64}`` assumes that the file is encoded with a 64 offset.
+  This is used for older Illumina/Solexa machines.
+- ``{auto}``: use auto detection. This is the default.
+
 
 samfile
 -------
