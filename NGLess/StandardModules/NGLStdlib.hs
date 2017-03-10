@@ -22,22 +22,13 @@ import NGLess
 
 loadStdlibModules :: [ModInfo] -> NGLessIO [Module]
 loadStdlibModules = mapM loadModules1
-
-externalModules =
-        ["example-cmd"
-        ,"motus"
-        ,"specI"
-        ,"soap"
-        ]
-
-loadModules1 :: ModInfo -> NGLessIO Module
-loadModules1 (ModInfo "example" version) = Example.loadModule version
-loadModules1 (ModInfo "batch" version) = Batch.loadModule version
-loadModules1 (ModInfo "samtools" version) = Samtools.loadModule version
-loadModules1 (ModInfo "mocat" version) = Mocat.loadModule version
-loadModules1 (ModInfo "parallel" version) = Parallel.loadModule version
-loadModules1 (ModInfo "soap" version) = Soap.loadModule version
-loadModules1 (ModInfo mname version)
-    | mname `elem` externalModules = Ext.loadModule mname version
-loadModules1 (ModInfo modname _) = throwScriptError ("Unknown module '" ++ T.unpack modname ++ "'.")
+    where
+        loadModules1 :: ModInfo -> NGLessIO Module
+        loadModules1 (ModInfo "example" version) = Example.loadModule version
+        loadModules1 (ModInfo "batch" version) = Batch.loadModule version
+        loadModules1 (ModInfo "samtools" version) = Samtools.loadModule version
+        loadModules1 (ModInfo "mocat" version) = Mocat.loadModule version
+        loadModules1 (ModInfo "parallel" version) = Parallel.loadModule version
+        loadModules1 (ModInfo "soap" version) = Soap.loadModule version
+        loadModules1 (ModInfo mname version) = Ext.loadModule mname version
 
