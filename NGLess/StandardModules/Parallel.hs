@@ -46,7 +46,7 @@ import Data.IORef
 import Data.Default
 import Control.Monad
 import System.IO.Unsafe (unsafePerformIO)
-import System.Directory (createDirectoryIfMissing, doesFileExist, copyFile, getDirectoryContents)
+import System.Directory (createDirectoryIfMissing, doesFileExist, getDirectoryContents)
 
 import qualified Data.Hash.MD5 as MD5
 import qualified Data.Conduit as C
@@ -165,15 +165,21 @@ executeCollect (NGOCounts istream) kwargs = do
     current <- lookupStringOrScriptError "collect arguments" "current" kwargs
     allentries <- lookupStringListOrScriptError "collect arguments" "allneeded" kwargs
     ofile <- lookupStringOrScriptError "collect arguments" "ofile" kwargs
-    canMove <- lookupBoolOrScriptErrorDef (return False) "collect hidden argument" "__can_move" kwargs
     hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
     hashdir <- setupHashDirectory "ngless-partials" hash
-    countfile <- asFile istream
-    let partialfile entry = hashdir </> "partial." ++ T.unpack entry
-    liftIO $ syncFile countfile
-    liftIO $ (if canMove then moveOrCopy else copyFile) countfile (partialfile current)
+    (gzfp,gzout) <- openNGLTempFile "compress" "partial." "tsv.gz"
+    C.runConduit $
+        (snd . asStream $ istream)
+        =$= CL.map unwrapByteLine
+        =$= C.unlinesAscii
+        =$= asyncGzipTo gzout
+    let partialfile entry = hashdir </> "partial." ++ T.unpack entry <.> "tsv.gz"
+    liftIO $ do
+        hClose gzout
+        syncFile gzfp
+        moveOrCopy gzfp (partialfile current)
     canCollect <- liftIO $ allM (doesFileExist . partialfile)  (reverse allentries)
-                         -- ^ checking in reverse order makes it more likely that ngless notices a missing file early on
+                 -- ^ checking in reverse order makes it more likely that ngless notices a missing file early on
     if canCollect
         then do
             newfp <- concatCounts allentries (map partialfile allentries)
