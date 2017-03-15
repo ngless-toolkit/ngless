@@ -73,6 +73,7 @@ echo ">>> Running with: $($ngless_bin --version-debug) <<<"
 basedir=$REPO
 for testdir in tests/*; do
     if test -d $testdir; then
+        ok=yes
         if test -f ${testdir}/TRAVIS_SKIP -a x$TRAVIS = xtrue; then
             echo "Skipping $testir on Travis"
             continue
