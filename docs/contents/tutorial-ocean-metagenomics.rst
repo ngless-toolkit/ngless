@@ -19,8 +19,8 @@ metagenomes.
 The data is available at `http://vm-lux.embl.de/~coelho/ngless-data/Demos/ocean-short.tar.gz
 <http://vm-lux.embl.de/~coelho/ngless-data/Demos/ocean-short.tar.gz>`__
 
-This is a toy dataset. It is based on real data, but each sample only contains
-250k samples.
+This is a toy dataset. It is based on real data, but the samples were trimmed
+so that they contains only 250k paired-end reads.
 
 The dataset is organized in classical MOCAT style. Ngless does not require this
 structure, but this tutorial also demonstrates how to upgrade from your
@@ -51,10 +51,13 @@ To run ngless, we need write a script. We start with a few imports::
     import "mocat" version "0.0"
     import "omrgc" version "0.0"
 
+These will all be used in the tutorial.
+
 3. Parallelization
 
 We are going to process each sample separately. For this, we use the ``lock1``
-function from the ``parallel`` module (which we imported before)::
+function from the `parallel <stdlib.html#parallel-module>`__ module (which we
+imported before)::
 
     samples = readlines('tara.demo.short')
     sample = lock1(samples)
@@ -70,7 +73,7 @@ been locked before, so you each time you run _ngless_, you will get a different
 sample.
 
 
-3. Preprocessing 
+3. Preprocessing
 
 First, we load the data (the FastQ files)::
 
@@ -91,6 +94,9 @@ catalog::
 
     mapped = map(input, reference='omrgc', mode_all=True)
 
+The line above is the reason we needed to import the ``omrgc`` module: it made
+the ``omrgc`` reference available.
+
 ::
 
     mapped = select(mapped, keep_if=[{mapped}, {unique}])
@@ -107,9 +113,8 @@ KEGG KOs, and eggNOG OGs::
 5. Aggregate the results
 
 We have done all this computation, now we need to save it somewhere. We will
-use the ``collect()`` function to aggregate across all the samples processed.
+use the ``collect()`` function to aggregate across all the samples processed::
 
-::
     collect(counts
             current=sample,
             allneeded=samples,
@@ -117,8 +122,8 @@ use the ``collect()`` function to aggregate across all the samples processed.
 
 6. Run it!
 
-This is our script. We save it to a file (say ``process.ngl``) and run it from
-the command line::
+This is our script. We save it to a file (``process.ngl`` in this example) and
+run it from the command line::
 
     $ ngless process.ngl
 
@@ -127,20 +132,20 @@ OM-RGC. You also need to run it once for each sample. However, this can be done
 in parallel, taking advantage of high performance computing clusters.
 
 
-# Full script
+Full script
+-----------
 
-::
+Here is the full script::
 
     ngless "0.0"
     import "parallel" version "0.0"
     import "mocat" version "0.0"
     import "omrgc" version "0.0"
 
-    BASEDIR = '.' # <- Where you keep your data
 
     samples = readlines('tara.demo.short')
     sample = lock1(samples)
-    input = load_mocat_sample(BASEDIR + sample)
+    input = load_mocat_sample(sample)
 
     preprocess(input, keep_singles=False) using |read|:
         read = substrim(read, min_quality=25)
