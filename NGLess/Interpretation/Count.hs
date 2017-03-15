@@ -1,4 +1,4 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, CPP #-}
@@ -570,8 +570,8 @@ loadFunctionalMap fname columns = do
 
         addTags :: [B.ByteString] -> [B.ByteString] -> [[B.ByteString]]
         addTags [] _ = error "impossible"
-        addTags [_] [v] = [B8.split ',' v] -- do not tag single features
-        addTags fs vss = [[B.concat [f, ":", v] | v <- B8.split ',' vs]
+        addTags [_] [v] = [B8.splitWith (\c -> c == ',' || c == '|') v] -- do not tag single features
+        addTags fs vss = [[B.concat [f, ":", v] | v <- B8.splitWith (\c -> c ==',' || c == '|') vs]
                                     | (f,vs) <- zip fs vss]
 
         selectIds :: Int -> [Int] -> [(Int, B.ByteString)] -> NGLess [B.ByteString]
