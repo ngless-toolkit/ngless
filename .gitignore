@@ -7,6 +7,7 @@
 /bwa-0.7.15/
 *.o
 *.hi
+*.pyc
 Html/fonts/
 Html/htmllibs/
 ngless-locks/
