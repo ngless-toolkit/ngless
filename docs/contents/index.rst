@@ -160,6 +160,8 @@ Authors
 
    introduction
    install
+   tutorial-ocean-metagenomics
+   tutorial-gut-metagenomics
    tutorial
    one-liners
    preprocess

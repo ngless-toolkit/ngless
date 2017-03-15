@@ -1,0 +1,151 @@
+=======================================
+Ocean Metagenomics Functional Profiling
+=======================================
+
+In this tutorial, we will analyse a small dataset of oceanic microbial
+metagenomes.
+
+1. Download the toy dataset
+
+The data is available at `http://vm-lux.embl.de/~coelho/ngless-data/Demos/ocean-short.tar.gz
+<http://vm-lux.embl.de/~coelho/ngless-data/Demos/ocean-short.tar.gz>`__
+
+This is a toy dataset. It is based on real data, but each sample only contains
+250k samples.
+
+The dataset is organized in classical MOCAT style. Ngless does not require this
+structure, but this tutorial also demonstrates how to upgrade from your
+existing MOCAT-based projects.
+
+
+::
+
+    $ find
+    ./SAMEA2621229.sampled
+    ./SAMEA2621229.sampled/ERR594355_2.short.fq.gz
+    ./SAMEA2621229.sampled/ERR594355_1.short.fq.gz
+    ./SAMEA2621155.sampled
+    ./SAMEA2621155.sampled/ERR599133_1.short.fq.gz
+    ./SAMEA2621155.sampled/ERR599133_2.short.fq.gz
+    ./SAMEA2621033.sampled
+    ./SAMEA2621033.sampled/ERR594391_2.short.fq.gz
+    ./SAMEA2621033.sampled/ERR594391_1.short.fq.gz
+    ./tara.demo.short
+    ./process.ngl
+
+2. Preliminary imports
+
+To run ngless, we need write a script. We start with a few imports::
+
+    ngless "0.0"
+    import "parallel" version "0.0"
+    import "mocat" version "0.0"
+    import "omrgc" version "0.0"
+
+3. Parallelization
+
+We are going to process each sample separately. For this, we use the ``lock1``
+function from the ``parallel`` module (which we imported before)::
+
+    samples = readlines('tara.demo.short')
+    sample = lock1(samples)
+
+The ``readlines`` function reads a file and returns all lines. In this case, we
+are reading the ``tara.demo.short`` file, which contains the three samples
+(``SAMEA2621229.sampled``, ``SAMEA2621155.sampled``, and
+``SAMEA2621033.sampled``).
+
+``lock1()`` is a slightly more complex function. It takes a list and *locks one
+of the elements* and returns it. It always chooses an element which has not
+been locked before, so you each time you run _ngless_, you will get a different
+sample.
+
+
+3. Preprocessing 
+
+First, we load the data (the FastQ files)::
+
+    input = load_mocat_sample(sample)
+
+And, now, we preprocess the data::
+
+    preprocess(input, keep_singles=False) using |read|:
+        read = substrim(read, min_quality=25)
+        if len(read) < 45:
+            discard
+
+
+3. Profiling using the OM-RGC
+
+After preprocessing, we map the reads to the ocean microbial reference gene
+catalog::
+
+    mapped = map(input, reference='omrgc', mode_all=True)
+
+::
+
+    mapped = select(mapped, keep_if=[{mapped}, {unique}])
+
+    
+Now, we need to ``count`` the results. This function takes the result of the
+above and aggregates it different ways. In this case, we want to aggregate by
+KEGG KOs, and eggNOG OGs::
+
+    counts = count(mapped,
+                features=['KEGG_ko', 'eggNOG_OG'],
+                normalizatio={scaled})
+
+5. Aggregate the results
+
+We have done all this computation, now we need to save it somewhere. We will
+use the ``collect()`` function to aggregate across all the samples processed.
+
+::
+    collect(counts
+            current=sample,
+            allneeded=samples,
+            ofile='omgc.profiles.txt')
+
+6. Run it!
+
+This is our script. We save it to a file (say ``process.ngl``) and run it from
+the command line::
+
+    $ ngless process.ngl
+
+Note that we need a large amount (ca. 64GB) of RAM memory to be able to use the
+OM-RGC. You also need to run it once for each sample. However, this can be done
+in parallel, taking advantage of high performance computing clusters.
+
+
+# Full script
+
+::
+
+    ngless "0.0"
+    import "parallel" version "0.0"
+    import "mocat" version "0.0"
+    import "omrgc" version "0.0"
+
+    BASEDIR = '.' # <- Where you keep your data
+
+    samples = readlines('tara.demo.short')
+    sample = lock1(samples)
+    input = load_mocat_sample(BASEDIR + sample)
+
+    preprocess(input, keep_singles=False) using |read|:
+        read = substrim(read, min_quality=25)
+        if len(read) < 45:
+            discard
+
+    mapped = map(input, reference='omrgc', mode_all=True)
+    mapped = select(mapped, keep_if=[{mapped}, {unique}])
+    collect(
+            count(mapped,
+                    features=['KEGG_ko', 'eggNOG_OG'],
+                    normalizatio={scaled}),
+            current=sample,
+            allneeded=samples,
+            ofile='omgc.profile.txt')
+
+
