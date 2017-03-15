@@ -5,6 +5,15 @@ Ocean Metagenomics Functional Profiling
 In this tutorial, we will analyse a small dataset of oceanic microbial
 metagenomes.
 
+.. note::
+    This tutorial uses the full Ocean Microbial Reference Gene Catalog
+    presented in `Structure and function of the global ocean microbiome
+    <http://science.sciencemag.org/content/348/6237/1261359.long>`__ Sunagawa,
+    Coelho, Chaffron, et al., Science, 2015
+
+    This catalog contains ca. 40 million genes and requires **56GiB** of RAM
+
+
 1. Download the toy dataset
 
 The data is available at `http://vm-lux.embl.de/~coelho/ngless-data/Demos/ocean-short.tar.gz
