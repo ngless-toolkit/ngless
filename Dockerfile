@@ -21,6 +21,8 @@ RUN apk add \
     make \
     vim \
     xz \
+    xz-dev \
+    libgcc \
     zlib-dev
 
 # GRAB A RECENT BINARY OF STACK

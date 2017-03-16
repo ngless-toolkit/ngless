@@ -11,8 +11,6 @@ before_install:
   - mkdir -p ~/.local/bin
   - export PATH=$HOME/.local/bin:$PATH
   - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
-  - export PATH=/opt/ghc/7.10.3/bin:$PATH
-  - stack --no-terminal setup
 
 env:
   - STACKOPTS=" --no-terminal"
@@ -20,10 +18,12 @@ env:
 addons:
   apt:
     packages:
-      - samtools
       - libgmp10
       - libgmp-dev
+      - liblzma-dev
+      - libcurl4-openssl-dev
 
 script:
+  - stack --no-terminal setup
   - make
   - ./run-tests.sh

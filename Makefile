@@ -12,11 +12,11 @@ BWA_DIR = bwa-0.7.15
 BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.15/bwa-0.7.15.tar.bz2
 BWA_TAR = bwa-0.7.15.tar.bz2
 
-SAM_DIR = samtools-1.3.1
-SAM_URL = https://github.com/samtools/samtools/releases/download/1.3.1/samtools-1.3.1.tar.bz2
-SAM_TAR = samtools-1.3.1.tar.bz2
+SAM_DIR = samtools-1.4
+SAM_URL = https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
+SAM_TAR = samtools-1.4.tar.bz2
 
-NGLESS_BUILD_BINARIES := NGLess/Dependencies/samtools_data.c NGLess/Dependencies/bwa_data.c
+NGLESS_EMBEDDED_BINARIES := NGLess/Dependencies/samtools_data.c NGLess/Dependencies/bwa_data.c
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
@@ -57,14 +57,12 @@ angular-animate.min.js = ajax.googleapis.com/ajax/libs/angularjs/1.2.16/angular-
 reqhtmllibs = $(addprefix $(HTML_LIBS_DIR)/, $(HTMLFILES))
 reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
 
-PREBUILD = NGLess.cabal $(NGLESS_BUILD_BINARIES)
-
-all: NGLess.cabal ngless
+all: ngless
 
 NGLess.cabal: NGLess.cabal.m4
 	m4 $< > $@
 
-ngless-embed: $(PREBUILD) modules
+ngless-embed: NGLess.cabal modules $(NGLESS_EMBEDDED_BINARIES)
 	stack build $(STACKOPTS) --flag NGLess:embed
 
 ngless: NGLess.cabal modules
@@ -73,10 +71,10 @@ ngless: NGLess.cabal modules
 modules:
 	cd Modules && $(MAKE)
 
-static: $(PREBUILD) modules
+static: NGLess.cabal modules $(NGLESS_EMBEDDED_BINARIES)
 	stack build $(STACKOPTS) --ghc-options='-optl-static -optl-pthread' --force-dirty --flag NGLess:embed
 
-fast: $(PREBUILD)
+fast: NGLess.cabal
 	stack build $(STACKOPTS) --ghc-options=-O0
 
 
@@ -88,13 +86,15 @@ test_samples/htseq-res/htseq_cds_noStrand_union.txt:
 	cd test_samples/ && gzip -dkf *.gz
 	cd test_samples/htseq-res && ./generateHtseqFiles.sh
 
-check: $(PREBUILD)
+check: NGLess.cabal
 	stack test $(STACKOPTS)
-fastcheck: $(PREBUILD)
+
+fastcheck: NGLess.cabal
 	stack test $(STACKOPTS) --ghc-options=-O0
+# Synonym
 tests: check
 
-bench: $(PREBUILD)
+bench: NGLess.cabal
 	stack bench $(STACKOPTS)
 
 profile:
@@ -111,7 +111,7 @@ install:
 nglessconf: $(SAM_DIR) $(BWA_DIR) $(reqhtmllibs) $(reqfonts)
 
 clean:
-	rm -f $(NGLESS_BUILD_BINARIES)
+	rm -f $(NGLESS_EMBEDDED_BINARIES)
 	stack clean $(STACKOPTS)
 
 distclean: clean
@@ -131,6 +131,8 @@ $(BWA_DIR):
 	rm $(BWA_TAR)
 	cd $(BWA_DIR) && curl https://patch-diff.githubusercontent.com/raw/lh3/bwa/pull/90.diff | patch -p1
 
+$(BWA_DIR)/bwa: $(BWA_DIR)
+	cd $(BWA_DIR) && $(MAKE)
 
 $(BWA_DIR)/ngless-bwa-static: $(BWA_DIR)
 	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"  LIBS="-lbwa -lm -lz -lrt -lpthread" && cp -p bwa ngless-bwa-static
@@ -140,11 +142,14 @@ $(SAM_DIR):
 	tar xvfj $(SAM_TAR)
 	rm $(SAM_TAR)
 
+$(SAM_DIR)/samtools-static: $(SAM_DIR)
+	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC" && cp -p samtools samtools-static
+
 $(SAM_DIR)/samtools: $(SAM_DIR)
-	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC"
+	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE)
 
 
-NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/samtools
+NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/samtools-static
 	xxd -i $< $@
 
 NGLess/Dependencies/bwa_data.c: $(BWA_DIR)/ngless-bwa-static

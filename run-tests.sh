@@ -2,6 +2,9 @@
 
 shopt -s nullglob
 
+SAMTOOLS_VERSION=1.4
+BWA_VERSION=0.7.15
+
 function remove_ngless_bin {
     # Ensure that the directory where ngless unpacks embedded binaries is removed (we want to test the embedded blobs)
     NGLDIR="$HOME/.local/share/ngless/bin"
@@ -23,10 +26,12 @@ elif [[ "$0" == *-static.sh ]]; then
     remove_ngless_bin
 else
     echo ">>> Testing NGLess ( regular build ) <<<"
-    export NGLESS_SAMTOOLS_BIN=$REPO/samtools-1.3.1/samtools
-    export NGLESS_BWA_BIN=$REPO/bwa-0.7.15/bwa
+    export NGLESS_SAMTOOLS_BIN=$REPO/samtools-${SAMTOOLS_VERSION}/samtools
+    export NGLESS_BWA_BIN=$REPO/bwa-${BWA_VERSION}/bwa
     echo ">> Will use samtools from '$NGLESS_SAMTOOLS_BIN' <<"
+    make samtools-${SAMTOOLS_VERSION}/samtools || (echo "make samtools failed" ; exit 1)
     echo ">> Will use bwa from '$NGLESS_BWA_BIN' <<"
+    make bwa-${BWA_VERSION}/bwa || (echo "make bwa failed" ; exit 1)
     MAKETARGET=""
 fi
 
