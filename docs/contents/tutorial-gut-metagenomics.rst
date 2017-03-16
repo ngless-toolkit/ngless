@@ -207,7 +207,7 @@ Here is the full script::
 
     counts = count(mapped,
                 features=['KEGG_ko', 'eggNOG_OG'],
-                normalizatio={scaled})
+                normalization={scaled})
 
     collect(counts,
             current=sample,

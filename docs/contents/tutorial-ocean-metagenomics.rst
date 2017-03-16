@@ -108,7 +108,7 @@ KEGG KOs, and eggNOG OGs::
 
     counts = count(mapped,
                 features=['KEGG_ko', 'eggNOG_OG'],
-                normalizatio={scaled})
+                normalization={scaled})
 
 5. Aggregate the results
 
@@ -157,7 +157,7 @@ Here is the full script::
     collect(
             count(mapped,
                     features=['KEGG_ko', 'eggNOG_OG'],
-                    normalizatio={scaled}),
+                    normalization={scaled}),
             current=sample,
             allneeded=samples,
             ofile='omgc.profile.txt')
