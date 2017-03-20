@@ -13,8 +13,13 @@ metagenomes.
 
 1. Download the toy dataset
 
-The data is available at `http://vm-lux.embl.de/~coelho/ngless-data/Demos/gut-short.tar.gz
-<http://vm-lux.embl.de/~coelho/ngless-data/Demos/gut-short.tar.gz>`__
+First download all the tutorial data::
+
+   ngless --download-demo gut-short
+
+This will `download
+<http://vm-lux.embl.de/~coelho/ngless-data/Demos/gut-short.tar.gz>`__ and
+expand the data to a directory called ``gut-short``.
 
 This is a toy dataset. It is based on `real data
 <http://www.ebi.ac.uk/ena/data/view/PRJNA339914>`__, but the samples were

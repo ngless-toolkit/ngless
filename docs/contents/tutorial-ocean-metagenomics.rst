@@ -16,8 +16,13 @@ metagenomes.
 
 1. Download the toy dataset
 
-The data is available at `http://vm-lux.embl.de/~coelho/ngless-data/Demos/ocean-short.tar.gz
-<http://vm-lux.embl.de/~coelho/ngless-data/Demos/ocean-short.tar.gz>`__
+First download all the tutorial data::
+
+   ngless --download-demo ocean-short
+
+This will `download
+<http://vm-lux.embl.de/~coelho/ngless-data/Demos/ocean-short.tar.gz>`__ and
+expand the data to a directory called ``ocean-short``.
 
 This is a toy dataset. It is based on real data, but the samples were trimmed
 so that they contains only 250k paired-end reads.

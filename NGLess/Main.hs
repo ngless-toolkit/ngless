@@ -232,6 +232,16 @@ modeExec (CreateReferencePackMode ofile gen mgtf mfunc) = runNGLessIO "creating 
 modeExec (DownloadFileMode url local) = runNGLessIO "download a file" $
     downloadFile url local
 
+modeExec (DownloadDemoMode demo) = runNGLessIO "downloading a demo" $
+    if demo `elem` ["gut-short", "ocean-short"]
+        then do
+            let url = "http://vm-lux.embl.de/~coelho/ngless-data/Demos/" ++ demo ++ ".tar.gz"
+            downloadExpandTar url "."
+            liftIO $ putStrLn ("\nDemo downloaded to " ++ demo)
+        else liftIO $ do
+            hPutStrLn stderr "Unknown demo"
+            exitFailure
+
 main = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
         foottext = concat [

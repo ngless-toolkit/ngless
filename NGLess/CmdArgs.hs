@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveDataTypeable, OverloadedStrings, LambdaCase #-}
-{- Copyright 2015-2016 NGLess Authors
+{-# LANGUAGE DeriveDataTypeable #-}
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
 module CmdArgs
@@ -73,6 +73,9 @@ data NGLessMode =
               { origUrl :: String
               , localFile :: FilePath
               }
+        | DownloadDemoMode
+              { demoName :: String
+              }
            deriving (Eq, Show)
 
 parseVerbosity = option (eitherReader readVerbosity) (long "verbosity" <> short 'v' <> value Normal)
@@ -130,10 +133,13 @@ downloadFileArgs = (flag' DownloadFileMode (long "download-file"))
                         <*> strOption (long "download-url")
                         <*> strOption (long "local-file")
 
+downloadDemoArgs = flag' DownloadDemoMode (long "download-demo")
+                        <*> strArgument (metavar "DEMO-NAME")
+
 
 nglessArgs :: Parser NGLessArgs
 nglessArgs = NGLessArgs
                 <$> parseVerbosity
                 <*> switch (long "quiet" <> short 'q')
                 <*> parseColor
-                <*> (mainArgs <|> downloadFileArgs <|> installArgs <|> createRefArgs)
+                <*> (mainArgs <|> downloadFileArgs <|> downloadDemoArgs <|> installArgs <|> createRefArgs)
