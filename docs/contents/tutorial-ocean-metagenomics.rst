@@ -29,10 +29,7 @@ so that they contains only 250k paired-end reads.
 
 The dataset is organized in classical MOCAT style. Ngless does not require this
 structure, but this tutorial also demonstrates how to upgrade from your
-existing MOCAT-based projects.
-
-
-::
+existing MOCAT-based projects.::
 
     $ find
     ./SAMEA2621229.sampled
@@ -46,6 +43,14 @@ existing MOCAT-based projects.
     ./SAMEA2621033.sampled/ERR594391_1.short.fq.gz
     ./tara.demo.short
     ./process.ngl
+
+
+The whole script we will be using is there as well (``process.ngl``), so you
+can immediately run it with::
+
+    ngless process.ngl
+
+The rest of this tutorial is an explanation of the steps in this script.
 
 2. Preliminary imports
 
@@ -106,7 +111,6 @@ the ``omrgc`` reference available.
 
     mapped = select(mapped, keep_if=[{mapped}, {unique}])
 
-    
 Now, we need to ``count`` the results. This function takes the result of the
 above and aggregates it different ways. In this case, we want to aggregate by
 KEGG KOs, and eggNOG OGs::

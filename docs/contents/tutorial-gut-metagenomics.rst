@@ -27,9 +27,7 @@ trimmed so that they contains only 250k paired-end reads.
 
 The dataset is organized in classical MOCAT style. Ngless does not require this
 structure, but this tutorial also demonstrates how to upgrade from your
-existing MOCAT-based projects.
-
-::
+existing MOCAT-based projects.::
 
     $ find
     ./igc.demo.short
@@ -46,6 +44,13 @@ existing MOCAT-based projects.
     ./SAMN05615098.short/SRR4052033.pair.1.fq.gz
     ./SAMN05615098.short/SRR4052033.single.fq.gz
     ./process.ngl
+
+The whole script we will be using is there as well (``process.ngl``), so you
+can immediately run it with::
+
+    ngless process.ngl
+
+The rest of this tutorial is an explanation of the steps in this script.
 
 
 2. Preliminary imports
