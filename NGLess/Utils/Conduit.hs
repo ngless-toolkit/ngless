@@ -36,7 +36,7 @@ import qualified Data.Conduit.Zlib as CZ
 import qualified Data.Conduit.BZlib as CZ
 #endif
 import qualified Data.Conduit as C
-import           Data.Conduit ((=$=), ($$))
+import           Data.Conduit ((=$=))
 
 import qualified Data.Sequence as Seq
 import           Data.Sequence ((|>), ViewL(..))
@@ -198,7 +198,7 @@ asyncGzipTo h = do
     bsConcatTo ((2 :: Int) ^ (15 :: Int))
         =$= CA.drainTo 8 drain
 
-asyncGzipToFile :: forall m. (MonadIO m, MonadResource m, MonadBaseControl IO m) => FilePath -> C.Sink B.ByteString m ()
+asyncGzipToFile :: forall m. (MonadResource m, MonadBaseControl IO m) => FilePath -> C.Sink B.ByteString m ()
 asyncGzipToFile fname = C.bracketP
     (openFile fname WriteMode)
     hClose
@@ -219,7 +219,7 @@ asyncGzipFrom h = do
     CA.gatherFrom 8 prod
         =$= stopAtNothing
 
-asyncGzipFromFile :: forall m. (MonadIO m, MonadResource m, MonadBaseControl IO m) => FilePath -> C.Source m B.ByteString
+asyncGzipFromFile :: forall m. (MonadResource m, MonadBaseControl IO m) => FilePath -> C.Source m B.ByteString
 asyncGzipFromFile fname = C.bracketP
     (openFile fname ReadMode)
     hClose

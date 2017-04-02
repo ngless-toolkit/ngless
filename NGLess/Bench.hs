@@ -19,7 +19,7 @@ import Configuration (setupTestConfiguration)
 
 
 import Interpretation.Map (_samStats)
-import Interpretation.Count (performCount, MMMethod(..), loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), Annotator(..))
+import Interpretation.Count (performCount, MMMethod(..), loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), Annotator(..), NMode(..))
 import Interpretation.Substrim (substrim)
 import Interpret (interpret)
 import Parse (parsengless)
@@ -76,7 +76,7 @@ basicCountOpts = CountOpts
         , optMinCount = 0.0
         , optMMMethod = MMDist1
         , optDelim = "\t"
-        , optNormSize = False
+        , optNormMode = NMRaw
         , optIncludeMinus1 = True
         }
 

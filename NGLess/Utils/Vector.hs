@@ -38,7 +38,7 @@ unsafeIncrement v i = unsafeIncrement' v i 1
 unsafeIncrement' :: (Num a, PrimMonad m, VUM.Unbox a) => VUM.MVector (PrimState m) a -> Int -> a -> m ()
 unsafeIncrement' v i inc = VUM.unsafeModify v (+ inc) i
 
-toFractions :: (PrimMonad m, VUM.Unbox a, Fractional a, Eq a, Num a) => VUM.MVector (PrimState m) a -> m ()
+toFractions :: (PrimMonad m, VUM.Unbox a, Fractional a, Eq a) => VUM.MVector (PrimState m) a -> m ()
 toFractions v = do
     v' <- VU.unsafeFreeze v
     let total = VU.foldr1 (+) v'

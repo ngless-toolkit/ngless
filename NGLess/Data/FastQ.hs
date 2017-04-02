@@ -118,7 +118,7 @@ fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, 
         offset :: Int8
         offset = encodingOffset enc
 
-fqDecodeC :: (Monad m, MonadError NGError m) => FastQEncoding -> C.Conduit ByteLine m ShortRead
+fqDecodeC :: (MonadError NGError m) => FastQEncoding -> C.Conduit ByteLine m ShortRead
 fqDecodeC enc = groupC 4 =$= CL.mapM parseShortReads
     where
         offset :: Int8
