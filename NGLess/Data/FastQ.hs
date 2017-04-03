@@ -118,12 +118,16 @@ fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, 
         offset :: Int8
         offset = encodingOffset enc
 
+
+-- | Decode a FastQ file
 fqDecodeC :: (MonadError NGError m) => FastQEncoding -> C.Conduit ByteLine m ShortRead
 fqDecodeC enc = groupC 4 =$= CL.mapM parseShortReads
     where
         offset :: Int8
         offset = encodingOffset enc
-        parseShortReads [ByteLine rid, ByteLine rseq, _, ByteLine rqs] = return $! ShortRead rid rseq (vSub rqs offset)
+        parseShortReads [ByteLine rid, ByteLine rseq, _, ByteLine rqs]
+            | B.length rseq == B.length rqs = return $! ShortRead rid rseq (vSub rqs offset)
+            | otherwise = throwDataError "Length of quality line is not the same as sequence"
         parseShortReads _ = throwDataError "Number of lines in FastQ file is not multiple of 4! EOF found"
 
 -- | reads a sequence of short reads.
@@ -152,7 +156,9 @@ statsFromFastQ fp enc =
         getPairedLines :: C.Conduit ByteLine NGLessIO (Pair ByteLine (VU.Vector Int8))
         getPairedLines = groupC 4 =$= CL.mapM getPairedLines'
             where
-                getPairedLines' [_, bps, _, ByteLine qs] = return $! bps :!: vSub qs offset
+                getPairedLines' [_, bps, _, ByteLine qs]
+                    | B.length (unwrapByteLine bps) == B.length qs = return $! bps :!: vSub qs offset
+                    | otherwise = throwDataError "Length of quality line is not the same as sequence"
                 getPairedLines' _ = throwDataError "fastq lines are not a multiple of 4"
 
 
