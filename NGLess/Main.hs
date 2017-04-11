@@ -187,8 +187,8 @@ modeExec opts@DefaultMode{} = do
         sc <- runNGLess $ checktypes modules sc' >>= validate modules
         when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
             whenStrictlyNormal setQuiet
-        odir <- nConfOutputDirectory <$> nglConfiguration
-        shouldOutput <- nConfCreateOutputDirectory <$> nglConfiguration
+        odir <- nConfReportDirectory <$> nglConfiguration
+        shouldOutput <- nConfCreateReportDirectory <$> nglConfiguration
         shouldPrintHeader <- nConfPrintHeader <$> nglConfiguration
         outputLno' DebugOutput "Validating script..."
         errs <- validateIO modules sc

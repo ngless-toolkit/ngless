@@ -52,8 +52,8 @@ data NGLessConfiguration = NGLessConfiguration
     , nConfTemporaryDirectory :: FilePath
     , nConfKeepTemporaryFiles :: Bool
     , nConfTrace :: Bool
-    , nConfCreateOutputDirectory :: Bool
-    , nConfOutputDirectory :: FilePath
+    , nConfCreateReportDirectory :: Bool
+    , nConfReportDirectory :: FilePath
     , nConfColor :: ColorSetting
     , nConfPrintHeader :: Bool
     , nConfSubsample :: Bool
@@ -81,11 +81,11 @@ guessConfiguration = do
         , nConfGlobalDataDirectory = nglessBinDirectory </> "../share/ngless/data"
         , nConfUserDirectory = defaultUserNglessDirectory
         , nConfUserDataDirectory = defaultUserNglessDirectory </> "data"
-        , nConfCreateOutputDirectory = True
+        , nConfCreateReportDirectory = True
         , nConfTemporaryDirectory = tmp
         , nConfKeepTemporaryFiles = False
         , nConfTrace = False
-        , nConfOutputDirectory = ""
+        , nConfReportDirectory = ""
         , nConfColor = AutoColor
         , nConfPrintHeader = True
         , nConfSubsample = False
@@ -122,8 +122,8 @@ readConfigFiles NGLessConfiguration{..} cfiles = do
         , nConfTemporaryDirectory = nConfTemporaryDirectory'
         , nConfKeepTemporaryFiles = nConfKeepTemporaryFiles'
         , nConfTrace = nConfTrace
-        , nConfCreateOutputDirectory = nConfCreateOutputDirectory
-        , nConfOutputDirectory = nConfOutputDirectory
+        , nConfCreateReportDirectory = nConfCreateReportDirectory
+        , nConfReportDirectory = nConfReportDirectory
         , nConfColor = nConfColor'
         , nConfPrintHeader = nConfPrintHeader'
         , nConfSubsample = nConfSubsample
@@ -162,11 +162,11 @@ initConfiguration opts = do
                 tmpdir = fromMaybe
                             (nConfTemporaryDirectory config)
                             temporary_directory
-                odir = case (output_directory, input) of
+                html_odir = case (html_report_directory, input) of
                     (Nothing, ScriptFilePath "-") -> "STDIN.output_ngless"
                     (Nothing, ScriptFilePath fpscript) -> fpscript ++ ".output_ngless"
                     (Nothing, InlineScript _ ) -> "INLINE_SCRIPT.output_ngless"
-                    (Just odir', _) -> odir'
+                    (Just html_odir', _) -> html_odir'
                 argv = case input of
                     ScriptFilePath f -> f:extraArgs
                     _ -> extraArgs
@@ -176,8 +176,8 @@ initConfiguration opts = do
             in config
                     { nConfTrace = trace
                     , nConfKeepTemporaryFiles = ktemp
-                    , nConfCreateOutputDirectory = createOutputDirectory
-                    , nConfOutputDirectory = odir
+                    , nConfCreateReportDirectory = createReportDirectory
+                    , nConfReportDirectory = html_odir
                     , nConfTemporaryDirectory = tmpdir
                     , nConfPrintHeader = nConfPrintHeader config && not no_header && not print_last
                     , nConfSubsample = subsampleMode

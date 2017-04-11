@@ -51,8 +51,8 @@ data NGLessMode =
               , print_last :: Bool
               , trace_flag :: Maybe Bool
               , nThreads :: Int
-              , createOutputDirectory :: Bool
-              , output_directory :: Maybe FilePath
+              , createReportDirectory :: Bool
+              , html_report_directory :: Maybe FilePath
               , temporary_directory :: Maybe FilePath
               , keep_temporary_files :: Maybe Bool
               , config_files :: [FilePath]
@@ -110,8 +110,8 @@ mainArgs = DefaultMode
               <*> switch (long "print-last" <> short 'p' <> help "print value of last line in script") -- print_last :: Bool
               <*> optional (switch (long "trace")) -- trace_flag :: Maybe Bool
               <*> option auto (long "jobs" <> short 'j' <> value 1) -- nThreads :: Int
-              <*> switch (long "output" <> help "whether to create the ngless_output directory") -- createOutputDirectory :: Bool
-              <*> optional (strOption $ long "output-directory" <> short 'o' <> help "name of output directory") -- output_directory :: Maybe FilePath
+              <*> switch (long "create-report" <> help "whether to create the report directory") -- createReportDirectory :: Bool
+              <*> optional (strOption $ long "html-report-directory" <> short 'o' <> help "name of output directory") -- html_report_directory :: Maybe FilePath
               <*> optional (strOption $ long "temporary-directory" <> short 't' <> help "Directory where to store temporary files") -- temporary_directory :: Maybe FilePath
               <*> optional (switch $ long "keep-temporary-files" <> help "Whether to keep temporary files (default is delete them)") -- keep_temporary_files :: Maybe Bool
               <*> many (strOption $ long "config-file" <> help "Configuration files to parse") -- config_files :: Maybe [FilePath]
