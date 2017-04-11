@@ -74,22 +74,14 @@ experience than is possible with a generic tool. In particular, when the user
 makes a mistake (and all users will make mistakes), we can diagnose it faster
 and provide a better error message than is possible to do with Bioboxes.
 
-However, it may be worthwhile to consider Docker-technologies as *being used by
-ngless* to make distribution easier. We plan to distribute a Docker image
-version of ngless, which can contain external modules as well, thus solving a
-whole set of distribution problems.
-
 ## What is the relationship of ngless to the [Common Workflow Language](http://common-workflow-language.github.io/)?
 
 Like for the question above, we consider ngless to be related to but not
 overlapping with the CWL (Common Workflow Language).
 
-In particular, we can envision using the CWL as a target of an ngless script:
-that is, we can imagine a future implementation of ngless that takes an ngless
-script and outputs a CWL one, which can be used to run the pipeline. In this
-analogy, CWL functions as a common assembly language, while ngless is the
-high-level language which compiles to CWL.
-
+In particular, much of functionality of ngless can also be accessed in CWL
+workflow, using [our CWL
+wrappers](https://github.com/luispedro/ngless/tree/master/scripts).
 
 ## Questions about the ngless language
 
@@ -98,7 +90,6 @@ high-level language which compiles to CWL.
 Yes, you can. Just add them as additional arguments and they will be available
 inside your script as `ARGV`.
 
-
 ## What are symbols (in the ngless language)?
 
 If you are familiar with the concept, you can think of them as `enums` in other
@@ -106,8 +97,11 @@ languages.
 
 Whenever a symbol is used in the argument to a function, this means that that
 function takes only one of a small number of possible symbols for that
-argument.
+argument. This improves error checking and readibility.
 
 ## Does the select function work on inserts (considering both mates) or per-read (treating the data as single-ended)?
 
-Select works considering the insert as a whole.
+By default, `select` considers the insert as a whole, but you can have it
+consider each read as single-end by using setting the `paired` argument to
+`False`.
+
