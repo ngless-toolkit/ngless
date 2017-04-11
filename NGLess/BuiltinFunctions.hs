@@ -1,4 +1,4 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
 module BuiltinFunctions
@@ -64,7 +64,7 @@ countArgs =
     ,ArgInformation "norm" False NGLBool []
     ,ArgInformation "discard_zeros" False NGLBool []
     ,ArgInformation "include_minus1" False NGLBool []
-    ,ArgInformation "normalization" False NGLSymbol [ArgCheckSymbol ["raw", "normed", "scaled"]]
+    ,ArgInformation "normalization" False NGLSymbol [ArgCheckSymbol ["raw", "normed", "scaled", "fpkm"]]
     ]
 
 selectArgs =

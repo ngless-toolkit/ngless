@@ -100,7 +100,7 @@ type FeatureSizeMap = M.Map B.ByteString Double
 data MMMethod = MMCountAll | MM1OverN | MMDist1 | MMUniqueOnly
     deriving (Eq, Show)
 
-data NMode = NMRaw | NMNormed | NMScaled
+data NMode = NMRaw | NMNormed | NMScaled | NMFpkm
     deriving (Eq, Show)
 
 
@@ -242,6 +242,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
             "raw" -> return NMRaw
             "normed" -> return NMNormed
             "scaled" -> return NMScaled
+            "fpkm" -> return NMFpkm
             other -> throwShouldNotOccur ("Illegal symbol value for normalization: " ++ show other)
     fs <- case lookup "features" args of
         Nothing -> return ["gene"]
@@ -450,20 +451,7 @@ distributeScaleCounts norm mmmethod annotators mcountss toDistribute =
             s <- runNGLess $ annSizeOf ann name
             liftIO $ VUM.write sizes i s
         redistribute mmmethod mcounts sizes indices
-        case norm of
-            NMNormed -> normalizeCounts mcounts sizes
-            NMScaled -> do
-                -- count vectors always include a -1 at this point (it is
-                -- ignored in output if the user does not request it, but
-                -- always computed). Thus, we compute the sum without it and do
-                -- not normalize it later:
-                let totalCounts v = withVector v (VU.sum . VU.tail)
-                initial <- totalCounts mcounts
-                normalizeCounts mcounts sizes
-                afternorm <- totalCounts mcounts
-                let factor = initial / afternorm
-                liftIO $ forM_ [1.. VUM.length mcounts - 1] (VUM.unsafeModify mcounts (* factor))
-            NMRaw -> return ()
+        normalizeCounts norm mcounts sizes
         liftIO $ VU.unsafeFreeze mcounts
 
 
@@ -471,7 +459,7 @@ redistribute :: MMMethod -> VUM.IOVector Double -> VUM.IOVector Double -> [IG.In
 redistribute MMDist1 ocounts sizes indices = do
     outputListLno' TraceOutput ["Counts (second pass)..."]
     fractCounts' <- liftIO $ VUM.clone ocounts
-    normalizeCounts fractCounts' sizes
+    normalizeCounts NMNormed fractCounts' sizes
     fractCounts <- liftIO $ VU.unsafeFreeze fractCounts'
     forM_ indices $ \vss -> IG.forM_ vss $ \vs -> do
         let cs = map (VU.unsafeIndex fractCounts) vs
@@ -497,16 +485,32 @@ increment1OverN counts vis = forM_ vis $ \vi -> unsafeIncrement' counts vi oneOv
         oneOverN :: Double
         oneOverN = 1.0 / convert (length vis)
 
-normalizeCounts :: VUM.IOVector Double -> VUM.IOVector Double -> NGLessIO ()
-normalizeCounts counts sizes = do
-    let n = VUM.length counts
-        n' = VUM.length sizes
-    unless (n == n') $
-        throwShouldNotOccur ("Counts vector is of size " ++ show n ++ ", but sizes is of size " ++ show n')
-    forM_ [0 .. n - 1] $ \i -> liftIO $ do
-        s <- VUM.read sizes i
-        when (s > 0) $
-            VUM.unsafeModify counts (/ s) i
+normalizeCounts :: NMode -> VUM.IOVector Double -> VUM.IOVector Double -> NGLessIO ()
+normalizeCounts NMRaw _ _ = return ()
+normalizeCounts NMNormed counts sizes = do
+        let n = VUM.length counts
+            n' = VUM.length sizes
+        unless (n == n') $
+            throwShouldNotOccur ("Counts vector is of size " ++ show n ++ ", but sizes is of size " ++ show n')
+        forM_ [0 .. n - 1] $ \i -> liftIO $ do
+            s <- VUM.read sizes i
+            when (s > 0) $
+                VUM.unsafeModify counts (/ s) i
+normalizeCounts nmethod counts sizes
+    | nmethod `elem` [NMScaled, NMFpkm] = do
+        -- count vectors always include a -1 at this point (it is
+        -- ignored in output if the user does not request it, but
+        -- always computed). Thus, we compute the sum without it and do
+        -- not normalize it later:
+        let totalCounts v = withVector v (VU.sum . VU.tail)
+        initial <- totalCounts counts
+        normalizeCounts NMNormed counts sizes
+        afternorm <- totalCounts counts
+        let factor
+                | nmethod == NMScaled = initial / afternorm
+                | otherwise =  (1.0e9 / initial) --- 1e6 [million fragments] * 1e3 [kilo basepairs] = 1e9
+        liftIO $ forM_ [1.. VUM.length counts - 1] (VUM.unsafeModify counts (* factor))
+    | otherwise = error "This should be unreachable code [normalizeCounts]"
 
 data LoadFunctionalMapState = LoadFunctionalMapState
                                         !Int -- ^ next free index
