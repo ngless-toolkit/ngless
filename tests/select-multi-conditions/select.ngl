@@ -2,3 +2,6 @@ ngless '0.0'
 input = samfile('input.sam')
 selected = select(input, keep_if=[{mapped}, {unique}])
 write(selected, ofile='output.selected.mapped_unique.sam')
+
+selected = select(input, paired=False, keep_if=[{mapped}, {unique}])
+write(selected, ofile='output.selected.mapped_unique_unpaired.sam')

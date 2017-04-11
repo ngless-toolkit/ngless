@@ -1,7 +1,7 @@
-{- Copyright 2014-2016 NGLess Authors
+{- Copyright 2014-2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Data.Sam
     ( SamLine(..)
     , samLength
@@ -191,7 +191,9 @@ samIntTag samline tname
                     && (fst <$> B8.uncons (B.drop 3 match)) == Just 'i' = fst <$> B8.readInt (B.drop 5 match)
             | otherwise = Nothing
 
--- | take in *lines* and transform them into groups of SamLines all refering to the same read
+-- | take in *ByteLines* and transform them into groups of SamLines all refering to the same read
+--
+-- Header lines are silently ignored
 readSamGroupsC :: (MonadError NGError m) => C.Conduit ByteLine m [SamLine]
 readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
     where
@@ -202,26 +204,36 @@ readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
                 _ -> return ()
         groupLine = (==) `on` samQName
 
--- | a chunked variation of readSamGroupsC which uses mulitple threads
-readSamGroupsC' :: Int -> C.Conduit ByteLine NGLessIO (V.Vector [SamLine])
-readSamGroupsC' mapthreads = do
+-- | a chunked variation of readSamGroupsC which uses multiple threads
+--
+-- When respectPairs is False, then the two mates of the same fragment will be
+-- considered grouped in different blocks
+readSamGroupsC' :: Int -> Bool -> C.Conduit ByteLine NGLessIO (V.Vector [SamLine])
+readSamGroupsC' mapthreads respectPairs = do
         C.dropWhile (\(ByteLine line) -> B8.head line == '@')
         C.conduitVector 4096
             =$= asyncMapEitherC mapthreads (liftM groupByName . V.mapM (readSamLine . unwrapByteLine))
             -- the groups may not be aligned on the group boundary, thus we need to fix them
             =$= fixSamGroups
     where
+        samQNameMate :: SamLine -> (B.ByteString, Bool)
+        samQNameMate s
+            | respectPairs = (samQName s, True)
+            | otherwise = (samQName s, isFirstInPair s)
         groupByName :: V.Vector SamLine -> V.Vector [SamLine]
-        groupByName vs = V.unfoldr groupByName' (0, B.empty, [])
+        groupByName vs = V.unfoldr groupByName' (0, error "null value", [])
             where
-                groupByName' :: (Int, B.ByteString, [SamLine]) -> Maybe ([SamLine], (Int, B.ByteString, [SamLine]))
-                groupByName' (ix,name, acc)
-                    | ix == V.length vs = if null acc
-                                            then Nothing
-                                            else Just (reverse acc, (ix, name,[]))
-                    | null acc = groupByName' (ix + 1, samQName (vs V.! ix), [vs V.! ix])
-                    | samQName (vs V.! ix) == name = groupByName' (ix + 1, name, vs V.! ix: acc)
-                    | otherwise = Just (reverse acc, (ix, B.empty, []))
+                groupByName' :: (Int, (B.ByteString, Bool), [SamLine]) -> Maybe ([SamLine], (Int, (B.ByteString, Bool), [SamLine]))
+                groupByName' (ix, name, acc)
+                        | ix == V.length vs = if null acc
+                                                then Nothing
+                                                else Just (reverse acc, (ix, error "null value", []))
+                        | null acc = groupByName' (ix + 1, cur_tag, [cur])
+                        | cur_tag == name = groupByName' (ix + 1, name, cur:acc)
+                        | otherwise = Just (reverse acc, (ix, error "null value", []))
+                    where
+                        cur = vs V.! ix
+                        cur_tag = samQNameMate cur
         fixSamGroups :: C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
         fixSamGroups = awaitJust fixSamGroups'
         fixSamGroups' :: V.Vector [SamLine] -> C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
@@ -230,7 +242,7 @@ readSamGroupsC' mapthreads = do
             Just cur -> do
                     let (lastprev:_) = V.last prev
                         (curfirst:_) = V.head cur
-                    if samQName lastprev /= samQName curfirst
+                    if samQNameMate lastprev /= samQNameMate curfirst
                         then do -- lucky case, the groups align with the vector boundary
                             C.yield prev
                             fixSamGroups' cur

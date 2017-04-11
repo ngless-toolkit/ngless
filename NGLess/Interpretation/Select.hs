@@ -1,8 +1,8 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
 
-{-# LANGUAGE TupleSections, OverloadedStrings, RankNTypes, FlexibleContexts #-}
+{-# LANGUAGE RankNTypes, FlexibleContexts #-}
 
 module Interpretation.Select
     ( executeSelect
@@ -70,7 +70,7 @@ _keep1 SelectUnique = \g -> if isGroupUnique (map fst g) then g else []
 
 -- readSamGroupsAsConduit :: (MonadIO m, MonadResource m) => FileOrStream -> C.Producer m [(SamLine, B.ByteString)]
 -- The reason we cannot just use readSamGroupsC is that we want to get the unparsed ByteString on the side
-readSamGroupsAsConduit istream =
+readSamGroupsAsConduit istream paired =
         istream
             =$= readSamLineOrDie
             =$= CL.groupBy groupLine
@@ -81,15 +81,18 @@ readSamGroupsAsConduit istream =
                 Right parsed -> C.yield (parsed,line)
         groupLine (SamHeader _,_) _ = False
         groupLine _ (SamHeader _,_) = False
-        groupLine (s0,_) (s1,_) = samQName s0 == samQName s1
+        groupLine (s0,_) (s1,_)
+            | paired = samQName s0 == samQName s1
+            | otherwise = samQName s0 == samQName s1 && isFirstInPair s0 == isFirstInPair s1
 
 
 executeSelect :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSelect (NGOMappedReadSet name istream ref) args = do
+    paired <- lookupBoolOrScriptErrorDef (return True) "select" "paired" args
     conditions <- _parseConditions args
     let (fpsam, istream') = asSamStream istream
         stream =
-            readSamGroupsAsConduit istream'
+            readSamGroupsAsConduit istream' paired
                 =$= CL.map (_matchConditions conditions)
                 =$= CL.concat
         out = Stream ("selected_" ++ takeBaseNameNoExtensions fpsam ++ ".sam") (stream =$= CL.map ByteLine)

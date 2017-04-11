@@ -414,7 +414,7 @@ performCount samfp gname annotators0 opts = do
         liftIO $ VUM.replicate n_entries (0.0 :: Double)
     toDistribute <-
             samcontent
-                $$+- readSamGroupsC' mapthreads
+                $$+- readSamGroupsC' mapthreads True
                 =$= asyncMapEitherC mapthreads (\samgroup -> forM annotators $ \ann -> do
                                                                 annotated <- V.mapM (annotateReadGroup opts ann) samgroup
                                                                 return $ splitSingletons method annotated)

@@ -306,6 +306,8 @@ Arguments by value:
 +-------------+-------------+------------+----------------+
 | drop_if     | [Symbol]    | no         | -              |
 +-------------+-------------+------------+----------------+
+| paired      | Bool        | no         | true           |
++-------------+-------------+------------+----------------+
 
 At least one of ``keep_if`` or ``drop_if`` should be passed, but not both. They accept the following symbols:
 
@@ -316,6 +318,9 @@ At least one of ``keep_if`` or ``drop_if`` should be passed, but not both. They 
 If ``keep_if`` is used, then reads are kept if they pass **all the conditions**.
 If ``drop_if`` they are discarded if they fail to **any condition**.
 
+By default, ``select`` operates on a paired-end read as a whole. If
+``paired=False`` is passed, however, then link between the two mates is not
+considered and each read is processed independently.
 
 count
 -----

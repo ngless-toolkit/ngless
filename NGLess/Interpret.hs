@@ -1,9 +1,6 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Interpret
     ( interpret
@@ -450,7 +447,8 @@ executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
 executePrint err  _ = throwScriptError ("Cannot print " ++ show err)
 
 executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
-executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} [] (Block [Variable var] body) = do
+executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Variable var] body) = do
+        paired <- lookupBoolOrScriptErrorDef (return True) "select" "paired" args
         let (samfp, istream) = asSamStream isam
         runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", samfp]
         (oname, ohandle) <- runNGLessIO $ openNGLTempFile samfp "block_selected_" "sam"
@@ -464,7 +462,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} [] (Block [Variab
                 =$= C.unlinesAscii
                 =$= CB.sinkHandle ohandle
         samcontent
-            $$+- C.transPipe runNGLessIO (readSamGroupsC' mapthreads)
+            $$+- C.transPipe runNGLessIO (readSamGroupsC' mapthreads paired)
             =$= asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . filterGroup))
             =$= CB.sinkHandle ohandle
         liftIO $ hClose ohandle

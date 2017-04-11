@@ -70,6 +70,7 @@ countArgs =
 selectArgs =
     [ArgInformation "keep_if" False (NGList NGLSymbol) [ArgCheckSymbol ["mapped", "unmapped", "unique"]]
     ,ArgInformation "drop_if" False (NGList NGLSymbol) [ArgCheckSymbol ["mapped", "unmapped", "unique"]]
+    ,ArgInformation "paired" False NGLBool []
     ,ArgInformation "__oname" False NGLString []
     ]
 
