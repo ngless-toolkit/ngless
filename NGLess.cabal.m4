@@ -121,4 +121,5 @@ benchmark nglessbench
   BASE_CONFIG
   build-depends:
     BUILD_DEPENDS,
+    HUnit >= 1.3,
     criterion

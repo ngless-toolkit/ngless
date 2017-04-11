@@ -29,6 +29,7 @@ import FileManagement (openNGLTempFile)
 import NGLess
 import Output
 import Utils.Utils
+import NGLess.NGLEnvironment
 import Utils.Samtools (convertSamToBam)
 import Utils.Conduit
 

@@ -7,17 +7,21 @@ module Tests.Utils
     , fromRight
     , asTempFile
     , testNGLessIO
+    , setupTestConfiguration
     ) where
 import Test.HUnit
 import qualified Data.Text as T
 import qualified Data.ByteString as B
 import Control.Monad.IO.Class (liftIO)
 import System.IO
+import CmdArgs
 
 import Language
 import Parse
+import Configuration
 import FileManagement
 import NGLess
+import NGLess.NGLEnvironment
 
 isError :: Either a b -> Assertion
 isError = isErrorMsg "Error not caught"
@@ -45,5 +49,12 @@ asTempFile sf ext = do
         B.hPut h sf
         hClose h
     return fp
+
+
+setupTestConfiguration :: IO ()
+setupTestConfiguration = do
+    config <- guessConfiguration
+    let config' = config { nConfTemporaryDirectory = "testing_tmp_dir", nConfKeepTemporaryFiles = True, nConfVerbosity = Quiet }
+    updateNglEnvironment' (\env -> env { ngleConfiguration = config' })
 
 

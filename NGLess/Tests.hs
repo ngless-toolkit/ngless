@@ -34,7 +34,6 @@ import Interpret
 import Tokens
 import Types
 import FileManagement
-import Configuration
 import NGLess
 
 import Interpretation.Map

@@ -29,9 +29,10 @@ import Control.Monad.Trans.Resource(release)
 
 import qualified StandardModules.Mappers.Bwa as Bwa
 import Network (downloadExpandTar, downloadOrCopyFile)
-import FileManagement (createTempDir)
-import Utils.Utils
+import FileManagement (createTempDir, InstallMode(..))
+import NGLess.NGLEnvironment
 import Configuration
+import Utils.Utils
 import Modules
 import Output
 import NGLess

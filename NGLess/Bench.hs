@@ -15,7 +15,7 @@ import           Control.DeepSeq (NFData)
 import Control.Monad.Trans.Resource (runResourceT)
 
 import NGLess (NGLessIO, testNGLessIO)
-import Configuration (setupTestConfiguration)
+import Tests.Utils (setupTestConfiguration)
 
 
 import Interpretation.Map (_samStats)

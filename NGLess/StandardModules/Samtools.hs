@@ -28,7 +28,6 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Default
 
 import FileManagement
-import Configuration
 import FileOrStream
 import Transform
 import Language

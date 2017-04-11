@@ -8,7 +8,6 @@ module StandardModules.NGLStdlib
     ) where
 
 
-import qualified Data.Text as T
 import qualified StandardModules.Example as Example
 import qualified StandardModules.Batch as Batch
 import qualified StandardModules.Samtools as Samtools

@@ -12,7 +12,7 @@ module StandardModules.Mappers.Bwa
 import System.Process
 import System.Exit
 import System.Directory
-import System.Posix.Types (FileOffset)
+import System.Posix (getFileStatus, fileSize, FileOffset)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.Char8 as BL8
@@ -23,9 +23,8 @@ import qualified Data.Conduit.Internal as C
 import           GHC.Conc (getNumCapabilities)
 
 import Output
-import Configuration
 import NGLess
-import FileManagement (getFileSize)
+import FileManagement (bwaBin)
 
 -- | Checks whether all necessary files are present for a BWA index
 -- Does not change any file on disk.
@@ -54,15 +53,14 @@ hasValidIndex basepath = doAllFilesExist indexRequiredFormats
 --
 -- | Checks whether we should customize bwa's indexing blocksize
 customBlockSize :: FilePath -> IO [String]
-customBlockSize path = sizeAsParam <$> getFileSize path
+customBlockSize path = sizeAsParam . fileSize <$> getFileStatus path
 
 sizeAsParam :: FileOffset -> [String]
-sizeAsParam size =
-    if size > minimalsize
-       then ["-b", show $ div size factor]
-       else []
-    where minimalsize = 100*1000*1000 -- 100MB - if smaller, use software's default
-          factor = 10
+sizeAsParam size
+    | size >= minimalsize = ["-b", show $ div size factor]
+    | otherwise = []
+        where minimalsize = 100*1000*1000 -- 100MB - if smaller, use software's default
+              factor = 10
 
 -- | Creates bwa index on disk
 createIndex :: FilePath -> NGLessIO ()

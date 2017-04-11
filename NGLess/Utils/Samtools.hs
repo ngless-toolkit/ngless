@@ -28,7 +28,6 @@ import           Control.Concurrent (getNumCapabilities)
 import           Data.List (isSuffixOf)
 import           System.Process (proc, CreateProcess(..), StdStream(..))
 
-import Configuration
 import FileManagement
 import Output
 import NGLess.NGError

@@ -1,8 +1,6 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
-
-{-# LANGUAGE TupleSections, OverloadedStrings #-}
 
 module BuiltinModules.Argv
     ( loadModule
@@ -12,10 +10,11 @@ import qualified Data.Text as T
 import Data.Default
 
 import Language
-import Configuration
 
 import Modules
 import NGLess
+import Configuration
+import NGLess.NGLEnvironment
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ = do

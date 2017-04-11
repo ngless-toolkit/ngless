@@ -262,6 +262,7 @@ main = do
             <*>
             (infoOption dateStr (long "date-short" <> help "print just release date string (useful for scripting)"))
     args <- execParser (info (versioner <*> helper <*> nglessArgs) metainfo)
-    initConfiguration args
+    config <- initConfiguration args
+    updateNglEnvironment' (\env -> env { ngleConfiguration = config })
     modeExec (mode args)
 

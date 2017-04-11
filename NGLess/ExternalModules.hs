@@ -31,6 +31,7 @@ import Data.Maybe
 import Data.List (find, isSuffixOf)
 import Data.Default (def)
 
+import NGLess.NGLEnvironment
 import FileManagement
 import Utils.Samtools
 import Configuration
