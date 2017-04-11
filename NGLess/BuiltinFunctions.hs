@@ -97,7 +97,7 @@ preprocessArgs =
 
 mapArgs =
     [ArgInformation "reference" False NGLString []
-    ,ArgInformation "fafile" False NGLString []
+    ,ArgInformation "fafile" False NGLString [ArgCheckFileReadable]
     ,ArgInformation "mode_all" False NGLBool []
     ,ArgInformation "mapper" False NGLString []
     ,ArgInformation "__extra_bwa" False (NGList NGLString) []

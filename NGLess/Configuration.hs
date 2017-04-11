@@ -79,6 +79,7 @@ data NGLessConfiguration = NGLessConfiguration
     , nConfSubsample :: Bool
     , nConfArgv :: [T.Text]
     , nConfVerbosity :: Verbosity
+    , nConfSearchPath :: [FilePath]
     } deriving (Eq, Show)
 
 getDefaultUserNglessDirectory :: IO FilePath
@@ -86,6 +87,8 @@ getDefaultUserNglessDirectory = liftM2 fromMaybe
     ((</> ".local/share/ngless") <$> getHomeDirectory)
     (liftM (</> "ngless")  <$> lookupEnv "XDG_DATA_HOME")
 
+
+-- | This sets the default configuration based on the environment
 guessConfiguration :: IO NGLessConfiguration
 guessConfiguration = do
     tmp <- getTemporaryDirectory
@@ -106,6 +109,7 @@ guessConfiguration = do
         , nConfSubsample = False
         , nConfArgv = []
         , nConfVerbosity = Normal
+        , nConfSearchPath = []
         }
 
 updateConfiguration :: NGLessConfiguration -> [FilePath] -> IO NGLessConfiguration
@@ -126,6 +130,7 @@ updateConfiguration NGLessConfiguration{..} cfiles = do
     nConfKeepTemporaryFiles' <- CF.lookupDefault nConfKeepTemporaryFiles cp "keep-temporary-files"
     nConfColor' <- CF.lookupDefault AutoColor cp "color"
     nConfPrintHeader' <- CF.lookupDefault nConfPrintHeader cp "print-header"
+    nConfSearchPath' <- CF.lookupDefault nConfSearchPath cp "search-path"
     return NGLessConfiguration
         { nConfDownloadBaseURL = nConfDownloadBaseURL'
         , nConfGlobalDataDirectory = nConfGlobalDataDirectory'
@@ -141,15 +146,19 @@ updateConfiguration NGLessConfiguration{..} cfiles = do
         , nConfSubsample = nConfSubsample
         , nConfArgv = nConfArgv
         , nConfVerbosity = nConfVerbosity
+        , nConfSearchPath = nConfSearchPath'
         }
-
 
 setupTestConfiguration :: IO ()
 setupTestConfiguration = do
     config <- guessConfiguration
     writeIORef nglConfigurationRef $ config { nConfTemporaryDirectory = "testing_tmp_dir", nConfKeepTemporaryFiles = True, nConfVerbosity = Quiet }
 
-initConfiguration :: NGLessArgs -> IO ()
+
+-- | Configuration is set in 3 steps:
+-- 1. guess. sets defaults
+-- 2. read configuration files (updateConfiguration)
+-- 3. use command line options
 initConfiguration opts = do
     config <- guessConfiguration
     config' <- updateConfiguration config (case mode opts of
@@ -187,6 +196,9 @@ updateConfigurationOptsMode DefaultMode{..} config =
         argv = case input of
             ScriptFilePath f -> f:extraArgs
             _ -> extraArgs
+        searchPath' = if null searchPath
+                            then nConfSearchPath config
+                            else searchPath
     in config
             { nConfTrace = trace
             , nConfKeepTemporaryFiles = ktemp
@@ -196,6 +208,7 @@ updateConfigurationOptsMode DefaultMode{..} config =
             , nConfPrintHeader = nConfPrintHeader config && not no_header && not print_last
             , nConfSubsample = subsampleMode
             , nConfArgv = T.pack <$> argv
+            , nConfSearchPath = searchPath'
             }
 updateConfigurationOptsMode _ config = config
 

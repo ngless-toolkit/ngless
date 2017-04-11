@@ -2,7 +2,6 @@
  - License: MIT
  -}
 
-{-# LANGUAGE OverloadedStrings #-}
 module ValidationIO
     ( validateIO
     ) where
@@ -62,14 +61,15 @@ validateReadInputs (Script _ es) = checkRecursive validateReadInputs' es
         validateReadInputs' _ = return ()
 
         checkFileReadable' :: T.Text -> ValidateIO ()
-        checkFileReadable' fname = liftIO (checkFileReadable $ T.unpack fname) >>= flip whenJust tell1
+        checkFileReadable' fname
+            | "<references>" `T.isInfixOf` fname = return () -- punt
+            | otherwise = liftIO (checkFileReadable $ T.unpack fname) >>= flip whenJust tell1
 
 
 validate_def_genomes :: Script -> ValidateIO ()
 validate_def_genomes (Script _ es) = checkRecursive validate_def_genomes' es
     where
         validate_def_genomes' (FunctionCall (FuncName "map") _ args _) = validateStrArg check_reference "reference" args es
-                                                                            >> validateStrArg check_fafile "fafile" args es
         validate_def_genomes' _ = return ()
 
 
@@ -117,11 +117,6 @@ check_reference r = do
                             then ["\n\tDid you mean to use the argument `fafile` to specify the FASTA file `", r, "`?\n",
                                   "\tmap() uses the argument `reference` for builtin references and `fafile` for a FASTA file path."]
                             else [])
-
-check_fafile fafile = do
-        r <- liftIO $ doesFileExist (T.unpack fafile)
-        unless r $
-            tell1 (T.concat ["map function expects a file in argument 'fafile', got ", fafile, ", which is not the name of a file."])
 
 validateOFile (Script _ es) = checkRecursive validateOFile' es
     where

@@ -1,4 +1,4 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -22,11 +22,15 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Internal as C
 import           Data.Conduit (($$), (=$=))
 import           Control.Monad.Extra (unlessM)
+import           Data.List (isInfixOf)
+import qualified Data.String.Utils as S
 
 
+import System.Directory
 import System.IO
 
 import Language
+import Configuration
 import FileManagement
 import ReferenceDatabases
 import Output
@@ -43,8 +47,10 @@ import Utils.Conduit
 import Utils.LockFile
 import Utils.Samtools (samBamConduit)
 
+-- | internal type
 data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
 
+-- | An object which represents a mapper
 data Mapper = Mapper
     { createIndex :: FilePath -> NGLessIO ()
     , hasValidIndex :: FilePath -> NGLessIO Bool
@@ -64,6 +70,7 @@ getMapper request = do
                 _ -> error "should not be possible map:getMapper"
             else throwScriptError ("Requested mapper '"++T.unpack request ++"' is not active.")
 
+-- | lazy index creation
 ensureIndexExists :: Mapper -> FilePath -> NGLessIO FilePath
 ensureIndexExists mapper refPath = do
     hasIndex <- hasValidIndex mapper refPath
@@ -83,6 +90,7 @@ ensureIndexExists mapper refPath = do
     hoursToDiffTime h = fromInteger (h * 3600)
 
 
+-- | parse map() args to return a reference
 lookupReference :: KwArgsValues -> NGLessIO ReferenceInfo
 lookupReference args = do
     let reference = lookup "reference" args
@@ -121,6 +129,30 @@ mapToReference mapper refIndex refs extraArgs = do
     return (newfp, stats)
 zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesC =$= samStatsC))
 
+
+expandReferenceSearchPath :: FilePath -> NGLessIO FilePath
+expandReferenceSearchPath fa
+        | not (hasPath fa) = return fa
+        | otherwise = do
+            searchpath <- nConfSearchPath <$> nglConfiguration
+            r <- findMaybeM searchpath $ \base -> do
+                let fa' = S.replace "<references>" base fa
+                outputListLno' TraceOutput ["Looking for FASTA file in ", fa']
+                exists <- liftIO (doesFileExist fa')
+                return $! if exists
+                            then Just fa'
+                            else Nothing
+            case r of
+                Just fa' -> return fa'
+                Nothing -> throwDataError ("Could not find reference '"++fa++"'")
+    where
+        findMaybeM :: Monad m => [a] -> (a -> m (Maybe b)) -> m (Maybe b)
+        findMaybeM [] _ = return Nothing
+        findMaybeM (x:xs) f = f x >>= \case
+            Nothing -> findMaybeM xs f
+            val -> return val
+        hasPath = ("<references>" `isInfixOf`)
+
 performMap :: Mapper -> ReferenceInfo -> T.Text -> ReadSet -> [String] -> NGLessIO NGLessObject
 performMap mapper ref name rs extraArgs = do
     (ref', defGen') <- indexReference ref
@@ -129,7 +161,9 @@ performMap mapper ref name rs extraArgs = do
     return $ NGOMappedReadSet name (File samPath') defGen'
     where
         indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)
-        indexReference (FaFile fa) = (,Nothing) <$> ensureIndexExists mapper fa
+        indexReference (FaFile fa) = do
+            fa' <- expandReferenceSearchPath fa
+            (,Nothing) <$> ensureIndexExists mapper fa'
         indexReference (PackagedReference r) = do
             ReferenceFilePaths fafile _ _ <- ensureDataPresent r
             case fafile of
