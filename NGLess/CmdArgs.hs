@@ -17,6 +17,7 @@ module CmdArgs
  -}
 
 import Options.Applicative
+import Data.Monoid ((<>))
 import qualified Data.Configurator.Types as CF
 import qualified Data.Text as T
 
