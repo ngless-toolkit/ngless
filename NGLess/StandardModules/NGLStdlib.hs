@@ -29,5 +29,5 @@ loadStdlibModules = mapM loadModules1
         loadModules1 (ModInfo "mocat" version) = Mocat.loadModule version
         loadModules1 (ModInfo "parallel" version) = Parallel.loadModule version
         loadModules1 (ModInfo "soap" version) = Soap.loadModule version
-        loadModules1 (ModInfo mname version) = Ext.loadModule mname version
+        loadModules1 minfo = Ext.loadModule minfo
 

@@ -37,6 +37,7 @@ import Utils.Samtools
 import Configuration
 import Utils.Conduit
 import FileOrStream
+import Utils.Suggestion
 import Utils.Utils
 import Language
 import Network
@@ -492,7 +493,8 @@ findLoad modname version = do
                                                 concat ["\n\t- " ++ show v | v <- uniq foundVersions]))
 
 checkCompatible :: T.Text -> T.Text -> ModInfo -> NGLessIO ()
-checkCompatible modname version ModInfo{ modVersion = version' } = do
+checkCompatible modname version mi = do
+        let version' = modVersion mi
         nversion <- norm version
         nversion' <- norm version'
         when (nversion' /= nversion) $
@@ -503,6 +505,14 @@ checkCompatible modname version ModInfo{ modVersion = version' } = do
             (majv:minv:_) -> return (majv, minv)
             _ -> throwScriptError ("Cannot parse version string '"++T.unpack ver++"'.")
 
-loadModule :: T.Text -> T.Text -> NGLessIO Module
-loadModule m version = asInternalModule =<< findLoad m version
+loadModule :: ModInfo -> NGLessIO Module
+loadModule mi
+        | isGlobalImport mi && name `notElem` knownModules =
+            throwScriptError ("Module '" ++ T.unpack name ++ "' is not known.\n\t" ++ T.unpack (suggestionMessage name knownModules) ++ "\n\tTo import local modules, use \"local import\"")
+        | otherwise = asInternalModule =<< findLoad name version
+    where
+        isGlobalImport LocalModInfo{} = False
+        isGlobalImport ModInfo{} = True
+        name = modName mi
+        version = modVersion mi
 

@@ -1,7 +1,6 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings, LambdaCase #-}
 
 module Parse
     ( parsengless
@@ -29,8 +28,8 @@ sliceList st e = take (e - st) . drop st
 
 -- | main function of this module
 --
--- Because the scripts are expected to be small, we can expect to load them
--- whole into memory (with a strict 'Text') before parsing
+-- Because the scripts are expected to be small, we load them whole into memory
+-- (with a strict 'Text') before parsing
 parsengless :: String -- ^ input filename (for error messages)
             -> Bool -- ^ whether the version statement is mandatory
             -> T.Text -- ^ input data
@@ -222,5 +221,8 @@ ngless_header = Header <$> (many eol *> ngless_version) <*> many import_mod
 ngless_version = ngless_version' <?> "ngless version declararion"
     where ngless_version' = reserved "ngless" *> (string <?> "ngless version string") <* eol
 
-import_mod = ModInfo <$> (reserved "import" *> (string <?> "module name")) <*> (match_word "version" *> (string <?> "module version")) <* eol
+import_mod =
+        LocalModInfo <$> (reserved "local" *> reserved "import" *> (string <?> "module name")) <*> (match_word "version" *> (string <?> "module version")) <* eol
+        <|>
+        ModInfo <$> (reserved "import" *> (string <?> "module name")) <*> (match_word "version" *> (string <?> "module version")) <* eol
 

@@ -1,7 +1,7 @@
-{- Copyright 2013-2015 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- | This module handles tokenization
 module Tokens
@@ -112,6 +112,7 @@ reservedwords =
         ,"discard"
         ,"continue"
         ,"not"
+        ,"local"
         ,"import"
         ,"using"
         ]

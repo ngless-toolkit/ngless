@@ -1,4 +1,4 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
 
@@ -232,6 +232,9 @@ usedVariables expr = execWriter . flip recursiveAnalyse expr $ \case
     _ -> return ()
 
 data ModInfo = ModInfo
+    { modName :: !T.Text
+    , modVersion :: !T.Text
+    } | LocalModInfo
     { modName :: !T.Text
     , modVersion :: !T.Text
     } deriving (Eq, Show)

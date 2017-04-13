@@ -1,6 +1,9 @@
 {- Copyright 2015-2016 NGLess Authors
  - License: MIT
  -}
+
+{-# LANGUAGE TemplateHaskell #-}
+
 module Modules
     ( ArgInformation(..)
     , ArgCheck(..)
@@ -11,14 +14,17 @@ module Modules
     , ModInfo(..) -- re-export
     , registerModule
     , loadedModules
+    , knownModules
     ) where
 import qualified Data.Text as T
+import qualified Language.Haskell.TH as TH
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef
 import Data.Aeson
 import Data.Default
 
+import Utils.FindModules
 import Language
 import NGLess
 
@@ -115,3 +121,7 @@ registerModule m = liftIO $ modifyIORef' loadedModulesRef (m:)
 
 loadedModules :: NGLessIO [Module]
 loadedModules = liftIO $ readIORef loadedModulesRef
+
+knownModules :: [T.Text]
+knownModules = T.pack <$> $(TH.runIO ((TH.ListE . fmap (TH.LitE . TH.stringL)) <$> listKnownModules))
+
