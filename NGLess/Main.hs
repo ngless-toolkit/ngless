@@ -6,6 +6,7 @@ module Main
     ) where
 
 import Data.Maybe
+import Data.Monoid ((<>))
 import Control.Monad
 import Control.Monad.IO.Class (liftIO, MonadIO(..))
 import Control.Concurrent
