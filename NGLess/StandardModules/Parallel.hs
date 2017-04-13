@@ -284,9 +284,11 @@ concatCounts headers inputs
             a <- A.async $ runResourceT (C.sequenceSources ss =$= CL.map (force . splitLines) $$ sinkTBMQueue' ch True)
             A.link a
             return (CA.sourceTBMQueue ch, a)
-        C.sequenceSources (fst <$> channels)
+        C.runConduit $
+            C.sequenceSources (fst <$> channels)
             =$= asyncMapEitherC mapthreads (sequence >=> concatPartials)
-            $$ C.sinkHandle hout
+            =$= CL.concatMap BL.toChunks
+            =$= CB.sinkHandle hout
         forM_ (snd <$> channels) (liftIO . A.wait)
         liftIO (hClose hout)
         return newfp
