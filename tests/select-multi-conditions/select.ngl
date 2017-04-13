@@ -5,3 +5,6 @@ write(selected, ofile='output.selected.mapped_unique.sam')
 
 selected = select(input, paired=False, keep_if=[{mapped}, {unique}])
 write(selected, ofile='output.selected.mapped_unique_unpaired.sam')
+
+selected = select(input, paired=True, keep_if=[{mapped}, {unique}])
+write(selected, ofile='output.selected.mapped_unique_paired.sam')

@@ -78,7 +78,7 @@ echo ">>> Running with: $($ngless_bin --version-debug) <<<"
 basedir=$REPO
 for testdir in tests/*; do
     if test -d $testdir; then
-        ok=yes
+        cur_ok=yes
         if test -f ${testdir}/TRAVIS_SKIP -a x$TRAVIS = xtrue; then
             echo "Skipping $testir on Travis"
             continue
@@ -91,20 +91,20 @@ for testdir in tests/*; do
             validate_arg="-n"
         fi
         cmd_args=""
-        if test -f ${testdir}/cmdargs ; then
-            cmd_args="$(cat ${testdir}/cmdargs)"
+        if test -f cmdargs ; then
+            cmd_args="$(cat cmdargs)"
         fi
         $ngless_bin --quiet -t temp $cmd_args $validate_arg *.ngl > output.stdout.txt 2>output.stderr.txt
         ngless_exit=$?
         if [[ $testdir == tests/error-* ]] ; then
             if test $ngless_exit -eq "0"; then
                 echo "Expected error message in test"
-                ok=no
+                cur_ok=no
             fi
         else
             if test $ngless_exit -ne "0"; then
                 echo "Error exit in test"
-                ok=no
+                cur_ok=no
             fi
         fi
         for f in expected.*; do
@@ -112,21 +112,22 @@ for testdir in tests/*; do
             diff -u $f $out
             if test $? -ne "0"; then
                echo "ERROR in test $testdir: $out did not match $f"
-               ok=no
+               cur_ok=no
             fi
         done
         if test -x ./check.sh; then
             ./check.sh
             if test $? -ne "0"; then
                 echo "ERROR in test $testdir: ./check.sh failed"
-                ok=no
+                cur_ok=no
             fi
         fi
 
-        if test $ok = "no"; then
+        if test $cur_ok = "no"; then
             echo "ERROR: Output from from ngless was:"
             cat output.stdout.txt
             cat output.stderr.txt
+            ok=no
         fi
 
         if test -x ./cleanup.sh; then
