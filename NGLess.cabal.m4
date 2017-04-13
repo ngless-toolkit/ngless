@@ -73,6 +73,77 @@ define(`BUILD_DEPENDS',
     yaml,
     zlib')
 
+define(`BUILD_MODULES',
+    `BuiltinFunctions
+    BuiltinModules.Argv
+    BuiltinModules.AsReads
+    BuiltinModules.Checks
+    BuiltinModules.Readlines
+    BuiltinModules.Remove
+    CmdArgs
+    Configuration
+    Data.FastQ
+    Data.GFF
+    Data.Sam
+    Dependencies.Embedded
+    ExternalModules
+    FileManagement
+    FileOrStream
+    Hooks
+    Interpret
+    Interpretation.Count
+    Interpretation.FastQ
+    Interpretation.Map
+    Interpretation.Select
+    Interpretation.Substrim
+    Interpretation.Unique
+    Interpretation.Write
+    Language
+    Modules
+    NGLess
+    NGLess.NGError
+    NGLess.NGLEnvironment
+    Network
+    Output
+    Parse
+    ReferenceDatabases
+    StandardModules.Batch
+    StandardModules.Example
+    StandardModules.Mappers.Bwa
+    StandardModules.Mappers.Soap
+    StandardModules.Mocat
+    StandardModules.NGLStdlib
+    StandardModules.Parallel
+    StandardModules.Samtools
+    StandardModules.Soap
+    Tokens
+    Transform
+    Types
+    Utils.Conduit
+    Utils.FindModules
+    Utils.IntGroups
+    Utils.LockFile
+    Utils.ProgressBar
+    Utils.Samtools
+    Utils.Suggestion
+    Utils.Utils
+    Utils.Vector
+    Validation
+    ValidationIO')
+
+define(`TEST_MODULES',
+    `Tests.Count
+    Tests.FastQ
+    Tests.IntGroups
+    Tests.NGLessAPI
+    Tests.Parse
+    Tests.Select
+    Tests.Types
+    Tests.Utils
+    Tests.Validation
+    Tests.Vector
+    Utils.Here')
+
 define(`BASE_CONFIG',
   `C-sources: NGLess/Dependencies/embedded.c NGLess/Data/FastQ.c
   default-extensions:  BangPatterns, OverloadedStrings, LambdaCase, TupleSections
@@ -101,6 +172,8 @@ executable ngless
   BASE_CONFIG
   build-depends:
     BUILD_DEPENDS
+  other-modules:
+    BUILD_MODULES
 
 Test-Suite nglesstest
   type:         exitcode-stdio-1.0
@@ -114,6 +187,9 @@ Test-Suite nglesstest
     test-framework-quickcheck2,
     test-framework-th,
     QuickCheck >= 2.8
+  other-modules:
+    BUILD_MODULES
+    TEST_MODULES
 
 benchmark nglessbench
   type:         exitcode-stdio-1.0
@@ -123,3 +199,5 @@ benchmark nglessbench
     BUILD_DEPENDS,
     HUnit >= 1.3,
     criterion
+  other-modules:
+    BUILD_MODULES
