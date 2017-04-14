@@ -6,7 +6,7 @@ from __future__ import print_function
 from subprocess import Popen
 import sys
 import tempfile
-from ngless_wrap import ngl_prepare_options, ngl_prepare_payload
+from ngless.wrap import ngl_prepare_options, ngl_prepare_payload
 
 try:
     import argparse

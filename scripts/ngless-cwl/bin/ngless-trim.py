@@ -6,7 +6,7 @@ from __future__ import print_function
 from subprocess import Popen
 import sys
 import tempfile
-from ngless_wrap import ngl_prepare_options, ngl_prepare_payload
+from ngless.wrap import ngl_prepare_options, ngl_prepare_payload
 
 try:
     import argparse
@@ -18,35 +18,20 @@ except ImportError:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", required=True,
-                        help="FastQ file with reads to map (forward)")
-    parser.add_argument("-i2", "--input-reverse",
-                        help="FastQ file with reads to map (reverse) - if paired end")
-    parser.add_argument("-s", "--input-singles",
-                        help="FastQ file with reads to map (singles) - if paired end and unpaired reads exist")
+                        help="FastQ file with reads to trim")
     parser.add_argument("-o", "--output", required=True,
                         help="Output file/path for results")
+    parser.add_argument("-m", "--method", required=True,
+                        choices=["substrim", "endstrim"],
+                        help="Which trimming method to use")
+    parser.add_argument("-q", "--min-quality", type=int, required=True,
+                        help="Minimum quality value")
+    parser.add_argument("-d", "--discard", type=int, default=50,
+                        help="Discard if shorted than")
     parser.add_argument("--debug", action="store_true",
                         help="Prints the payload before submitting to ngless")
 
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-r", "--reference",
-                       choices=["sacCer3", "ce10", "dm3", "gg4", "canFam2",
-                                "rn4", "bosTau4", "mm10", "hg19"],
-                       help="Map against a builtin reference")
-    group.add_argument("-f", "--fasta",
-                       help="Map against a given fasta file (will be indexed if index is not available)")
-
-    args = parser.parse_args()
-
-    if args.input_singles and not args.input_reverse:
-        parser.error("--input-singles cannot be used without --input-reverse, use --input instead")
-
-    if args.input_reverse:
-        args.target = "paired"
-    else:
-        args.target = "fastq"
-
-    return args
+    return parser.parse_args()
 
 
 def prepare(args):
@@ -54,20 +39,20 @@ def prepare(args):
     # commas at the beginning of each option are used when that section has
     # parameters from other functions.
     options = {
-        "input_opts": {
+        "fastq_opts": {
             "input": "'{input}'",
-            "input_reverse": "'{input_reverse}'",
-            "input_singles": "singles='{input_singles}'",
         },
         "write_opts": {
             "output": ", ofile='{output}'",
         },
-        "target_name": {
-            "target": "{target}",
+        "method_name": {
+            "method": "{method}",
         },
-        "target_opts": {
-            "reference": ", reference='{reference}'",
-            "fasta": ", fafile='{fasta}'",
+        "method_opts": {
+            "min_quality": ", min_quality={min_quality}",
+        },
+        "discard_opts": {
+            "discard": "{discard}",
         },
     }
 
@@ -75,9 +60,12 @@ def prepare(args):
 
     payload_tpl = """\
 ngless "0.0"
-input = {target_name}({input_opts})
-mapped = map(input{target_opts})
-write(mapped{write_opts})
+input = fastq({fastq_opts})
+preprocess(input) using |read|:
+    read = {method_name}(read{method_opts})
+    if len(read) < {discard_opts}:
+        discard
+write(input{write_opts})
 """.format(**ngl_options)
 
     return ngl_prepare_payload(args, payload_tpl)

@@ -6,7 +6,7 @@ from __future__ import print_function
 from subprocess import Popen
 import sys
 import tempfile
-from ngless_wrap import ngl_prepare_options, ngl_prepare_payload
+from ngless.wrap import ngl_prepare_options, ngl_prepare_payload
 
 try:
     import argparse
@@ -18,16 +18,9 @@ except ImportError:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", required=True,
-                        help="FastQ file with reads to trim")
+                        help="SAM/BAM/CRAM file filter")
     parser.add_argument("-o", "--output", required=True,
                         help="Output file/path for results")
-    parser.add_argument("-m", "--method", required=True,
-                        choices=["substrim", "endstrim"],
-                        help="Which trimming method to use")
-    parser.add_argument("-q", "--min-quality", type=int,
-                        help="Minimum quality value")
-    parser.add_argument("-d", "--discard", type=int, default=50,
-                        help="Discard if shorted than")
     parser.add_argument("--debug", action="store_true",
                         help="Prints the payload before submitting to ngless")
 
@@ -39,20 +32,11 @@ def prepare(args):
     # commas at the beginning of each option are used when that section has
     # parameters from other functions.
     options = {
-        "fastq_opts": {
+        "input_opts": {
             "input": "'{input}'",
         },
         "write_opts": {
             "output": ", ofile='{output}'",
-        },
-        "method_name": {
-            "method": "{method}",
-        },
-        "method_opts": {
-            "min_quality": ", min_quality={min_quality}",
-        },
-        "discard_opts": {
-            "discard": "{discard}",
         },
     }
 
@@ -60,12 +44,9 @@ def prepare(args):
 
     payload_tpl = """\
 ngless "0.0"
-input = fastq({fastq_opts})
-preprocess(input) using |read|:
-    read = {method_name}(read{method_opts})
-    if len(read) < {discard_opts}:
-        discard
-write(input{write_opts})
+mapped = samfile({input_opts})
+stats = mapstats(mapped)
+write(stats{write_opts})
 """.format(**ngl_options)
 
     return ngl_prepare_payload(args, payload_tpl)

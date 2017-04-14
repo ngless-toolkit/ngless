@@ -1,0 +1,4 @@
+input:
+  class: File
+  path: input.bam
+output: output.stats

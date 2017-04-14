@@ -1,0 +1,7 @@
+input:
+  class: File
+  path: input-forward.fq
+method: substrim
+min_quality: 20
+discard: 10
+output: output.fq

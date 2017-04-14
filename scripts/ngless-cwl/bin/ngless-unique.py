@@ -6,7 +6,7 @@ from __future__ import print_function
 from subprocess import Popen
 import sys
 import tempfile
-from ngless_wrap import ngl_prepare_options, ngl_prepare_payload, ngl_as_list
+from ngless.wrap import ngl_prepare_options, ngl_prepare_payload
 
 try:
     import argparse
@@ -18,15 +18,11 @@ except ImportError:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", required=True,
-                        help="SAM/BAM/CRAM file filter")
+                        help="FastQ file to filter")
     parser.add_argument("-o", "--output", required=True,
                         help="Output file/path for results")
-    parser.add_argument("-a", "--action", required=True,
-                        choices=["keep_if", "drop_if"],
-                        help="Whether to keep or drop when condition are met")
-    parser.add_argument("-c", "--conditions", required=True, nargs="+",
-                        choices=["mapped", "unmapped", "unique"],
-                        help="One or more conditions to filter on")
+    parser.add_argument("-c", "--max-copies",
+                        help="Max number of duplicate copies to keep")
     parser.add_argument("--debug", action="store_true",
                         help="Prints the payload before submitting to ngless")
 
@@ -44,11 +40,8 @@ def prepare(args):
         "write_opts": {
             "output": ", ofile='{output}'",
         },
-        "action_opts": {
-            "action": "{action}",
-        },
-        "cond_opts": {
-            "conditions": ngl_as_list("{conditions}", wrap_with="{}"),
+        "target_opts": {
+            "max_copies": ", max_copies={max_copies}",
         },
     }
 
@@ -56,9 +49,9 @@ def prepare(args):
 
     payload_tpl = """\
 ngless "0.0"
-mapped = samfile({input_opts})
-selected = select(mapped, {action_opts}={cond_opts})
-write(selected{write_opts})
+input = fastq({input_opts})
+unique = unique(input{target_opts})
+write(unique{write_opts})
 """.format(**ngl_options)
 
     return ngl_prepare_payload(args, payload_tpl)
