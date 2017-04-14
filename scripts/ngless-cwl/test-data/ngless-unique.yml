@@ -1,0 +1,4 @@
+input:
+  class: File
+  path: input-forward.fq
+output: output.fq
