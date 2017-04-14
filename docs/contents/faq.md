@@ -81,7 +81,9 @@ overlapping with the CWL (Common Workflow Language).
 
 In particular, much of functionality of ngless can also be accessed in CWL
 workflow, using [our CWL
-wrappers](https://github.com/luispedro/ngless/tree/master/scripts).
+wrappers](https://github.com/luispedro/ngless/tree/master/ngless-cwl).
+
+They are also available via `pip install ngless_cwl`
 
 ## Questions about the ngless language
 
