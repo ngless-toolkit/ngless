@@ -140,6 +140,18 @@ for testdir in tests/*; do
     fi
 done
 
+# Test ngless_cwl wrappers, need to add ngless to PATH
+PATH="$(dirname "$ngless_bin"):$PATH"
+export PATH
+
+cd scripts/ngless-cwl
+make test
+if test $? -ne "0"; then
+    echo "ERROR in cwl tests: Check output for more information"
+    ok=no
+fi
+cd -
+
 if test $ok = "yes"; then
     echo "All done."
 else
