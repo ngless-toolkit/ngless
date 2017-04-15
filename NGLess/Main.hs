@@ -5,6 +5,19 @@ module Main
     ( main
     ) where
 
+{-| #Structure of ngless
+
+ - This document describes the implementation, not the language.
+
+ - Since the scripts are assumed to be small, everything is performed in memory.
+
+ - 1. The whole text is loaded into memory (after UTF-8 decoding).
+ - 2. A complete abstract syntax tree is built.
+ - 3. The syntax tree is validated. This includes several checks for sanity.
+ - 4. The syntax tree is optimised. This step is not currently implemented.
+ - 5. The syntax tree is interpreted.
+-}
+
 import Data.Maybe
 import Data.Monoid ((<>))
 import Control.Monad
@@ -52,6 +65,7 @@ import qualified BuiltinModules.AsReads as ModAsReads
 import qualified BuiltinModules.Readlines as Readlines
 import qualified BuiltinModules.Remove as Remove
 
+
 -- | wrapPrint transforms the script by transforming the last expression <expr>
 -- into write(<expr>, ofile=STDOUT)
 wrapPrint :: Script -> NGLess Script
@@ -69,9 +83,10 @@ wrapPrint (Script v sc) = Script v <$> wrap sc
             | f `elem` ["print", "write"] = False
         wrapable _ = True
 
+redColor :: String
 redColor = setSGRCode [SetColor Foreground Dull Red]
 
-fatalError :: String -> IO b
+fatalError :: String -> IO a
 fatalError err = do
     hPutStrLn stderr "Exiting after fatal error:"
     hPutStrLn stderr (redColor ++ err)
@@ -103,6 +118,7 @@ runNGLessIO context (NGLessIO act) = runResourceT (runExceptT act) >>= \case
             exitFailure
         Right v -> return v
 
+-- | Load both automatically imported modules are user-requested one
 loadModules :: [ModInfo] -> NGLessIO [Module]
 loadModules mods  = do
     mA <- ModAsReads.loadModule ("" :: T.Text)
@@ -240,7 +256,7 @@ modeExec (DownloadDemoMode demo) = runNGLessIO "downloading a demo" $
             downloadExpandTar url "."
             liftIO $ putStrLn ("\nDemo downloaded to " ++ demo)
         else liftIO $ do
-            hPutStrLn stderr "Unknown demo"
+            hPutStrLn stderr (redColor ++ "Unkown demo '"++ demo ++ "'.")
             exitFailure
 
 main = do
