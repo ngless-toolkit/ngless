@@ -34,4 +34,11 @@ RUN mkdir -p /usr/src/
 RUN git clone --depth=10 https://github.com/luispedro/ngless  /usr/src/ngless
 WORKDIR /usr/src/ngless
 RUN m4 NGLess.cabal.m4 > NGLess.cabal
-RUN stack --local-bin-path /usr/local/bin install  --system-ghc --ghc-options '-optl-static -fPIC'
+
+# Build dependencies in a separate step to avoid a full rebuild on ngless compile failure
+RUN stack build --only-dependencies --system-ghc --ghc-options '-optl-static -optl-pthread -fPIC'
+
+RUN make NGLess/Dependencies/samtools_data.c STRIP=1
+RUN make NGLess/Dependencies/bwa_data.c STRIP=1
+
+RUN stack --local-bin-path /usr/local/bin install --system-ghc --ghc-options '-optl-static -optl-pthread -fPIC' --flag NGLess:embed
