@@ -152,9 +152,11 @@ $(SAM_DIR)/samtools: $(SAM_DIR)
 
 
 NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/$(SAM_TARGET)-static
+	strip $<
 	xxd -i $< $@
 
 NGLess/Dependencies/bwa_data.c: $(BWA_DIR)/$(BWA_TARGET)-static
+	strip $<
 	xxd -i $< $@
 
 # We cannot depend on $(HTML_LIBS_DIR) as wget sets the mtime in the past
