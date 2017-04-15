@@ -7,6 +7,9 @@ cwlVersion: v1.0
 class: CommandLineTool
 baseCommand: ['ngless-map.py']
 
+requirements:
+- $import: ngl-types.yml
+
 doc: |
   None
 
@@ -45,11 +48,8 @@ inputs:
       prefix: --debug
 
   reference:
-    type:
-    - "null"
-    - type: enum
-      symbols: ['sacCer3', 'ce10', 'dm3', 'gg4', 'canFam2', 'rn4', 'bosTau4', 'mm10', 'hg19']
-    doc: Map against a builtin reference
+    type: ngl-types.yml#builtin_reference?
+    doc: Select one of the reference databases included with ngless
     inputBinding:
       prefix: --reference
 

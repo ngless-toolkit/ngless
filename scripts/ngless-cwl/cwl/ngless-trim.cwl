@@ -7,6 +7,9 @@ cwlVersion: v1.0
 class: CommandLineTool
 baseCommand: ['ngless-trim.py']
 
+requirements:
+- $import: ngl-types.yml
+
 doc: |
   None
 
@@ -26,10 +29,8 @@ inputs:
       prefix: --output
 
   method:
-    type:
-      type: enum
-      symbols: ['substrim', 'endstrim']
-    doc: Which trimming method to use
+    type: ngl-types.yml#trim_method
+    doc: Given a read, keep the longest segment above a quality threshold (substrim) or trim from both ends (endstrim)
     inputBinding:
       prefix: --method
 

@@ -2,5 +2,7 @@ input:
   class: File
   path: input.bam
 action: keep_if
-conditions: mapped
+conditions:
+  - mapped
+  - unique
 output: output.bam
