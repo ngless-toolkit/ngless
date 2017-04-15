@@ -1,0 +1,12 @@
+start:
+  class: File
+  path: input-forward.fq
+trim_method: substrim
+trim_qual: 20
+trim_discard: 10
+trim_output_name: output.fq
+map_output_name: output.bam
+stats_output_name: output.stats
+ref:
+  class: File
+  path: reference.fna
