@@ -11,10 +11,12 @@ exec=$(prefix)/bin
 BWA_DIR = bwa-0.7.15
 BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.15/bwa-0.7.15.tar.bz2
 BWA_TAR = bwa-0.7.15.tar.bz2
+BWA_TARGET = ngless-bwa
 
 SAM_DIR = samtools-1.4
 SAM_URL = https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
 SAM_TAR = samtools-1.4.tar.bz2
+SAM_TARGET = ngless-samtools
 
 NGLESS_EMBEDDED_BINARIES := NGLess/Dependencies/samtools_data.c NGLess/Dependencies/bwa_data.c
 
@@ -134,25 +136,25 @@ $(BWA_DIR):
 $(BWA_DIR)/bwa: $(BWA_DIR)
 	cd $(BWA_DIR) && $(MAKE)
 
-$(BWA_DIR)/ngless-bwa-static: $(BWA_DIR)
-	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"  LIBS="-lbwa -lm -lz -lrt -lpthread" && cp -p bwa ngless-bwa-static
+$(BWA_DIR)/$(BWA_TARGET)-static: $(BWA_DIR)
+	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"  LIBS="-lbwa -lm -lz -lrt -lpthread" && cp -p bwa $(BWA_TARGET)-static
 
 $(SAM_DIR):
 	wget $(SAM_URL)
 	tar xvfj $(SAM_TAR)
 	rm $(SAM_TAR)
 
-$(SAM_DIR)/samtools-static: $(SAM_DIR)
-	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC" && cp -p samtools samtools-static
+$(SAM_DIR)/$(SAM_TARGET)-static: $(SAM_DIR)
+	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC" && cp -p samtools $(SAM_TARGET)-static
 
 $(SAM_DIR)/samtools: $(SAM_DIR)
 	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE)
 
 
-NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/samtools-static
+NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/$(SAM_TARGET)-static
 	xxd -i $< $@
 
-NGLess/Dependencies/bwa_data.c: $(BWA_DIR)/ngless-bwa-static
+NGLess/Dependencies/bwa_data.c: $(BWA_DIR)/$(BWA_TARGET)-static
 	xxd -i $< $@
 
 # We cannot depend on $(HTML_LIBS_DIR) as wget sets the mtime in the past
