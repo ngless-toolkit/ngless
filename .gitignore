@@ -2,6 +2,7 @@
 /.stack-work/
 /cabal.sandbox.config
 /dist/
+/docker/
 /samtools-1.4/
 /samtools-1.4.tar.bz2
 /bwa-0.7.15/
