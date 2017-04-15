@@ -7,6 +7,9 @@ cwlVersion: v1.0
 class: CommandLineTool
 baseCommand: ['ngless-select.py']
 
+requirements:
+- $import: ngl-types.yml
+
 doc: |
   None
 
@@ -26,18 +29,15 @@ inputs:
       prefix: --output
 
   action:
-    type:
-      type: enum
-      symbols: ['keep_if', 'drop_if']
+    type: ngl-types.yml#keep_drop_action
     doc: Whether to keep or drop when condition are met
+    doc: When selecting reads, target reads are either kept or dropped (see also 'Filter conditions')
     inputBinding:
       prefix: --action
 
   conditions:
-    type:
-      type: enum
-      symbols: ['mapped', 'unmapped', 'unique']
-    doc: One or more conditions to filter on
+    type: ngl-types.yml#filter_conditions[]
+    doc: When keeping/dropping reads select which subset should be targetted
     inputBinding:
       prefix: --conditions
 

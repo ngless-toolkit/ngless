@@ -7,6 +7,9 @@ cwlVersion: v1.0
 class: CommandLineTool
 baseCommand: ['ngless-count.py']
 
+requirements:
+- $import: ngl-types.yml
+
 doc: |
   None
 
@@ -31,11 +34,8 @@ inputs:
       prefix: --features
 
   multiple:
-    type:
-    - "null"
-    - type: enum
-      symbols: ['dist1', 'all1', '1overN', 'unique_only']
-    doc: How to handle multiple mappers
+    type: ngl-types.yml#multi_mappers?
+    doc: How to handle reads that map to more than one location?
     inputBinding:
       prefix: --multiple
 

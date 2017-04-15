@@ -1,0 +1,22 @@
+class: SchemaDefRequirement
+types:
+  - type: enum
+    name: multi_mappers
+    label: Multiple mappers
+    symbols: ['dist1', 'all1', '1overN', 'unique_only']
+  - type: enum
+    name: builtin_reference
+    label: Builtin reference
+    symbols: ['sacCer3', 'ce10', 'dm3', 'gg4', 'canFam2', 'rn4', 'bosTau4', 'mm10', 'hg19']
+  - type: enum
+    name: keep_drop_action
+    label: Reads to keep/drop
+    symbols: ['keep_if', 'drop_if']
+  - type: enum
+    name: filter_conditions
+    label: Filter conditions
+    symbols: ['mapped', 'unmapped', 'unique']
+  - type: enum
+    name: trim_method
+    label: Trimming method
+    symbols: ['substrim', 'endstrim']
