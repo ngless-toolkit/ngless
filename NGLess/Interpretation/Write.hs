@@ -165,6 +165,12 @@ executeWrite (NGOCounts iout) args = do
     tabToComma :: ByteLine -> ByteLine
     tabToComma (ByteLine line) = ByteLine $ B8.map (\case { '\t' -> ','; c -> c }) line
 
+executeWrite (NGOFilename fp) args = do
+    newfp <- getOFile args
+    canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
+    moveOrCopyCompress canMove fp newfp
+    return NGOVoid
+
 executeWrite v _ = throwShouldNotOccur ("Error: executeWrite of " ++ show v ++ " not implemented yet.")
 
 
