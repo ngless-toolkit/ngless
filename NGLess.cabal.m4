@@ -77,6 +77,7 @@ define(`BUILD_MODULES',
     `BuiltinFunctions
     BuiltinModules.Argv
     BuiltinModules.AsReads
+    BuiltinModules.Assemble
     BuiltinModules.Checks
     BuiltinModules.Readlines
     BuiltinModules.Remove

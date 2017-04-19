@@ -60,6 +60,7 @@ import Hooks
 import Utils.Suggestion
 
 import qualified BuiltinModules.Argv as ModArgv
+import qualified BuiltinModules.Assemble as ModAssemble
 import qualified BuiltinModules.Checks as Checks
 import qualified BuiltinModules.AsReads as ModAsReads
 import qualified BuiltinModules.Readlines as Readlines
@@ -123,11 +124,12 @@ loadModules :: [ModInfo] -> NGLessIO [Module]
 loadModules mods  = do
     mA <- ModAsReads.loadModule ("" :: T.Text)
     mArgv <- ModArgv.loadModule ("" :: T.Text)
+    mAssemble <- ModAssemble.loadModule ("" :: T.Text)
     mReadlines <- Readlines.loadModule ("" :: T.Text)
     mChecks <- Checks.loadModule ("" :: T.Text)
     mRemove <- Remove.loadModule ("" :: T.Text)
     imported <- loadStdlibModules mods
-    let loaded = (mReadlines:mArgv:mA:mChecks:mRemove:imported)
+    let loaded = (mReadlines:mArgv:mAssemble:mA:mChecks:mRemove:imported)
     forM_ loaded registerModule
     return loaded
 
