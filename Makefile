@@ -18,6 +18,11 @@ SAM_URL = https://github.com/samtools/samtools/releases/download/1.4/samtools-1.
 SAM_TAR = samtools-1.4.tar.bz2
 SAM_TARGET = ngless-samtools
 
+MEGAHIT_DIR = megahit-1.1.1
+MEGAHIT_TAR = v1.1.1.tar.gz
+MEGAHIT_URL = https://github.com/voutcn/megahit/archive/v1.1.1.tar.gz
+MEGAHIT_TARGET = ngless-megahit
+
 NGLESS_EMBEDDED_BINARIES := NGLess/Dependencies/samtools_data.c NGLess/Dependencies/bwa_data.c
 
 HTML = Html
@@ -126,7 +131,6 @@ uninstall:
 	rm -rf $(deps) $(exec)/ngless*
 
 
-#####  Setup required files
 $(BWA_DIR):
 	wget $(BWA_URL)
 	tar xvfj $(BWA_TAR)
@@ -149,6 +153,14 @@ $(SAM_DIR)/$(SAM_TARGET)-static: $(SAM_DIR)
 
 $(SAM_DIR)/samtools: $(SAM_DIR)
 	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE)
+
+$(MEGAHIT_DIR):
+	wget $(MEGAHIT_URL)
+	tar xvzf $(MEGAHIT_TAR)
+	rm $(MEGAHIT_TAR)
+
+$(MEGAHIT_DIR)/$(MEGAHIT_TARGET): $(MEGAHIT_DIR)
+	cd $(MEGAHIT_DIR) && $(MAKE)
 
 
 NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/$(SAM_TARGET)-static
