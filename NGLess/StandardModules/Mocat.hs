@@ -1,8 +1,7 @@
-{- Copyright 2016 NGLess Authors
+{- Copyright 2016-2017 NGLess Authors
  - License: MIT
  -}
 
-{-# LANGUAGE TupleSections, OverloadedStrings #-}
 
 module StandardModules.Mocat
     ( loadModule
@@ -18,13 +17,12 @@ import           Data.Conduit ((=$=), ($$))
 import           System.IO
 import System.FilePath
 import System.FilePath.Glob
-import Data.String.Utils
+import Data.List.Utils
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad
-import Control.Applicative
 import Data.Maybe
 import Data.Default
-import Data.List (sort)
+import Data.List (sort, isInfixOf)
 
 import Output
 import NGLess
@@ -34,26 +32,45 @@ import FileManagement
 import Utils.Conduit
 import Utils.Utils (dropEnd)
 
-replaceEnd :: String -> String -> String -> Maybe String
-replaceEnd end newEnd str
-        | endswith end str = Just (dropEnd (length end) str ++ newEnd)
-        | otherwise = Nothing
+exts :: [FilePath]
+exts = do
+    fq <- ["fq", "fastq"]
+    comp <- ["", ".gz", ".bz2"]
+    return $! fq ++ comp
+
+pairedEnds :: [(String, String)]
+pairedEnds = do
+    end <- exts
+    (s1,s2) <- [(".1", ".2") ,("_1", "_2")]
+    return (s1 ++ "." ++ end, s2 ++ "." ++ end)
+
+buildSingle m1
+    | "pair.1" `isInfixOf` m1 = replace "pair.1" "single" m1
+    | otherwise = "MARKER_FOR_FILE_WHICH_DOES_NOT_EXIST"
 
 mocatSamplePaired :: [FilePath] -> T.Text -> Bool -> NGLessIO [Expression]
-mocatSamplePaired matched encoding doQC = do
-    let matched1 = filter (\f -> endswith ".1.fq" f || endswith ".1.fq.gz" f || endswith ".1.fq.bz2" f) matched
+mocatSamplePaired fqfiles encoding doQC = do
+    let passthru = [(Variable "__perform_qc", ConstBool doQC), (Variable "encoding", ConstSymbol encoding)]
+        match1 :: FilePath -> Maybe (FilePath, FilePath)
+        match1 fp = listToMaybe . flip mapMaybe pairedEnds $ \(p1,p2) -> do
+                        guard (endswith p1 fp)
+                        return (fp, dropEnd (length p1) fp ++ p2)
+        matched1 = mapMaybe match1 fqfiles
         encodeStr = ConstStr . T.pack
-    forM matched1 $ \m1 -> do
-        let Just m2 = replaceEnd "1.fq" "2.fq" m1 <|> replaceEnd "1.fq.gz" "2.fq.gz" m1 <|> replaceEnd "1.fq.bz2" "2.fq.bz2" m1
-            singles = fromMaybe "" (replaceEnd "pair.1.fq" "single.fq" m1 <|> replaceEnd "pair.1.fq.gz" "single.fq.gz" m1 <|> replaceEnd "pair.1.fq.bz2" "single.fq.bz2" m1)
-        unless (m2 `elem` matched) $
+    (exps,used) <- fmap unzip $ forM matched1 $ \(m1,m2) -> do
+        let singles = buildSingle m1
+        unless (m2 `elem` fqfiles) $
             throwDataError ("Cannot find match for file: " ++ m1)
-        let passthru = [(Variable "__perform_qc", ConstBool doQC), (Variable "encoding", ConstSymbol encoding)]
-            singlesArgs
-                | singles `elem` matched = (Variable "singles", encodeStr singles):passthru
+        let singlesArgs
+                | singles `elem` fqfiles = (Variable "singles", encodeStr singles):passthru
                 | otherwise = passthru
-        outputListLno' DebugOutput ["mocat_load_sample found ", m1, " # ", m2, if singles `elem` matched then " # " ++ singles else ""]
-        return $! FunctionCall (FuncName "paired") (encodeStr m1) ((Variable "second", encodeStr m2):singlesArgs) Nothing
+        outputListLno' DebugOutput ["mocat_load_sample found ", m1, " # ", m2, if singles `elem` fqfiles then " # " ++ singles else ""]
+        let expr = FunctionCall (FuncName "paired") (encodeStr m1) ((Variable "second", encodeStr m2):singlesArgs) Nothing
+            used = [m1, m2, singles]
+        return (expr, used)
+    let singletons = [FunctionCall (FuncName "fastq") (encodeStr f) passthru Nothing
+                                | f <- fqfiles, f `notElem` concat used]
+    return $ singletons ++ exps
 
 
 executeLoad :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -62,14 +79,10 @@ executeLoad (NGOString samplename) kwargs = NGOExpression <$> do
     encoding <- lookupSymbolOrScriptErrorDef (return "auto") "encoding passthru argument" "encoding" kwargs
     outputListLno' TraceOutput ["Executing mocat_load_sample transform"]
     let basedir = T.unpack samplename
-    umatched <- fmap concat $ forM ["*.fq", "*.fq.gz", "*.fq.bz2"] $ \pat ->
-        liftIO $ namesMatching (basedir </> pat)
-    let matched = sort umatched
-        matched1 = filter (\f -> endswith ".1.fq" f || endswith ".1.fq.gz" f || endswith ".1.fq.bz2" f) matched
-    args <- ListExpression <$> if null matched1
-            then return [FunctionCall (FuncName "fastq") (ConstStr . T.pack $ f) [] Nothing | f <- matched]
-            else mocatSamplePaired matched encoding qcNeeded
-    return (FunctionCall (FuncName "group") args [(Variable "name", ConstStr samplename)] Nothing)
+    fqfiles <- fmap (sort . concat) $ forM exts $ \pat ->
+        liftIO $ namesMatching (basedir </> ("*." ++ pat))
+    args <- mocatSamplePaired fqfiles encoding qcNeeded
+    return (FunctionCall (FuncName "group") (ListExpression args) [(Variable "name", ConstStr samplename)] Nothing)
 executeLoad _ _ = throwShouldNotOccur "mocat_load_sample got the wrong arguments."
 
 executeParseCoord :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
