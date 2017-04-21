@@ -193,4 +193,7 @@ ngless-${VERSION}.tar.gz: ngless
 	tar -zcvf $(distdir).tar.gz $(distdir)
 	rm -rf $(distdir)
 
-.PHONY: all build clean check tests distclean dist static fast fastcheck modules
+deploy: static
+	ngless_deploy $(shell stack path --dist-dir)/build/ngless/ngless
+
+.PHONY: all build clean check tests distclean dist static fast fastcheck modules deploy

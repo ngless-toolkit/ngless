@@ -21,3 +21,6 @@ ngless-partials/
 NGLess/Dependencies/bwa_data.c
 NGLess/Dependencies/samtools_data.c
 /NGLess.cabal
+
+# Needed to compile ngless in some systems
+libstdc++.so
