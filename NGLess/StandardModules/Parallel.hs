@@ -108,6 +108,10 @@ executeLock1 (NGOList entries) kwargs  = do
     lockdir <- setupHashDirectory "ngless-locks" hash
     (e,rk) <- getLock lockdir entries'
     outputListLno' InfoOutput ["lock1: Obtained lock file: '", lockdir </> T.unpack e ++ ".lock", "'"]
+    reportdir <- setupHashDirectory "ngless-stats" hash
+    outputListLno' InfoOutput ["Writing stats to '", reportdir </> T.unpack e, "'"]
+    let setReportDir c = c { nConfReportDirectory = reportdir }
+    updateNglEnvironment $ \env -> env { ngleConfiguration = setReportDir (ngleConfiguration env) }
     registerHook FinishOkHook $ do
         let receiptfile = lockdir </> T.unpack e ++ ".finished"
         liftIO $ withFile receiptfile WriteMode $ \h -> do
