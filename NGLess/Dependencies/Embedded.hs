@@ -1,9 +1,10 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
 module Dependencies.Embedded
     ( samtoolsData
     , bwaData
+    , megahitData
     ) where
 
 import qualified Data.ByteString as B
@@ -19,6 +20,9 @@ foreign import ccall safe "get_samtools_data" c_get_samtools_data :: CString
 foreign import ccall safe "get_bwa_len" c_get_bwa_len :: CUInt
 foreign import ccall safe "get_bwa_data" c_get_bwa_data :: CString
 
+foreign import ccall safe "get_megahit_len" c_get_megahit_len :: CUInt
+foreign import ccall safe "get_megahit_data" c_get_megahit_data :: CString
+
 samtoolsData :: IO B.ByteString
 samtoolsData =
     B.unsafePackCStringLen (c_get_samtools_data, convert c_get_samtools_len)
@@ -27,3 +31,6 @@ bwaData :: IO B.ByteString
 bwaData =
     B.unsafePackCStringLen (c_get_bwa_data, convert c_get_bwa_len)
 
+megahitData :: IO B.ByteString
+megahitData =
+    B.unsafePackCStringLen (c_get_megahit_data, convert c_get_megahit_len)

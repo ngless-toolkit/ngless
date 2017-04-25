@@ -23,7 +23,10 @@ MEGAHIT_TAR = v1.1.1.tar.gz
 MEGAHIT_URL = https://github.com/voutcn/megahit/archive/v1.1.1.tar.gz
 MEGAHIT_TARGET = ngless-megahit
 
-NGLESS_EMBEDDED_BINARIES := NGLess/Dependencies/samtools_data.c NGLess/Dependencies/bwa_data.c
+NGLESS_EMBEDDED_BINARIES := \
+		NGLess/Dependencies/samtools_data.c \
+		NGLess/Dependencies/bwa_data.c \
+		NGLess/Dependencies/megahit_data.c
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
@@ -162,6 +165,14 @@ $(MEGAHIT_DIR):
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET): $(MEGAHIT_DIR)
 	cd $(MEGAHIT_DIR) && $(MAKE)
 
+$(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)
+	cd $(MEGAHIT_DIR) && strip megahit_asm_core
+	cd $(MEGAHIT_DIR) && strip megahit_sdbg_build
+	cd $(MEGAHIT_DIR) && strip megahit_toolkit
+	mkdir -p $@ && cp -pr $(MEGAHIT_DIR)/megahit_asm_core $(MEGAHIT_DIR)/megahit_sdbg_build $(MEGAHIT_DIR)/megahit_toolkit $(MEGAHIT_DIR)/megahit $@
+
+$(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged.tar.gz: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged
+	tar --create --file $@ --gzip $<
 
 NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/$(SAM_TARGET)-static
 	strip $<
@@ -170,6 +181,10 @@ NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/$(SAM_TARGET)-static
 NGLess/Dependencies/bwa_data.c: $(BWA_DIR)/$(BWA_TARGET)-static
 	strip $<
 	xxd -i $< $@
+
+NGLess/Dependencies/megahit_data.c: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged.tar.gz
+	xxd -i $< $@
+
 
 # We cannot depend on $(HTML_LIBS_DIR) as wget sets the mtime in the past
 # and it would cause the download to happen at every make run

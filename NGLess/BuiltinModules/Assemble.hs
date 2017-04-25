@@ -17,17 +17,13 @@ import           GHC.Conc (getNumCapabilities)
 
 import Language
 import Configuration
-import FileManagement (createTempDir)
+import FileManagement (createTempDir, megahitBin)
 import Modules
 import Output
 import NGLess
 import NGLess.NGLEnvironment
 import Utils.Utils (readProcessErrorWithExitCode)
 
-
-
-megahitBin :: NGLessIO FilePath
-megahitBin = return "megahit"
 
 executeAssemble :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeAssemble "assemble" expr [] = do

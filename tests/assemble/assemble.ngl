@@ -1,0 +1,5 @@
+ngless "0.0"
+
+input = paired('sample_1.fastq.gz', 'sample_2.fastq.gz')
+write(assemble(input), ofile='output.fna')
+

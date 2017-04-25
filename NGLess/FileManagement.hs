@@ -12,12 +12,18 @@ module FileManagement
     , setupHtmlViewer
     , takeBaseNameNoExtensions
     , samtoolsBin
+    , megahitBin
     , bwaBin
     ) where
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Archive.Tar.Entry as Tar
+import qualified Codec.Compression.GZip as GZip
 import System.FilePath
 import Control.Monad
+import System.Posix.Files (setFileMode)
 import System.Posix.Internals (c_getpid)
 
 import Data.FileEmbed (embedDir)
@@ -135,6 +141,39 @@ samtoolsBin :: NGLessIO FilePath
 samtoolsBin = findOrCreateBin "NGLESS_SAMTOOLS_BIN" samtoolsFname samtoolsData
     where
         samtoolsFname = "ngless-" ++ versionStr ++ "-samtools" ++ binaryExtension
+
+megahitBin :: NGLessIO FilePath
+megahitBin = liftIO (lookupEnv "NGLESS_MEGAHIT_BIN") >>= \case
+    Just bin -> checkExecutable "NGLESS_MEGAHIT_BIN" bin
+    Nothing -> do
+        path <- findBin "megahit"
+        maybe createMegahitBin return path
+
+createMegahitBin :: NGLessIO FilePath
+createMegahitBin = do
+    megahitData' <- liftIO megahitData
+    destdir <- binPath User
+    when (B.null megahitData') $
+        throwSystemError "Cannot find megahit on the system and this is a build without embedded dependencies."
+    outputListLno' TraceOutput ["Expanding megahit binaries into ", destdir]
+    unpackMegahit destdir $ Tar.read . GZip.decompress $ BL.fromChunks [megahitData']
+    return $ destdir </> "megahit"
+    where
+        unpackMegahit :: FilePath -> Tar.Entries Tar.FormatError -> NGLessIO ()
+        unpackMegahit _ Tar.Done = return ()
+        unpackMegahit _ (Tar.Fail err) = throwSystemError ("Error expanding megahit archive: " ++ show err)
+        unpackMegahit destdir (Tar.Next e next) = case Tar.entryContent e of
+            Tar.NormalFile content _ -> do
+                let dest = destdir </> takeBaseName (Tar.entryPath e)
+                liftIO $ do
+                    BL.writeFile dest content
+                    --setModificationTime dest (posixSecondsToUTCTime (fromIntegral $ Tar.entryTime e))
+                    setFileMode dest (Tar.entryPermissions e)
+                unpackMegahit destdir next
+            _ -> throwSystemError "Unexpectedentry in megahit tarball"
+
+
+
 copyDir ::  FilePath -> FilePath -> IO ()
 copyDir src dst = do
   createDirectoryIfMissing False dst

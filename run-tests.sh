@@ -4,6 +4,7 @@ shopt -s nullglob
 
 SAMTOOLS_VERSION=1.4
 BWA_VERSION=0.7.15
+MEGAHIT_VERSION=1.1.1
 
 function remove_ngless_bin {
     # Ensure that the directory where ngless unpacks embedded binaries is removed (we want to test the embedded blobs)
@@ -28,10 +29,13 @@ else
     echo ">>> Testing NGLess ( regular build ) <<<"
     export NGLESS_SAMTOOLS_BIN=$REPO/samtools-${SAMTOOLS_VERSION}/samtools
     export NGLESS_BWA_BIN=$REPO/bwa-${BWA_VERSION}/bwa
+    export NGLESS_MEGAHIT_BIN=$REPO/megahit-${MEGAHIT_VERSION}/megahit
     echo ">> Will use samtools from '$NGLESS_SAMTOOLS_BIN' <<"
     make samtools-${SAMTOOLS_VERSION}/samtools || (echo "make samtools failed" ; exit 1)
     echo ">> Will use bwa from '$NGLESS_BWA_BIN' <<"
     make bwa-${BWA_VERSION}/bwa || (echo "make bwa failed" ; exit 1)
+    echo ">> Will use megahit from '$NGLESS_MEGATHIT_BIN' <<"
+    make megahit-${MEGAHIT_VERSION}/ngless-megahit || (echo "make megahit failed" ; exit 1)
     MAKETARGET=""
 fi
 
