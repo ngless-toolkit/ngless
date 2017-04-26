@@ -45,6 +45,17 @@ import Modules
 import Output
 import NGLess
 
+
+downloadableModules = -- Should this be merged with knownModules?
+    [("example-cmd", "0.0")
+    ,("motus", "0.0")
+    ,("motus", "0.1")
+    ,("specI", "0.0")
+    ,("igc", "0.0")
+    ,("om-rgc", "0.0")
+    ]
+
+
 data FileTypeBase =
     FastqFileSingle
     | FastqFilePair
@@ -170,8 +181,8 @@ instance FromJSON Command where
             <*> o .:? "return" .!=  CommandReturn NGLVoid "" ""
 
 data ExternalModule = ExternalModule
-    { emInfo :: ModInfo
-    , modulePath :: FilePath
+    { emInfo :: ModInfo -- ^ module information
+    , modulePath :: FilePath -- ^ directory where module files are located
     , initCmd :: Maybe FilePath
     , initArgs :: [String]
     , emFunctions :: [Command]
@@ -227,6 +238,8 @@ nglessEnv basedir = do
                 :("NGLESS_NR_CORES", show ncpu)
                 :("TMPDIR", tmpdir) -- TMPDIR is the POSIX standard
                 :("TMP", tmpdir) -- TMP is also used on Windows
+                :("TEMPDIR", tmpdir) -- Some software uses TEMP/TEMPDIR
+                :("TEMP", tmpdir)
                 :env'
 
 executeCommand :: FilePath -> [Command] -> T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -375,6 +388,7 @@ asInternalModule em@ExternalModule{..} = do
         , runFunction = executeCommand modulePath emFunctions
         }
 
+-- | performs internal validation and calls init-cmd (if any)
 validateModule :: ExternalModule -> NGLessIO ()
 validateModule  em@ExternalModule{..} = do
     checkSyntax em
@@ -395,6 +409,9 @@ validateModule  em@ExternalModule{..} = do
                     "\tstdout='", out, "'\n",
                     "\tstderr='", err, "'"]
 
+
+-- | Attempts to find bugs in its argument. When no errors are found, it does
+-- nothing
 checkSyntax :: ExternalModule -> NGLessIO ()
 checkSyntax ExternalModule{..} = forM_ emFunctions $ \f -> do
         checkArg1NoName f
@@ -435,13 +452,6 @@ findFirstM f (x:xs) = f x >>= \case
     Nothing -> findFirstM f xs
     other -> return other
 
-downloadableModules =
-    [("example-cmd", "0.0")
-    ,("motus", "0.0")
-    ,("motus", "0.1")
-    ,("specI", "0.0")
-    ]
-
 downloadModule :: T.Text -> T.Text -> NGLessIO FilePath
 downloadModule modname modversion = do
     dataDirectory <- nConfUserDataDirectory <$> nglConfiguration
@@ -452,6 +462,7 @@ downloadModule modname modversion = do
     downloadExpandTar url dataDirectory
     return destdir
 
+-- | Find and load the external module
 findLoad :: T.Text -> T.Text -> NGLessIO ExternalModule
 findLoad modname version = do
     let modpath' = "Modules" </> T.unpack modname <.> "ngm"
