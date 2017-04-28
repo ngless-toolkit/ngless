@@ -114,6 +114,7 @@ readConfigFiles NGLessConfiguration{..} cfiles = do
     nConfColor' <- CF.lookupDefault AutoColor cp "color"
     nConfPrintHeader' <- CF.lookupDefault nConfPrintHeader cp "print-header"
     nConfSearchPath' <- CF.lookupDefault nConfSearchPath cp "search-path"
+    nConfCreateReportDirectory' <- CF.lookupDefault nConfCreateReportDirectory cp "create-report"
     return NGLessConfiguration
         { nConfDownloadBaseURL = nConfDownloadBaseURL'
         , nConfGlobalDataDirectory = nConfGlobalDataDirectory'
@@ -122,7 +123,7 @@ readConfigFiles NGLessConfiguration{..} cfiles = do
         , nConfTemporaryDirectory = nConfTemporaryDirectory'
         , nConfKeepTemporaryFiles = nConfKeepTemporaryFiles'
         , nConfTrace = nConfTrace
-        , nConfCreateReportDirectory = nConfCreateReportDirectory
+        , nConfCreateReportDirectory = nConfCreateReportDirectory'
         , nConfReportDirectory = nConfReportDirectory
         , nConfColor = nConfColor'
         , nConfPrintHeader = nConfPrintHeader'
