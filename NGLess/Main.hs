@@ -204,7 +204,6 @@ modeExec opts@DefaultMode{} = do
         sc <- runNGLess $ checktypes modules sc' >>= validate modules
         when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
             whenStrictlyNormal setQuiet
-        odir <- nConfReportDirectory <$> nglConfiguration
         shouldOutput <- nConfCreateReportDirectory <$> nglConfiguration
         shouldPrintHeader <- nConfPrintHeader <$> nglConfiguration
         outputLno' DebugOutput "Validating script..."
@@ -226,6 +225,7 @@ modeExec opts@DefaultMode{} = do
         outputLno' InfoOutput "Script OK. Starting interpretation..."
         interpret modules (nglBody transformed)
         triggerHook FinishOkHook
+        odir <- nConfReportDirectory <$> nglConfiguration
         return (shouldOutput, odir)
     when shouldOutput $ do
         createDirectoryIfMissing False odir
