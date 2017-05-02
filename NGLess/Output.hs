@@ -6,7 +6,6 @@
 module Output
     ( OutputType(..)
     , MappingInfo(..)
-    , outputLno'
     , outputListLno
     , outputListLno'
     , setOutputLno
@@ -114,16 +113,21 @@ savedMapOutput = unsafePerformIO (newIORef [])
 setOutputLno :: Maybe Int -> IO ()
 setOutputLno = writeIORef curLine
 
-outputListLno :: OutputType -> Maybe Int -> [String] -> NGLessIO ()
+-- | See `outputListLno'`, which is often the right function to use
+outputListLno :: OutputType      -- ^ Level at which to output
+                    -> Maybe Int -- ^ Line number (in script). Use 'Nothing' for global messages
+                    -> [String]
+                    -> NGLessIO ()
 outputListLno ot lno ms = output ot (fromMaybe 0 lno) (concat ms)
 
-outputListLno' :: OutputType -> [String] -> NGLessIO ()
+-- | Output a message.
+-- This function takes a list as it is often a more convenient interface
+outputListLno' :: OutputType      -- ^ Level at which to output
+                    -> [String]   -- ^ output. Will be 'concat' together (without any spaces or similar in between)
+                    -> NGLessIO ()
 outputListLno' !ot ms = do
     lno <- liftIO $ readIORef curLine
     outputListLno ot lno ms
-
-outputLno' :: OutputType -> String -> NGLessIO ()
-outputLno' !ot m = outputListLno' ot [m]
 
 shouldPrint :: Bool -- ^ is terminal
                 -> OutputType

@@ -56,7 +56,7 @@ performUnique fname enc mc = do
             =$= fqDecodeC enc
             $$ CL.mapM_ (multiplex k fhs)
         V.mapM_ (liftIO . hClose) fhs
-        outputLno' DebugOutput ("Wrote N Files to: " ++ dest)
+        outputListLno' DebugOutput ["Wrote N Files to: ", dest]
         (newfp,h) <- openNGLTempFile fname "" "fq.gz"
         readNFiles enc mc dest
             =$= fqEncodeC enc

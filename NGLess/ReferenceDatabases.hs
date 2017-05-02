@@ -162,7 +162,7 @@ installData (Just mode) refname = do
     outputListLno' InfoOutput ["Starting download from ", url]
     let destdir = basedir </> "References" </> T.unpack refname
     downloadExpandTar url destdir
-    outputLno' InfoOutput "Reference download completed!"
+    outputListLno' InfoOutput ["Reference download completed!"]
     return destdir
 
 

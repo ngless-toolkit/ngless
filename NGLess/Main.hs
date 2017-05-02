@@ -201,14 +201,14 @@ modeExec opts@DefaultMode{} = do
             forM_ (nglBody sc') $ \(lno,e) ->
                 putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)
             exitSuccess
-        outputLno' DebugOutput "Loading modules..."
+        outputListLno' DebugOutput ["Loading modules..."]
         modules <- loadModules (fromMaybe [] (nglModules <$> nglHeader sc'))
         sc <- runNGLess $ checktypes modules sc' >>= validate modules
         when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
             whenStrictlyNormal setQuiet
         shouldOutput <- nConfCreateReportDirectory <$> nglConfiguration
         shouldPrintHeader <- nConfPrintHeader <$> nglConfiguration
-        outputLno' DebugOutput "Validating script..."
+        outputListLno' DebugOutput ["Validating script..."]
         errs <- validateIO modules sc
         when (isJust errs) $ do
             let errormessage = T.intercalate "\n\n" (fromJust errs)
@@ -216,15 +216,15 @@ modeExec opts@DefaultMode{} = do
         when shouldPrintHeader $
             printHeader modules
         when (validateOnly opts) $ do
-            outputLno' InfoOutput "Script OK."
+            outputListLno' InfoOutput ["Script OK."]
             liftIO exitSuccess
-        outputLno' TraceOutput "Transforming script..."
+        outputListLno' TraceOutput ["Transforming script..."]
         when (debug_mode opts == "transform") $
             liftIO (print sc)
         transformed <- transform modules sc
         when (debug_mode opts == "transform") $
             liftIO (print transformed)
-        outputLno' InfoOutput "Script OK. Starting interpretation..."
+        outputListLno' InfoOutput ["Script OK. Starting interpretation..."]
         interpret modules (nglBody transformed)
         triggerHook FinishOkHook
         odir <- nConfReportDirectory <$> nglConfiguration
@@ -245,7 +245,7 @@ modeExec (InstallGenMode ref)
         error (concat ["Reference ", T.unpack ref, " is not a known reference."])
 
 modeExec (CreateReferencePackMode ofile gen mgtf mfunc) = runNGLessIO "creating reference package" $ do
-        outputLno' InfoOutput "Starting packaging (will download and index genomes)..."
+        outputListLno' InfoOutput ["Starting packaging (will download and index genomes)..."]
         createReferencePack ofile gen mgtf mfunc
 
 modeExec (DownloadFileMode url local) = runNGLessIO "download a file" $

@@ -97,6 +97,9 @@ runInterpretationRO env act = runReaderT act env
 runNGLessIO :: NGLessIO a -> InterpretationEnvIO a
 runNGLessIO = lift
 
+liftNGLessIO :: NGLessIO a -> InterpretationEnvIO a
+liftNGLessIO = lift
+
 runInROEnvIO :: InterpretationROEnv a -> InterpretationEnvIO a
 runInROEnvIO act = do
     env <- get
@@ -398,7 +401,7 @@ executePreprocess (NGOReadSet name rs) args (Block [Variable var] block) = do
 
         [_,_,s3'] <- forM [s1,s2,s3] (liftIO . A.wait)
 
-        runNGLessIO $ outputLno' DebugOutput "Preprocess finished"
+        liftNGLessIO $ outputListLno' DebugOutput ["Preprocess finished"]
 
         let isRS1 ReadSet1{} = True
             isRS1 _ = False
