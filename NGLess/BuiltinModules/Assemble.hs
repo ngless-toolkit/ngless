@@ -2,7 +2,6 @@
  - License: MIT
  -}
 
-
 module BuiltinModules.Assemble
     ( loadModule
     ) where
@@ -28,7 +27,7 @@ import Utils.Utils (readProcessErrorWithExitCode)
 executeAssemble :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeAssemble "assemble" expr [] = do
     files <- case expr of
-            NGOReadSet _ (ReadSet1 _ f) -> return ["-1", f]
+            NGOReadSet _ (ReadSet1 _ f) -> return ["-r", f]
             NGOReadSet _ (ReadSet2 _ f1 f2) -> return ["-1", f1, "-2", f2]
             NGOReadSet _ (ReadSet3 _ f1 f2 f3) -> return ["-1", f1, "-2", f2, "-r", f3]
             _ -> throwScriptError ("megahit:assemble first argument should have been readset, got '"++show expr++"'")
