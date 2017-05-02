@@ -75,7 +75,7 @@ deleteTempFile (fp, h) = do
     hClose h
     removeFileIfExists fp
 
--- removeIfTemporary removes files if (and only if):
+-- | removeIfTemporary removes files if (and only if):
 -- 1. this was a temporary file created by 'openNGLTempFile'
 -- 2. the user has not requested that temporary files be kept
 --
@@ -91,18 +91,25 @@ removeIfTemporary fp = do
         updateNglEnvironment $ \e -> e { ngleTemporaryFilesCreated = filter (==fp) (ngleTemporaryFilesCreated e) }
 
 
--- takeBaseName only takes out the first extension
+-- | This is a version of 'takeBaseName' which drops all extension
+-- ('takeBaseName' only takes out the first extension
 takeBaseNameNoExtensions = dropExtensions . takeBaseName
 
 -- | create a temporary directory as a sub-directory of the user-specified
--- temporary directory. Releasing deletes the directory and all its contents.
+-- temporary directory.
+--
+-- Releasing deletes the directory and all its contents (unless the user
+-- requested that temporary files be preserved).
 createTempDir :: String -> NGLessIO (ReleaseKey,FilePath)
 createTempDir template = do
         tbase <- nConfTemporaryDirectory <$> nglConfiguration
         liftIO $ createDirectoryIfMissing True tbase
+        keepTempFiles <- nConfKeepTemporaryFiles <$> nglConfiguration
         allocate
             (c_getpid >>= createFirst tbase (takeBaseNameNoExtensions template))
-            removeDirectoryRecursive
+            (if not keepTempFiles
+                then removeDirectoryRecursive
+                else const (return ()))
     where
         createFirst :: (Num a, Show a) => FilePath -> String -> a -> IO FilePath
         createFirst dirbase t n = do
