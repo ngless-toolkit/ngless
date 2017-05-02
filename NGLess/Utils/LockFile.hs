@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, CPP #-}
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
 
@@ -10,6 +10,7 @@ module Utils.LockFile
     , acquireLock'
     , acquireLock
     , fileAge
+    , removeFileIfExists
     ) where
 
 #ifndef WINDOWS
@@ -41,10 +42,8 @@ import System.Posix.Internals
 import Control.Monad.Trans.Resource
 import Network.BSD (getHostName)
 
-import NGLess
+import NGLess.NGError
 import Output
-import FileManagement
-
 
 data LockParameters = LockParameters
                 { lockFname :: FilePath
@@ -65,6 +64,8 @@ pidAsStr = show <$> getProcessID
 pidAsStr = return "(PID is not available on Windows)"
 #endif
 
+-- | Executes the action specified with a lock file around it so that multiple
+-- ngless do not clash with each other
 withLockFile :: LockParameters -> NGLessIO a -> NGLessIO a
 withLockFile params act =
     acquireLock' params >>= \case
@@ -81,9 +82,13 @@ sleep = threadDelay . toMicroSeconds
         toMicroSeconds :: NominalDiffTime -> Int
         toMicroSeconds = (1000000 *) . fromInteger . round
 
+
+-- | Atomically create a lock file with a given name
+-- If file already exists, returns 'Nothing'
 acquireLock :: FilePath -> NGLessIO (Maybe ReleaseKey)
 acquireLock fname = acquireLock' LockParameters { lockFname = fname, whenExistsStrategy = IfLockedNothing, maxAge = 0 }
 
+-- | Atomically create a lock file
 acquireLock' :: LockParameters -> NGLessIO (Maybe ReleaseKey)
 acquireLock' params@LockParameters{..} = liftIO (openLockFile lockFname) >>= \case
     Just h -> do
@@ -119,7 +124,8 @@ acquireLock' params@LockParameters{..} = liftIO (openLockFile lockFname) >>= \ca
                     acquireLock' (params { whenExistsStrategy = lessOneTry })
                 | otherwise -> throwSystemError ("Could not obtain lock " ++ lockFname ++ " even after waiting for its release.")
 
--- This code is adapted from https://hackage.haskell.org/package/lock-file-0.5.0.2/docs/src/System-IO-LockFile-Internal.html
+-- This code is adapted from
+-- https://hackage.haskell.org/package/lock-file-0.5.0.2/docs/src/System-IO-LockFile-Internal.html
 openLockFile :: FilePath -> IO (Maybe Handle)
 openLockFile lockFileName = do
     let openFlags = o_NONBLOCK .|. o_NOCTTY .|. o_RDWR .|. o_CREAT .|. o_EXCL .|. o_BINARY
@@ -144,3 +150,9 @@ fileAge fname = handleIf isDoesNotExistError (return Nothing) $ Just <$> do
     cur <- getCurrentTime
     return (cur `diffUTCTime` mtime)
 
+removeFileIfExists :: FilePath -> IO ()
+removeFileIfExists fp = removeFile fp `catch` ignoreDoesNotExistError
+    where
+        ignoreDoesNotExistError e
+                | isDoesNotExistError e = return ()
+                | otherwise = throwIO e

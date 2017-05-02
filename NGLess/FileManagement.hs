@@ -41,6 +41,7 @@ import Configuration
 import NGLess.NGLEnvironment
 import NGLess.NGError
 import Dependencies.Embedded
+import Utils.LockFile
 
 
 data InstallMode = User | Root deriving (Eq, Show)
@@ -70,11 +71,6 @@ openNGLTempFile' base prefix ext = do
 openNGLTempFile :: FilePath -> String -> String -> NGLessIO (FilePath, Handle)
 openNGLTempFile base pre ext = snd <$> openNGLTempFile' base pre ext
 
-removeFileIfExists fp = removeFile fp `catch` ignoreDoesNotExistError
-    where
-        ignoreDoesNotExistError e
-                | isDoesNotExistError e = return ()
-                | otherwise = throwIO e
 deleteTempFile (fp, h) = do
     hClose h
     removeFileIfExists fp
@@ -155,22 +151,29 @@ createMegahitBin = do
     destdir <- binPath User
     when (B.null megahitData') $
         throwSystemError "Cannot find megahit on the system and this is a build without embedded dependencies."
-    outputListLno' TraceOutput ["Expanding megahit binaries into ", destdir]
-    unpackMegahit destdir $ Tar.read . GZip.decompress $ BL.fromChunks [megahitData']
+    withLockFile LockParameters
+                { lockFname = destdir ++ ".megahit-expand"
+                , maxAge = 300
+                , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
+               } $ do
+        outputListLno' TraceOutput ["Expanding megahit binaries into ", destdir]
+        unpackMegahit destdir $ Tar.read . GZip.decompress $ BL.fromChunks [megahitData']
     return $ destdir </> "megahit"
     where
         unpackMegahit :: FilePath -> Tar.Entries Tar.FormatError -> NGLessIO ()
         unpackMegahit _ Tar.Done = return ()
         unpackMegahit _ (Tar.Fail err) = throwSystemError ("Error expanding megahit archive: " ++ show err)
-        unpackMegahit destdir (Tar.Next e next) = case Tar.entryContent e of
-            Tar.NormalFile content _ -> do
-                let dest = destdir </> takeBaseName (Tar.entryPath e)
-                liftIO $ do
-                    BL.writeFile dest content
-                    --setModificationTime dest (posixSecondsToUTCTime (fromIntegral $ Tar.entryTime e))
-                    setFileMode dest (Tar.entryPermissions e)
-                unpackMegahit destdir next
-            _ -> throwSystemError "Unexpectedentry in megahit tarball"
+        unpackMegahit destdir (Tar.Next e next) = do
+            case Tar.entryContent e of
+                Tar.NormalFile content _ -> do
+                    let dest = destdir </> takeBaseName (Tar.entryPath e)
+                    liftIO $ do
+                        BL.writeFile dest content
+                        --setModificationTime dest (posixSecondsToUTCTime (fromIntegral $ Tar.entryTime e))
+                        setFileMode dest (Tar.entryPermissions e)
+                Tar.Directory -> return ()
+                _ -> throwSystemError ("Unexpected entry in megahit tarball: " ++ show e)
+            unpackMegahit destdir next
 
 
 

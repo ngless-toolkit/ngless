@@ -28,8 +28,8 @@ import           Control.Concurrent (getNumCapabilities)
 import           Data.List (isSuffixOf)
 import           System.Process (proc, CreateProcess(..), StdStream(..))
 
-import FileManagement
 import Output
+import FileManagement
 import NGLess.NGError
 
 import Utils.Utils (readProcessErrorWithExitCode)
