@@ -163,7 +163,8 @@ $(MEGAHIT_DIR):
 	rm $(MEGAHIT_TAR)
 
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET): $(MEGAHIT_DIR)
-	cd $(MEGAHIT_DIR) && $(MAKE)
+	cd $(MEGAHIT_DIR) && patch -p1 <../build-scripts/megahit-1.1.1.patch
+	cd $(MEGAHIT_DIR) && $(MAKE) CXXFLAGS=-static
 
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)
 	cd $(MEGAHIT_DIR) && strip megahit_asm_core
