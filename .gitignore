@@ -22,4 +22,5 @@ ngless-partials/
 # Generated as part of build
 NGLess/Dependencies/bwa_data.c
 NGLess/Dependencies/samtools_data.c
+NGLess/Dependencies/megahit_data.c
 /NGLess.cabal
