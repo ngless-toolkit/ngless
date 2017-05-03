@@ -24,6 +24,7 @@ import ReferenceDatabases
 import BuiltinModules.Checks
 
 
+-- validation functions live in this Monad, where error messages can be written
 type ValidateIO = WriterT [T.Text] (ReaderT [Module] NGLessIO)
 tell1 = tell . (:[])
 
@@ -32,6 +33,7 @@ findFunctionIO fname = flip findFunction fname <$> ask >>= \case
     Just finfo -> return finfo
     Nothing -> throwShouldNotOccur ("Cannot find information for function: " ++ show fname)
 
+-- | Run as many checks as possible (including non-pure, IO consuming, checks)
 validateIO :: [Module] -> Script -> NGLessIO (Maybe [T.Text])
 validateIO mods sc = do
         err <- runReaderT (execWriterT (mapM ($sc) checks)) mods
@@ -42,7 +44,7 @@ validateIO mods sc = do
         checks =
             [validateReadInputs
             ,validateOFile
-            ,validate_def_genomes
+            ,checkReferencesExist
             ]
 
 
@@ -66,11 +68,30 @@ validateReadInputs (Script _ es) = checkRecursive validateReadInputs' es
             | otherwise = liftIO (checkFileReadable $ T.unpack fname) >>= flip whenJust tell1
 
 
-validate_def_genomes :: Script -> ValidateIO ()
-validate_def_genomes (Script _ es) = checkRecursive validate_def_genomes' es
+checkReferencesExist :: Script -> ValidateIO ()
+checkReferencesExist (Script _ es) = flip checkRecursive es $ \case
+        (FunctionCall (FuncName "map") _ args _) -> validateStrArg check1 "reference" args es
+        _ -> return ()
     where
-        validate_def_genomes' (FunctionCall (FuncName "map") _ args _) = validateStrArg check_reference "reference" args es
-        validate_def_genomes' _ = return ()
+        check1 :: T.Text -> ValidateIO ()
+        check1 r = do
+            mods <- ask
+            let refs = concatMap modReferences mods
+                ename (ExternalPackagedReference er) = refName er
+                ename er = erefName er
+                allnames = (ename <$> refs) ++ (refName <$> builtinReferences)
+            unless (r `elem` allnames) $ do
+                exists <- liftIO $ doesFileExist (T.unpack r)
+                tell1 . T.concat $ [
+                            "Could not find reference ", r, " (it is neither built in nor in any of the loaded modules).\n"
+                            ] ++ (if exists
+                                    then ["\n\tDid you mean to use the argument `fafile` to specify the FASTA file `", r, "`?\n",
+                                          "\tmap() uses the argument `reference` for builtin references and `fafile` for a FASTA file path."]
+                                    else [])
+                            ++ [suggestionMessage r allnames,
+                                "\n\tValid options are:"]
+                            ++ [T.concat ["\n\t\t - ", v] | v <- allnames]
+
 
 
 validateStrArg :: (T.Text -> ValidateIO ()) -> T.Text -> [(Variable,Expression)] -> [(Int,Expression)] -> ValidateIO ()
@@ -100,23 +121,6 @@ checkRecursive f es = forM_ es $ \(lno, e) ->
         addLno lno = map (addLno1 lno)
         addLno1 lno err = T.concat ["Line ", T.pack (show lno), ": ", err]
 
-
-
-check_reference :: T.Text -> ValidateIO ()
-check_reference r = do
-    mods <- ask
-    let refs = concatMap modReferences mods
-        ename (ExternalPackagedReference er) = refName er
-        ename er = erefName er
-        allnames = (ename <$> refs) ++ (refName <$> builtinReferences)
-    unless (r `elem` allnames) $ do
-        exists <- liftIO $ doesFileExist (T.unpack r)
-        tell1 . T.concat $ [
-                    "Could not find reference ", r, " (it is neither built in nor in any of the loaded modules)."
-                    ] ++ (if exists
-                            then ["\n\tDid you mean to use the argument `fafile` to specify the FASTA file `", r, "`?\n",
-                                  "\tmap() uses the argument `reference` for builtin references and `fafile` for a FASTA file path."]
-                            else [])
 
 validateOFile (Script _ es) = checkRecursive validateOFile' es
     where

@@ -1,4 +1,4 @@
-{- Copyright 2016 NGLess Authors
+{- Copyright 2016-2017 NGLess Authors
  - License: MIT
  -}
 
@@ -27,7 +27,7 @@ data Suggestion = Suggestion
 -- | Given an erroneous legal input and a list of what the legal options were,
 -- attempt to find a suggestion
 --
--- See also: suggestionMessage
+-- See also: 'suggestionMessage'
 findSuggestion :: T.Text
                     -- ^ What the user typed
                     -> [T.Text]
