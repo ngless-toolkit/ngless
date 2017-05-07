@@ -1,0 +1,1 @@
+../map3/check.sh
