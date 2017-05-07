@@ -38,8 +38,6 @@ RUN m4 NGLess.cabal.m4 > NGLess.cabal
 # Build dependencies in a separate step to avoid a full rebuild on ngless compile failure
 RUN stack build --only-dependencies --system-ghc --ghc-options '-optl-static -optl-pthread -fPIC'
 
-RUN make NGLess/Dependencies/samtools_data.c STRIP=1
-RUN make NGLess/Dependencies/bwa_data.c STRIP=1
-RUN make NGLess/Dependencies/megahit_data.c
+RUN make embedded-deps
 
 RUN stack --local-bin-path /usr/local/bin install --system-ghc --ghc-options '-optl-static -optl-pthread -fPIC' --flag NGLess:embed

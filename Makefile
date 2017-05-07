@@ -133,6 +133,7 @@ distclean: clean
 uninstall:
 	rm -rf $(deps) $(exec)/ngless*
 
+embedded-deps: $(NGLESS_EMBEDDED_BINARIES)
 
 $(BWA_DIR):
 	wget $(BWA_URL)
@@ -221,4 +222,4 @@ ngless-${VERSION}.tar.gz: ngless
 	tar -zcvf $(distdir).tar.gz $(distdir)
 	rm -rf $(distdir)
 
-.PHONY: all build clean check tests distclean dist static fast fastcheck modules
+.PHONY: all build clean check tests distclean dist static fast fastcheck modules embedded-deps
