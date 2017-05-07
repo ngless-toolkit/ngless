@@ -70,6 +70,7 @@ linesBounded maxLineSize = continue 0 []
                                 emit 0 [] (B.tail rest)
 
 
+-- | Remove trailing \r present when the original line terminator was \r\n (windows)
 lineWindowsTerminated :: B.ByteString -> B.ByteString
 lineWindowsTerminated line = if not (B.null line) && B.index line (B.length line - 1) == carriage_return
                                 then B.take (B.length line - 1) line
