@@ -40,5 +40,6 @@ RUN stack build --only-dependencies --system-ghc --ghc-options '-optl-static -op
 
 RUN make NGLess/Dependencies/samtools_data.c STRIP=1
 RUN make NGLess/Dependencies/bwa_data.c STRIP=1
+RUN make NGLess/Dependencies/megahit_data.c
 
 RUN stack --local-bin-path /usr/local/bin install --system-ghc --ghc-options '-optl-static -optl-pthread -fPIC' --flag NGLess:embed
