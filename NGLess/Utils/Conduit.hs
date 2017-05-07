@@ -68,15 +68,17 @@ linesBounded maxLineSize = continue 0 []
                                 C.yield (B.concat $ reverse (start:toks))
                                 emit 0 [] (B.tail rest)
 
+
+lineWindowsTerminated :: B.ByteString -> B.ByteString
+lineWindowsTerminated line = if not (B.null line) && B.index line (B.length line - 1) == carriage_return
+                                then B.take (B.length line - 1) line
+                                else line
+                                    where carriage_return = 13
+
 linesC :: (Monad m) => C.Conduit B.ByteString m ByteLine
 linesC =
     CB.lines
-#ifdef WINDOWS
-        =$= CL.map (\line ->
-                        if not (B.null line) && B.index line (B.length line - 1) == 13
-                            then B.take (B.length line - 1) line
-                            else line)
-#endif
+        =$= CL.map lineWindowsTerminated
         =$= CL.map ByteLine
 {-# INLINE linesC #-}
 
@@ -84,12 +86,7 @@ linesC =
 linesCBounded :: (MonadError NGError m) => C.Conduit B.ByteString m ByteLine
 linesCBounded =
     linesBounded 8192
-#ifdef WINDOWS
-        =$= CL.map (\line ->
-                        if not (B.null line) && B.index line (B.length line - 1) == 13
-                            then B.take (B.length line - 1) line
-                            else line)
-#endif
+        =$= CL.map lineWindowsTerminated
         =$= CL.map ByteLine
 
 byteLineSinkHandle :: (MonadIO m) => Handle -> C.Sink ByteLine m ()
