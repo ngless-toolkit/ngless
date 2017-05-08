@@ -2,28 +2,26 @@
 # USE ALPINE LINUX
 FROM alpine:edge
 RUN echo '@testing http://dl-cdn.alpinelinux.org/alpine/edge/testing' >> /etc/apk/repositories
-RUN apk update
-
-# We add vim to get xxd
-RUN apk add \
+RUN apk update && apk add \
     alpine-sdk \
     bash \
-    ca-certificates \
-    file \
     bzip2-dev \
+    ca-certificates \
     cabal@testing \
-    ghc@testing \
+    file \
     ghc-dev@testing \
-    libffi-dev \
+    ghc@testing \
     git \
     gmp-dev \
+    libffi-dev \
+    libgcc \
     m4 \
     make \
     vim \
     xz \
     xz-dev \
-    libgcc \
     zlib-dev
+# We add vim to get xxd
 
 # GRAB A RECENT BINARY OF STACK
 RUN wget -qO- https://get.haskellstack.org/ | sh
@@ -31,13 +29,16 @@ RUN wget -qO- https://get.haskellstack.org/ | sh
 RUN chmod 755 /usr/local/bin/stack
 RUN mkdir -p /usr/src/
 
-RUN git clone --depth=10 https://github.com/luispedro/ngless  /usr/src/ngless
+RUN git clone --depth=10 https://github.com/luispedro/ngless /usr/src/ngless
 WORKDIR /usr/src/ngless
+
 RUN m4 NGLess.cabal.m4 > NGLess.cabal
 
+# This will have all make calls use the ghc installed above
 # Build dependencies in a separate step to avoid a full rebuild on ngless compile failure
-RUN stack build --only-dependencies --system-ghc --ghc-options '-optl-static -optl-pthread -fPIC'
+ENV STACKOPTS="--system-ghc --only-dependencies"
+RUN make ngless-embed
 
-RUN make embedded-deps
-
-RUN stack --local-bin-path /usr/local/bin install --system-ghc --ghc-options '-optl-static -optl-pthread -fPIC' --flag NGLess:embed
+ENV STACKOPTS="--system-ghc"
+RUN make static
+RUN make install
