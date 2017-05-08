@@ -75,7 +75,7 @@ all: ngless
 NGLess.cabal: NGLess.cabal.m4
 	m4 $< > $@
 
-ngless-embed: NGLess.cabal $(NGLESS_BINS)
+ngless-embed: NGLess.cabal $(NGLESS_EMBEDDED_BINARIES)
 	stack build $(STACKOPTS) --flag NGLess:embed
 
 ngless: NGLess.cabal
@@ -113,7 +113,7 @@ install: ngless external-deps $(NGLESS_EXT_BINS)
 	cp -prf $(HTML) $(deps)
 	cp -prf $(NGLESS_EXT_BINS) $(deps)/bin
 
-external-deps: $(NGLESS_BINS) $(reqhtmllibs) $(reqfonts)
+external-deps: $(NGLESS_EXT_BINS) $(reqhtmllibs) $(reqfonts)
 
 clean:
 	rm -f $(NGLESS_EMBEDDED_BINARIES)
