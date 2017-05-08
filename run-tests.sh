@@ -6,6 +6,10 @@ SAMTOOLS_VERSION=1.4
 BWA_VERSION=0.7.15
 MEGAHIT_VERSION=1.1.1
 
+SAMTOOLS_BIN=ngless-0.0.0-samtools
+BWA_BIN=ngless-0.0.0-bwa
+MEGAHIT_BIN=megahit
+
 function remove_ngless_bin {
     # Ensure that the directory where ngless unpacks embedded binaries is removed (we want to test the embedded blobs)
     NGLDIR="$HOME/.local/share/ngless/bin"
@@ -27,15 +31,15 @@ elif [[ "$0" == *-static.sh ]]; then
     remove_ngless_bin
 else
     echo ">>> Testing NGLess ( regular build ) <<<"
-    export NGLESS_SAMTOOLS_BIN=$REPO/samtools-${SAMTOOLS_VERSION}/samtools
-    export NGLESS_BWA_BIN=$REPO/bwa-${BWA_VERSION}/bwa
-    export NGLESS_MEGAHIT_BIN=$REPO/megahit-${MEGAHIT_VERSION}/megahit
+    export NGLESS_SAMTOOLS_BIN=$REPO/samtools-${SAMTOOLS_VERSION}/${SAMTOOLS_BIN}
+    export NGLESS_BWA_BIN=$REPO/bwa-${BWA_VERSION}/${BWA_BIN}
+    export NGLESS_MEGAHIT_BIN=$REPO/megahit-${MEGAHIT_VERSION}/${MEGAHIT_BIN}
     echo ">> Will use samtools from '$NGLESS_SAMTOOLS_BIN' <<"
-    make samtools-${SAMTOOLS_VERSION}/samtools || (echo "make samtools failed" ; exit 1)
+    make samtools-${SAMTOOLS_VERSION}/${SAMTOOLS_BIN} || (echo "make samtools failed" ; exit 1)
     echo ">> Will use bwa from '$NGLESS_BWA_BIN' <<"
-    make bwa-${BWA_VERSION}/bwa || (echo "make bwa failed" ; exit 1)
-    echo ">> Will use megahit from '$NGLESS_MEGATHIT_BIN' <<"
-    make megahit-${MEGAHIT_VERSION}/ngless-megahit || (echo "make megahit failed" ; exit 1)
+    make bwa-${BWA_VERSION}/${BWA_BIN} || (echo "make bwa failed" ; exit 1)
+    echo ">> Will use megahit from '$NGLESS_MEGAHIT_BIN' <<"
+    make megahit-${MEGAHIT_VERSION}/${MEGAHIT_BIN} || (echo "make megahit failed" ; exit 1)
     MAKETARGET=""
 fi
 
@@ -52,6 +56,12 @@ if test $? -ne "0"; then
     echo "ERROR IN 'make check'"
     ok=no
 fi
+# ngless modules - also needed for tests later on
+make modules
+if test $? -ne "0"; then
+    echo "ERROR IN 'make modules'"
+    ok=no
+fi
 
 # Our test target (if not the default) is then also used for the subsequent tests
 if [ "$MAKETARGET" != "" ]; then
@@ -61,18 +71,18 @@ if [ "$MAKETARGET" != "" ]; then
         ok=no
     fi
 else
-    if ! test -x $NGLESS_SAMTOOLS_BIN ; then
+    if ! test -x "$NGLESS_SAMTOOLS_BIN" ; then
         echo "ERROR: samtools not found at '$NGLESS_SAMTOOLS_BIN'"
         exit 1
     fi
-    if ! test -x $NGLESS_BWA_BIN ; then
+    if ! test -x "$NGLESS_BWA_BIN" ; then
         echo "ERROR: bwa not found at '$NGLESS_BWA_BIN'"
         exit 1
     fi
 fi
 
 ngless_bin=$(stack path --local-install-root)/bin/ngless
-if ! test -x $ngless_bin ; then
+if ! test -x "$ngless_bin" ; then
     echo "Could not determine path for ngless (guessed $ngless_bin)"
     exit 1
 fi
@@ -81,14 +91,14 @@ echo ">>> Running with: $($ngless_bin --version-debug) <<<"
 
 basedir=$REPO
 for testdir in tests/*; do
-    if test -d $testdir; then
+    if test -d "$testdir"; then
         cur_ok=yes
-        if test -f ${testdir}/TRAVIS_SKIP -a x$TRAVIS = xtrue; then
-            echo "Skipping $testir on Travis"
+        if test -f "${testdir}/TRAVIS_SKIP" -a "x$TRAVIS" = xtrue; then
+            echo "Skipping $testdir on Travis"
             continue
         fi
         echo "Running $testdir"
-        cd $testdir
+        cd "$testdir"
         mkdir -p temp
         validate_arg=""
         if [[ $testdir == tests/error-validation-* ]] ; then
@@ -113,7 +123,7 @@ for testdir in tests/*; do
         fi
         for f in expected.*; do
             out=output${f#expected}
-            diff -u $f $out
+            diff -u "$f" "$out"
             if test $? -ne "0"; then
                echo "ERROR in test $testdir: $out did not match $f"
                cur_ok=no
@@ -138,9 +148,9 @@ for testdir in tests/*; do
             ./cleanup.sh
         fi
         rm -rf temp
-        rm -rf *.output_ngless
+        rm -rf ./*.output_ngless
         rm -f output.*
-        cd $basedir
+        cd "$basedir"
     fi
 done
 
