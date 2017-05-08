@@ -89,7 +89,8 @@ callMapper refIndex fps extraArgs outC = do
                 (return ()) -- stdin
                 outC -- stdout
                 CL.consume -- stderr
-    outputListLno' DebugOutput ["BWA info: ", BL8.unpack $ BL8.fromChunks err]
+    let err' = BL8.unpack $ BL8.fromChunks err
+    outputListLno' DebugOutput ["BWA info: ", err']
     case exitCode of
         ExitSuccess -> do
             outputListLno' InfoOutput ["Done mapping to ", refIndex]
@@ -98,5 +99,6 @@ callMapper refIndex fps extraArgs outC = do
             throwSystemError $ concat ["Failed mapping\n",
                             "Executable used::\t", bwaPath,"\n",
                             "Command line was::\n\t", unwords cmdargs, "\n",
-                            "Bwa error code was ", show code, "."]
+                            "Bwa error code was ", show code, ".\n",
+                            "Bwa stderr: ", err']
 
