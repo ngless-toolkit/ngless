@@ -162,9 +162,9 @@ $(MEGAHIT_DIR):
 	wget $(MEGAHIT_URL)
 	tar xvzf $(MEGAHIT_TAR)
 	rm $(MEGAHIT_TAR)
+	cd $(MEGAHIT_DIR) && patch -p1 <../build-scripts/megahit-1.1.1.patch
 
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET): $(MEGAHIT_DIR)
-	cd $(MEGAHIT_DIR) && patch -p1 <../build-scripts/megahit-1.1.1.patch
 	cd $(MEGAHIT_DIR) && $(MAKE) CXXFLAGS=-static
 
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)
