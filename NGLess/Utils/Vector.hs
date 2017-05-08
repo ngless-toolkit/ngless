@@ -1,6 +1,5 @@
 module Utils.Vector
- ( zeroVec
- , toFractions
+ ( toFractions
  , unsafeIncrement
  , unsafeIncrement'
 
@@ -28,9 +27,7 @@ import qualified Data.Vector.Unboxed.Mutable as VUM
 import qualified Data.Vector.Generic.Mutable as VGM
 import           Data.Vector.Algorithms.Intro (sortByBounds)
 
-import Utils.Utils
-
-zeroVec n = VUM.replicate n (0 :: Int)
+import Utils.Utils (mapMaybeM)
 
 unsafeIncrement :: (Num a, PrimMonad m, VUM.Unbox a) => VUM.MVector (PrimState m) a -> Int -> m ()
 unsafeIncrement v i = unsafeIncrement' v i 1
@@ -76,8 +73,11 @@ binaryFindBy comp v target = do
     return $! V.unsafeIndex v ix
 
 
-
-sortParallel :: (Ord e) => Int -> VM.IOVector e -> IO ()
+-- sort a vector in parallel threads
+sortParallel :: (Ord e) =>
+                        Int -- ^ nr of threads
+                        -> VM.IOVector e -- ^ vector
+                        -> IO ()
 sortParallel n v = sortPByBounds n v 0 (VM.length v)
 
 sortPByBounds :: (Ord e) => Int -> VM.IOVector e -> Int -> Int -> IO ()

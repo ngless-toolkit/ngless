@@ -19,6 +19,8 @@ import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.Control
 import           Control.Monad.Base
 
+-- This file should be a leaf in the import graph (i.e., not import any other NGLess modules)
+
 -- | An error in evaluating an ngless script
 -- Normally, it's easier to use the function interface of 'throwShouldNotOccur' and friends
 data NGErrorType =

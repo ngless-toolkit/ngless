@@ -17,10 +17,10 @@ import System.AtomicWrite.Writer.Text (atomicWriteFile)
 import Data.Time (getZonedTime)
 import Data.Time.Format (formatTime, defaultTimeLocale)
 import Data.IORef
-import CmdArgs
 
 import NGLess.NGError
 import Configuration
+import CmdArgs
 
 data NGLEnvironment = NGLEnvironment
                     { ngleScriptText :: !T.Text -- ^ The original text of the script

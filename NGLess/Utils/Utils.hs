@@ -30,10 +30,16 @@ import GHC.IO.Exception (IOErrorType(..))
 
 import Data.List (group, uncons, tails)
 import Data.Maybe (fromMaybe, catMaybes, mapMaybe)
+-- This module should not import from other NGLess modules
 
+{- This module is a grab bag of utility functions
+ -}
+
+-- | lookup with a default if the key is not present in the association list
 lookupWithDefault :: Eq b => a -> b -> [(b,a)] -> a
 lookupWithDefault def key values = fromMaybe def $ lookup key values
 
+-- | equivalent to the Unix command 'uniq'
 uniq :: Eq a => [a] -> [a]
 uniq = map head . group
 
@@ -41,7 +47,7 @@ allSame :: Eq a => [a] -> Bool
 allSame [] = True
 allSame (e:es) = all (==e) es
 
-
+-- | This gets stderr and the exit code
 readProcessErrorWithExitCode cp = do
     (_, _, Just herr, jHandle) <-
         createProcess cp { std_err = CreatePipe }
@@ -72,11 +78,15 @@ fmapMaybeM f (Just v) = Just <$> f v
 passthrough :: (Monad m) => (a -> m ()) -> a -> m a
 passthrough f a = f a >> return a
 
+-- | move a file if possible; otherwise copy
 moveOrCopy :: FilePath -> FilePath -> IO ()
 moveOrCopy oldfp newfp = renameFile oldfp newfp `catch` (\e -> case ioeGetErrorType e of
             UnsupportedOperation -> copyFile oldfp newfp
             _ -> ioError e)
 
+-- | Monadic version of find: returns the result of the first application of
+-- the argument which is not 'Nothing' or, if all applications fail, return
+-- 'Nothing'
 findM :: Monad m => [a] -> (a -> m (Maybe b)) -> m (Maybe b)
 findM [] _ = return Nothing
 findM (x:xs) f = f x >>= \case

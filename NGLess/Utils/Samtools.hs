@@ -1,8 +1,6 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
-
-{-# LANGUAGE OverloadedStrings #-}
 
 module Utils.Samtools
     ( samBamConduit
@@ -63,6 +61,8 @@ samBamConduit samfp
     | otherwise = conduitPossiblyCompressedFile samfp
 
 
+-- | Convert file types (SAM -> BAM)
+-- The output is a newly created temporary file
 convertSamToBam :: FilePath -> NGLessIO FilePath
 convertSamToBam samfile = do
     samPath <- samtoolsBin
@@ -78,6 +78,8 @@ convertSamToBam samfile = do
        ExitSuccess -> return newfp
        ExitFailure err -> throwSystemError ("Failure on converting sam to bam" ++ show err)
 
+-- | Convert file types (BAM -> SAM)
+-- The output is a newly created temporary file
 convertBamToSam :: FilePath -> NGLessIO FilePath
 convertBamToSam bamfile = do
     (newfp, hout) <- openNGLTempFile bamfile "converted_" "sam"

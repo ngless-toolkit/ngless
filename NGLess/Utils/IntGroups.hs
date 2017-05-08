@@ -20,6 +20,7 @@ import Control.DeepSeq          (NFData(..))
 import qualified Prelude
 import Prelude hiding (length, null)
 
+-- | IntGroups are a faster, strict, representation of [[Int]]
 data IntGroups = IntGroups !(VU.Vector Int) !(VU.Vector Int)
 instance NFData IntGroups where
     rnf (IntGroups !_ !_) = ()

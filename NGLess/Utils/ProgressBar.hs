@@ -1,3 +1,8 @@
+{- Copyright 2014-2016 NGLess Authors
+ - License: MIT
+ -}
+
+
 module Utils.ProgressBar
     ( mkProgressBar
     , updateProgressBar
@@ -16,7 +21,10 @@ data ProgressBar = ProgressBar
 
 noProgress = ProgressBar (-1) (-1) False
 
-updateProgressBar :: ProgressBar -> Rational -> IO ProgressBar
+-- | Redraw progress bar
+updateProgressBar :: ProgressBar -- ^ previous progressbar
+                  -> Rational -- ^ current fractional progress
+                  -> IO ProgressBar -- ^ new progressbar
 updateProgressBar bar _
     | not (pbarActive bar) = return bar
 updateProgressBar bar progress = do
@@ -26,6 +34,10 @@ updateProgressBar bar progress = do
         putStr "\r"
     return $ bar { cur = progress }
 
+-- | create a new 'ProgressBar' object
+-- This function also checks if 'stdout' is a terminal device.
+-- If it is not, then it returns a null progress bar,
+-- one which does not draw on the screen.
 mkProgressBar :: Int -> IO ProgressBar
 mkProgressBar w = do
     isTerm <- hIsTerminalDevice stdout

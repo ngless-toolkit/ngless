@@ -55,6 +55,7 @@ import NGLess.NGError
 newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
                 deriving (Show)
 
+linesBounded:: (Monad m, MonadError NGError m) => Int -> C.Conduit B.ByteString m B.ByteString
 linesBounded maxLineSize = continue 0 []
     where
         continue n toks

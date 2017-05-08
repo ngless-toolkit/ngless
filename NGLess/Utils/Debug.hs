@@ -2,8 +2,6 @@
  - License: MIT
  -}
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Utils.Debug
     ( tracex
     , trace
@@ -12,5 +10,6 @@ module Utils.Debug
 
 import Debug.Trace
 
+-- | Show value when evaluated, then return it
 tracex :: Show a => a -> a
 tracex x = trace (show x) x
