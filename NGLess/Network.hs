@@ -1,5 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
-
+{- Copyright 2013-2017 NGLess Authors
+ - License: MIT
+ -}
 module Network
     ( downloadFile
     , downloadOrCopyFile
@@ -12,6 +13,7 @@ import           Data.Conduit (($$+-), (=$=))
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString.Char8 as B
 import qualified Network.HTTP.Conduit as HTTP
@@ -20,6 +22,7 @@ import qualified Network.HTTP.Client as HTTP
 import Data.Conduit.Binary (sinkFile)
 import System.Directory (copyFile, createDirectoryIfMissing, removeFile)
 import Data.List (isPrefixOf)
+import System.Posix.Files (setFileMode)
 import System.FilePath
 
 import Output
@@ -48,15 +51,33 @@ downloadFile url destPath = do
                 $$+- printProgress (read (B.unpack csize))
                 =$= sinkFile destPath
 
+-- Download a tar.gz file and expand it onto 'destdir'
 downloadExpandTar :: FilePath -> FilePath -> NGLessIO ()
 downloadExpandTar url destdir = do
     let tarName = destdir <.> "tar.gz"
 
     liftIO $ createDirectoryIfMissing True destdir
-    downloadFile url tarName
-    liftIO $ do
-        Tar.unpack destdir . Tar.read . GZip.decompress =<< BL.readFile tarName
-        removeFile tarName
+    downloadOrCopyFile url tarName
+    expandTar . Tar.read . GZip.decompress =<< liftIO (BL.readFile tarName)
+    liftIO $ removeFile tarName
+  where
+    -- We cannot use Tar.unpack as that function does not correctly set permissions
+    expandTar :: Tar.Entries Tar.FormatError -> NGLessIO ()
+    expandTar Tar.Done = return ()
+    expandTar (Tar.Fail err) = throwSystemError ("Error expanding archive: " ++ show err)
+    expandTar (Tar.Next e next) = do
+          case Tar.entryContent e of
+              Tar.NormalFile content _ -> do
+                  let dest = destdir </> Tar.entryPath e
+                  outputListLno' TraceOutput ["Expanding ", dest]
+                  liftIO $ do
+                      createDirectoryIfMissing True (takeDirectory dest)
+                      BL.writeFile dest content
+                      --setModificationTime dest (posixSecondsToUTCTime (fromIntegral $ Tar.entryTime e))
+                      setFileMode dest (Tar.entryPermissions e)
+              Tar.Directory -> return ()
+              _ -> throwSystemError ("Unexpected entry in megahit tarball: " ++ show e)
+          expandTar next
 
 printProgress :: Int -> C.Conduit B.ByteString NGLessIO B.ByteString
 printProgress csize = liftIO (mkProgressBar 40) >>= loop 0
