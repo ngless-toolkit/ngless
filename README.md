@@ -123,6 +123,11 @@ The following sequence of commands should download and build the software
     cd ngless
     make
 
+To install, you can use the following command (replace `<PREFIX>` with
+the directory where you wish to install, default is `/usr/local`):
+
+    make install prefix=<PREFIX>
+
 ## More information
 
 - [Full documentation](http://ngless.readthedocs.org/en/latest/)

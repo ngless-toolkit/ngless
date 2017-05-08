@@ -11,22 +11,25 @@ exec=$(prefix)/bin
 BWA_DIR = bwa-0.7.15
 BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.15/bwa-0.7.15.tar.bz2
 BWA_TAR = bwa-0.7.15.tar.bz2
-BWA_TARGET = ngless-bwa
+BWA_TARGET = ngless-0.0.0-bwa
 
 SAM_DIR = samtools-1.4
 SAM_URL = https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
 SAM_TAR = samtools-1.4.tar.bz2
-SAM_TARGET = ngless-samtools
+SAM_TARGET = ngless-0.0.0-samtools
 
 MEGAHIT_DIR = megahit-1.1.1
 MEGAHIT_TAR = v1.1.1.tar.gz
 MEGAHIT_URL = https://github.com/voutcn/megahit/archive/v1.1.1.tar.gz
-MEGAHIT_TARGET = ngless-megahit
+MEGAHIT_TARGET = megahit
 
 NGLESS_EMBEDDED_BINARIES := \
 		NGLess/Dependencies/samtools_data.c \
 		NGLess/Dependencies/bwa_data.c \
 		NGLess/Dependencies/megahit_data.c
+
+MEGAHIT_BINS := $(MEGAHIT_DIR)/megahit_asm_core $(MEGAHIT_DIR)/megahit_sdbg_build $(MEGAHIT_DIR)/megahit_toolkit $(MEGAHIT_DIR)/megahit
+NGLESS_EXT_BINS = $(BWA_DIR)/$(BWA_TARGET) $(SAM_DIR)/$(SAM_TARGET) $(MEGAHIT_BINS)
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
@@ -72,29 +75,22 @@ all: ngless
 NGLess.cabal: NGLess.cabal.m4
 	m4 $< > $@
 
-ngless-embed: NGLess.cabal modules $(NGLESS_EMBEDDED_BINARIES)
+ngless-embed: NGLess.cabal $(NGLESS_BINS)
 	stack build $(STACKOPTS) --flag NGLess:embed
 
-ngless: NGLess.cabal modules
+ngless: NGLess.cabal
 	stack build $(STACKOPTS)
 
 modules:
 	cd Modules && $(MAKE)
 
-static: NGLess.cabal modules $(NGLESS_EMBEDDED_BINARIES)
+static: NGLess.cabal $(NGLESS_EMBEDDED_BINARIES)
 	stack build $(STACKOPTS) --ghc-options='-optl-static -optl-pthread' --force-dirty --flag NGLess:embed
 
 fast: NGLess.cabal
 	stack build $(STACKOPTS) --ghc-options=-O0
 
-
 dist: ngless-${VERSION}.tar.gz
-
-testinputfiles=test_samples/htseq-res/htseq_cds_noStrand_union.txt
-
-test_samples/htseq-res/htseq_cds_noStrand_union.txt:
-	cd test_samples/ && gzip -dkf *.gz
-	cd test_samples/htseq-res && ./generateHtseqFiles.sh
 
 check: NGLess.cabal
 	stack test $(STACKOPTS)
@@ -110,15 +106,14 @@ bench: NGLess.cabal
 profile:
 	stack build $(STACKOPTS) --executable-profiling --library-profiling --ghc-options="-fprof-auto -rtsopts"
 
-install:
+install: ngless external-deps $(NGLESS_EXT_BINS)
 	mkdir -p $(exec)
-	mkdir -p $(deps)
-	cp -rf $(HTML) $(deps)
-	cp -rf $(BWA_DIR) $(deps)
-	cp -rf $(SAM_DIR) $(deps)
-	cp -f dist/build/ngless/ngless $(exec)/ngless
+	mkdir -p $(deps)/bin
+	stack --local-bin-path $(exec) install $(STACKOPTS)
+	cp -prf $(HTML) $(deps)
+	cp -prf $(NGLESS_EXT_BINS) $(deps)/bin
 
-nglessconf: $(SAM_DIR) $(BWA_DIR) $(reqhtmllibs) $(reqfonts)
+external-deps: $(NGLESS_BINS) $(reqhtmllibs) $(reqfonts)
 
 clean:
 	rm -f $(NGLESS_EMBEDDED_BINARIES)
@@ -128,12 +123,7 @@ distclean: clean
 	rm -rf $(HTML_FONTS_DIR) $(HTML_LIBS_DIR)
 	rm -rf $(BWA_DIR)
 	rm -rf $(SAM_DIR)
-	rm -f test_samples/htseq-res/*.txt
 
-uninstall:
-	rm -rf $(deps) $(exec)/ngless*
-
-embedded-deps: $(NGLESS_EMBEDDED_BINARIES)
 
 $(BWA_DIR):
 	wget $(BWA_URL)
@@ -141,8 +131,8 @@ $(BWA_DIR):
 	rm $(BWA_TAR)
 	cd $(BWA_DIR) && curl https://patch-diff.githubusercontent.com/raw/lh3/bwa/pull/90.diff | patch -p1
 
-$(BWA_DIR)/bwa: $(BWA_DIR)
-	cd $(BWA_DIR) && $(MAKE)
+$(BWA_DIR)/$(BWA_TARGET): $(BWA_DIR)
+	cd $(BWA_DIR) && $(MAKE) && cp -p bwa $(BWA_TARGET)
 
 $(BWA_DIR)/$(BWA_TARGET)-static: $(BWA_DIR)
 	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"  LIBS="-lbwa -lm -lz -lrt -lpthread" && cp -p bwa $(BWA_TARGET)-static
@@ -155,8 +145,8 @@ $(SAM_DIR):
 $(SAM_DIR)/$(SAM_TARGET)-static: $(SAM_DIR)
 	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC" && cp -p samtools $(SAM_TARGET)-static
 
-$(SAM_DIR)/samtools: $(SAM_DIR)
-	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE)
+$(SAM_DIR)/$(SAM_TARGET): $(SAM_DIR)
+	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) && cp -p samtools $(SAM_TARGET)
 
 $(MEGAHIT_DIR):
 	wget $(MEGAHIT_URL)
@@ -167,11 +157,13 @@ $(MEGAHIT_DIR):
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET): $(MEGAHIT_DIR)
 	cd $(MEGAHIT_DIR) && $(MAKE) CXXFLAGS=-static
 
+megahit: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)
+
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)
 	cd $(MEGAHIT_DIR) && strip megahit_asm_core
 	cd $(MEGAHIT_DIR) && strip megahit_sdbg_build
 	cd $(MEGAHIT_DIR) && strip megahit_toolkit
-	mkdir -p $@ && cp -pr $(MEGAHIT_DIR)/megahit_asm_core $(MEGAHIT_DIR)/megahit_sdbg_build $(MEGAHIT_DIR)/megahit_toolkit $(MEGAHIT_DIR)/megahit $@
+	mkdir -p $@ && cp -pr $(MEGAHIT_BINS) $@
 
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged.tar.gz: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged
 	tar --create --file $@ --gzip $<
@@ -222,4 +214,4 @@ ngless-${VERSION}.tar.gz: ngless
 	tar -zcvf $(distdir).tar.gz $(distdir)
 	rm -rf $(distdir)
 
-.PHONY: all build clean check tests distclean dist static fast fastcheck modules embedded-deps
+.PHONY: all build clean check tests distclean dist static fast fastcheck modules external-deps megahit
