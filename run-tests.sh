@@ -24,11 +24,9 @@ echo ">>> Using repository at $REPO <<<"
 if [[ "$0" == *-embedded.sh ]]; then
     echo ">>> Testing NGLess ( with embedded binaries ) <<<"
     MAKETARGET="ngless-embed"
-    remove_ngless_bin
 elif [[ "$0" == *-static.sh ]]; then
     echo ">>> Testing NGLess ( static build with embedded binaries ) <<<"
     MAKETARGET="static"
-    remove_ngless_bin
 else
     echo ">>> Testing NGLess ( regular build ) <<<"
     export NGLESS_SAMTOOLS_BIN=$REPO/samtools-${SAMTOOLS_VERSION}/${SAMTOOLS_BIN}
@@ -43,32 +41,29 @@ else
     MAKETARGET=""
 fi
 
-ok="yes"
-
-make
-if test $? -ne "0"; then
-    echo "ERROR IN 'make'"
-    ok=no
-fi
 # haskell unit tests
+echo "Running 'make check'"
 make check
 if test $? -ne "0"; then
     echo "ERROR IN 'make check'"
-    ok=no
+    exit 1
 fi
-# ngless modules - also needed for tests later on
+
+# ngless modules - needed for tests later on
+echo "Running 'make modules'"
 make modules
 if test $? -ne "0"; then
     echo "ERROR IN 'make modules'"
-    ok=no
+    exit 1
 fi
 
 # Our test target (if not the default) is then also used for the subsequent tests
 if [ "$MAKETARGET" != "" ]; then
+    echo "Running 'make $MAKETARGET'"
     make $MAKETARGET
     if test $? -ne "0"; then
         echo "ERROR IN 'make $MAKETARGET'"
-        ok=no
+        exit 1
     fi
 else
     if ! test -x "$NGLESS_SAMTOOLS_BIN" ; then
@@ -79,16 +74,49 @@ else
         echo "ERROR: bwa not found at '$NGLESS_BWA_BIN'"
         exit 1
     fi
+    if ! test -x "$NGLESS_MEGAHIT_BIN" ; then
+        echo "ERROR: bwa not found at '$NGLESS_MEGAHIT_BIN'"
+        exit 1
+    fi
+
+    echo "running 'make'"
+    make
+    if test $? -ne "0"; then
+        echo "error in 'make'"
+        exit 1
+    fi
 fi
 
-ngless_bin=$(stack path --local-install-root)/bin/ngless
+ngless_bin=$(stack path ${STACKOPTS} --local-install-root)/bin/ngless
 if ! test -x "$ngless_bin" ; then
     echo "Could not determine path for ngless (guessed $ngless_bin)"
     exit 1
 fi
 
-echo ">>> Running with: $($ngless_bin --version-debug) <<<"
+echo ">>> Running tests with: $($ngless_bin --version-debug) <<<"
 
+if [ "$MAKETARGET" != "" ]; then
+    echo ">> Checking that binaries are indeed embedded"
+    remove_ngless_bin
+
+    $ngless_bin --print-path bwa &>/dev/null
+    if test $? -ne "0"; then
+        echo "Error 'bwa' binary was not correctly embedded"
+        exit 1
+    fi
+    $ngless_bin --print-path samtools &>/dev/null
+    if test $? -ne "0"; then
+        echo "Error 'samtools' binary was not correctly embedded"
+        exit 1
+    fi
+    echo ">> Binaries were correctly embedded"
+fi
+
+# To run ./check.sh on tests and to test ngless_cwl wrappers, need to add ngless to PATH
+PATH="$(dirname "$ngless_bin"):$PATH"
+export PATH
+
+ok="yes"
 basedir=$REPO
 for testdir in tests/*; do
     if test -d "$testdir"; then
@@ -154,11 +182,8 @@ for testdir in tests/*; do
     fi
 done
 
-# Test ngless_cwl wrappers, need to add ngless to PATH
-PATH="$(dirname "$ngless_bin"):$PATH"
-export PATH
-
 cd scripts/ngless-cwl
+echo "Running 'make test' on ngless-cwl"
 make test
 if test $? -ne "0"; then
     echo "ERROR in cwl tests: Check output for more information"
