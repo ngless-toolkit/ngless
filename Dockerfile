@@ -15,6 +15,7 @@ RUN apk update && apk add \
     gmp-dev \
     libffi-dev \
     libgcc \
+    linux-headers \
     m4 \
     make \
     vim \
