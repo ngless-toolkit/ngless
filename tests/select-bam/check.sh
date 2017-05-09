@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 
 if [ "$(which samtools 2>/dev/null)" == "" ]; then
-    SAMTOOLS="$NGLESS_SAMTOOLS_BIN"
+    if [ "$NGLESS_SAMTOOLS_BIN" == "" ]; then
+        SAMTOOLS="$(ngless --print-path samtools)"
+    else
+        SAMTOOLS="$NGLESS_SAMTOOLS_BIN"
+    fi
 else
     SAMTOOLS="$(which samtools)"
 fi
