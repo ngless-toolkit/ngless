@@ -7,18 +7,24 @@ prefix=/usr/local
 deps=$(prefix)/share/$(progname)
 exec=$(prefix)/bin
 
-
+# We can't depend on [BWA/SAM/MEGAHIT]_DIR as a build target.
+# These change every time a file inside is created/modified
+# As a workaround we target a file included in the tarball
 BWA_DIR = bwa-0.7.15
+BWA_DIR_TARGET = $(BWA_DIR)/Makefile
 BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.15/bwa-0.7.15.tar.bz2
 BWA_TAR = bwa-0.7.15.tar.bz2
 BWA_TARGET = ngless-0.0.0-bwa
 
 SAM_DIR = samtools-1.4
+SAM_DIR_TARGET = $(SAM_DIR)/configure
 SAM_URL = https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
 SAM_TAR = samtools-1.4.tar.bz2
 SAM_TARGET = ngless-0.0.0-samtools
 
 MEGAHIT_DIR = megahit-1.1.1
+# we can't target Makefile here cause we patch it after unpacking
+MEGAHIT_DIR_TARGET = $(MEGAHIT_DIR)/LICENSE
 MEGAHIT_TAR = v1.1.1.tar.gz
 MEGAHIT_URL = https://github.com/voutcn/megahit/archive/v1.1.1.tar.gz
 MEGAHIT_TARGET = megahit
@@ -123,38 +129,38 @@ distclean: clean
 	rm -rf $(HTML_FONTS_DIR) $(HTML_LIBS_DIR)
 	rm -rf $(BWA_DIR)
 	rm -rf $(SAM_DIR)
+	rm -rf $(MEGAHIT_DIR)
 
-
-$(BWA_DIR):
+$(BWA_DIR_TARGET):
 	wget $(BWA_URL)
 	tar xvfj $(BWA_TAR)
 	rm $(BWA_TAR)
 	cd $(BWA_DIR) && curl https://patch-diff.githubusercontent.com/raw/lh3/bwa/pull/90.diff | patch -p1
 
-$(BWA_DIR)/$(BWA_TARGET): $(BWA_DIR)
+$(BWA_DIR)/$(BWA_TARGET): $(BWA_DIR_TARGET)
 	cd $(BWA_DIR) && $(MAKE) && cp -p bwa $(BWA_TARGET)
 
-$(BWA_DIR)/$(BWA_TARGET)-static: $(BWA_DIR)
+$(BWA_DIR)/$(BWA_TARGET)-static: $(BWA_DIR_TARGET)
 	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"  LIBS="-lbwa -lm -lz -lrt -lpthread" && cp -p bwa $(BWA_TARGET)-static
 
-$(SAM_DIR):
+$(SAM_DIR_TARGET):
 	wget $(SAM_URL)
 	tar xvfj $(SAM_TAR)
 	rm $(SAM_TAR)
 
-$(SAM_DIR)/$(SAM_TARGET)-static: $(SAM_DIR)
+$(SAM_DIR)/$(SAM_TARGET)-static: $(SAM_DIR_TARGET)
 	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) LDFLAGS="-static" DFLAGS="-DNCURSES_STATIC" && cp -p samtools $(SAM_TARGET)-static
 
-$(SAM_DIR)/$(SAM_TARGET): $(SAM_DIR)
+$(SAM_DIR)/$(SAM_TARGET): $(SAM_DIR_TARGET)
 	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) && cp -p samtools $(SAM_TARGET)
 
-$(MEGAHIT_DIR):
+$(MEGAHIT_DIR_TARGET):
 	wget $(MEGAHIT_URL)
 	tar xvzf $(MEGAHIT_TAR)
 	rm $(MEGAHIT_TAR)
 	cd $(MEGAHIT_DIR) && patch -p1 <../build-scripts/megahit-1.1.1.patch
 
-$(MEGAHIT_DIR)/$(MEGAHIT_TARGET): $(MEGAHIT_DIR)
+$(MEGAHIT_DIR)/$(MEGAHIT_TARGET): $(MEGAHIT_DIR_TARGET)
 	cd $(MEGAHIT_DIR) && $(MAKE) CXXFLAGS=-static
 
 megahit: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)
@@ -178,7 +184,6 @@ NGLess/Dependencies/bwa_data.c: $(BWA_DIR)/$(BWA_TARGET)-static
 
 NGLess/Dependencies/megahit_data.c: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged.tar.gz
 	xxd -i $< $@
-
 
 # We cannot depend on $(HTML_LIBS_DIR) as wget sets the mtime in the past
 # and it would cause the download to happen at every make run
