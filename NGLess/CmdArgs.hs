@@ -78,6 +78,9 @@ data NGLessMode =
         | DownloadDemoMode
               { demoName :: String
               }
+        | PrintPathMode
+              { pathDesired :: String
+              }
            deriving (Eq, Show)
 
 parseVerbosity = option (eitherReader readVerbosity) (long "verbosity" <> short 'v' <> value Normal)
@@ -109,7 +112,7 @@ mainArgs = DefaultMode
               <*> strOption (long "debug" <> value "") -- debug_mode :: String
               <*> switch (long "validate-only" <> short 'n' <> help "Only validate input, do not run script") -- validateOnly :: Bool
               <*> switch (long "print-last" <> short 'p' <> help "print value of last line in script") -- print_last :: Bool
-              <*> optional (switch (long "trace")) -- trace_flag :: Maybe Bool
+              <*> optional (switch $ long "trace" <> help "Set highest verbosity mode") -- trace_flag :: Maybe Bool
               <*> option auto (long "jobs" <> short 'j' <> value 1) -- nThreads :: Int
               <*> switch (long "create-report" <> help "whether to create the report directory") -- createReportDirectory :: Bool
               <*> optional (strOption $ long "html-report-directory" <> short 'o' <> help "name of output directory") -- html_report_directory :: Maybe FilePath
@@ -139,10 +142,12 @@ downloadFileArgs = (flag' DownloadFileMode (long "download-file"))
 downloadDemoArgs = flag' DownloadDemoMode (long "download-demo")
                         <*> strArgument (metavar "DEMO-NAME")
 
+printPathArgs = flag' PrintPathMode (long "print-path")
+                        <*> strArgument (metavar "EXEC")
 
 nglessArgs :: Parser NGLessArgs
 nglessArgs = NGLessArgs
                 <$> parseVerbosity
                 <*> switch (long "quiet" <> short 'q')
                 <*> parseColor
-                <*> (mainArgs <|> downloadFileArgs <|> downloadDemoArgs <|> installArgs <|> createRefArgs)
+                <*> (mainArgs <|> downloadFileArgs <|> downloadDemoArgs <|> installArgs <|> createRefArgs <|> printPathArgs)

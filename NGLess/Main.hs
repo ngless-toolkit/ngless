@@ -53,7 +53,7 @@ import NGLess.NGError
 import NGLess.NGLEnvironment
 import Modules
 import CmdArgs
-import FileManagement (setupHtmlViewer)
+import FileManagement
 import StandardModules.NGLStdlib
 import Network
 import Hooks
@@ -260,6 +260,15 @@ modeExec (DownloadDemoMode demo) = runNGLessIO "downloading a demo" $
         else liftIO $ do
             hPutStrLn stderr (redColor ++ "Unkown demo '"++ demo ++ "'.")
             exitFailure
+
+modeExec (PrintPathMode exec) = runNGLessIO "finding internal path" $ do
+    path <- case exec of
+      "samtools" -> samtoolsBin
+      "megahit" -> megahitBin
+      "bwa" -> bwaBin
+      _ -> throwSystemError ("Unknown binary " ++ exec ++ ".")
+    liftIO $ putStrLn path
+
 
 main = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
