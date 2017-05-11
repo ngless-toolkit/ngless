@@ -33,6 +33,7 @@ NGLESS_EMBEDDED_BINARIES := \
 		NGLess/Dependencies/samtools_data.c \
 		NGLess/Dependencies/bwa_data.c \
 		NGLess/Dependencies/megahit_data.c
+NGLESS_EMBEDDED_TARGET = NGLess/Dependencies/embedded.c
 
 MEGAHIT_BINS := $(MEGAHIT_DIR)/megahit_asm_core $(MEGAHIT_DIR)/megahit_sdbg_build $(MEGAHIT_DIR)/megahit_toolkit $(MEGAHIT_DIR)/megahit
 NGLESS_EXT_BINS = $(BWA_DIR)/$(BWA_TARGET) $(SAM_DIR)/$(SAM_TARGET) $(MEGAHIT_BINS)
@@ -81,7 +82,7 @@ all: ngless
 NGLess.cabal: NGLess.cabal.m4
 	m4 $< > $@
 
-ngless-embed: NGLess.cabal $(NGLESS_EMBEDDED_BINARIES)
+ngless-embed: NGLess.cabal $(NGLESS_EMBEDDED_TARGET)
 	stack build $(STACKOPTS) --flag NGLess:embed
 
 ngless: NGLess.cabal
@@ -90,7 +91,7 @@ ngless: NGLess.cabal
 modules:
 	cd Modules && $(MAKE)
 
-static: NGLess.cabal $(NGLESS_EMBEDDED_BINARIES)
+static: NGLess.cabal $(NGLESS_EMBEDDED_TARGET)
 	stack build $(STACKOPTS) --ghc-options='-optl-static -optl-pthread' --force-dirty --flag NGLess:embed
 
 fast: NGLess.cabal
@@ -130,6 +131,9 @@ distclean: clean
 	rm -rf $(BWA_DIR)
 	rm -rf $(SAM_DIR)
 	rm -rf $(MEGAHIT_DIR)
+
+$(NGLESS_EMBEDDED_TARGET): $(NGLESS_EMBEDDED_BINARIES)
+	touch $(NGLESS_EMBEDDED_TARGET)
 
 $(BWA_DIR_TARGET):
 	wget $(BWA_URL)
