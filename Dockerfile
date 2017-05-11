@@ -33,8 +33,6 @@ RUN mkdir -p /usr/src/
 RUN git clone --depth=10 https://github.com/luispedro/ngless /usr/src/ngless
 WORKDIR /usr/src/ngless
 
-RUN m4 NGLess.cabal.m4 > NGLess.cabal
-
 # This will have all make calls use the ghc installed above
 # Build dependencies in a separate step to avoid a full rebuild on ngless compile failure
 ENV STACKOPTS="--system-ghc --only-dependencies"
@@ -42,4 +40,4 @@ RUN make ngless-embed
 
 ENV STACKOPTS="--system-ghc"
 RUN make static
-RUN make install
+RUN stack --local-bin-path /usr/local/bin install $STACKOPTS --ghc-options '-optl-static -optl-pthread' --flag NGLess:embed
