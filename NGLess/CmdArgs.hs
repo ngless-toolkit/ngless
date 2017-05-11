@@ -128,11 +128,11 @@ installArgs = (flag' InstallGenMode (long "install-reference-data"))
                 <*> (T.pack <$> strArgument (help "Name of reference to install" <> metavar "REF"))
         -- += details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
 
-createRefArgs = flag' CreateReferencePackMode (long "create-reference-pack")
-                        <*> strOption (long "output-name")
-                        <*> strOption (long "genome-url")
-                        <*> optional (strOption $ long "gtf-url")
-                        <*> optional (strOption $ long "functional-map-url")
+createRefArgs = flag' CreateReferencePackMode (long "create-reference-pack" <> internal)
+                        <*> strOption (long "output-name" <> internal)
+                        <*> strOption (long "genome-url" <> internal)
+                        <*> optional (strOption $ long "gtf-url" <> internal)
+                        <*> optional (strOption $ long "functional-map-url" <> internal)
         -- += details ["Example:", "ngless --create-reference-pack ref.tar.gz -g http://...genome.fa.gz -a http://...gtf.fa.gz"]
 
 downloadFileArgs = (flag' DownloadFileMode (long "download-file"))
