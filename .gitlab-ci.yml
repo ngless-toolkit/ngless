@@ -1,0 +1,27 @@
+build-and-test:
+    image: alpine:edge
+    stage: build
+
+    before_script:
+    - echo '@testing http://dl-cdn.alpinelinux.org/alpine/edge/testing' >> /etc/apk/repositories
+    - apk update
+    - apk add alpine-sdk bash bzip2-dev ca-certificates cabal@testing file
+        ghc-dev@testing ghc@testing git gmp-dev libffi-dev libgcc
+        linux-headers m4 make py2-pip python2 python2-dev vim xz xz-dev
+        zlib-dev
+
+    - wget -qO- https://get.haskellstack.org/ | sh
+    - chmod 755 /usr/local/bin/stack
+    - pip install tox
+    - mkdir bin
+
+    script:
+    - STACKOPTS="--system-ghc" ./run-tests-static.sh
+    - stack --local-bin-path bin install --system-ghc --ghc-options '-optl-static -optl-pthread' --flag NGLess:embed
+
+    artifacts:
+        when: on_success
+        paths:
+        - bin/ngless
+        - Modules/packages/
+        expire_in: 1 month

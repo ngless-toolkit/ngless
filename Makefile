@@ -215,7 +215,7 @@ $(HTML_FONTS_DIR)/%.ttf:
 
 ngless-${VERSION}.tar.gz: ngless
 	mkdir -p $(distdir)/share $(distdir)/bin
-	stack build
+	stack build $(STACKOPTS)
 	cp dist/build/$(progname)/$(progname) $(distdir)/bin
 	cp -r $(BWA_DIR) $(distdir)/share
 	cp -r $(SAM_DIR) $(distdir)/share
