@@ -168,6 +168,10 @@ $(MEGAHIT_DIR)/$(MEGAHIT_TARGET): $(MEGAHIT_DIR_TARGET)
 	cd $(MEGAHIT_DIR) && $(MAKE) CXXFLAGS=-static
 
 megahit: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)
+$(MEGAHIT_DIR)/megahit_asm_core: megahit
+$(MEGAHIT_DIR)/megahit_sdbg_build: megahit
+$(MEGAHIT_DIR)/megahit_toolkit: megahit
+$(MEGAHIT_DIR)/megahit: megahit
 
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)
 	cd $(MEGAHIT_DIR) && strip megahit_asm_core
