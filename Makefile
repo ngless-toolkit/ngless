@@ -36,7 +36,7 @@ NGLESS_EMBEDDED_BINARIES := \
 NGLESS_EMBEDDED_TARGET = NGLess/Dependencies/embedded.c
 
 MEGAHIT_BINS := $(MEGAHIT_DIR)/megahit_asm_core $(MEGAHIT_DIR)/megahit_sdbg_build $(MEGAHIT_DIR)/megahit_toolkit $(MEGAHIT_DIR)/megahit
-NGLESS_EXT_BINS = $(BWA_DIR)/$(BWA_TARGET) $(SAM_DIR)/$(SAM_TARGET) $(MEGAHIT_BINS)
+NGLESS_EXT_BINS = $(BWA_DIR)/$(BWA_TARGET) $(SAM_DIR)/$(SAM_TARGET) $(MEGAHIT_BINS) $(MEGAHIT_DIR)/static-build
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
@@ -164,16 +164,22 @@ $(MEGAHIT_DIR_TARGET):
 	rm $(MEGAHIT_TAR)
 	cd $(MEGAHIT_DIR) && patch -p1 <../build-scripts/megahit-1.1.1.patch
 
+$(MEGAHIT_DIR)/static-build: $(MEGAHIT_DIR_TARGET)
+	cd $(MEGAHIT_DIR) && $(MAKE) clean && $(MAKE) CXXFLAGS=-static
+	touch $(MEGAHIT_DIR)/static-build
+
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET): $(MEGAHIT_DIR_TARGET)
-	cd $(MEGAHIT_DIR) && $(MAKE) CXXFLAGS=-static
+	cd $(MEGAHIT_DIR) && $(MAKE) clean && $(MAKE)
+	rm -f $(MEGAHIT_DIR)/static-build
+
+megahit-static: $(MEGAHIT_DIR)/static-build
 
 megahit: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)
 $(MEGAHIT_DIR)/megahit_asm_core: megahit
 $(MEGAHIT_DIR)/megahit_sdbg_build: megahit
 $(MEGAHIT_DIR)/megahit_toolkit: megahit
-$(MEGAHIT_DIR)/megahit: megahit
 
-$(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)
+$(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged: $(MEGAHIT_DIR)/static-build
 	cd $(MEGAHIT_DIR) && strip megahit_asm_core
 	cd $(MEGAHIT_DIR) && strip megahit_sdbg_build
 	cd $(MEGAHIT_DIR) && strip megahit_toolkit
