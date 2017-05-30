@@ -136,7 +136,7 @@ loadModules mods  = do
 
 headerStr :: String
 headerStr = "NGLess v"++versionStr++" (C) NGLess authors\n"++
-            "http://luispedro.github.io/ngless\n"++
+            "https://ngless.readthedocs.io/\n"++
             "\n"
 
 formatCitation :: T.Text -> String
