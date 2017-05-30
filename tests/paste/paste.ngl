@@ -1,0 +1,19 @@
+ngless "0.0"
+import "parallel" version "0.0"
+
+
+__paste(["1.txt"]
+    ,headers=["1"]
+    ,ofile="output.1.txt")
+
+__paste(["1.txt", "2.txt"]
+    ,headers=["1", "2"]
+    ,ofile="output.12.txt")
+
+__paste(["1.txt", "2.txt", "3.txt"]
+    ,headers=["1", "2", "3"]
+    ,ofile="output.123.txt")
+
+__paste(["1.txt", "2.txt", "3.txt", "45.txt"]
+    ,headers=["1", "2", "3", "4", "5"]
+    ,ofile="output.12345.txt")

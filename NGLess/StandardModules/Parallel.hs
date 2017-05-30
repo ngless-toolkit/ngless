@@ -2,7 +2,7 @@
  - License: MIT
  -}
 
-{-# LANGUAGE TupleSections, CPP #-}
+{-# LANGUAGE FlexibleContexts, CPP #-}
 
 module StandardModules.Parallel
     ( loadModule
@@ -17,6 +17,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import           Data.Time (getZonedTime)
 import           Data.Time.Format (formatTime, defaultTimeLocale)
+import           Data.List (minimumBy)
 import           Data.List.Extra (snoc, chunksOf)
 
 #ifndef WINDOWS
@@ -38,6 +39,7 @@ import           Control.Monad.Extra (allM, unlessM)
 import           Control.DeepSeq
 import           Data.Traversable
 import           Control.Concurrent (threadDelay)
+import           Control.Monad.Trans.Class
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource
@@ -51,8 +53,9 @@ import System.Directory (createDirectoryIfMissing, doesFileExist, getDirectoryCo
 import qualified Data.Hash.MD5 as MD5
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
-import           Data.Conduit ((=$=), ($$))
+import           Data.Conduit ((.|), (=$=), ($$), ($$+), ($$++))
 
 import Hooks
 import Output
@@ -187,7 +190,7 @@ executeCollect (NGOCounts istream) kwargs = do
                  -- ^ checking in reverse order makes it more likely that ngless notices a missing file early on
     if canCollect
         then do
-            newfp <- concatCounts allentries (map partialfile allentries)
+            newfp <- pasteCounts allentries (map partialfile allentries)
             liftIO $ moveOrCopy newfp (T.unpack ofile)
         else outputListLno' TraceOutput ["Cannot collect (not all files present yet), wrote partial file to ", partialfile current]
     return NGOVoid
@@ -208,6 +211,10 @@ nChunks n xs = chunksOf p xs
     where
         p = 1 + (length xs `div` n)
 
+splitAtTab ell = case B.elemIndex 9 ell of -- 9 is TAB
+    Nothing -> throwDataError "Line does not have a TAB character"
+    Just tix -> return $ B.splitAt tix ell
+
 splitLines :: [V.Vector B.ByteString] -> NGLess (V.Vector B.ByteString, V.Vector B.ByteString)
 splitLines [] = throwShouldNotOccur "splitLines called with empty vector"
 splitLines (first_ell:ells) = runST $ do
@@ -222,10 +229,6 @@ splitLines (first_ell:ells) = runST $ do
                 return . Right $ (indices', contents')
     where
         n = V.length first_ell
-        splitAtTab :: B.ByteString -> NGLess (B.ByteString, B.ByteString)
-        splitAtTab ell = case B.elemIndex 9 ell of -- 9 is TAB
-            Nothing -> throwDataError "Line does not have a TAB character"
-            Just tix -> return $ B.splitAt tix ell
         fillData !ix indices contents
             | ix == n = return $ Right ()
             | otherwise = case splitAtTab (first_ell V.! ix) of
@@ -263,41 +266,110 @@ sinkTBMQueue' q shouldClose = do
 -- hitting the limit on open files by a process, so we work in batches of 512.
 maxNrOpenFiles = 512 :: Int
 
-concatCounts :: [T.Text] -> [FilePath] -> NGLessIO FilePath
-concatCounts headers inputs
+
+type CResSourceBPair = C.ResumableSource NGLessIO (B.ByteString, B.ByteString)
+mergeCounts :: [C.Source NGLessIO ByteLine] -> C.Source NGLessIO ByteLine
+mergeCounts [] = throwShouldNotOccur "Attempt to merge empty sources"
+mergeCounts ss = do
+        start <- forM ss $ \s -> do
+            (s', v) <- lift $ (s .| CL.mapM (splitAtTab . unwrapByteLine)) $$+ CC.head
+            case v of
+                Nothing -> throwShouldNotOccur "Trying to merge a headerless file"
+                Just (_,hs) -> do
+                    let p = placeholder (B8.count '\t' hs + 1)
+                    s'' <- lift $ step s'
+                    return $! (s'', p)
+        go start
+
+    where
+        -- Nothing is greater than anything else so it flows to the end
+        compareMaybe :: (Ord a) => Maybe a -> Maybe a -> Ordering
+        compareMaybe (Just a) (Just b) = compare a b
+        compareMaybe Just{} Nothing = LT
+        compareMaybe Nothing Just{} = GT
+        compareMaybe Nothing Nothing = EQ
+
+        placeholder :: Int -> B.ByteString
+        placeholder n = B.intercalate "\t" ("":["0" | _ <- [1..n]])
+
+        fst3 (a, _, _) = a
+        go :: [(Maybe (B.ByteString, B.ByteString, CResSourceBPair), B.ByteString)] -> C.Source NGLessIO ByteLine
+        go sources = do
+            let nextH :: Maybe B.ByteString
+                nextH = minimumBy compareMaybe (map ((fst3 <$>) . fst) sources)
+            case nextH of
+                Nothing -> return ()
+                Just header -> do
+                    cn <- forM sources $ \(s, p) -> case s of
+                        Nothing -> return (p, (s, p))
+                        Just (h, v, s')
+                            | header == h -> do
+                                s'' <- lift $ step s'
+                                return $! (v, (s'', p))
+                            | otherwise -> return $! (p, (s, p))
+                    let (cur, next) = unzip cn
+                    C.yield $ ByteLine (B.concat (header:cur))
+                    go next
+        step :: CResSourceBPair -> NGLessIO (Maybe (B.ByteString, B.ByteString, CResSourceBPair))
+        step s = do
+            (s', val) <- s $$++ CC.head
+            return $! case val of
+              Just (h,v) -> Just (h, v, s')
+              Nothing -> Nothing
+
+pasteCounts :: [T.Text] -> [FilePath] -> NGLessIO FilePath
+pasteCounts headers inputs
     | length inputs > maxNrOpenFiles = do
         let current = take maxNrOpenFiles inputs
             currenth = take maxNrOpenFiles headers
             rest = drop maxNrOpenFiles inputs
             resth = drop maxNrOpenFiles headers
-        first <- concatCounts currenth current
-        concatCounts (snoc resth $ T.intercalate "\t" currenth) (snoc rest first)
+        first <- pasteCounts currenth current
+        pasteCounts (snoc resth $ T.intercalate "\t" currenth) (snoc rest first)
     | otherwise = do
         (newfp,hout) <- openNGLTempFile "collected" "collected.counts." "txt"
         liftIO $ T.hPutStrLn hout (T.intercalate "\t" ("":headers))
         numCapabilities <- liftIO getNumCapabilities
-        let mapthreads = max 1 (numCapabilities - 1)
-            sources =
-                [conduitPossiblyCompressedFile f
-                    =$= CB.lines
-                    =$= (C.await >> C.awaitForever C.yield) -- drop header line
-                    =$=  (C.conduitVector 2048 :: C.Conduit B.ByteString (ResourceT IO) (V.Vector B.ByteString))
-                    | f <- inputs]
-            sourcesplits = nChunks mapthreads sources
-        channels <- liftIO $ forM sourcesplits $ \ss -> do
-            ch <- TQ.newTBMQueueIO 4
-            a <- A.async $ runResourceT (C.sequenceSources ss =$= CL.map (force . splitLines) $$ sinkTBMQueue' ch True)
-            A.link a
-            return (CA.sourceTBMQueue ch, a)
-        C.runConduit $
-            C.sequenceSources (fst <$> channels)
-            =$= asyncMapEitherC mapthreads (sequence >=> concatPartials)
-            =$= CL.concatMap BL.toChunks
-            =$= CB.sinkHandle hout
-        forM_ (snd <$> channels) (liftIO . A.wait)
+        let filesSynced = False
+        if filesSynced
+            then do
+                let sources =
+                        [conduitPossiblyCompressedFile f
+                            =$= CB.lines
+                            =$= (CC.drop 1 >>
+                                C.conduitVector 2048 :: C.Conduit B.ByteString (ResourceT IO) (V.Vector B.ByteString))
+                            | f <- inputs]
+                    sourcesplits = nChunks numCapabilities sources
+                channels <- liftIO $ forM sourcesplits $ \ss -> do
+                    ch <- TQ.newTBMQueueIO 4
+                    a <- A.async $ runResourceT (C.sequenceSources ss =$= CL.map (force . splitLines) $$ sinkTBMQueue' ch True)
+                    A.link a
+                    return (CA.sourceTBMQueue ch, a)
+                C.runConduit $
+                    C.sequenceSources (fst <$> channels)
+                    =$= asyncMapEitherC numCapabilities (sequence >=> concatPartials)
+                    =$= CL.concatMap BL.toChunks
+                    =$= CB.sinkHandle hout
+                forM_ (snd <$> channels) (liftIO . A.wait)
+            else do
+                C.runConduit $
+                    mergeCounts [conduitPossiblyCompressedFile f .|  linesC | f <- inputs]
+                    .| byteLineSinkHandle hout
         liftIO (hClose hout)
         return newfp
 
+
+executePaste :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
+executePaste (NGOList ifiles) kwargs = do
+    outputListLno' WarningOutput ["Calling __paste which is an internal function, exposed for testing only"]
+    ofile <- lookupStringOrScriptError "__paste arguments" "ofile" kwargs
+    headers <- lookupStringListOrScriptError "__paste arguments" "headers" kwargs
+    ifiles' <- forM ifiles (stringOrTypeError "__concat argument")
+    newfp <- pasteCounts headers (map T.unpack ifiles')
+    liftIO $ moveOrCopy newfp (T.unpack ofile)
+    return NGOVoid
+executePaste _ _ = do
+    throwScriptError "Bad call to test function __paste"
 
 lock1 = Function
     { funcName = FuncName "lock1"
@@ -331,6 +403,19 @@ setTagFunction = Function
     , funcAllowsAutoComprehension = False
     }
 
+
+pasteHiddenFunction = Function
+    { funcName = FuncName "__paste"
+    , funcArgType = Just (NGList NGLString)
+    , funcArgChecks = []
+    , funcRetType = NGLString
+    , funcKwArgs =
+        [ ArgInformation "ofile" True NGLString [ArgCheckFileWritable]
+        , ArgInformation "headers" True (NGList NGLString) []
+        ]
+    , funcAllowsAutoComprehension = False
+    }
+
 addHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 addHash script = do
         isSubsample <- nConfSubsample <$> nglConfiguration
@@ -351,12 +436,18 @@ loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
         return def
         { modInfo = ModInfo "stdlib.parallel" "0.0"
-        , modFunctions = [lock1, collectFunction, setTagFunction]
+        , modFunctions =
+            [ lock1
+            , collectFunction
+            , setTagFunction
+            , pasteHiddenFunction
+            ]
         , modTransform = addHash
         , runFunction = \case
             "lock1" -> executeLock1
             "collect" -> executeCollect
             "set_parallel_tag" -> executeSetTag
+            "__paste" -> executePaste
             _ -> error "Bad function name"
         }
 
