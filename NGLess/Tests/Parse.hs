@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, OverloadedStrings, TupleSections #-}
+{-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
 module Tests.Parse
     ( tgroup_Parse
     ) where
@@ -16,6 +16,7 @@ import Tests.Utils
 import Parse
 import Tokens
 import Language
+import Utils.Here
 
 tgroup_Parse = $(testGroupGenerator)
 --
@@ -93,6 +94,25 @@ case_parse_import = parsengless "test" True ngs @?= Right ng
     where
         ngs = "ngless '0.0'\nimport 'testing' version '3.2-x'\n"
         ng  = Script (Just $ Header "0.0" [ModInfo "testing" "3.2-x"]) []
+
+case_parse_comment_before_import = isOk "comments after ngless line should not fail (regression test)" $ parsengless "test" True [here|
+ngless "0.0"
+# This should not fail
+import "parallel" version "0.0"
+
+# This should not fail either
+sample = lock1(readlines('input.txt'))
+input = fastq(sample)
+|]
+
+case_parse_empty_line_before_import = isOk "empty lineafter ngless line should not fail (regression test)" $ parsengless "test" True [here|
+ngless "0.0"
+
+import "parallel" version "0.0"
+
+sample = lock1(readlines('input.txt'))
+input = fastq(sample)
+|]
 
 case_parse_list = parseText _listexpr "[a,b]" @?= ListExpression [Lookup Nothing (Variable "a"), Lookup Nothing (Variable "b")]
 

@@ -217,7 +217,7 @@ block = do
 variableList = sepBy1 variable (operator ',') <?> "variable list"
 variable = Variable <$> word <?> "variable"
 
-ngless_header = Header <$> (many eol *> ngless_version) <*> many import_mod
+ngless_header = Header <$> (many eol *> ngless_version <* many eol) <*> many (import_mod <* many eol)
 ngless_version = ngless_version' <?> "ngless version declararion"
     where ngless_version' = reserved "ngless" *> (string <?> "ngless version string") <* eol
 
