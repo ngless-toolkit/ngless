@@ -1,0 +1,3 @@
+ngless "0.0"
+
+write(select(samfile('nonunique.sam'), keep_if=[{unique}]), ofile='output.unique.sam')

@@ -168,4 +168,9 @@ mUnique slines
     | otherwise = []
 
 isGroupUnique :: [SamLine] -> Bool
-isGroupUnique = allSame . map samRName
+isGroupUnique [] = True
+isGroupUnique [_] = True
+isGroupUnique [f,s] = (isFirstInPair f /= isFirstInPair s) &&
+                            (not (isAligned f && isAligned s) || (samRName f == samRName s))
+isGroupUnique _ = False
+
