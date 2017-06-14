@@ -40,8 +40,8 @@ versions for all these channels.
 
 ### Linux
 
-You can get a [statically linked version of
-NGless](http://vm-lux.embl.de/~coelho/ngless-data/releases/ngless-0.0.0-unreleased-Linux64).
+You can get an [unreleased statically linked version of
+NGless](http://vm-lux.embl.de/~coelho/ngless-data/releases/ngless-0.0.0-unreleased-Linux64) or a [nighly build of the latest development code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test).
 This should work across a wide range of Linux versions (please
 [report](https://github.com/luispedro/ngless/issues) any issues you encounter):
 
@@ -50,6 +50,8 @@ This should work across a wide range of Linux versions (please
     ./ngless-0.0.0-unreleased-Linux64
 
 This download bundles bwa and samtools (also statically linked).
+
+If you want to try one of ngless' builtin modules (motus, specI, ...) you can download [the full nighly build zip file](https://gitlab.com/ngless/ngless/builds/artifacts/master/download?job=build-and-test) which includes them.
 
 ### Brew
 
