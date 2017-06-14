@@ -1,6 +1,5 @@
 module Utils.Vector
- ( toFractions
- , unsafeIncrement
+ ( unsafeIncrement
  , unsafeIncrement'
 
  , binarySearch
@@ -34,15 +33,6 @@ unsafeIncrement v i = unsafeIncrement' v i 1
 
 unsafeIncrement' :: (Num a, PrimMonad m, VUM.Unbox a) => VUM.MVector (PrimState m) a -> Int -> a -> m ()
 unsafeIncrement' v i inc = VUM.unsafeModify v (+ inc) i
-
-toFractions :: (PrimMonad m, VUM.Unbox a, Fractional a, Eq a) => VUM.MVector (PrimState m) a -> m ()
-toFractions v = do
-    v' <- VU.unsafeFreeze v
-    let total = VU.foldr1 (+) v'
-        n = VGM.length v
-    when (total /= 0) $
-        forM_ [0..n - 1] $ \i ->
-            VUM.unsafeModify v (/ total) i
 
 binarySearch :: (Ord a) => V.Vector a -> a -> Int
 binarySearch v = binarySearchByRange 0 (V.length v) compare v

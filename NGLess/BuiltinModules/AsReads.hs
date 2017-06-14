@@ -5,8 +5,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module BuiltinModules.AsReads
-    ( executeReads
-    , loadModule
+    ( loadModule
     ) where
 
 import qualified Data.ByteString as B

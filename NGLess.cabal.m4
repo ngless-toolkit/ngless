@@ -50,7 +50,6 @@ define(`BUILD_DEPENDS',
     mtl >= 2.2,
     MissingH >= 1.3,
     network,
-    parallel,
     parsec >= 3.1,
     primitive >= 0.6,
     process >= 1.2.3,
@@ -145,6 +144,9 @@ define(`TEST_MODULES',
     Tests.Vector
     Utils.Here')
 
+define(`BENCH_MODULES',
+    `Tests.Utils')
+
 define(`BASE_CONFIG',
   `C-sources: NGLess/Dependencies/embedded.c NGLess/Data/FastQ.c
   default-extensions:  BangPatterns, OverloadedStrings, LambdaCase, TupleSections
@@ -201,4 +203,5 @@ benchmark nglessbench
     HUnit >= 1.3,
     criterion
   other-modules:
-    BUILD_MODULES
+    BUILD_MODULES,
+    BENCH_MODULES

@@ -1,10 +1,9 @@
-{- Copyright 2016 NGLess Authors
+{- Copyright 2016-2017 NGLess Authors
  - License: MIT
  -}
 
 module BuiltinModules.Readlines
-    ( executeReadlines
-    , loadModule
+    ( loadModule
     ) where
 
 import qualified Data.ByteString.Char8 as B8
