@@ -6,16 +6,30 @@ module Main
     ) where
 
 {-| #Structure of ngless
-
- - This document describes the implementation, not the language.
-
- - Since the scripts are assumed to be small, everything is performed in memory.
-
- - 1. The whole text is loaded into memory (after UTF-8 decoding).
+ -
+ - # Basic ngless interpretation workflow:
+ -
+ - 1. The whole text is loaded into memory (after UTF-8 decoding). Scripts are small.
  - 2. A complete abstract syntax tree is built.
- - 3. The syntax tree is validated. This includes several checks for sanity.
- - 4. The syntax tree is optimised. This step is not currently implemented.
- - 5. The syntax tree is interpreted.
+ - 	These steps are implemented in Tokens.hs & Parse.hs
+ - 	The AST is represented with types defined in Language.hs
+ - 3. Modules are loaded.
+ - 	This step is implemented in Main.hs.
+ - 	NGless has several implicit modules (i.e., functionality which is
+ - 	implemented as a module, but which the user does not have to import).
+ - 	See Modules.hs for more information about modules.
+ - 4. The syntax tree is validated. This includes several checks for sanity.
+ - 	These steps are implemented in Types.hs (basic type validation)
+ - 	followed by Validation.hs and ValidationIO.hs
+ - 5. The syntax tree is transformed.
+ - 	This step is implemented in Transform.hs. This performs simplification
+ - 	and optimization of the tree.
+ - 6. The syntax tree is interpreted.
+ - 	This step is implemented in Interpret.hs
+ - 	Most of the work is then performed by functionality inside
+ - 	Interpretation/ or in the implicitly (or explicitly) imported modules
+ - 	in BuiltinModules or StandardModules
+ -
 -}
 
 import Data.Maybe

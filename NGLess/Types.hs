@@ -1,10 +1,15 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
 module Types
     ( checktypes
     ) where
+
+{-| # Type Checking
+ -
+ - This module performs type inferrence and checking.
+ -}
 
 import qualified Data.Text as T
 import qualified Data.Map as Map
@@ -33,7 +38,7 @@ type TypeMSt = StateT (Int, TypeMap)        -- ^ Current line & current type map
                     (ReaderT [Module]       -- ^ the modules passed in (fixed)
                         (Writer [T.Text]))) -- ^ we write out error messages
 
--- | checktypes attempts to add types to all the Lookup Expression
+-- | checktypes attempts to add types to all the Lookup Expression objects
 checktypes :: [Module] -> Script -> NGLess Script
 checktypes mods script@(Script _ exprs) = let w = runEitherT (runStateT (inferScriptM exprs) (0,Map.empty)) in
     case runWriter (runReaderT w mods) of
@@ -43,7 +48,7 @@ checktypes mods script@(Script _ exprs) = let w = runEitherT (runStateT (inferSc
         (Left err, []) -> Left err
         (_, errs) -> throwScriptError . T.unpack . T.unlines $ errs
 
--- error in line concat
+-- | error in line concat
 errorInLineC :: [String] -> TypeMSt ()
 errorInLineC = errorInLine . T.concat . map fromString
 

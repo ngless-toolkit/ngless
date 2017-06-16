@@ -1,4 +1,4 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
 
@@ -16,6 +16,16 @@ module Modules
     , loadedModules
     , knownModules
     ) where
+
+{-|
+ - # Modules
+ -
+ - Modules add additional functions, constants, or references to ngless
+ -
+ - See https://ngless.readthedocs.io/en/latest/modules.html for user information.
+ -
+ - The data type 'Module' encapsulates all information about a module.
+ -}
 import qualified Data.Text as T
 import qualified Language.Haskell.TH as TH
 import System.IO.Unsafe (unsafePerformIO)
@@ -36,6 +46,8 @@ data Reference = Reference
     , refHasFunctionalMap :: Bool
     } deriving (Eq, Show)
 
+
+-- | Checks for an argument.
 data ArgCheck =
             ArgCheckSymbol [T.Text] -- ^ for symbols, list allowed values
             | ArgCheckFileReadable -- ^ file should be readable
@@ -50,6 +62,8 @@ data ArgInformation = ArgInformation
     , argChecks :: [ArgCheck] -- ^ what checks should be performed on the argument
     } deriving (Eq, Show)
 
+
+-- | This represents an ngless function
 data Function = Function
     { funcName :: FuncName -- ^ name of function
     , funcArgType :: Maybe NGLType -- ^ if it takes an unnamed argument, what is its type
@@ -87,6 +101,8 @@ instance FromJSON ExternalReference where
                                 <*> o .:? "gtf-file"
                                 <*> o .:? "map-file"
 
+
+-- | This represents a module (i.e., something which is imported by ngless)
 data Module = Module
     { modInfo :: !ModInfo -- ^ name & version
     , modCitation :: Maybe T.Text

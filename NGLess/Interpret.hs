@@ -9,6 +9,43 @@ module Interpret
     , _evalBinary
     ) where
 
+{-| This is the interpreter module. The main function, 'interpet' expects an
+ - AST and executes it.
+ -
+ - Most types in ngless refer to files on disk or streams and not to data (as
+ - the data elements are quite large).
+ -
+ - Interpretation is fairly trivial pattern matching, with the exception that
+ - interpreting blocks uses heavily tuned code.
+ -
+ - Ngless functions are implemented by Haskell functions with the signature
+ - 'NGLessObject -> KwArgsValues -> NGLessIO NGLessObject' (the first argument
+ - is the unnamed argument, followed by a list of keyword arguments). By
+ - convention, they are named 'execute*' (this is a convention only).
+ -
+ - Several builtin functions are implemented by the files in the
+ - Interpretation/ directory.
+ -
+ - # Interpretation
+ -
+ -  Interpretation is done inside two monads
+ -  1. InterpretationEnvIO
+ -      This is the NGLessIO monad with a variable environment on top
+ -  2. InterpretationROEnv
+ -      This is a read-only variable environment on top of NGLess
+ -
+ - For blocks, we have a special system where block-variables are read-write,
+ - but others are read-only.
+ -
+ - Functions inside the interpret monads are named interpret*, helper
+ - non-monadic functions which perform computations are named eval*.
+ -
+ - # TODO/Improvement ideas
+ -
+ - Replacing the variable map with a vector could potentially be faster (only
+ - matters for block interpretation).
+ -}
+
 
 import Control.Applicative
 import Control.Monad
@@ -66,20 +103,6 @@ import Utils.Utils
 import Utils.Conduit
 
 
-{- Interpretation is done inside two monads
- -  1. InterpretationEnvIO
- -      This is the NGLessIO monad with a variable environment on top
- -  2. InterpretationROEnv
- -      This is a read-only variable environment on top of NGLess
- -
- - For blocks, we have a special system where block-variables are read-write,
- - but others are read-only.
- -
- - Functions inside the interpret monads are named interpret*, helper
- - non-monadic functions which perform computations are named eval*.
- -
- -}
-
 
 data NGLInterpretEnv = NGLInterpretEnv
     { ieModules :: [Module]
@@ -105,7 +128,7 @@ runInROEnvIO act = do
     env <- get
     runNGLess $ runReaderT act env
 
-{- The result of a block is a status indicating why the block finished
+{-| The result of a block is a status indicating why the block finished
  - and the value of all block variables.
  -}
 data BlockStatus = BlockOk | BlockDiscarded | BlockContinued

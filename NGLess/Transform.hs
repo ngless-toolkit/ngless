@@ -25,11 +25,11 @@ import NGLess
 import BuiltinFunctions
 
 
-{- Before interpretation, scripts are transformed to allow for several
-    optimizations.
+{-| Before interpretation, scripts are transformed to allow for several
+  - optimizations.
 
-    This is implemented by adding hidden arguments to functions and by
-    replacing expressions by Optimized instances.
+  - This is implemented by adding hidden arguments to functions and by
+  - replacing expressions by Optimized instances.
 -}
 
 transform :: [Module] -> Script -> NGLessIO Script
