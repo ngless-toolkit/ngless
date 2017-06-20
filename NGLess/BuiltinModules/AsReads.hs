@@ -23,6 +23,8 @@ import Data.Either.Combinators
 import Language
 import FileManagement
 
+import Interpretation.FastQ (encodingFor)
+
 import Data.Sam
 import Data.FastQ
 import Modules
@@ -64,19 +66,23 @@ samToFastQ fpsam stream = do
     hasPaired' <- liftIO $ readIORef hasPaired
     hasSingle' <- liftIO $ readIORef hasSingle
     case (hasPaired', hasSingle') of
-        (True, True) -> return $! ReadSet3 SolexaEncoding oname1 oname2 oname3
+        (True, True) -> do
+            enc <- encodingFor oname1
+            return $! ReadSet3 enc oname1 oname2 oname3
         (False, True) -> do
             release rk1
             release rk2
-            return $! ReadSet1 SolexaEncoding oname3
+            enc <- encodingFor oname3
+            return $! ReadSet1 enc oname3
         (True, False) -> do
             release rk3
-            return $! ReadSet2 SolexaEncoding oname1 oname2
+            enc <- encodingFor oname1
+            return $! ReadSet2 enc oname1 oname2
         (False, False) -> do
             -- the input is empty
             release rk3
             outputListLno' WarningOutput ["as_reads returning an empty read set"]
-            return $! ReadSet2 SolexaEncoding oname1 oname2
+            return $! ReadSet2 SangerEncoding oname1 oname2
 
 
 asFQ :: [SamLine] -> Either B.ByteString (B.ByteString,B.ByteString)

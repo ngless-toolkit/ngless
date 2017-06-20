@@ -1,0 +1,8 @@
+ngless "0.0"
+input = as_reads(samfile('sanger.encoded.sam'))
+preprocess(input, keep_singles=True) using |read|:
+    read = substrim(read, min_quality=25)
+    if len(read) < 45:
+        discard
+
+write(input, ofile='output.fq')
