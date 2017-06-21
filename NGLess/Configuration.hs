@@ -1,13 +1,14 @@
 {- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE RecordWildCards, CPP #-}
+{-# LANGUAGE RecordWildCards, TemplateHaskell, CPP #-}
 module Configuration
     ( NGLessConfiguration(..)
     , ColorSetting(..)
     , guessConfiguration
     , initConfiguration
     , versionStr
+    , gitHashStr
     , compilationDateStr
     , embeddedStr
     , dateStr
@@ -18,6 +19,7 @@ import System.Environment (getExecutablePath, lookupEnv)
 import System.Directory
 import System.FilePath
 import Data.Maybe
+import Development.GitRev (gitHash)
 import qualified Data.Text as T
 import qualified Data.Configurator as CF
 
@@ -28,6 +30,9 @@ versionStr = "0.0.0"
 
 dateStr :: String
 dateStr = "not released"
+
+gitHashStr :: String
+gitHashStr = $(gitHash)
 
 defaultBaseURL :: FilePath
 defaultBaseURL = "http://vm-lux.embl.de/~coelho/ngless-data/"
