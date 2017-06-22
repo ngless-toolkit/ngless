@@ -2,6 +2,17 @@
 # converts data in MOCAT .coods & map files to the standard GTF format
 
 from collections import defaultdict
+def norm_undef(tokens):
+    valid = 0
+    ntokens = []
+    for i,tk in enumerate(tokens):
+        if tk == 'undef':
+            ntokens.append('unclassified ' + tokens[valid])
+        else:
+            ntokens.append(tk)
+            valid = i
+    return ntokens
+
 coord_file = 'data/RefMG.v1.padded.coord'
 refmg_map_file = 'data/RefMG.v1.padded.refmg.map'
 RANKS = ['kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species', 'specI_cluster',]
@@ -17,10 +28,16 @@ for g in genes:
     t = g.split('.')[0]
     taxa2genes[t].append(g)
 
+taxa2genes = dict(taxa2genes)
+
 for line in open(refmg_map_file):
     tokens = line.rstrip().split('\t')
-    for gene in taxa2genes[tokens[0]]:
-        start,end = coords[gene]
+    tokens = norm_undef(tokens)
+    for gene in taxa2genes.get(tokens[0], ['missing']):
+        if gene == 'missing':
+            start, end = '0', '1000'
+        else:
+            start,end = coords[gene]
         for r,tk in zip(RANKS, tokens[1:]):
             print("\t".join([
                     gene,

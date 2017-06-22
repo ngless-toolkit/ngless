@@ -1,7 +1,7 @@
 MODULES: motus specI targzs
 
 MOTUS_VERSION = 0.1
-SPECI_VERSION = 0.0
+SPECI_VERSION = 0.1
 
 motus:
 	cd motus.ngm/$(MOTUS_VERSION) && $(MAKE)
