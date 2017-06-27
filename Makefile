@@ -82,9 +82,6 @@ all: ngless
 NGLess.cabal: NGLess.cabal.m4
 	m4 $< > $@
 
-ngless-embed: NGLess.cabal $(NGLESS_EMBEDDED_TARGET)
-	stack build $(STACKOPTS) --flag NGLess:embed
-
 ngless: NGLess.cabal
 	stack build $(STACKOPTS)
 

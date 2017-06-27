@@ -36,7 +36,7 @@ WORKDIR /usr/src/ngless
 # This will have all make calls use the ghc installed above
 # Build dependencies in a separate step to avoid a full rebuild on ngless compile failure
 ENV STACKOPTS="--system-ghc --only-dependencies"
-RUN make ngless-embed
+RUN make static
 
 ENV STACKOPTS="--system-ghc"
 RUN make static
