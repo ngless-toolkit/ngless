@@ -15,7 +15,7 @@ build-and-test-ubuntu:
 
     script:
     - STACKOPTS="--system-ghc" ./run-tests-static.sh
-    - stack --local-bin-path bin install --system-ghc --ghc-options '-optl-static -optl-pthread' --flag NGLess:embed
+    - stack --local-bin-path bin install --system-ghc --ghc-options '-fPIC' --flag NGLess:embed
 
     artifacts:
         when: on_success
@@ -36,7 +36,7 @@ build-and-test-alpine:
 
     script:
     - STACKOPTS="--system-ghc" ./run-tests-static.sh
-    - stack --local-bin-path bin install --system-ghc --ghc-options '-optl-static -optl-pthread' --flag NGLess:embed
+    - stack --local-bin-path bin install --system-ghc --ghc-options '-fPIC' --flag NGLess:embed
 
     artifacts:
         when: on_success

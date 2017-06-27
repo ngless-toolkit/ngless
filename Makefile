@@ -92,7 +92,7 @@ modules:
 	cd Modules && $(MAKE)
 
 static: NGLess.cabal $(NGLESS_EMBEDDED_TARGET)
-	stack build $(STACKOPTS) --ghc-options='-optl-static -optl-pthread' --force-dirty --flag NGLess:embed
+	stack build $(STACKOPTS) --ghc-options='-fPIC' --force-dirty --flag NGLess:embed
 
 fast: NGLess.cabal
 	stack build $(STACKOPTS) --ghc-options=-O0
