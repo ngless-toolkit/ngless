@@ -21,10 +21,7 @@ function remove_ngless_bin {
 REPO="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 echo ">>> Using repository at $REPO <<<"
 
-if [[ "$0" == *-embedded.sh ]]; then
-    echo ">>> Testing NGLess ( with embedded binaries ) <<<"
-    MAKETARGET="ngless-embed"
-elif [[ "$0" == *-static.sh ]]; then
+if [[ "$0" == *-static.sh ]]; then
     echo ">>> Testing NGLess ( static build with embedded binaries ) <<<"
     MAKETARGET="static"
 else
