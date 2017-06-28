@@ -139,9 +139,9 @@ readConfigFiles NGLessConfiguration{..} cfiles = do
         }
 
 -- | Configuration is set in 3 steps:
--- 1. guess. sets defaults
--- 2. read configuration files (readConfigFiles)
--- 3. use command line options
+-- 1. 'guessConfiguration' sets defaults based on environment
+-- 2. 'readConfigFiles' reads configuration files
+-- 3. 'updateConfigurationOpts' uses command line options to update
 initConfiguration :: NGLessArgs -> IO NGLessConfiguration
 initConfiguration opts = do
         config <- guessConfiguration

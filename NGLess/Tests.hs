@@ -1,8 +1,11 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
--- Unit tests are their own programme.
+-- | Unit tests are their own programme.
+--
+-- Unit tests written in Haskell have less overhead than full integration tests
+-- in the tests/ directory, but are not always as convenient.
 
 module Main where
 
@@ -24,10 +27,8 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import           Data.Conduit ((=$=), ($$))
-import           Control.Monad.State.Strict
-
-
-import Data.Convertible
+import           Control.Monad.State.Strict (execState, modify')
+import           Data.Convertible (convert)
 
 import Language
 import Interpret
@@ -45,8 +46,8 @@ import Utils.Here
 import qualified Data.GFF as GFF
 
 import Tests.Utils
-import Tests.FastQ
-import Tests.Validation
+import Tests.FastQ (tgroup_FastQ)
+import Tests.Validation (tgroup_Validation)
 import Tests.Select (tgroup_Select)
 import Tests.Types (tgroup_Types)
 import Tests.Count (tgroup_Count)

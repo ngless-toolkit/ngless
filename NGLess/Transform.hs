@@ -1,4 +1,4 @@
-{- Copyright 2016 NGLess Authors
+{- Copyright 2016-2017 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -28,10 +28,21 @@ import BuiltinFunctions
 {-| Before interpretation, scripts are transformed to allow for several
   - optimizations.
 
-  - This is implemented by adding hidden arguments to functions and by
-  - replacing expressions by Optimized instances.
+  - As a first step, the script is normalized, introducing temporary variables
+  - so that function calls do not contain nested expressions.  For example:
+  -
+  -     write(mapstats(samfile('input.sam')), ofile='stats.txt')
+  -
+  - is re-written to the equivalent of:
+  -
+  -     temp$0 = samfile('input.sam')
+  -     temp$1 = mapstats(temp$1)
+  -     write(temp$1, ofile='stats.txt')
+  -
+  - Note that "temp$xx" are not valid ngless variable names. Thus, these
+  - temporary variables can only be introduced internally and will never clash
+  - with any user variables.
 -}
-
 transform :: [Module] -> Script -> NGLessIO Script
 transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
     where
@@ -53,6 +64,8 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
 pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression
 pureRecursiveTransform f e = runIdentity (recursiveTransform (return . f) e)
 
+-- | A little helper function which turns a lifts a pure transform `Expression
+-- -> Expression` into the generic `[(Int, Expression)] -> NGLessIO [(Int, Expression)]`
 pureTransform :: (Expression -> Expression) -> [(Int,Expression)] -> NGLessIO [(Int, Expression)]
 pureTransform f = return . map (second (pureRecursiveTransform f))
 
@@ -67,9 +80,16 @@ addArgument func newArg expr = case expr of
             FunctionCall fname e (newArg:args) b
     _ -> expr
 
+-- | Checks if a variable is used in any of the given expressions
+--
+-- See 'isVarUsed1'
 isVarUsed :: Variable -> [(Int, Expression)] -> Bool
 isVarUsed v = any (isVarUsed1 v . snd)
 
+
+-- | Checks if a variable is used in a single 'Expression'
+--
+-- See 'isVarUsed'
 isVarUsed1 :: Variable -> Expression -> Bool
 isVarUsed1 v expr = evalCont $ callCC $ \exit -> do
                 recursiveAnalyse (isVarUsed1' exit) expr
@@ -151,6 +171,16 @@ canQCPreprocessTransform v ((_, expr):rest)
     | otherwise = canQCPreprocessTransform v rest
 
 
+-- | 'ifLenDiscardSpecial' special cases a common case inside preprocess
+-- blocks, namely:
+--
+-- if len(read) < #:
+--     discard
+--
+-- gets rewritten to
+--
+-- Optimized (LenThresholdDiscard read < #)
+--
 ifLenDiscardSpecial :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 ifLenDiscardSpecial = pureTransform $ \case
         (Condition (BinaryOp b (UnaryOp UOpLen (Lookup _ v)) (ConstInt thresh))
@@ -166,7 +196,7 @@ substrimReassign = pureTransform $ \case
         e -> e
 
 
--- | This makes the following transformation
+-- | 'addOFileChecks' implements the following transformation
 --
 -- variable = <non constant expression>
 --
@@ -232,6 +262,9 @@ addOFileChecks' ((lno,e):rest) = do
         validVariables (ConstStr _) = []
         validVariables _ = [Variable "this", Variable "wont", Variable "work"] -- this causes the caller to bailout
 
+-- | Implements addition of temp$nn variables to simplify expressions
+--
+-- This allows the rest of the code to be simpler
 addTemporaries = addTemporaries' 0
     where
         addTemporaries' :: Int -> [(Int,Expression)] -> NGLessIO [(Int,Expression)]
