@@ -211,6 +211,9 @@ modeExec opts@DefaultMode{} = do
     (shouldOutput,odir) <- runNGLessIO "loading and running script" $ do
         updateNglEnvironment (\e -> e { ngleScriptText = ngltext })
         sc' <- runNGLess $ parsengless fname reqversion ngltext >>= maybe_add_print
+        updateNglEnvironment (\e -> e {ngleVersion = case (nglHeader sc') of
+            Nothing -> T.pack versionStr
+            Just header -> nglVersion header})
         when (debug_mode opts == "ast") $ liftIO $ do
             forM_ (nglBody sc') $ \(lno,e) ->
                 putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)

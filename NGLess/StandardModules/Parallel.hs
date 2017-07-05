@@ -17,8 +17,9 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import           Data.Time (getZonedTime)
 import           Data.Time.Format (formatTime, defaultTimeLocale)
-import           Data.List (minimumBy)
+import           Data.List (minimumBy, map)
 import           Data.List.Extra (snoc, chunksOf)
+import qualified Data.Map.Lazy as M (Map, (!), empty, insert, filter, keys)
 
 #ifndef WINDOWS
 import           System.Posix.Unistd (fileSynchronise)
@@ -41,12 +42,13 @@ import           Data.Traversable
 import           Control.Concurrent (threadDelay)
 import           Control.Monad.Trans.Class
 
+
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource
+import Control.Monad.State.Lazy
 import System.IO
 import Data.IORef
 import Data.Default
-import Control.Monad
 import System.IO.Unsafe (unsafePerformIO)
 import System.Directory (createDirectoryIfMissing, doesFileExist, getDirectoryContents)
 
@@ -416,21 +418,85 @@ pasteHiddenFunction = Function
     , funcAllowsAutoComprehension = False
     }
 
-addHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
-addHash script = do
+addLockHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+addLockHash script = do
         isSubsample <- nConfSubsample <$> nglConfiguration
-        pureTransform (addHash' isSubsample) script
+        pureTransform (addLockHash' isSubsample) script
     where
-        addHash' :: Bool -> Expression -> Expression
-        addHash' isSubsample (FunctionCall (FuncName fn) expr kwargs block)
-            | fn `elem` ["lock1", "collect"] = FunctionCall (FuncName fn) expr ((Variable "__hash", ConstStr h):kwargs) block
+        addLockHash' :: Bool -> Expression -> Expression
+        addLockHash' isSubsample (FunctionCall (FuncName "lock1") expr kwargs block) =
+            FunctionCall (FuncName "lock1") expr ((Variable "__hash", ConstStr h):kwargs) block
             where
-                h = T.pack . (++ (if isSubsample then "-subsample" else "")) . MD5.md5s . MD5.Str . show $
-                        case fn of
-                            "lock1" -> map snd script
-                            "collect" -> expr:map snd script
-                            _ -> error "impossible case"
-        addHash' _ e = e
+                h = T.pack . (++ (if isSubsample then "-subsample" else "")) . MD5.md5s . MD5.Str . show $ map snd script
+        addLockHash' _ e = e
+
+
+{-| Calculation of hashes for collect method calls
+ so that the hash depends only on the relevant (influencing the
+ collected result) part of the script.
+
+ Hashes for variables are stored in a map (as a state).
+ For each expression (top to bottom) first the block variables
+ are added to the map (if present), then hashes are calculated
+ and applied (in lookups) recursively.
+ Each collect call receives new variable __hash storing the hash
+ of it's own expression (with hashes already applied inside).
+-}
+
+addCollectHashes :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+addCollectHashes expr_lst = do
+    env <- nglEnvironment
+    modules <- loadedModules
+    let nVer = ngleVersion env
+    let modInfos = map modInfo modules
+    return $ addCollectHashes' nVer modInfos (M.insert (Variable "ARGV") (T.pack "ARGV") M.empty) expr_lst
+
+addCollectHashes' :: T.Text -> [ModInfo] -> (M.Map Variable T.Text) -> [(Int, Expression)] -> [(Int, Expression)]
+addCollectHashes' _ _ _ [] = []
+addCollectHashes' nV mods state_ ((lno, expr):rest) = case expr of
+        (FunctionCall (FuncName "collect") ex kw block) ->
+            let ((FunctionCall _ _ kw' _), s') = runState (recursiveTransform hashExpression expr) state' in
+                (lno, (FunctionCall (FuncName "collect") ex ((head kw'):kw) block)):(recCall s' rest)
+        _ -> (lno, expr):(recCall (execState (recursiveTransform hashExpression expr) state') rest)
+
+    where
+        state' = execState (recursiveTransform gatherBlockVars expr) state_
+
+        recCall = addCollectHashes' nV mods
+
+        addVersions :: [Char] -> [Char]
+        addVersions = (++ (show mods)) . (++ (show nV))
+
+        hashOf :: Expression -> T.Text
+        hashOf = T.pack . MD5.md5s . MD5.Str . addVersions . show
+
+        hashExpression :: Expression -> State (M.Map Variable T.Text) Expression
+        hashExpression (Assignment v e) = do
+            let h = hashOf e
+            modify (M.insert v h)
+            return  (Assignment (Variable h) e)
+        hashExpression (Lookup t v) = do
+            hashMap <- get
+            return (Lookup t (Variable (hashMap M.!  v)))
+        hashExpression e@(FunctionCall (FuncName "preprocess") (Lookup _ (Variable hashedV)) _ _) = do
+            let h = hashOf e
+            hashMap <- get
+            let v = head $ M.keys $ M.filter (== hashedV) hashMap
+            modify (M.insert v h)
+            return e
+        hashExpression e@(FunctionCall (FuncName "collect") expr_ kwargs block) =
+            return (FunctionCall (FuncName "collect") expr_ ((Variable "__hash", ConstStr (hashOf e)):kwargs) block)
+        hashExpression e = return e
+
+        gatherBlockVars :: Expression -> State (M.Map Variable T.Text) Expression
+        gatherBlockVars e@(FunctionCall _ _ _ (Just (Block vars _))) = do
+            modify $ addBlockVarsToMap vars
+            return e
+        gatherBlockVars e = return e
+
+        addBlockVarsToMap:: [Variable] -> (M.Map Variable T.Text) -> (M.Map Variable T.Text)
+        addBlockVarsToMap [] m = m
+        addBlockVarsToMap (v@(Variable v'):vs) m = addBlockVarsToMap vs (M.insert v v' m)
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
@@ -442,7 +508,7 @@ loadModule _ =
             , setTagFunction
             , pasteHiddenFunction
             ]
-        , modTransform = addHash
+        , modTransform = addCollectHashes >=> addLockHash
         , runFunction = \case
             "lock1" -> executeLock1
             "collect" -> executeCollect
