@@ -17,7 +17,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import           Data.Time (getZonedTime)
 import           Data.Time.Format (formatTime, defaultTimeLocale)
-import           Data.List (minimumBy, map)
+import           Data.List (minimumBy, sortOn)
 import           Data.List.Extra (snoc, chunksOf)
 import qualified Data.Map.Lazy as M (Map, (!), empty, insert, filter, keys)
 
@@ -445,27 +445,25 @@ addLockHash script = do
 
 addCollectHashes :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 addCollectHashes expr_lst = do
-    env <- nglEnvironment
+    nVer <- ngleVersion <$> nglEnvironment
     modules <- loadedModules
-    let nVer = ngleVersion env
     let modInfos = map modInfo modules
-    return $ addCollectHashes' nVer modInfos (M.insert (Variable "ARGV") (T.pack "ARGV") M.empty) expr_lst
+        state0 = M.insert (Variable "ARGV") (T.pack "ARGV") M.empty
+    return $ evalState (mapM (addCollectHashes' nVer modInfos) expr_lst) state0
 
-addCollectHashes' :: T.Text -> [ModInfo] -> (M.Map Variable T.Text) -> [(Int, Expression)] -> [(Int, Expression)]
-addCollectHashes' _ _ _ [] = []
-addCollectHashes' nV mods state_ ((lno, expr):rest) = case expr of
-        (FunctionCall (FuncName "collect") ex kw block) ->
-            let ((FunctionCall _ _ kw' _), s') = runState (recursiveTransform hashExpression expr) state' in
-                (lno, (FunctionCall (FuncName "collect") ex ((head kw'):kw) block)):(recCall s' rest)
-        _ -> (lno, expr):(recCall (execState (recursiveTransform hashExpression expr) state') rest)
-
+addCollectHashes' :: T.Text -> [ModInfo] -> (Int, Expression) -> State (M.Map Variable T.Text) (Int, Expression)
+addCollectHashes' nV mods (lno, expr) = do
+            recursiveAnalyse gatherBlockVars expr
+            e' <- recursiveTransform hashExpression expr
+            return $! case expr of
+                    (FunctionCall (FuncName "collect") ex kw block) ->
+                        let (FunctionCall _ _ kw' _) = e' in
+                            (lno, FunctionCall (FuncName "collect") ex (head kw':kw) block)
+                    _ -> (lno, expr)
     where
-        state' = execState (recursiveTransform gatherBlockVars expr) state_
-
-        recCall = addCollectHashes' nV mods
-
-        addVersions :: [Char] -> [Char]
-        addVersions = (++ (show mods)) . (++ (show nV))
+        addVersions :: String -> String
+        addVersions = (++ show sortedMods) . (++ show nV)
+        sortedMods = sortOn modName mods
 
         hashOf :: Expression -> T.Text
         hashOf = T.pack . MD5.md5s . MD5.Str . addVersions . show
@@ -488,11 +486,10 @@ addCollectHashes' nV mods state_ ((lno, expr):rest) = case expr of
             return (FunctionCall (FuncName "collect") expr_ ((Variable "__hash", ConstStr (hashOf e)):kwargs) block)
         hashExpression e = return e
 
-        gatherBlockVars :: Expression -> State (M.Map Variable T.Text) Expression
-        gatherBlockVars e@(FunctionCall _ _ _ (Just (Block vars _))) = do
+        gatherBlockVars :: Expression -> State (M.Map Variable T.Text) ()
+        gatherBlockVars (FunctionCall _ _ _ (Just (Block vars _))) =
             modify $ addBlockVarsToMap vars
-            return e
-        gatherBlockVars e = return e
+        gatherBlockVars _ = return ()
 
         addBlockVarsToMap:: [Variable] -> (M.Map Variable T.Text) -> (M.Map Variable T.Text)
         addBlockVarsToMap [] m = m
