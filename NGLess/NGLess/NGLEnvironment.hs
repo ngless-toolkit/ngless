@@ -23,7 +23,8 @@ import Configuration
 import CmdArgs
 
 data NGLEnvironment = NGLEnvironment
-                    { ngleScriptText :: !T.Text -- ^ The original text of the script
+                    { ngleVersion :: !T.Text
+                    , ngleScriptText :: !T.Text -- ^ The original text of the script
                     , ngleMappersActive :: [T.Text] -- ^ which mappers can be used
                     , ngleTemporaryFilesCreated :: [FilePath] -- ^ list of temporary files created
                     , ngleConfiguration :: NGLessConfiguration
@@ -31,7 +32,7 @@ data NGLEnvironment = NGLEnvironment
 
 ngle :: IORef NGLEnvironment
 {-# NOINLINE ngle #-}
-ngle = unsafePerformIO (newIORef $ NGLEnvironment "" ["bwa"] [] (error "Configuration not set"))
+ngle = unsafePerformIO (newIORef $ NGLEnvironment "" "" ["bwa"] [] (error "Configuration not set"))
 
 nglEnvironment :: NGLessIO NGLEnvironment
 nglEnvironment = liftIO $ readIORef ngle
