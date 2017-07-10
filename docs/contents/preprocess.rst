@@ -64,15 +64,16 @@ independently. Three things can happen:
 3. one mate is kept, the other discarded.
 
 The only question is what to do in the third case. By default, the
-``preprocess`` call will discard the pair, but you can change that behaviour
-with the ``keep_singles`` argument::
+``preprocess`` call keep the mate turning the read into an unpaired read (a
+single), but you can change that behaviour by setting the ``keep_singles``
+argument to ``False``::
 
-    preprocess(input, keep_singles=True) using |r|:
+    preprocess(input, keep_singles=False) using |r|:
         r = substrim(r, min_quality=20)
         if len(r) < 45:
             discard
 
-Now, the output will consist of both paired- and single-end reads.
+Now, the output will consist of only paired-end reads.
 
 Filtering reads matching a reference
 ------------------------------------
