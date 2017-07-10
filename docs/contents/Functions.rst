@@ -166,6 +166,8 @@ copies (default: 2).
 Two short reads with the same nucleotide sequence are considered copies,
 independently of quality and identifiers.
 
+This function is currently limited to single-end samples.
+
 preprocess
 ----------
 
