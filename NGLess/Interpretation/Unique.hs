@@ -32,8 +32,6 @@ import Output
 
 import qualified Data.HashTable.IO as H
 
-(!) = V.unsafeIndex
-
 maxTempFileSize :: Double
 maxTempFileSize = 512*1000*1000 -- 512MB
 
@@ -67,7 +65,7 @@ performUnique fname enc mc = do
         return newfp
     where
         multiplex k fhs r = liftIO $
-                B.hPutStr (fhs ! hashRead k r) (fqEncode enc r)
+                B.hPutStr (fhs V.! hashRead k r) (fqEncode enc r)
 
 hashRead :: Int -> ShortRead -> Int
 hashRead k (ShortRead _ r _) = mod (hash r) k
