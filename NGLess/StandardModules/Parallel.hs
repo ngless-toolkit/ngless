@@ -278,7 +278,7 @@ mergeCounts ss = do
             case v of
                 Nothing -> throwShouldNotOccur "Trying to merge a headerless file"
                 Just (_,hs) -> do
-                    let p = placeholder (B8.count '\t' hs + 1)
+                    let p = placeholder (B8.count '\t' hs)
                     s'' <- lift $ step s'
                     return $! (s'', p)
         go start
