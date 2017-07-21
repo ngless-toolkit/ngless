@@ -192,7 +192,7 @@ executeCollect (NGOCounts istream) kwargs = do
                  -- ^ checking in reverse order makes it more likely that ngless notices a missing file early on
     if canCollect
         then do
-            newfp <- pasteCounts allentries (map partialfile allentries)
+            newfp <- pasteCounts False allentries (map partialfile allentries)
             liftIO $ moveOrCopy newfp (T.unpack ofile)
         else outputListLno' TraceOutput ["Cannot collect (not all files present yet), wrote partial file to ", partialfile current]
     return NGOVoid
@@ -319,21 +319,20 @@ mergeCounts ss = do
               Just (h,v) -> Just (h, v, s')
               Nothing -> Nothing
 
-pasteCounts :: [T.Text] -> [FilePath] -> NGLessIO FilePath
-pasteCounts headers inputs
+pasteCounts :: Bool -> [T.Text] -> [FilePath] -> NGLessIO FilePath
+pasteCounts matchingRows headers inputs
     | length inputs > maxNrOpenFiles = do
         let current = take maxNrOpenFiles inputs
             currenth = take maxNrOpenFiles headers
             rest = drop maxNrOpenFiles inputs
             resth = drop maxNrOpenFiles headers
-        first <- pasteCounts currenth current
-        pasteCounts (snoc resth $ T.intercalate "\t" currenth) (snoc rest first)
+        first <- pasteCounts matchingRows currenth current
+        pasteCounts matchingRows (snoc resth $ T.intercalate "\t" currenth) (snoc rest first)
     | otherwise = do
         (newfp,hout) <- openNGLTempFile "collected" "collected.counts." "txt"
         liftIO $ T.hPutStrLn hout (T.intercalate "\t" ("":headers))
         numCapabilities <- liftIO getNumCapabilities
-        let filesSynced = False
-        if filesSynced
+        if matchingRows
             then do
                 let sources =
                         [conduitPossiblyCompressedFile f
@@ -366,8 +365,9 @@ executePaste (NGOList ifiles) kwargs = do
     outputListLno' WarningOutput ["Calling __paste which is an internal function, exposed for testing only"]
     ofile <- lookupStringOrScriptError "__paste arguments" "ofile" kwargs
     headers <- lookupStringListOrScriptError "__paste arguments" "headers" kwargs
+    matchingRows <- lookupBoolOrScriptErrorDef (return False) "__paste arguments" "matching_rows" kwargs
     ifiles' <- forM ifiles (stringOrTypeError "__concat argument")
-    newfp <- pasteCounts headers (map T.unpack ifiles')
+    newfp <- pasteCounts matchingRows headers (map T.unpack ifiles')
     liftIO $ moveOrCopy newfp (T.unpack ofile)
     return NGOVoid
 executePaste _ _ = do
@@ -414,6 +414,7 @@ pasteHiddenFunction = Function
     , funcKwArgs =
         [ ArgInformation "ofile" True NGLString [ArgCheckFileWritable]
         , ArgInformation "headers" True (NGList NGLString) []
+        , ArgInformation "matching_rows" False NGLBool []
         ]
     , funcAllowsAutoComprehension = False
     }
