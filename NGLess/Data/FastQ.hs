@@ -119,16 +119,27 @@ fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, 
         offset = encodingOffset enc
 
 
--- | Decode a FastQ file
+-- | Decode a FastQ file as a Conduit
+--
+-- Throws DataError if the stream is not in valid FastQ format
 fqDecodeC :: (MonadError NGError m) => FastQEncoding -> C.Conduit ByteLine m ShortRead
-fqDecodeC enc = groupC 4 =$= CL.mapM parseShortReads
+fqDecodeC enc = awaitJust $ \(ByteLine rid) ->
+        lineOrError4 $ \rseq ->
+            lineOrError4 $ \_ ->
+                lineOrError4 $ \rqs->
+                    if B.length rseq == B.length rqs
+                        then do
+                            C.yield $! ShortRead rid rseq (vSub rqs offset)
+                            fqDecodeC enc
+                        else throwDataError "Length of quality line is not the same as sequence"
     where
         offset :: Int8
         offset = encodingOffset enc
-        parseShortReads [ByteLine rid, ByteLine rseq, _, ByteLine rqs]
-            | B.length rseq == B.length rqs = return $! ShortRead rid rseq (vSub rqs offset)
-            | otherwise = throwDataError "Length of quality line is not the same as sequence"
-        parseShortReads _ = throwDataError "Number of lines in FastQ file is not multiple of 4! EOF found"
+        lineOrError4 f = C.await >>=
+                            maybe
+                                (throwDataError "Number of lines in FastQ file is not multiple of 4! EOF found")
+                                (f . unwrapByteLine)
+
 
 -- | reads a sequence of short reads.
 -- returns an error if there are any problems.
