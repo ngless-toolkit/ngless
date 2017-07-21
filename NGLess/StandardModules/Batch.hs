@@ -1,8 +1,6 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2017 NGLess Authors
  - License: MIT
  -}
-
-{-# LANGUAGE TupleSections, OverloadedStrings #-}
 
 module StandardModules.Batch
     ( loadModule
@@ -14,22 +12,17 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
 import Control.Applicative
 import Control.Monad
-import Text.Read
+import Text.Read (readMaybe)
 import Data.Maybe
 import Data.Default
 
 import Language
 import Modules
 import NGLess
-
-getLSFncpus :: IO (Maybe Int)
-getLSFncpus = (>>= readMaybe) <$> lookupEnv "LSB_DJOB_NUMPROC"
+import Utils.Batch (getNcpus)
 
 getLSFjobIndex :: IO (Maybe Integer)
 getLSFjobIndex = (>>= readMaybe) <$> lookupEnv "LSB_JOBINDEX"
-
-getGEncpus :: IO (Maybe Int)
-getGEncpus = (>>= readMaybe) <$> lookupEnv "NSLOTS"
 
 getGEjobIndex :: IO (Maybe Integer)
 getGEjobIndex = (>>= readMaybe) <$> lookupEnv "SGE_TASK_ID"
@@ -37,9 +30,6 @@ getGEjobIndex = (>>= readMaybe) <$> lookupEnv "SGE_TASK_ID"
 
 getJobIndex :: IO (Maybe Integer)
 getJobIndex = liftA2 (<|>) getLSFjobIndex getGEjobIndex
-
-getNcpus :: IO (Maybe Int)
-getNcpus = liftA2 (<|>) getLSFncpus getGEncpus
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ = liftIO $ do

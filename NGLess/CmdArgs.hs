@@ -5,6 +5,7 @@
 module CmdArgs
     ( ColorSetting(..)
     , Verbosity(..)
+    , NThreadsOpts(..)
     , NGLessInput(..)
     , NGLessArgs(..)
     , NGLessMode(..)
@@ -18,6 +19,7 @@ module CmdArgs
 
 import Options.Applicative
 import Data.Monoid ((<>))
+import Text.Read (readMaybe)
 import qualified Data.Configurator.Types as CF
 import qualified Data.Text as T
 
@@ -32,6 +34,14 @@ instance CF.Configured ColorSetting where
     convert (CF.String "none") = Just NoColor
     convert _ = Nothing
 
+
+data NThreadsOpts = NThreads Int | NThreadsAuto
+    deriving (Eq, Show)
+
+instance CF.Configured NThreadsOpts where
+    convert (CF.String "auto") = Just NThreadsAuto
+    convert (CF.String val) = NThreads <$> (readMaybe $ T.unpack val)
+    convert _ = Nothing
 
 data NGLessInput =
         InlineScript String
@@ -51,7 +61,7 @@ data NGLessMode =
               , validateOnly :: Bool
               , print_last :: Bool
               , trace_flag :: Maybe Bool
-              , nThreads :: Int
+              , nThreads :: NThreadsOpts
               , createReportDirectory :: Bool
               , html_report_directory :: Maybe FilePath
               , temporary_directory :: Maybe FilePath
@@ -107,13 +117,20 @@ parseInput = InlineScript <$> strOption
                         <> help "inline script to execute")
             <|> ScriptFilePath <$> strArgument (metavar "INPUT" <> help "Filename of script to interpret")
 
+parseNThreads = option (eitherReader readNThreads) (long "jobs" <> short 'j' <> value (NThreads 1))
+    where
+        readNThreads "auto" = Right NThreadsAuto
+        readNThreads val = case readMaybe val of
+                            Just n -> Right (NThreads n)
+                            Nothing -> Left ("Failed to parse "++val++" as a threads option")
+
 mainArgs = DefaultMode
               <$> parseInput -- input :: NGLessInput
               <*> strOption (long "debug" <> value "") -- debug_mode :: String
               <*> switch (long "validate-only" <> short 'n' <> help "Only validate input, do not run script") -- validateOnly :: Bool
               <*> switch (long "print-last" <> short 'p' <> help "print value of last line in script") -- print_last :: Bool
               <*> optional (switch $ long "trace" <> help "Set highest verbosity mode") -- trace_flag :: Maybe Bool
-              <*> option auto (long "jobs" <> short 'j' <> value 1) -- nThreads :: Int
+              <*> parseNThreads
               <*> switch (long "create-report" <> help "whether to create the report directory") -- createReportDirectory :: Bool
               <*> optional (strOption $ long "html-report-directory" <> short 'o' <> help "name of output directory") -- html_report_directory :: Maybe FilePath
               <*> optional (strOption $ long "temporary-directory" <> short 't' <> help "Directory where to store temporary files") -- temporary_directory :: Maybe FilePath

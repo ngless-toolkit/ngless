@@ -71,6 +71,7 @@ import FileManagement
 import StandardModules.NGLStdlib
 import Network
 import Hooks
+import Utils.Batch
 import Utils.Suggestion
 
 import qualified BuiltinModules.Argv as ModArgv
@@ -203,7 +204,11 @@ modeExec opts@DefaultMode{} = do
     let (fname,reqversion) = case input opts of
                 ScriptFilePath fp -> (fp,True)
                 InlineScript _ -> ("inline",False)
-    setNumCapabilities (nThreads opts)
+    case nThreads opts of
+        NThreads n -> setNumCapabilities n
+        NThreadsAuto -> getNcpus >>= \case
+            Just n -> setNumCapabilities n
+            Nothing -> fatalError "Could not determine number of CPUs"
     ngltext <- loadScript (input opts) >>= \case
         Right t -> return t
         Left err ->  fatalError err

@@ -121,6 +121,7 @@ define(`BUILD_MODULES',
     Transform
     Types
     Utils.Conduit
+    Utils.Batch
     Utils.FindModules
     Utils.IntGroups
     Utils.LockFile

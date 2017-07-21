@@ -23,7 +23,8 @@ priority: later options take precedence.
 Options
 -------
 
-``jobs``: number of CPUs to use.
+``jobs``: number of CPUs to use. You can use the keyword ``auto`` to attempt
+auto-detection (see below).
 
 ``temporary-directory``: where to keep temporary files. By default, this is the
 system defined temporary directory (either ``/tmp`` or the value of the
@@ -49,4 +50,18 @@ Debug options
 ``keep-temporary-files``: whether to keep temporary files after the end of the programme.
 
 ``trace`` (only command line): print a lot of internal information.
+
+Auto-detection of the number of CPUs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If the option ``auto`` is passed as the number of jobs (either on the command
+line or in the configuration file), ngless will inspect the environment looking
+for a small set of clues as to how many CPUs to use. In particular, it will
+make use of these variables:
+
+- ``OMP_NUM_THREADS``
+- ``NSLOTS``
+- ``LSB_DJOB_NUMPROC``
+
+If none are found (or they do not contain a single number), an error is produced.
 
