@@ -16,17 +16,12 @@ firstJust (x:xs) = x >>= \case
     val -> return val
 
 getNcpus :: IO (Maybe Int)
-getNcpus = firstJust
-            [ getOpenMPThreads
-            , getGEncpus 
-            , getLSFncpus
-            ]
+getNcpus = firstJust . map getIntFromEnv $
+                 [ "OMP_NUM_THREADS"
+                 , "NSLOTS"
+                 , "LSB_DJOB_NUMPROC"
+                 , "SLURM_CPUS_PER_TASK"
+                 ]
 
-getLSFncpus :: IO (Maybe Int)
-getLSFncpus = (>>= readMaybe) <$> lookupEnv "LSB_DJOB_NUMPROC"
-
-getGEncpus :: IO (Maybe Int)
-getGEncpus = (>>= readMaybe) <$> lookupEnv "NSLOTS"
-
-getOpenMPThreads :: IO (Maybe Int)
-getOpenMPThreads = (>>= readMaybe) <$> lookupEnv "OMP_NUM_THREADS"
+getIntFromEnv :: String -> IO (Maybe Int)
+getIntFromEnv evar = (>>= readMaybe) <$> lookupEnv evar
