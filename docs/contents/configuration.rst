@@ -62,6 +62,7 @@ make use of these variables:
 - ``OMP_NUM_THREADS``
 - ``NSLOTS``
 - ``LSB_DJOB_NUMPROC``
+- ``SLURM_CPUS_PER_TASK``
 
 If none are found (or they do not contain a single number), an error is produced.
 
