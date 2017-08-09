@@ -18,6 +18,7 @@ module Output
 import Text.Printf (printf)
 import System.IO
 import System.IO.Unsafe (unsafePerformIO)
+import System.IO.SafeWrite (withOutputFile)
 import Data.Maybe
 import Data.IORef
 import Data.Aeson
@@ -254,7 +255,8 @@ writeOutputJS fname scriptName script = do
     t <- getZonedTime
     let script' = zip [1..] (T.lines script)
         sInfo = ScriptInfo fname (show t) (wrapScript script' fqStats (mi_lno <$> mapStats))
-    BL.writeFile fname (BL.concat
+    withOutputFile fname $ \hout ->
+        BL.hPutStr hout (BL.concat
                     ["var output = "
                     , encode $ object
                         [ "output" .= fullOutput
