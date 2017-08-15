@@ -64,7 +64,7 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import           Data.Conduit ((=$=), ($$+), ($$+-), ($$))
+import           Data.Conduit ((=$=), ($$+), ($$+-), ($$), (.|))
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.TQueue as CA
@@ -103,10 +103,16 @@ import Utils.Utils
 import Utils.Conduit
 
 
+type SimpleVariableMap = Map.Map T.Text NGLessObject
+data VariableMap = VariableMapGlobal SimpleVariableMap
+                    | VariableMapBlock BlockVariables SimpleVariableMap
+
+variableMapLookup v (VariableMapGlobal sm) = Map.lookup v sm
+variableMapLookup v (VariableMapBlock b sm) = lookupBlockVar v b <|> Map.lookup v sm
 
 data NGLInterpretEnv = NGLInterpretEnv
     { ieModules :: [Module]
-    , ieVariableEnv :: Map.Map T.Text NGLessObject
+    , ieVariableEnv :: VariableMap
     }
 
 -- Monad 1: IO + read-write environment
@@ -134,9 +140,12 @@ runInROEnvIO act = do
 data BlockStatus = BlockOk | BlockDiscarded | BlockContinued
     deriving (Eq,Show)
 
+data BlockVariables = BlockVariables1 !T.Text NGLessObject
+            deriving (Eq, Show)
+
 data BlockResult = BlockResult
                 { blockStatus :: {-# UNPACK #-} !BlockStatus
-                , blockValues :: [(T.Text, NGLessObject)]
+                , blockValues :: BlockVariables
                 } deriving (Eq,Show)
 
 autoComprehendNB f (NGOList es) args = NGOList <$> sequence [f e args | e <- es]
@@ -149,7 +158,7 @@ setlno !n = liftIO $ setOutputLno (Just n)
 lookupVariable :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
 lookupVariable !k = liftM2 (<|>)
     (lookupConstant k)
-    (Map.lookup k . ieVariableEnv <$> ask)
+    (variableMapLookup k . ieVariableEnv <$> ask)
 
 lookupConstant :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
 lookupConstant !k = do
@@ -161,7 +170,8 @@ lookupConstant !k = do
 
 
 setVariableValue :: T.Text -> NGLessObject -> InterpretationEnvIO ()
-setVariableValue !k !v = modify $ \(NGLInterpretEnv mods e) -> (NGLInterpretEnv mods (Map.insert k v e))
+setVariableValue !k !v = modify $
+                            \(NGLInterpretEnv mods (VariableMapGlobal vm)) -> (NGLInterpretEnv mods (VariableMapGlobal (Map.insert k v vm)))
 
 findFunction :: FuncName -> InterpretationEnvIO (NGLessObject -> KwArgsValues -> NGLessIO NGLessObject)
 findFunction fname@(FuncName fname') = do
@@ -190,7 +200,7 @@ traceExpr m e =
 
 interpret :: [Module] -> [(Int,Expression)] -> NGLessIO ()
 interpret modules es = do
-    evalStateT (interpretIO es) (NGLInterpretEnv modules Map.empty)
+    evalStateT (interpretIO es) (NGLInterpretEnv modules $ VariableMapGlobal Map.empty)
     outputListLno InfoOutput Nothing ["Interpretation finished."]
 
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
@@ -365,6 +375,8 @@ executePreprocess (NGOReadSet name rs) args (Block [Variable var] block) = do
 
         keepSingles <- runNGLessIO $ lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args
         qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__input_qc" args
+        numCapabilities <- liftIO getNumCapabilities
+        let mapthreads = max 1 (numCapabilities - 2)
 
         (enc, fp1, fp2, fp3) <- case rs of
             (ReadSet1 enc fp) -> do
@@ -387,31 +399,32 @@ executePreprocess (NGOReadSet name rs) args (Block [Variable var] block) = do
         let asSource "" _ = C.yieldMany []
             asSource fp q =
                     let input = conduitPossiblyCompressedFile fp
-                            =$= linesCBounded
-                            =$= fqDecodeC enc
-                            =$= C.conduitVector 4096
+                            .| linesCBounded
+                            .| C.conduitVector 4096
+                            .| asyncMapEitherC mapthreads (fqDecodeVector enc)
                     in if qcInput
                             then input =$= writeAndContinue q
                             else input
 
-            write h q = writeAndContinue q
-                        =$= ((C.concat :: C.Conduit (V.Vector ShortRead) InterpretationEnvIO ShortRead)
-                                =$= fqEncodeC enc =$= asyncGzipTo h)
+            write nt h q =
+                    writeAndContinue q
+                        .| asyncMapC nt (B.concat . map (fqEncode enc) . V.toList)
+                        .| asyncGzipTo h
 
         env <- gets id
-        numCapabilities <- liftIO getNumCapabilities
-        let mapthreads = max 1 (numCapabilities - 2)
+        let processpairs :: (V.Vector ShortRead, V.Vector ShortRead) -> NGLess (V.Vector ShortRead, V.Vector ShortRead, V.Vector ShortRead)
+            processpairs = liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles) . uncurry V.zip
         zipSource2 (asSource fp1 q1) (asSource fp2 q2)
-            =$= asyncMapEitherC mapthreads (liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles) . uncurry V.zip)
+            =$= asyncMapEitherC mapthreads processpairs
             $$ void $ C.sequenceSinks
-                    [CL.map (\(a,_,_) -> a) =$= write out1 q1
-                    ,CL.map (\(_,a,_) -> a) =$= write out2 q2
-                    ,CL.map (\(_,_,a) -> a) =$= write out3 q3
+                    [CL.map (\(a,_,_) -> a) =$= write mapthreads out1 q1
+                    ,CL.map (\(_,a,_) -> a) =$= write mapthreads out2 q2
+                    ,CL.map (\(_,_,a) -> a) =$= write mapthreads out3 q3
                     ]
 
         asSource fp3 q3
             =$= asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . interpretPBlock1 block var))
-            $$ void (write out3 q3)
+            $$ void (write mapthreads out3 q3)
 
         forM_ [k1, k2, k3, pk1, pk2, pk3] release
         liftIO $ forM_ [out1, out2, out3] hClose
@@ -459,10 +472,10 @@ executeMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " 
 
 interpretPBlock1 :: Expression -> T.Text -> ShortRead -> InterpretationROEnv (Maybe ShortRead)
 interpretPBlock1 block var r = do
-    r' <- interpretBlock1 [(var, NGOShortRead r)] block
+    r' <- interpretBlock1 (BlockVariables1 var (NGOShortRead r)) block
     case blockStatus r' of
         BlockDiscarded -> return Nothing -- Discard Read.
-        _ -> case lookup var (blockValues r') of
+        _ -> case lookupBlockVar var (blockValues r') of
                 Just (NGOShortRead rr) -> case srLength rr of
                     0 -> return Nothing
                     _ -> return (Just rr)
@@ -501,9 +514,9 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
         filterGroup [] = return []
         filterGroup [SamHeader line] = return [line]
         filterGroup mappedreads  = do
-                    mrs' <- interpretBlock1 [(var, NGOMappedRead mappedreads)] body
+                    mrs' <- interpretBlock1 (BlockVariables1 var (NGOMappedRead mappedreads)) body
                     if blockStatus mrs' `elem` [BlockContinued, BlockOk]
-                        then case lookup var (blockValues mrs') of
+                        then case lookupBlockVar var (blockValues mrs') of
                             Just (NGOMappedRead []) -> return []
                             Just (NGOMappedRead rs) -> return (encodeSamLine <$> rs)
                             _ -> nglTypeError ("Expected variable "++show var++" to contain a mapped read.")
@@ -518,7 +531,16 @@ interpretArguments args =
         e' <- interpretTopValue e
         return (v, e')
 
-interpretBlock :: [(T.Text, NGLessObject)] -> [Expression] -> InterpretationROEnv BlockResult
+lookupBlockVar :: T.Text -> BlockVariables -> Maybe NGLessObject
+lookupBlockVar n' (BlockVariables1 n v)
+    | n == n' = Just v
+    | otherwise = Nothing
+
+updateBlockVar (BlockVariables1 n _) n' v'
+    | n /= n' = throwShouldNotOccur ("only assignments to block variable are possible [assigning to '"++show n'++"']")
+    | otherwise = return $! BlockVariables1 n v'
+
+interpretBlock :: BlockVariables -> [Expression] -> InterpretationROEnv BlockResult
 interpretBlock vs [] = return (BlockResult BlockOk vs)
 interpretBlock vs (e:es) = do
     r <- interpretBlock1 vs e
@@ -526,12 +548,13 @@ interpretBlock vs (e:es) = do
         BlockOk -> interpretBlock (blockValues r) es
         _ -> return r
 
-interpretBlock1 :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv BlockResult
-interpretBlock1 vs (Optimized (LenThresholdDiscard (Variable v) bop thresh)) = case lookup v vs of
-        Just (NGOShortRead r) ->
+interpretBlock1 :: BlockVariables -> Expression -> InterpretationROEnv BlockResult
+interpretBlock1 vs (Optimized (LenThresholdDiscard (Variable v) bop thresh)) = case lookupBlockVar v vs of
+        Just (NGOShortRead r) -> do
             let status = if binInt bop (srLength r) thresh
                     then BlockDiscarded
-                    else BlockOk in return (BlockResult status vs)
+                    else BlockOk
+            return (BlockResult status vs)
         _ -> throwShouldNotOccur ("Variable name not found in optimized processing " ++ show v)
     where
         binInt :: BOp -> Int -> Int -> Bool
@@ -540,19 +563,16 @@ interpretBlock1 vs (Optimized (LenThresholdDiscard (Variable v) bop thresh)) = c
         binInt BOpLTE a b = a <= b
         binInt BOpGTE a b = a >= b
         binInt _ _ _ = error "This is impossible: the optimized transformation should ensure this case never exists"
-interpretBlock1 vs (Optimized (SubstrimReassign (Variable v) mq)) = case lookup v vs  of
-        Just (NGOShortRead r) -> let
-                nv = NGOShortRead (substrim mq r)
-                vs' = map (\p@(a,_) -> if a == v then (a,nv) else p) vs
-            in return (BlockResult BlockOk vs')
+interpretBlock1 vs (Optimized (SubstrimReassign (Variable v) mq)) = case lookupBlockVar v vs  of
+        Just (NGOShortRead r) -> do
+            let nv = NGOShortRead $! substrim mq r
+            vs' <- updateBlockVar vs v nv
+            return $! BlockResult BlockOk vs'
         _ -> throwShouldNotOccur ("Variable name not found in optimized processing " ++ show v)
 interpretBlock1 vs (Assignment (Variable n) val) = do
     val' <- interpretBlockExpr vs val
-    if n `notElem` map fst vs
-        then throwShouldNotOccur ("only assignments to block variable are possible [assigning to '"++show n++"']")
-        else do
-            let vs' = map (\p@(a,_) -> (if a == n then (a,val') else p)) vs
-            return $ BlockResult BlockOk vs'
+    vs' <- updateBlockVar vs n val'
+    return $ BlockResult BlockOk vs'
 interpretBlock1 vs Discard = return (BlockResult BlockDiscarded vs)
 interpretBlock1 vs Continue = return (BlockResult BlockContinued vs)
 interpretBlock1 vs (Condition c ifT ifF) = do
@@ -561,8 +581,8 @@ interpretBlock1 vs (Condition c ifT ifF) = do
 interpretBlock1 vs (Sequence expr) = interpretBlock vs expr -- interpret [expr]
 interpretBlock1 vs x = unreachable ("interpretBlock1: This should not have happened " ++ show vs ++ " " ++ show x)
 
-interpretBlockExpr :: [(T.Text, NGLessObject)] -> Expression -> InterpretationROEnv NGLessObject
-interpretBlockExpr vs val = local (\(NGLInterpretEnv mods e) -> (NGLInterpretEnv mods (Map.union e (Map.fromList vs)))) (interpretPreProcessExpr val)
+interpretBlockExpr :: BlockVariables -> Expression -> InterpretationROEnv NGLessObject
+interpretBlockExpr vs val = local (\(NGLInterpretEnv mods (VariableMapGlobal sm)) -> (NGLInterpretEnv mods (VariableMapBlock vs sm))) (interpretPreProcessExpr val)
 
 interpretPreProcessExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretPreProcessExpr (FunctionCall (FuncName "substrim") var args _) = do

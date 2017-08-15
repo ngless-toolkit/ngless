@@ -9,6 +9,7 @@ module Data.FastQ
     , encodingOffset
     , encodingName
     , fqDecode
+    , fqDecodeVector
     , fqDecodeC
     , fqEncode
     , fqEncodeC
@@ -31,8 +32,8 @@ import Control.Monad
 import Control.Monad.Except
 import Control.Exception
 
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
-import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Storable.Mutable as VSM
 import qualified Data.Vector.Unboxed.Mutable as VUM
 
@@ -68,7 +69,7 @@ data FastQEncoding = SangerEncoding | SolexaEncoding deriving (Eq, Bounded, Enum
 data FQStatistics = FQStatistics
                 { bpCounts :: (Int, Int, Int, Int) -- ^ number of (A, C, T, G)
                 , lc :: Int8 -- ^ lowest quality value
-                , qualCounts ::  [V.Vector Int] -- ^ quality counts by position
+                , qualCounts ::  [VU.Vector Int] -- ^ quality counts by position
                 , nSeq :: Int -- ^ number of sequences
                 , seqSize :: (Int,Int) -- ^ min and max
                 } deriving(Eq,Show)
@@ -155,6 +156,19 @@ fqDecode enc s = C.runConduit $
         =$= linesCBounded
         =$= fqDecodeC enc
         =$= CL.consume
+
+fqDecodeVector :: FastQEncoding -> V.Vector ByteLine -> NGLess (V.Vector ShortRead)
+fqDecodeVector enc vs
+        | V.length vs `mod` 4 /= 0 = throwDataError "Number of input lines in FastQ file is not a multiple of 4"
+        | otherwise = return $! V.generate (V.length vs `div` 4) parse1
+    where
+        offset :: Int8
+        offset = encodingOffset enc
+        parse1 i = ShortRead rid rseq (vSub rqs offset)
+            where
+                rid  = unwrapByteLine $ vs V.! (i*4)
+                rseq = unwrapByteLine $ vs V.! (i*4 + 1)
+                rqs  = unwrapByteLine $ vs V.! (i*4 + 3)
 
 statsFromFastQ :: FilePath -> FastQEncoding -> NGLessIO FQStatistics
 statsFromFastQ fp enc =
@@ -253,7 +267,7 @@ gcFraction res = gcCount / allBpCount
 qualityPercentiles :: FQStatistics -> [(Int, Int, Int, Int)]
 qualityPercentiles FQStatistics{qualCounts=qCounts} = Prelude.map statistics qCounts
     where
-        statistics :: V.Vector Int -> (Int, Int, Int, Int)
+        statistics :: VU.Vector Int -> (Int, Int, Int, Int)
         statistics qs = (bpSum `div` elemTotal + minQualityValue
                                 , calcPercentile 0.50 + minQualityValue
                                 , calcPercentile 0.25 + minQualityValue
@@ -261,15 +275,15 @@ qualityPercentiles FQStatistics{qualCounts=qCounts} = Prelude.map statistics qCo
             where
                 -- Calculates [('a',1), ('b',2)] = 0 + 'a' * 1 + 'b' * 2.
                 -- 'a' and 'b' minus encoding.
-                bpSum = V.ifoldl' (\n i q -> n + i * q) 0 qs
-                elemTotal = V.sum qs
+                bpSum = VU.ifoldl' (\n i q -> n + i * q) 0 qs
+                elemTotal = VU.sum qs
 
                 calcPercentile :: Double -> Int
                 calcPercentile perc = accUntilLim val'
                     where
                         val' = ceiling (fromIntegral elemTotal * perc)
                         accUntilLim :: Int -> Int
-                        accUntilLim lim = case V.findIndex (>= lim) $ V.postscanl (+) 0 qs of
+                        accUntilLim lim = case VU.findIndex (>= lim) $ VU.postscanl (+) 0 qs of
                               Just v -> v
                               Nothing -> error "ERROR: Logical impossibility in calcPercentile function"
 
