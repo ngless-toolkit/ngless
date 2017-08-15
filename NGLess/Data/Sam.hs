@@ -239,17 +239,17 @@ readSamGroupsC' mapthreads respectPairs = do
         fixSamGroups' :: V.Vector [SamLine] -> C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
         fixSamGroups' prev = C.await >>= \case
             Nothing -> C.yield prev
-            Just cur -> do
-                    let (lastprev:_) = V.last prev
-                        (curfirst:_) = V.head cur
-                    if samQNameMate lastprev /= samQNameMate curfirst
-                        then do -- lucky case, the groups align with the vector boundary
+            Just cur -> case (V.last prev, V.head cur) of
+                    ((lastprev:_),(curfirst:_))
+                        | samQNameMate lastprev /= samQNameMate curfirst -> do
+                            -- lucky case, the groups align with the vector boundary
                             C.yield prev
                             fixSamGroups' cur
-                        else do
+                        | otherwise -> do
                             C.yield (V.slice 0 (V.length prev - 1) prev)
                             cur' <- liftIO $ injectLast (V.last prev) cur
                             fixSamGroups' cur'
+                    _ -> throwShouldNotOccur "This should have been an impossible situation in `fixSamGroups`"
         injectLast :: [SamLine] -> V.Vector [SamLine] -> IO (V.Vector [SamLine])
         injectLast prev gs = do
             gs' <- V.unsafeThaw gs

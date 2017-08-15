@@ -10,14 +10,14 @@ module Interpretation.Select
     ) where
 
 import qualified Data.ByteString.Char8 as B
-import Control.Monad.Except
 import qualified Data.Conduit as C
+import           Data.Conduit ((=$=))
 import qualified Data.Conduit.List as CL
-import Data.Bits (Bits(..))
-import Data.Conduit ((=$=))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import           Data.Either.Combinators
+import           Data.Bits (Bits(..))
+import           Control.Monad.Except (throwError)
+import           Data.Either.Combinators (fromRight)
 import Data.Maybe
 
 import FileManagement
@@ -26,7 +26,6 @@ import Language
 import NGLess
 
 import Data.Sam
-import Utils.Utils
 import Utils.Conduit
 
 data SelectCondition = SelectMapped | SelectUnmapped | SelectUnique
@@ -37,8 +36,8 @@ data MatchCondition = KeepIf [SelectCondition] | DropIf [SelectCondition]
 
 _parseConditions :: KwArgsValues -> NGLessIO MatchCondition
 _parseConditions args = do
-        let NGOList keep_if = lookupWithDefault (NGOList []) "keep_if" args
-            NGOList drop_if = lookupWithDefault (NGOList []) "drop_if" args
+        keep_if <- lookupSymbolListOrScriptErrorDef (return []) "arguments to select" "keep_if" args
+        drop_if <- lookupSymbolListOrScriptErrorDef (return []) "arguments to select" "drop_if" args
         keep_if' <- mapM asSC keep_if
         drop_if' <- mapM asSC drop_if
         case (keep_if', drop_if') of
@@ -46,10 +45,10 @@ _parseConditions args = do
             ([], cs) -> return $! DropIf cs
             (_, _) -> throwScriptError "To select, you cannot use both keep_if and drop_if"
     where
-        asSC :: NGLessObject -> NGLessIO SelectCondition
-        asSC (NGOSymbol "mapped") = return SelectMapped
-        asSC (NGOSymbol "unmapped") = return SelectUnmapped
-        asSC (NGOSymbol "unique") = return SelectUnique
+        asSC :: T.Text -> NGLessIO SelectCondition
+        asSC "mapped" = return SelectMapped
+        asSC "unmapped" = return SelectUnmapped
+        asSC "unique" = return SelectUnique
         asSC c = throwShouldNotOccur ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
 
 _matchConditions :: MatchCondition -> [(SamLine,B.ByteString)] -> [B.ByteString]

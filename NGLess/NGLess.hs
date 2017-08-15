@@ -24,6 +24,8 @@ module NGLess
     , lookupIntegerOrScriptErrorDef
     , lookupSymbolOrScriptError
     , lookupSymbolOrScriptErrorDef
+    , lookupSymbolListOrScriptError
+    , lookupSymbolListOrScriptErrorDef
     , testNGLessIO
     ) where
 
@@ -95,6 +97,16 @@ lookupSymbolOrScriptErrorDef defval context name args = case lookup name args of
     Nothing -> defval
     Just (NGOSymbol s) -> return s
     Just other -> throwScriptError ("Expected a symbol in argument " ++ T.unpack name ++ " in context '" ++ context ++ "' instead observed: " ++ show other)
+
+
+lookupSymbolListOrScriptErrorDef :: (MonadError NGError m) => m [T.Text] -> String -> T.Text -> KwArgsValues -> m [T.Text]
+lookupSymbolListOrScriptErrorDef defval context name args = case lookup name args of
+    Nothing -> defval
+    Just (NGOList ss) -> symbolOrTypeError context `mapM` ss
+    Just other -> throwScriptError ("Expected a symbol in argument " ++ T.unpack name ++ " in context '" ++ context ++ "', instead saw " ++ show other)
+
+lookupSymbolListOrScriptError :: (MonadError NGError m) => String -> T.Text -> KwArgsValues -> m [T.Text]
+lookupSymbolListOrScriptError = requiredLookup lookupSymbolListOrScriptErrorDef
 
 
 requiredLookup :: (MonadError NGError m) => (m a -> String-> T.Text -> KwArgsValues -> m a) -> String-> T.Text -> KwArgsValues -> m a
