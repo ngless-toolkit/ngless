@@ -61,6 +61,7 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
@@ -70,10 +71,7 @@ import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.TQueue as CA
 import           Control.Concurrent.STM (atomically)
 import           Control.DeepSeq (NFData(..))
-import           Data.Strict.Tuple (Pair(..))
-import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector as V
-import           Data.Int
 import           Safe (atMay)
 import           Control.Error (note)
 
@@ -170,8 +168,9 @@ lookupConstant !k = do
 
 
 setVariableValue :: T.Text -> NGLessObject -> InterpretationEnvIO ()
-setVariableValue !k !v = modify $
-                            \(NGLInterpretEnv mods (VariableMapGlobal vm)) -> (NGLInterpretEnv mods (VariableMapGlobal (Map.insert k v vm)))
+setVariableValue !k !v = modify $ \case
+                            (NGLInterpretEnv mods (VariableMapGlobal vm)) -> (NGLInterpretEnv mods (VariableMapGlobal (Map.insert k v vm)))
+                            _ -> error "This should never happen (setVariableValue)"
 
 findFunction :: FuncName -> InterpretationEnvIO (NGLessObject -> KwArgsValues -> NGLessIO NGLessObject)
 findFunction fname@(FuncName fname') = do
@@ -346,13 +345,9 @@ vMapMaybeLifted f v = sequence $ V.unfoldr loop 0
 
 shortReadVectorStats = do
     q <- liftIO $ TQ.newTBMQueueIO 8
-    let getPairs :: C.Conduit (V.Vector ShortRead) IO (Pair ByteLine (VU.Vector Int8))
-        getPairs = C.awaitForever $ \ells ->
-            V.forM_ ells (C.yield . toPair)
-        toPair (ShortRead _ bps qs) = ByteLine bps :!: qs
     p <- liftIO . A.async $
         CA.sourceTBMQueue q
-            =$= getPairs
+            .| CC.concat
             $$ fqStatsC
     k <- register (atomically . TQ.closeTBMQueue $ q)
     return (q, k, p)

@@ -26,8 +26,7 @@ import qualified Data.ByteString as B
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import           Control.DeepSeq (NFData(..))
-import           Data.Strict.Tuple (Pair(..))
-import Data.Conduit         (($$), (=$=))
+import           Data.Conduit ((=$=), (.|))
 import Control.Monad
 import Control.Monad.Except
 import Control.Exception
@@ -171,23 +170,14 @@ fqDecodeVector enc vs
                 rqs  = unwrapByteLine $ vs V.! (i*4 + 3)
 
 statsFromFastQ :: FilePath -> FastQEncoding -> NGLessIO FQStatistics
-statsFromFastQ fp enc =
+statsFromFastQ fp enc = C.runConduitRes $
         conduitPossiblyCompressedFile fp
-            =$= linesCBounded
-            =$= getPairedLines
-            $$ fqStatsC
-    where
-        offset = encodingOffset enc
-        getPairedLines :: C.Conduit ByteLine NGLessIO (Pair ByteLine (VU.Vector Int8))
-        getPairedLines = groupC 4 =$= CL.mapM getPairedLines'
-            where
-                getPairedLines' [_, bps, _, ByteLine qs]
-                    | B.length (unwrapByteLine bps) == B.length qs = return $! bps :!: vSub qs offset
-                    | otherwise = throwDataError "Length of quality line is not the same as sequence"
-                getPairedLines' _ = throwDataError "fastq lines are not a multiple of 4"
+            .| linesCBounded
+            .| fqDecodeC enc
+            .| fqStatsC
 
 
-fqStatsC :: forall m. (MonadIO m) => C.Sink (Pair ByteLine (VU.Vector Int8)) m FQStatistics
+fqStatsC :: forall m. (MonadIO m) => C.Sink ShortRead m FQStatistics
 fqStatsC = do
         -- This is pretty ugly code, but threading the state through a foldM
         -- was >2x slower. In any case, all the ugliness is well hidden.
@@ -218,8 +208,8 @@ fqStatsC = do
             return $! FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq)
     where
 
-        update :: VSM.IOVector Int -> VUM.IOVector Int -> IORef (VSM.IOVector Int) -> Pair ByteLine (VU.Vector Int8) -> m ()
-        update !charCounts !stats qcs (ByteLine bps :!: qs) = liftIO $ do
+        update :: VSM.IOVector Int -> VUM.IOVector Int -> IORef (VSM.IOVector Int) -> ShortRead -> m ()
+        update !charCounts !stats qcs (ShortRead _ bps qs) = liftIO $ do
             let len = B.length bps
                 qlen = 256*len
             prevLen <- VSM.length <$> readIORef qcs
