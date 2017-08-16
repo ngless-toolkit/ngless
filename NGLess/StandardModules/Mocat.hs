@@ -11,9 +11,9 @@ import qualified Data.Text as T
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Conduit.Combinators as C
-import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit ((=$=), ($$))
+import qualified Data.Conduit as C
+import           Data.Conduit ((.|))
 import           System.IO
 import System.FilePath
 import System.FilePath.Glob
@@ -89,16 +89,17 @@ executeParseCoord :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeParseCoord (NGOString coordfp) _ = do
     let coordfp' = T.unpack coordfp
     (newfp, hout) <- openNGLTempFile coordfp' "converted_" ".gtf"
-    conduitPossiblyCompressedFile coordfp'
-        =$= CB.lines
-        =$= CL.mapM convertToGff
-        =$= C.unlinesAscii
-        $$ C.sinkHandle hout
+    C.runConduit $
+        conduitPossiblyCompressedFile coordfp'
+            .| linesCBounded
+            .| CL.mapM convertToGff
+            .| C.unlinesAscii
+            .| C.sinkHandle hout
     liftIO $ hClose hout
     return (NGOString . T.pack $ newfp)
         where
-            convertToGff :: B.ByteString -> NGLessIO B.ByteString
-            convertToGff line = case B8.split '\t' line of
+            convertToGff :: ByteLine -> NGLessIO B.ByteString
+            convertToGff (ByteLine line) = case B8.split '\t' line of
                                     [gene,start,end] -> return $! B.intercalate "\t"
                                                                     [gene
                                                                     ,"protein_coding"
