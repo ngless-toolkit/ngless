@@ -68,8 +68,9 @@ convertSamToBam samfile = do
     samPath <- samtoolsBin
     (newfp, hout) <- openNGLTempFile samfile "converted_" "bam"
     outputListLno' DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
-    (errmsg, exitCode) <- liftIO $ readProcessErrorWithExitCode
-                                    (proc samPath ["view", "-bS", samfile]) { std_out = UseHandle hout }
+    (errmsg, exitCode) <- liftIO $ do
+        numCapabilities <- getNumCapabilities
+        readProcessErrorWithExitCode (proc samPath ["view", "-@", show numCapabilities, "-bS", samfile]) { std_out = UseHandle hout }
     if null errmsg
         then outputListLno' DebugOutput ["No output from samtools."]
         else outputListLno' InfoOutput ["Message from samtools: ", errmsg]
