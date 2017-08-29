@@ -36,12 +36,13 @@ import Data.Maybe
 import Data.Monoid ((<>))
 import Control.Monad
 import Control.Monad.IO.Class (liftIO, MonadIO(..))
-import Control.Concurrent
 import Options.Applicative
 import System.FilePath
 import System.Directory
+import Control.Monad.Extra (whenJust)
 import System.IO (stderr, hPutStrLn)
-import System.Console.ANSI
+import Control.Concurrent (setNumCapabilities)
+import System.Console.ANSI (setSGRCode, SGR(..), ConsoleLayer(..), Color(..), ColorIntensity(..))
 import System.Exit (exitSuccess, exitFailure)
 
 import Control.Monad.Trans.Except
@@ -53,6 +54,7 @@ import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as B
 
 import Interpret
+import JSONScript (writeScriptJSON)
 import Validation
 import ValidationIO
 import Transform
@@ -201,6 +203,9 @@ loadScript (ScriptFilePath fname) =
 
 modeExec :: NGLessMode -> IO ()
 modeExec opts@DefaultMode{} = do
+    when (not (experimentalFeatures opts) && isJust (exportJSON opts)) $
+        fatalError ("The use of --export-json requires the --experimental-features flag\n"++
+                    "This feature may change at any time.\n")
     let (fname,reqversion) = case input opts of
                 ScriptFilePath fp -> (fp,True)
                 InlineScript _ -> ("inline",False)
@@ -238,6 +243,9 @@ modeExec opts@DefaultMode{} = do
         when (validateOnly opts) $ do
             outputListLno' InfoOutput ["Script OK."]
             liftIO exitSuccess
+        whenJust (exportJSON opts) $ \jsoname -> liftIO $ do
+            writeScriptJSON jsoname sc
+            exitSuccess
         outputListLno' TraceOutput ["Transforming script..."]
         when (debug_mode opts == "transform") $
             liftIO (print sc)

@@ -69,6 +69,8 @@ data NGLessMode =
               , config_files :: [FilePath]
               , no_header :: Bool
               , subsampleMode :: Bool
+              , experimentalFeatures :: Bool
+              , exportJSON :: Maybe FilePath
               , searchPath :: [FilePath]
               , extraArgs :: [String]
               }
@@ -138,6 +140,8 @@ mainArgs = DefaultMode
               <*> many (strOption $ long "config-file" <> help "Configuration files to parse") -- config_files :: Maybe [FilePath]
               <*> switch (long "no-header" <> help "Do not print copyright information") -- no_header :: Bool
               <*> switch (long "subsample" <> help "Subsample mode: quickly test a pipeline by discarding 99% of the input")-- subsampleMode :: Bool
+              <*> switch (long "experimental-features" <> help "Whether to allow the use of experimental features") -- experimentalFeatures :: Bool
+              <*> optional (strOption $ long "export-json" <> help "File to write JSON representation of script to") -- exportJSON :: Maybe FilePath
               <*> many (strOption $ long "search-dir" <> help "Reference search directories (replace <references> in script)") -- searchPath :: [FilePath]
               <*> many (strArgument (metavar "ARGV")) -- extraArgs :: [String]
 

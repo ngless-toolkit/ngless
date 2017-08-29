@@ -100,6 +100,7 @@ define(`BUILD_MODULES',
     Interpretation.Substrim
     Interpretation.Unique
     Interpretation.Write
+    JSONScript
     Language
     Modules
     NGLess
