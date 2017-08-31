@@ -7,9 +7,9 @@
 Ngless is a domain-specific language for NGS (next-generation sequencing data)
 processing.
 
-**Note**: This is *pre-release* software, currently available as a preview
-only. Please [get in touch](mailto:coelho@embl.de) if you want to use it in
-your work. For questions, you can also use the [ngless mailing
+**Note**: This is *pre-release* software, currently in beta (testing) It is
+stable enough to use, but there may still be some (minor) changes before an
+official release. For questions, you can also use the [ngless mailing
 list](https://groups.google.com/forum/#!forum/ngless).
 
 ## Example
