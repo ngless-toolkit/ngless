@@ -9,12 +9,15 @@ module Data.GFF
     ) where
 
 import Data.Maybe
+import Control.Monad
 import Control.DeepSeq
 
 import qualified Data.ByteString as S
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lex.Integral as I
+import qualified Data.ByteString.Lex.Fractional as F
 
 import NGLess.NGError
 
@@ -32,7 +35,7 @@ data GffLine = GffLine
             , gffEnd :: !Int
             , gffScore :: !(Maybe Float)
             , gffStrand :: !GffStrand
-            , gffPhase :: !Int -- ^phase: use -1 to denote .
+            , gffPhase :: {-# UNPACK #-} !Int -- ^phase: use -1 to denote .
             , gffId :: !B.ByteString
             } deriving (Eq,Show)
 
@@ -76,29 +79,42 @@ gffGeneId g = fromMaybe "unknown" (listToMaybe . catMaybes $ map (`lookup` attrs
 
 
 readGffLine :: B.ByteString -> Either NGError GffLine
-readGffLine line
-    |length tokens == 9 = return $ GffLine
+readGffLine line = case B8.split '\t' line of
+        [tk0,tk1,tk2,tk3,tk4,tk5,tk6,tk7,tk8] ->
+            GffLine
                 tk0
                 tk1
                 tk2
-                (read $ B8.unpack tk3)
-                (read $ B8.unpack tk4)
-                (score tk5)
-                (parseStrand $ B8.head tk6)
-                (phase tk7)
-                (S8.copy . gffGeneId $ tk8)
-    |otherwise = throwDataError ("unexpected line in GFF: " ++ show line)
+                <$> intOrError tk3
+                <*> intOrError tk4
+                <*> score tk5
+                <*> strandOrError tk6
+                <*> phase tk7
+                <*> pure (S8.copy . gffGeneId $ tk8)
+        _ -> throwDataError ("unexpected line in GFF: " ++ show line)
     where
-        tokens = B8.split '\t' line
-        [tk0,tk1,tk2,tk3,tk4,tk5,tk6,tk7,tk8] = tokens
-        score "." = Nothing
-        score v = Just (read $ B8.unpack v)
-        phase "." = -1
-        phase r = read (B8.unpack r)
+        parseOrError :: (a -> Maybe b) -> a -> NGLess b
+        parseOrError p s = case p s of
+                    Just v -> return v
+                    Nothing -> throwDataError $ "Could not parse GFF line: "++ show line
+        intOrError :: B.ByteString -> NGLess Int
+        intOrError = parseOrError (liftM fst . I.readDecimal)
+        floatOrError = parseOrError (liftM fst . F.readDecimal)
+        score :: B.ByteString -> NGLess (Maybe Float)
+        score "." = return Nothing
+        score v = Just <$> floatOrError v
 
-parseStrand :: Char -> GffStrand
-parseStrand '.' = GffUnStranded
-parseStrand '+' = GffPosStrand
-parseStrand '-' = GffNegStrand
-parseStrand '?' = GffUnknownStrand
-parseStrand _ = error "unhandled value for strand"
+        phase :: B.ByteString -> NGLess Int
+        phase "." = return (-1)
+        phase r = intOrError r
+        strandOrError :: B.ByteString -> NGLess GffStrand
+        strandOrError s = case B8.uncons s of
+            Just (s',_) -> parseStrand s'
+            _ -> throwDataError "Could not parse GFF line (empty strand field)"
+
+parseStrand :: Char -> NGLess GffStrand
+parseStrand '.' = return GffUnStranded
+parseStrand '+' = return GffPosStrand
+parseStrand '-' = return GffNegStrand
+parseStrand '?' = return GffUnknownStrand
+parseStrand u = throwDataError $ "Parsing GFF line: unhandled value for strand ("++[u]++")"
