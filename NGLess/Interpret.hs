@@ -65,7 +65,7 @@ import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import           Data.Conduit ((=$=), ($$+), ($$+-), ($$), (.|))
+import           Data.Conduit ((=$=), ($$), (.|))
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.TQueue as CA
@@ -488,17 +488,17 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
         (oname, ohandle) <- runNGLessIO $ openNGLTempFile samfp "block_selected_" "sam"
         env <- gets id
         numCapabilities <- liftIO getNumCapabilities
-        let mapthreads = max 1 (numCapabilities - 2)
-        (samcontent, ()) <-
+        let mapthreads = max 1 (numCapabilities - 1)
+        C.runConduit $
             C.transPipe runNGLessIO istream
-                $$+ C.takeWhile ((=='@') . B8.head . unwrapByteLine)
-                =$= CL.map unwrapByteLine
-                =$= C.unlinesAscii
-                =$= CB.sinkHandle ohandle
-        samcontent
-            $$+- C.transPipe runNGLessIO (readSamGroupsC' mapthreads paired)
-            =$= asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . filterGroup))
-            =$= CB.sinkHandle ohandle
+                .| (do
+                    (C.takeWhile ((=='@') . B8.head . unwrapByteLine)
+                        .| CL.map unwrapByteLine
+                        .| C.unlinesAscii)
+                    (C.transPipe runNGLessIO (readSamGroupsC' mapthreads paired)
+                        .| asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . filterGroup))
+                        ))
+                .| CB.sinkHandle ohandle
         liftIO $ hClose ohandle
         return input { nglSamFile = File oname }
     where
