@@ -1,7 +1,7 @@
 {- Copyright 2014-2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module Data.Sam
     ( SamLine(..)
     , samLength
@@ -14,6 +14,7 @@ module Data.Sam
     , isNegative
     , isFirstInPair
     , isSecondInPair
+    , isSamHeaderString
     , matchSize
     , matchIdentity
     ) where
@@ -31,6 +32,7 @@ import           Data.Strict.Tuple (Pair(..))
 import Data.Bits (testBit)
 import Control.Error (note)
 import Control.DeepSeq
+import Control.Monad.Base
 
 import Data.Maybe
 import Data.Function (on)
@@ -84,6 +86,8 @@ isFirstInPair = (`testBit` 6) . samFlag
 isSecondInPair :: SamLine -> Bool
 isSecondInPair = (`testBit` 7) . samFlag
 
+isSamHeaderString :: B.ByteString -> Bool
+isSamHeaderString s = not (B.null s) && (B.head s == 64) -- 64 is '@'
 
 newtype SimpleParser a = SimpleParser { runSimpleParser :: B.ByteString -> Maybe (Pair a B.ByteString) }
 instance Functor SimpleParser where
@@ -204,13 +208,15 @@ readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
                 _ -> return ()
         groupLine = (==) `on` samQName
 
+
+
 -- | a chunked variation of readSamGroupsC which uses multiple threads
 --
 -- When respectPairs is False, then the two mates of the same fragment will be
 -- considered grouped in different blocks
-readSamGroupsC' :: Int -> Bool -> C.Conduit ByteLine NGLessIO (V.Vector [SamLine])
+readSamGroupsC' :: forall m . (MonadError NGError m, MonadBase IO m, MonadIO m) => Int -> Bool -> C.Conduit ByteLine m (V.Vector [SamLine])
 readSamGroupsC' mapthreads respectPairs = do
-        C.dropWhile (\(ByteLine line) -> B8.head line == '@')
+        C.dropWhile (isSamHeaderString . unwrapByteLine)
         C.conduitVector 4096
             =$= asyncMapEitherC mapthreads (liftM groupByName . V.mapM (readSamLine . unwrapByteLine))
             -- the groups may not be aligned on the group boundary, thus we need to fix them
@@ -234,9 +240,9 @@ readSamGroupsC' mapthreads respectPairs = do
                     where
                         cur = vs V.! ix
                         cur_tag = samQNameMate cur
-        fixSamGroups :: C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
+        fixSamGroups :: C.Conduit (V.Vector [SamLine]) m (V.Vector [SamLine])
         fixSamGroups = awaitJust fixSamGroups'
-        fixSamGroups' :: V.Vector [SamLine] -> C.Conduit (V.Vector [SamLine]) NGLessIO (V.Vector [SamLine])
+        fixSamGroups' :: V.Vector [SamLine] -> C.Conduit (V.Vector [SamLine]) m (V.Vector [SamLine])
         fixSamGroups' prev = C.await >>= \case
             Nothing -> C.yield prev
             Just cur -> case (V.last prev, V.head cur) of

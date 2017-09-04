@@ -483,6 +483,7 @@ executePrint err  _ = throwScriptError ("Cannot print " ++ show err)
 executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Variable var] body) = do
         paired <- lookupBoolOrScriptErrorDef (return True) "select" "paired" args
+        outputHeader <- lookupBoolOrScriptErrorDef (return True) "select" "__output_header" args
         let (samfp, istream) = asSamStream isam
         runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", samfp]
         (oname, ohandle) <- runNGLessIO $ openNGLTempFile samfp "block_selected_" "sam"
@@ -492,12 +493,12 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
         C.runConduit $
             C.transPipe runNGLessIO istream
                 .| (do
-                    (C.takeWhile ((=='@') . B8.head . unwrapByteLine)
-                        .| CL.map unwrapByteLine
-                        .| C.unlinesAscii)
-                    (C.transPipe runNGLessIO (readSamGroupsC' mapthreads paired)
-                        .| asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . filterGroup))
-                        ))
+                    when outputHeader $
+                        CL.map unwrapByteLine
+                            .| CC.takeWhile isSamHeaderString
+                            .| C.unlinesAscii
+                    readSamGroupsC' mapthreads paired
+                        .| asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . filterGroup)))
                 .| CB.sinkHandle ohandle
         liftIO $ hClose ohandle
         return input { nglSamFile = File oname }
