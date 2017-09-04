@@ -494,9 +494,9 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
             C.transPipe runNGLessIO istream
                 .| (do
                     when outputHeader $
-                        CL.map unwrapByteLine
-                            .| CC.takeWhile isSamHeaderString
-                            .| C.unlinesAscii
+                        CC.takeWhile (isSamHeaderString . unwrapByteLine)
+                            .| CL.map unwrapByteLine
+                            .| CC.unlinesAscii
                     readSamGroupsC' mapthreads paired
                         .| asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . filterGroup)))
                 .| CB.sinkHandle ohandle
