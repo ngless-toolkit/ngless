@@ -279,14 +279,18 @@ modeExec (CreateReferencePackMode ofile gen mgtf mfunc) = runNGLessIO "creating 
 modeExec (DownloadFileMode url local) = runNGLessIO "download a file" $
     downloadFile url local
 
-modeExec (DownloadDemoMode demo) = runNGLessIO "downloading a demo" $
-    if demo `elem` ["gut-short", "ocean-short"]
+modeExec (DownloadDemoMode demo) = do
+    let known = ["gut-short", "ocean-short"]
+    if demo `elem` known
         then do
             let url = "http://vm-lux.embl.de/~coelho/ngless-data/Demos/" ++ demo ++ ".tar.gz"
-            downloadExpandTar url "."
-            liftIO $ putStrLn ("\nDemo downloaded to " ++ demo)
-        else liftIO $ do
-            hPutStrLn stderr (redColor ++ "Unkown demo '"++ demo ++ "'.")
+            runNGLessIO "downloading a demo" $ downloadExpandTar url "."
+            putStrLn ("\nDemo downloaded to " ++ demo)
+        else do
+            hPutStrLn stderr (redColor ++ "Unknown demo '"++ demo ++ "'.\n"++
+                                    T.unpack (suggestionMessage (T.pack demo) (T.pack <$> known))++
+                                    "Available demos are:\n")
+            forM_ known $ hPutStrLn stderr . ("\t- " ++)
             exitFailure
 
 modeExec (PrintPathMode exec) = runNGLessIO "finding internal path" $ do
