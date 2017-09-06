@@ -68,7 +68,7 @@ encodingFor fp = do
     C.runConduit $
         conduitPossiblyCompressedFile fp
         =$= linesCBounded
-        =$= groupC 4
+        =$= CL.chunksOf 4
         =$= encodingC 255 0
 
 -- | Checks if file has no content

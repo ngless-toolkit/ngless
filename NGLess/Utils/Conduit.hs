@@ -10,7 +10,6 @@ module Utils.Conduit
     , asyncMapEitherC
     , linesC
     , linesCBounded
-    , groupC
     , awaitJust
     , asyncGzipTo
     , asyncGzipToFile
@@ -40,7 +39,7 @@ import           Data.Conduit ((=$=))
 
 import qualified Data.Sequence as Seq
 import           Data.Sequence ((|>), ViewL(..))
-import           Control.Monad (unless, forM_, when)
+import           Control.Monad (forM_, when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.Resource (MonadResource, MonadBaseControl)
@@ -142,16 +141,6 @@ asyncMapEitherC :: forall a m b e . (MonadIO m, NFData b, NFData e, MonadError e
 asyncMapEitherC maxSize f = asyncMapC maxSize f =$= (C.awaitForever $ \case
                                 Right v -> C.yield v
                                 Left err -> throwError err)
-
--- | groupC yields the input as groups of 'n' elements. If the input is not a
--- multiple of 'n', the last element will be incomplete
-groupC :: (Monad m) => Int -> C.Conduit a m [a]
-groupC n = loop n []
-    where
-        loop 0 ps = C.yield (reverse ps) >> loop n []
-        loop c ps = C.await >>= \case
-            Nothing -> unless (null ps) $ C.yield (reverse ps)
-            Just p -> loop (c-1) (p:ps)
 
 -- | This is a simple utility adapted from
 -- http://neilmitchell.blogspot.de/2015/07/thoughts-on-conduits.html
