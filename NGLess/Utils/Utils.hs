@@ -56,9 +56,10 @@ readProcessErrorWithExitCode cp = do
     -- the same pattern is used in the implementation of
     -- readProcessWithErrorCode (which cannot be used here as we want to
     -- use `hout` for stdout)
-    void . forkIO $ void (evaluate (length err))
+    void . forkIO $ do
+        void (evaluate (length err))
+        hClose herr
     exitCode <- waitForProcess jHandle
-    hClose herr
     return (err, exitCode)
 
 maybeM :: (Monad m) => m (Maybe a) -> (a -> m (Maybe b)) -> m (Maybe b)
