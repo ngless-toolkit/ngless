@@ -166,7 +166,6 @@ define(`BASE_CONFIG',
     cpp-options: -DWINDOWS
   if !os(windows)
     build-depends:
-      bzlib,
       bzlib-conduit,
       double-conversion,
       unix
