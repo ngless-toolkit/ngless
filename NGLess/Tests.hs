@@ -272,17 +272,4 @@ case_test_setup_html_view = do
     assertBool "index.html should be present after setupHtmlViewer" ex
     removeDirectoryRecursive "testing_tmp_dir_html/"
 
-case_async_gzip_to_from = do
-    let testdata = [0 :: Int .. 12]
-    result <- testNGLessIO $ do
-        CL.sourceList testdata
-            =$= CL.map (B8.pack . (\n -> show n ++ "\n"))
-            $$ asyncGzipToFile "testing_tmp_dir/test.gz"
-        asyncGzipFromFile "testing_tmp_dir/test.gz" $$ asyncGzipToFile "testing_tmp_dir/test-copied.gz"
-        asyncGzipFromFile "testing_tmp_dir/test-copied.gz"
-            =$= linesC
-            =$= CL.map (read . B8.unpack .  unwrapByteLine)
-            $$ CL.consume
-    result @?= testdata
-
 
