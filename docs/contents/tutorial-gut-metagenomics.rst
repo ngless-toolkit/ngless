@@ -6,11 +6,6 @@ Human Gut Metagenomics Functional & Taxonomic Profiling
 In this tutorial, we will analyse a small dataset of human gut microbial
 metagenomes.
 
-.. note::
-    This tutorial uses the `Integrated Gene Catalogue
-    <http://www.nature.com/nbt/journal/v32/n8/full/nbt.2942.html>`__ and
-    requires ca. **15GiB** of RAM
-
 1. Download the toy dataset
 
 First download all the tutorial data::
@@ -124,6 +119,12 @@ to reads::
 Now, we will use the ``input`` object which has been filtered of human reads.
 
 5. Profiling using the IGC
+
+.. note::
+    This section of the tutorial uses the `Integrated Gene Catalogue
+    <http://www.nature.com/nbt/journal/v32/n8/full/nbt.2942.html>`__ and
+    requires ca. **15GiB** of RAM. Skip to step 9 if your machine does not have
+    this much memory.
 
 After preprocessing, we map the reads to the integrated gene catalog::
 
