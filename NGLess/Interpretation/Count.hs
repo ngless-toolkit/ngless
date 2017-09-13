@@ -19,6 +19,7 @@ module Interpretation.Count
     ) where
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BS
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as BL
@@ -37,9 +38,10 @@ import qualified Data.Set as S
 
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit ((=$), (=$=), ($$+), ($$+-))
+import           Data.Conduit ((.|), (=$), (=$=), ($$+), ($$+-))
 import qualified Data.Strict.Tuple as TU
 import           Data.Strict.Tuple (Pair(..))
 
@@ -124,7 +126,7 @@ data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctiona
 
 
 data RefSeqInfo = RefSeqInfo
-                        { rsiName :: {-# UNPACK #-} !B.ByteString
+                        { rsiName :: {-# UNPACK #-} !BS.ShortByteString
                         , rsiSize :: {-# UNPACK #-} !Double
                         } deriving (Eq, Show)
 instance NFData RefSeqInfo where
@@ -135,7 +137,17 @@ instance Ord RefSeqInfo where
 
 
 compareShortLong  :: RefSeqInfo -> B.ByteString -> Ordering
-compareShortLong (RefSeqInfo short _) long = compare short long
+compareShortLong (RefSeqInfo short _) long = loop 0
+    where
+        n1 = BS.length short
+        n2 = B.length long
+        n = min n1 n2
+        loop i
+            | i == n = compare n1 n2
+            | otherwise = let cur = compare (BS.index short i) (B.index long i) in
+                                if cur == EQ
+                                    then loop (i + 1)
+                                    else cur
 
 data Annotator =
                 SeqNameAnnotator (Maybe (V.Vector RefSeqInfo)) -- ^ Just annotate by sequence names
@@ -183,7 +195,7 @@ annEnumerate (SeqNameAnnotator Nothing)   = error "Using unfinished annotator"
 annEnumerate (SeqNameAnnotator (Just ix)) = ("-1",0):enumerateRSVector ix
 annEnumerate (GeneMapAnnotator _ ix)      = ("-1",0):enumerateRSVector ix
 annEnumerate (GFFAnnotator _ headers _)   = zip ("-1":headers) [0..]
-enumerateRSVector ix = V.toList . flip V.imap ix $ \i rs -> (rsiName rs, i + 1)
+enumerateRSVector ix = V.toList . flip V.imap ix $ \i rs -> (BS.fromShort $ rsiName rs, i + 1)
 
 -- Number of elements
 annSize :: Annotator -> Int
@@ -317,10 +329,12 @@ annSamHeaderParser :: Int -> [Annotator] -> CountOpts -> C.Sink ByteLine NGLessI
 annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annSamHeaderParser1 anns)
     where
         annSamHeaderParser1 (SeqNameAnnotator Nothing) = do
-            chunks <- asyncMapEitherC mapthreads (V.mapM seqNameSize)
-                =$= CL.fold (flip (:)) []
+            headers <-
+                asyncMapEitherC mapthreads (V.mapM seqNameSize)
+                .| CC.concat
+                .| CC.sinkVector
             vsorted <- liftIO $ do
-                v <- V.unsafeThaw (V.concat chunks)
+                v <- V.unsafeThaw headers
                 sortParallel mapthreads v
                 V.unsafeFreeze v
             return $! SeqNameAnnotator (Just vsorted)
@@ -351,12 +365,12 @@ annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annS
         indexUpdates :: GeneMapAnnotation -> (Int, ByteLine) -> NGLess [(Int, Double)]
         indexUpdates gmap line = do
             RefSeqInfo seqid val <- seqNameSize line
-            let ixs = fromMaybe [] $ M.lookup seqid gmap
+            let ixs = fromMaybe [] $ M.lookup (BS.fromShort seqid) gmap
             return [(ix,val) | ix <- ixs]
         seqNameSize :: (Int, ByteLine) -> NGLess RefSeqInfo
         seqNameSize (n, ByteLine h) = case B8.split '\t' h of
                 [_,seqname,sizestr] -> case B8.readInt (B.drop 3 sizestr) of
-                    Just (size, _) -> return $! RefSeqInfo (B.drop 3 seqname) (convert size)
+                    Just (size, _) -> return $! RefSeqInfo (BS.toShort $ B.drop 3 seqname) (convert size)
                     Nothing -> throwDataError ("Could not parse sequence length in header (line: " ++ show n ++ ")")
                 _ -> throwDataError ("SAM file does not contain the right number of tokens (line: " ++ show n ++ ")")
 
@@ -536,7 +550,7 @@ loadFunctionalMap fname columns = do
     where
         finishFunctionalMap (LoadFunctionalMapState _ gmap namemap) = GeneMapAnnotator
                                                                             (reindex gmap namemap)
-                                                                            (V.fromList [RefSeqInfo n 0.0 | n <- M.keys namemap])
+                                                                            (V.fromList [RefSeqInfo (BS.toShort n) 0.0 | n <- M.keys namemap])
         reindex :: M.Map B.ByteString [Int] -> M.Map B.ByteString Int -> M.Map B.ByteString [Int]
         reindex gmap namemap = M.map (map reindex1) gmap
             where
