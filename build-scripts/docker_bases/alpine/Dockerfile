@@ -2,16 +2,15 @@ FROM alpine:edge
 
 LABEL maintainer "alves.rjc+docker@gmail.com"
 
-RUN echo '@testing http://dl-cdn.alpinelinux.org/alpine/edge/testing' >> /etc/apk/repositories && \
-    apk --no-cache add \
+RUN apk --no-cache add \
     alpine-sdk \
     bash \
     bzip2-dev \
     ca-certificates \
-    cabal@testing \
+    cabal \
     file \
-    ghc-dev@testing \
-    ghc@testing \
+    ghc-dev \
+    ghc \
     git \
     gmp-dev \
     libffi-dev \
@@ -34,5 +33,6 @@ RUN echo '@testing http://dl-cdn.alpinelinux.org/alpine/edge/testing' >> /etc/ap
 RUN git clone https://gitlab.com/ngless/ngless && \
     cd ngless && \
     STACKOPTS="--system-ghc --only-dependencies" make ngless && \
+    STACKOPTS="--system-ghc --only-dependencies" make tests && \
     cd .. && \
     rm -rf ngless
