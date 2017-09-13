@@ -18,6 +18,7 @@ module Utils.Vector
 import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.IO.Class
+import qualified Control.Concurrent.SSem as SSem
 import qualified Control.Concurrent.Async as A
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
@@ -68,24 +69,31 @@ sortParallel :: (Ord e) =>
                         Int -- ^ nr of threads
                         -> VM.IOVector e -- ^ vector
                         -> IO ()
-sortParallel n v = sortPByBounds n v 0 (VM.length v)
+sortParallel n v
+    | n <= 0 = ioError (userError "sortParallel must be called with a strictly positive number of threads")
+    | n == 1 = sortByBounds compare v 0 (VM.length v)
+    | otherwise = do
+        sem <- SSem.new (n - 1)
+        sortPByBounds sem v 0 (VM.length v)
 
-sortPByBounds :: (Ord e) => Int -> VM.IOVector e -> Int -> Int -> IO ()
-sortPByBounds 1 v start end = sortByBounds compare v start end
-sortPByBounds threads v start end
-    | end - start < 1024 = sortByBounds compare v start end
+sortPByBounds :: (Ord e) => SSem.SSem -> VM.IOVector e -> Int -> Int -> IO ()
+sortPByBounds sem v start end
+    | end - start < 1024 = do
+        sortByBounds compare v start end
     | otherwise = do
         mid <- pivot v start end
         k <- VGM.unstablePartition (< mid) v
-        let t1 :: Int
-            t1
-                | k - start < 1024 = 1
-                | end - k < 1024 = threads - 1
-                | otherwise = threads `div` 2
-            t2 = threads - t1
-        void $ A.concurrently
-            (sortPByBounds t1 v start k)
-            (sortPByBounds t2 v k end)
+        -- At this point, we have 1 thread allocated (the one which is running).
+        -- We will attempt to acquire a second one. If successful, we can run
+        -- the two blocks concurrently; otherwise, simply sort one after the
+        -- other.
+        let sortBlock1 = sortPByBounds sem v start k
+            sortBlock2 = sortPByBounds sem v k end
+        SSem.tryWait sem >>= \case
+            Nothing -> sortBlock1 >> sortBlock2
+            Just _ -> do
+                A.concurrently_ sortBlock1 sortBlock2
+                SSem.signal sem
 
 pivot v start end = do
         a <- VM.read v start
