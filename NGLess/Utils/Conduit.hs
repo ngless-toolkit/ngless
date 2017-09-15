@@ -73,7 +73,7 @@ linesC =
 
 linesCBounded :: (MonadError NGError m) => C.Conduit B.ByteString m ByteLine
 linesCBounded =
-    linesBounded 8192
+    linesBounded 65536
         =$= CL.map lineWindowsTerminated
         =$= CL.map ByteLine
 
