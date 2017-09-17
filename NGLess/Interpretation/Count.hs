@@ -149,6 +149,7 @@ compareShortLong (RefSeqInfo short _) long = loop 0
                                     then loop (i + 1)
                                     else cur
 
+
 data Annotator =
                 SeqNameAnnotator (Maybe (V.Vector RefSeqInfo)) -- ^ Just annotate by sequence names
                 | GFFAnnotator GFFAnnotationMap [B.ByteString] FeatureSizeMap -- ^ map reference regions to features + feature sizes
@@ -621,38 +622,41 @@ loadGFF gffFp opts = do
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "'..."]
         partials <- C.runConduit $
                 conduitPossiblyCompressedFile gffFp
-                =$= CB.lines
-                =$= readAnnotationOrDie
-                =$= sequenceSinks
-                    [CL.fold (insertg f) (0, M.empty, M.empty, M.empty) | f <- optFeatures opts]
+                    .| linesC
+                    .| readAnnotationOrDie
+                    .| sequenceSinks
+                        [CL.fold (insertg f) (0, M.empty, M.empty, M.empty) | f <- optFeatures opts]
 
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "' complete."]
         return $! map finishGffAnnotator partials
     where
         singleFeature = length (optFeatures opts) == 1
-        readAnnotationOrDie :: C.Conduit B.ByteString NGLessIO GffLine
-        readAnnotationOrDie = C.awaitForever $ \line ->
+        readAnnotationOrDie :: C.Conduit ByteLine NGLessIO GffLine
+        readAnnotationOrDie = C.awaitForever $ \(ByteLine line) ->
             unless (B8.head line == '#') $
                 case readGffLine line of
                     Right g -> C.yield g
                     Left err -> throwError err
         finishGffAnnotator ::  (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double) -> Annotator
         finishGffAnnotator (_, amap,namemap,szmap) = GFFAnnotator amap' headers szmap
-            where (amap',headers) = reindex amap namemap
+            where (amap' :!: headers) = reindex amap namemap
         -- The signature looks hairy, but we pass a tuple to have the state while iterating using the fold.
         --  - next: next available ID
         --  - gmap: current annotation map
         --  - namemap: str -> int name to ID
         --  - szmap: str -> double name to feature size
-        insertg :: B.ByteString -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double) -> GffLine -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
-        insertg f cur@(next, gmap, namemap, szmap) gline
+        insertg :: B.ByteString
+                        -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
+                        -> GffLine
+                        -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
+        insertg f cur@(!next, !gmap, !namemap, !szmap) gline
                 | gffType gline /= f = cur
                 | otherwise = (next', gmap', namemap', szmap')
             where
                 header
                     | singleFeature = gffId gline
                     | otherwise = B.concat [B8.pack (show $ gffType gline), "\t", gffId gline]
-                (namemap', active, !next') = case M.lookup header namemap of
+                (!namemap', active, !next') = case M.lookup header namemap of
                     Just v -> (namemap, v, next)
                     Nothing -> (M.insert header next namemap, next, next+1)
 
@@ -671,8 +675,8 @@ loadGFF gffFp opts = do
                 inserts1 val = Just $! convert (gffSize gline) + fromMaybe 0.0 val
         -- First integer IDs are assigned "first come, first served"
         -- `reindex` makes them alphabetical
-        reindex :: GFFAnnotationMap -> M.Map B.ByteString Int -> (GFFAnnotationMap, [B.ByteString])
-        reindex amap namemap = (M.map (fmap (map reindexAI)) amap, headers)
+        reindex :: GFFAnnotationMap -> M.Map B.ByteString Int -> Pair GFFAnnotationMap [B.ByteString]
+        reindex amap namemap = (M.map (fmap (map reindexAI)) amap :!: headers)
             where
                 headers = M.keys namemap -- these are sorted
                 reindexAI :: AnnotationInfo -> AnnotationInfo
