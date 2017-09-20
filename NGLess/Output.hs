@@ -1,4 +1,4 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, RecordWildCards #-}
@@ -13,6 +13,7 @@ module Output
     , outputMapStatistics
     , writeOutputJS
     , writeOutputTSV
+    , outputConfiguration
     ) where
 
 import Text.Printf (printf)
@@ -284,3 +285,23 @@ writeOutputTSV fqStatsFp mapStatsFp = do
 
         msHeaders                      = ["inputFile",    "reference",       "totalReads",       "totalAligned",       "totalUnique"]
         encodeMapStats MappingInfo{..} = [mi_inputFile, mi_reference, show mi_totalReads, show mi_totalAligned, show mi_totalUnique]
+
+outputConfiguration :: NGLessIO ()
+outputConfiguration = do
+    cfg <- ngleConfiguration <$> nglEnvironment
+    outputListLno' TraceOutput ["# Configuration"]
+    outputListLno' TraceOutput ["\tdownload base URL: ", nConfDownloadBaseURL cfg]
+    outputListLno' TraceOutput ["\tglobal data directory: ", nConfGlobalDataDirectory cfg]
+    outputListLno' TraceOutput ["\tuser directory: ", nConfUserDirectory cfg]
+    outputListLno' TraceOutput ["\tuser data directory: ", nConfUserDataDirectory cfg]
+    outputListLno' TraceOutput ["\ttemporary directory: ", nConfTemporaryDirectory cfg]
+    outputListLno' TraceOutput ["\tkeep temporary files: ", show $ nConfKeepTemporaryFiles cfg]
+    outputListLno' TraceOutput ["\tcreate report: ", show $ nConfCreateReportDirectory cfg]
+    outputListLno' TraceOutput ["\treport directory: ", nConfReportDirectory cfg]
+    outputListLno' TraceOutput ["\tcolor setting: ", show $ nConfColor cfg]
+    outputListLno' TraceOutput ["\tprint header: ",  show $ nConfPrintHeader cfg]
+    outputListLno' TraceOutput ["\tsubsample: ", show $ nConfSubsample cfg]
+    outputListLno' TraceOutput ["\tverbosity: ", show $ nConfVerbosity cfg]
+    outputListLno' TraceOutput ["\tsearch path:"]
+    forM_ (nConfSearchPath cfg) $ \p ->
+        outputListLno' TraceOutput ["\t\t", p]

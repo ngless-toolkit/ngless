@@ -220,6 +220,7 @@ modeExec opts@DefaultMode{} = do
     let maybe_add_print = (if print_last opts then wrapPrint else return)
     (shouldOutput,odir) <- runNGLessIO "loading and running script" $ do
         updateNglEnvironment (\e -> e { ngleScriptText = ngltext })
+        outputConfiguration
         sc' <- runNGLess $ parsengless fname reqversion ngltext >>= maybe_add_print
         updateNglEnvironment (\e -> e {ngleVersion = fromMaybe (T.pack versionStr) (nglVersion <$> nglHeader sc') })
         when (debug_mode opts == "ast") $ liftIO $ do
