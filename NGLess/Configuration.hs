@@ -179,10 +179,13 @@ initConfiguration opts = do
                 searchPath' = if null searchPath
                                     then nConfSearchPath config
                                     else searchPath
+                createReportDirectory' = fromMaybe
+                                    (nConfCreateReportDirectory config)
+                                    createReportDirectory
             in config
                     { nConfTrace = trace
                     , nConfKeepTemporaryFiles = ktemp
-                    , nConfCreateReportDirectory = createReportDirectory
+                    , nConfCreateReportDirectory = createReportDirectory'
                     , nConfReportDirectory = html_odir
                     , nConfTemporaryDirectory = tmpdir
                     , nConfPrintHeader = nConfPrintHeader config && not no_header && not print_last
