@@ -18,6 +18,8 @@ RUN apk update && apk add \
     linux-headers \
     m4 \
     make \
+    openssh \
+    openssh-client \
     vim \
     xz \
     xz-dev \
