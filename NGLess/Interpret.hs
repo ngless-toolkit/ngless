@@ -69,6 +69,7 @@ import           Data.Conduit ((=$=), ($$), (.|))
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.TQueue as CA
+import           Control.Monad.Extra (whenJust)
 import           Control.Concurrent.STM (atomically)
 import           Control.DeepSeq (NFData(..))
 import qualified Data.Vector as V
@@ -98,6 +99,7 @@ import Interpretation.Select
 import Interpretation.Unique
 import Interpretation.Substrim
 import Utils.Utils
+import Utils.Suggestion
 import Utils.Conduit
 
 
@@ -302,6 +304,8 @@ interpretFunction' f _ _ _ = throwShouldNotOccur . concat $ ["Interpretation of 
 executeSamfile expr@(NGOString fname) args = do
     traceExpr "samfile" expr
     gname <- lookupStringOrScriptErrorDef (return fname) "samfile group name" "name" args
+    err <- liftIO (checkFileReadable (T.unpack fname))
+    whenJust err (throwDataError . T.unpack)
     return $ NGOMappedReadSet gname (File . T.unpack $ fname) Nothing
 executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show args)
 
