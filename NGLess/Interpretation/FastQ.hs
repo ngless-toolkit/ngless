@@ -72,6 +72,9 @@ encodingFor fp = do
         =$= encodingC 255 0
 
 -- | Checks if file has no content
+--
+-- Note that this is more than checking if the file is empty: a compressed file
+-- with no content will not be empty.
 checkNoContent fp =
     conduitPossiblyCompressedFile fp
         =$= linesCBounded
@@ -111,15 +114,6 @@ optionalSubsample f = do
             return newfp
         else return f
 
--- ^ Process quality.
-doQC1 :: Maybe FastQEncoding -- ^ encoding to use (or autodetect)
-                -> FilePath         -- ^ FastQ file
-                -> NGLessIO ReadSet
-doQC1 enc f = do
-        enc' <- maybe (encodingFor f) return enc
-        fd <- statsFromFastQ f enc'
-        outputFQStatistics f fd enc'
-        return (ReadSet1 enc' f)
 
 executeGroup :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeGroup (NGOList rs) args = do
@@ -211,15 +205,20 @@ executeFastq expr args = do
         (NGOString fname) -> NGOReadSet fname <$> do
             fname' <- optionalSubsample (T.unpack fname)
             asReadSet1mayQC qcNeeded enc fname'
-        (NGOList fps) -> NGOList <$> sequence [NGOReadSet fname <$> doQC1 enc (T.unpack fname) | NGOString fname <- fps]
+        (NGOList fps) -> NGOList <$> sequence [NGOReadSet fname <$> asReadSet1mayQC True enc (T.unpack fname) | NGOString fname <- fps]
         v -> throwScriptError ("fastq function: unexpected first argument: " ++ show v)
 
 
-asReadSet1mayQC :: Bool -> Maybe FastQEncoding -> FilePath -> NGLessIO ReadSet
-asReadSet1mayQC True enc fp = doQC1 enc fp
-asReadSet1mayQC False enc fp = do
-    enc' <- fromMaybe (encodingFor fp) (return <$> enc)
-    return (ReadSet1 enc' fp)
+asReadSet1mayQC :: Bool -- ^ whether to perform QC
+                -> Maybe FastQEncoding -- ^ encoding to use (or autodetect)
+                -> FilePath         -- ^ FastQ file
+                -> NGLessIO ReadSet
+asReadSet1mayQC qc enc fp =  do
+    enc' <- maybe (encodingFor fp) return enc
+    when qc $ do
+        s <- statsFromFastQ fp enc'
+        outputFQStatistics fp s enc'
+    return $! ReadSet1 enc' fp
 
 executePaired :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
@@ -235,13 +234,27 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
             (fp1',h1') <- openNGLTempFile (T.unpack mate1) "subsampled" "1.fq.gz"
             (fp2',h2') <- openNGLTempFile (T.unpack mate2) "subsampled" "2.fq.gz"
             outputListLno' TraceOutput ["Subsampling paired files ", T.unpack mate1, " and ", T.unpack mate2, " (parallel processing)"]
-            void . liftIO $ A.concurrently
+            liftIO $ A.concurrently_
                 (performSubsample (T.unpack mate1) h1')
                 (performSubsample (T.unpack mate2) h2')
             return (fp1', fp2')
         else return (T.unpack mate1, T.unpack mate2)
-    (ReadSet1 enc1 fp1) <- asReadSet1mayQC qcNeeded enc fp1'
-    (ReadSet1 enc2 fp2) <- asReadSet1mayQC qcNeeded enc fp2'
+    (ReadSet1 enc1 fp1, ReadSet1 enc2 fp2) <-
+        if not qcNeeded
+            then (,)
+                 <$> asReadSet1mayQC qcNeeded enc fp1'
+                 <*> asReadSet1mayQC qcNeeded enc fp2'
+            else do
+                enc1 <- fromMaybe (encodingFor fp1') (return <$> enc)
+                enc2 <- fromMaybe (encodingFor fp1') (return <$> enc)
+                (es1,es2) <- liftIO $ A.concurrently
+                            (runExceptT $ statsFromFastQ fp1' enc1)
+                            (runExceptT $ statsFromFastQ fp2' enc2)
+                s1 <- runNGLess es1
+                s2 <- runNGLess es2
+                outputFQStatistics fp1' s1 enc1
+                outputFQStatistics fp2' s2 enc2
+                return $! (ReadSet1 enc1 fp1', ReadSet1 enc2 fp2')
     when (enc1 /= enc2) $
         throwDataError ("Mates do not seem to have the same quality encoding! (first mate [" ++ fp1 ++ "] had " ++ show enc1 ++ ", second one [" ++ fp2 ++ "] " ++ show enc2 ++ ").")
     case mate3 of

@@ -29,6 +29,7 @@ import           Control.DeepSeq (NFData(..))
 import           Data.Conduit ((=$=), (.|))
 import Control.Monad
 import Control.Monad.Except
+import Control.Monad.Trans.Resource
 import Control.Exception
 
 import qualified Data.Vector as V
@@ -169,7 +170,7 @@ fqDecodeVector enc vs
                 rseq = unwrapByteLine $ vs V.! (i*4 + 1)
                 rqs  = unwrapByteLine $ vs V.! (i*4 + 3)
 
-statsFromFastQ :: FilePath -> FastQEncoding -> NGLessIO FQStatistics
+statsFromFastQ :: (MonadIO m, MonadError NGError m, MonadBaseControl IO m, MonadThrow m) => FilePath -> FastQEncoding -> m FQStatistics
 statsFromFastQ fp enc = C.runConduitRes $
         conduitPossiblyCompressedFile fp
             .| linesCBounded
