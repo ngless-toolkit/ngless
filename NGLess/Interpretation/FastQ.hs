@@ -122,7 +122,7 @@ executeGroup (NGOList rs) args = do
             [r] -> addName name r
             _ -> do
                 rs' <- getRSOrError `mapM` rs
-                grouped <- groupFiles name rs'
+                grouped <- runNGLess $ groupFiles name rs'
                 return (NGOReadSet name grouped)
     where
         getRSOrError (NGOReadSet _ r) = return r
@@ -131,70 +131,10 @@ executeGroup (NGOList rs) args = do
         addName _  other = throwScriptError . concat $ ["In group call, all arguments should have been NGOReadSet, got ", show other]
 executeGroup other _ = throwScriptError ("Illegal argument to group(): " ++ show other)
 
-groupFiles :: T.Text -> [ReadSet] -> NGLessIO ReadSet
+groupFiles :: T.Text -> [ReadSet] -> NGLess ReadSet
 groupFiles name [] =
     throwDataError ("Attempted to group sample '" ++ T.unpack name ++ "' but sample is empty (no read files).")
-groupFiles name rs = do
-    let encs = map rsEncoding rs
-    unless (allSame encs) $
-        throwDataError "In group call not all input files have the same encoding!"
-    let dims = map dim1 rs
-        dim1 :: ReadSet -> Int
-        dim1 ReadSet1{} = 1
-        dim1 ReadSet2{} = 2
-        dim1 ReadSet3{} = 3
-    if
-        | all (==1) dims -> catFiles1 name rs
-        | all (==2) dims -> catFiles2 name rs
-        -- If it has a single 3 or a mix of 2s & 1s, then it's a 3
-        | otherwise -> catFiles3 name rs
-
-
-catFiles1 name rs@(ReadSet1 enc _:_) = do
-    (newfp, h) <- openNGLTempFile (T.unpack name) "concatenated_" "fq.gz"
-    forM_ rs $ \(ReadSet1 _ fp) ->
-        hCat h fp
-    liftIO (hClose h)
-    return (ReadSet1 enc newfp)
-catFiles1 _ rs = throwShouldNotOccur ("catFiles1 called with args : " ++ show rs)
-
-catFiles2 name rs@(ReadSet2 enc _ _:_) = do
-    (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq.gz"
-    (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq.gz"
-    forM_ rs $ \(ReadSet2 _ fp1 fp2) -> do
-        hCat h1 fp1
-        hCat h2 fp2
-    liftIO (hClose h1)
-    liftIO (hClose h2)
-    return (ReadSet2 enc newfp1 newfp2)
-catFiles2 _ rs = throwShouldNotOccur ("catFiles2 called with args : " ++ show rs)
-
-catFiles3 _ [] = throwShouldNotOccur "catFiles3 called with an empty list"
-catFiles3 name rs@(r:_) = do
-    (newfp1, h1) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.1.fq.gz"
-    (newfp2, h2) <- openNGLTempFile (T.unpack name) "concatenated_" ".paired.2.fq.gz"
-    (newfp3, h3) <- openNGLTempFile (T.unpack name) "concatenated_" ".singles.fq.gz"
-    let enc = rsEncoding r
-    forM_ rs $ \case
-        ReadSet1 _ fp -> hCat h3 fp
-        ReadSet2 _ fp1 fp2 -> do
-            outputListLno' TraceOutput ["Concatenating ", fp1, " # ", fp2]
-            hCat h1 fp1
-            hCat h2 fp2
-        ReadSet3 _ fp1 fp2 fp3 -> do
-            outputListLno' TraceOutput ["Concatenating ", fp1, " # ", fp2, " # ", fp3]
-            hCat h1 fp1
-            hCat h2 fp2
-            hCat h3 fp3
-    liftIO (hClose h1)
-    liftIO (hClose h2)
-    liftIO (hClose h3)
-    return (ReadSet3 enc newfp1 newfp2 newfp3)
-
-hCat h fp = CB.sourceFile fp $$ CB.sinkHandle h
-rsEncoding (ReadSet1 enc _) = enc
-rsEncoding (ReadSet2 enc _ _) = enc
-rsEncoding (ReadSet3 enc _ _ _) = enc
+groupFiles name rs = return $! ReadSet (concatMap pairedSamples rs) (concatMap singleSamples rs)
 
 
 executeFastq :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -202,23 +142,24 @@ executeFastq expr args = do
     enc <- getEncArgument "fastq" args
     qcNeeded <- lookupBoolOrScriptErrorDef (return True) "fastq hidden QC argument" "__perform_qc" args
     case expr of
-        (NGOString fname) -> NGOReadSet fname <$> do
+        (NGOString fname) -> do
             fname' <- optionalSubsample (T.unpack fname)
-            asReadSet1mayQC qcNeeded enc fname'
-        (NGOList fps) -> NGOList <$> sequence [NGOReadSet fname <$> asReadSet1mayQC True enc (T.unpack fname) | NGOString fname <- fps]
+            fq <- asFQFilePathMayQC qcNeeded enc fname'
+            return $ NGOReadSet fname (ReadSet [] [fq])
+        (NGOList fps) -> NGOList <$> sequence [NGOReadSet fname . ReadSet [] . (:[]) <$> asFQFilePathMayQC True enc (T.unpack fname) | NGOString fname <- fps]
         v -> throwScriptError ("fastq function: unexpected first argument: " ++ show v)
 
 
-asReadSet1mayQC :: Bool -- ^ whether to perform QC
+asFQFilePathMayQC :: Bool -- ^ whether to perform QC
                 -> Maybe FastQEncoding -- ^ encoding to use (or autodetect)
                 -> FilePath         -- ^ FastQ file
-                -> NGLessIO ReadSet
-asReadSet1mayQC qc enc fp =  do
+                -> NGLessIO FastQFilePath
+asFQFilePathMayQC qc enc fp =  do
     enc' <- maybe (encodingFor fp) return enc
     when qc $ do
         s <- statsFromFastQ fp enc'
         outputFQStatistics fp s enc'
-    return $! ReadSet1 enc' fp
+    return $! FastQFilePath enc' fp
 
 executePaired :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
@@ -239,11 +180,11 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
                 (performSubsample (T.unpack mate2) h2')
             return (fp1', fp2')
         else return (T.unpack mate1, T.unpack mate2)
-    (ReadSet1 enc1 fp1, ReadSet1 enc2 fp2) <-
+    pair@(FastQFilePath enc1 fp1, FastQFilePath enc2 fp2) <-
         if not qcNeeded
             then (,)
-                 <$> asReadSet1mayQC qcNeeded enc fp1'
-                 <*> asReadSet1mayQC qcNeeded enc fp2'
+                 <$> asFQFilePathMayQC qcNeeded enc fp1'
+                 <*> asFQFilePathMayQC qcNeeded enc fp2'
             else do
                 enc1 <- fromMaybe (encodingFor fp1') (return <$> enc)
                 enc2 <- fromMaybe (encodingFor fp1') (return <$> enc)
@@ -254,20 +195,20 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
                 s2 <- runNGLess es2
                 outputFQStatistics fp1' s1 enc1
                 outputFQStatistics fp2' s2 enc2
-                return $! (ReadSet1 enc1 fp1', ReadSet1 enc2 fp2')
+                return (FastQFilePath enc1 fp1', FastQFilePath enc2 fp2')
     when (enc1 /= enc2) $
         throwDataError ("Mates do not seem to have the same quality encoding! (first mate [" ++ fp1 ++ "] had " ++ show enc1 ++ ", second one [" ++ fp2 ++ "] " ++ show enc2 ++ ").")
     case mate3 of
-        "" -> return (ReadSet2 enc1 fp1 fp2)
+        "" -> return $! ReadSet [pair] []
         f3 -> do
-            (ReadSet1 enc3 fp3) <- optionalSubsample (T.unpack f3) >>= asReadSet1mayQC qcNeeded enc
+            single@(FastQFilePath enc3 fp3) <- optionalSubsample (T.unpack f3) >>= asFQFilePathMayQC qcNeeded enc
             if (enc1 /= enc3)
                 then do
                     is3empty <- checkNoContent fp3 -- this is a special case, but seen in the wild
                     unless is3empty $
                         throwDataError ("Mates do not seem to have the same quality encoding! (paired mates [" ++ fp1 ++ " had " ++ show enc1 ++ ", single one [" ++ fp3 ++ "] " ++ show enc3 ++ ").")
-                    return $! ReadSet2 enc1 fp1 fp2
-            else return $! ReadSet3 enc1 fp1 fp2 fp3
+                    return $! ReadSet [pair] []
+            else return $! ReadSet [pair] [single]
 executePaired expr _ = throwScriptError ("Function paired expects a string, got: " ++ show expr)
 
 getEncArgument fname args =

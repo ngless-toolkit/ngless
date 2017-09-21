@@ -87,6 +87,7 @@ define(`BUILD_MODULES',
     CmdArgs
     Configuration
     Data.FastQ
+    Data.FastQ.Utils
     Data.GFF
     Data.Sam
     Dependencies.Embedded

@@ -11,6 +11,7 @@ import qualified Data.Text as T
 import Control.Monad
 import Data.Default (def)
 
+import Data.FastQ
 import Language
 import FileManagement (removeIfTemporary)
 import FileOrStream
@@ -21,9 +22,10 @@ import NGLess
 executeRemove :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeRemove "__remove" expr [] = do
     let files = case expr of
-            NGOReadSet _ (ReadSet1 _ f) -> [f]
-            NGOReadSet _ (ReadSet2 _ f1 f2) -> [f1, f2]
-            NGOReadSet _ (ReadSet3 _ f1 f2 f3) -> [f1, f2, f3]
+            NGOReadSet _ (ReadSet pairs singles) ->
+                                (fqpathFilePath . fst <$> pairs)
+                                ++ (fqpathFilePath . snd <$> pairs)
+                                ++ (fqpathFilePath <$> singles)
             NGOMappedReadSet _ (File f) _ -> [f]
             NGOCounts (File f) -> [f]
             _ -> []

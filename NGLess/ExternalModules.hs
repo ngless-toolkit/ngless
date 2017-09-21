@@ -31,6 +31,8 @@ import Data.Maybe
 import Data.List (find, isSuffixOf)
 import Data.Default (def)
 
+import Data.FastQ.Utils (concatenateFQs)
+import Data.FastQ
 import NGLess.NGLEnvironment
 import FileManagement
 import Utils.Samtools
@@ -286,9 +288,17 @@ executeCommand basedir cmds funcname input args = do
             _ -> error "NOT IMPLEMENTED"
 
 asfilePaths :: NGLessObject -> Maybe CommandExtra -> NGLessIO  [FilePath]
-asfilePaths (NGOReadSet _ (ReadSet1 _ fp)) _ = return [fp]
-asfilePaths (NGOReadSet _ (ReadSet2 _ fp1 fp2)) _ = return [fp1, fp2]
-asfilePaths (NGOReadSet _ (ReadSet3 _ fp1 fp2 fp3)) _ = return [fp1, fp2, fp3]
+asfilePaths (NGOReadSet _ (ReadSet pairs singles)) _ = do
+    let concatenateFQs' [] = return Nothing
+        concatenateFQs' rs = Just <$> concatenateFQs rs
+    fq1 <- concatenateFQs' (fst <$> pairs)
+    fq2 <- concatenateFQs' (snd <$> pairs)
+    fq3 <- concatenateFQs' singles
+    case (fq1, fq2, fq3) of
+        (Nothing, Nothing, Just f)  -> return [fqpathFilePath f]
+        (Just f1, Just f2, Nothing) -> return [fqpathFilePath f1, fqpathFilePath f2]
+        (Just f1, Just f2, Just f3) -> return [fqpathFilePath f1, fqpathFilePath f2, fqpathFilePath f3]
+        _ -> throwScriptError "Malformed input argument to asfilePaths"
 asfilePaths input@(NGOCounts _) argOptions = (:[]) <$> asCountsFile input argOptions
 asfilePaths (NGOMappedReadSet _ input _) payload = (:[]) <$> do
     filepath <- asFile input
@@ -331,9 +341,7 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
                 Just (FlagInfo flags) -> map T.unpack flags
                 _ -> ["--" ++ T.unpack (argName ai)]
     | argType ai == NGLReadSet = case v of
-        NGOReadSet _ (ReadSet1 _ fq) -> return [fq]
-        NGOReadSet _ (ReadSet2 _ fq1 fq2) -> return [fq1, fq2]
-        NGOReadSet _ (ReadSet3 _ fq1 fq2 fq3) -> return [fq1, fq2, fq3]
+        NGOReadSet{} -> asfilePaths v undefined
         _ -> throwScriptError ("Expected readset for argument in function call, got " ++ show v)
     | otherwise = do
         asStr <- case argType ai of

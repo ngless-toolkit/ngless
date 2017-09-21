@@ -37,10 +37,10 @@ maxTempFileSize = 512*1000*1000 -- 512MB
 
 executeUnique :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeUnique (NGOList e) args = NGOList <$> mapM (`executeUnique` args) e
-executeUnique (NGOReadSet name (ReadSet1 enc fname)) args = do
+executeUnique (NGOReadSet name (ReadSet [] [FastQFilePath enc fname])) args = do
     mc <- fromInteger <$> lookupIntegerOrScriptErrorDef (return 1) "unique argument" "max_copies" args
     newfp <- performUnique fname enc mc
-    return (NGOReadSet name $ ReadSet1 enc newfp)
+    return (NGOReadSet name $ ReadSet [] [FastQFilePath enc newfp])
 executeUnique expr _ = throwShouldNotOccur ("executeUnique: Cannot handle argument " ++ show expr)
 
 performUnique :: FilePath -> FastQEncoding -> Int -> NGLessIO FilePath

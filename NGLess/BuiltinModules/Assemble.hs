@@ -20,6 +20,8 @@ import FileManagement (createTempDir, megahitBin)
 import Modules
 import Output
 import NGLess
+import Data.FastQ
+import Data.FastQ.Utils
 import NGLess.NGLEnvironment
 import Utils.Utils (readProcessErrorWithExitCode)
 
@@ -27,9 +29,18 @@ import Utils.Utils (readProcessErrorWithExitCode)
 executeAssemble :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeAssemble "assemble" expr [] = do
     files <- case expr of
-            NGOReadSet _ (ReadSet1 _ f) -> return ["-r", f]
-            NGOReadSet _ (ReadSet2 _ f1 f2) -> return ["-1", f1, "-2", f2]
-            NGOReadSet _ (ReadSet3 _ f1 f2 f3) -> return ["-1", f1, "-2", f2, "-r", f3]
+            NGOReadSet _ (ReadSet [] singles) -> do
+                FastQFilePath _ f <- concatenateFQs singles
+                return ["-r", f]
+            NGOReadSet _ (ReadSet pairs []) -> do
+                FastQFilePath _ f1 <- concatenateFQs (fst <$> pairs)
+                FastQFilePath _ f2 <- concatenateFQs (snd <$> pairs)
+                return ["-1", f1, "-2", f2]
+            NGOReadSet _ (ReadSet pairs singles) -> do
+                FastQFilePath _ f1 <- concatenateFQs (fst <$> pairs)
+                FastQFilePath _ f2 <- concatenateFQs (snd <$> pairs)
+                FastQFilePath _ f3 <- concatenateFQs singles
+                return ["-1", f1, "-2", f2, "-r", f3]
             _ -> throwScriptError ("megahit:assemble first argument should have been readset, got '"++show expr++"'")
     megahitPath <- megahitBin
     keepTempFiles <- nConfKeepTemporaryFiles <$> nglConfiguration

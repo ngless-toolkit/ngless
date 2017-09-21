@@ -68,21 +68,21 @@ samToFastQ fpsam stream = do
     case (hasPaired', hasSingle') of
         (True, True) -> do
             enc <- encodingFor oname1
-            return $! ReadSet3 enc oname1 oname2 oname3
+            return $! ReadSet [(FastQFilePath enc oname1,FastQFilePath enc oname2)] [FastQFilePath enc oname3]
         (False, True) -> do
             release rk1
             release rk2
             enc <- encodingFor oname3
-            return $! ReadSet1 enc oname3
+            return $! ReadSet [] [FastQFilePath enc oname3]
         (True, False) -> do
             release rk3
             enc <- encodingFor oname1
-            return $! ReadSet2 enc oname1 oname2
+            return $! ReadSet [(FastQFilePath enc oname1,FastQFilePath enc oname2)] []
         (False, False) -> do
             -- the input is empty
             release rk3
             outputListLno' WarningOutput ["as_reads returning an empty read set"]
-            return $! ReadSet2 SangerEncoding oname1 oname2
+            return $! ReadSet [(FastQFilePath SangerEncoding oname1,FastQFilePath SangerEncoding oname2)] []
 
 
 asFQ :: [SamLine] -> Either B.ByteString (B.ByteString,B.ByteString)

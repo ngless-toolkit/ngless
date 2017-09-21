@@ -85,11 +85,10 @@ data NGLType =
         | NGList !NGLType
     deriving (Eq, Ord, Show)
 
-data ReadSet =
-        ReadSet1 FastQEncoding FilePath -- ^ encoding file_on_disk
-        | ReadSet2 FastQEncoding FilePath FilePath -- ^ encoding file_on_disk
-        | ReadSet3 FastQEncoding FilePath FilePath FilePath-- ^ encoding file_on_disk
-        deriving (Eq, Show, Ord)
+data ReadSet = ReadSet
+                { pairedSamples :: [(FastQFilePath, FastQFilePath)]
+                , singleSamples :: [FastQFilePath]
+                } deriving (Eq, Show, Ord)
 
 data NGLessObject =
         NGOString !T.Text

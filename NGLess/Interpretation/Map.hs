@@ -20,9 +20,9 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Internal as C
-import           Data.Conduit (($$), (=$=))
+import           Data.Conduit (($$), (=$=), (.|))
 import           Control.Monad.Extra (unlessM)
-import           Data.List (isInfixOf)
+import           Data.List (isInfixOf, foldl')
 import qualified Data.String.Utils as S
 
 
@@ -41,6 +41,7 @@ import qualified StandardModules.Mappers.Bwa as Bwa
 import qualified StandardModules.Mappers.Soap as Soap
 
 import Data.Sam
+import Data.FastQ
 import Utils.Utils
 import FileOrStream
 import Utils.Conduit
@@ -103,32 +104,32 @@ lookupReference args = do
 
 
 mapToReference :: Mapper -> FilePath -> ReadSet -> [String] -> NGLessIO (FilePath, (Int, Int, Int))
-mapToReference mapper refIndex (ReadSet3 _ fp1 fp2 fp3) extraArgs = do
-    (out, hout) <- openNGLTempFile refIndex "mapped_concat_" ".sam"
+mapToReference mapper refIndex (ReadSet pairs singletons) extraArgs = do
+    (newfp, hout) <- openNGLTempFile refIndex "mapped_" ".sam"
     let out1 = CB.sinkHandle hout
         out2 :: C.Sink B.ByteString IO ()
         out2 = CB.lines
-                =$= CL.filter (\line -> not (B.null line) &&  B8.head line /= '@')
-                =$= C.unlinesAscii
-                =$= CB.sinkHandle hout
-    (t0,a0,u0) <- runNGLess =<< callMapper mapper refIndex [fp1, fp2] extraArgs (zipToStats out1)
-    (t1,a1,u1) <- runNGLess =<< callMapper mapper refIndex [fp3] extraArgs (zipToStats out2)
-
+                .| CL.filter (\line -> not (B.null line) &&  B8.head line /= '@')
+                .| C.unlinesAscii
+                .| CB.sinkHandle hout
+    statsp <- forM (zip pairs (out1:repeat out2)) $ \((FastQFilePath _ fp1, FastQFilePath _ fp2), out) ->
+                callMapper mapper refIndex [fp1, fp2] extraArgs (zipToStats out)
+    let outs = if null statsp
+                    then out1:repeat out2
+                    else repeat out2
+    statss <- forM (zip singletons outs) $ \(FastQFilePath _ fp, out) ->
+                callMapper mapper refIndex [fp] extraArgs (zipToStats out)
     liftIO $ hClose hout
-    return (out, (t0+t1,a0+a1, u0+u1))
-
-mapToReference mapper refIndex refs extraArgs = do
-    (newfp, hout) <- openNGLTempFile refIndex "mapped_" ".sam"
-    outputListLno' DebugOutput ["Write .sam file to: ", newfp]
-    let fps = case refs of
-            ReadSet1 _ fp -> [fp]
-            ReadSet2 _ fp1 fp2 -> [fp1, fp2]
-            _ -> error "This case should never happen: mapToReference"
-    stats <- runNGLess =<< callMapper mapper refIndex fps extraArgs (zipToStats (C.sinkHandle hout))
-    liftIO $ hClose hout
-    return (newfp, stats)
+    (newfp,) <$> combinestats statsp statss
 zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesC =$= samStatsC))
 
+combinestats first second = do
+        first' <- runNGLess $ sequence first
+        second' <- runNGLess $ sequence second
+        return $ foldl' add3 (0,0,0) (first' ++ second')
+    where
+        add3 :: (Int, Int, Int) -> (Int, Int, Int) -> (Int, Int, Int)
+        add3 (!a,!b,!c) (!a',!b',!c') = (a + a', b + b', c + c')
 
 expandReferenceSearchPath :: FilePath -> NGLessIO FilePath
 expandReferenceSearchPath fa

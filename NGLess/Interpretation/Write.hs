@@ -14,14 +14,16 @@ import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
+import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Combinators as C
-import           Data.Conduit ((=$=), runConduit, ($$))
+import           Data.Conduit ((=$=), runConduit, ($$), (.|))
 import           System.Directory (copyFile)
 import           System.IO (hClose)
 import Data.String.Utils
 import Data.List (isInfixOf)
 
+import Data.FastQ
 import Language
 import Configuration
 import FileOrStream
@@ -105,23 +107,40 @@ executeWrite (NGOList el) args = do
 executeWrite (NGOReadSet _ rs) args = do
     ofile <- getOFile args
     canMove <- lookupBoolOrScriptErrorDef (return False) "internal write arg" "__can_move" args
+    let moveOrCopyCompressFQs :: Bool -> [FastQFilePath] -> FilePath -> NGLessIO ()
+        moveOrCopyCompressFQs _ [] _ = return ()
+        moveOrCopyCompressFQs canMove [FastQFilePath _ f] ofile = moveOrCopyCompress canMove f ofile
+        moveOrCopyCompressFQs _ multiple ofile = do
+            concat <- concatenate (extractFile <$> multiple)
+            moveOrCopyCompress True concat ofile
+        extractFile (FastQFilePath _ f) = f
+        concatenate inputs@(fp:_) = do
+            (fp,h) <- openNGLTempFile fp "concat" "tmp"
+            let sourceAll [] = return ()
+                sourceAll (f:fs) = C.sourceFile f >> sourceAll fs
+            C.runConduit $
+                (sourceAll inputs .| C.sinkHandle h)
+            liftIO $ hClose h
+            return fp
+
+
     case rs of
-        ReadSet1 _ r -> do
-            moveOrCopyCompress canMove r ofile
+        ReadSet [] singles -> do
+            moveOrCopyCompressFQs canMove singles ofile
             return NGOVoid
-        ReadSet2 _ r1 r2 -> do
+        ReadSet pairs [] -> do
             fname1 <- _formatFQOname ofile "pair.1"
             fname2 <- _formatFQOname ofile "pair.2"
-            moveOrCopyCompress canMove r1 fname1
-            moveOrCopyCompress canMove r2 fname2
+            moveOrCopyCompressFQs canMove (fst <$> pairs) fname1
+            moveOrCopyCompressFQs canMove (snd <$> pairs) fname2
             return NGOVoid
-        ReadSet3 _ r1 r2 r3 -> do
+        ReadSet pairs singletons -> do
             fname1 <- _formatFQOname ofile "pair.1"
             fname2 <- _formatFQOname ofile "pair.2"
             fname3 <- _formatFQOname ofile "singles"
-            moveOrCopyCompress canMove r1 fname1
-            moveOrCopyCompress canMove r2 fname2
-            moveOrCopyCompress canMove r3 fname3
+            moveOrCopyCompressFQs canMove (fst <$> pairs) fname1
+            moveOrCopyCompressFQs canMove (snd <$> pairs) fname2
+            moveOrCopyCompressFQs canMove singletons fname3
             return NGOVoid
 executeWrite el@(NGOMappedReadSet _ iout  _) args = do
     fp <- asFile iout

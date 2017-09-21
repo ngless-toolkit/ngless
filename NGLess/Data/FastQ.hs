@@ -3,6 +3,7 @@
 module Data.FastQ
     ( ShortRead(..)
     , FastQEncoding(..)
+    , FastQFilePath(..)
     , FQStatistics(..)
     , srSlice
     , srLength
@@ -65,6 +66,11 @@ instance NFData ShortRead where
     rnf ShortRead{} = ()
 
 data FastQEncoding = SangerEncoding | SolexaEncoding deriving (Eq, Bounded, Enum, Show, Ord)
+
+data FastQFilePath = FastQFilePath
+                        { fqpathEncoding :: !FastQEncoding -- ^ encoding
+                        , fqpathFilePath :: FilePath -- ^ file_on_disk
+                        } deriving (Eq, Show, Ord)
 
 data FQStatistics = FQStatistics
                 { bpCounts :: (Int, Int, Int, Int) -- ^ number of (A, C, T, G)
