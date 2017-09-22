@@ -157,7 +157,7 @@ rewritePreprocess v ((lno,expr):rest) = case expr of
 
 fastQVar :: Expression -> Maybe (T.Text, Variable)
 fastQVar (Assignment v (FunctionCall (FuncName fname) _ _ _))
-        | fname `elem` ["fastq", "paired", "mocat_load_sample"] = Just (fname, v)
+        | fname `elem` ["fastq", "paired", "load_mocat_sample"] = Just (fname, v)
 fastQVar _ = Nothing
 
 -- The rule is: we can perform the transform if the first usage of the Variable

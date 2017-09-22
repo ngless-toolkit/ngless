@@ -64,7 +64,7 @@ mocatSamplePaired fqfiles encoding doQC = do
         let singlesArgs
                 | singles `elem` fqfiles = (Variable "singles", encodeStr singles):passthru
                 | otherwise = passthru
-        outputListLno' DebugOutput ["mocat_load_sample found ", m1, " # ", m2, if singles `elem` fqfiles then " # " ++ singles else ""]
+        outputListLno' DebugOutput ["load_mocat_sample found ", m1, " # ", m2, if singles `elem` fqfiles then " # " ++ singles else ""]
         let expr = FunctionCall (FuncName "paired") (encodeStr m1) ((Variable "second", encodeStr m2):singlesArgs) Nothing
             used = [m1, m2, singles]
         return (expr, used)
@@ -77,13 +77,13 @@ executeLoad :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeLoad (NGOString samplename) kwargs = NGOExpression <$> do
     qcNeeded <- lookupBoolOrScriptErrorDef (return True) "hidden QC argument" "__perform_qc" kwargs
     encoding <- lookupSymbolOrScriptErrorDef (return "auto") "encoding passthru argument" "encoding" kwargs
-    outputListLno' TraceOutput ["Executing mocat_load_sample transform"]
+    outputListLno' TraceOutput ["Executing load_mocat_sample transform"]
     let basedir = T.unpack samplename
     fqfiles <- fmap (sort . concat) $ forM exts $ \pat ->
         liftIO $ namesMatching (basedir </> ("*." ++ pat))
     args <- mocatSamplePaired fqfiles encoding qcNeeded
     return (FunctionCall (FuncName "group") (ListExpression args) [(Variable "name", ConstStr samplename)] Nothing)
-executeLoad _ _ = throwShouldNotOccur "mocat_load_sample got the wrong arguments."
+executeLoad _ _ = throwShouldNotOccur "load_mocat_sample got the wrong arguments."
 
 executeParseCoord :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeParseCoord (NGOString coordfp) _ = do
