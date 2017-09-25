@@ -288,11 +288,11 @@ executeCommand basedir cmds funcname input args = do
             _ -> error "NOT IMPLEMENTED"
 
 asfilePaths :: NGLessObject -> Maybe CommandExtra -> NGLessIO  [FilePath]
-asfilePaths (NGOReadSet _ (ReadSet pairs singles)) _ = do
+asfilePaths (NGOReadSet _ (ReadSet paired singles)) _ = do
     let concatenateFQs' [] = return Nothing
         concatenateFQs' rs = Just <$> concatenateFQs rs
-    fq1 <- concatenateFQs' (fst <$> pairs)
-    fq2 <- concatenateFQs' (snd <$> pairs)
+    fq1 <- concatenateFQs' (fst <$> paired)
+    fq2 <- concatenateFQs' (snd <$> paired)
     fq3 <- concatenateFQs' singles
     case (fq1, fq2, fq3) of
         (Nothing, Nothing, Just f)  -> return [fqpathFilePath f]

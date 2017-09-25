@@ -25,7 +25,6 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Char8 as B8
 
 import qualified Data.Conduit as C
-import qualified Data.Conduit.List as CL
 import           Data.Conduit ((=$=), ($$))
 import           Control.Monad.State.Strict (execState, modify')
 import           Data.Convertible (convert)

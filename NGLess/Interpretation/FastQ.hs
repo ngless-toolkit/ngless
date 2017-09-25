@@ -35,7 +35,6 @@ import Configuration
 import Language
 import Output
 import Utils.Conduit
-import Utils.Utils
 import NGLess
 import NGLess.NGLEnvironment
 
@@ -132,9 +131,9 @@ executeGroup (NGOList rs) args = do
 executeGroup other _ = throwScriptError ("Illegal argument to group(): " ++ show other)
 
 groupFiles :: T.Text -> [ReadSet] -> NGLess ReadSet
-groupFiles name [] =
-    throwDataError ("Attempted to group sample '" ++ T.unpack name ++ "' but sample is empty (no read files).")
-groupFiles name rs = return $! ReadSet (concatMap pairedSamples rs) (concatMap singleSamples rs)
+groupFiles context [] =
+    throwDataError ("Attempted to group sample '" ++ T.unpack context ++ "' but sample is empty (no read files).")
+groupFiles _ rs = return $! ReadSet (concatMap pairedSamples rs) (concatMap singleSamples rs)
 
 
 executeFastq :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
