@@ -23,4 +23,4 @@ ngless-partials/
 NGLess/Dependencies/bwa_data.c
 NGLess/Dependencies/samtools_data.c
 NGLess/Dependencies/megahit_data.c
-/NGLess.cabal
+NGLess.cabal

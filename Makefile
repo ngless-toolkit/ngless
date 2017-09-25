@@ -79,32 +79,29 @@ reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
 
 all: ngless
 
-NGLess.cabal: NGLess.cabal.m4
-	m4 $< > $@
-
-ngless: NGLess.cabal
+ngless:
 	stack build $(STACKOPTS)
 
 modules:
 	cd Modules && $(MAKE)
 
-static: NGLess.cabal $(NGLESS_EMBEDDED_TARGET)
+static: $(NGLESS_EMBEDDED_TARGET)
 	stack build $(STACKOPTS) --ghc-options='-fPIC' --force-dirty --flag NGLess:embed
 
-fast: NGLess.cabal
+fast:
 	stack build $(STACKOPTS) --ghc-options=-O0
 
 dist: ngless-${VERSION}.tar.gz
 
-check: NGLess.cabal
+check:
 	stack test $(STACKOPTS)
 
-fastcheck: NGLess.cabal
+fastcheck:
 	stack test $(STACKOPTS) --ghc-options=-O0
 # Synonym
 tests: check
 
-bench: NGLess.cabal
+bench:
 	stack bench $(STACKOPTS)
 
 profile:

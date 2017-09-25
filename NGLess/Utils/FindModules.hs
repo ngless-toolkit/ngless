@@ -21,7 +21,7 @@ listKnownModules = do
     -- Go up the directory stack until you find "NGLess.cabal.m4"
     cwd <- getCurrentDirectory
     let parents = fmap joinPath . tails $ splitDirectories cwd
-    Just startpoint <- findM (doesFileExist . (</> "NGLess.cabal.m4")) parents
+    Just startpoint <- findM (doesFileExist . (</> "stack.yaml")) parents
     mapMaybe asModName <$> listDirectory (startpoint </> "Modules")
 
 
