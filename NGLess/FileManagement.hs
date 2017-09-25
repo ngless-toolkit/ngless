@@ -31,6 +31,7 @@ import Output
 import System.Directory
 import System.IO
 import System.IO.Error
+import System.IO.SafeWrite (withOutputFile)
 import Control.Exception
 import System.Environment (getExecutablePath, lookupEnv)
 import Control.Monad.Trans.Resource
@@ -158,8 +159,9 @@ createMegahitBin = do
     destdir <- binPath User
     when (B.null megahitData') $
         throwSystemError "Cannot find megahit on the system and this is a build without embedded dependencies."
+    liftIO $ createDirectoryIfMissing True destdir
     withLockFile LockParameters
-                { lockFname = destdir ++ ".megahit-expand"
+                { lockFname = destdir ++ "lock.megahit-expand"
                 , maxAge = 300
                 , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
                } $ do
@@ -230,10 +232,14 @@ writeBin fname bindata = do
     bindata' <- liftIO bindata
     when (B.null bindata') $
         throwSystemError ("Cannot find " ++ fname ++ " on the system and this is a build without embedded dependencies.")
-    liftIO $ do
-        createDirectoryIfMissing True userBinPath
-        let fname' = userBinPath </> fname
-        B.writeFile fname' bindata'
+    liftIO $ createDirectoryIfMissing True userBinPath
+    let fname' = userBinPath </> fname
+    withLockFile LockParameters
+                    { lockFname = fname' ++ ".expand.lock"
+                    , maxAge = 300
+                    , whenExistsStrategy = IfLockedRetry { nrLockRetries = 60, timeBetweenRetries = 60 }
+                    } $ liftIO $ do
+        withOutputFile fname' (flip B.hPut bindata')
         p <- getPermissions fname'
         setPermissions fname' (setOwnerExecutable True p)
         return fname'
