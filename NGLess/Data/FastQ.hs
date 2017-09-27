@@ -130,14 +130,12 @@ fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, 
 --
 -- Throws DataError if the stream is not in valid FastQ format
 fqDecodeC :: (MonadError NGError m) => FastQEncoding -> C.Conduit ByteLine m ShortRead
-fqDecodeC enc = awaitJust $ \(ByteLine rid) ->
+fqDecodeC enc = C.awaitForever $ \(ByteLine rid) ->
         lineOrError4 $ \rseq ->
             lineOrError4 $ \_ ->
                 lineOrError4 $ \rqs->
                     if B.length rseq == B.length rqs
-                        then do
-                            C.yield $! ShortRead rid rseq (vSub rqs offset)
-                            fqDecodeC enc
+                        then C.yield $! ShortRead rid rseq (vSub rqs offset)
                         else throwDataError "Length of quality line is not the same as sequence"
     where
         offset :: Int8
