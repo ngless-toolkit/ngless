@@ -14,6 +14,7 @@ module NGLess
     , symbolOrTypeError
     , stringOrTypeError
     , integerOrTypeError
+    , decodeSymbolOrError
     , lookupBoolOrScriptError
     , lookupBoolOrScriptErrorDef
     , lookupStringOrScriptError
@@ -34,6 +35,7 @@ import           Control.Monad.Except
 
 import Language
 import NGLess.NGError
+import Utils.Suggestion
 
 type KwArgsValues = [(T.Text, NGLessObject)]
 
@@ -107,6 +109,15 @@ lookupSymbolListOrScriptErrorDef defval context name args = case lookup name arg
 
 lookupSymbolListOrScriptError :: (MonadError NGError m) => String -> T.Text -> KwArgsValues -> m [T.Text]
 lookupSymbolListOrScriptError = requiredLookup lookupSymbolListOrScriptErrorDef
+
+decodeSymbolOrError :: (MonadError NGError m) => String-> [(T.Text, a)] -> T.Text -> m a
+decodeSymbolOrError context allowed used = case lookup used allowed of
+    Just v -> return v
+    Nothing -> throwScriptError ("Invalid symbol value in context "
+                                            ++context++".\n"
+                                            ++T.unpack (suggestionMessage used (fst <$> allowed))
+                                            ++"\nValid values are:"
+                                            ++concat [("\n\t - "++T.unpack val) | (val,_) <- allowed])
 
 
 requiredLookup :: (MonadError NGError m) => (m a -> String-> T.Text -> KwArgsValues -> m a) -> String-> T.Text -> KwArgsValues -> m a

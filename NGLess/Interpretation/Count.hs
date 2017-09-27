@@ -204,12 +204,6 @@ annSize (SeqNameAnnotator (Just ix)) = V.length ix + 1
 annSize (GeneMapAnnotator _ ix) = V.length ix + 1
 annSize ann = length (annEnumerate ann)
 
-methodFor "1overN" = return MM1OverN
-methodFor "dist1" = return MMDist1
-methodFor "all1" = return MMCountAll
-methodFor "unique_only" = return MMUniqueOnly
-methodFor other = throwShouldNotOccur ("Unexpected multiple method " ++ T.unpack other)
-
 
 {- We define the type AnnotationIntersectionMode mainly to facilitate tests,
  - which depend on being able to write code such as
@@ -219,10 +213,6 @@ methodFor other = throwShouldNotOccur ("Unexpected multiple method " ++ T.unpack
 data AnnotationIntersectionMode = IntersectUnion | IntersectStrict | IntersectNonEmpty
     deriving (Eq, Show)
 
-annotationRuleFor "union" = return IntersectUnion
-annotationRuleFor "intersection_strict" = return IntersectUnion
-annotationRuleFor "intersection_non_empty" = return IntersectNonEmpty
-annotationRuleFor m = throwScriptError (concat ["Unexpected annotation mode (", show m, ")."])
 
 annotationRule :: AnnotationIntersectionMode -> AnnotationRule
 annotationRule IntersectUnion = union
@@ -238,25 +228,33 @@ executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
 executeCount (NGOMappedReadSet rname istream refinfo) args = do
     minCount <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
-    method <- methodFor =<< lookupSymbolOrScriptErrorDef (return "dist1")
+    method <- decodeSymbolOrError "multiple argument in count() function"
+                    [("1overN", MM1OverN)
+                    ,("dist1", MMDist1)
+                    ,("all1", MMCountAll)
+                    ,("unique_only", MMUniqueOnly)
+                    ] =<< lookupSymbolOrScriptErrorDef (return "dist1")
                                     "multiple argument to count " "multiple" args
     strand_specific <- lookupBoolOrScriptErrorDef (return False) "count function" "strand" args
     include_minus1 <- lookupBoolOrScriptErrorDef (return False) "count function" "include_minus1" args
     mocatMap <- lookupFilePath "functional_map argument to count()" "functional_map" args
     gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
     discardZeros <- lookupBoolOrScriptErrorDef (return False) "count argument parsing" "discard_zeros" args
-    m <- (liftM annotationRule . annotationRuleFor) =<< lookupSymbolOrScriptErrorDef (return "union") "mode argument to count" "mode" args
+    m <- liftM annotationRule $ decodeSymbolOrError "mode argument to count"
+                    [("union", IntersectUnion)
+                    ,("intersection_strict", IntersectUnion)
+                    ,("intersection_non_empty", IntersectNonEmpty)
+                    ] =<< lookupSymbolOrScriptErrorDef (return "union") "mode argument to count" "mode" args
     delim <- T.encodeUtf8 <$> lookupStringOrScriptErrorDef (return "\t") "count hidden argument (should always be valid)" "__delim" args
     when ("norm" `elem` (fst <$> args) && "normalization" `elem` (fst <$> args)) $
         outputListLno' WarningOutput ["In count() function: both `norm` and `normalization` used. `norm` is semi-deprecated and will be ignored in favor of `normalization`"]
     normSize <- lookupBoolOrScriptErrorDef (return False) "count function" "norm" args
-    normalization <- lookupSymbolOrScriptErrorDef (return $! if normSize then "normed" else "raw") "count function" "normalization" args
-    normMode <- case normalization of
-            "raw" -> return NMRaw
-            "normed" -> return NMNormed
-            "scaled" -> return NMScaled
-            "fpkm" -> return NMFpkm
-            other -> throwShouldNotOccur ("Illegal symbol value for normalization: " ++ show other)
+    normMode <- decodeSymbolOrError "normalization option"
+                        [("raw", NMRaw)
+                        ,("normed", NMNormed)
+                        ,("scaled", NMScaled)
+                        ,("fpkm", NMFpkm)] =<< lookupSymbolOrScriptErrorDef
+                                                    (return $! if normSize then "normed" else "raw") "count function" "normalization" args
     fs <- case lookup "features" args of
         Nothing -> return ["gene"]
         Just (NGOSymbol f) -> return [f]
