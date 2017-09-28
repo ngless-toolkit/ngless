@@ -41,7 +41,7 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit ((.|), (=$), (=$=), ($$+), ($$+-))
+import           Data.Conduit ((.|), (=$=), ($$+), ($$+-))
 import qualified Data.Strict.Tuple as TU
 import           Data.Strict.Tuple (Pair(..))
 
@@ -534,16 +534,22 @@ loadFunctionalMap :: FilePath -> [B.ByteString] -> NGLessIO [Annotator]
 loadFunctionalMap fname [] = throwScriptError ("Loading annotation file '"++fname++"' but no features requested. This is probably a bug.")
 loadFunctionalMap fname columns = do
         outputListLno' InfoOutput ["Loading map file ", fname]
-        (resume, [headers]) <- (CB.sourceFile fname =$ CB.lines =$= enumerate)
-                $$+ (CL.isolate 1 =$= CL.map (B8.split '\t' . snd) =$ CL.consume)
-        cis <- runNGLess $ lookUpColumns headers
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
-        anns <- map finishFunctionalMap <$> (resume
-                $$+- C.conduitVector 8192
-                =$= asyncMapEitherC mapthreads (V.mapM (selectColumns cis)) -- after this we have vectors of (<gene name>, [<feature-name>])
-                =$ sequenceSinks
-                    [CL.fold (V.foldl' (inserts1 c)) (LoadFunctionalMapState 0 M.empty M.empty) | c <- [0 .. length cis - 1]])
+        anns <- C.runConduit $
+                    CB.sourceFile fname
+                    .| CB.lines
+                    .| enumerate
+                    .| (do
+                        hline <- CL.head
+                        cis <- case hline of
+                            Nothing -> throwDataError ("Empty map file: "++fname)
+                            Just (_, header) -> let headers = B8.split '\t' header
+                                                    in runNGLess $ lookUpColumns headers
+                        C.conduitVector 8192
+                            .| asyncMapEitherC mapthreads (V.mapM (selectColumns cis)) -- after this we have vectors of (<gene name>, [<feature-name>])
+                            .| sequenceSinks
+                                [finishFunctionalMap <$> CL.fold (V.foldl' (inserts1 c)) (LoadFunctionalMapState 0 M.empty M.empty) | c <- [0 .. length cis - 1]])
         outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
         return anns
     where
