@@ -244,15 +244,15 @@ modeExec opts@DefaultMode{} = do
         when (validateOnly opts) $ do
             outputListLno' InfoOutput ["Script OK."]
             liftIO exitSuccess
-        whenJust (exportJSON opts) $ \jsoname -> liftIO $ do
-            writeScriptJSON jsoname sc
-            exitSuccess
         outputListLno' TraceOutput ["Transforming script..."]
         when (debug_mode opts == "transform") $
             liftIO (print sc)
         transformed <- transform modules sc
         when (debug_mode opts == "transform") $
             liftIO (print transformed)
+        whenJust (exportJSON opts) $ \jsoname -> liftIO $ do
+            writeScriptJSON jsoname sc transformed
+            exitSuccess
         outputListLno' InfoOutput ["Script OK. Starting interpretation..."]
         interpret modules (nglBody transformed)
         triggerHook FinishOkHook

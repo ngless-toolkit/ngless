@@ -87,10 +87,11 @@ encodeUOp UOpNot = "not"
 encodeMaybeType Nothing = Null
 encodeMaybeType (Just t) = toJSON $ show t
 
-writeScriptJSON :: FilePath -> Script -> IO ()
-writeScriptJSON fname sc =
+writeScriptJSON :: FilePath -> Script -> Script -> IO ()
+writeScriptJSON fname osc tsc =
     withOutputFile fname $ \hout ->
         BL.hPutStr hout $ encode $ object
-                [ "header" .= toJSON (EncHeader <$> nglHeader sc)
-                , "script" .= toJSON (second EncExpression <$> nglBody sc)
+                [ "header" .= toJSON (EncHeader <$> nglHeader osc)
+                , "original-script" .= toJSON (second EncExpression <$> nglBody osc)
+                , "transformed-script" .= toJSON (second EncExpression <$> nglBody tsc)
                 ]
