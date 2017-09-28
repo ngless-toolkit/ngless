@@ -359,6 +359,8 @@ Arguments by value:
 +-------------------+-----------------+------------+----------------+
 | features          | [ String ]      | no         | 'gene'         |
 +-------------------+-----------------+------------+----------------+
+| subfeatures       | [ String ]      | no         | -              |
++-------------------+-----------------+------------+----------------+
 | mode              | Symbol          | no         | {union}        |
 +-------------------+-----------------+------------+----------------+
 | multiple          | Symbol          | no         | {dist1}        |
@@ -382,7 +384,12 @@ passed using the ``gff_file`` or ``functional_map`` arguments. If you had
 previously used a ``reference`` argument for the ``map()`` function, then
 you can also leave this argument empty and ngless will do the right thing.
 
-``features``: which features to count.
+``features``: which features to count. If a GFF file is used, this refers to
+the "features" field.
+
+``subfeatures``: this is useful in GFF-mode as the same feature can encode
+multiple attributes (or, in NGLess parlance, "subfeatures"). By default, NGLess
+will look for the ``"ID"`` or ``"gene_id"`` attributes.
 
 ``mode`` indicates how to handle reads that partially overlap a features.
 Possible values for ``mode`` are ``{union}``, ``{intersection-strict}``, and

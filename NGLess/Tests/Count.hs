@@ -60,6 +60,7 @@ listNub = S.toList . S.fromList
 defCountOpts =
     CountOpts
     { optFeatures = []
+    , optSubFeatures = Nothing
     , optIntersectMode = annotationRule IntersectUnion
     , optStrandSpecific = False
     , optMinCount = 0.0

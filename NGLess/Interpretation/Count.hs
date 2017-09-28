@@ -52,6 +52,7 @@ import Data.List                (foldl1', foldl', sort)
 import GHC.Conc                 (getNumCapabilities)
 import Control.DeepSeq          (NFData(..))
 import Control.Error            (note)
+import Control.Applicative      ((<|>))
 import Data.Maybe
 
 import System.IO                (hClose)
@@ -89,12 +90,14 @@ toShortest = B8.pack . show
  - The main function is performCount which loops over mapped read groups
  -. annotating them with an Annotator.
  -}
+
 -- GFFAnnotationMap maps from `References` (e.g., chromosomes) to positions to (strand/feature-id)
 type AnnotationInfo = Pair GffStrand Int
 type GffIMMap = IM.IntervalMap Int [AnnotationInfo]
 type GFFAnnotationMap = M.Map B.ByteString GffIMMap
 type AnnotationRule = GffIMMap -> GffStrand -> (Int, Int) -> [AnnotationInfo]
 
+-- This implements MOCAT-style "gene name" -> "feature" annotation
 type GeneMapAnnotation = M.Map B8.ByteString [Int]
 
 type FeatureSizeMap = M.Map B.ByteString Double
@@ -112,6 +115,7 @@ minDouble = (2.0 :: Double) ^^ fst (floatRange (1.0 :: Double))
 data CountOpts =
     CountOpts
     { optFeatures :: [B.ByteString] -- ^ list of features to condider
+    , optSubFeatures :: Maybe [B.ByteString] -- ^ list of sub-features to condider
     , optIntersectMode :: AnnotationRule
     , optStrandSpecific :: !Bool
     , optMinCount :: !Double
@@ -183,12 +187,11 @@ annSizeOf :: Annotator -> B.ByteString -> Either NGError Double
 annSizeOf _ "-1" = return 0.0
 annSizeOf (SeqNameAnnotator Nothing) _ = throwShouldNotOccur "Using unloaded annotator"
 annSizeOf (SeqNameAnnotator (Just ix)) name = annSizeOfInRSVector name ix
-annSizeOf (GFFAnnotator _ _ szmap) name = annSizeOf' name szmap
-annSizeOf (GeneMapAnnotator _ ix) name = annSizeOfInRSVector name ix
-annSizeOfInRSVector name ix = rsiSize <$> note (NGError DataError $ "Could not find size of item ["++B8.unpack name++"]") (binaryFindBy compareShortLong ix name)
-annSizeOf' name ix = case M.lookup name ix of
+annSizeOf (GFFAnnotator _ _ szmap) name = case M.lookup name szmap of
     Just s -> return s
     Nothing -> throwShouldNotOccur ("Header does not exist in sizes: "++show name)
+annSizeOf (GeneMapAnnotator _ ix) name = annSizeOfInRSVector name ix
+annSizeOfInRSVector name ix = rsiSize <$> note (NGError DataError $ "Could not find size of item ["++B8.unpack name++"]") (binaryFindBy compareShortLong ix name)
 
 
 annEnumerate :: Annotator -> [(B.ByteString, Int)]
@@ -257,12 +260,18 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
                                                     (return $! if normSize then "normed" else "raw") "count function" "normalization" args
     fs <- case lookup "features" args of
         Nothing -> return ["gene"]
-        Just (NGOSymbol f) -> return [f]
+        Just (NGOString f) -> return [f]
         Just (NGOList feats') -> mapM (stringOrTypeError "count features argument") feats'
+        _ -> throwShouldNotOccur "executeAnnotation: TYPE ERROR"
+    subfeatures <- case lookup "subfeatures" args of
+        Nothing -> return Nothing
+        Just (NGOString sf) -> return $ Just [sf]
+        Just (NGOList subfeats') -> Just <$> mapM (stringOrTypeError "count subfeatures argument") subfeats'
         _ -> throwShouldNotOccur "executeAnnotation: TYPE ERROR"
     samfp <- asFile istream
     let opts = CountOpts
             { optFeatures = map (B8.pack . T.unpack) fs
+            , optSubFeatures = map (B8.pack . T.unpack) <$> subfeatures
             , optIntersectMode = m
             , optStrandSpecific = strand_specific
             , optMinCount = if discardZeros
@@ -285,7 +294,10 @@ loadAnnotator (AnnotateGFF gf) opts = loadGFF gf opts
 loadAnnotator (AnnotateFunctionalMap mm) opts = loadFunctionalMap mm (optFeatures opts)
 
 
-performCount1Pass :: MMMethod -> VUM.IOVector Double -> C.Sink (VU.Vector Int, IG.IntGroups) NGLessIO [IG.IntGroups]
+-- First pass over the data
+performCount1Pass :: MMMethod
+                        -> VUM.IOVector Double -- ^ counts vector. Will be modified
+                        -> C.Sink (VU.Vector Int, IG.IntGroups) NGLessIO [IG.IntGroups]
 performCount1Pass MMUniqueOnly mcounts = do
     C.awaitForever $ \(singles, _) -> liftIO (incrementAll mcounts singles)
     return []
@@ -629,12 +641,21 @@ loadGFF gffFp opts = do
                     .| linesC
                     .| readAnnotationOrDie
                     .| sequenceSinks
-                        [CL.fold (insertg f) (0, M.empty, M.empty, M.empty) | f <- optFeatures opts]
+                        [CL.fold (insertg f sf) (0, M.empty, M.empty, M.empty)
+                                    |  f <- optFeatures    opts
+                                    , sf <- case optSubFeatures opts of
+                                                Nothing -> [Nothing]
+                                                Just fs -> Just <$> fs]
 
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "' complete."]
         return $! map finishGffAnnotator partials
     where
-        singleFeature = length (optFeatures opts) == 1
+        singleFeature
+            | length (optFeatures opts) > 1 = False
+            | otherwise = case optSubFeatures opts of
+                Nothing -> True
+                Just [_] -> True
+                _ -> False
         readAnnotationOrDie :: C.Conduit ByteLine NGLessIO GffLine
         readAnnotationOrDie = C.awaitForever $ \(ByteLine line) ->
             unless (B8.head line == '#') $
@@ -649,34 +670,40 @@ loadGFF gffFp opts = do
         --  - gmap: current annotation map
         --  - namemap: str -> int name to ID
         --  - szmap: str -> double name to feature size
-        insertg :: B.ByteString
+        insertg :: B.ByteString -- ^ feature
+                        -> Maybe B.ByteString -- ^ subfeature
                         -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
                         -> GffLine
                         -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
-        insertg f cur@(!next, !gmap, !namemap, !szmap) gline
+        insertg f sf cur@(!next, !gmap, !namemap, !szmap) gline
                 | gffType gline /= f = cur
-                | otherwise = (next', gmap', namemap', szmap')
+                | otherwise = case lookupSubFeature sf of
+                    Nothing -> cur
+                    Just val -> let
+                            header
+                                | singleFeature = val
+                                | otherwise = B.concat $ [f, "\t"] ++(case sf of { Nothing -> []; Just s -> [s,"\t"]}) ++[val]
+                            (!namemap', active, !next') = case M.lookup header namemap of
+                                Just v -> (namemap, v, next)
+                                Nothing -> (M.insert header next namemap, next, next+1)
+
+                            gmap' :: GFFAnnotationMap
+                            gmap' = M.alter insertg' (gffSeqId gline) gmap
+                            insertg' immap = Just $ IM.alter
+                                                        (\vs -> Just ((gffStrand gline :!: active):fromMaybe [] vs))
+                                                        asInterval
+                                                        (fromMaybe IM.empty immap)
+
+                            asInterval :: IM.Interval Int
+                            asInterval = IM.ClosedInterval (gffStart gline) (gffEnd gline)
+
+                            szmap' = M.alter inserts1 header szmap
+                            inserts1 :: Maybe Double -> Maybe Double
+                            inserts1 cursize = Just $! convert (gffSize gline) + fromMaybe 0.0 cursize
+                        in (next', gmap', namemap', szmap')
             where
-                header
-                    | singleFeature = gffId gline
-                    | otherwise = B.concat [B8.pack (show $ gffType gline), "\t", gffId gline]
-                (!namemap', active, !next') = case M.lookup header namemap of
-                    Just v -> (namemap, v, next)
-                    Nothing -> (M.insert header next namemap, next, next+1)
-
-                gmap' :: GFFAnnotationMap
-                gmap' = M.alter insertg' (gffSeqId gline) gmap
-                insertg' immap = Just $ IM.alter
-                                            (\vs -> Just ((gffStrand gline :!: active):fromMaybe [] vs))
-                                            asInterval
-                                            (fromMaybe IM.empty immap)
-
-                asInterval :: IM.Interval Int
-                asInterval = IM.ClosedInterval (gffStart gline) (gffEnd gline)
-
-                szmap' = M.alter inserts1 header szmap
-                inserts1 :: Maybe Double -> Maybe Double
-                inserts1 val = Just $! convert (gffSize gline) + fromMaybe 0.0 val
+                lookupSubFeature Nothing = lookup "ID" (gffAttrs gline) <|> lookup "gene_id" (gffAttrs gline)
+                lookupSubFeature (Just s) = lookup s (gffAttrs gline)
         -- First integer IDs are assigned "first come, first served"
         -- `reindex` makes them alphabetical
         reindex :: GFFAnnotationMap -> M.Map B.ByteString Int -> Pair GFFAnnotationMap [B.ByteString]

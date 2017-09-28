@@ -55,6 +55,7 @@ writeArgs =
 
 countArgs =
     [ArgInformation "features" False (NGList NGLString) []
+    ,ArgInformation "subfeatures" False (NGList NGLString) []
     ,ArgInformation "min" False NGLInteger []
     ,ArgInformation "multiple" False NGLSymbol [ArgCheckSymbol ["all1", "dist1", "1overN", "unique_only"]]
     ,ArgInformation "mode" False NGLSymbol [ArgCheckSymbol ["union", "intersection_strict", "intersection_non_empty"]]
