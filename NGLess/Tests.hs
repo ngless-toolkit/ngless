@@ -202,9 +202,6 @@ IRIS:7:1:17:150#0	4	*	0	0	*	*	0	0	TGATGTACTATGCATATGAACTTGTATGCAAAGTGG	abaabaa`a
 |]
 -- Parse GFF lines
 
-gff_line = "chrI\tunknown\texon\t4124\t4358\t.\t-\t.\tgene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-gff_attributes = "gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
-gff_structure  = GFF.GffLine "chrI" "unknown" "exon" 4124 4358 Nothing GFF.GffNegStrand (-1) "Y74C9A.3"
 
 
 case_trim_attrs_1  = GFF._trimString " x = 10" @?= "x = 10"
@@ -215,7 +212,10 @@ case_trim_attrs_5  = GFF._trimString "   X    " @?= "X"
 
 
 case_parse_gff_line = GFF.readGffLine gff_line @?= Right gff_structure
-case_parse_gff_atributes = GFF._parseGffAttributes gff_attributes @?= [("gene_id","Y74C9A.3"), ("transcript_id" ,"NM_058260"), ("gene_name", "Y74C9A.3"), ("p_id", "P23728"), ("tss_id", "TSS14501")]
+    where
+        gff_line = "chrI\tunknown\texon\t4124\t4358\t.\t-\t.\tgene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"
+        gff_structure  = GFF.GffLine "chrI" "unknown" "exon" 4124 4358 Nothing GFF.GffNegStrand (-1) attrsExpected
+        attrsExpected = [("gene_id","Y74C9A.3"), ("transcript_id" ,"NM_058260"), ("gene_name", "Y74C9A.3"), ("p_id", "P23728"), ("tss_id", "TSS14501")]
 
 -- _parseGffAttributes
 case_parse_gff_atributes_normal_1 = GFF._parseGffAttributes "ID=chrI;dbxref=NCBI:NC_001133;Name=chrI" @?= [("ID","chrI"),("dbxref","NCBI:NC_001133"),("Name","chrI")]

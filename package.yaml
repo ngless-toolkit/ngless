@@ -118,6 +118,7 @@ tests:
   nglesstest:
     main: Tests.hs
     source-dirs: NGLess/
+    cpp-options: -DIS_BUILDING_TEST
     dependencies:
     - HUnit >=1.3
     - test-framework >=0.8

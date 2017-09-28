@@ -1,16 +1,21 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 
 module Data.GFF
     ( GffLine(..)
     , GffStrand(..)
     , readGffLine
+    , gffId
+#if IS_BUILDING_TEST
     , _parseGffAttributes
     , _trimString
+#endif
     ) where
 
 import Data.Maybe
 import Control.Monad
 import Control.DeepSeq
+import           Control.Arrow (second)
+import           Control.Applicative ((<|>))
 
 import qualified Data.ByteString as S
 import qualified Data.ByteString as B
@@ -36,15 +41,17 @@ data GffLine = GffLine
             , gffScore :: !(Maybe Float)
             , gffStrand :: !GffStrand
             , gffPhase :: {-# UNPACK #-} !Int -- ^phase: use -1 to denote .
-            , gffId :: !B.ByteString
+            , gffAttrs :: ![(B.ByteString, B.ByteString)]
             } deriving (Eq,Show)
 
 instance NFData GffLine where
-    -- All but the score are bang annotated
-    rnf GffLine{ gffScore = sc } = rnf sc `seq` ()
+    -- All but the score and attrs are bang annotated
+    rnf GffLine{ gffScore = sc, gffAttrs = attrs } = rnf sc `seq` rnf attrs
+
+gffId GffLine { gffAttrs = attrs } = fromMaybe "unknown" (lookup "ID" attrs <|> lookup "gene_id" attrs)
 
 _parseGffAttributes :: S.ByteString -> [(S.ByteString, S.ByteString)]
-_parseGffAttributes = map (\(aid,aval) -> (aid, S8.filter (/='\"') . S.tail $ aval))
+_parseGffAttributes = map (second (S8.filter (/='\"') . S.tail))
                         . map (\x -> S8.break (== (checkAttrTag x)) x)
                         . map _trimString
                         . S8.split ';'
@@ -72,12 +79,6 @@ _trimString = trimBeg . trimEnd
         isSpace = (== ' ')
 
 
-gffGeneId :: S8.ByteString -> S8.ByteString
-gffGeneId g = fromMaybe "unknown" (listToMaybe . catMaybes $ map (`lookup` attrs) ["ID", "gene_id"])
-    where
-        attrs = _parseGffAttributes g
-
-
 readGffLine :: B.ByteString -> Either NGError GffLine
 readGffLine line = case B8.split '\t' line of
         [tk0,tk1,tk2,tk3,tk4,tk5,tk6,tk7,tk8] ->
@@ -90,7 +91,7 @@ readGffLine line = case B8.split '\t' line of
                 <*> score tk5
                 <*> strandOrError tk6
                 <*> phase tk7
-                <*> pure (S8.copy . gffGeneId $ tk8)
+                <*> pure (_parseGffAttributes tk8)
         _ -> throwDataError ("unexpected line in GFF: " ++ show line)
     where
         parseOrError :: (a -> Maybe b) -> a -> NGLess b
