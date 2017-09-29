@@ -1,11 +1,12 @@
 # NGLess: NGS Processing with Less Work
 
-[![Join the chat at https://gitter.im/luispedro/ngless](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/luispedro/ngless?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
-[![Build Status](https://travis-ci.org/luispedro/ngless.svg?branch=master)](https://travis-ci.org/luispedro/ngless)
-
 Ngless is a domain-specific language for NGS (next-generation sequencing data)
 processing.
+
+[![Build Status](https://travis-ci.org/luispedro/ngless.svg?branch=master)](https://travis-ci.org/luispedro/ngless)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/hyperium/hyper/master/LICENSE)
+[![Join the chat at https://gitter.im/luispedro/ngless](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/luispedro/ngless?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 
 **Note**: This is *pre-release* software, currently in beta (testing) It is
 stable enough to use, but there may still be some (minor) changes before an
