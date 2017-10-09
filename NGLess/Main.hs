@@ -75,6 +75,7 @@ import Network
 import Hooks
 import Utils.Batch
 import Utils.Suggestion
+import CWL
 
 import qualified BuiltinModules.Argv as ModArgv
 import qualified BuiltinModules.Assemble as ModAssemble
@@ -206,6 +207,9 @@ modeExec opts@DefaultMode{} = do
     when (not (experimentalFeatures opts) && isJust (exportJSON opts)) $
         fatalError ("The use of --export-json requires the --experimental-features flag\n"++
                     "This feature may change at any time.\n")
+    when (not (experimentalFeatures opts) && isJust (exportCWL opts)) $
+        fatalError ("The use of --export-cwl requires the --experimental-features flag\n"++
+                    "This feature may change at any time.\n")
     let (fname,reqversion) = case input opts of
                 ScriptFilePath fp -> (fp,True)
                 InlineScript _ -> ("inline",False)
@@ -252,6 +256,9 @@ modeExec opts@DefaultMode{} = do
             liftIO (print transformed)
         whenJust (exportJSON opts) $ \jsoname -> liftIO $ do
             writeScriptJSON jsoname sc transformed
+            exitSuccess
+        whenJust (exportCWL opts) $ \cwlname -> liftIO $ do
+            writeCWL sc fname cwlname
             exitSuccess
         outputListLno' InfoOutput ["Script OK. Starting interpretation..."]
         interpret modules (nglBody transformed)

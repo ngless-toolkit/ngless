@@ -71,6 +71,7 @@ data NGLessMode =
               , subsampleMode :: Bool
               , experimentalFeatures :: Bool
               , exportJSON :: Maybe FilePath
+              , exportCWL :: Maybe FilePath
               , deprecationCheck :: Bool
               , searchPath :: [FilePath]
               , extraArgs :: [String]
@@ -143,6 +144,7 @@ mainArgs = DefaultMode
               <*> switch (long "subsample" <> help "Subsample mode: quickly test a pipeline by discarding 99% of the input")-- subsampleMode :: Bool
               <*> switch (long "experimental-features" <> help "Whether to allow the use of experimental features") -- experimentalFeatures :: Bool
               <*> optional (strOption $ long "export-json" <> help "File to write JSON representation of script to") -- exportJSON :: Maybe FilePath
+              <*> optional (strOption $ long "export-cwl" <> help "File to write CWL wrapper of given script") -- exportCWL :: Maybe FilePath
               <*> switch (long "check-deprecation" <> help "Check if ngless version or any used modules have been deprecated")-- deprecationCheck :: Bool
               <*> many (strOption $ long "search-dir" <> help "Reference search directories (replace <references> in script)") -- searchPath :: [FilePath]
               <*> many (strArgument (metavar "ARGV")) -- extraArgs :: [String]
