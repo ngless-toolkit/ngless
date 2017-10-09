@@ -59,6 +59,7 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , ifLenDiscardSpecial
                 , substrimReassign
                 , addOFileChecks
+                , addIndexChecks
                 ]
 
 pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression
@@ -261,6 +262,52 @@ addOFileChecks' ((lno,e):rest) = do
         validVariables (BinaryOp _ re le) = validVariables re ++ validVariables le
         validVariables (ConstStr _) = []
         validVariables _ = [Variable "this", Variable "wont", Variable "work"] -- this causes the caller to bailout
+
+-- | 'addIndexChecks' implements the following transformation
+--
+-- array = <non constant expression>
+--
+-- <code>
+--
+--   array[ix]
+--
+-- into
+--
+-- array = <non constant expression>
+-- __check_index_access(array, index1=ix,...)
+--
+-- <code>
+--
+-- write(input, ofile="output/"+variable+".sam")
+addIndexChecks :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
+addIndexChecks sc = reverse <$> addIndexChecks' (reverse sc)
+addIndexChecks' :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
+addIndexChecks' [] = return []
+addIndexChecks' ((lno,e):rest) = do
+        vars <- runNGLess . execWriterT . flip recursiveAnalyse e $ \case
+            (IndexExpression (Lookup _ v) (IndexOne ix1@ConstInt{})) -> tell [(v, ix1)]
+            _ -> return ()
+        rest' <- addIndexChecks' (maybeAddChecks vars rest)
+        return ((lno,e):rest')
+
+     where
+        -- The similarity of this code and the code for addOFileChecks hints at
+        -- a possible merging with a good abstraction
+        maybeAddChecks :: [(Variable,Expression)] -> [(Int, Expression)] -> [(Int, Expression)]
+        maybeAddChecks [(v,ix)] [] = [(0, indexCheckExpr v ix)]
+        maybeAddChecks vars@[(v,ix)] ((lno',e'):rest') = case e' of
+            Assignment v' _
+                | v' == v -> ((lno', indexCheckExpr v ix):(lno', e'):rest')
+            _ -> (lno',e') : maybeAddChecks vars rest'
+        maybeAddChecks _ rest' = rest'
+
+        indexCheckExpr arr ix1 = FunctionCall
+                            (FuncName "__check_index_access")
+                            (Lookup Nothing arr)
+                            [(Variable "original_lno", ConstInt (toInteger lno))
+                            ,(Variable "index1", ix1)]
+                            Nothing
+
 
 -- | Implements addition of temp$nn variables to simplify expressions
 --

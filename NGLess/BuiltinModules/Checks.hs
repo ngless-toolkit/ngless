@@ -41,21 +41,43 @@ executeChecks "__check_ofile" expr args = do
     liftIO (checkOFile oname) >>= \case
         Nothing -> return NGOVoid
         Just err -> throwSystemError $! concat [T.unpack err, " (used in line ", show lno, ")."]
+executeChecks "__check_index_access" (NGOList vs) args = do
+    lno <- lookupIntegerOrScriptError "index access check" "original_lno" args
+    index1 <- lookupIntegerOrScriptError "index access check" "index1" args
+    when (fromInteger index1 >= length vs) $
+        throwScriptError (concat ["Index access on line ", show lno, " is invalid.\n Accessing element with index ", show index1,
+                    " but list only has ", show (length vs), " elements.",
+                    (if fromInteger index1 == length vs
+                        then "\nPlease note that NGLess uses 0-based indexing."
+                        else "")
+                    ])
+    return NGOVoid
 executeChecks _ _ _ = throwShouldNotOccur "checks called in an unexpected fashion."
+
+indexCheck = Function
+    { funcName = FuncName "__check_index_access"
+    , funcArgType = Nothing
+    , funcArgChecks = []
+    , funcRetType = NGLVoid
+    , funcKwArgs =
+                [ArgInformation "original_lno" True NGLInteger []
+                ,ArgInformation "index1" True NGLInteger []]
+    , funcAllowsAutoComprehension = False
+    }
 
 oFileCheck = Function
     { funcName = FuncName "__check_ofile"
     , funcArgType = Just NGLString
     , funcArgChecks = []
     , funcRetType = NGLVoid
-    , funcKwArgs = [ArgInformation "lno" True NGLInteger []]
+    , funcKwArgs = [ArgInformation "original_lno" True NGLInteger []]
     , funcAllowsAutoComprehension = False
     }
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ = return def
     { modInfo = ModInfo "builtin.checks" "0.0"
-    , modFunctions = [oFileCheck]
+    , modFunctions = [oFileCheck, indexCheck]
     , runFunction = executeChecks
     }
 
