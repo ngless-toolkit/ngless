@@ -22,7 +22,7 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Applicative
 import Data.String
-import Data.List (find)
+import           Data.List (find, foldl')
 
 import Modules
 import Language
@@ -38,10 +38,18 @@ type TypeMSt = StateT (Int, TypeMap)        -- ^ Current line & current type map
                     (ReaderT [Module]       -- ^ the modules passed in (fixed)
                         (Writer [T.Text]))) -- ^ we write out error messages
 
+--
 -- | checktypes attempts to add types to all the Lookup Expression objects
 checktypes :: [Module] -> Script -> NGLess Script
-checktypes mods script@(Script _ exprs) = let w = runEitherT (runStateT (inferScriptM exprs) (0,Map.empty)) in
-    case runWriter (runReaderT w mods) of
+checktypes mods script@(Script _ exprs) = let
+            initial = foldl' addmod Map.empty mods
+            addmod :: TypeMap -> Module -> TypeMap
+            addmod tm m = foldl' addconst tm (modConstants m)
+            addconst tm (name, val) = case typeOfObject val of
+                Just t -> Map.insert name t tm
+                Nothing -> tm
+            w = runEitherT (runStateT (inferScriptM exprs) (0,initial))
+    in case runWriter (runReaderT w mods) of
         (Right (_,(_, tmap)), []) -> do
             typed <- addTypes tmap exprs
             return $ script { nglBody = typed }
@@ -368,7 +376,7 @@ checkmethodargs m args = do
                 _ -> error "This should never happen: multiple arguments with the same name should have been caught before"
 
 addTypes :: TypeMap -> [(Int, Expression)] -> NGLess [(Int,Expression)]
-addTypes tmap exprs = mapM (secondM addTypes') exprs
+addTypes tmap exprs = mapM (secondM (runNGLess . recursiveTransform addTypes')) exprs
     where
         addTypes' :: Expression -> NGLess Expression
         addTypes' (Lookup Nothing v@(Variable n)) = case Map.lookup n tmap of
