@@ -3,3 +3,7 @@ ngless '0.0'
 counted = count(samfile('seq1_2.sam.bz2'), features=['seqname'], multiple={all1}, normalization={fpkm})
 write(counted, ofile='output.all1.fpkm.txt')
 
+write(counted, ofile='output.w_comment.all1.fpkm.txt', comment='Testing comment functionality')
+write(counted, ofile='output.w_auto_comment.all1.fpkm.txt', auto_comments=[{script}])
+write(counted, ofile='output.w_auto_and_manual_comment.all1.fpkm.txt', comment='Testing comment functionality', auto_comments=[{script}])
+

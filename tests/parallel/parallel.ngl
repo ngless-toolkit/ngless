@@ -7,5 +7,6 @@ mapped = map(input, fafile='ref.fna')
 collect(count(mapped, features=['seqname']),
     current=sample,
     allneeded=readlines('input.txt'),
-    ofile='output.tsv')
+    ofile='output.tsv',
+    auto_comments=[{script}])
 

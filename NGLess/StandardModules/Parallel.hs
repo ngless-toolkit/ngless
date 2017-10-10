@@ -190,9 +190,20 @@ executeCollect (NGOCounts istream) kwargs = do
         moveOrCopy gzfp (partialfile current)
     canCollect <- liftIO $ allM (doesFileExist . partialfile)  (reverse allentries)
                  -- ^ checking in reverse order makes it more likely that ngless notices a missing file early on
+    manualComment <- fmapMaybeM (stringOrTypeError "comment argument to collect() function") (lookup "comment" kwargs)
+    autoComments <- case lookup "auto_comments" kwargs of
+                        Nothing -> return []
+                        Just (NGOList cs) -> mapM (\s -> do
+                                                        let errmsg = "auto_comments argument in write() call"
+                                                        symbolOrTypeError errmsg s >>=
+                                                            decodeSymbolOrError errmsg
+                                                                [("date", AutoDate)
+                                                                ,("script", AutoScript)]) cs
+                        _ -> throwScriptError "auto_comments argument to write() call must be a list of symbols"
+    comment <- buildComment manualComment autoComments
     if canCollect
         then do
-            newfp <- pasteCounts False allentries (map partialfile allentries)
+            newfp <- pasteCounts comment False allentries (map partialfile allentries)
             liftIO $ moveOrCopy newfp (T.unpack ofile)
         else outputListLno' TraceOutput ["Cannot collect (not all files present yet), wrote partial file to ", partialfile current]
     return NGOVoid
@@ -280,7 +291,7 @@ mergeCounts ss = do
                 Just (_,hs) -> do
                     let p = placeholder (B8.count '\t' hs)
                     s'' <- lift $ step s'
-                    return $! (s'', p)
+                    return (s'', p)
         go start
 
     where
@@ -307,8 +318,8 @@ mergeCounts ss = do
                         Just (h, v, s')
                             | header == h -> do
                                 s'' <- lift $ step s'
-                                return $! (v, (s'', p))
-                            | otherwise -> return $! (p, (s, p))
+                                return (v, (s'', p))
+                            | otherwise -> return (p, (s, p))
                     let (cur, next) = unzip cn
                     C.yield $ ByteLine (B.concat (header:cur))
                     go next
@@ -319,17 +330,18 @@ mergeCounts ss = do
               Just (h,v) -> Just (h, v, s')
               Nothing -> Nothing
 
-pasteCounts :: Bool -> [T.Text] -> [FilePath] -> NGLessIO FilePath
-pasteCounts matchingRows headers inputs
+pasteCounts :: [T.Text] -> Bool -> [T.Text] -> [FilePath] -> NGLessIO FilePath
+pasteCounts comments matchingRows headers inputs
     | length inputs > maxNrOpenFiles = do
         let current = take maxNrOpenFiles inputs
             currenth = take maxNrOpenFiles headers
             rest = drop maxNrOpenFiles inputs
             resth = drop maxNrOpenFiles headers
-        first <- pasteCounts matchingRows currenth current
-        pasteCounts matchingRows (snoc resth $ T.intercalate "\t" currenth) (snoc rest first)
+        first <- pasteCounts [] matchingRows currenth current
+        pasteCounts comments matchingRows (snoc resth $ T.intercalate "\t" currenth) (snoc rest first)
     | otherwise = do
         (newfp,hout) <- openNGLTempFile "collected" "collected.counts." "txt"
+        C.runConduit (commentC "# " comments .| CB.sinkHandle hout)
         liftIO $ T.hPutStrLn hout (T.intercalate "\t" ("":headers))
         numCapabilities <- liftIO getNumCapabilities
         if matchingRows
@@ -352,8 +364,7 @@ pasteCounts matchingRows headers inputs
                     =$= CL.concatMap BL.toChunks
                     =$= CB.sinkHandle hout
                 forM_ (snd <$> channels) (liftIO . A.wait)
-            else do
-                C.runConduit $
+            else C.runConduit $
                     mergeCounts [conduitPossiblyCompressedFile f .|  linesC | f <- inputs]
                     .| byteLineSinkHandle hout
         liftIO (hClose hout)
@@ -367,11 +378,10 @@ executePaste (NGOList ifiles) kwargs = do
     headers <- lookupStringListOrScriptError "__paste arguments" "headers" kwargs
     matchingRows <- lookupBoolOrScriptErrorDef (return False) "__paste arguments" "matching_rows" kwargs
     ifiles' <- forM ifiles (stringOrTypeError "__concat argument")
-    newfp <- pasteCounts matchingRows headers (map T.unpack ifiles')
+    newfp <- pasteCounts [] matchingRows headers (map T.unpack ifiles')
     liftIO $ moveOrCopy newfp (T.unpack ofile)
     return NGOVoid
-executePaste _ _ = do
-    throwScriptError "Bad call to test function __paste"
+executePaste _ _ = throwScriptError "Bad call to test function __paste"
 
 lock1 = Function
     { funcName = FuncName "lock1"
@@ -392,6 +402,8 @@ collectFunction = Function
         ,ArgInformation "allneeded" True (NGList NGLString) []
         ,ArgInformation "ofile" True NGLString [ArgCheckFileWritable]
         ,ArgInformation "__can_move" False NGLBool []
+        ,ArgInformation "comment" False NGLString []
+        ,ArgInformation "auto_comments" False (NGList NGLSymbol) [ArgCheckSymbol ["date", "script"]]
         ]
     , funcAllowsAutoComprehension = False
     }

@@ -1,0 +1,4 @@
+# Testing comment functionality
+	seq1_2.sam.bz2
+seq1	99990
+seq2	100
