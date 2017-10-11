@@ -1,0 +1,9 @@
+ngless '0.0'
+
+counts = count(samfile('seq1_2.sam.bz2'),
+                features=['seqname'],
+                multiple={all1},
+                normalization={fpkm})
+
+write(counts, ofile='output.hash.txt', auto_comments=[{script}, {hash}])
+

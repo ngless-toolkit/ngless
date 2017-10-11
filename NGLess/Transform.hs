@@ -17,11 +17,18 @@ import Control.Monad.Writer
 import Control.Monad.RWS
 import Control.Arrow (first, second)
 import Control.Monad.Identity (Identity(..), runIdentity)
+import Control.Monad.State.Lazy
+import Data.Maybe
+import qualified Data.Hash.MD5 as MD5
+import qualified Data.Map.Strict as M
+import           Data.List (sortOn, foldl')
 
 import Language
 import Modules
 import Output
 import NGLess
+import Utils.Utils
+import NGLess.NGLEnvironment
 import BuiltinFunctions
 
 
@@ -60,6 +67,7 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , substrimReassign
                 , addOFileChecks
                 , addIndexChecks
+                , addOutputHash
                 ]
 
 pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression
@@ -360,3 +368,53 @@ addTemporaries = addTemporaries' 0
                     let t = funcRetType <$> findFunction mods f
                     return (Lookup t v)
                 functionCallTemp e = return e
+
+{-| Calculation of hashes for output method calls
+ so that the hash depends only on the relevant (influencing the result) part of
+ the script.
+
+ Hashes for variables are stored in a map (as a state).  For each expression
+ (top to bottom) first the block variables are added to the map (if present),
+ then hashes are calculated and applied (in lookups) recursively.
+ Each output call receives new variable __hash storing the hash of its own nput
+ expression (with hashes already applied inside).
+-}
+
+addOutputHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+addOutputHash expr_lst = do
+        nv <- ngleVersion <$> nglEnvironment
+        modules <- loadedModules
+        let modInfos = map modInfo modules
+            state0 = M.insert (Variable "ARGV") (T.pack "ARGV") M.empty
+            versionString = show nv ++ show (sortOn modName modInfos)
+        return $! evalState (mapM (secondM $ addOutputHash' versionString) expr_lst) state0
+    where
+        addOutputHash' :: String -> Expression -> State (M.Map Variable T.Text) Expression
+        addOutputHash' versionString expr = flip recursiveTransform expr $ \e -> case e of
+                        Assignment v val -> do
+                            h <- hashOf val
+                            modify (M.insert v h)
+                            return e
+                        FunctionCall (FuncName "preprocess") (Lookup _ v) _ block -> do
+                            h <- withState (injectBlockVars block) $ hashOf e
+                            modify (M.insert v h)
+                            return e
+                        FunctionCall f@(FuncName fname) oarg kwargs block
+                            | fname `elem` ["collect", "write"] -> do
+                                h <- hashOf oarg
+                                return (FunctionCall f oarg ((Variable "__hash", ConstStr h):kwargs) block)
+                        _ -> return e
+            where
+                injectBlockVars :: Maybe Block -> M.Map Variable T.Text -> M.Map Variable T.Text
+                injectBlockVars Nothing m = m
+                injectBlockVars (Just (Block vars _)) m = foldl' injectBlockVars' m vars
+                    where
+                        injectBlockVars' hm v@(Variable n) = M.insert v n hm
+                hashOf :: Expression -> State (M.Map Variable T.Text) T.Text
+                hashOf ex = do
+                    expr' <- flip recursiveTransform ex $ \case
+                        Lookup t v@(Variable n) -> do
+                            h <- fromMaybe n <$> gets (M.lookup v)
+                            return $! Lookup t (Variable h)
+                        e -> return e
+                    return . T.pack . MD5.md5s . MD5.Str . (versionString ++) . show $ expr'

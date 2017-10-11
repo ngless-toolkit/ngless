@@ -17,9 +17,8 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import           Data.Time (getZonedTime)
 import           Data.Time.Format (formatTime, defaultTimeLocale)
-import           Data.List (minimumBy, sortOn)
+import           Data.List (minimumBy)
 import           Data.List.Extra (snoc, chunksOf)
-import qualified Data.Map.Lazy as M (Map, (!), empty, insert, filter, keys)
 
 #ifndef WINDOWS
 import           System.Posix.Unistd (fileSynchronise)
@@ -175,7 +174,7 @@ executeCollect (NGOCounts istream) kwargs = do
     current <- lookupStringOrScriptError "collect arguments" "current" kwargs
     allentries <- lookupStringListOrScriptError "collect arguments" "allneeded" kwargs
     ofile <- lookupStringOrScriptError "collect arguments" "ofile" kwargs
-    hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
+    hash <- lookupStringOrScriptError "collect arguments" "__hash" kwargs
     hashdir <- setupHashDirectory "ngless-partials" hash
     (gzfp,gzout) <- openNGLTempFile "compress" "partial." "tsv.gz"
     C.runConduit $
@@ -198,9 +197,10 @@ executeCollect (NGOCounts istream) kwargs = do
                                                         symbolOrTypeError errmsg s >>=
                                                             decodeSymbolOrError errmsg
                                                                 [("date", AutoDate)
-                                                                ,("script", AutoScript)]) cs
+                                                                ,("script", AutoScript)
+                                                                ,("hash", AutoResultHash)]) cs
                         _ -> throwScriptError "auto_comments argument to write() call must be a list of symbols"
-    comment <- buildComment manualComment autoComments
+    comment <- buildComment manualComment autoComments hash
     if canCollect
         then do
             newfp <- pasteCounts comment False allentries (map partialfile allentries)
@@ -403,7 +403,7 @@ collectFunction = Function
         ,ArgInformation "ofile" True NGLString [ArgCheckFileWritable]
         ,ArgInformation "__can_move" False NGLBool []
         ,ArgInformation "comment" False NGLString []
-        ,ArgInformation "auto_comments" False (NGList NGLSymbol) [ArgCheckSymbol ["date", "script"]]
+        ,ArgInformation "auto_comments" False (NGList NGLSymbol) [ArgCheckSymbol ["date", "script", "hash"]]
         ]
     , funcAllowsAutoComprehension = False
     }
@@ -444,69 +444,6 @@ addLockHash script = do
         addLockHash' _ e = e
 
 
-{-| Calculation of hashes for collect method calls
- so that the hash depends only on the relevant (influencing the
- collected result) part of the script.
-
- Hashes for variables are stored in a map (as a state).
- For each expression (top to bottom) first the block variables
- are added to the map (if present), then hashes are calculated
- and applied (in lookups) recursively.
- Each collect call receives new variable __hash storing the hash
- of it's own expression (with hashes already applied inside).
--}
-
-addCollectHashes :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
-addCollectHashes expr_lst = do
-    nVer <- ngleVersion <$> nglEnvironment
-    modules <- loadedModules
-    let modInfos = map modInfo modules
-        state0 = M.insert (Variable "ARGV") (T.pack "ARGV") M.empty
-    return $ evalState (mapM (addCollectHashes' nVer modInfos) expr_lst) state0
-
-addCollectHashes' :: T.Text -> [ModInfo] -> (Int, Expression) -> State (M.Map Variable T.Text) (Int, Expression)
-addCollectHashes' nV mods (lno, expr) = do
-            recursiveAnalyse gatherBlockVars expr
-            e' <- recursiveTransform hashExpression expr
-            return $! case expr of
-                    (FunctionCall (FuncName "collect") ex kw block) ->
-                        let (FunctionCall _ _ kw' _) = e' in
-                            (lno, FunctionCall (FuncName "collect") ex (head kw':kw) block)
-                    _ -> (lno, expr)
-    where
-        addVersions :: String -> String
-        addVersions = (++ show sortedMods) . (++ show nV)
-        sortedMods = sortOn modName mods
-
-        hashOf :: Expression -> T.Text
-        hashOf = T.pack . MD5.md5s . MD5.Str . addVersions . show
-
-        hashExpression :: Expression -> State (M.Map Variable T.Text) Expression
-        hashExpression (Assignment v e) = do
-            let h = hashOf e
-            modify (M.insert v h)
-            return  (Assignment (Variable h) e)
-        hashExpression (Lookup t v) = do
-            hashMap <- get
-            return (Lookup t (Variable (hashMap M.!  v)))
-        hashExpression e@(FunctionCall (FuncName "preprocess") (Lookup _ (Variable hashedV)) _ _) = do
-            let h = hashOf e
-            hashMap <- get
-            let v = head $ M.keys $ M.filter (== hashedV) hashMap
-            modify (M.insert v h)
-            return e
-        hashExpression e@(FunctionCall (FuncName "collect") expr_ kwargs block) =
-            return (FunctionCall (FuncName "collect") expr_ ((Variable "__hash", ConstStr (hashOf e)):kwargs) block)
-        hashExpression e = return e
-
-        gatherBlockVars :: Expression -> State (M.Map Variable T.Text) ()
-        gatherBlockVars (FunctionCall _ _ _ (Just (Block vars _))) =
-            modify $ addBlockVarsToMap vars
-        gatherBlockVars _ = return ()
-
-        addBlockVarsToMap:: [Variable] -> (M.Map Variable T.Text) -> (M.Map Variable T.Text)
-        addBlockVarsToMap [] m = m
-        addBlockVarsToMap (v@(Variable v'):vs) m = addBlockVarsToMap vs (M.insert v v' m)
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
@@ -518,7 +455,7 @@ loadModule _ =
             , setTagFunction
             , pasteHiddenFunction
             ]
-        , modTransform = addCollectHashes >=> addLockHash
+        , modTransform = addLockHash
         , runFunction = \case
             "lock1" -> executeLock1
             "collect" -> executeCollect

@@ -56,6 +56,7 @@ data WriteOptions = WriteOptions
                 , woVerbose :: Bool
                 , woComment :: Maybe T.Text
                 , woAutoComment :: [AutoComment]
+                , woHash :: T.Text
                 } deriving (Eq, Show)
 
 parseWriteOptions :: KwArgsValues -> NGLessIO WriteOptions
@@ -77,8 +78,10 @@ parseWriteOptions args = do
                                                         symbolOrTypeError errmsg s >>=
                                                             decodeSymbolOrError errmsg
                                                                 [("date", AutoDate)
-                                                                ,("script", AutoScript)]) cs
+                                                                ,("script", AutoScript)
+                                                                ,("hash", AutoResultHash)]) cs
                         _ -> throwScriptError "auto_comments argument to write() call must be a list of symbols"
+    hash <- lookupStringOrScriptError "hidden __hash argument to write() function" "__hash" args
     return $! WriteOptions
                 { woOFile = ofile
                 , woFormat = format
@@ -86,6 +89,7 @@ parseWriteOptions args = do
                 , woVerbose = verbose
                 , woComment = comment
                 , woAutoComment = autoComments
+                , woHash = hash
                 }
 
 
@@ -194,7 +198,7 @@ executeWrite el@(NGOMappedReadSet _ iout  _) args = do
 executeWrite (NGOCounts iout) args = do
     opts <- parseWriteOptions args
     outputListLno' InfoOutput ["Writing counts to: ", woOFile opts]
-    comment <- buildComment (woComment opts) (woAutoComment opts)
+    comment <- buildComment (woComment opts) (woAutoComment opts) (woHash opts)
     case fromMaybe "tsv" (woFormat opts) of
         "tsv" -> do
             fp <- asFile iout

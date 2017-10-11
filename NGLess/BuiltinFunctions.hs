@@ -52,7 +52,7 @@ writeArgs =
     ,ArgInformation "format" False NGLSymbol [ArgCheckSymbol ["tsv", "csv", "bam", "sam"]]
     ,ArgInformation "verbose" False NGLBool []
     ,ArgInformation "comment" False NGLString []
-    ,ArgInformation "auto_comments" False (NGList NGLSymbol) [ArgCheckSymbol ["date", "script"]]
+    ,ArgInformation "auto_comments" False (NGList NGLSymbol) [ArgCheckSymbol ["date", "script", "hash"]]
     ]
 
 countArgs =

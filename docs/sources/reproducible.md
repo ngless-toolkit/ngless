@@ -30,5 +30,18 @@ argument allows for any free text string:
             comment="For my awesome Science publication",
             auto_comments=[{script}])
 
+Finally, you can use the magical `{hash}` auto comment:
+
+    write(counted,
+            ofile="output.txt",
+            comment="For my awesome Science publication",
+            auto_comments=[{script}, {hash}])
+
+This will add a hash string to the output describing the computational path to
+compute the result. This is smarter than a simple hash of the script as it does
+not consider code that is not necessary to generate the script or elements such
+as variable names (i.e., if you change the variable names, the hash will stay
+the same as it is the same computational path).
+
 The `collect()` function also support the same arguments.
 
