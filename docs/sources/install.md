@@ -5,9 +5,27 @@ for testing of early versions by fellow scientists. We do not recommend use in
 production. Please [get in touch](mailto:coelho@embl.de) if you are interested
 in using ngless in your projects.
 
-At the moment, ngless can be esily obtained in binary form for Windows
+At the moment, ngless can be esily obtained in binary form for Linux, Windows
 (experimental) and with either *brew* or *nix* (for Mac OS X or Linux). Of
 course, you can also compile from source.
+
+## Linux (binary)
+
+You can get an [unreleased statically linked version of
+NGless](http://vm-lux.embl.de/~coelho/ngless-data/releases/ngless-0.0.0-unreleased-Linux64)
+or a [nighly build of the latest development
+code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
+This should work across a wide range of Linux versions (please
+[report](https://github.com/luispedro/ngless/issues) any issues you encounter):
+
+    wget http://vm-lux.embl.de/~coelho/ngless-data/releases/ngless-0.0.0-unreleased-Linux64
+    chmod +x ngless-0.0.0-unreleased-Linux64
+    ./ngless-0.0.0-unreleased-Linux64
+
+This download bundles bwa, samtools and megahit (also statically linked).
+
+If you want to try one of ngless' builtin modules (motus, specI, ...) you can download [the full nighly build zip file](https://gitlab.com/ngless/ngless/builds/artifacts/master/download?job=build-and-test-ubuntu) which includes them.
+
 
 ## Windows
 

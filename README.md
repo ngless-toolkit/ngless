@@ -42,7 +42,9 @@ versions for all these channels.
 ### Linux
 
 You can get an [unreleased statically linked version of
-NGless](http://vm-lux.embl.de/~coelho/ngless-data/releases/ngless-0.0.0-unreleased-Linux64) or a [nighly build of the latest development code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
+NGless](http://vm-lux.embl.de/~coelho/ngless-data/releases/ngless-0.0.0-unreleased-Linux64)
+or a [nighly build of the latest development
+code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
 This should work across a wide range of Linux versions (please
 [report](https://github.com/luispedro/ngless/issues) any issues you encounter):
 
