@@ -48,7 +48,7 @@ code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?jo
 This should work across a wide range of Linux versions (please
 [report](https://github.com/luispedro/ngless/issues) any issues you encounter):
 
-    wget http://vm-lux.embl.de/~coelho/ngless-data/releases/ngless-0.0.0-unreleased-Linux64
+    curl -O http://vm-lux.embl.de/~coelho/ngless-data/releases/ngless-0.0.0-unreleased-Linux64
     chmod +x ngless-0.0.0-unreleased-Linux64
     ./ngless-0.0.0-unreleased-Linux64
 
