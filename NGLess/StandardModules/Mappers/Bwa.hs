@@ -88,7 +88,7 @@ callMapper refIndex fps extraArgs outC = do
     let bwathreads
             | strictThreads && numCapabilities > 1 = numCapabilities - 1
             | otherwise = numCapabilities
-        cmdargs =  concat [["mem", "-t", show bwathreads, refIndex], extraArgs, fps]
+        cmdargs =  concat [["mem", "-t", show bwathreads], extraArgs, [refIndex], fps]
         with1Thread :: IO a -> IO a
         with1Thread act
             | strictThreads = bracket
