@@ -163,7 +163,7 @@ initConfiguration opts = do
                         }
 
         updateConfigurationOptsMode DefaultMode{..} config =
-            let trace = fromMaybe
+            let nConfTrace' = fromMaybe
                             (nConfTrace config)
                             trace_flag
                 strictThreads' = fromMaybe
@@ -190,7 +190,7 @@ initConfiguration opts = do
                                     (nConfCreateReportDirectory config)
                                     createReportDirectory
             in config
-                    { nConfTrace = trace
+                    { nConfTrace = nConfTrace'
                     , nConfStrictThreads = strictThreads'
                     , nConfKeepTemporaryFiles = ktemp
                     , nConfCreateReportDirectory = createReportDirectory'

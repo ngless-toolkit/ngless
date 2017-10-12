@@ -49,10 +49,10 @@ data NGLessInput =
     deriving (Eq, Show)
 
 data NGLessArgs = NGLessArgs
-        { verbosity :: Verbosity
+        { mode :: NGLessMode
+        , verbosity :: Verbosity
         , quiet :: Bool
         , color :: Maybe ColorSetting
-        , mode :: NGLessMode
         } deriving (Eq, Show)
 data NGLessMode =
         DefaultMode
@@ -129,18 +129,22 @@ parseNThreads = option (eitherReader readNThreads) (long "jobs" <> short 'j' <> 
                             Just n -> Right (NThreads n)
                             Nothing -> Left ("Failed to parse "++val++" as a threads option")
 
+triSwitch :: String -> String -> Parser (Maybe Bool)
+triSwitch name helpmsg = optional (flag' True  (long         name <> help helpmsg)
+                               <|> flag' False (long ("no-"++name) <> help ("opposite of --"++name)))
+
 mainArgs = DefaultMode
               <$> parseInput -- input :: NGLessInput
               <*> strOption (long "debug" <> value "") -- debug_mode :: String
               <*> switch (long "validate-only" <> short 'n' <> help "Only validate input, do not run script") -- validateOnly :: Bool
               <*> switch (long "print-last" <> short 'p' <> help "print value of last line in script") -- print_last :: Bool
-              <*> optional (switch $ long "trace" <> help "Set highest verbosity mode") -- trace_flag :: Maybe Bool
+              <*> triSwitch "trace" "Set highest verbosity mode" -- trace_flag :: Maybe Bool
               <*> parseNThreads
-              <*> optional (switch $ long "scrict-threads" <> help "Strictly respect the --threads option (by default, NGLess will, occasionally, use more threads than specified)") -- scrict-threads :: Bool
-              <*> optional (switch $ long "create-report" <> help "whether to create the report directory") -- createReportDirectory :: Bool
+              <*> triSwitch "scrict-threads" "strictly respect the --threads option (by default, NGLess will, occasionally, use more threads than specified)" -- scrict-threads :: Bool
+              <*> triSwitch "create-report" "create the report directory" -- createReportDirectory :: Bool
               <*> optional (strOption $ long "html-report-directory" <> short 'o' <> help "name of output directory") -- html_report_directory :: Maybe FilePath
               <*> optional (strOption $ long "temporary-directory" <> short 't' <> help "Directory where to store temporary files") -- temporary_directory :: Maybe FilePath
-              <*> optional (switch $ long "keep-temporary-files" <> help "Whether to keep temporary files (default is delete them)") -- keep_temporary_files :: Maybe Bool
+              <*> triSwitch "keep-temporary-files" "Whether to keep temporary files (default is delete them)" -- keep_temporary_files :: Maybe Bool
               <*> many (strOption $ long "config-file" <> help "Configuration files to parse") -- config_files :: Maybe [FilePath]
               <*> switch (long "no-header" <> help "Do not print copyright information") -- no_header :: Bool
               <*> switch (long "subsample" <> help "Subsample mode: quickly test a pipeline by discarding 99% of the input")-- subsampleMode :: Bool
@@ -174,7 +178,7 @@ printPathArgs = flag' PrintPathMode (long "print-path")
 
 nglessArgs :: Parser NGLessArgs
 nglessArgs = NGLessArgs
-                <$> parseVerbosity
+                <$> (mainArgs <|> downloadFileArgs <|> downloadDemoArgs <|> installArgs <|> createRefArgs <|> printPathArgs)
+                <*> parseVerbosity
                 <*> switch (long "quiet" <> short 'q')
                 <*> parseColor
-                <*> (mainArgs <|> downloadFileArgs <|> downloadDemoArgs <|> installArgs <|> createRefArgs <|> printPathArgs)
