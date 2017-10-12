@@ -20,10 +20,13 @@ import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Conduit.Process as CP
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Internal as C
-import           GHC.Conc (getNumCapabilities)
+import           Control.Exception (bracket)
+import           GHC.Conc (getNumCapabilities, setNumCapabilities)
 
 import Output
 import NGLess
+import Configuration
+import NGLess.NGLEnvironment
 import FileManagement (bwaBin)
 
 -- | Checks whether all necessary files are present for a BWA index
@@ -81,10 +84,22 @@ callMapper refIndex fps extraArgs outC = do
     outputListLno' InfoOutput ["Starting mapping to ", refIndex]
     bwaPath <- bwaBin
     numCapabilities <- liftIO getNumCapabilities
-    let cmdargs =  concat [["mem", "-t", show numCapabilities, refIndex], extraArgs, fps]
+    strictThreads <- nConfStrictThreads <$> nglConfiguration
+    let bwathreads
+            | strictThreads && numCapabilities > 1 = numCapabilities - 1
+            | otherwise = numCapabilities
+        cmdargs =  concat [["mem", "-t", show bwathreads, refIndex], extraArgs, fps]
+        with1Thread :: IO a -> IO a
+        with1Thread act
+            | strictThreads = bracket
+                                (setNumCapabilities 1)
+                                (const $ setNumCapabilities numCapabilities)
+                                (const act)
+            | otherwise = act
+
     outputListLno' TraceOutput ["Calling binary ", bwaPath, " with args: ", unwords cmdargs]
     let cp = proc bwaPath cmdargs
-    (exitCode, out, err) <- liftIO $
+    (exitCode, out, err) <- liftIO . with1Thread $
             CP.sourceProcessWithStreams cp
                 (return ()) -- stdin
                 outC -- stdout

@@ -62,6 +62,7 @@ data NGLessMode =
               , print_last :: Bool
               , trace_flag :: Maybe Bool
               , nThreads :: NThreadsOpts
+              , strictThreads :: Maybe Bool
               , createReportDirectory :: Maybe Bool
               , html_report_directory :: Maybe FilePath
               , temporary_directory :: Maybe FilePath
@@ -135,6 +136,7 @@ mainArgs = DefaultMode
               <*> switch (long "print-last" <> short 'p' <> help "print value of last line in script") -- print_last :: Bool
               <*> optional (switch $ long "trace" <> help "Set highest verbosity mode") -- trace_flag :: Maybe Bool
               <*> parseNThreads
+              <*> optional (switch $ long "scrict-threads" <> help "Strictly respect the --threads option (by default, NGLess will, occasionally, use more threads than specified)") -- scrict-threads :: Bool
               <*> optional (switch $ long "create-report" <> help "whether to create the report directory") -- createReportDirectory :: Bool
               <*> optional (strOption $ long "html-report-directory" <> short 'o' <> help "name of output directory") -- html_report_directory :: Maybe FilePath
               <*> optional (strOption $ long "temporary-directory" <> short 't' <> help "Directory where to store temporary files") -- temporary_directory :: Maybe FilePath

@@ -26,6 +26,18 @@ Options
 ``jobs``: number of CPUs to use. You can use the keyword ``auto`` to attempt
 auto-detection (see below).
 
+``strict-threads``: by default, NGLess will, in certain conditions, use more
+CPUs than specified by the ``jobs`` argument (in bursts of activity). This
+happens, for example, when it calls an external short-read-mapper (such as `bwa
+<http://bio-bwa.sourceforge.net/bwa.shtml>`__). By default, it will pass the
+threads argument through to ``bwa``. However, it will still be processing
+``bwa``'s output using its own threads. This will results in small bursts of
+activity where the CPU usage is above ``jobs``. If you specify
+``--strict-threads``, however, then this behavior is curtailed and it will
+never use more threads than specified (in particular, it will call ``bwa``
+using one thread fewer than specified, while restricting itself to a single
+thread, thus even peak usage is at most the number of specified threads).
+
 ``temporary-directory``: where to keep temporary files. By default, this is the
 system defined temporary directory (either ``/tmp`` or the value of the
 ``$TEMPDIR`` environment variable on Unix).

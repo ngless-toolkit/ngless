@@ -28,14 +28,17 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import           Data.Conduit (($$), (=$=))
 import           Control.Monad.Extra (guard, allM, whenM)
-import           GHC.Conc (getNumCapabilities)
+import           GHC.Conc (getNumCapabilities, setNumCapabilities)
 import           Data.List (isSuffixOf)
 import           Control.Monad.Trans.Resource
+import           Control.Exception (bracket)
 
 import Output
 import NGLess
 import Utils.Conduit
 import FileManagement
+import Configuration
+import NGLess.NGLEnvironment
 import Utils.Utils (dropEnd)
 
 hasValidIndex :: FilePath -> NGLessIO Bool
@@ -85,19 +88,29 @@ callMapper :: FilePath -> [FilePath] -> [String] -> C.Consumer B.ByteString IO a
 callMapper refIndex fps extraArgs outC = do
     outputListLno' InfoOutput ["Starting mapping to ", refIndex]
     numCapabilities <- liftIO getNumCapabilities
+    strictThreads <- nConfStrictThreads <$> nglConfiguration
     (rk,(otemp,htemp)) <- openNGLTempFile' refIndex "map_" "soap"
     (rk2,(otemp2,htemp2)) <- openNGLTempFile' refIndex "map2_" "soap"
     liftIO $ hClose htemp
     liftIO $ hClose htemp2
-    let fps' = case fps of
+    let soapThreads
+            | strictThreads && numCapabilities > 1 = numCapabilities - 1
+            | otherwise = numCapabilities
+        fps' = case fps of
                         [fp] -> ["-a", fp]
                         [fp, fp'] -> ["-a", fp, "-b", fp', "-2", otemp2]
                         _ -> error "SOAP Multiple errors"
-        cmdargs =  concat [fps', ["-p", show numCapabilities, "-D", refIndex ++ ".index", "-o", otemp], extraArgs]
+        cmdargs =  concat [fps', ["-p", show soapThreads, "-D", refIndex ++ ".index", "-o", otemp], extraArgs]
         soapPath = "soap2.21"
+        with1Thread act
+            | strictThreads = bracket
+                                (setNumCapabilities 1)
+                                (const $ setNumCapabilities numCapabilities)
+                                (const act)
+            | otherwise = act
     outputListLno' TraceOutput ["Calling binary ", soapPath, " with args: ", unwords cmdargs]
     let cp = proc soapPath cmdargs
-    (exitCode, (), err) <- liftIO $
+    (exitCode, (), err) <- liftIO $ with1Thread $
             CP.sourceProcessWithStreams cp
                 (return ()) -- stdin
                 (return ()) -- stdout

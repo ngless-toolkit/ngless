@@ -57,6 +57,7 @@ data NGLessConfiguration = NGLessConfiguration
     , nConfTemporaryDirectory :: FilePath
     , nConfKeepTemporaryFiles :: Bool
     , nConfTrace :: Bool
+    , nConfStrictThreads :: Bool
     , nConfCreateReportDirectory :: Bool
     , nConfReportDirectory :: FilePath
     , nConfColor :: ColorSetting
@@ -90,6 +91,7 @@ guessConfiguration = do
         , nConfTemporaryDirectory = tmp
         , nConfKeepTemporaryFiles = False
         , nConfTrace = False
+        , nConfStrictThreads = False
         , nConfReportDirectory = ""
         , nConfColor = AutoColor
         , nConfPrintHeader = True
@@ -116,6 +118,7 @@ readConfigFiles NGLessConfiguration{..} cfiles = do
     nConfUserDataDirectory' <- CF.lookupDefault nConfUserDataDirectory cp "user-data-directory"
     nConfTemporaryDirectory' <- CF.lookupDefault nConfTemporaryDirectory cp "temporary-directory"
     nConfKeepTemporaryFiles' <- CF.lookupDefault nConfKeepTemporaryFiles cp "keep-temporary-files"
+    nConfStrictThreads' <- CF.lookupDefault nConfStrictThreads cp "strict-threads"
     nConfColor' <- CF.lookupDefault AutoColor cp "color"
     nConfPrintHeader' <- CF.lookupDefault nConfPrintHeader cp "print-header"
     nConfSearchPath' <- CF.lookupDefault nConfSearchPath cp "search-path"
@@ -128,6 +131,7 @@ readConfigFiles NGLessConfiguration{..} cfiles = do
         , nConfTemporaryDirectory = nConfTemporaryDirectory'
         , nConfKeepTemporaryFiles = nConfKeepTemporaryFiles'
         , nConfTrace = nConfTrace
+        , nConfStrictThreads = nConfStrictThreads'
         , nConfCreateReportDirectory = nConfCreateReportDirectory'
         , nConfReportDirectory = nConfReportDirectory
         , nConfColor = nConfColor'
@@ -162,6 +166,9 @@ initConfiguration opts = do
             let trace = fromMaybe
                             (nConfTrace config)
                             trace_flag
+                strictThreads' = fromMaybe
+                            (nConfStrictThreads config)
+                            strictThreads
                 ktemp = fromMaybe
                             (nConfKeepTemporaryFiles config)
                             keep_temporary_files
@@ -184,6 +191,7 @@ initConfiguration opts = do
                                     createReportDirectory
             in config
                     { nConfTrace = trace
+                    , nConfStrictThreads = strictThreads'
                     , nConfKeepTemporaryFiles = ktemp
                     , nConfCreateReportDirectory = createReportDirectory'
                     , nConfReportDirectory = html_odir
