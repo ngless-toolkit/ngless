@@ -179,15 +179,6 @@ for testdir in tests/*; do
     fi
 done
 
-cd scripts/ngless-cwl
-echo "Running 'make test' on ngless-cwl"
-make test
-if test $? -ne "0"; then
-    echo "ERROR in cwl tests: Check output for more information"
-    ok=no
-fi
-cd -
-
 if test $ok = "yes"; then
     echo "All done."
 else

@@ -1,8 +1,0 @@
-input:
-  class: File
-  path: input.bam
-action: keep_if
-conditions:
-  - mapped
-  - unique
-output: output.bam
