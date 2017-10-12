@@ -166,27 +166,6 @@ case_template_id = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= takeBaseName
 case_template    = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= "xpto_1"
 
 
-preprocess_s = "ngless '0.0'\n\
-    \input = fastq('test_samples/sample20.fq')\n\
-    \preprocess(input) using |read|:\n\
-    \   read = read[3:]\n\
-    \   read = read[: len(read) ]\n\
-    \   read = substrim(read, min_quality=5)\n\
-    \   if len(read) > 20:\n\
-    \       continue\n\
-    \   if len(read) <= 20:\n\
-    \       discard\n\
-    \write(input, ofile='test_samples/sample20_post.fq')\n"
-
-
-case_preprocess_script = case parsetest preprocess_s >>= checktypes [] of
-    Left err -> assertFailure (show err)
-    Right expr -> do
-        testNGLessIO $ (interpret []) . nglBody $ expr
-        res' <- B.readFile "test_samples/sample20_post.fq"
-        (length $ B8.lines res') @?= (16 :: Int)
-        removeFile "test_samples/sample20_post.fq"
-
 case_sam20 = do
         sam <- testNGLessIO $ asTempFile sam20 "sam"  >>= _samStats
         sam @?= (5,0,0)
