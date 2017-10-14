@@ -631,7 +631,7 @@ annotationMode _ (Just ref) Nothing Nothing = do
         (Nothing, Nothing) -> throwScriptError ("Could not find annotation file for '" ++ T.unpack ref ++ "'")
         (Just _, Just _) -> throwDataError ("Reference " ++ T.unpack ref ++ " has both a GFF and a functional map file. Cannot figure out what to do.")
 annotationMode _ _ _ _ =
-            throwShouldNotOccur "For counting, you must do one of\n1. use seqname mode\n2. pass in a GFF file using the argument 'gff_file'\n3. pass in a gene map using the argument 'functional_map'"
+            throwScriptError "For counting, you must do one of\n1. use seqname mode\n2. pass in a GFF file using the argument 'gff_file'\n3. pass in a gene map using the argument 'functional_map'"
 
 loadGFF :: FilePath -> CountOpts -> NGLessIO [Annotator]
 loadGFF gffFp opts = do
