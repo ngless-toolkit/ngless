@@ -163,6 +163,7 @@ Authors
    tutorial-ocean-metagenomics
    tutorial-gut-metagenomics
    tutorial
+   command-line-wrappers
    one-liners
    preprocess
    Functions
