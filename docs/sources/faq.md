@@ -5,7 +5,11 @@ for questions about the ngless language.
 
 ## Why a new domain-specific language instead of a library in Python (or another existing language)?
 
-There are several advantages:
+First of all, you can actually use NGLess through Python, using
+[NGLessPy](https://github.com/luispedro/nglesspy).
+
+However, the native mode of NGLess is using its internal DSL (domain specific
+langugage).  There are several advantages to this approach:
 
 1. Fast error checking which can speed up the development process. For example,
    static type checking, which is known to many programmer. In general, we do a
@@ -23,19 +27,17 @@ There are several advantages:
    but also my best guess of what you meant + all legal values). I really care
    about error messages.
 
-2. Another important advantage is that Haskell has a compiled implementation
-   and performance matters. I use Python all the time and like the ecosystem a
-   lot, but for some of the things that ngless does, it'd just be too slow (and
-   if using PyPy, I'd miss out on numpy, so that's not very feasible either).
-
-3. By controlling the environment more than would be typical with a Python
+2. By controlling the environment more than would be typical with a Python
    library (or any other language), we can also get some reproducibility
    guarantees. Note too that we declare the version of every script so that we
    can update the interpreter in the future without silently changing the
    behaviour of older ones.
 
-4. Using a domain specific language makes the resulting scripts very readable
+3. Using a domain specific language makes the resulting scripts very readable
    even for non-experts as there is little boilerplate.
+
+4. Finally, we needed the result to be fast and languages such as Python often
+   add a lot of overhead.
 
 ## Is the language extensible?
 
@@ -49,8 +51,6 @@ Add new model organisms can similarly be done with simple YAML file.
 
 More advanced extensions can be done in Haskell, but this is considered a
 solution for advanced users.
-
-
 
 ## Couldn't you just use Docker/[Bioboxes](http://bioboxes.org/)?
 
@@ -80,10 +80,18 @@ Like for the question above, we consider ngless to be related to but not
 overlapping with the CWL (Common Workflow Language).
 
 In particular, much of functionality of ngless can also be accessed in CWL
-workflow, using [our CWL
-wrappers](https://github.com/luispedro/ngless/tree/master/ngless-cwl).
+workflow, using [our command line wrappers](command-line-wrappers.html) all of
+which have CWL wrappers.
 
-They are also available via `pip install ngless_cwl`
+Additionally, (with some limitations), you can embedded a generic NGLess script
+within a larger CWL workflow by using the `--export-cwl` functionality. For
+example, to automatically generate a wrapper for a script called
+`my-script.ngl`, call:
+
+    ngless --export-cwl=wrapper.cwl my-script.ngl
+
+The automatically generate `wrapper.cwl` can now be used as a CWL tool within a
+larger pipeline.
 
 ## How does ngless interact with job schedulers and HPC clusters?
 
@@ -91,7 +99,7 @@ Generally speaking, it does not. It can be used with HPC clusters, whereby you
 simply run a job that calls the ngless binary.
 
 The [parallel
-module](http://ngless.readthedocs.io/en/latest/stdlib.html?highlight=parallel#parallel-module)
+module](http://ngless.embl.de/stdlib.html?highlight=parallel#parallel-module)
 can be used to split large jobs in many tasks, so that you can run multiple
 ngless instances and they collaborate. It is written such that does not depend
 on the HPC scheduler and can, thus, be used in any HPC system (or even, for

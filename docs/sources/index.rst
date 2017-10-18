@@ -30,16 +30,23 @@ Example
             ofile='gene_counts.csv',
             format={csv})
 
-Basic features
---------------
+Building and installing
+-----------------------
+
+See the `install <install.html>`__ page for more information.
+
+Basic functionality
+-------------------
 
 -  preprocessing and quality control of FastQ files
 -  mapping to a reference genome (implemented through
-   `bwa <http://bio-bwa.sourceforge.net/>`__)
+   `bwa <http://bio-bwa.sourceforge.net/>`__ by default)
+-  assembly of contigs
 -  annotation and summarization of the alignments using reference gene
    annotations
+-  `much more <Functions.html>`__
 
-Ngless has builtin support for some model organisms:
+Ngless has builtin support for model organisms:
 
 1. Homo sapiens (hg19)
 2. Mus Muscullus (mm10)
@@ -50,7 +57,14 @@ Ngless has builtin support for some model organisms:
 7. Caenorhabditis elegans (ce10)
 8. Saccharomyces cerevisiae (sacCer3)
 
-and the standard library includes support for `mOTUs <motus.html>`__.
+and the standard library includes support for `mOTUs <motus.html>`__,
+metagenomics profiling of `marine samples <tutorial-ocean-metagenomics.html>`__
+and `human gut microbiome samples <tutorial-gut-metagenomics.html>`__. We also
+have `standard library modules <stdlib.html>`__ for helping users upgrading
+from MOCAT or running many samples (we have used NGLess on projects with
+>10,000 samples).
+
+NGLess puts `a strong emphasis on reproducibility <reproducible.html>`__.
 
 Traditional Unix command line usage
 -----------------------------------
@@ -132,30 +146,19 @@ from another programme (not just ``cat``).
 `Frequently Asked Questions
 (FAQ) <http://ngless.readthedocs.org/en/latest/faq.html>`__
 
-Building and installing
------------------------
-
-Again, please note that this is pre-release software. Thus, we do not
-provide any easy to install (pre-built) packages at the moment, but they
-will be provided once the software is released. However, any comments
-(including bug and build reports), are more than welcome.
-
-`stack <http://docs.haskellstack.org/en/stable/README/>`__ is highly
-recommended. Install it and running ``stack build`` should (1) download
-all dependencies with the correct versions and (2) build ngless. It will
-perform this task in its own sandbox so it will not interfere with any
-other work.
-
 Authors
 -------
 
 -  `Luis Pedro Coelho <http://luispedro.org>`__ (email: coelho@embl.de)
-   (on twitter: [@luispedrocoelho](https://twitter.com/luispedrocoelho))
+   (on twitter: `@luispedrocoelho <https://twitter.com/luispedrocoelho>`__)
 -  Paulo Monteiro
+-  Renato Alves
 -  `Ana Teresa Freitas <http://web.tecnico.ulisboa.pt/ana.freitas/>`__
+-  Peer Bork
 
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
 
    introduction

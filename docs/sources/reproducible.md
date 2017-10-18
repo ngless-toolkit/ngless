@@ -3,6 +3,15 @@
 NGLess has several builtin features to make it easier to achieve reproducible
 research.
 
+All information that is needed to run a result is contained in the NGLess
+script. There is no command line or configuration option which changes the
+results: they only change the way in which the computation was run (what
+information was printed on the console, where intermediate files were saved,
+&c).
+
+The version annotations that NGLess requires also enhance reproducibility while
+allowing us to update NGLess going forward.
+
 ## Annotate results with input script
 
 The `write()` function call supports the argument `auto_comments` which will
