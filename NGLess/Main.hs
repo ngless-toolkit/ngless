@@ -154,7 +154,7 @@ loadModules mods  = do
 
 headerStr :: String
 headerStr = "NGLess v"++versionStr++" (C) NGLess authors\n"++
-            "https://ngless.readthedocs.io/\n"++
+            "http://ngless.embl.de/\n"++
             "\n"
 
 formatCitation :: T.Text -> String
@@ -315,7 +315,7 @@ main = do
         foottext = concat [
                             "ngless v", versionStr, "(C) NGLess Authors 2013-2017\n",
                             "For more information:\n",
-                            "\thttp://ngless.rtfd.io/\n",
+                            "\thttp://ngless.embl.de/\n",
                             "For comments/discussion:\n",
                             "\thttps://groups.google.com/forum/#!forum/ngless"
                             ]

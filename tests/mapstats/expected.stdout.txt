@@ -1,5 +1,5 @@
 NGLess v0.0.0 (C) NGLess authors
-https://ngless.readthedocs.io/
+http://ngless.embl.de/
 
 	input.sam
 total	7

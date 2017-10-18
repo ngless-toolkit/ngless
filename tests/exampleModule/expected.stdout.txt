@@ -1,5 +1,5 @@
 NGLess v0.0.0 (C) NGLess authors
-https://ngless.readthedocs.io/
+http://ngless.embl.de/
 
 Called example function 'example'
 First argument is NGOReadSet "sample.fq" (ReadSet {pairedSamples = [], singleSamples = [FastQFilePath {fqpathEncoding = SolexaEncoding, fqpathFilePath = "sample.fq"}]})

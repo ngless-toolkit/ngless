@@ -59,7 +59,7 @@ If you want to try one of ngless' builtin modules (motus, specI, ...) you can do
 ### Brew
 
 If you use [homebrew](http://brew.sh/), you easily build and install
-[ngless](http://ngless.readthedocs.io/) using this repository.
+[ngless](http://ngless.embld.de/) using this repository.
 
 First install the two required dependencies:
 
@@ -135,9 +135,8 @@ the directory where you wish to install, default is `/usr/local`):
 
 ## More information
 
-- [Full documentation](http://ngless.readthedocs.org/en/latest/)
-- [Frequently Asked Questions (FAQ)](http://ngless.readthedocs.org/en/latest/faq.html)
-- [ngless webpage](http://luispedro.github.io/ngless/)
+- [Full documentation](http://ngless.embl.de/)
+- [Frequently Asked Questions (FAQ)](http://ngless.embl.de/faq.html)
 - [ngless mailing list](https://groups.google.com/forum/#!forum/ngless)
 
 ## Authors
