@@ -179,5 +179,6 @@ Authors
    configuration
    reproducible
    faq
+   nglesspy
    advanced
    Language
