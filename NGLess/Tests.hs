@@ -16,13 +16,11 @@ import Test.Framework.Providers.HUnit
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
 
-import System.Directory (removeFile
-                        ,removeDirectoryRecursive
+import System.Directory (removeDirectoryRecursive
                         ,doesFileExist
                         )
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.ByteString.Char8 as B
-import qualified Data.ByteString.Char8 as B8
 
 import qualified Data.Conduit as C
 import           Data.Conduit ((=$=), ($$))
@@ -32,7 +30,6 @@ import           Data.Convertible (convert)
 import Language
 import Interpret
 import Tokens
-import Types
 import FileManagement
 import NGLess
 
@@ -251,3 +248,22 @@ case_test_setup_html_view = do
     removeDirectoryRecursive "testing_tmp_dir_html/"
 
 
+case_expand_path = do
+    expandPath' "/nothing1/file.txt" [] @?=  ["/nothing1/file.txt"]
+    expandPath' "/nothing2/file.txt" [undefined] @?=  ["/nothing2/file.txt"]
+    expandPath' "/nothing3/file.txt" ["/home/luispedro/my-directory"] @?=  ["/nothing3/file.txt"]
+    expandPath' "<>/nothing4/file.txt" ["/home/luispedro/my-directory1"] @?=  ["/home/luispedro/my-directory1/nothing4/file.txt"]
+    expandPath' "<>/nothing/file.txt" ["/home/luispedro/my-directory"
+                                      ,"/home/alternative/your-directory"] @?=  ["/home/luispedro/my-directory/nothing/file.txt"
+                                                                                ,"/home/alternative/your-directory/nothing/file.txt"]
+    expandPath' "<refs>/nothing/file.txt" ["/home/luispedro/my-directory"
+                                      ,"/home/alternative/your-directory"] @?=  ["/home/luispedro/my-directory/nothing/file.txt"
+                                                                                ,"/home/alternative/your-directory/nothing/file.txt"]
+    expandPath' "<refs>/nothing/file.txt" ["refs=/home/luispedro/my-directory"
+                                      ,"/home/alternative/your-directory"] @?=  ["/home/luispedro/my-directory/nothing/file.txt"
+                                                                                ,"/home/alternative/your-directory/nothing/file.txt"]
+    expandPath' "<refs>/nothing/file.txt" ["refs=/home/luispedro/my-directory"
+                                      ,"nope=/home/alternative/your-directory"] @?=  ["/home/luispedro/my-directory/nothing/file.txt"]
+    expandPath' "<refs>/nothing/file.txt" ["other=/home/luispedro/my-directory"
+                                      ,"nope=/home/alternative/your-directory"] @?=  []
+    expandPath' "<refs>/nothing/file.txt" [] @?= []

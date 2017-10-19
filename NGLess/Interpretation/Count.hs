@@ -60,7 +60,7 @@ import Data.Convertible         (convert)
 
 import Data.GFF
 import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamGroupsC')
-import FileManagement (openNGLTempFile)
+import FileManagement (openNGLTempFile, expandPath)
 import ReferenceDatabases
 import NGLess.NGError
 import FileOrStream
@@ -282,7 +282,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
             , optNormMode = normMode
             , optIncludeMinus1 = include_minus1
             }
-    amode <- annotationMode (optFeatures opts) refinfo (T.unpack <$> mocatMap) (T.unpack <$> gffFile)
+    amode <- annotationMode (optFeatures opts) refinfo mocatMap gffFile
     annotators <- loadAnnotator amode opts
     NGOCounts . File <$> performCount samfp rname annotators opts
 executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
@@ -759,5 +759,5 @@ intersection' im = concat . IM.elems $ foldl1' IM.intersection im
 
 lookupFilePath context name args = case lookup name args of
     Nothing -> return Nothing
-    Just a -> Just <$> stringOrTypeError context a
+    Just a -> stringOrTypeError context a >>= (expandPath . T.unpack)
 

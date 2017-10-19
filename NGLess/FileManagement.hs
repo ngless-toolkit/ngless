@@ -1,7 +1,7 @@
 {- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE TemplateHaskell, CPP #-}
+{-# LANGUAGE TemplateHaskell, QuasiQuotes, CPP #-}
 module FileManagement
     ( InstallMode(..)
     , createTempDir
@@ -14,6 +14,10 @@ module FileManagement
     , samtoolsBin
     , megahitBin
     , bwaBin
+    , expandPath
+#ifdef IS_BUILDING_TEST
+    , expandPath'
+#endif
     ) where
 
 import qualified Data.ByteString as B
@@ -21,13 +25,13 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
+import           Text.RE.TDFA.String
+import           Data.List (isPrefixOf)
 import System.FilePath
 import Control.Monad
 import System.Posix.Files (setFileMode)
 import System.Posix.Internals (c_getpid)
 
-import Data.FileEmbed (embedDir)
-import Output
 import System.Directory
 import System.IO
 import System.IO.Error
@@ -36,9 +40,12 @@ import Control.Exception
 import System.Environment (getExecutablePath, lookupEnv)
 import Control.Monad.Trans.Resource
 import Control.Monad.IO.Class (liftIO)
+import Data.Maybe
 
 import Configuration
 
+import Data.FileEmbed (embedDir)
+import Output
 import NGLess.NGLEnvironment
 import NGLess.NGError
 import Dependencies.Embedded
@@ -262,6 +269,40 @@ checkExecutable name bin = do
     return bin
 
 
+expandPath :: FilePath -> NGLessIO (Maybe FilePath)
+expandPath fbase = do
+        searchpath <- nConfSearchPath <$> nglConfiguration
+        let candidates = expandPath' fbase searchpath
+        findMaybeM candidates $ \p -> do
+            outputListLno' TraceOutput ["Looking for file (", fbase, ") in ", p]
+            exists <- liftIO (doesFileExist p)
+            return $! if exists
+                            then Just p
+                            else Nothing
+    where
+        findMaybeM :: Monad m => [a] -> (a -> m (Maybe b)) -> m (Maybe b)
+        findMaybeM [] _ = return Nothing
+        findMaybeM (x:xs) f = f x >>= \case
+            Nothing -> findMaybeM xs f
+            val -> return val
+
+expandPath' :: FilePath -> [FilePath] -> [FilePath]
+expandPath' fbase search = case matchedText $ fbase ?=~ [re|<(@{%id})?>|] of
+        Nothing -> [fbase]
+        Just c -> mapMaybe (expandPath'' $ trim c) search
+    where
+        trim = init . drop 1
+        expandPath'' :: FilePath -> FilePath -> Maybe FilePath
+        expandPath'' code path = (</> fbase') <$> simplify code path
+        simplify :: FilePath -> FilePath -> Maybe FilePath
+        simplify c path
+            | '=' `notElem` path = Just path
+            | (c++"=")`isPrefixOf` path = Just $ drop (length c + 1) path
+            | otherwise = Nothing
+        fbase' = removeSlash1 $ fbase *=~/ [ed|<(@{%id})?>///|]
+        removeSlash1 "" = ""
+        removeSlash1 ('/':p) = removeSlash1 p
+        removeSlash1 p = p
 
 binaryExtension :: String
 #ifdef WINDOWS

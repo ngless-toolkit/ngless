@@ -19,6 +19,7 @@ import NGLess
 import Modules
 import Language
 import BuiltinFunctions
+import FileManagement
 import Utils.Suggestion
 import ReferenceDatabases
 import BuiltinModules.Checks
@@ -26,6 +27,7 @@ import BuiltinModules.Checks
 
 -- validation functions live in this Monad, where error messages can be written
 type ValidateIO = WriterT [T.Text] (ReaderT [Module] NGLessIO)
+liftNGLessIO = lift . lift
 tell1 = tell . (:[])
 
 findFunctionIO :: FuncName -> ValidateIO Function
@@ -63,9 +65,10 @@ validateReadInputs (Script _ es) = checkRecursive validateReadInputs' es
         validateReadInputs' _ = return ()
 
         checkFileReadable' :: T.Text -> ValidateIO ()
-        checkFileReadable' fname
-            | "<references>" `T.isInfixOf` fname = return () -- punt
-            | otherwise = liftIO (checkFileReadable $ T.unpack fname) >>= flip whenJust tell1
+        checkFileReadable' fname =
+            (liftNGLessIO . expandPath $ T.unpack fname) >>= \case
+                Just p -> liftIO (checkFileReadable p) >>= flip whenJust tell1
+                Nothing -> tell1 $ T.concat ["Could not find necessary input file ", fname]
 
 
 checkReferencesExist :: Script -> ValidateIO ()
