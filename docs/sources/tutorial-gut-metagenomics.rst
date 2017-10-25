@@ -3,6 +3,10 @@
 Human Gut Metagenomics Functional & Taxonomic Profiling
 =======================================================
 
+.. note::
+    This tutorial is also available as a `slide presentation
+    <http://ngless.embl.de/_static/gut-metagenomics-tutorial-presentation/gut_specI_tutorial.html>`__
+
 In this tutorial, we will analyse a small dataset of human gut microbial
 metagenomes.
 

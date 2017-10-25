@@ -1,0 +1,63 @@
+ngless "0.0"
+import "parallel" version "0.0"
+import "mocat" version "0.0"
+import "motus" version "0.1"
+import "igc" version "0.0"
+import "specI" version "0.1"
+
+samples = readlines('igc.demo.short')
+sample = lock1(samples)
+
+input = load_mocat_sample(sample)
+
+preprocess(input, keep_singles=False) using |read|:
+    read = substrim(read, min_quality=25)
+    if len(read) < 45:
+        discard
+
+mapped = map(input, reference='hg19')
+
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=90, action={unmatch})
+    if mr.flag({mapped}):
+        discard
+
+input = as_reads(mapped)
+
+
+mapped = map(input, reference='igc', mode_all=True)
+
+counts = count(mapped,
+            features=['KEGG_ko', 'eggNOG_OG'],
+            normalization={scaled})
+
+collect(counts,
+        current=sample,
+        allneeded=samples,
+        ofile='igc.profiles.txt')
+
+mapped = map(input, reference='motus', mode_all=True)
+
+counted = count(mapped, features=['gene'], multiple={dist1})
+
+motus_table = motus(counted)
+collect(motus_table,
+        current=sample,
+        allneeded=samples,
+        ofile='motus-counts.txt')
+
+input = as_reads(mapped)
+
+mapped = map(input, reference='refmg')
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=97, action={drop})
+    if not mr.flag({mapped}):
+        discard
+
+collect(count(mapped,
+                features=['species'],
+                include_minus1=True),
+        current=sample,
+        allneeded=samples,
+        ofile='species.raw.counts.txt')
+

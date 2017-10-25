@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Introduction to NGLess</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body { font-family: 'Droid Serif'; }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+    </style>
+  </head>
+  <body>
+    <style>
+IMG {
+    max-width: 75%;
+    text-align: center;
+}
+
+    </style>
+    <textarea id="source">
+
+class: center, middle
+
+# Metagenomics analysis with NGLess
+
+[Luis Pedro Coelho](http://luispedro.org)
+
+[@luispedrocoelho](https://twitter.com/luispedrocoelho)
+
+---
+
+# NGLess
+
+NGLess is built around a domain-specific language for genomics
+
+- Flexible system with built-in support for many basic operations
+- Designed for reproducibility from the ground-up.
+- Can integrate with Common Workflow Language based systems (basic operations
+  are already available as CWL modules, more complex ones will soon be).
+- Can scale up to 10,000s of samples (including cluster integration and
+  robustness to node failures)
+
+---
+
+# What we will be doing:
+
+1. Loading a set of Fastq files
+2. Preprocessing it
+3. Filtering out human reads
+4. Mapping (aligning) against a set of marker genes
+5. Building a table of taxonomic abundances
+
+In summary, **going from raw data to a table of features**.
+
+
+We will work on a very small example
+
+- Real world examples would need at least a few hours of CPU time. Aligning to
+  a big gene catalog takes _hours of CPU time per sample_.
+
+- We will work on **sampled data**
+
+---
+
+# Step 0: Download the data
+
+Retrieve data:
+
+    ngless --download-demo gut-short
+
+This will retrieve data and a script for a short demo based on metagenomes from
+the human gut ([Zeller et al, 2014](https://dx.doi.org/10.15252/msb.20145645)).
+
+There is a text-version of this tutorial at
+[http://ngless.embl.de/tutorial-gut-metagenomics.html](http://ngless.embl.de/tutorial-gut-metagenomics.html).
+
+---
+
+# Data is organized with a _sample per directory_
+
+
+    $ find
+    ./igc.demo.short
+    ./SAMN05615096.short
+    ./SAMN05615096.short/SRR4052021.pair.1.fq.gz
+    ./SAMN05615096.short/SRR4052021.single.fq.gz
+    ./SAMN05615096.short/SRR4052021.pair.2.fq.gz
+    ./process.ngl
+    ./SAMN05615097.short
+    ./SAMN05615097.short/SRR4052022.pair.2.fq.gz
+    ./SAMN05615097.short/SRR4052022.single.fq.gz
+    ./SAMN05615097.short/SRR4052022.pair.1.fq.gz
+    ./SAMN05615098.short
+    ./SAMN05615098.short/SRR4052033.single.fq.gz
+    ./SAMN05615098.short/SRR4052033.pair.1.fq.gz
+    ./SAMN05615098.short/SRR4052033.pair.2.fq.gz
+
+---
+
+# Step 1: basic preprocessing
+
+```python
+    ngless "0.0"
+    import "mocat" version "0.0"
+
+    input = load_mocat_sample('SAMN05615097.short')
+
+    preprocess(input, keep_singles=False) using |read|:
+        read = substrim(read, min_quality=25)
+        if len(read) &lt; 45:
+            discard
+
+    write(input, ofile='preproc.fq.gz')
+```
+[1_preproc.ngl](scripts/1_preproc.ngl)
+
+---
+
+# Step 1.1: Declarations
+```python
+    ngless "0.0"
+    import "mocat" version "0.0"
+
+```
+
+With NGLess, you **must declare all versions of anything you use**:
+
+- perfect reproducibility
+- _everything that you need_ is specified in the script.
+- command line/configuration files change _how_ computation is run, not _what_
+  the computation is.
+
+---
+
+# Step 1.2: Loading data &amp; preprocessing
+
+```python
+    ngless "0.0"
+    import "mocat" version "0.0"
+
+    input = load_mocat_sample('SAMN05615097.short')
+
+    preprocess(input, keep_singles=False) using |read|:
+        read = substrim(read, min_quality=25)
+        if len(read) &lt; 45:
+            discard
+
+    write(input, ofile='preproc.fq.gz')
+```
+[1_preproc.ngl](scripts/1_preproc.ngl)
+
+
+Typical preprocessing pipeline
+
+1.  Trimming reads by quality:
+
+ - substrim()
+ - endstrim()
+
+2. Discarding reads that are too small
+
+---
+
+# Running it
+
+    $ ngless 1_preproc.ngl
+
+    NGLess v0.0.0 (C) NGLess authors
+    http://ngless.embl.de/
+
+    When publishing results from this script, please cite the following references:
+
+         - MOCAT2: a metagenomic assembly, annotation and profiling framework.
+         Kultima JR, Coelho LP, Forslund K, Huerta-Cepas J, Li S, Driessen M,
+         et al. (2016) Bioinformatics (2016)
+
+
+    [Mon 23-10-2017 16:53]: Script OK. Starting interpretation...
+    [Mon 23-10-2017 16:53]: Interpretation finished.
+
+---
+
+# Running it: important options
+
+```bash
+$ ngless --help
+
+...
+Available options:
+  -n,--validate-only       Only validate input, do not run script
+  --trace                  Set highest verbosity mode
+  -j,--jobs                Nr of threads to use
+  --scrict-threads         strictly respect the --jobs option (by default,
+                           NGLess will, occasionally, use more threads than
+                           specified)
+  -t,--temporary-directory ARG
+                           Directory where to store temporary files
+  --keep-temporary-files   Whether to keep temporary files (default is delete
+                           them)
+  --config-file ARG        Configuration files to parse
+  --subsample              Subsample mode: quickly test a pipeline by discarding
+                           99% of the input
+```
+---
+
+# Discard human reads
+
+```python
+...
+
+mapped = map(input, reference='hg19')
+
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=90, action={unmatch})
+    if mr.flag({mapped}):
+        discard
+write(mapped, ofile='mapped.bam')
+```
+[2_map_hg19.ngl](scripts/2_map_hg19.ngl)
+
+
+1. The `map()` function transforms a `ShortRead` to a `MappedShortRead`. In
+   this case, we are using the builtin `'hg19'` reference.
+2. With [select()](http://ngless.embl.de/Functions.html#select), we can process
+these `MappedShortRead`.
+
+We need to add a minimal match size to avoid random, spurious matches (45
+should be safe).
+
+---
+
+# Back to reads
+
+```python
+ngless '0.0'
+import "mocat" version "0.0"
+
+input = load_mocat_sample('SAMN05615097.short')
+
+preprocess(input, keep_singles=False) using |read|:
+    read = substrim(read, min_quality=25)
+    if len(read) &lt; 45:
+        discard
+
+mapped = map(input, reference='hg19')
+
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=90, action={unmatch})
+    if mr.flag({mapped}):
+        discard
+
+input = as_reads(mapped)
+```
+[3_taxprofile.ngl](scripts/3_taxprofile.ngl)
+
+`as_reads()` converts from `MappedShortReads` (BAM file) to `ShortReads` (FastQ files).
+
+---
+
+# Quantify mOTUs and specI clusters (taxonomic)
+
+
+```python
+ngless "0.0"
+import "mocat" version "0.0"
+import "motus" version "0.1"
+import "specI" version "0.1"
+
+...
+```
+[3_taxprofile.ngl](scripts/3_taxprofile.ngl)
+
+Same preprocessing as before, but with **new imports**.
+
+---
+
+
+```python
+...
+mapped = map(input, reference='motus', mode_all=True)
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=97, action={drop})
+    if not mr.flag({mapped}):
+        discard
+
+counted = count(mapped, features=['gene'], multiple={dist1})
+
+write(motus(counted),
+        ofile='motus.counts.txt')
+```
+[3_taxprofile.ngl](scripts/3_taxprofile.ngl)
+
+
+1. We again `select()` to extract high quality mappings only.
+2. We use [count()](http://ngless.embl.de/Functions.html#count) to aggregate  
+3. Finally, we use the `motus()` special function to summarize by 
+
+---
+
+# Continuing...
+
+```python
+input = as_reads(mapped)
+
+mapped = map(input, reference='refmg')
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=97, action={drop})
+    if not mr.flag({mapped}):
+        discard
+
+write(count(mapped,
+                features=['species'],
+                include_minus1=True),
+    ofile='species.raw.counts.txt')
+```
+[3_taxprofile.ngl](scripts/3_taxprofile.ngl)
+
+
+---
+
+# For **one sample**, we are done!
+
+What if we have many samples?
+
+1. Process all of them
+2. Paste the results
+
+Note that step 1 can be done in parallel. In fact, for large projects, you
+_need_ to do it in parallel.
+
+---
+
+# NGLess can help you with this
+
+```python
+
+ngless "0.0"
+import "parallel" version "0.0"
+
+samples = readlines('igc.demo.short')
+sample = lock1(samples)
+input = load_mocat_sample(sample)
+
+...
+motus_table = motus(counted)
+collect(motus_table,
+        current=sample,
+        allneeded=samples,
+        ofile='complete-counts.txt')
+```
+[4_parallel.ngl](scripts/4_parallel.ngl)
+
+
+The [parallel module](http://ngless.embl.de/stdlib.html#parallel-module) has a
+few utility functions to help handle large scale projects:
+
+- `lock1()` : select a sample from a pool of tasks
+- `collect()` : paste many results together (**if and only if** all of them are present).
+
+---
+
+# Mapping to the IGC
+
+The IGC, integrated gene catalog, is the most current human gut gene catalog.
+
+Now, this should be easier to understand:
+
+```python
+
+ngless "0.0"
+import "igc" version "0.0"
+
+...
+
+mapped = map(input, reference='igc', mode_all=True)
+counts = count(mapped,
+            features=['KEGG_ko', 'eggNOG_OG'],
+            normalization={scaled})
+
+collect(counts,
+        current=sample,
+        allneeded=samples,
+        ofile='igc.profiles.txt')
+```
+    5_w_igc.ngl
+
+As with the human reference, the IGC is _lazily downloaded_.
+
+---
+
+# You can also run NGLess from Python
+
+
+This is **very experimental**.
+
+```python
+from ngless import NGLess
+
+sc = NGLess.NGLess('0.0')
+
+sc.import_('mocat', '0.0')
+e = sc.env
+
+e.sample = sc.load_mocat_sample_('testing')
+
+@sc.preprocess_(e.sample, using='r')
+def proc(bk):
+    bk.r = sc.substrim_(bk.r, min_quality=25)
+    sc.if_(sc.len_(bk.r) &lt; 45,
+            sc.discard_)
+
+e.mapped = sc.map_(e.sample, reference='hg19')
+e.mapped = sc.select_(e.mapped, keep_if=['{mapped}'])
+
+sc.write_(e.mapped, ofile='ofile.sam')
+
+sc.run()
+```
+
+---
+# More information
+
+- [NGLess webpage](http://ngless.embl.de)
+- [Code on github](http://github.com/luispedro.org)
+- [Google user group](https://groups.google.com/forum/#!forum/ngless)
+
+---
+
+<div style="padding-top: 60%; text-align: right; padding-right: 10em;">
+Thank you.
+</div>
+
+    </textarea>
+    <script src="https://gnab.github.io/remark/downloads/remark-latest.min.js">
+    </script>
+    <script>
+var slideshow = remark.create({
+    countIncrementalSlides: false,
+    highlightLines: true,
+    });
+    </script>
+  </body>
+</html>

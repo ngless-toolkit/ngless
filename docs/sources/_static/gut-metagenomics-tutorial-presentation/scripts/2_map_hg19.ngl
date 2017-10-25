@@ -1,0 +1,17 @@
+ngless "0.0"
+import "mocat" version "0.0"
+
+input = load_mocat_sample('SAMN05615097.short')
+
+preprocess(input, keep_singles=False) using |read|:
+    read = substrim(read, min_quality=25)
+    if len(read) < 45:
+        discard
+
+mapped = map(input, reference='hg19')
+
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=90, action={unmatch})
+    if mr.flag({mapped}):
+        discard
+write(mapped, ofile='mapped.bam')

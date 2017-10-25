@@ -1,0 +1,45 @@
+ngless "0.0"
+import "mocat" version "0.0"
+import "motus" version "0.1"
+import "specI" version "0.1"
+
+input = load_mocat_sample('SAMN05615097.short')
+
+preprocess(input, keep_singles=False) using |read|:
+    read = substrim(read, min_quality=25)
+    if len(read) < 45:
+        discard
+
+mapped = map(input, reference='hg19')
+
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=90, action={unmatch})
+    if mr.flag({mapped}):
+        discard
+
+input = as_reads(mapped)
+
+mapped = map(input, reference='motus', mode_all=True)
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=97, action={drop})
+    if not mr.flag({mapped}):
+        discard
+
+counted = count(mapped, features=['gene'], multiple={dist1})
+
+write(motus(counted),
+        ofile='motus.counts.txt')
+
+input = as_reads(mapped)
+
+mapped = map(input, reference='refmg')
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=97, action={drop})
+    if not mr.flag({mapped}):
+        discard
+
+write(count(mapped,
+                features=['species'],
+                include_minus1=True),
+    ofile='species.raw.counts.txt')
+
