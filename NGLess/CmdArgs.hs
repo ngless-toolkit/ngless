@@ -122,7 +122,7 @@ parseInput = InlineScript <$> strOption
                         <> help "inline script to execute")
             <|> ScriptFilePath <$> strArgument (metavar "INPUT" <> help "Filename of script to interpret")
 
-parseNThreads = option (eitherReader readNThreads) (long "jobs" <> short 'j' <> value (NThreads 1))
+parseNThreads = option (eitherReader readNThreads) (long "jobs" <> short 'j' <> long "threads" <> value (NThreads 1) <> help "Nr of threads to use")
     where
         readNThreads "auto" = Right NThreadsAuto
         readNThreads val = case readMaybe val of
