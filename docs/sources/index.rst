@@ -181,5 +181,6 @@ Authors
    reproducible
    faq
    nglesspy
+   cwl
    advanced
    Language

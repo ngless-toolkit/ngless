@@ -90,8 +90,8 @@ example, to automatically generate a wrapper for a script called
 
     ngless --export-cwl=wrapper.cwl my-script.ngl
 
-The automatically generate `wrapper.cwl` can now be used as a CWL tool within a
-larger pipeline.
+The automatically generated `wrapper.cwl` file can now be used as a CWL tool
+within a larger pipeline. See more in the [CWL page](cwl.html).
 
 ## How does ngless interact with job schedulers and HPC clusters?
 
