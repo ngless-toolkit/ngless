@@ -177,6 +177,7 @@ Authors
    Organisms
    motus
    configuration
+   searchpath
    reproducible
    faq
    nglesspy

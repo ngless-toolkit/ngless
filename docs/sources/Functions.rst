@@ -236,7 +236,8 @@ Arguments by value:
 +-------------+-------------+------------+----------------+
 
 The user must provide either a path to a FASTA file in the ``fafile`` argument
-or the name of a builtin reference using the ``reference`` argument.
+or the name of a builtin reference using the ``reference`` argument. The
+``fafile`` argument supports `search path expansion <searchpath.html>`__.
 
 NGLess provides the following builtin datasets:
 
@@ -383,6 +384,9 @@ necessary. For other features, you will need extra information. This can be
 passed using the ``gff_file`` or ``functional_map`` arguments. If you had
 previously used a ``reference`` argument for the ``map()`` function, then
 you can also leave this argument empty and ngless will do the right thing.
+
+The ``gff_file`` and ``functional_map`` arguments support `search path
+expansion <searchpath.html>`__.
 
 ``features``: which features to count. If a GFF file is used, this refers to
 the "features" field.
