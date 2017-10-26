@@ -14,6 +14,8 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
+import           Control.Monad.Extra (unlessM)
+import           System.Directory (doesDirectoryExist)
 import           System.IO
 import System.FilePath
 import System.FilePath.Glob
@@ -79,6 +81,8 @@ executeLoad (NGOString samplename) kwargs = NGOExpression <$> do
     encoding <- lookupSymbolOrScriptErrorDef (return "auto") "encoding passthru argument" "encoding" kwargs
     outputListLno' TraceOutput ["Executing load_mocat_sample transform"]
     let basedir = T.unpack samplename
+    unlessM (liftIO $ doesDirectoryExist basedir) $
+        throwDataError ("Attempting to load directory '"++basedir++"', but directory does not exist.")
     fqfiles <- fmap (sort . concat) $ forM exts $ \pat ->
         liftIO $ namesMatching (basedir </> ("*." ++ pat))
     args <- mocatSamplePaired fqfiles encoding qcNeeded
