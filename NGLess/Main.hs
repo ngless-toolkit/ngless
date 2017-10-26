@@ -41,6 +41,7 @@ import System.FilePath
 import System.Directory
 import Control.Monad.Extra (whenJust)
 import System.IO (stderr, hPutStrLn)
+import Control.Exception (catch, IOException)
 import Control.Concurrent (setNumCapabilities)
 import System.Console.ANSI (setSGRCode, SGR(..), ConsoleLayer(..), Color(..), ColorIntensity(..))
 import System.Exit (exitSuccess, exitFailure)
@@ -123,7 +124,12 @@ runNGLessIO context (NGLessIO act) = runResourceT (runExceptT act) >>= \case
             hPutStrLn stderr ("Exiting after fatal error while " ++ context)
             case etype of
                 ShouldNotOccur ->
-                        hPutStrLn stderr "Should Not Occur Error! This probably indicates a bug in ngless.\n\tPlease get in touch with the authors <coelho@embl.de> with a description of how this happened."
+                        hPutStrLn stderr $
+                                        "Should Not Occur Error! This probably indicates a bug in ngless.\n" ++
+                                        "\tPlease get in touch with the authors with a description of how this happened.\n" ++
+                                        "\tIf possible run your script with the --trace flag and post the script and the resulting trace at \n"++
+                                        "\t\thttp://github.com/luispedro/ngless/issues\n" ++
+                                        "\tor email us at coelho@embl.de."
                 ScriptError ->
                         hPutStrLn stderr "Script Error"
                 DataError ->
@@ -310,7 +316,7 @@ modeExec (PrintPathMode exec) = runNGLessIO "finding internal path" $ do
     liftIO $ putStrLn path
 
 
-main = do
+main' = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
         foottext = concat [
                             "ngless v", versionStr, "(C) NGLess Authors 2013-2017\n",
@@ -334,3 +340,8 @@ main = do
     updateNglEnvironment' (\env -> env { ngleConfiguration = config })
     modeExec (mode args)
 
+main = catch main' $ \e -> do
+            putStrLn ("Exiting after internal error. If you can reproduce this issue, please run your script "++
+                    "with the --trace flag and report a bug at http://github.com/luispedro/ngless/issues")
+            print (e :: IOException)
+            exitFailure
