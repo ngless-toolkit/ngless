@@ -64,7 +64,8 @@ validate mods expr = case errors of
 validateVersion :: [Module] -> Script -> Maybe T.Text
 validateVersion _ sc = nglVersion  <$> nglHeader sc >>= \case
     "0.0" -> Nothing
-    version -> Just (T.concat ["Version ", version, " is not supported (only version 0.0 is available)."])
+    "0.5" -> Nothing
+    version -> Just (T.concat ["Version ", version, " is not supported (only versions 0.0/0.5 are available in this release)."])
 
 -- | check whether results of calling pure functions are use
 validate_pure_function _ (Script _ es) = check_toplevel validate_pure_function' es

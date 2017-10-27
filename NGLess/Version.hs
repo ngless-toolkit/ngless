@@ -13,10 +13,10 @@ module Version
 import Development.GitRev (gitHash)
 
 versionStr :: String
-versionStr = "0.0.0"
+versionStr = "0.5.0"
 
 dateStr :: String
-dateStr = "not released"
+dateStr = "Nov 1 2017"
 
 gitHashStr :: String
 gitHashStr = $(gitHash)

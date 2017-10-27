@@ -34,6 +34,7 @@ import NGLess.NGLEnvironment
 import Configuration
 import Utils.Utils
 import Modules
+import Version
 import Output
 import NGLess
 
@@ -48,7 +49,7 @@ dataDirectory Root = nConfGlobalDataDirectory <$> nglConfiguration
 dataDirectory User = nConfUserDataDirectory   <$> nglConfiguration
 
 builtinReferences :: [Reference]
-builtinReferences = [Reference rn (T.concat [rn, "-0.0.0"]) Nothing True False | rn <-
+builtinReferences = [Reference rn (T.concat [rn, "-", T.pack versionStr]) Nothing True False | rn <-
                 [ "hg19" -- Homo_sapiens
                 , "mm10" -- Mus_musculus
                 , "rn4" --  Rattus_norvegicus
