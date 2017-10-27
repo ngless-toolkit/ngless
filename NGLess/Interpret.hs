@@ -267,11 +267,10 @@ maybeInterpretExpr :: Maybe Expression -> InterpretationROEnv (Maybe NGLessObjec
 maybeInterpretExpr = fmapMaybeM interpretExpr
 
 interpretFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe Block -> InterpretationEnvIO NGLessObject
-interpretFunction (FuncName "preprocess") expr@(Lookup _ (Variable varName)) args (Just block) = do
+interpretFunction (FuncName "preprocess") expr args (Just block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- interpretArguments args
     res' <- executePreprocess expr' args' block
-    setVariableValue varName res'
     return res'
 interpretFunction (FuncName "preprocess") expr _ _ = throwShouldNotOccur ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
 interpretFunction f expr args block = do

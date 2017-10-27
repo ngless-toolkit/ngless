@@ -68,6 +68,7 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , addOFileChecks
                 , addIndexChecks
                 , addOutputHash
+                , reassignPreprocess
                 ]
 
 pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression
@@ -418,3 +419,20 @@ addOutputHash expr_lst = do
                             return $! Lookup t (Variable h)
                         e -> return e
                     return . T.pack . MD5.md5s . MD5.Str . (versionString ++) . show $ expr'
+
+-- In ngless 0.0, preprocess() would change its arguments, so that
+--
+--  preprocess(input) ...
+--
+-- was equivalent to
+--
+-- input = preprocess(input) ...
+reassignPreprocess :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+reassignPreprocess sc = do
+    v <- ngleVersion <$> nglEnvironment
+    return $! case v of
+        "0.0" -> map (second reassignPreprocess') sc
+        _ -> sc
+reassignPreprocess' :: Expression -> Expression
+reassignPreprocess' e@(FunctionCall (FuncName "preprocess") (Lookup _ v) _ _) = Assignment v e
+reassignPreprocess' e = e

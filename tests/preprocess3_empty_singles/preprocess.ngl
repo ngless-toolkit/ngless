@@ -1,7 +1,7 @@
 ngless '0.0'
 input = paired('sample.fq', 'sample2.fq', singles='singles.fq')
 trim = 3
-preprocess(input) using |read|:
+input = preprocess(input) using |read|:
    read = read[trim:]
    if len(read) < 10:
        discard

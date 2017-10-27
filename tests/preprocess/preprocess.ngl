@@ -1,7 +1,7 @@
 ngless '0.0'
 input = fastq('sample.fq')
 trim = 3
-preprocess(input) using |read|:
+input = preprocess(input) using |read|:
     read = read[trim:]
     if len(read) < 10:
         discard
@@ -9,21 +9,21 @@ write(input, ofile='output.fq')
 
 
 input = fastq('sample.fq')
-preprocess(input) using |read|:
+input = preprocess(input) using |read|:
     read = substrim(read, min_quality=20)
     if len(read) < 10:
         discard
 write(input, ofile='output.substrim.fq')
 
 input = fastq('sample.fq')
-preprocess(input) using |read|:
+input = preprocess(input) using |read|:
     read = endstrim(read, min_quality=20)
     if len(read) < 10:
         discard
 write(input, ofile='output.endstrim.fq')
 
 input = fastq('sample.fq')
-preprocess(input) using |read|:
+input = preprocess(input) using |read|:
     read = endstrim(read, min_quality=20)
     if len(read) < 10:
         discard

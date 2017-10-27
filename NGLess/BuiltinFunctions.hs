@@ -31,7 +31,7 @@ builtinFunctions =
     ,Function (FuncName "group") (Just (NGList NGLReadSet)) [] NGLReadSet groupArgs False
     ,Function (FuncName "samfile") (Just NGLString) [ArgCheckFileReadable] NGLMappedReadSet samfileArgs False
     ,Function (FuncName "unique") (Just NGLReadSet) [] NGLReadSet uniqueArgs False
-    ,Function (FuncName "preprocess") (Just NGLReadSet) [] NGLVoid preprocessArgs False
+    ,Function (FuncName "preprocess") (Just NGLReadSet) [] NGLReadSet preprocessArgs False
     ,Function (FuncName "substrim") (Just NGLRead) [] NGLRead substrimArgs False
     ,Function (FuncName "endstrim") (Just NGLRead) [] NGLRead endstrimArgs False
     ,Function (FuncName "map") (Just NGLReadSet) [] NGLMappedReadSet mapArgs False

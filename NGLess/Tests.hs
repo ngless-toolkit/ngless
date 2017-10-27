@@ -100,13 +100,13 @@ case_indent_space = isOk "ParseFailed" $ parsetest indent_space
 
 indent_comment = "ngless '0.0'\n\
     \reads = fastq('input1.fq')\n\
-    \preprocess(reads) using |read|:\n\
+    \reads = preprocess(reads) using |read|:\n\
     \    read = read[5:]\n\
     \    # comment \n"
 
 indent_space  = "ngless '0.0'\n\
     \reads = fastq('input1.fq')\n\
-    \preprocess(reads) using |read|:\n\
+    \reads = preprocess(reads) using |read|:\n\
     \    read = read[5:]\n\
     \    \n"
 
