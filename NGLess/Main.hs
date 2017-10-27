@@ -63,6 +63,7 @@ import Language
 import Types
 import Parse
 import Configuration
+import Version
 import ReferenceDatabases
 import Output
 import NGLess

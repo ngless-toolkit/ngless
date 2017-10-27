@@ -1,17 +1,12 @@
 {- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE RecordWildCards, TemplateHaskell, CPP #-}
+{-# LANGUAGE RecordWildCards, CPP #-}
 module Configuration
     ( NGLessConfiguration(..)
     , ColorSetting(..)
     , guessConfiguration
     , initConfiguration
-    , versionStr
-    , gitHashStr
-    , compilationDateStr
-    , embeddedStr
-    , dateStr
     ) where
 
 import Control.Monad
@@ -19,34 +14,13 @@ import System.Environment (getExecutablePath, lookupEnv)
 import System.Directory
 import System.FilePath
 import Data.Maybe
-import Development.GitRev (gitHash)
 import qualified Data.Text as T
 import qualified Data.Configurator as CF
 
 import CmdArgs
 
-versionStr :: String
-versionStr = "0.0.0"
-
-dateStr :: String
-dateStr = "not released"
-
-gitHashStr :: String
-gitHashStr = $(gitHash)
-
 defaultBaseURL :: FilePath
 defaultBaseURL = "http://vm-lux.embl.de/~coelho/ngless-data/"
-
-compilationDateStr :: String
-compilationDateStr = __DATE__
-
-embeddedStr :: String
-#ifdef NO_EMBED_SAMTOOLS_BWA
-embeddedStr = "No"
-#else
-embeddedStr = "Yes"
-#endif
-
 
 -- | ngless configuration options
 data NGLessConfiguration = NGLessConfiguration

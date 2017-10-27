@@ -43,6 +43,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 
 import Configuration
+import Version (versionStr)
 
 import Data.FileEmbed (embedDir)
 import Output

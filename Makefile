@@ -14,13 +14,13 @@ BWA_DIR = bwa-0.7.15
 BWA_DIR_TARGET = $(BWA_DIR)/Makefile
 BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.15/bwa-0.7.15.tar.bz2
 BWA_TAR = bwa-0.7.15.tar.bz2
-BWA_TARGET = ngless-0.0.0-bwa
+BWA_TARGET = ngless-$(VERSION)-bwa
 
 SAM_DIR = samtools-1.4
 SAM_DIR_TARGET = $(SAM_DIR)/configure
 SAM_URL = https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
 SAM_TAR = samtools-1.4.tar.bz2
-SAM_TARGET = ngless-0.0.0-samtools
+SAM_TARGET = ngless-$(VERSION)-samtools
 
 MEGAHIT_DIR = megahit-1.1.1
 # we can't target Makefile here cause we patch it after unpacking
