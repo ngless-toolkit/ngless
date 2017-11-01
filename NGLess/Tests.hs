@@ -253,6 +253,7 @@ case_expand_path = do
     expandPath' "/nothing2/file.txt" [undefined] @?=  ["/nothing2/file.txt"]
     expandPath' "/nothing3/file.txt" ["/home/luispedro/my-directory"] @?=  ["/nothing3/file.txt"]
     expandPath' "<>/nothing4/file.txt" ["/home/luispedro/my-directory1"] @?=  ["/home/luispedro/my-directory1/nothing4/file.txt"]
+    expandPath' "<>/nothing4/file.txt" ["refs=/home/luispedro/my-directory1"] @?=  []
     expandPath' "<>/nothing/file.txt" ["/home/luispedro/my-directory"
                                       ,"/home/alternative/your-directory"] @?=  ["/home/luispedro/my-directory/nothing/file.txt"
                                                                                 ,"/home/alternative/your-directory/nothing/file.txt"]
