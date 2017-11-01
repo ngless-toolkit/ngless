@@ -1,0 +1,10 @@
+ngless '0.0'
+split1 = fastq('split1.fq')
+split2 = fastq('split2.fq')
+split = group([split1, split2], name='sample')
+split = preprocess(split) using |r|:
+    r = substrim(r, min_quality=20)
+    if len(r) < 30:
+        discard
+write(split, ofile='together.fq')
+
