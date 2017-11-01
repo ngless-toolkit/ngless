@@ -11,26 +11,34 @@ OS X or Linux). Of course, you can also compile from source.
 
 ## Linux (binary)
 
-You can get an [unreleased statically linked version of
-NGless](http://vm-lux.embl.de/~coelho/ngless-data/releases/ngless-0.0.0-unreleased-Linux64)
-or a [nighly build of the latest development
+You can get a [statically linked version of
+NGless 0.5](http://ngless.embl.de/releases/ngless-0.5.0-Linux64) or a [nighly build
+of the latest development
 code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
 This should work across a wide range of Linux versions (please
 [report](https://github.com/luispedro/ngless/issues) any issues you encounter):
 
-    curl -O http://vm-lux.embl.de/~coelho/ngless-data/releases/ngless-0.0.0-unreleased-Linux64
-    chmod +x ngless-0.0.0-unreleased-Linux64
-    ./ngless-0.0.0-unreleased-Linux64
+    curl -O http://ngless.embl.de/releases/ngless-0.5.0-Linux64
+    chmod +x ngless-0.5.0-Linux64
+    ./ngless-0.5.0-Linux64
 
 This download bundles bwa, samtools and megahit (also statically linked).
 
-If you want to try one of ngless' builtin modules (motus, specI, ...) you can download [the full nighly build zip file](https://gitlab.com/ngless/ngless/builds/artifacts/master/download?job=build-and-test-ubuntu) which includes them.
+If you want to try one of ngless' builtin modules (motus, specI, ...) you can
+download [the full nighly build zip
+file](https://gitlab.com/ngless/ngless/builds/artifacts/master/download?job=build-and-test-ubuntu)
+which includes them.
 
 
 ## Windows
 
+NGLess [cannot currently compile on
+Windows](https://github.com/luispedro/ngless/issues/39).
+
+<!--
+
 Download and run the [Windows
-Installer](https://dl.dropboxusercontent.com/u/68453937/NGLess-0.0.0-install.exe).
+Installer](http://ngless.embl.de/releases/ngless-0.5.0-Windows.exe)
 The result is a command line utility, so you need to run it on the command
 line. After running the installer, typing `ngless` on the terminal should work
 as the installer will add the right directories to the path variable; you may
@@ -39,11 +47,12 @@ Cygwin is **not** a dependency).
 
 The Windows package includes [bwa](http://bio-bwa.sourceforge.net/) and
 [samtools](http://www.htslib.org/). The bwa and samtools executables are
-available as `ngless-0.0.0-bwa` and `ngless-0.0.0-samtools`, respectively.  It
+available as `ngless-0.5.0-bwa` and `ngless-0.5.0-samtools`, respectively.  It
 has been tested on Windows 10, but this has not had as intensitive testing as
 the Linux/Mac OS X versions so any [bug
 reports](https://github.com/luispedro/ngless/issues) are appreciated.
 
+-->
 
 ## From source
 
