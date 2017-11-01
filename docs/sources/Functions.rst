@@ -173,9 +173,9 @@ preprocess
 
 This function executes the given block for each read in the ReadSet.  Unless
 the read is **discarded**, it is transferred (after transformations) to the
-output. The output is assigned to the same name as the inputs. For example::
+output. For example::
 
-    preprocess(inputs) using |read|:
+    inputs = preprocess(inputs) using |read|:
         read = read[3:]
 
 Argument:
