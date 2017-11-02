@@ -36,7 +36,7 @@ NGLESS_EMBEDDED_BINARIES := \
 NGLESS_EMBEDDED_TARGET = NGLess/Dependencies/embedded.c
 
 MEGAHIT_BINS := $(MEGAHIT_DIR)/megahit_asm_core $(MEGAHIT_DIR)/megahit_sdbg_build $(MEGAHIT_DIR)/megahit_toolkit $(MEGAHIT_DIR)/megahit
-NGLESS_EXT_BINS = $(BWA_DIR)/$(BWA_TARGET) $(SAM_DIR)/$(SAM_TARGET) $(MEGAHIT_BINS) $(MEGAHIT_DIR)/static-build
+NGLESS_EXT_BINS = $(BWA_DIR)/$(BWA_TARGET) $(SAM_DIR)/$(SAM_TARGET) $(MEGAHIT_BINS)
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
