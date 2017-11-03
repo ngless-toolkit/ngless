@@ -1,4 +1,6 @@
-# Search path expansion
+=====================
+Search path expansion
+=====================
 
 .. note::
     Search path expansion is a very powerful feature. It can be abused to
