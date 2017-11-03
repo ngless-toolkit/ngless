@@ -59,7 +59,6 @@ dependencies:
   - random
   - regex
   - safe
-  - safeio >=0.0.2
   - strict
   - stm
   - stm-chans
@@ -75,6 +74,18 @@ dependencies:
   - vector-algorithms
   - yaml
   - zlib
+
+when:
+  - condition: ! 'os(windows)'
+    cpp-options: -DWINDOWS
+    dependencies:
+    - atomic-write
+  - condition: ! '!(os(windows))'
+    dependencies:
+    - bzlib-conduit
+    - double-conversion
+    - safeio >=0.0.2
+    - unix
 
 executables:
   ngless:
@@ -100,13 +111,6 @@ executables:
         - -O2
         - -rtsopts
         - ! '"-with-rtsopts=-A64m -n4m -H -qg"'
-    - condition: os(windows)
-      cpp-options: -DWINDOWS
-    - condition: ! '!(os(windows))'
-      dependencies:
-      - bzlib-conduit
-      - double-conversion
-      - unix
     - condition: ! '!(flag(embed))'
       then:
         cc-options: -DNO_EMBED_SAMTOOLS_BWA
@@ -147,13 +151,6 @@ tests:
         - -O2
         - -rtsopts
         - ! '"-with-rtsopts=-A64m -n4m -H -qg"'
-    - condition: os(windows)
-      cpp-options: -DWINDOWS
-    - condition: ! '!(os(windows))'
-      dependencies:
-      - bzlib-conduit
-      - double-conversion
-      - unix
     - condition: ! '!(flag(embed))'
       then:
         cc-options: -DNO_EMBED_SAMTOOLS_BWA
@@ -189,13 +186,6 @@ benchmarks:
         - -O2
         - -rtsopts
         - ! '"-with-rtsopts=-A64m -n4m -H -qg"'
-    - condition: os(windows)
-      cpp-options: -DWINDOWS
-    - condition: ! '!(os(windows))'
-      dependencies:
-      - bzlib-conduit
-      - double-conversion
-      - unix
     - condition: ! '!(flag(embed))'
       then:
         cc-options: -DNO_EMBED_SAMTOOLS_BWA

@@ -13,9 +13,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import           Data.Maybe
 import           Control.Monad.Trans.Cont (evalCont, callCC)
-import           System.IO.SafeWrite (withOutputFile)
 
-
+import Utils.Utils
 import Language
 
 {- Build a CWL wrapper for the NGLess script
@@ -61,20 +60,19 @@ extractARGVUsage e = evalCont $ callCC $ \exit -> do
         extractARGVUsage' _ _ = return ()
 
 extractAllARGVUsage :: Script -> [Integer]
-extractAllARGVUsage (Script _ body) = mapMaybe extractARGVUsage (snd <$> body) 
+extractAllARGVUsage (Script _ body) = mapMaybe extractARGVUsage (snd <$> body)
 
 extractOutput (Script _ body) = head $ mapMaybe  extractOutput' (snd <$> body)
     where
         extractOutput' :: Expression -> Maybe Integer
         extractOutput' (FunctionCall (FuncName "write") _ kwargs _) = do
             ofile <- lookup (Variable "ofile") kwargs
-            ix <- extractARGVUsage ofile
-            return ix
+            extractARGVUsage ofile
         extractOutput' _ = Nothing
 
 writeCWL :: Script -> FilePath -> FilePath -> IO ()
-writeCWL sc scFname fp = do
-    withOutputFile fp $ \h -> do
+writeCWL sc scFname fp =
+    withOutputFile fp $ \h ->
         B.hPut h (B8.pack $ buildCWL scFname sc)
 
 buildCWL :: FilePath -> Script -> String

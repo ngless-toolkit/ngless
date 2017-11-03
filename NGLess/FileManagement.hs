@@ -35,7 +35,6 @@ import System.Posix.Internals (c_getpid)
 import System.Directory
 import System.IO
 import System.IO.Error
-import System.IO.SafeWrite (withOutputFile)
 import Control.Exception
 import System.Environment (getExecutablePath, lookupEnv)
 import Control.Monad.Trans.Resource
@@ -51,6 +50,7 @@ import NGLess.NGLEnvironment
 import NGLess.NGError
 import Dependencies.Embedded
 import Utils.LockFile
+import Utils.Utils
 
 
 data InstallMode = User | Root deriving (Eq, Show)

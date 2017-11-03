@@ -2,6 +2,8 @@
  - License: MIT
  -}
 
+{-# LANGUAGE CPP #-}
+
 module Utils.Utils
     ( lookupWithDefault
     , maybeM
@@ -16,6 +18,7 @@ module Utils.Utils
     , secondM
     , headtails
     , dropEnd
+    , withOutputFile
     ) where
 
 import Control.Monad
@@ -30,6 +33,12 @@ import GHC.IO.Exception (IOErrorType(..))
 
 import Data.List (group, uncons, tails)
 import Data.Maybe (fromMaybe, catMaybes, mapMaybe)
+#ifdef WINDOWS
+import           System.AtomicWrite.Internal (tempFileFor, closeAndRename)
+#else
+import           System.IO.SafeWrite (withOutputFile)
+#endif
+
 -- This module should not import from other NGLess modules
 
 {- This module is a grab bag of utility functions
@@ -103,3 +112,13 @@ headtails = mapMaybe uncons . tails
 dropEnd :: Int -> [a] -> [a]
 dropEnd v a = take (length a - v) a -- take of a negative is the empty sequence, which is correct in this case
 
+#ifdef WINDOWS
+-- Windows-compatible reimplementation of safeio's withOutputFile
+-- (Note that this is not as complete as safeio as it does not sync the
+-- directory).
+withOutputFile :: FilePath -> (Handle -> IO a) -> IO a
+withOutputFile fp act = do
+    (fp', h) <- tempFileFor fp
+    act h
+    closeAndRename h fp' fp
+#endif
