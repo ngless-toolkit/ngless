@@ -17,15 +17,15 @@ Example
 ::
 
     ngless "0.5"
-    input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
+    input = paired('ctrl1.fq', 'ctrl2.fq', singles='ctrl-singles.fq')
     input = preprocess(input) using |read|:
         read = read[5:]
         read = substrim(read, min_quality=26)
         if len(read) < 31:
             discard
 
-    mapped = map(input,
-                    reference='hg19')
+    mapped = map(input, reference='hg19')
+
     write(count(mapped, features=['gene']),
             ofile='gene_counts.csv',
             format={csv})
