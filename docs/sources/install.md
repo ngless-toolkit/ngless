@@ -1,13 +1,12 @@
 # Installation
 
-**NOTE**: As of October 2017, ngless is considered beta software. We are using
-it daily and intensively testing, but are still happy to receive any feedback.
-Please [get in touch](mailto:coelho@embl.de) if you are interested in using
-ngless in your projects.
 
-At the moment, ngless can be esily obtained in binary form for Linux, Windows
-(experimental and not kept up to date) and with either *brew* or *nix* (for Mac
-OS X or Linux). Of course, you can also compile from source.
+## Bioconda (binary)
+
+One of the simplest ways to install NGLess is through
+[bioconda](http://bioconda.github.io):
+
+    conda install -c bioconda ngless 
 
 ## Linux (binary)
 
