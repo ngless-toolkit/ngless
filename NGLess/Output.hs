@@ -303,8 +303,10 @@ writeOutputTSV :: FilePath -> FilePath -> IO ()
 writeOutputTSV fqStatsFp mapStatsFp = do
         fqStats <- reverse <$> readIORef savedFQOutput
         mapStats <- reverse <$> readIORef savedMapOutput
-        BL.writeFile fqStatsFp  . formatTSV fqHeaders $ encodeFQStats <$> fqStats
-        BL.writeFile mapStatsFp . formatTSV msHeaders $ encodeMapStats <$> mapStats
+        withOutputFile fqStatsFp $ \hout ->
+            BL.hPut hout  . formatTSV fqHeaders $ encodeFQStats <$> fqStats
+        withOutputFile mapStatsFp $ \hout ->
+            BL.hPutStr hout . formatTSV msHeaders $ encodeMapStats <$> mapStats
     where
         formatTSV :: [String] -> [[String]] -> BL.ByteString
         formatTSV header contents = BL.concat [BL8.intercalate "\t" (BL8.pack <$> header), "\n",
@@ -313,8 +315,8 @@ writeOutputTSV fqStatsFp mapStatsFp = do
         fqHeaders                = ["file"  , "encoding", "numSeqs",    "minSeqLen",         "maxSeqLen",        "gcContent"]
         encodeFQStats FQInfo{..} = [fileName,  encoding, show numSeqs, show (fst seqLength), show (snd seqLength), show gcContent]
 
-        msHeaders                      = ["inputFile",    "reference",       "totalReads",       "totalAligned",       "totalUnique"]
-        encodeMapStats MappingInfo{..} = [mi_inputFile, mi_reference, show mi_totalReads, show mi_totalAligned, show mi_totalUnique]
+        msHeaders                      = [ "inputFile",  "lineNumber",  "reference",            "total",            "aligned",            "unique"]
+        encodeMapStats MappingInfo{..} = [mi_inputFile,   show mi_lno, mi_reference, show mi_totalReads, show mi_totalAligned, show mi_totalUnique]
 
 outputConfiguration :: NGLessIO ()
 outputConfiguration = do
