@@ -10,5 +10,6 @@
 #     
 # Output hash: 0f45254f869c6333150758cb0b2bca0d
 	seq1_2.sam.bz2
+-1	1
 seq1	99990
 seq2	100

@@ -61,6 +61,7 @@ import Data.Convertible         (convert)
 import Data.GFF
 import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamGroupsC')
 import FileManagement (openNGLTempFile, expandPath)
+import NGLess.NGLEnvironment
 import ReferenceDatabases
 import NGLess.NGError
 import FileOrStream
@@ -239,7 +240,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
                     ] =<< lookupSymbolOrScriptErrorDef (return "dist1")
                                     "multiple argument to count " "multiple" args
     strand_specific <- lookupBoolOrScriptErrorDef (return False) "count function" "strand" args
-    include_minus1 <- lookupBoolOrScriptErrorDef (return False) "count function" "include_minus1" args
+    include_minus1 <- lookupBoolOrScriptErrorDef defaultMinus1 "count function" "include_minus1" args
     mocatMap <- lookupFilePath "functional_map argument to count()" "functional_map" args
     gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
     discardZeros <- lookupBoolOrScriptErrorDef (return False) "count argument parsing" "discard_zeros" args
@@ -287,6 +288,11 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
     NGOCounts . File <$> performCount samfp rname annotators opts
 executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
+
+defaultMinus1 :: NGLessIO Bool
+defaultMinus1 = do
+    version <- ngleVersion <$> nglEnvironment
+    return $! version `notElem` ["0.0", "0.5"]
 
 loadAnnotator :: AnnotationMode -> CountOpts -> NGLessIO [Annotator]
 loadAnnotator AnnotateSeqName _ = return [SeqNameAnnotator Nothing]

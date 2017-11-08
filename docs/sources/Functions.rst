@@ -393,7 +393,7 @@ Arguments by value:
 +-------------------+-----------------+------------+----------------+
 | normalization     | Symbol          | no         | {raw}          |
 +-------------------+-----------------+------------+----------------+
-| include_minus1    | Bool            | no         | false          |
+| include_minus1    | Bool            | no         | true           |
 +-------------------+-----------------+------------+----------------+
 | min               | Integer         | no         | 0              |
 +-------------------+-----------------+------------+----------------+
@@ -457,6 +457,10 @@ argument to True.
 
 Unmapped inserts are included in the output if ``{include_minus1}`` is true
 (default: ``False``).
+
+
+.. versionadded:: 0.6
+    Before version 0.6, the default was to **not** include the -1 fraction.
 
 substrim
 --------
