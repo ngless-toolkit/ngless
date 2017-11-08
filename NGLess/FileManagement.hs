@@ -158,13 +158,13 @@ megahitBin :: NGLessIO FilePath
 megahitBin = liftIO (lookupEnv "NGLESS_MEGAHIT_BIN") >>= \case
     Just bin -> checkExecutable "NGLESS_MEGAHIT_BIN" bin
     Nothing -> do
-        path <- findBin "megahit"
+        path <- findBin ("ngless-"++versionStr ++ "megahit/megahit")
         maybe createMegahitBin return path
 
 createMegahitBin :: NGLessIO FilePath
 createMegahitBin = do
     megahitData' <- liftIO megahitData
-    destdir <- binPath User
+    destdir <- (</> ("ngless-" ++ versionStr ++ "-megahit")) <$> binPath User
     when (B.null megahitData') $
         throwSystemError "Cannot find megahit on the system and this is a build without embedded dependencies."
     liftIO $ createDirectoryIfMissing True destdir
