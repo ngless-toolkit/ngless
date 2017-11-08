@@ -34,6 +34,7 @@ readlines_Function = Function
     , funcRetType = NGList NGLString
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False
+    , funcChecks = []
     }
 
 loadModule :: T.Text -> NGLessIO Module

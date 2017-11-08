@@ -1,4 +1,4 @@
-ngless '0.0'
+ngless '0.6'
 one = fastq('sample.fq')
 mapped = map(one,reference='sacCer3')
 write(mapped, ofile='one.sam')
@@ -9,3 +9,5 @@ split = group([split1, split2], name='sample')
 mapped = map(split, reference='sacCer3')
 write(mapped, ofile='split.sam')
 
+write(qcstats({fastq}), ofile='output.fqstats.tsv')
+write(qcstats({mapping}), ofile='output.mapstats.tsv')

@@ -63,6 +63,7 @@ indexCheck = Function
                 [ArgInformation "original_lno" True NGLInteger []
                 ,ArgInformation "index1" True NGLInteger []]
     , funcAllowsAutoComprehension = False
+    , funcChecks = []
     }
 
 oFileCheck = Function
@@ -72,6 +73,7 @@ oFileCheck = Function
     , funcRetType = NGLVoid
     , funcKwArgs = [ArgInformation "original_lno" True NGLInteger []]
     , funcAllowsAutoComprehension = False
+    , funcChecks = []
     }
 
 loadModule :: T.Text -> NGLessIO Module

@@ -110,6 +110,29 @@ Returns
 
 MappedReadSet
 
+qcstats
+-------
+
+.. versionadded:: 0.6
+    This functionality was not available prior to 0.6
+
+Returns the auto-computed statistics::
+
+    write(qcstats({fastq}), ofile='fqstats.txt')
+
+
+Returns
+~~~~~~~
+
+CountsTable
+
+Argument
+~~~~~~~~
+
+``{fastq}``: FastQ statistics
+``{mapping}``: Mapping statistics
+
+
 countfile
 ---------
 

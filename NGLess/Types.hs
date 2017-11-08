@@ -298,7 +298,7 @@ findMethodInfo m =  case filter ((==m) . methodName) builtinMethods of
 checkFuncUnnamed :: FuncName -> Expression -> TypeMSt (Maybe NGLType)
 checkFuncUnnamed f arg = do
         targ <- nglTypeOf arg
-        Function _ metype _ rtype _ allowAutoComp <- funcInfo f
+        Function _ metype _ rtype _ allowAutoComp _ <- funcInfo f
         case metype of
             Just etype -> case targ of
                 Just (NGList t)
@@ -319,7 +319,7 @@ checkFuncUnnamed f arg = do
 
 checkFuncKwArgs :: FuncName -> [(Variable, Expression)] -> TypeMSt ()
 checkFuncKwArgs f args = do
-    Function _ _ _ _ argInfo _ <- funcInfo f
+    Function _ _ _ _ argInfo _ _ <- funcInfo f
     mapM_ (check1arg (concat ["function '", show f, "'"]) argInfo) args
 
 

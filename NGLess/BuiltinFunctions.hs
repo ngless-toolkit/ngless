@@ -26,21 +26,21 @@ findFunction :: [Module] -> FuncName -> Maybe Function
 findFunction mods fn = find ((==fn) . funcName) $ builtinFunctions ++ concat (modFunctions <$> mods)
 
 builtinFunctions =
-    [Function (FuncName "fastq") (Just NGLString) [ArgCheckFileReadable] NGLReadSet fastqArgs False
-    ,Function (FuncName "paired") (Just NGLString) [ArgCheckFileReadable] NGLReadSet pairedArgs False
-    ,Function (FuncName "group") (Just (NGList NGLReadSet)) [] NGLReadSet groupArgs False
-    ,Function (FuncName "samfile") (Just NGLString) [ArgCheckFileReadable] NGLMappedReadSet samfileArgs False
-    ,Function (FuncName "unique") (Just NGLReadSet) [] NGLReadSet uniqueArgs False
-    ,Function (FuncName "preprocess") (Just NGLReadSet) [] NGLReadSet preprocessArgs False
-    ,Function (FuncName "substrim") (Just NGLRead) [] NGLRead substrimArgs False
-    ,Function (FuncName "endstrim") (Just NGLRead) [] NGLRead endstrimArgs False
-    ,Function (FuncName "map") (Just NGLReadSet) [] NGLMappedReadSet mapArgs False
-    ,Function (FuncName "mapstats") (Just NGLMappedReadSet) [] NGLCounts mapStatsArgs False
-    ,Function (FuncName "select") (Just NGLMappedReadSet) [] NGLMappedReadSet selectArgs False
-    ,Function (FuncName "count") (Just NGLMappedReadSet) [] NGLCounts countArgs False
-    ,Function (FuncName "countfile") (Just NGLString) [ArgCheckFileReadable] NGLCounts [] False
-    ,Function (FuncName "write") (Just NGLAny) [] NGLVoid writeArgs False
-    ,Function (FuncName "print") (Just NGLAny) [] NGLVoid [] False
+    [Function (FuncName "fastq") (Just NGLString) [ArgCheckFileReadable] NGLReadSet fastqArgs False []
+    ,Function (FuncName "paired") (Just NGLString) [ArgCheckFileReadable] NGLReadSet pairedArgs False []
+    ,Function (FuncName "group") (Just (NGList NGLReadSet)) [] NGLReadSet groupArgs False []
+    ,Function (FuncName "samfile") (Just NGLString) [ArgCheckFileReadable] NGLMappedReadSet samfileArgs False []
+    ,Function (FuncName "unique") (Just NGLReadSet) [] NGLReadSet uniqueArgs False []
+    ,Function (FuncName "preprocess") (Just NGLReadSet) [] NGLReadSet preprocessArgs False []
+    ,Function (FuncName "substrim") (Just NGLRead) [] NGLRead substrimArgs False []
+    ,Function (FuncName "endstrim") (Just NGLRead) [] NGLRead endstrimArgs False []
+    ,Function (FuncName "map") (Just NGLReadSet) [] NGLMappedReadSet mapArgs False []
+    ,Function (FuncName "mapstats") (Just NGLMappedReadSet) [] NGLCounts mapStatsArgs False []
+    ,Function (FuncName "select") (Just NGLMappedReadSet) [] NGLMappedReadSet selectArgs False []
+    ,Function (FuncName "count") (Just NGLMappedReadSet) [] NGLCounts countArgs False []
+    ,Function (FuncName "countfile") (Just NGLString) [ArgCheckFileReadable] NGLCounts [] False []
+    ,Function (FuncName "write") (Just NGLAny) [] NGLVoid writeArgs False []
+    ,Function (FuncName "print") (Just NGLAny) [] NGLVoid [] False []
     ]
 
 groupArgs =

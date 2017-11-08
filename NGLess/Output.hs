@@ -31,6 +31,7 @@ import Data.Time.Format (formatTime, defaultTimeLocale)
 import System.Console.ANSI
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
+import           Control.Monad.Extra (whenJust)
 import           Numeric (showFFloat)
 import           Control.Arrow (first)
 import qualified Data.Text as T
@@ -291,18 +292,28 @@ writeOutputJS fname scriptName script = do
                     ,";\n"])
 
 
-writeOutputTSV :: FilePath -> FilePath -> IO ()
-writeOutputTSV fqStatsFp mapStatsFp = do
+writeOutputTSV :: Bool -- ^ whether to transpose matrix
+                -> Maybe FilePath
+                -> Maybe FilePath
+                -> IO ()
+writeOutputTSV transpose fqStatsFp mapStatsFp = do
         fqStats <- reverse <$> readIORef savedFQOutput
         mapStats <- reverse <$> readIORef savedMapOutput
-        withOutputFile fqStatsFp $ \hout ->
-            BL.hPut hout  . formatTSV fqHeaders $ encodeFQStats <$> fqStats
-        withOutputFile mapStatsFp $ \hout ->
-            BL.hPutStr hout . formatTSV msHeaders $ encodeMapStats <$> mapStats
+        whenJust fqStatsFp $ \fp ->
+            withOutputFile fp $ \hout ->
+                BL.hPut hout  . formatTSV fqHeaders $ encodeFQStats <$> fqStats
+        whenJust mapStatsFp $ \fp ->
+            withOutputFile fp $ \hout ->
+                BL.hPutStr hout . formatTSV msHeaders $ encodeMapStats <$> mapStats
     where
-        formatTSV :: [String] -> [[String]] -> BL.ByteString
-        formatTSV header contents = BL.concat [BL8.intercalate "\t" (BL8.pack <$> header), "\n",
+        formatTSV :: [BL.ByteString] -> [[String]] -> BL.ByteString
+        formatTSV header contents
+            | transpose = BL.concat ("\tstats\n":(formatTSV1 header <$> zip [0..] contents))
+            | otherwise = BL.concat [BL8.intercalate "\t" header, "\n",
                                     BL8.intercalate "\n" (asTSVline <$> contents), "\n"]
+        formatTSV1 :: [BL.ByteString] -> (Int, [String]) -> BL.ByteString
+        formatTSV1 header (i,contents) = BL.concat [BL8.concat [BL8.concat [BL8.pack . show $ i, ":", h], "\t", BL8.pack c, "\n"]
+                                                                        | (h, c) <- zip header contents]
         asTSVline = BL8.intercalate "\t" . map BL8.pack
         fqHeaders                = ["file"  , "encoding", "numSeqs",    "minSeqLen",         "maxSeqLen",        "gcContent"]
         encodeFQStats FQInfo{..} = [fileName,  encoding, show numSeqs, show (fst seqLength), show (snd seqLength), show gcContent]

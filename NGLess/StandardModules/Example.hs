@@ -33,6 +33,7 @@ exampleFunction = Function
             [ArgInformation "opt1" False NGLSymbol [ArgCheckSymbol ["test1", "test2"]]
             ]
     , funcAllowsAutoComprehension = True
+    , funcChecks = []
     }
 
 loadModule :: T.Text -> NGLessIO Module

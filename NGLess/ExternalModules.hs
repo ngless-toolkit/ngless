@@ -225,7 +225,7 @@ addPathToRef mpath er@ExternalReference{..} = er
 addPathToRef _ er = er
 
 
-asFunction Command{..} = Function (FuncName nglName) (Just . argType . cargInfo $ arg1) [] (commandReturnType ret) (map cargInfo additional) False
+asFunction Command{..} = Function (FuncName nglName) (Just . argType . cargInfo $ arg1) [] (commandReturnType ret) (map cargInfo additional) False []
 
 {- | Environment to expose to module processes -}
 nglessEnv :: FilePath -> NGLessIO [(String,String)]

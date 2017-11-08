@@ -8,6 +8,7 @@ module Modules
     ( ArgInformation(..)
     , ArgCheck(..)
     , Function(..)
+    , FunctionCheck(..)
     , Reference(..)
     , ExternalReference(..)
     , Module(..)
@@ -54,6 +55,11 @@ data ArgCheck =
             | ArgCheckFileWritable -- ^ file should be writeable (i.e., this is an output file)
             deriving (Eq,Show)
 
+-- | Checks for a function
+data FunctionCheck =
+            FunctionCheckMinNGLessVersion (Int, Int)
+            deriving (Eq, Show)
+
 -- | Basic information about argument to a function
 data ArgInformation = ArgInformation
     { argName :: !T.Text -- ^ argument name
@@ -71,6 +77,7 @@ data Function = Function
     , funcRetType :: NGLType -- ^ what type it returns
     , funcKwArgs :: [ArgInformation] -- ^ what are the keyword arguments
     , funcAllowsAutoComprehension :: Bool -- ^ if true, then calling this function with [funcArgType] should return [funcRetType]
+    , funcChecks :: [FunctionCheck]
     } deriving (Eq, Show)
 
 data ExternalReference = ExternalReference

@@ -40,6 +40,7 @@ removeFunction = Function
     , funcRetType = NGLVoid
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False
+    , funcChecks = []
     }
 
 loadModule :: T.Text -> NGLessIO Module

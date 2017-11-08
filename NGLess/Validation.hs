@@ -10,6 +10,8 @@ module Validation
     ) where
 
 import qualified Data.Text as T
+import qualified Data.Text.Read as T
+import           Data.Either.Combinators (rightToMaybe)
 import           Control.Monad.Extra (whenJust)
 import           Control.Monad.Writer.Strict
 import           Control.Monad.RWS
@@ -48,6 +50,7 @@ validate mods expr = case errors of
         checks' :: [[Module] -> Script -> Writer [T.Text] ()]
         checks' =
             [validateNoConstantAssignments
+            ,validateNGLessVersionUses
             ]
 
 {- Each checking function has the type
@@ -62,10 +65,11 @@ validate mods expr = case errors of
 
 
 validateVersion :: [Module] -> Script -> Maybe T.Text
-validateVersion _ sc = nglVersion  <$> nglHeader sc >>= \case
+validateVersion _ sc = nglVersion <$> nglHeader sc >>= \case
     "0.0" -> Nothing
     "0.5" -> Nothing
-    version -> Just (T.concat ["Version ", version, " is not supported (only versions 0.0/0.5 are available in this release)."])
+    "0.6" -> Nothing
+    version -> Just (T.concat ["Version ", version, " is not supported (only versions 0.0/0.5/0.6 are available in this release)."])
 
 -- | check whether results of calling pure functions are use
 validate_pure_function _ (Script _ es) = check_toplevel validate_pure_function' es
@@ -245,8 +249,6 @@ uses_STDOUT = constant_used "STDOUT"
 validateNoConstantAssignments :: [Module] -> Script -> Writer [T.Text] ()
 validateNoConstantAssignments mods (Script _ es) = foldM_ checkAssign builtins es
     where
-        tell1lno :: Int -> T.Text -> Writer [T.Text] ()
-        tell1lno lno err = tell [T.concat ["Line ", T.pack (show lno), ": ", err]]
         checkAssign active (lno,e) = case e of
             Assignment (Variable v) _ -> do
                 when (v `elem` active) $
@@ -278,3 +280,41 @@ errors_from_list :: [Maybe T.Text] -> Maybe T.Text
 errors_from_list errs = case catMaybes errs of
     [] -> Nothing
     errs' -> Just (T.concat errs')
+
+tell1lno :: Int -> T.Text -> Writer [T.Text] ()
+tell1lno lno err = tell [T.concat ["Line ", T.pack (show lno), ": ", err]]
+
+validateNGLessVersionUses :: [Module] -> Script -> Writer [T.Text] ()
+validateNGLessVersionUses mods sc = case nglVersion <$> nglHeader sc of
+        Nothing -> return ()
+        Just version -> forM_ (nglBody sc) $ \(lno, expr) ->
+            recursiveAnalyse (check version lno) expr
+    where
+        check :: T.Text -> Int -> Expression -> Writer [T.Text] ()
+        check version lno f = case f of
+            FunctionCall fname@(FuncName fname') _ _ _ -> case minVersionFor fname of
+                Just minV
+                    | versionLE minV version -> return ()
+                    | otherwise ->
+                        tell1lno lno $ T.concat ["Function ", fname', " requires ngless version ", T.pack . show $ fst minV, ".", T.pack . show $ snd minV]
+                _ -> return ()
+            _ -> return ()
+        minVersionFor :: FuncName -> Maybe (Int, Int)
+        minVersionFor fname = do
+            finfo <- findFunction mods fname
+            FunctionCheckMinNGLessVersion minV <- flip find (funcChecks finfo) $ \case
+                            FunctionCheckMinNGLessVersion{} -> True
+                            _ -> False
+            return minV
+        versionLE (majV, minV) actual = case parseVersion actual of
+            Just (aMaj, aMin) -> case aMaj `compare` majV of
+                GT -> True
+                EQ -> aMin >= minV
+                LT -> False
+            _ -> False
+        parseVersion :: T.Text -> Maybe (Int, Int)
+        parseVersion version = do
+            (majV, rest) <- rightToMaybe $ T.decimal version
+            guard $ not (T.null rest)
+            (minV, _) <- rightToMaybe $ T.decimal (T.tail version)
+            return (majV, minV)

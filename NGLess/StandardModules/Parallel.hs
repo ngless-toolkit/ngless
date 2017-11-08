@@ -390,6 +390,7 @@ lock1 = Function
     , funcRetType = NGLString
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False
+    , funcChecks = []
     }
 
 collectFunction = Function
@@ -406,6 +407,7 @@ collectFunction = Function
         ,ArgInformation "auto_comments" False (NGList NGLSymbol) [ArgCheckSymbol ["date", "script", "hash"]]
         ]
     , funcAllowsAutoComprehension = False
+    , funcChecks = []
     }
 
 setTagFunction = Function
@@ -415,6 +417,7 @@ setTagFunction = Function
     , funcRetType = NGLString
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False
+    , funcChecks = []
     }
 
 
@@ -429,6 +432,7 @@ pasteHiddenFunction = Function
         , ArgInformation "matching_rows" False NGLBool []
         ]
     , funcAllowsAutoComprehension = False
+    , funcChecks = []
     }
 
 addLockHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]

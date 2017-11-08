@@ -163,6 +163,7 @@ samtools_sort_function = Function
     , funcRetType = NGLMappedReadSet
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False
+    , funcChecks = []
     }
 
 

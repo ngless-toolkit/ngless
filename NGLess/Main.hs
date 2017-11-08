@@ -85,6 +85,7 @@ import qualified BuiltinModules.Checks as Checks
 import qualified BuiltinModules.AsReads as ModAsReads
 import qualified BuiltinModules.Readlines as Readlines
 import qualified BuiltinModules.Remove as Remove
+import qualified BuiltinModules.QCStats as ModQCStats
 
 
 -- | wrapPrint transforms the script by transforming the last expression <expr>
@@ -153,8 +154,9 @@ loadModules mods  = do
     mReadlines <- Readlines.loadModule ("" :: T.Text)
     mChecks <- Checks.loadModule ("" :: T.Text)
     mRemove <- Remove.loadModule ("" :: T.Text)
+    mStats <- ModQCStats.loadModule ("" :: T.Text)
     imported <- loadStdlibModules mods
-    let loaded = (mReadlines:mArgv:mAssemble:mA:mChecks:mRemove:imported)
+    let loaded = (mReadlines:mArgv:mAssemble:mA:mChecks:mRemove:mStats:imported)
     forM_ loaded registerModule
     return loaded
 
@@ -277,7 +279,7 @@ modeExec opts@DefaultMode{} = do
         setupHtmlViewer odir
         T.writeFile (odir </> "script.ngl") ngltext
         writeOutputJS (odir </> "output.js") fname ngltext
-        writeOutputTSV (odir </> "fq.tsv") (odir </> "mappings.tsv")
+        writeOutputTSV False (Just $ odir </> "fq.tsv") (Just $ odir </> "mappings.tsv")
     exitSuccess
 
 

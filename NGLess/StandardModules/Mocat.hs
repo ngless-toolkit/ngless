@@ -128,6 +128,7 @@ mocatLoadSample = Function
             ,ArgInformation "encoding" False NGLSymbol [ArgCheckSymbol ["auto", "33", "64", "sanger", "solexa"]]
             ]
     , funcAllowsAutoComprehension = False
+    , funcChecks = []
     }
 
 coordToGtf = Function
@@ -137,6 +138,7 @@ coordToGtf = Function
     , funcRetType = NGLString
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False
+    , funcChecks = []
     }
 
 
