@@ -347,6 +347,7 @@ vMapMaybeLifted f v = sequence $ V.unfoldr loop 0
                                 Left err -> Just (Left err, V.length v) -- early exit: we are done
             | otherwise = Nothing
 
+shortReadVectorStats :: (MonadIO m, MonadResource m) => m (TQ.TBMQueue (V.Vector ShortRead), ReleaseKey, A.Async FQStatistics)
 shortReadVectorStats = do
     q <- liftIO $ TQ.newTBMQueueIO 8
     p <- liftIO . A.async $
@@ -432,6 +433,10 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
 
         liftNGLessIO $ outputListLno' DebugOutput ["Preprocess finished"]
 
+        Just lno <- ngleLno <$> runNGLessIO nglEnvironment
+        runNGLessIO $ outputFQStatistics ("preproc.lno"++show lno++".pairs.1") s1' outenc
+        runNGLessIO $ outputFQStatistics ("preproc.lno"++show lno++".pairs.2") s2' outenc
+        runNGLessIO $ outputFQStatistics ("preproc.lno"++show lno++".singles") s3' outenc
         NGOReadSet name <$> case (nSeq s1' > 0, nSeq s2' > 0, nSeq s3' > 0) of
                     (True, True, False) -> do
                         liftIO $ removeFile fp3'
