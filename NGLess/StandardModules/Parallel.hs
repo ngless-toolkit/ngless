@@ -40,6 +40,7 @@ import           Control.DeepSeq
 import           Data.Traversable
 import           Control.Concurrent (threadDelay)
 import           Control.Monad.Trans.Class
+import           System.AtomicWrite.Writer.Text (atomicWriteFile)
 
 
 import Control.Monad.IO.Class (liftIO)
@@ -102,8 +103,9 @@ setupHashDirectory basename hash = do
     let actiondir = basename </> prefix ++ take 8 (T.unpack hash)
         scriptfile = actiondir </> "script.ngl"
     liftIO $ createDirectoryIfMissing True actiondir
-    unlessM (liftIO $ doesFileExist scriptfile) $
-        writeAnnotatedScriptTo scriptfile
+    unlessM (liftIO $ doesFileExist scriptfile) $ do
+        sct <- ngleScriptText <$> nglEnvironment
+        liftIO $ atomicWriteFile scriptfile sct
     return actiondir
 
 executeLock1 (NGOList entries) kwargs  = do
@@ -450,9 +452,11 @@ addLockHash script = do
 
 
 loadModule :: T.Text -> NGLessIO Module
-loadModule _ =
+loadModule v
+    | v /= "0.6" = throwScriptError ("Parallel behaviour changed. Only version 0.6 is now supported")
+    | otherwise =
         return def
-        { modInfo = ModInfo "stdlib.parallel" "0.0"
+        { modInfo = ModInfo "stdlib.parallel" "0.6"
         , modFunctions =
             [ lock1
             , collectFunction

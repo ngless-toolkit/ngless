@@ -1,5 +1,5 @@
 ngless "0.0"
-import "parallel" version "0.0"
+import "parallel" version "0.6"
 
 sample = lock1(readlines('input.txt'))
 input = fastq(sample)
