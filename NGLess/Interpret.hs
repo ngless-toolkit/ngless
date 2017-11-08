@@ -89,6 +89,7 @@ import Modules
 import NGLess
 import Data.Sam
 import Data.FastQ
+import NGLess.NGLEnvironment
 import NGLess.NGError
 
 import Interpretation.Map
@@ -153,7 +154,7 @@ autoComprehendNB f e args = f e args
 
 -- Set line number
 setlno :: Int -> InterpretationEnvIO ()
-setlno !n = liftIO $ setOutputLno (Just n)
+setlno !n = runNGLessIO $ updateNglEnvironment (\e -> e { ngleLno = Just n } )
 
 lookupVariable :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
 lookupVariable !k = liftM2 (<|>)

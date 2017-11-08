@@ -11,7 +11,6 @@ module Output
     , commentC
     , outputListLno
     , outputListLno'
-    , setOutputLno
     , outputFQStatistics
     , outputMapStatistics
     , writeOutputJS
@@ -126,10 +125,6 @@ data MappingInfo = MappingInfo
 
 $(deriveToJSON defaultOptions{fieldLabelModifier = drop 3} ''MappingInfo)
 
-curLine :: IORef (Maybe Int)
-{-# NOINLINE curLine #-}
-curLine = unsafePerformIO (newIORef Nothing)
-
 savedOutput :: IORef [OutputLine]
 {-# NOINLINE savedOutput #-}
 savedOutput = unsafePerformIO (newIORef [])
@@ -141,9 +136,6 @@ savedFQOutput = unsafePerformIO (newIORef [])
 savedMapOutput :: IORef [MappingInfo]
 {-# NOINLINE savedMapOutput #-}
 savedMapOutput = unsafePerformIO (newIORef [])
-
-setOutputLno :: Maybe Int -> IO ()
-setOutputLno = writeIORef curLine
 
 -- | See `outputListLno'`, which is often the right function to use
 outputListLno :: OutputType      -- ^ Level at which to output
@@ -158,7 +150,7 @@ outputListLno' :: OutputType      -- ^ Level at which to output
                     -> [String]   -- ^ output. Will be 'concat' together (without any spaces or similar in between)
                     -> NGLessIO ()
 outputListLno' !ot ms = do
-    lno <- liftIO $ readIORef curLine
+    lno <- ngleLno <$> nglEnvironment
     outputListLno ot lno ms
 
 shouldPrint :: Bool -- ^ is terminal
@@ -220,7 +212,7 @@ encodeBPStats res = map encode1 (FQ.qualityPercentiles res)
 
 outputFQStatistics :: FilePath -> FQ.FQStatistics -> FastQEncoding -> NGLessIO ()
 outputFQStatistics fname stats enc = do
-    lno' <- liftIO $ readIORef curLine
+    lno' <- ngleLno <$> nglEnvironment
     let enc'    = encodingName enc
         sSize'  = FQ.seqSize stats
         nSeq'   = FQ.nSeq stats
@@ -237,7 +229,7 @@ outputFQStatistics fname stats enc = do
 
 outputMapStatistics :: MappingInfo -> NGLessIO ()
 outputMapStatistics mi@(MappingInfo _ _ ref total aligned unique) = do
-        lno <- liftIO $ readIORef curLine
+        lno <- ngleLno <$> nglEnvironment
         let out = outputListLno' ResultOutput
         out ["Finished mapping to ", ref]
         out ["Total reads: ", show total]
