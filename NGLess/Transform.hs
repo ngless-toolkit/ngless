@@ -58,7 +58,8 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
         transforms = preTransforms ++ modTransforms ++ builtinTransforms
         modTransforms = map modTransform mods
         preTransforms =
-                [ addTemporaries
+                [ reassignPreprocess
+                , addTemporaries
                 ]
         builtinTransforms =
                 [ writeToMove
@@ -68,7 +69,6 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , addOFileChecks
                 , addIndexChecks
                 , addOutputHash
-                , reassignPreprocess
                 ]
 
 pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression
@@ -396,10 +396,6 @@ addOutputHash expr_lst = do
                             h <- hashOf val
                             modify (M.insert v h)
                             return e
-                        FunctionCall (FuncName "preprocess") (Lookup _ v) _ block -> do
-                            h <- withState (injectBlockVars block) $ hashOf e
-                            modify (M.insert v h)
-                            return e
                         FunctionCall f@(FuncName fname) oarg kwargs block
                             | fname `elem` ["collect", "write"] -> do
                                 h <- hashOf oarg
@@ -412,7 +408,10 @@ addOutputHash expr_lst = do
                     where
                         injectBlockVars' hm v@(Variable n) = M.insert v n hm
                 hashOf :: Expression -> State (M.Map Variable T.Text) T.Text
-                hashOf ex = do
+                hashOf e@(FunctionCall _ _ _ block) = withState (injectBlockVars block) $ hashOf' e
+                hashOf e  = hashOf' e
+
+                hashOf' ex = do
                     expr' <- flip recursiveTransform ex $ \case
                         Lookup t v@(Variable n) -> do
                             h <- fromMaybe n <$> gets (M.lookup v)
