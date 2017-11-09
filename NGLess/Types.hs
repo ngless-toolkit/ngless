@@ -280,7 +280,7 @@ funcInfo fn = do
     case matched of
         [fi] -> return fi
         [] -> do
-            errorInLineC ["Unknown function '", show fn, "'", T.unpack (suggestionMessage (unwrapFuncName fn) (unwrapFuncName . funcName <$> fs))]
+            errorInLineC ["Unknown function '", show fn, "'. ", T.unpack (suggestionMessage (unwrapFuncName fn) (unwrapFuncName . funcName <$> fs))]
             cannotContinue
         _ -> do
             errorInLineC ["Too many matches for function '", show fn, "'"]
@@ -290,7 +290,7 @@ findMethodInfo m =  case filter ((==m) . methodName) builtinMethods of
                      [mi] -> return mi
                      _ -> do
                         errorInLineC
-                                    ["Cannot find method `", T.unpack (unwrapMethodName m), "`."
+                                    ["Cannot find method `", T.unpack (unwrapMethodName m), "`. "
                                     ,T.unpack $ suggestionMessage (unwrapMethodName m) ((unwrapMethodName . methodName) <$> builtinMethods)
                                     ]
                         cannotContinue

@@ -1,8 +1,7 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase, FlexibleContexts #-}
 
 module Validation
     ( validate
@@ -31,26 +30,24 @@ import Utils.Suggestion
 validate :: [Module] -> Script -> NGLess Script
 validate mods expr = case errors of
         [] -> Right expr
-        _ -> throwScriptError . T.unpack . T.concat $ errors
+        _ -> throwScriptError . concat . addNL . map T.unpack $ errors
     where
-        errors = mapMaybe (\f -> f mods expr) checks ++
-                concatMap (\f -> execWriter (f mods expr)) checks'
+        addNL [] = []
+        addNL [e] = [e]
+        addNL (e:es) = e:"\n":addNL es
+        errors = concatMap (\f -> execWriter (f mods expr)) checks
+        checks :: [[Module] -> Script -> Writer [T.Text] ()]
         checks =
             [validateVersion
-            ,validate_variables
+            ,validateVariables
             ,validateFunctionReqArgs -- check for the existence of required arguments in functions.
-            ,validate_symbol_in_args
-            ,validate_STDIN_only_used_once
-            ,validate_map_ref_input
-            ,validateWriteOName
-            ]
-        -- The interface below is better and the checks above should be
-        -- converted to this style:
-        checks' :: [[Module] -> Script -> Writer [T.Text] ()]
-        checks' =
-            [validateNoConstantAssignments
+            ,validateSymbolInArgs
+            ,validateSTDINusedOnce
+            ,validateMapRef
+            ,validateNoConstantAssignments
             ,validateNGLessVersionUses
             ,validatePureFunctions
+            ,validateWriteOName
             ]
 
 {- Each checking function has the type
@@ -64,24 +61,30 @@ validate mods expr = case errors of
  -}
 
 
-validateVersion :: [Module] -> Script -> Maybe T.Text
-validateVersion _ sc = nglVersion <$> nglHeader sc >>= \case
-    "0.0" -> Nothing
-    "0.5" -> Nothing
-    "0.6" -> Nothing
-    version -> Just (T.concat ["Version ", version, " is not supported (only versions 0.0/0.5/0.6 are available in this release)."])
+validateVersion :: [Module] -> Script -> Writer [T.Text] ()
+validateVersion _ sc = case nglVersion <$> nglHeader sc of
+    Nothing -> return ()
+    Just "0.0" -> return ()
+    Just "0.5" -> return ()
+    Just "0.6" -> return ()
+    Just version -> tell [T.concat ["Version ", version, " is not supported (only versions 0.0/0.5/0.6 are available in this release)."]]
 
 -- | check whether results of calling pure functions are use
-validatePureFunctions mods (Script _ es) =
+validatePureFunctions mods (Script h es) =
         forM_ es $ \(lno, expr) -> case expr of
+            FunctionCall (FuncName "preprocess") _ _ _
+                | not (version00 h) -> tell1lno lno ["Preprocess must be assigned to an output (behaviour changed from version 0.0)"]
+                | otherwise -> return ()
             FunctionCall fname@(FuncName f) _ _ _
                 | isPure fname -> tell1lno lno ["Result of calling function `",  f, "` should be assigned to a variable (this function has no effect otherwise)."]
             _ -> return ()
 
     where
         isPure f = FunctionCheckReturnAssigned `elem` (fromMaybe [] $ funcChecks <$> findFunction mods f)
+        version00 (Just (Header "0.0" _)) = True
+        version00 _ = False
 
-validateFunctionReqArgs :: [Module] -> Script -> Maybe T.Text
+validateFunctionReqArgs :: [Module] -> Script -> Writer [T.Text] ()
 validateFunctionReqArgs mods = checkRecursiveScript validateFunctionReqArgs'
     where
         validateFunctionReqArgs' (FunctionCall f _ args _) = case findFunction mods f of
@@ -94,22 +97,21 @@ validateFunctionReqArgs mods = checkRecursiveScript validateFunctionReqArgs'
                             else Just (T.concat ["Function ", T.pack . show $ f, " requires argument ", argName ainfo, "."])
         validateFunctionReqArgs' _ = Nothing
 
-validate_variables :: [Module] -> Script -> Maybe T.Text
-validate_variables mods (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e of
+validateVariables :: [Module] -> Script -> Writer [T.Text] ()
+validateVariables mods (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e of
         Assignment (Variable v) e' -> do
             vs <- get
-            err <- recursiveAnalyse checkVarUsage e'
+            recursiveAnalyse checkVarUsage e'
             put (v:vs)
-            return err
         _ -> recursiveAnalyse checkVarUsage e
     where
-        runChecker :: RWS () [Maybe T.Text] [T.Text] () -> Maybe T.Text
-        runChecker c = errors_from_list . snd . evalRWS c () $ (fst <$> concatMap modConstants mods)
-        checkVarUsage :: Expression -> RWS () [Maybe T.Text] [T.Text] ()
+        runChecker :: RWS () [T.Text] [T.Text] () -> Writer [T.Text] ()
+        runChecker c = tell . snd . evalRWS c () $ (fst <$> concatMap modConstants mods)
+        checkVarUsage :: Expression -> RWS () [T.Text] [T.Text] ()
         checkVarUsage (Lookup _ (Variable v)) = do
                 used <- get
                 when (v `notElem` used) $
-                    tell [Just (T.concat ["Could not find variable `", T.pack . show $v, "`. ", suggestionMessage v used])]
+                    tell [T.concat ["Could not find variable `", T.pack . show $v, "`. ", suggestionMessage v used]]
         checkVarUsage (FunctionCall _ _ _ (Just block)) = do
             vs <- get
             let unVariable (Variable v) = v
@@ -120,29 +122,29 @@ validate_variables mods (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e
             put (v:vs)
         checkVarUsage _ = return ()
 
-validate_symbol_in_args :: [Module] -> Script -> Maybe T.Text
-validate_symbol_in_args mods = checkRecursiveScript validate_symbol_in_args'
+validateSymbolInArgs :: [Module] -> Script -> Writer [T.Text] ()
+validateSymbolInArgs mods = checkRecursiveScriptWriter validateSymbolInArgs'
     where
-        validate_symbol_in_args' (FunctionCall f _ args _) = checkFunction f args
-        validate_symbol_in_args' (MethodCall m _ arg0 args) = checkMethod m arg0 args
-        validate_symbol_in_args' _ = Nothing
+        validateSymbolInArgs' (FunctionCall f _ args _) = checkFunction f args
+        validateSymbolInArgs' (MethodCall m _ arg0 args) = checkMethod m arg0 args
+        validateSymbolInArgs' _ = return ()
 
-        checkFunction :: FuncName -> [(Variable, Expression)]-> Maybe T.Text
+        checkFunction :: FuncName -> [(Variable, Expression)]-> Writer [T.Text] ()
         checkFunction f args = case findFunction mods f of
-                Nothing -> Just (T.concat ["Function '", T.pack . show $ f, "' not found"])
-                Just finfo -> errors_from_list $ map (check1 finfo) args
+                Nothing -> tell [T.concat ["Function '", T.pack . show $ f, "' not found"]]
+                Just finfo -> mapM_ (check1 finfo) args
             where
                 check1 finfo (Variable v, expr) = let legal = allowedFunction finfo v in case expr of
                         ConstSymbol s
-                            | s `elem` legal -> Nothing
-                            | otherwise -> Just . T.concat $ case findSuggestion s legal of
+                            | s `notElem` legal -> tell . (:[]) . T.concat $
+                                case findSuggestion s legal of
                                     Nothing ->
                                         ["Argument: `", v, "` (for function ", T.pack (show f), ") expects one of ", showA legal, " but got {", s, "}"]
                                     Just (Suggestion valid reason) ->
                                         ["Argument `", v, "` for function ", T.pack (show f), ", got {", s, "}.\n\tDid you mean {", valid, "} (", reason, ")\n\n",
                                         "Legal arguments are: [", showA legal, "]\n"]
-                        ListExpression es   -> errors_from_list $ map (\e -> check1 finfo (Variable v, e)) es
-                        _                   -> Nothing
+                        ListExpression es   -> mapM_ (\e -> check1 finfo (Variable v, e)) es
+                        _                   -> return ()
 
         allowedFunction :: Function -> T.Text -> [T.Text]
         allowedFunction finfo v = fromMaybe [] $ do
@@ -160,20 +162,20 @@ validate_symbol_in_args mods = checkRecursiveScript validate_symbol_in_args'
 
         checkMethod m (Just a) args = checkMethod m Nothing ((Variable "__0", a):args)
         checkMethod m Nothing args = case findMethod m of
-                Nothing -> Just (T.concat ["Method'", T.pack . show $ m, "' not found"])
-                Just minfo -> errors_from_list $ map (check1m minfo) args
+                Nothing -> tell [T.concat ["Method'", T.pack . show $ m, "' not found"]]
+                Just minfo -> mapM_ (check1m minfo) args
             where
                 check1m minfo (Variable v, expr) = let legal = allowedMethod minfo v in case expr of
                     ConstSymbol s
-                        | s `elem` legal ->  Nothing
-                        | otherwise -> Just . T.concat $ case findSuggestion s legal of
+                        | s `notElem` legal ->  tell . (:[]) . T.concat $
+                            case findSuggestion s legal of
                                 Nothing ->
                                     (if v /= "__0" then ["Argument `", v, "` "] else ["Unnamed argument "]) ++ ["(for method ", unwrapMethodName m, ") expects one of ", showA legal, " but got {", s, "}"]
                                 Just (Suggestion valid reason) ->
                                     (if v /= "__0" then ["Argument `", v, "` "] else ["Unnamed argument "]) ++ ["(for method ", unwrapMethodName m, ") got {", s, "}"] ++
                                         ["\n\tDid you mean {", valid, "} (", reason, ")\n\nAllowed arguments are: [", showA legal, "]"]
-                    ListExpression es   -> errors_from_list $ map (\e -> check1m minfo (Variable v, e)) es
-                    _                   -> Nothing
+                    ListExpression es   -> mapM_ (\e -> check1m minfo (Variable v, e)) es
+                    _                   -> return ()
 
         showA [] = ""
         showA [e] = T.concat ["{", e, "}"]
@@ -181,18 +183,18 @@ validate_symbol_in_args mods = checkRecursiveScript validate_symbol_in_args'
 
 
 
-validate_map_ref_input :: [Module] -> Script -> Maybe T.Text
-validate_map_ref_input _ = checkRecursiveScript validate_map_ref_input'
+validateMapRef :: [Module] -> Script -> Writer [T.Text] ()
+validateMapRef _ = checkRecursiveScript validateMapRef'
     where
-        validate_map_ref_input' (FunctionCall (FuncName "map") _ args _) =
+        validateMapRef' (FunctionCall (FuncName "map") _ args _) =
             case (lookup (Variable "reference") args, lookup (Variable "fafile") args) of
                 (Nothing, Nothing) -> Just "Either fafile or reference must be specified in argument to map function"
                 (Just _, Just _) -> Just "You cannot specify both fafile and reference in arguments to map function"
                 _ -> Nothing
-        validate_map_ref_input' _ = Nothing
+        validateMapRef' _ = Nothing
 
-validateWriteOName :: [Module] -> Script -> Maybe T.Text
-validateWriteOName _ = checkRecursiveScript validateWriteOName'
+validateWriteOName :: [Module] -> Script -> Writer [T.Text] ()
+validateWriteOName _ = checkRecursiveScript $ validateWriteOName'
     where
         validateWriteOName' (FunctionCall (FuncName "write") (Lookup (Just t) _) args _) =
             lookup (Variable "oname") args >>= staticValue >>= \case
@@ -209,15 +211,16 @@ validateWriteOName _ = checkRecursiveScript validateWriteOName'
         checkType _ _ = Nothing
 
 
-validate_STDIN_only_used_once :: [Module] -> Script -> Maybe T.Text
-validate_STDIN_only_used_once _ (Script _ code) = check_use Nothing code
+validateSTDINusedOnce :: [Module] -> Script -> Writer [T.Text] ()
+validateSTDINusedOnce _ (Script _ code) = foldM_ validateSTDINusedOnce' Nothing code
     where
-        check_use _ [] = Nothing
-        check_use ub@(Just p) ((lno,e):es)
-            | stdin_used e = Just . T.pack . concat $ ["Error on line ", show lno, " STDIN can only be used once in the script (previously used on line ", show p, ")"]
-            | otherwise = check_use ub es
-        check_use Nothing ((lno,e):es) = check_use (if stdin_used e then Just lno else Nothing) es
-        stdin_used = constant_used "STDIN"
+        validateSTDINusedOnce' :: Maybe Int -> (Int, Expression) -> Writer [T.Text] (Maybe Int)
+        validateSTDINusedOnce' s (lno,e)
+            | constant_used "STDIN" e = do
+                whenJust s $ \prev ->
+                    tell1lno lno ["STDIN can only be used once (previously used on line ", T.pack (show prev), ")."]
+                return $ Just lno
+            | otherwise = return s
 
 
 constant_used :: T.Text -> Expression -> Bool
@@ -255,19 +258,16 @@ validateNoConstantAssignments mods (Script _ es) = foldM_ checkAssign builtins e
         builtins = ["STDIN", "STDOUT"] ++ (fst <$> concatMap modConstants mods)
 
 
-check_toplevel :: (Expression -> Maybe T.Text) -> [(Int, Expression)] -> Maybe T.Text
-check_toplevel _ [] = Nothing
-check_toplevel f ((lno,e):es) = case f e of
-        Nothing -> check_toplevel f es
-        Just m -> Just (T.concat ["Line ", T.pack (show lno), ": ", m])
+addLno lno errs = [T.concat ["Error on line ", T.pack (show lno), ": ", e] | e <- errs]
 
-checkRecursiveScript :: (Expression -> Maybe T.Text) -> Script -> Maybe T.Text
-checkRecursiveScript f (Script _ es) = check_toplevel checkRecursive es
+checkRecursiveScriptWriter :: (Expression -> Writer [T.Text] ()) -> Script -> Writer [T.Text] ()
+checkRecursiveScriptWriter f (Script _ es) = forM_ es $ \(lno, e) ->
+        censor (addLno lno) $ recursiveAnalyse f e
+
+checkRecursiveScript :: (Expression -> Maybe T.Text) -> Script -> Writer [T.Text] ()
+checkRecursiveScript f (Script _ es) = forM_ es $ \(lno, e) ->
+        censor (addLno lno) $ recursiveAnalyse f' e
     where
-        checkRecursive :: Expression -> Maybe T.Text
-        checkRecursive e = case execWriter (recursiveAnalyse f' e) of
-                [] -> Nothing
-                errors -> Just $ T.concat errors
         f' :: Expression -> Writer [T.Text] ()
         f' e' = whenJust (f e') (tell . (:[]))
 
