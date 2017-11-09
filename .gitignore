@@ -7,6 +7,8 @@
 /samtools-1.4.tar.bz2
 /bwa-0.7.15/
 /megahit-1.1.1/
+/Prodigal-2.6.3/
+/v2.6.3.tar.gz
 
 *.o
 *.hi
@@ -22,5 +24,6 @@ ngless-partials/
 # Generated as part of build
 NGLess/Dependencies/bwa_data.c
 NGLess/Dependencies/samtools_data.c
+NGLess/Dependencies/prodigal_data.c
 NGLess/Dependencies/megahit_data.c
 NGLess.cabal

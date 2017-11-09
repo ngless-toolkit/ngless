@@ -313,6 +313,7 @@ modeExec (DownloadDemoMode demo) = do
 modeExec (PrintPathMode exec) = runNGLessIO "finding internal path" $ do
     path <- case exec of
       "samtools" -> samtoolsBin
+      "prodigal" -> prodigalBin
       "megahit" -> megahitBin
       "bwa" -> bwaBin
       _ -> throwSystemError ("Unknown binary " ++ exec ++ ".")

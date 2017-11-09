@@ -12,6 +12,7 @@ module FileManagement
     , setupHtmlViewer
     , takeBaseNameNoExtensions
     , samtoolsBin
+    , prodigalBin
     , megahitBin
     , bwaBin
     , expandPath
@@ -153,6 +154,12 @@ samtoolsBin :: NGLessIO FilePath
 samtoolsBin = findOrCreateBin "NGLESS_SAMTOOLS_BIN" samtoolsFname samtoolsData
     where
         samtoolsFname = "ngless-" ++ versionStr ++ "-samtools" ++ binaryExtension
+        --
+-- | path to prodigal
+prodigalBin :: NGLessIO FilePath
+prodigalBin = findOrCreateBin "NGLESS_PRODIGAL_BIN" prodigalFname prodigalData
+    where
+        prodigalFname = "ngless-" ++ versionStr ++ "-prodigal" ++ binaryExtension
 
 megahitBin :: NGLessIO FilePath
 megahitBin = liftIO (lookupEnv "NGLESS_MEGAHIT_BIN") >>= \case

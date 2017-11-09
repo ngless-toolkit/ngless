@@ -22,6 +22,12 @@ SAM_URL = https://github.com/samtools/samtools/releases/download/1.4/samtools-1.
 SAM_TAR = samtools-1.4.tar.bz2
 SAM_TARGET = ngless-$(VERSION)-samtools
 
+PRODIGAL_DIR = Prodigal-2.6.3
+PRODIGAL_DIR_TARGET = $(PRODIGAL_DIR)/Makefile
+PRODIGAL_URL = https://github.com/hyattpd/Prodigal/archive/v2.6.3.tar.gz
+PRODIGAL_TAR = v2.6.3.tar.gz
+PRODIGAL_TARGET = ngless-$(VERSION)-prodigal
+
 MEGAHIT_DIR = megahit-1.1.1
 # we can't target Makefile here cause we patch it after unpacking
 MEGAHIT_DIR_TARGET = $(MEGAHIT_DIR)/LICENSE
@@ -31,12 +37,13 @@ MEGAHIT_TARGET = megahit
 
 NGLESS_EMBEDDED_BINARIES := \
 		NGLess/Dependencies/samtools_data.c \
+		NGLess/Dependencies/prodigal_data.c \
 		NGLess/Dependencies/bwa_data.c \
 		NGLess/Dependencies/megahit_data.c
 NGLESS_EMBEDDED_TARGET = NGLess/Dependencies/embedded.c
 
 MEGAHIT_BINS := $(MEGAHIT_DIR)/megahit_asm_core $(MEGAHIT_DIR)/megahit_sdbg_build $(MEGAHIT_DIR)/megahit_toolkit $(MEGAHIT_DIR)/megahit
-NGLESS_EXT_BINS = $(BWA_DIR)/$(BWA_TARGET) $(SAM_DIR)/$(SAM_TARGET) $(MEGAHIT_BINS)
+NGLESS_EXT_BINS = $(BWA_DIR)/$(BWA_TARGET) $(SAM_DIR)/$(SAM_TARGET) $(PRODIGAL_DIR)/$(PRODIGAL_TARGET) $(MEGAHIT_BINS)
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
@@ -124,6 +131,7 @@ distclean: clean
 	rm -rf $(HTML_FONTS_DIR) $(HTML_LIBS_DIR)
 	rm -rf $(BWA_DIR)
 	rm -rf $(SAM_DIR)
+	rm -rf $(PRODIGAL_DIR)
 	rm -rf $(MEGAHIT_DIR)
 
 $(NGLESS_EMBEDDED_TARGET): $(NGLESS_EMBEDDED_BINARIES)
@@ -151,6 +159,17 @@ $(SAM_DIR)/$(SAM_TARGET)-static: $(SAM_DIR_TARGET)
 
 $(SAM_DIR)/$(SAM_TARGET): $(SAM_DIR_TARGET)
 	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) && cp -p samtools $(SAM_TARGET)
+
+$(PRODIGAL_DIR_TARGET):
+	wget $(PRODIGAL_URL)
+	tar xvfj $(PRODIGAL_TAR)
+	rm $(PRODIGAL_TAR)
+
+$(PRODIGAL_DIR)/$(PRODIGAL_TARGET)-static: $(PRODIGAL_DIR_TARGET)
+	cd $(PRODIGAL_DIR) && $(MAKE) CFLAGS="-static" && cp -p prodigal $(PRODIGAL_TARGET)-static
+
+$(PRODIGAL_DIR)/$(PRODIGAL_TARGET): $(PRODIGAL_DIR_TARGET)
+	cd $(PRODIGAL_DIR) && $(MAKE) && cp -p prodigal $(PRODIGAL_TARGET)
 
 $(MEGAHIT_DIR_TARGET):
 	wget $(MEGAHIT_URL)
@@ -183,6 +202,10 @@ $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged.tar.gz: $(MEGAHIT_DIR)/$(MEGAHIT_TARGE
 	tar --create --file $@ --gzip $<
 
 NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/$(SAM_TARGET)-static
+	strip $<
+	xxd -i $< $@
+
+NGLess/Dependencies/prodigal_data.c: $(PRODIGAL_DIR)/$(PRODIGAL_TARGET)-static
 	strip $<
 	xxd -i $< $@
 
@@ -223,6 +246,8 @@ ngless-${VERSION}.tar.gz: ngless
 	cp dist/build/$(progname)/$(progname) $(distdir)/bin
 	cp -r $(BWA_DIR) $(distdir)/share
 	cp -r $(SAM_DIR) $(distdir)/share
+	cp -r $(PRODIGAL_DIR) $(distdir)/share
+	cp -r $(MEGAHIT_DIR) $(distdir)/share
 	cp -r $(HTML) $(distdir)/share
 	tar -zcvf $(distdir).tar.gz $(distdir)
 	rm -rf $(distdir)
