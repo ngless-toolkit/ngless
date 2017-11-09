@@ -71,7 +71,7 @@ assembleFunction = Function
     , funcRetType = NGLString
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False
-    , funcChecks = []
+    , funcChecks = [FunctionCheckReturnAssigned]
     }
 
 loadModule :: T.Text -> NGLessIO Module

@@ -58,6 +58,7 @@ data ArgCheck =
 -- | Checks for a function
 data FunctionCheck =
             FunctionCheckMinNGLessVersion (Int, Int)
+            | FunctionCheckReturnAssigned -- ^ Function is pure
             deriving (Eq, Show)
 
 -- | Basic information about argument to a function

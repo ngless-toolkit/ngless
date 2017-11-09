@@ -39,7 +39,7 @@ qcStatsFunction = Function
     , funcRetType = NGLCounts
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False
-    , funcChecks = []
+    , funcChecks = [FunctionCheckReturnAssigned]
     }
 
 loadModule :: T.Text -> NGLessIO Module

@@ -109,7 +109,7 @@ as_reads_Function = Function
     , funcRetType = NGLReadSet
     , funcKwArgs = []
     , funcAllowsAutoComprehension = True
-    , funcChecks = []
+    , funcChecks = [FunctionCheckReturnAssigned]
     }
 
 loadModule :: T.Text -> NGLessIO Module

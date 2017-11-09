@@ -37,7 +37,6 @@ validate mods expr = case errors of
                 concatMap (\f -> execWriter (f mods expr)) checks'
         checks =
             [validateVersion
-            ,validate_pure_function
             ,validate_variables
             ,validateFunctionReqArgs -- check for the existence of required arguments in functions.
             ,validate_symbol_in_args
@@ -51,6 +50,7 @@ validate mods expr = case errors of
         checks' =
             [validateNoConstantAssignments
             ,validateNGLessVersionUses
+            ,validatePureFunctions
             ]
 
 {- Each checking function has the type
@@ -72,19 +72,14 @@ validateVersion _ sc = nglVersion <$> nglHeader sc >>= \case
     version -> Just (T.concat ["Version ", version, " is not supported (only versions 0.0/0.5/0.6 are available in this release)."])
 
 -- | check whether results of calling pure functions are use
-validate_pure_function _ (Script _ es) = check_toplevel validate_pure_function' es
+validatePureFunctions mods (Script _ es) =
+        forM_ es $ \(lno, expr) -> case expr of
+            FunctionCall fname@(FuncName f) _ _ _
+                | isPure fname -> tell1lno lno ["Result of calling function `",  f, "` should be assigned to a variable (this function has no effect otherwise)."]
+            _ -> return ()
+
     where
-        validate_pure_function' (FunctionCall (FuncName f) _ _ _)
-            | f `elem` pureFunctions = Just (T.concat ["Result of calling function ",  f, " should be assigned to something (this function has no effect otherwise)."])
-        validate_pure_function' _ = Nothing
-        pureFunctions =
-                    [ "unique"
-                    , "substrim"
-                    , "map"
-                    , "count"
-                    , "select"
-                    , "as_reads"
-                    ]
+        isPure f = FunctionCheckReturnAssigned `elem` (fromMaybe [] $ funcChecks <$> findFunction mods f)
 
 validateFunctionReqArgs :: [Module] -> Script -> Maybe T.Text
 validateFunctionReqArgs mods = checkRecursiveScript validateFunctionReqArgs'
@@ -252,7 +247,7 @@ validateNoConstantAssignments mods (Script _ es) = foldM_ checkAssign builtins e
         checkAssign active (lno,e) = case e of
             Assignment (Variable v) _ -> do
                 when (v `elem` active) $
-                    tell1lno lno (T.concat ["assignment to constant `", v, "` is illegal."])
+                    tell1lno lno ["assignment to constant `", v, "` is illegal."]
                 return $ if T.all isUpper v
                             then v:active
                             else active
@@ -281,8 +276,8 @@ errors_from_list errs = case catMaybes errs of
     [] -> Nothing
     errs' -> Just (T.concat errs')
 
-tell1lno :: Int -> T.Text -> Writer [T.Text] ()
-tell1lno lno err = tell [T.concat ["Line ", T.pack (show lno), ": ", err]]
+tell1lno :: Int -> [T.Text] -> Writer [T.Text] ()
+tell1lno lno err = tell [T.concat $ ["Line ", T.pack (show lno), ": "] ++ err]
 
 validateNGLessVersionUses :: [Module] -> Script -> Writer [T.Text] ()
 validateNGLessVersionUses mods sc = case nglVersion <$> nglHeader sc of
@@ -296,7 +291,7 @@ validateNGLessVersionUses mods sc = case nglVersion <$> nglHeader sc of
                 Just minV
                     | versionLE minV version -> return ()
                     | otherwise ->
-                        tell1lno lno $ T.concat ["Function ", fname', " requires ngless version ", T.pack . show $ fst minV, ".", T.pack . show $ snd minV]
+                        tell1lno lno ["Function ", fname', " requires ngless version ", T.pack . show $ fst minV, ".", T.pack . show $ snd minV]
                 _ -> return ()
             _ -> return ()
         minVersionFor :: FuncName -> Maybe (Int, Int)
