@@ -1,5 +1,5 @@
 ngless "0.0"
 
-input = paired('sample_1.fastq.gz', 'sample_2.fastq.gz')
+input = fastq('sample.fq.gz')
 write(assemble(input), ofile='output.fna')
 
