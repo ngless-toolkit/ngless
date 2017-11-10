@@ -140,7 +140,7 @@ mainArgs = DefaultMode
               <*> switch (long "print-last" <> short 'p' <> help "print value of last line in script") -- print_last :: Bool
               <*> triSwitch "trace" "Set highest verbosity mode" -- trace_flag :: Maybe Bool
               <*> parseNThreads
-              <*> triSwitch "scrict-threads" "strictly respect the --threads option (by default, NGLess will, occasionally, use more threads than specified)" -- scrict-threads :: Bool
+              <*> triSwitch "strict-threads" "strictly respect the --threads option (by default, NGLess will, occasionally, use more threads than specified)" -- scrict-threads :: Bool
               <*> triSwitch "create-report" "create the report directory" -- createReportDirectory :: Bool
               <*> optional (strOption $ long "html-report-directory" <> short 'o' <> help "name of output directory") -- html_report_directory :: Maybe FilePath
               <*> optional (strOption $ long "temporary-directory" <> short 't' <> help "Directory where to store temporary files") -- temporary_directory :: Maybe FilePath
