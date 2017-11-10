@@ -600,7 +600,7 @@ function to process a large set of inputs::
 orf_find
 --------
 
-`orf_find` finds open reading frames (ORFs) in a seqeuence set::
+`orf_find` finds open reading frames (ORFs) in a sequence set::
 
     contigs = assemble(input)
     orfs = select(contigs, is_metagenome=True)
