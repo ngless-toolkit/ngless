@@ -18,11 +18,11 @@ BWA_TAR = bwa-0.7.15.tar.bz2
 BWA_SHA1 = b3a5606ecd2dd926e220edd311ff6eb16a47a2c0
 BWA_TARGET = ngless-bwa
 
-SAM_DIR = samtools-1.4
+SAM_DIR = samtools-1.6
 SAM_DIR_TARGET = $(SAM_DIR)/configure
-SAM_URL = https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
-SAM_TAR = samtools-1.4.tar.bz2
-SAM_SHA1 = bf211dff0180274d83e79450177ef0ce0197bcb2
+SAM_URL = https://github.com/samtools/samtools/releases/download/1.6/samtools-1.6.tar.bz2
+SAM_TAR = samtools-1.6.tar.bz2
+SAM_SHA1 = c72c059b0d6525d1b12acbe25cc1f69157d4da7a
 SAM_TARGET = ngless-samtools
 
 PRODIGAL_DIR = Prodigal-2.6.3
