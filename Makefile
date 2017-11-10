@@ -3,6 +3,7 @@ VERSION := 0.5.1
 progname := ngless
 distdir := ngless-${VERSION}
 
+SHELL=/bin/bash
 prefix=/usr/local
 deps=$(prefix)/share/$(progname)
 exec=$(prefix)/bin
@@ -14,25 +15,29 @@ BWA_DIR = bwa-0.7.15
 BWA_DIR_TARGET = $(BWA_DIR)/Makefile
 BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.15/bwa-0.7.15.tar.bz2
 BWA_TAR = bwa-0.7.15.tar.bz2
+BWA_SHA1 = b3a5606ecd2dd926e220edd311ff6eb16a47a2c0
 BWA_TARGET = ngless-bwa
 
 SAM_DIR = samtools-1.4
 SAM_DIR_TARGET = $(SAM_DIR)/configure
 SAM_URL = https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
 SAM_TAR = samtools-1.4.tar.bz2
+SAM_SHA1 = bf211dff0180274d83e79450177ef0ce0197bcb2
 SAM_TARGET = ngless-samtools
 
 PRODIGAL_DIR = Prodigal-2.6.3
 PRODIGAL_DIR_TARGET = $(PRODIGAL_DIR)/Makefile
 PRODIGAL_URL = https://github.com/hyattpd/Prodigal/archive/v2.6.3.tar.gz
 PRODIGAL_TAR = v2.6.3.tar.gz
+PRODIGAL_SHA1 = 1259e999193cd0c095935baebfb8bcb0233e850f
 PRODIGAL_TARGET = ngless-prodigal
 
 MEGAHIT_DIR = megahit-1.1.1
 # we can't target Makefile here cause we patch it after unpacking
 MEGAHIT_DIR_TARGET = $(MEGAHIT_DIR)/LICENSE
-MEGAHIT_TAR = v1.1.1.tar.gz
 MEGAHIT_URL = https://github.com/voutcn/megahit/archive/v1.1.1.tar.gz
+MEGAHIT_TAR = v1.1.1.tar.gz
+MEGAHIT_SHA1 = e82308db9a351ea0ccdaf4bebead86ca338a6f0c
 MEGAHIT_TARGET = megahit
 
 NGLESS_EMBEDDED_BINARIES := \
@@ -138,7 +143,8 @@ $(NGLESS_EMBEDDED_TARGET): $(NGLESS_EMBEDDED_BINARIES)
 	touch $(NGLESS_EMBEDDED_TARGET)
 
 $(BWA_DIR_TARGET):
-	wget $(BWA_URL)
+	wget $(BWA_URL) -O $(BWA_TAR)
+	sha1sum -c <(echo "$(BWA_SHA1)  $(BWA_TAR)")
 	tar xvf $(BWA_TAR)
 	rm $(BWA_TAR)
 	cd $(BWA_DIR) && curl https://patch-diff.githubusercontent.com/raw/lh3/bwa/pull/90.diff | patch -p1
@@ -150,7 +156,8 @@ $(BWA_DIR)/$(BWA_TARGET)-static: $(BWA_DIR_TARGET)
 	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"  LIBS="-lbwa -lm -lz -lrt -lpthread" && cp -p bwa $(BWA_TARGET)-static
 
 $(SAM_DIR_TARGET):
-	wget $(SAM_URL)
+	wget $(SAM_URL) -O $(SAM_TAR)
+	sha1sum -c <(echo "$(SAM_SHA1)  $(SAM_TAR)")
 	tar xvf $(SAM_TAR)
 	rm $(SAM_TAR)
 
@@ -161,7 +168,8 @@ $(SAM_DIR)/$(SAM_TARGET): $(SAM_DIR_TARGET)
 	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) && cp -p samtools $(SAM_TARGET)
 
 $(PRODIGAL_DIR_TARGET):
-	wget $(PRODIGAL_URL)
+	wget $(PRODIGAL_URL) -O $(PRODIGAL_TAR)
+	sha1sum -c <(echo "$(PRODIGAL_SHA1)  $(PRODIGAL_TAR)")
 	tar xvf $(PRODIGAL_TAR)
 	rm $(PRODIGAL_TAR)
 
@@ -172,7 +180,8 @@ $(PRODIGAL_DIR)/$(PRODIGAL_TARGET): $(PRODIGAL_DIR_TARGET)
 	cd $(PRODIGAL_DIR) && $(MAKE) && cp -p prodigal $(PRODIGAL_TARGET)
 
 $(MEGAHIT_DIR_TARGET):
-	wget $(MEGAHIT_URL)
+	wget $(MEGAHIT_URL) -O $(MEGAHIT_TAR)
+	sha1sum -c <(echo "$(MEGAHIT_SHA1)  $(MEGAHIT_TAR)")
 	tar xvf $(MEGAHIT_TAR)
 	rm $(MEGAHIT_TAR)
 	cd $(MEGAHIT_DIR) && patch -p1 <../build-scripts/megahit-1.1.1.patch

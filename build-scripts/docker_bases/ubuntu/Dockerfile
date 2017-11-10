@@ -6,6 +6,7 @@ RUN apt update && \
     apt install -y \
     build-essential \
     cabal-install \
+    coreutils \
     curl \
     ghc \
     git \

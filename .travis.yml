@@ -21,6 +21,7 @@ python:
 addons:
   apt:
     packages:
+      - coreutils
       - libgmp10
       - libgmp-dev
       - liblzma-dev

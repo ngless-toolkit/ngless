@@ -8,6 +8,7 @@ RUN apk --no-cache add \
     bzip2-dev \
     ca-certificates \
     cabal \
+    coreutils \
     file \
     ghc-dev \
     ghc \
