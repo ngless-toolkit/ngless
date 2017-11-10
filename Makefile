@@ -14,19 +14,19 @@ BWA_DIR = bwa-0.7.15
 BWA_DIR_TARGET = $(BWA_DIR)/Makefile
 BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.15/bwa-0.7.15.tar.bz2
 BWA_TAR = bwa-0.7.15.tar.bz2
-BWA_TARGET = ngless-$(VERSION)-bwa
+BWA_TARGET = ngless-bwa
 
 SAM_DIR = samtools-1.4
 SAM_DIR_TARGET = $(SAM_DIR)/configure
 SAM_URL = https://github.com/samtools/samtools/releases/download/1.4/samtools-1.4.tar.bz2
 SAM_TAR = samtools-1.4.tar.bz2
-SAM_TARGET = ngless-$(VERSION)-samtools
+SAM_TARGET = ngless-samtools
 
 PRODIGAL_DIR = Prodigal-2.6.3
 PRODIGAL_DIR_TARGET = $(PRODIGAL_DIR)/Makefile
 PRODIGAL_URL = https://github.com/hyattpd/Prodigal/archive/v2.6.3.tar.gz
 PRODIGAL_TAR = v2.6.3.tar.gz
-PRODIGAL_TARGET = ngless-$(VERSION)-prodigal
+PRODIGAL_TARGET = ngless-prodigal
 
 MEGAHIT_DIR = megahit-1.1.1
 # we can't target Makefile here cause we patch it after unpacking
@@ -203,18 +203,26 @@ $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged.tar.gz: $(MEGAHIT_DIR)/$(MEGAHIT_TARGE
 
 NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/$(SAM_TARGET)-static
 	strip $<
-	xxd -i $< $@
+	ln -s $< $(<F)
+	xxd -i $(<F) $@
+	rm -f $(<F)
 
 NGLess/Dependencies/prodigal_data.c: $(PRODIGAL_DIR)/$(PRODIGAL_TARGET)-static
 	strip $<
-	xxd -i $< $@
+	ln -s $< $(<F)
+	xxd -i $(<F) $@
+	rm -f $(<F)
 
 NGLess/Dependencies/bwa_data.c: $(BWA_DIR)/$(BWA_TARGET)-static
 	strip $<
-	xxd -i $< $@
+	ln -s $< $(<F)
+	xxd -i $(<F) $@
+	rm -f $(<F)
 
 NGLess/Dependencies/megahit_data.c: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged.tar.gz
-	xxd -i $< $@
+	ln -s $< $(<F)
+	xxd -i $(<F) $@
+	rm -f $(<F)
 
 # We cannot depend on $(HTML_LIBS_DIR) as wget sets the mtime in the past
 # and it would cause the download to happen at every make run
