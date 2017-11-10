@@ -7,9 +7,11 @@ NGLESS_VERSION=0.5.1
 SAMTOOLS_VERSION=1.4
 BWA_VERSION=0.7.15
 MEGAHIT_VERSION=1.1.1
+PRODIGAL_VERSION=2.6.3
 
 SAMTOOLS_BIN=ngless-${NGLESS_VERSION}-samtools
 BWA_BIN=ngless-${NGLESS_VERSION}-bwa
+PRODIGAL_BIN=ngless-${NGLESS_VERSION}-prodigal
 MEGAHIT_BIN=megahit
 
 function remove_ngless_bin {
@@ -30,11 +32,14 @@ else
     echo ">>> Testing NGLess ( regular build ) <<<"
     export NGLESS_SAMTOOLS_BIN=$REPO/samtools-${SAMTOOLS_VERSION}/${SAMTOOLS_BIN}
     export NGLESS_BWA_BIN=$REPO/bwa-${BWA_VERSION}/${BWA_BIN}
+    export NGLESS_PRODIGAL_BIN=$REPO/Prodigal-${PRODIGAL_VERSION}/${PRODIGAL_BIN}
     export NGLESS_MEGAHIT_BIN=$REPO/megahit-${MEGAHIT_VERSION}/${MEGAHIT_BIN}
     echo ">> Will use samtools from '$NGLESS_SAMTOOLS_BIN' <<"
     make samtools-${SAMTOOLS_VERSION}/${SAMTOOLS_BIN} || (echo "make samtools failed" ; exit 1)
     echo ">> Will use bwa from '$NGLESS_BWA_BIN' <<"
     make bwa-${BWA_VERSION}/${BWA_BIN} || (echo "make bwa failed" ; exit 1)
+    echo ">> Will use prodigal from '$NGLESS_PRODIGAL_BIN' <<"
+    make Prodigal-${PRODIGAL_VERSION}/${PRODIGAL_BIN} || (echo "make prodigal failed" ; exit 1)
     echo ">> Will use megahit from '$NGLESS_MEGAHIT_BIN' <<"
     make megahit-${MEGAHIT_VERSION}/${MEGAHIT_BIN} || (echo "make megahit failed" ; exit 1)
     MAKETARGET=""

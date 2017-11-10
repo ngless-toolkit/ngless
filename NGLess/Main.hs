@@ -86,6 +86,7 @@ import qualified BuiltinModules.AsReads as ModAsReads
 import qualified BuiltinModules.Readlines as Readlines
 import qualified BuiltinModules.Remove as Remove
 import qualified BuiltinModules.QCStats as ModQCStats
+import qualified BuiltinModules.ORFFind as ModORFFind
 
 
 -- | wrapPrint transforms the script by transforming the last expression <expr>
@@ -155,8 +156,9 @@ loadModules mods  = do
     mChecks <- Checks.loadModule ("" :: T.Text)
     mRemove <- Remove.loadModule ("" :: T.Text)
     mStats <- ModQCStats.loadModule ("" :: T.Text)
+    mOrfFind <- ModORFFind.loadModule ("" :: T.Text)
     imported <- loadStdlibModules mods
-    let loaded = (mReadlines:mArgv:mAssemble:mA:mChecks:mRemove:mStats:imported)
+    let loaded = (mReadlines:mOrfFind:mArgv:mAssemble:mA:mChecks:mRemove:mStats:imported)
     forM_ loaded registerModule
     return loaded
 

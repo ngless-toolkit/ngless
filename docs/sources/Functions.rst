@@ -597,3 +597,150 @@ function to process a large set of inputs::
     sample = lock1(readlines('samplelist.txt'))
 
 
+orf_find
+--------
+
+`orf_find` finds open reading frames (ORFs) in a seqeuence set::
+
+    contigs = assemble(input)
+    orfs = select(contigs, is_metagenome=True)
+
+Argument:
+~~~~~~~~~
+
+SequenceSet
+
+Return:
+~~~~~~~
+
+SequenceSet
+
+Arguments by value:
+~~~~~~~~~~~~~~~~~~~
+
++-----------------+-------------+------------+----------------+
+| Name            | Type        | Required   | Default Value  |
++=================+=============+============+================+
+| is_metagenome   | Bool        | yes        | -              |
++-----------------+-------------+------------+----------------+
+| coords_out      | FilePath    | no         | -              |
++-----------------+-------------+------------+----------------+
+| prots_out       | FilePath    | no         | -              |
++-----------------+-------------+------------+----------------+
+
+Implementation
+~~~~~~~~~~~~~~
+
+NGLess uses `Prodigal
+<https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/>`__ as the underlying
+gene finder.
+
+count
+-----
+
+Given a file with aligned sequencing reads (ReadSet), ``count()`` will produce
+a counts table depending on the arguments passed. For example::
+
+    counts = count(mapped, min=2, mode={union}, multiple={dist1})
+
+Argument:
+~~~~~~~~~
+
+MappedReadSet
+
+Return:
+~~~~~~~
+
+CountTable
+
+Arguments by value:
+~~~~~~~~~~~~~~~~~~~
+
++-------------------+-----------------+------------+----------------+
+| Name              | Type            | Required   | Default value  |
++===================+=================+============+================+
+| gff\_file         | String          | no*        |  -             |
++-------------------+-----------------+------------+----------------+
+| functional\_map   | String          | no*        |  -             |
++-------------------+-----------------+------------+----------------+
+| features          | [ String ]      | no         | 'gene'         |
++-------------------+-----------------+------------+----------------+
+| subfeatures       | [ String ]      | no         | -              |
++-------------------+-----------------+------------+----------------+
+| mode              | Symbol          | no         | {union}        |
++-------------------+-----------------+------------+----------------+
+| multiple          | Symbol          | no         | {dist1}        |
++-------------------+-----------------+------------+----------------+
+| strand            | Bool            | no         | false          |
++-------------------+-----------------+------------+----------------+
+| normalization     | Symbol          | no         | {raw}          |
++-------------------+-----------------+------------+----------------+
+| include_minus1    | Bool            | no         | true           |
++-------------------+-----------------+------------+----------------+
+| min               | Integer         | no         | 0              |
++-------------------+-----------------+------------+----------------+
+| discard_zeros     | Bool            | no         | false          |
++-------------------+-----------------+------------+----------------+
+
+
+If the features to count are ``['seqname']``, then each read will be assigned
+to the name of reference it matched and only an input set of mapped reads is
+necessary. For other features, you will need extra information. This can be
+passed using the ``gff_file`` or ``functional_map`` arguments. If you had
+previously used a ``reference`` argument for the ``map()`` function, then
+you can also leave this argument empty and ngless will do the right thing.
+
+The ``gff_file`` and ``functional_map`` arguments support `search path
+expansion <searchpath.html>`__.
+
+``features``: which features to count. If a GFF file is used, this refers to
+the "features" field.
+
+``subfeatures``: this is useful in GFF-mode as the same feature can encode
+multiple attributes (or, in NGLess parlance, "subfeatures"). By default, NGLess
+will look for the ``"ID"`` or ``"gene_id"`` attributes.
+
+``mode`` indicates how to handle reads that partially overlap a features.
+Possible values for ``mode`` are ``{union}``, ``{intersection-strict}``, and
+``{intersection-nonempty}`` (default: ``{union}``). For each read position are
+obtained features that intersect it, which is known as sets. The different
+modes are:
+
+-  ``{union}`` the union of all the sets.
+-  ``{intersection-strict}`` the intersection of all the sets.
+-  ``{intersection-nonempty}`` the intersection of all non-empty sets.
+
+How to handle multiple mappers (inserts which have more than one "hit" in the
+reference) is defined by the ``multiple`` argument:
+
+- ``{unique_only}``: only use uniquely mapped inserts
+- ``{all1}``: count all hits separately. An insert mapping to 4 locations adds 1 to each location
+- ``{1overN}``: fractionally distribute multiple mappers. An insert mapping to 4 locations adds 0.25 to each location
+- ``{dist1}``: distribute multiple reads based on uniquely mapped reads. An insert mapping to 4 locations adds to these in proportion to how uniquely mapped inserts are distributed among these 4 locations.
+
+Argument ``strand`` represents whether the data are from a strand-specific
+(default is ``false``). When the data is not strand-specific, a read is always
+overlapping with a feature independently of whether maps to the same or the
+opposite strand. For strand-specific data, the read has to be mapped to the
+same strand as the feature.
+
+``min`` defines the minimum amount of overlaps a given feature must have, at
+least, to be kept (default: 0, i.e., keep all counts). If you just want to
+discard features that are exactly zero, you should set the ``discard_zeros``
+argument to True.
+
+``normalization`` specifies if and how to normalize to take into account feature size:
+
+- ``{raw}`` (default) is no normalization
+- ``{normed}`` is the result of the ``{raw}`` mode divided by the size of the
+  feature
+- ``{scaled}`` is the result of the ``{normed}`` mode scaled up so that the
+  total number of counts is identical to the ``{raw}`` (within rounding error)
+
+Unmapped inserts are included in the output if ``{include_minus1}`` is true
+(default: ``False``).
+
+
+.. versionadded:: 0.6
+    Before version 0.6, the default was to **not** include the -1 fraction.
+

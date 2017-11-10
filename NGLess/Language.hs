@@ -79,6 +79,7 @@ data NGLType =
         | NGLReadSet
         | NGLMappedRead
         | NGLMappedReadSet
+        | NGLSequenceSet
         | NGLCounts
         | NGLVoid
         | NGLAny
@@ -99,6 +100,7 @@ data NGLessObject =
         | NGOFilename !FilePath
         | NGOShortRead !ShortRead
         | NGOReadSet T.Text ReadSet
+        | NGOSequenceSet FileOrStream
         | NGOMappedReadSet
                     { nglgroupName :: T.Text
                     , nglSamFile :: FileOrStream
