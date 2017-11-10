@@ -139,7 +139,7 @@ $(NGLESS_EMBEDDED_TARGET): $(NGLESS_EMBEDDED_BINARIES)
 
 $(BWA_DIR_TARGET):
 	wget $(BWA_URL)
-	tar xvfj $(BWA_TAR)
+	tar xvf $(BWA_TAR)
 	rm $(BWA_TAR)
 	cd $(BWA_DIR) && curl https://patch-diff.githubusercontent.com/raw/lh3/bwa/pull/90.diff | patch -p1
 
@@ -151,7 +151,7 @@ $(BWA_DIR)/$(BWA_TARGET)-static: $(BWA_DIR_TARGET)
 
 $(SAM_DIR_TARGET):
 	wget $(SAM_URL)
-	tar xvfj $(SAM_TAR)
+	tar xvf $(SAM_TAR)
 	rm $(SAM_TAR)
 
 $(SAM_DIR)/$(SAM_TARGET)-static: $(SAM_DIR_TARGET)
@@ -162,7 +162,7 @@ $(SAM_DIR)/$(SAM_TARGET): $(SAM_DIR_TARGET)
 
 $(PRODIGAL_DIR_TARGET):
 	wget $(PRODIGAL_URL)
-	tar xvfj $(PRODIGAL_TAR)
+	tar xvf $(PRODIGAL_TAR)
 	rm $(PRODIGAL_TAR)
 
 $(PRODIGAL_DIR)/$(PRODIGAL_TARGET)-static: $(PRODIGAL_DIR_TARGET)
@@ -173,7 +173,7 @@ $(PRODIGAL_DIR)/$(PRODIGAL_TARGET): $(PRODIGAL_DIR_TARGET)
 
 $(MEGAHIT_DIR_TARGET):
 	wget $(MEGAHIT_URL)
-	tar xvzf $(MEGAHIT_TAR)
+	tar xvf $(MEGAHIT_TAR)
 	rm $(MEGAHIT_TAR)
 	cd $(MEGAHIT_DIR) && patch -p1 <../build-scripts/megahit-1.1.1.patch
 
