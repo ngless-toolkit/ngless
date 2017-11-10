@@ -2,16 +2,14 @@
 
 shopt -s nullglob
 
-NGLESS_VERSION=0.5.1
-
 SAMTOOLS_VERSION=1.4
 BWA_VERSION=0.7.15
 MEGAHIT_VERSION=1.1.1
 PRODIGAL_VERSION=2.6.3
 
-SAMTOOLS_BIN=ngless-${NGLESS_VERSION}-samtools
-BWA_BIN=ngless-${NGLESS_VERSION}-bwa
-PRODIGAL_BIN=ngless-${NGLESS_VERSION}-prodigal
+SAMTOOLS_BIN=ngless-samtools
+BWA_BIN=ngless-bwa
+PRODIGAL_BIN=ngless-prodigal
 MEGAHIT_BIN=megahit
 
 function remove_ngless_bin {
