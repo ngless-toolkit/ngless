@@ -1,2 +1,12 @@
+Version 0.5+
+	* Fix --strict-threads command-line option spelling
+	* Add Prodigal
+	* Use multiple threads in SAM->BAM conversion
+	* Better error checking/script validation
+	* Change include_m1 default in count() function to True
+	* Add qcstats() function
+	* Output preprocessed FQ statistics (had been erroneously removed)
+	* Version embedded megahit binary
+
 Version 0.5 2017-11-01 by luispedro
 	* First release supporting all basic functionality.
