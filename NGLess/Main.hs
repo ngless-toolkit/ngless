@@ -214,6 +214,12 @@ loadScript (ScriptFilePath fname) =
             Left err -> Left (show err)
 
 
+parseVersion :: T.Text -> NGLess NGLVersion
+parseVersion "0.0" = return $ NGLVersion 0 0
+parseVersion "0.5" = return $ NGLVersion 0 5
+parseVersion "0.6" = return $ NGLVersion 0 6
+parseVersion v = throwScriptError $ "Cannot parse version string '" ++ T.unpack v
+
 modeExec :: NGLessMode -> IO ()
 modeExec opts@DefaultMode{} = do
     when (not (experimentalFeatures opts) && isJust (exportJSON opts)) $
@@ -238,7 +244,8 @@ modeExec opts@DefaultMode{} = do
         updateNglEnvironment (\e -> e { ngleScriptText = ngltext })
         outputConfiguration
         sc' <- runNGLess $ parsengless fname reqversion ngltext >>= maybe_add_print
-        updateNglEnvironment (\e -> e {ngleVersion = fromMaybe (T.pack versionStr) (nglVersion <$> nglHeader sc') })
+        activeVersion <- runNGLess . parseVersion $ fromMaybe (T.pack versionStr) (nglVersion <$> nglHeader sc')
+        updateNglEnvironment (\e -> e {ngleVersion = activeVersion })
         when (debug_mode opts == "ast") $ liftIO $ do
             forM_ (nglBody sc') $ \(lno,e) ->
                 putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)

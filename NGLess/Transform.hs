@@ -430,7 +430,7 @@ reassignPreprocess :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 reassignPreprocess sc = do
     v <- ngleVersion <$> nglEnvironment
     return $! case v of
-        "0.0" -> map (second reassignPreprocess') sc
+        NGLVersion 0 0 -> map (second reassignPreprocess') sc
         _ -> sc
 reassignPreprocess' :: Expression -> Expression
 reassignPreprocess' e@(FunctionCall (FuncName "preprocess") (Lookup _ v) _ _) = Assignment v e

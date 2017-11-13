@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module NGLess.NGLEnvironment
-    ( NGLEnvironment(..)
+    ( NGLVersion(..)
+    , NGLEnvironment(..)
     , nglEnvironment
     , nglConfiguration
     , updateNglEnvironment
@@ -18,8 +19,16 @@ import NGLess.NGError
 import Configuration
 import CmdArgs
 
+data NGLVersion = NGLVersion !Int !Int
+                        deriving (Eq, Show)
+
+instance Ord NGLVersion where
+    compare (NGLVersion majV0 minV0) (NGLVersion majV1 minV1)
+        | majV0 == majV1 = compare minV0 minV1
+        | otherwise = compare majV0 majV1
+
 data NGLEnvironment = NGLEnvironment
-                    { ngleVersion :: !T.Text
+                    { ngleVersion :: !NGLVersion
                     , ngleLno :: !(Maybe Int)
                     , ngleScriptText :: !T.Text -- ^ The original text of the script
                     , ngleMappersActive :: [T.Text] -- ^ which mappers can be used
@@ -29,7 +38,7 @@ data NGLEnvironment = NGLEnvironment
 
 ngle :: IORef NGLEnvironment
 {-# NOINLINE ngle #-}
-ngle = unsafePerformIO (newIORef $ NGLEnvironment "" Nothing "" ["bwa"] [] (error "Configuration not set"))
+ngle = unsafePerformIO (newIORef $ NGLEnvironment (NGLVersion 0 0) Nothing "" ["bwa"] [] (error "Configuration not set"))
 
 nglEnvironment :: NGLessIO NGLEnvironment
 nglEnvironment = liftIO $ readIORef ngle

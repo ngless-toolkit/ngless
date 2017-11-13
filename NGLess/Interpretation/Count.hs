@@ -291,8 +291,8 @@ executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or 
 
 defaultMinus1 :: NGLessIO Bool
 defaultMinus1 = do
-    version <- ngleVersion <$> nglEnvironment
-    return $! version `notElem` ["0.0", "0.5"]
+    v <- ngleVersion <$> nglEnvironment
+    return $! v > NGLVersion 0 5
 
 loadAnnotator :: AnnotationMode -> CountOpts -> NGLessIO [Annotator]
 loadAnnotator AnnotateSeqName _ = return [SeqNameAnnotator Nothing]
