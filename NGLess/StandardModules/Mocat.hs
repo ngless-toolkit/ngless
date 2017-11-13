@@ -146,7 +146,7 @@ loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
         return def
         { modInfo = ModInfo "stdlib.mocat" "0.0"
-        , modCitation = Just citation
+        , modCitations = citations
         , modFunctions = [mocatLoadSample, coordToGtf]
         , runFunction = \case
                         "load_mocat_sample" -> executeLoad
@@ -154,10 +154,10 @@ loadModule _ =
                         other -> \_ _ -> throwShouldNotOccur ("mocat execute function called with wrong arguments: " ++ show other)
         }
     where
-        citation = T.concat
-            ["MOCAT2: a metagenomic assembly, annotation and profiling framework.\n"
+        citations =
+            [T.concat ["MOCAT2: a metagenomic assembly, annotation and profiling framework.\n"
             ,"Kultima JR, Coelho LP, Forslund K, Huerta-Cepas J, Li S, Driessen M, et al. (2016)\n"
-            ,"Bioinformatics (2016) doi:10.1093/bioinformatics/btw183\n\n"
-            ,"MOCAT: A Metagenomics Assembly and Gene Prediction Toolkit.\n"
+            ,"Bioinformatics (2016) doi:10.1093/bioinformatics/btw183\n\n"]
+            ,T.concat ["MOCAT: A Metagenomics Assembly and Gene Prediction Toolkit.\n"
             ,"Kultima JR, Sunagawa S, Li J, Chen W, Chen H, Mende DR, et al. (2012)\n"
-            ,"PLoS ONE 7(10): e47656. doi:10.1371/journal.pone.0047656\n"]
+            ,"PLoS ONE 7(10): e47656. doi:10.1371/journal.pone.0047656\n"]]

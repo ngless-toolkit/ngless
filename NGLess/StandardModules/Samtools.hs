@@ -171,7 +171,7 @@ loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
         return def
         { modInfo = ModInfo "stdlib.samtools" "0.0"
-        , modCitation = Just citation
+        , modCitations = [citation]
         , modFunctions = [samtools_sort_function]
         , modTransform = sortOFormat >=> checkUnique
         , runFunction = const executeSort

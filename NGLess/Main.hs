@@ -73,6 +73,7 @@ import Modules
 import CmdArgs
 import FileManagement
 import StandardModules.NGLStdlib
+import Citations
 import Network
 import Hooks
 import Utils.Batch
@@ -184,9 +185,8 @@ formatCitation citation = T.unpack . T.unlines . map T.unwords $ citationLines
             | otherwise = groupLines' (w:acc) (n + T.length w) ws
 
 
-printHeader :: [Module] -> NGLessIO ()
-printHeader mods = liftIO $ do
-    let citations = mapMaybe modCitation mods
+printHeader :: [T.Text] -> NGLessIO ()
+printHeader citations = liftIO $ do
     putStr headerStr
     unless (null citations) $ do
         putStr "When publishing results from this script, please cite the following references:\n\n"
@@ -212,6 +212,7 @@ loadScript (ScriptFilePath fname) =
         decodeUtf8'' s = case T.decodeUtf8' s of
             Right r -> Right r
             Left err -> Left (show err)
+
 
 modeExec :: NGLessMode -> IO ()
 modeExec opts@DefaultMode{} = do
@@ -254,8 +255,6 @@ modeExec opts@DefaultMode{} = do
         when (isJust errs) $ do
             let errormessage = T.intercalate "\n\n" (fromJust errs)
             liftIO $ fatalError (T.unpack errormessage)
-        when shouldPrintHeader $
-            printHeader modules
         when (validateOnly opts) $ do
             outputListLno' InfoOutput ["Script OK."]
             liftIO exitSuccess
@@ -265,6 +264,8 @@ modeExec opts@DefaultMode{} = do
         transformed <- transform modules sc
         when (debug_mode opts == "transform") $
             liftIO (print transformed)
+        when shouldPrintHeader $
+            printHeader (collectCitations modules transformed)
         whenJust (exportJSON opts) $ \jsoname -> liftIO $ do
             writeScriptJSON jsoname sc transformed
             exitSuccess

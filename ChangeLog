@@ -1,4 +1,5 @@
 Version 0.5+
+	* Better citations information
 	* Add `orf_find` function
 	* Fix --strict-threads command-line option spelling
 	* Add Prodigal

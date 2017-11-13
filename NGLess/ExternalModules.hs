@@ -391,7 +391,7 @@ asInternalModule em@ExternalModule{..} = do
     validateModule em
     return def
         { modInfo = emInfo
-        , modCitation = emCitation
+        , modCitations = maybeToList emCitation
         , modReferences = references
         , modFunctions = map asFunction emFunctions
         , runFunction = executeCommand modulePath emFunctions

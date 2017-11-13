@@ -19,7 +19,7 @@ loadModule _ = do
     updateNglEnvironment addSoap
     return def
         { modInfo = ModInfo "stdlib.soap" "0.0"
-        , modCitation = Just citation
+        , modCitations = [citation]
         , modFunctions = []
         , runFunction = \_ _ _ -> throwShouldNotOccur "soap has no functions!"
         }
