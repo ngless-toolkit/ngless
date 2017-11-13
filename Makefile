@@ -172,6 +172,7 @@ $(PRODIGAL_DIR_TARGET):
 	sha1sum -c <(echo "$(PRODIGAL_SHA1)  $(PRODIGAL_TAR)")
 	tar xvf $(PRODIGAL_TAR)
 	rm $(PRODIGAL_TAR)
+	cd $(PRODIGAL_DIR) && patch -p1 <../build-scripts/0001-Fix-undefined-behavior-causing-behavior.patch
 
 $(PRODIGAL_DIR)/$(PRODIGAL_TARGET)-static: $(PRODIGAL_DIR_TARGET)
 	cd $(PRODIGAL_DIR) && $(MAKE) CFLAGS="-static" && cp -p prodigal $(PRODIGAL_TARGET)-static
