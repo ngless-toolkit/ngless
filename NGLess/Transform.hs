@@ -60,6 +60,7 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
         preTransforms =
                 [ reassignPreprocess
                 , addTemporaries
+                , addOutputHash -- Hashing should be based on what the user input (pre-transforms)
                 ]
         builtinTransforms =
                 [ writeToMove
@@ -68,7 +69,6 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , substrimReassign
                 , addOFileChecks
                 , addIndexChecks
-                , addOutputHash
                 ]
 
 pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression

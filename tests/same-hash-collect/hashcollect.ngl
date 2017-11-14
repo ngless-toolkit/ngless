@@ -1,0 +1,11 @@
+ngless "0.6"
+import "parallel" version "0.6"
+
+samples = ['basic']
+sample = lock1(samples)
+counted = count(samfile(sample + '.sam'), features=['seqname'], multiple={dist1})
+collect(counted,
+        current=sample,
+        allneeded=samples,
+        ofile='output.counts.txt',
+        auto_comments=[{hash}, {script}])
