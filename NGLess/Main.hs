@@ -218,7 +218,7 @@ parseVersion :: T.Text -> NGLess NGLVersion
 parseVersion "0.0" = return $ NGLVersion 0 0
 parseVersion "0.5" = return $ NGLVersion 0 5
 parseVersion "0.6" = return $ NGLVersion 0 6
-parseVersion v = throwScriptError $ "Cannot parse version string '" ++ T.unpack v
+parseVersion v = throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 0.0/0.5/0.6 are available in this release)."]
 
 modeExec :: NGLessMode -> IO ()
 modeExec opts@DefaultMode{} = do

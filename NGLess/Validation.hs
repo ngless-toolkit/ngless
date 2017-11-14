@@ -38,8 +38,7 @@ validate mods expr = case errors of
         errors = concatMap (\f -> execWriter (f mods expr)) checks
         checks :: [[Module] -> Script -> Writer [T.Text] ()]
         checks =
-            [validateVersion
-            ,validateVariables
+            [validateVariables
             ,validateFunctionReqArgs -- check for the existence of required arguments in functions.
             ,validateSymbolInArgs
             ,validateSTDINusedOnce
@@ -60,14 +59,6 @@ validate mods expr = case errors of
  - error messages or passes the script unharmed on the Right side.
  -}
 
-
-validateVersion :: [Module] -> Script -> Writer [T.Text] ()
-validateVersion _ sc = case nglVersion <$> nglHeader sc of
-    Nothing -> return ()
-    Just "0.0" -> return ()
-    Just "0.5" -> return ()
-    Just "0.6" -> return ()
-    Just version -> tell [T.concat ["Version ", version, " is not supported (only versions 0.0/0.5/0.6 are available in this release)."]]
 
 -- | check whether results of calling pure functions are use
 validatePureFunctions mods (Script h es) =
