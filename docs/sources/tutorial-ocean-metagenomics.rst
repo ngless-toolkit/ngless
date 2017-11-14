@@ -83,7 +83,7 @@ been locked before, so you each time you run _ngless_, you will get a different
 sample.
 
 
-3. Preprocessing
+4. Preprocessing
 
 First, we load the data (the FastQ files)::
 
@@ -97,7 +97,7 @@ And, now, we preprocess the data::
             discard
 
 
-3. Profiling using the OM-RGC
+5. Profiling using the OM-RGC
 
 After preprocessing, we map the reads to the ocean microbial reference gene
 catalog::
@@ -119,7 +119,7 @@ KEGG KOs, and eggNOG OGs::
                 features=['KEGG_ko', 'eggNOG_OG'],
                 normalization={scaled})
 
-5. Aggregate the results
+7. Aggregate the results
 
 We have done all this computation, now we need to save it somewhere. We will
 use the ``collect()`` function to aggregate across all the samples processed::
@@ -129,7 +129,7 @@ use the ``collect()`` function to aggregate across all the samples processed::
             allneeded=samples,
             ofile='omgc.profiles.txt')
 
-6. Run it!
+8. Run it!
 
 This is our script. We save it to a file (``process.ngl`` in this example) and
 run it from the command line::

@@ -164,6 +164,7 @@ Authors
    introduction
    install
    tutorial-ocean-metagenomics
+   tutorial-assembly-gp
    tutorial-gut-metagenomics
    tutorial
    command-line-wrappers

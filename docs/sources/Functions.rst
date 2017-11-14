@@ -597,6 +597,28 @@ function to process a large set of inputs::
     sample = lock1(readlines('samplelist.txt'))
 
 
+assemble
+--------
+
+`assemble`
+
+Implementation
+~~~~~~~~~~~~~~
+
+`assemble()` uses the `MEGAHIT
+<https://academic.oup.com/bioinformatics/article/31/10/1674/177884>`__
+assembler.
+
+Arguments
+~~~~~~~~~
+
+ReadSet
+
+Returns
+~~~~~~~
+
+string : generated file
+
 orf_find
 --------
 
