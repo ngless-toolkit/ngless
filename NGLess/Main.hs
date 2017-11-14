@@ -148,8 +148,8 @@ runNGLessIO context (NGLessIO act) = runResourceT (runExceptT act) >>= \case
         Right v -> return v
 
 -- | Load both automatically imported modules are user-requested one
-loadModules :: [ModInfo] -> NGLessIO [Module]
-loadModules mods  = do
+loadModules :: NGLVersion -> [ModInfo] -> NGLessIO [Module]
+loadModules av mods  = do
     mA <- ModAsReads.loadModule ("" :: T.Text)
     mArgv <- ModArgv.loadModule ("" :: T.Text)
     mAssemble <- ModAssemble.loadModule ("" :: T.Text)
@@ -157,9 +157,10 @@ loadModules mods  = do
     mChecks <- Checks.loadModule ("" :: T.Text)
     mRemove <- Remove.loadModule ("" :: T.Text)
     mStats <- ModQCStats.loadModule ("" :: T.Text)
-    mOrfFind <- ModORFFind.loadModule ("" :: T.Text)
+    mOrfFind <- ModORFFind.loadModule ("0.6" :: T.Text)
     imported <- loadStdlibModules mods
-    let loaded = (mReadlines:mOrfFind:mArgv:mAssemble:mA:mChecks:mRemove:mStats:imported)
+    let loaded = [mOrfFind | av >= NGLVersion 0 6]
+                    ++ [mReadlines, mArgv, mAssemble, mA, mChecks, mRemove, mStats] ++ imported
     forM_ loaded registerModule
     return loaded
 
@@ -251,7 +252,7 @@ modeExec opts@DefaultMode{} = do
                 putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)
             exitSuccess
         outputListLno' DebugOutput ["Loading modules..."]
-        modules <- loadModules (fromMaybe [] (nglModules <$> nglHeader sc'))
+        modules <- loadModules activeVersion (fromMaybe [] (nglModules <$> nglHeader sc'))
         sc <- runNGLess $ checktypes modules sc' >>= validate modules
         when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
             whenStrictlyNormal setQuiet
