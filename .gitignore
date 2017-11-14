@@ -3,7 +3,7 @@
 /cabal.sandbox.config
 /dist/
 /docker/
-/samtools-1.4/
+/samtools-1.6/
 /bwa-0.7.15/
 /megahit-1.1.1/
 /Prodigal-2.6.3/
