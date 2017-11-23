@@ -190,7 +190,7 @@ data ExternalModule = ExternalModule
     , initArgs :: [String]
     , emFunctions :: [Command]
     , references :: [ExternalReference]
-    , emCitation :: Maybe T.Text
+    , emCitations :: [T.Text]
     } deriving (Eq, Show)
 
 instance FromJSON ExternalModule where
@@ -204,7 +204,9 @@ instance FromJSON ExternalModule where
                 return (init_cmd, init_args)
         references <- o .:? "references" .!= []
         emFunctions <- o .:? "functions" .!= []
-        emCitation <- o .:? "citation"
+        singleCitation <- o .:? "citation"
+        citations <- o .:? "citations" .!= []
+        let emCitations = maybeToList singleCitation ++ citations
         emInfo <- ModInfo <$> o .: "name" <*> o .: "version"
         let modulePath = undefined
         return ExternalModule{..}
@@ -391,7 +393,7 @@ asInternalModule em@ExternalModule{..} = do
     validateModule em
     return def
         { modInfo = emInfo
-        , modCitations = maybeToList emCitation
+        , modCitations = emCitations
         , modReferences = references
         , modFunctions = map asFunction emFunctions
         , runFunction = executeCommand modulePath emFunctions

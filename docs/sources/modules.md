@@ -206,13 +206,20 @@ of the output type.
 
 ### Citation
 
-Finally, if you wish to, you can add a citation:
+Finally, if you wish to, you can add one or more citations:
 
     citation: "A paper which you want to be listed when users import your module"
+
 
 This will be printed out whenever users use your module and thus will help you
 get exposure.
 
+If you have more than one citation, you can use the ``citations`` key and
+provide a list:
+
+    citations:
+        - "Paper 1"
+        - "Paper 2"
 ## Internal Modules
 
 This is very advanced as it requires writing Haskell code which can then
