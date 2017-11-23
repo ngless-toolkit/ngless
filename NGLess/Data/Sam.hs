@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module Data.Sam
     ( SamLine(..)
+    , SamGroup(..)
     , samLength
     , readSamGroupsC
     , readSamGroupsC'
@@ -40,6 +41,8 @@ import Control.Monad.Except
 import NGLess.NGError
 import Utils.Conduit
 
+
+type SamGroup = [SamLine]
 
 data SamLine = SamLine
             { samQName :: !B.ByteString

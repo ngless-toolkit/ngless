@@ -104,6 +104,7 @@ mapArgs =
     ,ArgInformation "fafile" False NGLString [ArgCheckFileReadable]
     ,ArgInformation "mode_all" False NGLBool []
     ,ArgInformation "mapper" False NGLString []
+    ,ArgInformation "block_size_megabases" False NGLInteger []
     ,ArgInformation "__extra_bwa" False (NGList NGLString) []
     ,ArgInformation "__oname" False NGLString []
     ]

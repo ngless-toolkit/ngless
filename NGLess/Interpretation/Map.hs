@@ -43,6 +43,7 @@ import FileOrStream
 import Utils.Conduit
 import Utils.LockFile
 import Utils.Samtools (samBamConduit)
+import Interpretation.LowMemory
 
 -- | internal type
 data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
@@ -183,17 +184,32 @@ runExceptC (C.ConduitM c0) =
          in go (c0 C.Done)
 
 executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeMap fps args = do
+executeMap fqs args = do
     ref <- lookupReference args
     oAll <- lookupBoolOrScriptErrorDef (return False) "map() call" "mode_all" args
     extraArgs <- map T.unpack <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
     mapperName <- lookupStringOrScriptErrorDef (return "bwa") "map() call" "mapper" args
+    blockSize <- lookupIntegerOrScriptErrorDef (return 0) "map() call" "block_size_megabases" args
     mapper <- getMapper mapperName
     let bwaArgs = extraArgs ++ ["-a" | oAll]
-        executeMap' (NGOList es)            = NGOList <$> forM es executeMap'
-        executeMap' (NGOReadSet name rs)    = performMap mapper ref name rs bwaArgs
-        executeMap' v = throwShouldNotOccur ("map expects ReadSet, got " ++ show v ++ "")
-    executeMap' fps
+        executeMap' r (NGOList es)            = NGOList <$> forM es (executeMap' r)
+        executeMap' r (NGOReadSet name rs)    = performMap mapper r name rs bwaArgs
+        executeMap' _ v = throwShouldNotOccur ("map expects ReadSet, got " ++ show v ++ "")
+    case blockSize of
+        0 -> executeMap' ref fqs
+        bs -> do
+            case ref of
+                FaFile fa -> do
+                    outputListLno' TraceOutput ["Splitting FASTA file '", fa, "'"]
+                    blocks <- splitFASTA (1000 * 1000 * fromInteger bs) fa (fa ++ ".block_size_" ++ show blockSize ++ "M")
+                    partials <- forM blocks $ \block -> do
+                        NGOMappedReadSet _ (File sp) r <- executeMap' (FaFile block) fqs
+                        return (sp, r)
+                    final <- mergeSamFiles (fst <$> partials)
+                    -- TODO : FIX THE NAMING HERE
+                    return $! NGOMappedReadSet "merged" (File final) (snd $ head partials)
+                _ -> throwScriptError "block_size_megabases is not implemented for reference arguments"
+
 
 executeMapStats :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMapStats (NGOMappedReadSet name sami _) _ = do

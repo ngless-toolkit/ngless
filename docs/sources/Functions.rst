@@ -1,3 +1,4 @@
+
 .. _Functions:
 
 =========
@@ -248,15 +249,17 @@ MappedReadSet
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 
-+-------------+-------------+------------+----------------+
-| Name        | Type        | Required   | Default Value  |
-+=============+=============+============+================+
-| reference   | String      | no         | -              |
-+-------------+-------------+------------+----------------+
-| fafile      | String      | no         | -              |
-+-------------+-------------+------------+----------------+
-| mode_all    | Bool        | no         | -              |
-+-------------+-------------+------------+----------------+
++------------------------+-------------+------------+----------------+
+| Name                   | Type        | Required   | Default Value  |
++========================+=============+============+================+
+| reference              | String      | no         | -              |
++------------------------+-------------+------------+----------------+
+| fafile                 | String      | no         | -              |
++------------------------+-------------+------------+----------------+
+| block_size_megabases   | Integer     | no         | -              |
++------------------------+-------------+------------+----------------+
+| mode_all               | Bool        | no         | -              |
++------------------------+-------------+------------+----------------+
 
 The user must provide either a path to a FASTA file in the ``fafile`` argument
 or the name of a builtin reference using the ``reference`` argument. The
@@ -292,6 +295,9 @@ To use any of these, pass in the name as the reference value::
 
 Ngless does not ship with any of these datasets, but they are downloaded
 lazily: i.e., the first time you use them, ngless will download and cache them.
+
+The option ``block_size_megabases`` turns on low memory mode (see the
+corresponding section in the `mapping documentation <mapping.html>`__)
 
 The option ``mode_all=True`` can be passed to include all alignments of both
 single and paired-end reads in the output SAM/BAM.
