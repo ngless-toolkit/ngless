@@ -150,22 +150,23 @@ _samStats :: FilePath -> NGLessIO (Int, Int, Int)
 _samStats fname = samBamConduit fname $$ linesC =$= samStatsC >>= runNGLess
 
 samStatsC :: (MonadIO m) => C.Sink ByteLine m (NGLess (Int, Int, Int))
-samStatsC = do
-    let add1if !v True = v+1
+samStatsC = runExceptC $ readSamGroupsC .| samStatsC'
+
+samStatsC' :: (MonadError NGError m) => C.Sink SamGroup m (Int, Int, Int)
+samStatsC' = CL.foldM summarize (0, 0, 0)
+    where
+        add1if !v True = v+1
         add1if !v False = v
-        summarize _ [] = error "This is a bug in ngless"
+        summarize _ [] = throwShouldNotOccur "empty SamGroup in samStatsC'::summarize"
         summarize (!t, !al, !u) g = let
                     aligned = any isAligned g
                     sameRName = allSame (samRName <$> g)
                     unique = aligned && sameRName
-            in
+            in return $!
                 (t + 1
                 ,add1if al aligned
                 ,add1if  u unique
                 )
-    runExceptC $
-        readSamGroupsC
-        =$= CL.fold summarize (0, 0, 0)
 
 -- | this is copied from runErrorC, using ExceptT as we do not want to have to
 -- make `e` be of class `Error`.
@@ -205,9 +206,20 @@ executeMap fqs args = do
                     partials <- forM blocks $ \block -> do
                         NGOMappedReadSet _ (File sp) r <- executeMap' (FaFile block) fqs
                         return (sp, r)
-                    final <- mergeSamFiles (fst <$> partials)
+
+
+                    (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam"
+                    ((total, aligned, unique), ()) <- C.runConduit $
+                        mergeSamFiles (fst <$> partials)
+                        .| zipSink2 samStatsC'
+                            (CL.concat
+                                .| CL.map (ByteLine . encodeSamLine)
+                                .| byteLineSinkHandle hout)
+                    liftIO $ hClose hout
+
+                    outputMapStatistics (MappingInfo undefined sam fa total aligned unique)
                     -- TODO : FIX THE NAMING HERE
-                    return $! NGOMappedReadSet "merged" (File final) (snd $ head partials)
+                    return $! NGOMappedReadSet "merged" (File sam) (snd $ head partials)
                 _ -> throwScriptError "block_size_megabases is not implemented for reference arguments"
 
 

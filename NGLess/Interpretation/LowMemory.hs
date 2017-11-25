@@ -70,24 +70,17 @@ splitFASTA maxBPS ifile ofileBase =
                                     getNbps' (faseqLength fa + sofar)
 
 
-mergeSamFiles :: [FilePath] -> NGLessIO FilePath
-mergeSamFiles [] = throwShouldNotOccur "empty input to mergeSamFiles"
+mergeSamFiles :: [FilePath] -> C.Source NGLessIO SamGroup
+mergeSamFiles [] = lift $ throwShouldNotOccur "empty input to mergeSamFiles"
 mergeSamFiles inputs = do
-    outputListLno' TraceOutput ["Merging SAM files: ", show inputs]
-    (sam, hout) <- openNGLTempFile (head inputs) "merged_" ".sam"
-    C.runConduit $
-        -- There are obvious opportunities to make this code take advantage of parallelism
-        C.sequenceSources
-                    [CB.sourceFile f
-                        .| linesC
-                        .| readSamGroupsC
-                                | f <- inputs]
-            .| CL.map mergeSAMGroups
-            .| CC.concat
-            .| CL.map (ByteLine . encodeSamLine)
-            .| byteLineSinkHandle hout
-    liftIO $ hClose hout
-    return sam
+    lift $ outputListLno' TraceOutput ["Merging SAM files: ", show inputs]
+    -- There are obvious opportunities to make this code take advantage of parallelism
+    C.sequenceSources
+                [CB.sourceFile f
+                    .| linesC
+                    .| readSamGroupsC
+                            | f <- inputs]
+        .| CL.map mergeSAMGroups
 
 mergeSAMGroups :: [SamGroup] -> SamGroup
 mergeSAMGroups groups = group group1 ++ group group2 ++ group groupS
