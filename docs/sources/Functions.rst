@@ -265,29 +265,7 @@ The user must provide either a path to a FASTA file in the ``fafile`` argument
 or the name of a builtin reference using the ``reference`` argument. The
 ``fafile`` argument supports `search path expansion <searchpath.html>`__.
 
-NGLess provides the following builtin datasets:
-
-+-----------+-----------------------------+-------------+
-| Name      | Description                 | Assembly    |
-+===========+=============================+=============+
-| sacCer3   | saccharomyces\_cerevisiae   | R64-1-1     |
-+-----------+-----------------------------+-------------+
-| ce10      | caenorhabditis\_elegans     | WBcel235    |
-+-----------+-----------------------------+-------------+
-| dm3       | drosophila\_melanogaster    | BDGP5       |
-+-----------+-----------------------------+-------------+
-| gg4       | gallus\_gallus              | Galgal4     |
-+-----------+-----------------------------+-------------+
-| canFam2   | canis\_familiaris           | CanFam3.1   |
-+-----------+-----------------------------+-------------+
-| rn4       | rattus\_norvegicus          | Rnor\_5.0   |
-+-----------+-----------------------------+-------------+
-| bosTau4   | bos\_taurus                 | UMD3.1      |
-+-----------+-----------------------------+-------------+
-| mm10      | mus\_musculus               | GRCm38      |
-+-----------+-----------------------------+-------------+
-| hg19      | homo\_sapiens               | GRCh38      |
-+-----------+-----------------------------+-------------+
+A list of datasets provided by NGLess can be found at :ref:`Organisms`.
 
 To use any of these, pass in the name as the reference value::
 
