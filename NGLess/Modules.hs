@@ -41,6 +41,7 @@ import NGLess
 
 data Reference = Reference
     { refName :: T.Text
+    , refAlias :: Maybe T.Text
     , refVersionedName :: T.Text
     , refUrl :: Maybe FilePath
     , refHasGff :: Bool
@@ -102,7 +103,7 @@ instance FromJSON ExternalReference where
                             path <- o .: "url"
                             hasGtf <- o .: "has-gtf"
                             hasMap <- o .: "has-mapfile"
-                            return (ExternalPackagedReference (Reference name vname (Just path) hasGtf hasMap))
+                            return (ExternalPackagedReference (Reference name Nothing vname (Just path) hasGtf hasMap))
                         _ -> ExternalReference
                                 <$> o .: "name"
                                 <*> o .: "fasta-file"

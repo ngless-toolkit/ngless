@@ -5,6 +5,8 @@ module ReferenceDatabases
     ( Reference(..)
     , ReferenceFilePaths(..)
     , builtinReferences
+    , isDefaultReference
+    , getReference
     , createReferencePack
     , ensureDataPresent
     , installData
@@ -48,19 +50,37 @@ data ReferenceFilePaths = ReferenceFilePaths
 dataDirectory Root = nConfGlobalDataDirectory <$> nglConfiguration
 dataDirectory User = nConfUserDataDirectory   <$> nglConfiguration
 
+-- These references were obtained from Ensembl
+-- Check build-scripts/create-standard-packs.py for additional information
 builtinReferences :: [Reference]
-builtinReferences = [Reference rn (T.concat [rn, "-", T.pack versionStr]) Nothing True False | rn <-
-                [ "hg19" -- Homo_sapiens
-                , "mm10" -- Mus_musculus
-                , "rn4" --  Rattus_norvegicus
-                , "bosTau4" --  Bos_taurus
-                , "canFam2" --Canis_familiaris
-                , "dm3" --Drosophila_melanogaster
-                , "ce10" --Caenorhabditis_elegans
-                , "sacCer3" --Saccharomyces_cerevisiae
+builtinReferences = [Reference rn (Just alias) (T.concat [rn, "-", T.pack versionStr]) Nothing True False | (rn, alias) <-
+                [ ("bosTau4", "Bos_taurus_UMD3.1")
+                , ("ce10", "Caenorhabditis_elegans_WBcel235")
+                , ("canFam3", "Canis_familiaris_CanFam3.1")
+                , ("dm5", "Drosophila_melanogaster_BDGP5")
+                , ("dm6", "Drosophila_melanogaster_BDGP6")
+                , ("gg4", "Gallus_gallus_Galgal4")
+                , ("gg5", "Gallus_gallus_5.0")
+                , ("hg19", "Homo_sapiens_GRCh37.p13")
+                , ("hg38.p7", "Homo_sapiens_GRCh38.p7")
+                , ("hg38.p10", "Homo_sapiens_GRCh38.p10")
+                , ("mm10.p2", "Mus_musculus_GRCm38.p2")
+                , ("mm10.p5", "Mus_musculus_GRCm38.p5")
+                , ("rn5", "Rattus_norvegicus_Rnor_5.0")
+                , ("rn6", "Rattus_norvegicus_Rnor_6.0")
+                , ("sacCer3", "Saccharomyces_cerevisiae_R64-1-1")
                 ]]
 
-isDefaultReference rn = isJust $ find ((==rn) . refName) builtinReferences
+
+getAlias :: (a -> Bool) -> Maybe a -> Bool
+getAlias f (Just n) = f n
+getAlias _ Nothing = False
+
+getReference :: [Reference] -> T.Text -> Maybe Reference
+getReference allrefs rn = find (\ref -> (== rn) (refName ref) || getAlias (== rn) (refAlias ref)) allrefs
+
+isDefaultReference :: T.Text -> Bool
+isDefaultReference rn = isJust $ getReference builtinReferences rn
 
 moduleDirectReference :: T.Text -> NGLessIO (Maybe ReferenceFilePaths)
 moduleDirectReference rname = do
@@ -149,7 +169,7 @@ installData (Just mode) refname = do
     let unpackRef (ExternalPackagedReference r) = Just r
         unpackRef _ = Nothing
         refs = mapMaybe unpackRef $ concatMap modReferences mods
-    ref  <- case find ((==refname) . refName) (refs ++ builtinReferences) of
+    ref  <- case getReference (refs ++ builtinReferences) refname of
         Just ref -> return ref
         Nothing -> throwScriptError ("Could not find reference '" ++ T.unpack refname ++ "'. It is not builtin nor in one of the loaded modules.")
     url <- case refUrl ref of

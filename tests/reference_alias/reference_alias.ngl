@@ -1,0 +1,4 @@
+ngless '0.0'
+input = fastq('sample.fq')
+mapped = map(input,reference='Saccharomyces_cerevisiae_R64-1-1')
+write(mapped, ofile='output.sam')

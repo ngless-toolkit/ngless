@@ -82,7 +82,7 @@ checkReferencesExist (Script _ es) = flip checkRecursive es $ \case
             let refs = concatMap modReferences mods
                 ename (ExternalPackagedReference er) = refName er
                 ename er = erefName er
-                allnames = (ename <$> refs) ++ (refName <$> builtinReferences)
+                allnames = (ename <$> refs) ++ (refName <$> builtinReferences) ++ mapMaybe refAlias builtinReferences
             unless (r `elem` allnames) $ do
                 exists <- liftIO $ doesFileExist (T.unpack r)
                 tell1 . T.concat $ [

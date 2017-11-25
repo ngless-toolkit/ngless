@@ -10,6 +10,9 @@ Version 0.5+
 	* Add qcstats() function
 	* Output preprocessed FQ statistics (had been erroneously removed)
 	* Version embedded megahit binary
+	* Added reference alias for a more human readable name
+	* Updated builtin referenced to include latest releases of assemblies
+	* Fixed inconsistency between reference identifiers and underlying files
 
 Version 0.5 2017-11-01 by luispedro
 	* First release supporting all basic functionality.
