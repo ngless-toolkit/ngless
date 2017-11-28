@@ -3,11 +3,15 @@
  -}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE CPP #-}
 
 module Interpretation.Map
     ( executeMap
     , executeMapStats
+#ifdef IS_BUILDING_TEST
     , _samStats
+    , mergeSAMGroups
+#endif
     ) where
 
 import qualified Data.Text as T
@@ -18,13 +22,20 @@ import           Control.Monad.Except
 
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
-import qualified Data.Conduit.Combinators as C
-import qualified Data.Conduit.Internal as C
+import qualified Data.Conduit.Combinators as CC
+import qualified Data.Conduit.Internal as CI
+import qualified Data.Conduit as C
 import           Data.Conduit (($$), (=$=), (.|))
 import           Control.Monad.Extra (unlessM)
 import           Data.List (foldl')
 
+
 import System.IO
+import System.IO.Error
+import System.FilePath.Glob (namesMatching)
+import System.Directory
+import System.FilePath
+import System.PosixCompat.Files (createSymbolicLink)
 
 import Language
 import FileManagement
@@ -37,13 +48,14 @@ import qualified StandardModules.Mappers.Bwa as Bwa
 import qualified StandardModules.Mappers.Soap as Soap
 
 import Data.Sam
+import Data.Fasta
 import Data.FastQ
 import Utils.Utils
 import FileOrStream
 import Utils.Conduit
+import Configuration
 import Utils.LockFile
 import Utils.Samtools (samBamConduit)
-import Interpretation.LowMemory
 
 -- | internal type
 data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
@@ -68,24 +80,64 @@ getMapper request = do
                 _ -> error "should not be possible map:getMapper"
             else throwScriptError ("Requested mapper '"++T.unpack request ++"' is not active.")
 
+getIndexOutput createLink fafile = do
+    indexDir <- nConfIndexStorePath <$> nglConfiguration
+    case indexDir of
+        Just d -> liftIO $ do
+            let dropSlash "" = ""
+                dropSlash ('/':r) = dropSlash r
+                dropSlash p = p
+            afafile <- makeAbsolute fafile
+            let fafile' = d </> dropSlash afafile
+            createDirectoryIfMissing True (takeDirectory fafile')
+            when createLink $
+                createSymbolicLink afafile fafile'
+                    `catchIOError` (\e -> unless (isAlreadyExistsError e) (ioError e))
+            return fafile'
+        Nothing -> return fafile
+
 -- | lazy index creation
-ensureIndexExists :: Mapper -> FilePath -> NGLessIO FilePath
-ensureIndexExists mapper refPath = do
-    hasIndex <- hasValidIndex mapper refPath
+ensureIndexExists :: Int -> Mapper -> FilePath -> NGLessIO [FilePath]
+ensureIndexExists 0 mapper fafile = do
+    hasIndex <- hasValidIndex mapper fafile
     if hasIndex
-        then outputListLno' DebugOutput ["Index for ", refPath, " already exists."]
-        else withLockFile LockParameters
-                            { lockFname = refPath ++ ".ngless-index.lock"
+        then do
+            outputListLno' DebugOutput ["Index for ", fafile, " already exists."]
+            return [fafile]
+        else do
+            fafile' <- getIndexOutput True fafile
+            withLockFile LockParameters
+                            { lockFname = fafile' ++ ".ngless-index.lock"
                             , maxAge = hoursToDiffTime 36
                             , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
                             } $
                 -- recheck if index exists with the lock in place
                 -- it may have been created in the meanwhile (especially if we slept waiting for the lock)
-                unlessM (hasValidIndex mapper refPath) $
-                    createIndex mapper refPath
-    return refPath
+                unlessM (hasValidIndex mapper fafile') $
+                    createIndex mapper fafile'
+            return [fafile']
   where
     hoursToDiffTime h = fromInteger (h * 3600)
+
+ensureIndexExists blockSize mapper fafile = do
+    blocks <- ensureSplitsExist blockSize fafile
+    forM_ blocks (ensureIndexExists 0 mapper)
+    return blocks
+
+ensureSplitsExist blockSize fafile = do
+    fafile' <- getIndexOutput False fafile
+    let ofafile = takeDirectory fafile' </> takeBaseName fafile <.> "splits_" ++ show blockSize ++ "m"
+        receipt = ofafile <.> "done"
+    done <- liftIO $ doesFileExist receipt
+    if done
+        then do
+            outputListLno' TraceOutput ["Splits for FASTA file '", fafile, "' found"]
+            liftIO $ namesMatching (ofafile ++ ".*.fna")
+        else do
+            outputListLno' DebugOutput ["Splitting FASTA file '", fafile, "'"]
+            splitFASTA (1000*1000*blockSize) fafile ofafile
+
+
 
 
 -- | parse map() args to return a reference
@@ -107,7 +159,7 @@ mapToReference mapper refIndex (ReadSet pairs singletons) extraArgs = do
         out2 :: C.Sink B.ByteString IO ()
         out2 = CB.lines
                 .| CL.filter (\line -> not (B.null line) &&  B8.head line /= '@')
-                .| C.unlinesAscii
+                .| CC.unlinesAscii
                 .| CB.sinkHandle hout
     statsp <- forM (zip pairs (out1:repeat out2)) $ \((FastQFilePath _ fp1, FastQFilePath _ fp2), out) ->
                 callMapper mapper refIndex [fp1, fp2] extraArgs (zipToStats out)
@@ -120,6 +172,46 @@ mapToReference mapper refIndex (ReadSet pairs singletons) extraArgs = do
     (newfp,) <$> combinestats statsp statss
 zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesC =$= samStatsC))
 
+splitFASTA :: Int -> FilePath -> FilePath -> NGLessIO [FilePath]
+splitFASTA maxBPS ifile ofileBase =
+        withLockFile LockParameters
+                { lockFname = ifile ++ (show maxBPS) ++ ".split.lock"
+                , maxAge = (36 * 3000)
+                , whenExistsStrategy = IfLockedRetry { nrLockRetries = 120, timeBetweenRetries = 60 }
+                } $ C.runConduit $
+            conduitPossiblyCompressedFile ifile
+                .| faConduit
+                .| splitWriter
+    where
+        splitWriter = splitWriter' [] (0 :: Int)
+        splitWriter' fs n = do
+            let f = ofileBase ++ "." ++ show n ++ ".fna"
+            getNbps
+                .| faWriteC
+                .| CB.sinkFileCautious f
+            finished <- CC.null
+            if finished
+                then return (f:fs)
+                else splitWriter' (f:fs) (n + 1)
+        getNbps = awaitJust $ \fa -> do
+                        C.yield fa
+                        if faseqLength fa > maxBPS
+                            then do
+                                lift $ outputListLno' WarningOutput
+                                            ["While splitting file '", ifile, ": Sequence ", B8.unpack (seqheader fa), " is ", show (faseqLength fa)
+                                            ," bases long (which is longer than the block size). Note that NGLess does not split sequences."]
+                                return ()
+                            else getNbps' (faseqLength fa)
+
+        getNbps' sofar = awaitJust $ \fa ->
+                            if faseqLength fa + sofar > maxBPS
+                                then C.leftover fa
+                                else do
+                                    C.yield fa
+                                    getNbps' (faseqLength fa + sofar)
+
+
+
 combinestats first second = do
         first' <- runNGLess $ sequence first
         second' <- runNGLess $ sequence second
@@ -128,22 +220,44 @@ combinestats first second = do
         add3 :: (Int, Int, Int) -> (Int, Int, Int) -> (Int, Int, Int)
         add3 (!a,!b,!c) (!a',!b',!c') = (a + a', b + b', c + c')
 
-performMap :: Mapper -> ReferenceInfo -> T.Text -> ReadSet -> [String] -> NGLessIO NGLessObject
-performMap mapper ref name rs extraArgs = do
-    (ref', defGen') <- indexReference ref
-    (samPath', (total, aligned, unique)) <- mapToReference mapper ref' rs extraArgs
-    outputMapStatistics (MappingInfo undefined samPath' ref' total aligned unique)
-    return $ NGOMappedReadSet name (File samPath') defGen'
+
+
+
+performMap :: Mapper -> Int -> ReferenceInfo -> T.Text -> ReadSet -> [String] -> NGLessIO NGLessObject
+performMap mapper blockSize ref name rs extraArgs = do
+    (ref', mappedRef) <- indexReference ref
+    case ref' of
+        [single] -> do
+            (samPath', (total, aligned, unique)) <- mapToReference mapper single rs extraArgs
+            outputMapStatistics (MappingInfo undefined samPath' single total aligned unique)
+            return $ NGOMappedReadSet name (File samPath') mappedRef
+        blocks -> do
+            (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam"
+            partials <- forM blocks (\block -> fst <$> mapToReference mapper block rs extraArgs)
+            ((total, aligned, unique), ()) <- C.runConduit $
+                mergeSamFiles partials
+                .| zipSink2 samStatsC'
+                    (CL.concat
+                        .| CL.map (ByteLine . encodeSamLine)
+                        .| byteLineSinkHandle hout)
+            liftIO $ hClose hout
+            let refname = case ref of
+                    FaFile fa -> fa
+                    PackagedReference r -> T.unpack r
+            outputMapStatistics (MappingInfo undefined sam refname total aligned unique)
+            return $! NGOMappedReadSet name (File sam) mappedRef
+
+
     where
-        indexReference :: ReferenceInfo -> NGLessIO (FilePath, Maybe T.Text)
+        indexReference :: ReferenceInfo -> NGLessIO ([FilePath], Maybe T.Text)
         indexReference (FaFile fa) =
             expandPath fa >>= \case
-                Just fa' -> (,Nothing) <$> ensureIndexExists mapper fa'
+                Just fa' -> (,Nothing) <$> ensureIndexExists blockSize mapper fa'
                 Nothing -> throwDataError ("Could not find FASTA file: "++fa)
         indexReference (PackagedReference r) = do
             ReferenceFilePaths fafile _ _ <- ensureDataPresent r
             case fafile of
-                Just fp -> (, Just r) <$> ensureIndexExists mapper fp
+                Just fp -> (, Just r) <$> ensureIndexExists blockSize mapper fp
                 Nothing -> throwScriptError ("Could not find reference '" ++ T.unpack r ++ "'.")
 
 _samStats :: FilePath -> NGLessIO (Int, Int, Int)
@@ -171,18 +285,18 @@ samStatsC' = CL.foldM summarize (0, 0, 0)
 -- | this is copied from runErrorC, using ExceptT as we do not want to have to
 -- make `e` be of class `Error`.
 runExceptC :: (Monad m) => C.Sink i (ExceptT e m) r -> C.Sink i m (Either e r)
-runExceptC (C.ConduitM c0) =
-    C.ConduitM $ \rest ->
-        let go (C.Done r) = rest (Right r)
-            go (C.PipeM mp) = C.PipeM $ do
+runExceptC (CI.ConduitM c0) =
+    CI.ConduitM $ \rest ->
+        let go (CI.Done r) = rest (Right r)
+            go (CI.PipeM mp) = CI.PipeM $ do
                 eres <- runExceptT mp
                 return $! case eres of
                     Left e -> rest $ Left e
                     Right p -> go p
-            go (C.Leftover p i) = C.Leftover (go p) i
-            go (C.HaveOutput p f o) = C.HaveOutput (go p) (runExceptT f >> return ()) o
-            go (C.NeedInput x y) = C.NeedInput (go . x) (go . y)
-         in go (c0 C.Done)
+            go (CI.Leftover p i) = CI.Leftover (go p) i
+            go (CI.HaveOutput p f o) = CI.HaveOutput (go p) (runExceptT f >> return ()) o
+            go (CI.NeedInput x y) = CI.NeedInput (go . x) (go . y)
+         in go (c0 CI.Done)
 
 executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMap fqs args = do
@@ -194,34 +308,9 @@ executeMap fqs args = do
     mapper <- getMapper mapperName
     let bwaArgs = extraArgs ++ ["-a" | oAll]
         executeMap' r (NGOList es)            = NGOList <$> forM es (executeMap' r)
-        executeMap' r (NGOReadSet name rs)    = performMap mapper r name rs bwaArgs
+        executeMap' r (NGOReadSet name rs)    = performMap mapper (fromInteger blockSize) r name rs bwaArgs
         executeMap' _ v = throwShouldNotOccur ("map expects ReadSet, got " ++ show v ++ "")
-    case blockSize of
-        0 -> executeMap' ref fqs
-        bs -> do
-            case ref of
-                FaFile fa -> do
-                    outputListLno' TraceOutput ["Splitting FASTA file '", fa, "'"]
-                    blocks <- splitFASTA (1000 * 1000 * fromInteger bs) fa (fa ++ ".block_size_" ++ show blockSize ++ "M")
-                    partials <- forM blocks $ \block -> do
-                        NGOMappedReadSet _ (File sp) r <- executeMap' (FaFile block) fqs
-                        return (sp, r)
-
-
-                    (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam"
-                    ((total, aligned, unique), ()) <- C.runConduit $
-                        mergeSamFiles (fst <$> partials)
-                        .| zipSink2 samStatsC'
-                            (CL.concat
-                                .| CL.map (ByteLine . encodeSamLine)
-                                .| byteLineSinkHandle hout)
-                    liftIO $ hClose hout
-
-                    outputMapStatistics (MappingInfo undefined sam fa total aligned unique)
-                    -- TODO : FIX THE NAMING HERE
-                    return $! NGOMappedReadSet "merged" (File sam) (snd $ head partials)
-                _ -> throwScriptError "block_size_megabases is not implemented for reference arguments"
-
+    executeMap' ref fqs
 
 executeMapStats :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMapStats (NGOMappedReadSet name sami _) _ = do
@@ -238,3 +327,32 @@ executeMapStats (NGOMappedReadSet name sami _) _ = do
     liftIO $ hClose hout
     return $! NGOCounts (File countfp)
 executeMapStats other _ = throwScriptError ("Wrong argument for mapstats: "++show other)
+
+
+mergeSamFiles :: [FilePath] -> C.Source NGLessIO SamGroup
+mergeSamFiles [] = lift $ throwShouldNotOccur "empty input to mergeSamFiles"
+mergeSamFiles inputs = do
+    lift $ outputListLno' TraceOutput ["Merging SAM files: ", show inputs]
+    -- There are obvious opportunities to make this code take advantage of parallelism
+    C.sequenceSources
+                [CB.sourceFile f
+                    .| linesC
+                    .| readSamGroupsC
+                            | f <- inputs]
+        .| CL.map mergeSAMGroups
+
+mergeSAMGroups :: [SamGroup] -> SamGroup
+mergeSAMGroups groups = group group1 ++ group group2 ++ group groupS
+    where
+        (group1, group2, groupS) = foldl (\(g1,g2,gS) s ->
+                                                (if isFirstInPair s
+                                                    then (s:g1, g2, gS)
+                                                    else if isSecondInPair s
+                                                        then (g1, s:g2, gS)
+                                                        else (g1, g2, s:gS))) ([], [], []) $ concat groups
+        group :: [SamLine] -> [SamLine]
+        group [] = []
+        group gs = case filter isAligned gs of
+            [] -> [head gs]
+            gs' -> gs'
+

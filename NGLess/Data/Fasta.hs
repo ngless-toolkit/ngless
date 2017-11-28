@@ -11,6 +11,7 @@ module Data.Fasta
     ) where
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
 import qualified Data.Conduit.Combinators as C
@@ -42,9 +43,9 @@ faConduit' :: (MonadIO m, MonadError NGError m) => C.Conduit ByteLine m FastaSeq
 faConduit' = C.await >>= \case
                 Nothing -> return ()
                 Just (ByteLine header)
-                  | B.null header -> throwDataError ("Unexpected empty string at line 1")
+                  | B.null header -> throwDataError "Unexpected empty string at line 1"
                   | B.head header == greaterThanSign -> getdata (1 :: Int) (B.drop 1 header) []
-                  | otherwise -> throwDataError"Unexpected data"
+                  | otherwise -> throwDataError ("Unexpected data (expected > sign, got: " ++ B8.unpack (B.take 80 header) ++ ")")
   where
     getdata !n header toks = C.await >>= \case
                                 Nothing -> C.yield $ FastaSeq header (B.concat $ reverse toks)

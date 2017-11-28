@@ -70,6 +70,7 @@ dependencies:
   - time >=1.5
   - transformers
   - transformers-base
+  - unix-compat
   - vector >=0.11
   - vector-algorithms
   - yaml

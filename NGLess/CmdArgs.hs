@@ -75,6 +75,7 @@ data NGLessMode =
               , exportCWL :: Maybe FilePath
               , deprecationCheck :: Bool
               , searchPath :: [FilePath]
+              , indexPath :: Maybe FilePath
               , extraArgs :: [String]
               }
         | InstallGenMode
@@ -153,6 +154,7 @@ mainArgs = DefaultMode
               <*> optional (strOption $ long "export-cwl" <> help "File to write CWL wrapper of given script") -- exportCWL :: Maybe FilePath
               <*> switch (long "check-deprecation" <> help "Check if ngless version or any used modules have been deprecated")-- deprecationCheck :: Bool
               <*> many (strOption $ long "search-dir" <> help "Reference search directories (replace <references> in script)") -- searchPath :: [FilePath]
+              <*> optional (strOption $ long "index-path" <> help "Index path (directory where indices are stored)") -- indexPath :: Maybe FilePath
               <*> many (strArgument (metavar "ARGV")) -- extraArgs :: [String]
 
 installArgs = (flag' InstallGenMode (long "install-reference-data"))

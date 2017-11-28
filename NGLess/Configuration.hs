@@ -14,6 +14,7 @@ import System.Environment (getExecutablePath, lookupEnv)
 import System.Directory
 import System.FilePath
 import Data.Maybe
+import Control.Applicative
 import qualified Data.Text as T
 import qualified Data.Configurator as CF
 
@@ -40,6 +41,7 @@ data NGLessConfiguration = NGLessConfiguration
     , nConfArgv :: [T.Text]
     , nConfVerbosity :: Verbosity
     , nConfSearchPath :: [FilePath]
+    , nConfIndexStorePath :: Maybe FilePath
     } deriving (Eq, Show)
 
 
@@ -73,6 +75,7 @@ guessConfiguration = do
         , nConfArgv = []
         , nConfVerbosity = Normal
         , nConfSearchPath = []
+        , nConfIndexStorePath = Nothing
         }
 
 -- | Update configuration options based on config files
@@ -97,6 +100,7 @@ readConfigFiles NGLessConfiguration{..} cfiles = do
     nConfPrintHeader' <- CF.lookupDefault nConfPrintHeader cp "print-header"
     nConfSearchPath' <- CF.lookupDefault nConfSearchPath cp "search-path"
     nConfCreateReportDirectory' <- CF.lookupDefault nConfCreateReportDirectory cp "create-report"
+    nConfIndexStorePath' <- CF.lookup cp "index-path"
     return NGLessConfiguration
         { nConfDownloadBaseURL = nConfDownloadBaseURL'
         , nConfGlobalDataDirectory = nConfGlobalDataDirectory'
@@ -114,6 +118,7 @@ readConfigFiles NGLessConfiguration{..} cfiles = do
         , nConfArgv = nConfArgv
         , nConfVerbosity = nConfVerbosity
         , nConfSearchPath = nConfSearchPath'
+        , nConfIndexStorePath = nConfIndexStorePath' <|> nConfIndexStorePath
         }
 
 -- | Configuration is set in 3 steps:
@@ -163,6 +168,7 @@ initConfiguration opts = do
                 createReportDirectory' = fromMaybe
                                     (nConfCreateReportDirectory config)
                                     createReportDirectory
+                indexPath' = indexPath <|> nConfIndexStorePath config
             in config
                     { nConfTrace = nConfTrace'
                     , nConfStrictThreads = strictThreads'
@@ -174,6 +180,7 @@ initConfiguration opts = do
                     , nConfSubsample = subsampleMode
                     , nConfArgv = T.pack <$> argv
                     , nConfSearchPath = searchPath'
+                    , nConfIndexStorePath = indexPath'
                     }
         updateConfigurationOptsMode _ config = config
 

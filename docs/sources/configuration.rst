@@ -54,6 +54,8 @@ system dependent, on Linux, typically ``$HOME/.local/share/ngless/``.
 ``user-data-directory``: user writable directory to cache data (default is a
 ``data`` directory inside the ``user-directory`` [see above]).
 
+``index-path``: user writable directory to store indices and similar data.
+
 ``global-data-directory``: global data directory.
 
 Debug options

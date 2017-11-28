@@ -13,6 +13,7 @@ Version 0.5+
 	* Added reference alias for a more human readable name
 	* Updated builtin referenced to include latest releases of assemblies
 	* Fixed inconsistency between reference identifiers and underlying files
+	* Add --index-path functionality to define where to write indices (issue #47)
 
 Version 0.5 2017-11-01 by luispedro
 	* First release supporting all basic functionality.

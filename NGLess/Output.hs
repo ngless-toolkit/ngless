@@ -337,6 +337,8 @@ outputConfiguration = do
     outputListLno' DebugOutput ["\tprint header: ",  show $ nConfPrintHeader cfg]
     outputListLno' DebugOutput ["\tsubsample: ", show $ nConfSubsample cfg]
     outputListLno' DebugOutput ["\tverbosity: ", show $ nConfVerbosity cfg]
+    forM_ (nConfIndexStorePath cfg) $ \p ->
+        outputListLno' DebugOutput ["\tindex storage path: ", p]
     outputListLno' DebugOutput ["\tsearch path:"]
     forM_ (nConfSearchPath cfg) $ \p ->
         outputListLno' DebugOutput ["\t\t", p]
