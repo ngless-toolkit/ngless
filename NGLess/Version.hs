@@ -11,9 +11,12 @@ module Version
     ) where
 
 import Development.GitRev (gitHash)
+import Data.Version (showVersion)
+
+import Paths_NGLess (version)
 
 versionStr :: String
-versionStr = "0.5+git"
+versionStr = showVersion version
 
 dateStr :: String
 dateStr = "unreleased"

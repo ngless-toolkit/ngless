@@ -1,5 +1,4 @@
-VERSION := 0.5.1
-
+VERSION := $(shell ./build-scripts/read-version.sh)
 progname := ngless
 distdir := ngless-${VERSION}
 
