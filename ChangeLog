@@ -1,19 +1,18 @@
-Version 0.5+
-	* Allow `citations` as key in external modules
-	* Better citations information
-	* Add `orf_find` function
-	* Fix --strict-threads command-line option spelling
-	* Add Prodigal
-	* Use multiple threads in SAM->BAM conversion
-	* Better error checking/script validation
-	* Change include_m1 default in count() function to True
+Version 0.6 2017-11-29 by luispedro
+	* Add `orf_find` function (implemented through Prodigal)
 	* Add qcstats() function
 	* Output preprocessed FQ statistics (had been erroneously removed)
-	* Version embedded megahit binary
+	* Fix --strict-threads command-line option spelling
+	* Use multiple threads in SAM->BAM conversion
+	* Change include_m1 default in count() function to True
+	* Add --index-path functionality to define where to write indices (issue #47)
+	* Allow `citations` as key in external modules
+	* Better citations information
+	* Better error checking/script validation
 	* Added reference alias for a more human readable name
+	* Version embedded megahit binary
 	* Updated builtin referenced to include latest releases of assemblies
 	* Fixed inconsistency between reference identifiers and underlying files
-	* Add --index-path functionality to define where to write indices (issue #47)
 
 Version 0.5 2017-11-01 by luispedro
 	* First release supporting all basic functionality.

@@ -163,6 +163,7 @@ Authors
 
    introduction
    install
+   whatsnew
    tutorial-ocean-metagenomics
    tutorial-assembly-gp
    tutorial-gut-metagenomics

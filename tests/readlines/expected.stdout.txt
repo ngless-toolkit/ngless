@@ -1,4 +1,4 @@
-NGLess v0.5+git (C) NGLess authors
+NGLess v0.6.0 (C) NGLess authors
 http://ngless.embl.de/
 
 line 1
