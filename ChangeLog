@@ -1,4 +1,7 @@
-Version 0.6 2017-11-29 by luispedro
+Version 0.6.0+GIT
+	* Better error message in readlines() when file opening fails
+
+Version 0.6.0 2017-11-29 by luispedro
 	* Add `orf_find` function (implemented through Prodigal)
 	* Add qcstats() function
 	* Output preprocessed FQ statistics (had been erroneously removed)
@@ -14,5 +17,8 @@ Version 0.6 2017-11-29 by luispedro
 	* Updated builtin referenced to include latest releases of assemblies
 	* Fixed inconsistency between reference identifiers and underlying files
 
-Version 0.5 2017-11-01 by luispedro
+Version 0.5.1 2017-11-02 by luispedro
+	* Fix building step (static compilation)
+
+Version 0.5.0 2017-11-01 by luispedro
 	* First release supporting all basic functionality.

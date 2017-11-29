@@ -2,13 +2,16 @@
  - License: MIT
  -}
 
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module BuiltinModules.Readlines
     ( loadModule
     ) where
 
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
-import qualified Data.Conduit.Combinators as C
+import qualified Data.Conduit as C
+import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit ((=$=), ($$))
@@ -21,7 +24,9 @@ import NGLess
 
 executeReadlines :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeReadlines (NGOString fname) _ = do
-    content <- C.sourceFile (T.unpack fname)
+    content <-
+        (CC.sourceFile (T.unpack fname) `C.catchC` (\(e :: IOError) ->
+                                            throwDataError ("Could not read file '"++T.unpack fname++"': " ++ show e)))
             =$= CB.lines
             $$ CL.consume
     return $! NGOList [NGOString (T.pack . B8.unpack $ ell) | ell <- content]
