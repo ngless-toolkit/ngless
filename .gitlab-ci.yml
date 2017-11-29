@@ -1,4 +1,30 @@
 build-and-test-ubuntu:
+    image: registry.gitlab.com/ngless/ngless/ubuntu-ghc-stack:latest
+    stage: build
+
+    before_script:
+    - apt update
+    - apt upgrade -y
+    - stack upgrade
+    - mkdir bin
+    # Needed for tests that print UTF8 characters such as motus
+    # Same issue as https://github.com/commercialhaskell/stack/issues/793
+
+    variables:
+        LC_ALL: "C.UTF-8"
+
+    script:
+    - ./run-tests-static.sh
+    - stack --local-bin-path bin install --ghc-options '-fPIC' --flag NGLess:embed
+
+    artifacts:
+        when: on_success
+        paths:
+        - bin/ngless
+        - Modules/packages/
+        expire_in: 1 month
+
+build-and-test-ubuntu-rolling:
     image: registry.gitlab.com/ngless/ngless/ubuntu-ghc-stack:rolling
     stage: build
 
