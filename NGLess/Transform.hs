@@ -159,10 +159,10 @@ qcInPreprocess ((lno,expr):rest) = case fastQVar expr of
 
 rewritePreprocess _ [] = [] -- this should never happen
 rewritePreprocess v ((lno,expr):rest) = case expr of
-    FunctionCall f@(FuncName "preprocess") e@(Lookup _ v') args b
+    Assignment t (FunctionCall f@(FuncName "preprocess") e@(Lookup _ v') args b)
         | v == v' ->
                 let expr' = FunctionCall f e ((Variable "__input_qc", ConstBool True):args) b
-                    in (lno,expr'):rest
+                    in (lno,Assignment t expr'):rest
     _ -> (lno,expr):rewritePreprocess v rest
 
 fastQVar :: Expression -> Maybe (T.Text, Variable)
@@ -174,7 +174,7 @@ fastQVar _ = Nothing
 -- 'v' is in a preproces call. Otherwise, it is not guaranteed to be safe
 canQCPreprocessTransform :: Variable -> [(Int, Expression)] -> Bool
 canQCPreprocessTransform _ [] = False
-canQCPreprocessTransform v ((_,FunctionCall (FuncName "preprocess") (Lookup _ v') _ _):_)
+canQCPreprocessTransform v ((_,Assignment _ (FunctionCall (FuncName "preprocess") (Lookup _ v') _ _)):_)
     | v' == v = True
 canQCPreprocessTransform v ((_, expr):rest)
     | isVarUsed1 v expr = False

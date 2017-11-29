@@ -1,4 +1,5 @@
 Version 0.6.0+GIT
+	* Fix streaming short read QC (performance regression)
 	* Better error message in readlines() when file opening fails
 
 Version 0.6.0 2017-11-29 by luispedro
