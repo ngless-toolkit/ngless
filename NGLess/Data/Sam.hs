@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module Data.Sam
     ( SamLine(..)
-    , SamGroup(..)
+    , SamGroup
     , samLength
     , readSamGroupsC
     , readSamGroupsC'
