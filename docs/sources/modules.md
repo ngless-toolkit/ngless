@@ -153,12 +153,12 @@ name used). For example:
             additional:
                 -
                     name: verbose
-                    atype: bool
+                    atype: flag
                     def: false
                     when-true: "-v"
                 -
                     name: complete
-                    atype: bool
+                    atype: flag
                     def: false
                     when-true:
                         - "--output=complete"
