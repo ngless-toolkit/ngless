@@ -16,6 +16,7 @@ BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.15/bwa-0.7.15.tar.bz
 BWA_TAR = bwa-0.7.15.tar.bz2
 BWA_SHA1 = b3a5606ecd2dd926e220edd311ff6eb16a47a2c0
 BWA_TARGET = ngless-bwa
+BWA_TARGET_VERSIONED = ngless-${VERSION}-bwa
 
 SAM_DIR = samtools-1.6
 SAM_DIR_TARGET = $(SAM_DIR)/configure
@@ -23,6 +24,7 @@ SAM_URL = https://github.com/samtools/samtools/releases/download/1.6/samtools-1.
 SAM_TAR = samtools-1.6.tar.bz2
 SAM_SHA1 = c72c059b0d6525d1b12acbe25cc1f69157d4da7a
 SAM_TARGET = ngless-samtools
+SAM_TARGET_VERSIONED = ngless-${VERSION}-samtools
 
 PRODIGAL_DIR = Prodigal-2.6.3
 PRODIGAL_DIR_TARGET = $(PRODIGAL_DIR)/Makefile
@@ -30,6 +32,7 @@ PRODIGAL_URL = https://github.com/hyattpd/Prodigal/archive/v2.6.3.tar.gz
 PRODIGAL_TAR = v2.6.3.tar.gz
 PRODIGAL_SHA1 = 1259e999193cd0c095935baebfb8bcb0233e850f
 PRODIGAL_TARGET = ngless-prodigal
+PRODIGAL_TARGET_VERSIONED = ngless-${VERSION}-prodigal
 
 MEGAHIT_DIR = megahit-1.1.1
 # we can't target Makefile here cause we patch it after unpacking
@@ -48,6 +51,7 @@ NGLESS_EMBEDDED_TARGET = NGLess/Dependencies/embedded.c
 
 MEGAHIT_BINS := $(MEGAHIT_DIR)/megahit_asm_core $(MEGAHIT_DIR)/megahit_sdbg_build $(MEGAHIT_DIR)/megahit_toolkit $(MEGAHIT_DIR)/megahit
 NGLESS_EXT_BINS = $(BWA_DIR)/$(BWA_TARGET) $(SAM_DIR)/$(SAM_TARGET) $(PRODIGAL_DIR)/$(PRODIGAL_TARGET) $(MEGAHIT_BINS)
+NGLESS_EXT_BINS_VERSIONED = $(BWA_DIR)/$(BWA_TARGET_VERSIONED) $(SAM_DIR)/$(SAM_TARGET_VERSIONED) $(PRODIGAL_DIR)/$(PRODIGAL_TARGET_VERSIONED)
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
@@ -118,12 +122,14 @@ bench:
 profile:
 	stack build $(STACKOPTS) --executable-profiling --library-profiling --ghc-options="-fprof-auto -rtsopts"
 
-install: ngless external-deps $(NGLESS_EXT_BINS)
+install: ngless external-deps $(NGLESS_EXT_BINS_VERSIONED) $(MEGAHIT_BINS)
 	mkdir -p $(exec)
 	mkdir -p $(deps)/bin
 	stack --local-bin-path $(exec) install $(STACKOPTS)
 	cp -prf $(HTML) $(deps)
-	cp -prf $(NGLESS_EXT_BINS) $(deps)/bin
+	cp -prf $(NGLESS_EXT_BINS_VERSIONED) $(deps)/bin
+	mkdir -p $(deps)/bin/ngless-${VERSION}-megahit
+	cp -prf $(MEGAHIT_BINS) $(deps)/bin/ngless-${VERSION}-megahit
 
 external-deps: $(NGLESS_EXT_BINS) $(reqhtmllibs) $(reqfonts)
 
@@ -154,6 +160,9 @@ $(BWA_DIR)/$(BWA_TARGET): $(BWA_DIR_TARGET)
 $(BWA_DIR)/$(BWA_TARGET)-static: $(BWA_DIR_TARGET)
 	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"  LIBS="-lbwa -lm -lz -lrt -lpthread" && cp -p bwa $(BWA_TARGET)-static
 
+$(BWA_DIR)/$(BWA_TARGET_VERSIONED): $(BWA_DIR)/$(BWA_TARGET)
+	cp $< $@
+
 $(SAM_DIR_TARGET):
 	wget $(SAM_URL) -O $(SAM_TAR)
 	sha1sum -c <(echo "$(SAM_SHA1)  $(SAM_TAR)")
@@ -165,6 +174,9 @@ $(SAM_DIR)/$(SAM_TARGET)-static: $(SAM_DIR_TARGET)
 
 $(SAM_DIR)/$(SAM_TARGET): $(SAM_DIR_TARGET)
 	cd $(SAM_DIR) && ./configure --without-curses && $(MAKE) && cp -p samtools $(SAM_TARGET)
+
+$(SAM_DIR)/$(SAM_TARGET_VERSIONED): $(SAM_DIR)/$(SAM_TARGET)
+	cp $< $@
 
 $(PRODIGAL_DIR_TARGET):
 	wget $(PRODIGAL_URL) -O $(PRODIGAL_TAR)
@@ -178,6 +190,9 @@ $(PRODIGAL_DIR)/$(PRODIGAL_TARGET)-static: $(PRODIGAL_DIR_TARGET)
 
 $(PRODIGAL_DIR)/$(PRODIGAL_TARGET): $(PRODIGAL_DIR_TARGET)
 	cd $(PRODIGAL_DIR) && $(MAKE) && cp -p prodigal $(PRODIGAL_TARGET)
+
+$(PRODIGAL_DIR)/$(PRODIGAL_TARGET_VERSIONED): $(PRODIGAL_DIR)/$(PRODIGAL_TARGET)
+	cp $< $@
 
 $(MEGAHIT_DIR_TARGET):
 	wget $(MEGAHIT_URL) -O $(MEGAHIT_TAR)
