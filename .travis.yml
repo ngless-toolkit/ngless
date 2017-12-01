@@ -2,10 +2,10 @@ sudo: false
 language: python
 
 cache:
-  ccache: true
   directories:
     - $HOME/.ghc
     - $HOME/.cabal
+    - $HOME/.ccache
     - $HOME/.stack
 
 
