@@ -2,7 +2,7 @@ VERSION := $(shell ./build-scripts/read-version.sh)
 progname := ngless
 distdir := ngless-${VERSION}
 
-SHELL=/bin/bash
+SHELL=bash
 prefix=/usr/local
 deps=$(prefix)/share/$(progname)
 exec=$(prefix)/bin

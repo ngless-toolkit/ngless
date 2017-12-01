@@ -36,7 +36,12 @@ addons:
       - liblzma-dev
       - libcurl4-openssl-dev
 
+
 script:
   - stack --no-terminal setup
   - make
-  - ./run-tests.sh
+  - make modules
+  - make check
+  - mkdir prefix-test
+  - make install prefix=${PWD}/prefix-test
+  - PATH=${PWD}/prefix-test/bin:$PATH ./run-tests.sh
