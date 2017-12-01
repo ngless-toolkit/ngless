@@ -165,7 +165,7 @@ megahitBin :: NGLessIO FilePath
 megahitBin = liftIO (lookupEnv "NGLESS_MEGAHIT_BIN") >>= \case
     Just bin -> checkExecutable "NGLESS_MEGAHIT_BIN" bin
     Nothing -> do
-        path <- findBin ("ngless-"++versionStr ++ "megahit/megahit")
+        path <- findBin ("ngless-"++versionStr ++ "-megahit/megahit")
         maybe createMegahitBin return path
 
 createMegahitBin :: NGLessIO FilePath
