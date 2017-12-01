@@ -13,3 +13,4 @@ import Debug.Trace
 -- | Show value when evaluated, then return it
 tracex :: Show a => a -> a
 tracex x = trace (show x) x
+{-# WARNING tracex "Using tracex [remove before committing]" #-}
