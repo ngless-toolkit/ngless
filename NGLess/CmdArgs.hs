@@ -97,6 +97,7 @@ data NGLessMode =
         | PrintPathMode
               { pathDesired :: String
               }
+        | CheckInstallMode
            deriving (Eq, Show)
 
 parseVerbosity = option (eitherReader readVerbosity) (long "verbosity" <> short 'v' <> value Normal)
@@ -178,9 +179,17 @@ downloadDemoArgs = flag' DownloadDemoMode (long "download-demo")
 printPathArgs = flag' PrintPathMode (long "print-path")
                         <*> strArgument (metavar "EXEC")
 
+checkInstallArgs = flag' CheckInstallMode (long "check-install" <> help "Check if ngless is correctly installed")
+
 nglessArgs :: Parser NGLessArgs
 nglessArgs = NGLessArgs
-                <$> (mainArgs <|> downloadFileArgs <|> downloadDemoArgs <|> installArgs <|> createRefArgs <|> printPathArgs)
+                <$> (mainArgs
+                        <|> downloadFileArgs
+                        <|> downloadDemoArgs
+                        <|> installArgs
+                        <|> createRefArgs
+                        <|> printPathArgs
+                        <|> checkInstallArgs)
                 <*> parseVerbosity
                 <*> switch (long "quiet" <> short 'q')
                 <*> parseColor

@@ -330,6 +330,12 @@ modeExec (PrintPathMode exec) = runNGLessIO "finding internal path" $ do
       _ -> throwSystemError ("Unknown binary " ++ exec ++ ".")
     liftIO $ putStrLn path
 
+modeExec CheckInstallMode = runNGLessIO "Checking install" $ do
+    void samtoolsBin
+    void prodigalBin
+    void megahitBin
+    void bwaBin
+    liftIO $ putStrLn "Install OK"
 
 main' = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
