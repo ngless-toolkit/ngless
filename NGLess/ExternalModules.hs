@@ -160,11 +160,11 @@ data CommandReturn = CommandReturn
     deriving (Eq, Show)
 
 instance FromJSON CommandReturn where
-    parseJSON = withObject "hidden argument" $ \o ->
-        CommandReturn
-            <$> (unwrapReadNGLType <$> o .: "rtype")
-            <*> o .: "name"
-            <*> o .: "extension"
+    parseJSON = withObject "hidden argument" $ \o -> do
+        t <- unwrapReadNGLType <$> o .: "rtype"
+        if t == NGLVoid
+            then return $! CommandReturn NGLVoid "" ""
+            else CommandReturn t <$> o .: "name" <*> o .: "extension"
 
 data Command = Command
     { nglName :: T.Text
