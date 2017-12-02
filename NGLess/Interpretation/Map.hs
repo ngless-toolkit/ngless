@@ -27,7 +27,7 @@ import qualified Data.Conduit.Internal as CI
 import qualified Data.Conduit as C
 import           Data.Conduit (($$), (=$=), (.|))
 import           Control.Monad.Extra (unlessM)
-import           Data.List (foldl')
+import           Data.List (foldl', sort)
 
 
 import System.IO
@@ -36,6 +36,8 @@ import System.FilePath.Glob (namesMatching)
 import System.Directory
 import System.FilePath
 import System.PosixCompat.Files (createSymbolicLink)
+import System.IO.SafeWrite (withOutputFile)
+
 
 import Language
 import FileManagement
@@ -132,12 +134,13 @@ ensureSplitsExist blockSize fafile = do
     if done
         then do
             outputListLno' TraceOutput ["Splits for FASTA file '", fafile, "' found"]
-            liftIO $ namesMatching (ofafile ++ ".*.fna")
+            liftIO $ sort <$> namesMatching (ofafile ++ ".*.fna")
         else do
             outputListLno' DebugOutput ["Splitting FASTA file '", fafile, "'"]
-            splitFASTA (1000*1000*blockSize) fafile ofafile
-
-
+            splits <- splitFASTA blockSize fafile ofafile
+            liftIO $ withOutputFile receipt $ \hout ->
+                hPutStrLn hout ("FASTA file '" ++ fafile ++ "' split into blocks of " ++ show blockSize ++ " megabases.")
+            return splits
 
 
 -- | parse map() args to return a reference
@@ -173,9 +176,9 @@ mapToReference mapper refIndex (ReadSet pairs singletons) extraArgs = do
 zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesC =$= samStatsC))
 
 splitFASTA :: Int -> FilePath -> FilePath -> NGLessIO [FilePath]
-splitFASTA maxBPS ifile ofileBase =
+splitFASTA megaBPS ifile ofileBase =
         withLockFile LockParameters
-                { lockFname = ifile ++ (show maxBPS) ++ ".split.lock"
+                { lockFname = ifile ++ "." ++ (show megaBPS) ++ "m.split.lock"
                 , maxAge = (36 * 3000)
                 , whenExistsStrategy = IfLockedRetry { nrLockRetries = 120, timeBetweenRetries = 60 }
                 } $ C.runConduit $
@@ -183,6 +186,7 @@ splitFASTA maxBPS ifile ofileBase =
                 .| faConduit
                 .| splitWriter
     where
+        maxBPS = 1000 * 1000 * megaBPS
         splitWriter = splitWriter' [] (0 :: Int)
         splitWriter' fs n = do
             let f = ofileBase ++ "." ++ show n ++ ".fna"
@@ -211,7 +215,6 @@ splitFASTA maxBPS ifile ofileBase =
                                     getNbps' (faseqLength fa + sofar)
 
 
-
 combinestats first second = do
         first' <- runNGLess $ sequence first
         second' <- runNGLess $ sequence second
@@ -219,7 +222,6 @@ combinestats first second = do
     where
         add3 :: (Int, Int, Int) -> (Int, Int, Int) -> (Int, Int, Int)
         add3 (!a,!b,!c) (!a',!b',!c') = (a + a', b + b', c + c')
-
 
 
 
