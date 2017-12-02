@@ -253,7 +253,7 @@ executeCommand basedir cmds funcname input args = do
                 (throwShouldNotOccur ("Call to undefined function "++T.unpack funcname++"."))
                 return
                 (find ((== funcname) . nglName) cmds)
-    paths <- asfilePaths input (cargPayload $ arg1 cmd)
+    paths <- encodeArgument (arg1 cmd) (Just input)
     paths' <- liftIO $ mapM canonicalizePath paths
     args' <- argsArguments cmd args
     moarg <- case ret cmd of
@@ -289,8 +289,8 @@ executeCommand basedir cmds funcname input args = do
             NGLMappedReadSet -> NGOMappedReadSet (groupName input) (File newfp) Nothing
             _ -> error "NOT IMPLEMENTED"
 
-asfilePaths :: NGLessObject -> Maybe CommandExtra -> NGLessIO  [FilePath]
-asfilePaths (NGOReadSet _ (ReadSet paired singles)) _ = do
+asFilePaths :: NGLessObject -> Maybe CommandExtra -> NGLessIO  [FilePath]
+asFilePaths (NGOReadSet _ (ReadSet paired singles)) _ = do
     let concatenateFQs' [] = return Nothing
         concatenateFQs' rs = Just <$> concatenateFQs rs
     fq1 <- concatenateFQs' (fst <$> paired)
@@ -300,9 +300,9 @@ asfilePaths (NGOReadSet _ (ReadSet paired singles)) _ = do
         (Nothing, Nothing, Just f)  -> return [fqpathFilePath f]
         (Just f1, Just f2, Nothing) -> return [fqpathFilePath f1, fqpathFilePath f2]
         (Just f1, Just f2, Just f3) -> return [fqpathFilePath f1, fqpathFilePath f2, fqpathFilePath f3]
-        _ -> throwScriptError "Malformed input argument to asfilePaths"
-asfilePaths input@(NGOCounts _) argOptions = (:[]) <$> asCountsFile input argOptions
-asfilePaths (NGOMappedReadSet _ input _) payload = (:[]) <$> do
+        _ -> throwScriptError "Malformed input argument to asFilePaths"
+asFilePaths input@(NGOCounts _) argOptions = (:[]) <$> asCountsFile input argOptions
+asFilePaths (NGOMappedReadSet _ input _) payload = (:[]) <$> do
     filepath <- asFile input
     case payload of
         Nothing -> return filepath
@@ -312,7 +312,7 @@ asfilePaths (NGOMappedReadSet _ input _) payload = (:[]) <$> do
             SamOrBamFile -> return filepath
             _ -> throwScriptError "Unexpected combination of arguments"
         Just other -> throwShouldNotOccur ("encodeArgument: unexpected payload: "++show other)
-asfilePaths invalid _ = throwShouldNotOccur ("AsFile path got "++show invalid)
+asFilePaths invalid _ = throwShouldNotOccur ("AsFile path got "++show invalid)
 
 asCountsFile :: NGLessObject -> Maybe CommandExtra -> NGLessIO String
 asCountsFile (NGOCounts icounts) Nothing = asFile icounts
@@ -343,7 +343,7 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
                 Just (FlagInfo flags) -> map T.unpack flags
                 _ -> ["--" ++ T.unpack (argName ai)]
     | argType ai == NGLReadSet = case v of
-        NGOReadSet{} -> asfilePaths v undefined
+        NGOReadSet{} -> asFilePaths v undefined
         _ -> throwScriptError ("Expected readset for argument in function call, got " ++ show v)
     | otherwise = do
         asStr <- case argType ai of
@@ -351,7 +351,7 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
             NGLSymbol -> T.unpack <$> symbolOrTypeError "in external module" v
             NGLInteger ->  show <$> integerOrTypeError "in external module" v
             NGLMappedReadSet -> case v of
-                NGOMappedReadSet{} -> head <$> asfilePaths v payload
+                NGOMappedReadSet{} -> head <$> asFilePaths v payload
                 _ -> throwScriptError ("Expected mappedreadset for argument in function call, got " ++ show v)
             NGLCounts -> asCountsFile v payload
             other -> throwShouldNotOccur ("Unexpected type tag in external module " ++ show other)
