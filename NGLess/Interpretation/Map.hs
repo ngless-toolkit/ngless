@@ -147,6 +147,7 @@ ensureSplitsExist blockSize fafile = do
             splits <- splitFASTA blockSize fafile ofafile
             liftIO $ withOutputFile receipt $ \hout ->
                 hPutStrLn hout ("FASTA file '" ++ fafile ++ "' split into blocks of " ++ show blockSize ++ " megabases.")
+            outputListLno' InfoOutput ["Split FASTA file '", fafile, "' into ", show (length splits), " chunks."]
             return splits
 
 
@@ -185,8 +186,8 @@ zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesC =$= samStatsC))
 splitFASTA :: Int -> FilePath -> FilePath -> NGLessIO [FilePath]
 splitFASTA megaBPS ifile ofileBase =
         withLockFile LockParameters
-                { lockFname = ifile ++ "." ++ (show megaBPS) ++ "m.split.lock"
-                , maxAge = (36 * 3000)
+                { lockFname = ifile ++ "." ++ show megaBPS ++ "m.split.lock"
+                , maxAge = 36 * 3000
                 , whenExistsStrategy = IfLockedRetry { nrLockRetries = 120, timeBetweenRetries = 60 }
                 } $ C.runConduit $
             conduitPossiblyCompressedFile ifile
@@ -202,7 +203,7 @@ splitFASTA megaBPS ifile ofileBase =
                 .| CB.sinkFileCautious f
             finished <- CC.null
             if finished
-                then return (f:fs)
+                then return $ reverse (f:fs) -- reversing is done just so that chunks are indexed "in order"
                 else splitWriter' (f:fs) (n + 1)
         getNbps = awaitJust $ \fa -> do
                         C.yield fa

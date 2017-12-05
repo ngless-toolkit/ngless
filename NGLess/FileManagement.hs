@@ -280,6 +280,7 @@ checkExecutable name bin = do
 expandPath :: FilePath -> NGLessIO (Maybe FilePath)
 expandPath fbase = do
         searchpath <- nConfSearchPath <$> nglConfiguration
+        outputListLno' TraceOutput ["Looking for file '", fbase, "' (search path is ", show searchpath, ")"]
         let candidates = expandPath' fbase searchpath
         findMaybeM candidates $ \p -> do
             outputListLno' TraceOutput ["Looking for file (", fbase, ") in ", p]
