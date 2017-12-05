@@ -23,7 +23,7 @@ import qualified Data.Vector.Unboxed as VU
 import qualified Data.ByteString.Char8 as B
 
 import qualified Data.Conduit as C
-import           Data.Conduit ((=$=), ($$))
+import           Data.Conduit ((=$=), ($$), (.|))
 import           Control.Monad.State.Strict (execState, modify')
 import           Data.Convertible (convert)
 
@@ -36,8 +36,10 @@ import NGLess
 import Interpretation.Map
 import Interpretation.Unique
 
+import Data.Sam
 import Data.FastQ
 import Utils.Conduit
+import Utils.Samtools (samBamConduit)
 import Utils.Here
 import qualified Data.GFF as GFF
 
@@ -162,9 +164,11 @@ case_uop_minus_2 = _evalUnary UOpMinus (NGOInteger (-10)) @?= Right (NGOInteger 
 case_template_id = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq"
 case_template    = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= "xpto_1"
 
+samStats :: FilePath -> NGLessIO (Int, Int, Int)
+samStats fname = C.runConduit (samBamConduit fname .| linesC .| samStatsC) >>= runNGLess
 
 case_sam20 = do
-        sam <- testNGLessIO $ asTempFile sam20 "sam"  >>= _samStats
+        sam <- testNGLessIO $ asTempFile sam20 "sam"  >>= samStats
         sam @?= (5,0,0)
     where
         sam20 = [here|
@@ -200,7 +204,7 @@ case_parse_gff_atributes_trail_del = GFF._parseGffAttributes "gene_id=chrI;dbxre
 case_parse_gff_atributes_trail_del_space = GFF._parseGffAttributes "gene_id=chrI;dbxref=NCBI:NC_001133;Name=chrI; " @?= [("gene_id","chrI"),("dbxref","NCBI:NC_001133"),("Name","chrI")]
 
 
-case_calc_sam_stats = testNGLessIO (_samStats "test_samples/sample.sam.gz") >>= \r ->
+case_calc_sam_stats = testNGLessIO (samStats "test_samples/sample.sam.gz") >>= \r ->
   r @?=  (2772,1310,1299)
 
 --- Unique.hs

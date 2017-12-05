@@ -18,15 +18,19 @@ module Data.Sam
     , isSamHeaderString
     , matchSize
     , matchIdentity
+
+    , samStatsC
+    , samStatsC'
     ) where
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.Conduit.Internal as CI
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import qualified Data.Conduit.Combinators as C
-import           Data.Conduit ((=$=))
+import qualified Data.Conduit.Combinators as CC
+import           Data.Conduit ((=$=), (.|))
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import           Data.Strict.Tuple (Pair(..))
@@ -39,6 +43,7 @@ import Data.Maybe
 import Data.Function (on)
 import Control.Monad.Except
 import NGLess.NGError
+import Utils.Utils
 import Utils.Conduit
 
 
@@ -219,11 +224,11 @@ readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
 -- considered grouped in different blocks
 readSamGroupsC' :: forall m . (MonadError NGError m, MonadBase IO m, MonadIO m) => Int -> Bool -> C.Conduit ByteLine m (V.Vector [SamLine])
 readSamGroupsC' mapthreads respectPairs = do
-        C.dropWhile (isSamHeaderString . unwrapByteLine)
-        C.conduitVector 4096
-            =$= asyncMapEitherC mapthreads (liftM groupByName . V.mapM (readSamLine . unwrapByteLine))
+        CC.dropWhile (isSamHeaderString . unwrapByteLine)
+        CC.conduitVector 4096
+            .| asyncMapEitherC mapthreads (liftM groupByName . V.mapM (readSamLine . unwrapByteLine))
             -- the groups may not be aligned on the group boundary, thus we need to fix them
-            =$= fixSamGroups
+            .| fixSamGroups
     where
         samQNameMate :: SamLine -> (B.ByteString, Bool)
         samQNameMate s
@@ -264,4 +269,41 @@ readSamGroupsC' mapthreads respectPairs = do
             gs' <- V.unsafeThaw gs
             VM.modify gs' (prev ++ ) 0
             V.unsafeFreeze gs'
+
+samStatsC :: (MonadIO m) => C.Sink ByteLine m (NGLess (Int, Int, Int))
+samStatsC = runExceptC $ readSamGroupsC .| samStatsC'
+
+samStatsC' :: (MonadError NGError m) => C.Sink SamGroup m (Int, Int, Int)
+samStatsC' = CL.foldM summarize (0, 0, 0)
+    where
+        add1if !v True = v+1
+        add1if !v False = v
+        summarize c [] = return c
+        summarize c (samline:_)
+            | isHeader samline = return c
+        summarize (!t, !al, !u) g = let
+                    aligned = any isAligned g
+                    sameRName = allSame (samRName <$> g)
+                    unique = aligned && sameRName
+            in return
+                (t + 1
+                ,add1if al aligned
+                ,add1if  u unique
+                )
+
+-- | this is copied from runErrorC, using ExceptT as we do not want to have to
+-- make `e` be of class `Error`.
+runExceptC :: (Monad m) => C.Sink i (ExceptT e m) r -> C.Sink i m (Either e r)
+runExceptC (CI.ConduitM c0) =
+    CI.ConduitM $ \rest ->
+        let go (CI.Done r) = rest (Right r)
+            go (CI.PipeM mp) = CI.PipeM $ do
+                eres <- runExceptT mp
+                return $! case eres of
+                    Left e -> rest $ Left e
+                    Right p -> go p
+            go (CI.Leftover p i) = CI.Leftover (go p) i
+            go (CI.HaveOutput p f o) = CI.HaveOutput (go p) (runExceptT f >> return ()) o
+            go (CI.NeedInput x y) = CI.NeedInput (go . x) (go . y)
+         in go (c0 CI.Done)
 

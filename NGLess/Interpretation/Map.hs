@@ -9,7 +9,6 @@ module Interpretation.Map
     ( executeMap
     , executeMapStats
 #ifdef IS_BUILDING_TEST
-    , _samStats
     , mergeSAMGroups
 #endif
     ) where
@@ -23,7 +22,6 @@ import           Control.Monad.Except
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
-import qualified Data.Conduit.Internal as CI
 import qualified Data.Conduit as C
 import           Data.Conduit (($$), (=$=), (.|))
 import           Control.Monad.Extra (unlessM)
@@ -52,12 +50,10 @@ import qualified StandardModules.Mappers.Soap as Soap
 import Data.Sam
 import Data.Fasta
 import Data.FastQ
-import Utils.Utils
 import FileOrStream
 import Utils.Conduit
 import Configuration
 import Utils.LockFile
-import Utils.Samtools (samBamConduit)
 
 -- | internal type
 data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
@@ -272,44 +268,6 @@ performMap mapper blockSize ref name rs extraArgs = do
             case fafile of
                 Just fp -> (, Just r) <$> ensureIndexExists blockSize mapper fp
                 Nothing -> throwScriptError ("Could not find reference '" ++ T.unpack r ++ "'.")
-
-_samStats :: FilePath -> NGLessIO (Int, Int, Int)
-_samStats fname = samBamConduit fname $$ linesC =$= samStatsC >>= runNGLess
-
-samStatsC :: (MonadIO m) => C.Sink ByteLine m (NGLess (Int, Int, Int))
-samStatsC = runExceptC $ readSamGroupsC .| samStatsC'
-
-samStatsC' :: (MonadError NGError m) => C.Sink SamGroup m (Int, Int, Int)
-samStatsC' = CL.foldM summarize (0, 0, 0)
-    where
-        add1if !v True = v+1
-        add1if !v False = v
-        summarize _ [] = throwShouldNotOccur "empty SamGroup in samStatsC'::summarize"
-        summarize (!t, !al, !u) g = let
-                    aligned = any isAligned g
-                    sameRName = allSame (samRName <$> g)
-                    unique = aligned && sameRName
-            in return $!
-                (t + 1
-                ,add1if al aligned
-                ,add1if  u unique
-                )
-
--- | this is copied from runErrorC, using ExceptT as we do not want to have to
--- make `e` be of class `Error`.
-runExceptC :: (Monad m) => C.Sink i (ExceptT e m) r -> C.Sink i m (Either e r)
-runExceptC (CI.ConduitM c0) =
-    CI.ConduitM $ \rest ->
-        let go (CI.Done r) = rest (Right r)
-            go (CI.PipeM mp) = CI.PipeM $ do
-                eres <- runExceptT mp
-                return $! case eres of
-                    Left e -> rest $ Left e
-                    Right p -> go p
-            go (CI.Leftover p i) = CI.Leftover (go p) i
-            go (CI.HaveOutput p f o) = CI.HaveOutput (go p) (runExceptT f >> return ()) o
-            go (CI.NeedInput x y) = CI.NeedInput (go . x) (go . y)
-         in go (c0 CI.Done)
 
 executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMap fqs args = do

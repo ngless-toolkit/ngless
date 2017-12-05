@@ -11,7 +11,7 @@ module Interpretation.Select
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Conduit as C
-import           Data.Conduit ((=$=))
+import           Data.Conduit ((=$=), (.|))
 import qualified Data.Conduit.List as CL
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -20,12 +20,15 @@ import           Control.Monad.Except (throwError)
 import           Data.Either.Combinators (fromRight)
 import Data.Maybe
 
+import Data.Sam
 import FileManagement
 import FileOrStream
 import Language
+import Output
+
+import NGLess.NGLEnvironment
 import NGLess
 
-import Data.Sam
 import Utils.Conduit
 
 data SelectCondition = SelectMapped | SelectUnmapped | SelectUnique
@@ -51,12 +54,12 @@ _parseConditions args = do
         asSC "unique" = return SelectUnique
         asSC c = throwShouldNotOccur ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
 
-_matchConditions :: MatchCondition -> [(SamLine,B.ByteString)] -> [B.ByteString]
-_matchConditions _ [(SamHeader _,line)] = [line]
-_matchConditions (DropIf []) slines = map snd slines
+_matchConditions :: MatchCondition -> [(SamLine,B.ByteString)] -> [(SamLine, B.ByteString)]
+_matchConditions _ r@[(SamHeader _,_)] = r
+_matchConditions (DropIf []) slines = slines
 _matchConditions (DropIf (c:cs)) slines = _matchConditions (DropIf cs) (_drop1 c slines)
 
-_matchConditions (KeepIf []) slines = map snd slines
+_matchConditions (KeepIf []) slines = slines
 _matchConditions (KeepIf (c:cs)) slines = _matchConditions (KeepIf cs) (_keep1 c slines)
 
 _drop1 SelectUnmapped = filter (isAligned . fst)
@@ -89,14 +92,21 @@ executeSelect :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSelect (NGOMappedReadSet name istream ref) args = do
     paired <- lookupBoolOrScriptErrorDef (return True) "select" "paired" args
     conditions <- _parseConditions args
+    Just lno <- ngleLno <$> nglEnvironment
     let (fpsam, istream') = asSamStream istream
         stream =
             readSamGroupsAsConduit istream' paired
-                =$= CL.map (_matchConditions conditions)
-                =$= CL.concat
+                .| CL.map (_matchConditions conditions)
+                .| streamedSamStats lno ("select_"++T.unpack name) ("select.lno"++show lno)
+                .| CL.map (map snd)
+                .| CL.concat
         out = Stream ("selected_" ++ takeBaseNameNoExtensions fpsam ++ ".sam") (stream =$= CL.map ByteLine)
     return $! NGOMappedReadSet name out ref
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
+
+streamedSamStats lno ifile ref = C.passthroughSink (CL.map (map fst) .| samStatsC') $ \(total, aligned, unique) ->
+    outputMapStatistics (MappingInfo lno ifile ref total aligned unique)
+
 
 data FilterAction = FADrop | FAUnmatch
     deriving (Eq)
