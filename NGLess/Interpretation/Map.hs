@@ -82,21 +82,32 @@ getMapper request = do
                 _ -> error "should not be possible map:getMapper"
             else throwScriptError ("Requested mapper '"++T.unpack request ++"' is not active.")
 
+
+isSubPath path base = let
+                        path' = splitPath path
+                        base' = splitPath base
+                        isSubPath' _ [] = True
+                        isSubPath' [] _ = False
+                        isSubPath' (p:ps) (b:bs) = p == b && isSubPath' ps bs
+                    in isSubPath' path' base'
+
+
 getIndexOutput createLink fafile = do
     indexDir <- nConfIndexStorePath <$> nglConfiguration
     case indexDir of
-        Just d -> liftIO $ do
-            let dropSlash "" = ""
-                dropSlash ('/':r) = dropSlash r
-                dropSlash p = p
-            afafile <- makeAbsolute fafile
-            let fafile' = d </> dropSlash afafile
-            createDirectoryIfMissing True (takeDirectory fafile')
-            when createLink $
-                createSymbolicLink afafile fafile'
-                    `catchIOError` (\e -> unless (isAlreadyExistsError e) (ioError e))
-            return fafile'
-        Nothing -> return fafile
+        Just d
+            | not (fafile `isSubPath` d) -> liftIO $ do
+                let dropSlash "" = ""
+                    dropSlash ('/':r) = dropSlash r
+                    dropSlash p = p
+                afafile <- makeAbsolute fafile
+                let fafile' = d </> dropSlash afafile
+                createDirectoryIfMissing True (takeDirectory fafile')
+                when createLink $
+                    createSymbolicLink afafile fafile'
+                        `catchIOError` (\e -> unless (isAlreadyExistsError e) (ioError e))
+                return fafile'
+        _ -> return fafile
 
 -- | lazy index creation
 ensureIndexExists :: Int -> Mapper -> FilePath -> NGLessIO [FilePath]
