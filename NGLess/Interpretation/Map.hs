@@ -309,9 +309,16 @@ mergeSamFiles inputs = do
     C.sequenceSources
                 [CB.sourceFile f
                     .| linesC
-                    .| readSamGroupsC
+                    .| (readSamHeaders >> readSamGroupsC)
                             | f <- inputs]
-        .| CL.map mergeSAMGroups
+        .| (CL.map concat >> CL.map mergeSAMGroups)
+
+readSamHeaders :: C.Conduit ByteLine NGLessIO SamGroup
+readSamHeaders = do
+    hs <- CC.takeWhile (\(ByteLine line) -> B.null line || B.head line == 64)
+                .| CL.map (\(ByteLine line) -> SamHeader line)
+                .| CC.sinkList
+    C.yield hs
 
 mergeSAMGroups :: [SamGroup] -> SamGroup
 mergeSAMGroups groups = group group1 ++ group group2 ++ group groupS
