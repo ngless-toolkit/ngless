@@ -33,7 +33,6 @@ import Tokens
 import FileManagement
 import NGLess
 
-import Interpretation.Map
 import Interpretation.Unique
 
 import Data.Sam

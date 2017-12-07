@@ -287,6 +287,7 @@ interpretFunction' (FuncName "unique")    expr args Nothing = runNGLessIO (execu
 interpretFunction' (FuncName "write")     expr args Nothing = traceExpr "write" expr >> runNGLessIO (executeWrite expr args)
 interpretFunction' (FuncName "map")       expr args Nothing = runNGLessIO (executeMap expr args)
 interpretFunction' (FuncName "mapstats")  expr args Nothing = runNGLessIO (executeMapStats expr args)
+interpretFunction' (FuncName "__merge_samfiles")  expr args Nothing = runNGLessIO (executeMergeSams expr args)
 interpretFunction' (FuncName "select")    expr args Nothing = runNGLessIO (executeSelect expr args)
 interpretFunction' (FuncName "count")     expr args Nothing = runNGLessIO (executeCount expr args)
 interpretFunction' (FuncName "countfile") expr args Nothing = runNGLessIO (executeCountFile expr args)

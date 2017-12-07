@@ -41,6 +41,8 @@ builtinFunctions =
     ,Function (FuncName "countfile") (Just NGLString) [ArgCheckFileReadable] NGLCounts [] False [FunctionCheckReturnAssigned]
     ,Function (FuncName "write") (Just NGLAny) [] NGLVoid writeArgs False []
     ,Function (FuncName "print") (Just NGLAny) [] NGLVoid [] False []
+
+    ,Function (FuncName "__merge_samfiles") (Just (NGList NGLString)) [] NGLMappedReadSet [] False []
     ]
 
 groupArgs =

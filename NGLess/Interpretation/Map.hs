@@ -3,14 +3,11 @@
  -}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE CPP #-}
 
 module Interpretation.Map
     ( executeMap
     , executeMapStats
-#ifdef IS_BUILDING_TEST
-    , mergeSAMGroups
-#endif
+    , executeMergeSams
     ) where
 
 import qualified Data.Text as T
@@ -300,6 +297,23 @@ executeMapStats (NGOMappedReadSet name sami _) _ = do
     return $! NGOCounts (File countfp)
 executeMapStats other _ = throwScriptError ("Wrong argument for mapstats: "++show other)
 
+executeMergeSams :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeMergeSams (NGOList ifnames) _ = do
+    outputListLno' WarningOutput ["Calling internal function __merge_samfiles"]
+    partials <- mapM (fmap T.unpack . stringOrTypeError "__merge_samfiles") ifnames
+    (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam"
+    ((total, aligned, unique), ()) <- C.runConduit $
+        mergeSamFiles partials
+        .| zipSink2 samStatsC'
+            (CL.concat
+                .| CL.map (ByteLine . encodeSamLine)
+                .| byteLineSinkHandle hout)
+    outputMapStatistics (MappingInfo undefined sam "no-ref" total aligned unique)
+    liftIO $ hClose hout
+    return $! NGOMappedReadSet "test" (File sam) Nothing
+executeMergeSams _ _ = throwScriptError "Wrong argument for internal function __merge_samfiles"
+
+
 
 mergeSamFiles :: [FilePath] -> C.Source NGLessIO SamGroup
 mergeSamFiles [] = lift $ throwShouldNotOccur "empty input to mergeSamFiles"
@@ -311,7 +325,7 @@ mergeSamFiles inputs = do
                     .| linesC
                     .| (readSamHeaders >> readSamGroupsC)
                             | f <- inputs]
-        .| (CL.map concat >> CL.map mergeSAMGroups)
+        .| ((CC.take 1 .| CL.map concat) >> CL.map mergeSAMGroups)
 
 readSamHeaders :: C.Conduit ByteLine NGLessIO SamGroup
 readSamHeaders = do
