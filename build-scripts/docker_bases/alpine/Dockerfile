@@ -30,25 +30,6 @@ RUN apk --no-cache add \
     chmod 755 /usr/local/bin/stack && \
     pip install tox
 
-# Workaround for https://bugs.alpinelinux.org/issues/8098 (not yet fixed as of alpine package bash-4.4.12-1)
-RUN cd /tmp && \
-    wget https://ftp.gnu.org/gnu/bash/bash-4.3.30.tar.gz && \
-    tar xf bash-4.3.30.tar.gz && \
-    cd bash-4.3.30/ && \
-    ./configure \
-        --prefix=/usr \
-        --bindir=/bin \
-        --mandir=/usr/share/man \
-        --infodir=/usr/share/info \
-        --without-curses \
-        --disable-nls \
-        --disable-readline \
-        --without-bash-malloc && \
-    make -j8 && \
-    make install && \
-    rm -rf /tmp/bash*
-# TODO Remove this once upstream package is fixed
-
 # Build ngless dependencies to save time during build
 RUN git clone https://gitlab.com/ngless/ngless && \
     cd ngless && \

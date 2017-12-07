@@ -89,6 +89,10 @@ build-and-test-alpine:
     - apk update
     - apk upgrade
     - stack upgrade
+    # NOTE Workaround to bash hanging when <() is used
+    # This has to be set on the parent shell before launching bash
+    # More info at: http://www.openwall.com/lists/musl/2017/12/07/13
+    - ulimit -u 1000
     - mkdir bin
 
     variables:
