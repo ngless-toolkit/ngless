@@ -1,7 +1,8 @@
-Version 0.6.0+GIT
+Version 0.6.1 2017-12-10 by luispedro
 	* Add --check-install mode
 	* Fix streaming short read QC (performance regression)
 	* Better error message in readlines() when file opening fails
+	* Compute statistics after select()
 
 Version 0.6.0 2017-11-29 by luispedro
 	* Add `orf_find` function (implemented through Prodigal)
