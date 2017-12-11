@@ -3,15 +3,25 @@
 
 ## Bioconda (binary)
 
-One of the simplest ways to install NGLess is through
+The recommended way to install NGLess is through
 [bioconda](http://bioconda.github.io):
 
     conda install -c bioconda ngless 
 
+### Docker
+
+Alternatively, a docker container with NGLess is available at
+[biocontainers](https://quay.io/repository/biocontainers/ngless):
+
+    docker run -v $PWD:/workdir -w /workdir -it quay.io/biocontainers/ngless:0.6.1--py35_0 ngless --version
+
+Adapt the mount flags (``-v``) as needed.
+
+
 ## Linux (binary)
 
 You can get a [statically linked version of
-NGless 0.6.0](http://ngless.embl.de/releases/ngless-0.6.0-Linux64) or a [nighly build
+NGless 0.6.1](http://ngless.embl.de/releases/ngless-0.6.1-Linux64) or a [nighly build
 of the latest development
 code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
 This should work across a wide range of Linux versions (please
