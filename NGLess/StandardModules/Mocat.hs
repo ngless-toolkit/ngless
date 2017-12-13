@@ -66,12 +66,15 @@ mocatSamplePaired fqfiles encoding doQC = do
         let singlesArgs
                 | singles `elem` fqfiles = (Variable "singles", encodeStr singles):passthru
                 | otherwise = passthru
-        outputListLno' DebugOutput ["load_mocat_sample found ", m1, " # ", m2, if singles `elem` fqfiles then " # " ++ singles else ""]
+        outputListLno' InfoOutput ["load_mocat_sample found paired-end sample '", m1, "' - '", m2, if singles `elem` fqfiles then "' with singles file '" ++ singles ++ "'" else "'"]
         let expr = FunctionCall (FuncName "paired") (encodeStr m1) ((Variable "second", encodeStr m2):singlesArgs) Nothing
             used = [m1, m2, singles]
         return (expr, used)
-    let singletons = [FunctionCall (FuncName "fastq") (encodeStr f) passthru Nothing
-                                | f <- fqfiles, f `notElem` concat used]
+    let singletonFiles = [f | f <- fqfiles, f `notElem` concat used]
+        singletons = [FunctionCall (FuncName "fastq") (encodeStr f) passthru Nothing
+                                | f <- singletonFiles]
+    forM_ singletonFiles $ \f ->
+        outputListLno' InfoOutput ["load_mocat_sample found single-end sample '", f, "'"]
     return $ singletons ++ exps
 
 
