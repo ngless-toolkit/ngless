@@ -191,7 +191,11 @@ executeCollect (NGOCounts istream) kwargs = do
         moveOrCopy gzfp (partialfile current)
     canCollect <- liftIO $ allM (doesFileExist . partialfile)  (reverse allentries)
                  -- ^ checking in reverse order makes it more likely that ngless notices a missing file early on
+
+    -- It seems wasteful to build the comment string even if `canCollect` is False.
+    -- However, these operations are very cheap and provide some basic error checking:
     manualComment <- fmapMaybeM (stringOrTypeError "comment argument to collect() function") (lookup "comment" kwargs)
+
     autoComments <- case lookup "auto_comments" kwargs of
                         Nothing -> return []
                         Just (NGOList cs) -> mapM (\s -> do
@@ -203,6 +207,7 @@ executeCollect (NGOCounts istream) kwargs = do
                                                                 ,("hash", AutoResultHash)]) cs
                         _ -> throwScriptError "auto_comments argument to write() call must be a list of symbols"
     comment <- buildComment manualComment autoComments hash
+
     if canCollect
         then do
             newfp <- pasteCounts comment False allentries (map partialfile allentries)
