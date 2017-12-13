@@ -48,6 +48,7 @@ import Data.Sam
 import Data.Fasta
 import Data.FastQ
 import FileOrStream
+import Utils.Utils
 import Utils.Conduit
 import Configuration
 import Utils.LockFile
@@ -319,23 +320,29 @@ mergeSamFiles :: [FilePath] -> C.Source NGLessIO SamGroup
 mergeSamFiles [] = lift $ throwShouldNotOccur "empty input to mergeSamFiles"
 mergeSamFiles inputs = do
     lift $ outputListLno' TraceOutput ["Merging SAM files: ", show inputs]
-    -- There are obvious opportunities to make this code take advantage of parallelism
+    forM_ inputs $ \f ->
+        CB.sourceFile f
+            .| linesC
+            .| readSamHeaders
+    -- This is sub-optimal as we reparse the file.
+    -- There are also obvious opportunities to make this code take advantage of parallelism
     C.sequenceSources
-                [CB.sourceFile f
-                    .| linesC
-                    .| (readSamHeaders >> readSamGroupsC)
-                            | f <- inputs]
-        .| ((CC.take 1 .| CL.map concat) >> CL.map mergeSAMGroups)
+            [CB.sourceFile f
+                .| linesC
+                .| readSamGroupsC
+                        | f <- inputs]
+
+        .| CL.mapM mergeSAMGroups
 
 readSamHeaders :: C.Conduit ByteLine NGLessIO SamGroup
-readSamHeaders = do
-    hs <- CC.takeWhile (\(ByteLine line) -> B.null line || B.head line == 64)
-                .| CL.map (\(ByteLine line) -> SamHeader line)
-                .| CC.sinkList
-    C.yield hs
+readSamHeaders =
+    CC.takeWhile (\(ByteLine line) -> B.null line || B.head line == 64)
+                .| CL.map (\(ByteLine line) -> [SamHeader line])
 
-mergeSAMGroups :: [SamGroup] -> SamGroup
-mergeSAMGroups groups = group group1 ++ group group2 ++ group groupS
+mergeSAMGroups :: [SamGroup] -> NGLessIO SamGroup
+mergeSAMGroups groups
+        | not (allSame . fmap samQName $ concat groups) = throwDataError "Merging unsynced SAM files (not implemented yet)"
+        | otherwise = return $ group group1 ++ group group2 ++ group groupS
     where
         (group1, group2, groupS) = foldl (\(g1,g2,gS) s ->
                                                 (if isFirstInPair s
