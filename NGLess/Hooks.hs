@@ -1,10 +1,12 @@
-{- Copyright 2016 NGLess Authors
+{- Copyright 2016-2017 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
 module Hooks
     ( Hook(..)
     , registerHook
+    , registerFailHook
+    , triggerFailHook
     , triggerHook
     ) where
 
@@ -23,8 +25,18 @@ nglHooks :: IORef [(Hook, NGLessIO ())]
 {-# NOINLINE nglHooks #-}
 nglHooks = unsafePerformIO (newIORef [])
 
+failHooks :: IORef [IO ()]
+{-# NOINLINE failHooks #-}
+failHooks = unsafePerformIO (newIORef [])
+
 registerHook :: Hook -> NGLessIO () -> NGLessIO ()
 registerHook hook act = liftIO $ modifyIORef nglHooks ((hook,act):)
+
+registerFailHook :: IO () -> NGLessIO ()
+registerFailHook act = liftIO $ modifyIORef failHooks (act:)
+
+triggerFailHook :: IO ()
+triggerFailHook = readIORef failHooks >>= sequence_
 
 triggerHook :: Hook -> NGLessIO ()
 triggerHook hook = do

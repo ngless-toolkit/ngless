@@ -1,3 +1,6 @@
+Version 0.6.1+
+	* Add 'failed' files to parallel lock1()
+
 Version 0.6.1 2017-12-10 by luispedro
 	* Add --check-install mode
 	* Fix streaming short read QC (performance regression)

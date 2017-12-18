@@ -125,6 +125,7 @@ runNGLessIO :: String -> NGLessIO a -> IO a
 runNGLessIO context (NGLessIO act) = runResourceT (runExceptT act) >>= \case
         Left (NGError NoErrorExit _) -> exitSuccess
         Left (NGError etype emsg) -> do
+            triggerFailHook
             hPutStrLn stderr ("Exiting after fatal error while " ++ context)
             case etype of
                 ShouldNotOccur ->

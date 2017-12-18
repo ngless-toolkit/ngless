@@ -127,6 +127,10 @@ executeLock1 (NGOList entries) kwargs  = do
                 tstr = formatTime defaultTimeLocale tformat t
             hPutStrLn h (concat ["Finished ", T.unpack e, " at ", tstr])
         release rk
+    registerFailHook $ do
+        let logfile = lockdir </> T.unpack e ++ ".failed"
+        withFile logfile WriteMode $ \h ->
+            hPutStrLn h "Execution failed" -- TODO output log here
     return $! NGOString e
 
 executeLock1 arg _ = throwScriptError ("Wrong argument for lock1 (expected a list of strings, got `" ++ show arg ++ "`")
@@ -134,21 +138,29 @@ executeLock1 arg _ = throwScriptError ("Wrong argument for lock1 (expected a lis
 
 lockName = (++ ".lock") . T.unpack
 finishedName = (++ ".finished") . T.unpack
+failedName = (++ ".failed") . T.unpack
+
 getLock basedir fs = do
     existing <- liftIO $ getDirectoryContents basedir
     let notfinished = flip filter fs $ \fname -> finishedName fname `notElem` existing
         notlocked = flip filter notfinished $ \fname -> lockName fname `notElem` existing
+        notfailed = flip filter notlocked $ \fname -> failedName fname `notElem` existing
 
     outputListLno' TraceOutput ["Looking for a lock in ", basedir, ". Total number of elements is ", show (length fs), " (not locked: ", show (length notlocked), "; not finished: ", show (length notfinished), ")."]
-    -- first try all the elements that are not locked
-    -- if that fails, try the locked elements in the hope that some may be stale
-    getLock' basedir notlocked >>= \case
+    -- first try all the elements that are not locked and have not failed
+    -- if that fails, try the unlocked but failed
+    -- Finally, try the locked elements in the hope that some may be stale
+    getLock' basedir notfailed >>= \case
         Just v -> return v
-        Nothing -> (outputListLno' TraceOutput ["NOT locked failed."] >> getLock' basedir notfinished) >>= \case
+        Nothing -> getLock' basedir (filter (`notElem` notfailed) notlocked) >>= \case
             Just v -> return v
             Nothing -> do
-                outputListLno' InfoOutput ["Could get a lock for any file."]
-                throwGenericError "Could not obtain any lock"
+                outputListLno' TraceOutput ["All elements locked. checking for stale locks"]
+                getLock' basedir notfinished >>= \case
+                    Just v -> return v
+                    Nothing -> do
+                        outputListLno' InfoOutput ["Could get a lock for any file."]
+                        throwGenericError "Could not obtain any lock"
 
 getLock' _ [] = return Nothing
 getLock' basedir (f:fs) = do
