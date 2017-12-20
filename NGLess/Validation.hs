@@ -302,5 +302,5 @@ validateNGLessVersionUses mods sc = case nglVersion <$> nglHeader sc of
         parseVersion version = do
             (majV, rest) <- rightToMaybe $ T.decimal version
             guard $ not (T.null rest)
-            (minV, _) <- rightToMaybe $ T.decimal (T.tail version)
+            (minV, _) <- rightToMaybe $ T.decimal (T.tail rest)
             return (majV, minV)
