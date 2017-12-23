@@ -348,10 +348,9 @@ annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annS
         annSamHeaderParser1 (SeqNameAnnotator Nothing) = do
             headers <-
                 asyncMapEitherC mapthreads (V.mapM seqNameSize)
-                .| CC.concat
-                .| CC.sinkVector
+                .| CC.sinkList
             vsorted <- liftIO $ do
-                v <- V.unsafeThaw headers
+                v <- V.unsafeThaw $ V.concat headers
                 sortParallel mapthreads v
                 V.unsafeFreeze v
             return $! SeqNameAnnotator (Just vsorted)
