@@ -32,6 +32,8 @@ criteria:
 - `min_match_size`: minimum match size
 - `min_identity_pc`: minimum percent identity (considered over the matching
   location, trimming on the left and right are excluded).
+- `max_trim`: maximum number of bases trimmed off the ends. Use 0 to specify
+  only global matches.
 
 If more than one test is specified, then they are combined with the AND
 operation (i.e., all conditions have to be fulfilled for the test to be true).

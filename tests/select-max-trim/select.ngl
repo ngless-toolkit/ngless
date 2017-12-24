@@ -1,0 +1,5 @@
+ngless "0.7"
+input = samfile('input.sam')
+selected = select(input) using |mr|:
+    mr = mr.filter(max_trim=1)
+write(selected, ofile='output.selected.trim1.sam')

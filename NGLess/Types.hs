@@ -287,6 +287,7 @@ funcInfo fn = do
             errorInLineC ["Too many matches for function '", show fn, "'"]
             cannotContinue
 
+findMethodInfo :: MethodName -> TypeMSt MethodInfo
 findMethodInfo m =  case filter ((==m) . methodName) builtinMethods of
                      [mi] -> return mi
                      _ -> do

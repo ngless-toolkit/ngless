@@ -20,6 +20,7 @@ data MethodInfo = MethodInfo
     , methodReturnType :: NGLType
     , methodKwargsInfo :: [ArgInformation] -- Unnamed argument is called "__0"
     , methodIsPure :: Bool
+    , methodChecks :: [FunctionCheck]
     } deriving (Eq, Show)
 
 findFunction :: [Module] -> FuncName -> Maybe Function
@@ -124,18 +125,19 @@ endstrimArgs =
 
 
 builtinMethods =
-    [MethodInfo (MethodName "flag")   NGLMappedRead (Just NGLSymbol) NGLBool flagArgs True
-    ,MethodInfo (MethodName "filter") NGLMappedRead Nothing NGLMappedRead filterArgs True
-    ,MethodInfo (MethodName "pe_filter") NGLMappedRead Nothing NGLMappedRead [] True
-    ,MethodInfo (MethodName "some_match") NGLMappedRead (Just NGLString) NGLBool [] True
-    ,MethodInfo (MethodName "unique") NGLMappedRead Nothing NGLMappedRead [] True
-    ,MethodInfo (MethodName "avg_quality") NGLRead Nothing NGLDouble [] True
-    ,MethodInfo (MethodName "fraction_at_least") NGLRead (Just NGLInteger) NGLDouble [] True
+    [MethodInfo (MethodName "flag")   NGLMappedRead (Just NGLSymbol) NGLBool flagArgs True []
+    ,MethodInfo (MethodName "filter") NGLMappedRead Nothing NGLMappedRead filterArgs True []
+    ,MethodInfo (MethodName "pe_filter") NGLMappedRead Nothing NGLMappedRead [] True []
+    ,MethodInfo (MethodName "some_match") NGLMappedRead (Just NGLString) NGLBool [] True []
+    ,MethodInfo (MethodName "unique") NGLMappedRead Nothing NGLMappedRead [] True []
+    ,MethodInfo (MethodName "avg_quality") NGLRead Nothing NGLDouble [] True []
+    ,MethodInfo (MethodName "fraction_at_least") NGLRead (Just NGLInteger) NGLDouble [] True []
     ]
 
 filterArgs =
     [ArgInformation "min_identity_pc" False NGLInteger []
     ,ArgInformation "min_match_size" False NGLInteger []
+    ,ArgInformation "max_trim" False NGLInteger [ArgCheckMinVersion (0,7)]
     ,ArgInformation "action" False NGLSymbol [ArgCheckSymbol ["drop", "unmatch"]]
     ,ArgInformation "reverse" False NGLBool []
     ]

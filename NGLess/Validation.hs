@@ -19,12 +19,16 @@ import           Data.String.Utils (endswith)
 import           Data.List (find)
 import           Data.Maybe
 import           Data.Char (isUpper)
+import           Data.Foldable (asum)
 
 import Language
 import Modules
 import NGLess.NGError
 import BuiltinFunctions
 import Utils.Suggestion
+
+findMethod :: MethodName -> Maybe MethodInfo
+findMethod m = find ((==m) . methodName) builtinMethods
 
 -- | Returns either an error message if it finds any errors or the input script unscathed
 validate :: [Module] -> Script -> NGLess Script
@@ -143,8 +147,6 @@ validateSymbolInArgs mods = checkRecursiveScriptWriter validateSymbolInArgs'
             ArgCheckSymbol ss <- find (\case { ArgCheckSymbol{} -> True; _ -> False }) (argChecks argInfo)
             return ss
 
-        findMethod :: MethodName -> Maybe MethodInfo
-        findMethod m = find ((==m) . methodName) builtinMethods
 
         allowedMethod minfo v = fromMaybe [] $ do
             argInfo <- find ((==v) . argName) (methodKwargsInfo minfo)
@@ -278,20 +280,42 @@ validateNGLessVersionUses mods sc = case nglVersion <$> nglHeader sc of
     where
         check :: T.Text -> Int -> Expression -> Writer [T.Text] ()
         check version lno f = case f of
-            FunctionCall fname@(FuncName fname') _ _ _ -> case minVersionFor fname of
-                Just minV
-                    | versionLE minV version -> return ()
-                    | otherwise ->
-                        tell1lno lno ["Function ", fname', " requires ngless version ", T.pack . show $ fst minV, ".", T.pack . show $ snd minV]
+                FunctionCall fname@(FuncName fname') _ kwargs _ ->
+                    whenJust (findFunction mods fname) $ \finfo -> do
+                        checkVersion ["Function ", fname'] $ minVersionFunction finfo
+                        forM_ kwargs $ \(Variable name,_) ->
+                            checkVersion ["Using argument ", name, " to function ", fname'] $ checkArg (funcKwArgs finfo) name
+                MethodCall mname@(MethodName mname') _ _ kwargs ->
+                    whenJust (findMethod mname) $ \minfo -> do
+                        checkVersion ["Using method ", mname'] $ minVersionMethod minfo
+                        forM_ kwargs $ \(Variable name, _) ->
+                            checkVersion ["Using argument ", name, " to method ", mname'] $ checkArg (methodKwargsInfo minfo) name
                 _ -> return ()
-            _ -> return ()
-        minVersionFor :: FuncName -> Maybe (Int, Int)
-        minVersionFor fname = do
-            finfo <- findFunction mods fname
-            FunctionCheckMinNGLessVersion minV <- flip find (funcChecks finfo) $ \case
-                            FunctionCheckMinNGLessVersion{} -> True
-                            _ -> False
-            return minV
+            where
+                checkVersion _ Nothing = return ()
+                checkVersion prefix (Just minV)
+                    | versionLE minV version = return ()
+                    | otherwise = tell1lno lno (prefix ++ [" requires ngless version ", T.pack . show $ fst minV, ".", T.pack . show $ snd minV, " (version '", version, "' is active)."])
+        minVersionFunction :: Function -> Maybe (Int, Int)
+        minVersionFunction finfo =
+            asum $ flip map (funcChecks finfo) $ \case
+                            FunctionCheckMinNGLessVersion minV -> Just minV
+                            _ -> Nothing
+
+        minVersionMethod :: MethodInfo -> Maybe (Int, Int)
+        minVersionMethod minfo =
+            asum $ flip map (methodChecks minfo) $ \case
+                            FunctionCheckMinNGLessVersion minV -> Just minV
+                            _ -> Nothing
+
+        checkArg :: [ArgInformation] -> T.Text -> Maybe (Int, Int)
+        checkArg ainfos argname = do
+            ainfo <- find ((== argname) . argName) ainfos
+            minVersion (argChecks ainfo)
+
+        minVersion [] = Nothing
+        minVersion (ArgCheckMinVersion minV:_) = Just minV
+        minVersion (_:rs) = minVersion rs
         versionLE (majV, minV) actual = case parseVersion actual of
             Just (aMaj, aMin) -> case aMaj `compare` majV of
                 GT -> True

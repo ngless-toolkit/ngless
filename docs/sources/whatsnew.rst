@@ -3,6 +3,12 @@ What's New (History)
 ====================
 
 
+After version 0.6 (unreleased)
+------------------------------
+
+- Added `max_trim <methods.html>`__ argument to ``filter`` method of
+  ``MappedReadSet``.
+
 Version 0.6
 -----------
 

@@ -131,6 +131,7 @@ executeMappedReadMethod (MethodName "pe_filter") samlines Nothing [] = return . 
 executeMappedReadMethod (MethodName "filter") samlines Nothing kwargs = do
     minID <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_identity_pc" kwargs
     minMatchSize <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_match_size" kwargs
+    maxTrim <- fromInteger <$> lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "max_trim" kwargs
     reverseTest <- lookupBoolOrScriptErrorDef (return False) "filter method" "reverse" kwargs
     action <- lookupSymbolOrScriptErrorDef (return "drop") "filter method" "action" kwargs >>= \case
         "drop" -> return FADrop
@@ -144,7 +145,10 @@ executeMappedReadMethod (MethodName "filter") samlines Nothing kwargs = do
         okSize
             | minMatchSize == -1 = const True
             | otherwise = \s -> fromRight 0 (matchSize s) >= fromInteger minMatchSize
-        rawTest s = okID s && okSize s
+        okTrim
+            | maxTrim == -1 = const True
+            | otherwise = \s -> B.length (samSeq s) - fromRight 0 (matchSize s) <= maxTrim
+        rawTest s = okID s && okSize s && okTrim s
         passTest
             | reverseTest = not . rawTest
             | otherwise = rawTest

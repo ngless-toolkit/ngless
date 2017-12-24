@@ -54,11 +54,12 @@ data ArgCheck =
             ArgCheckSymbol [T.Text] -- ^ for symbols, list allowed values
             | ArgCheckFileReadable -- ^ file should be readable
             | ArgCheckFileWritable -- ^ file should be writeable (i.e., this is an output file)
+            | ArgCheckMinVersion (Int, Int) -- ^ first version where this argument can be used
             deriving (Eq,Show)
 
 -- | Checks for a function
 data FunctionCheck =
-            FunctionCheckMinNGLessVersion (Int, Int)
+            FunctionCheckMinNGLessVersion (Int, Int) -- ^ first version where this function can be used
             | FunctionCheckReturnAssigned -- ^ Function is pure
             deriving (Eq, Show)
 
