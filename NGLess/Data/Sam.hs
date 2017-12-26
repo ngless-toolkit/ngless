@@ -130,6 +130,7 @@ encodeSamLine samline = B.intercalate "\t"
 
 readSamLine :: B.ByteString -> Either NGError SamLine
 readSamLine line
+    | B.null line = throwDataError "Unexpected empty line"
     | B8.head line == '@' = return (SamHeader line)
     | otherwise = case runSimpleParser samP line of
         Just (v :!: _) -> return v
