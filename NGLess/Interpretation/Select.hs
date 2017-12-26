@@ -18,6 +18,8 @@ import qualified Data.Text.Encoding as TE
 import           Data.Bits (Bits(..))
 import           Control.Monad.Except (throwError)
 import           Data.Either.Combinators (fromRight)
+import           Data.List (foldl')
+
 import Data.Maybe
 
 import Data.Sam
@@ -108,8 +110,55 @@ streamedSamStats lno ifile ref = C.passthroughSink (CL.map (map fst) .| samStats
     outputMapStatistics (MappingInfo lno ifile ref total aligned unique)
 
 
+splitSamlines3 = foldl' add1 ([],[],[])
+    where
+        add1 (g1,g2,gs) s
+            | isFirstInPair s = (s:g1,g2,gs)
+            | isSecondInPair s = (g1, s:g2, gs)
+            | otherwise = (g1, g2, s:gs)
+
 data FilterAction = FADrop | FAUnmatch
     deriving (Eq)
+
+data SelectGroupOptions = SelectGroupOptions
+    !Double -- ^ min id
+    !Int -- ^ minMatchSize
+    !Int -- ^ maxTrim
+    !Bool -- ^ reverse
+    !FilterAction
+
+applySelect :: SelectGroupOptions -> SamGroup -> SamGroup
+applySelect (SelectGroupOptions minID minMatchSize (-1) rev act) =
+                    case act of
+                        FADrop -> filter passTest
+                        FAUnmatch -> map (unmatchUnless passTest)
+    where
+        okID
+            | minID < 0.0 = const True
+            | otherwise = \s -> fromRight 0.0 (matchIdentity s) >= minID
+        okSize
+            | minMatchSize == -1 = const True
+            | otherwise = \s -> fromRight 0 (matchSize s) >= minMatchSize
+        rawTest s = okID s && okSize s
+        passTest
+            | rev = not . rawTest
+            | otherwise = rawTest
+applySelect (SelectGroupOptions minID minMatch maxTrim rev act) = \samlines ->
+                    let samlines' = applySelect (SelectGroupOptions minID minMatch (-1) rev act) samlines
+                        (g1,g2,gs) = splitSamlines3 samlines'
+                        (s1,s2,ss) = (seqSize g1, seqSize g2, seqSize gs)
+                        okTrim :: Int -> SamLine -> Bool
+                        okTrim seqlen = \s -> (seqlen - fromRight 0 (matchSize s) <= maxTrim)
+                        in case act of
+                            FADrop -> filter (okTrim s1) g1 ++ filter (okTrim s2) g2 ++ filter (okTrim ss) gs
+                            FAUnmatch -> map (unmatchUnless $ okTrim s1) g1 ++ map (unmatchUnless $ okTrim s2) g2 ++ map (unmatchUnless $ okTrim ss) gs
+
+unmatchUnless c s
+    | not (c s) = unmatch s
+    | otherwise = s
+unmatch samline = samline { samFlag = (samFlag samline .|. 4) `clearBit` 1, samRName = "*", samCigar = "*" }
+seqSize :: SamGroup -> Int
+seqSize = maximum . map (B.length . samSeq)
 
 executeMappedReadMethod :: MethodName -> [SamLine] -> Maybe NGLessObject -> KwArgsValues -> NGLess NGLessObject
 executeMappedReadMethod (MethodName "flag") samlines (Just (NGOSymbol flag)) [] = do
@@ -125,40 +174,17 @@ executeMappedReadMethod (MethodName "some_match") samlines (Just (NGOString targ
         ismatch :: SamLine -> Bool
         ismatch = (==target') . samRName
         target' = TE.encodeUtf8 target
-
-
 executeMappedReadMethod (MethodName "pe_filter") samlines Nothing [] = return . NGOMappedRead . filterPE $ samlines
 executeMappedReadMethod (MethodName "filter") samlines Nothing kwargs = do
     minID <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_identity_pc" kwargs
-    minMatchSize <- lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_match_size" kwargs
+    minMatchSize <- fromInteger <$> lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_match_size" kwargs
     maxTrim <- fromInteger <$> lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "max_trim" kwargs
     reverseTest <- lookupBoolOrScriptErrorDef (return False) "filter method" "reverse" kwargs
     action <- lookupSymbolOrScriptErrorDef (return "drop") "filter method" "action" kwargs >>= \case
         "drop" -> return FADrop
         "unmatch" -> return FAUnmatch
         other -> throwScriptError ("unknown action in filter(): `" ++ T.unpack other ++"`.\nAllowed values are:\n\tdrop\n\tunmatch\n\tkeep\n")
-    let minIDD :: Double
-        minIDD = fromInteger minID / 100.0
-        okID
-            | minID == -1 = const True
-            | otherwise = \s -> fromRight 0.0 (matchIdentity s) >= minIDD
-        okSize
-            | minMatchSize == -1 = const True
-            | otherwise = \s -> fromRight 0 (matchSize s) >= fromInteger minMatchSize
-        okTrim
-            | maxTrim == -1 = const True
-            | otherwise = \s -> B.length (samSeq s) - fromRight 0 (matchSize s) <= maxTrim
-        rawTest s = okID s && okSize s && okTrim s
-        passTest
-            | reverseTest = not . rawTest
-            | otherwise = rawTest
-        unmatchUnless c s
-            | not (c s) = unmatch s
-            | otherwise = s
-        unmatch samline = samline { samFlag = (samFlag samline .|. 4) `clearBit` 1, samRName = "*", samCigar = "*" }
-        samlines' = case action of
-            FADrop -> filter passTest samlines
-            FAUnmatch -> map (unmatchUnless passTest) samlines
+    let samlines' = applySelect (SelectGroupOptions (fromInteger minID / 100.0) minMatchSize maxTrim reverseTest action) samlines
     return (NGOMappedRead samlines')
 executeMappedReadMethod (MethodName "unique") samlines Nothing [] = return . NGOMappedRead . mUnique $ samlines
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
