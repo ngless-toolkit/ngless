@@ -27,3 +27,20 @@ specified in the script. As low memory mode is heuristic, it can potentially
 *change* results. As NGLess aims to capture all parameters that can change the
 result **inside** the script, it must be specified as an argument to ``map()``.
 
+Using SOAPAligner
+-----------------
+
+.. note:: Support for SOAPAligner is experimental (as of version 0.6)
+
+You can use SOAPAligner as an alternative to bwa using the following code::
+
+
+    import "soap" version "0.0"
+
+    input = ....
+
+    mapped = map(input, mapper="soap")
+
+Note that, unlike the case for bwa, SOAPAligner is not bundled with NGLess and
+must be in the PATH to be used.
+
