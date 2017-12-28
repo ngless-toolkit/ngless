@@ -10,7 +10,7 @@ module FileOrStream
     ) where
 
 import           Control.Monad.Writer
-import           Data.Conduit (($$), (=$=))
+import           Data.Conduit ((.|), (=$=))
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as C
 import System.IO
@@ -34,11 +34,10 @@ instance Eq FileOrStream where
 
 asFile :: FileOrStream -> NGLessIO FilePath
 asFile (File fp) = return fp
-asFile (Stream fp istream) = do
-    (newfp,hout) <- openNGLTempFile "streamed_" (takeBaseNameNoExtensions fp) (takeExtensions fp)
-    istream $$ byteLineSinkHandle hout
-    liftIO (hClose hout)
-    return newfp
+asFile (Stream fp istream) =
+    makeNGLTempFile "streamed_" (takeBaseNameNoExtensions fp) (takeExtensions fp) $ \hout ->
+        C.runConduit $
+            istream .| byteLineSinkHandle hout
 
 
 asStream :: FileOrStream -> (FilePath, C.Source NGLessIO ByteLine)

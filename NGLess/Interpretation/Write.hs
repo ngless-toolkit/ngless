@@ -22,7 +22,6 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as C
 import           Data.Conduit ((=$=), runConduit, ($$), (.|))
 import           System.Directory (copyFile)
-import           System.IO (hClose)
 import           Data.Maybe
 import Data.String.Utils
 import Data.List (isInfixOf)
@@ -31,7 +30,7 @@ import Data.FastQ
 import Language
 import Configuration
 import FileOrStream
-import FileManagement (openNGLTempFile)
+import FileManagement (makeNGLTempFile)
 import NGLess
 import Output
 import Utils.Utils
@@ -152,10 +151,9 @@ executeWrite (NGOReadSet _ rs) args = do
         moveOrCopyCompressFQs [FastQFilePath _ f] ofname = moveOrCopyCompress (woCanMove opts) f ofname
         moveOrCopyCompressFQs multiple ofname = do
             let inputs = fqpathFilePath <$> multiple
-            (fp',h) <- openNGLTempFile (head inputs) "concat" "tmp"
-            C.runConduit
-                (mapM_ C.sourceFile inputs .| C.sinkHandle h)
-            liftIO $ hClose h
+            fp' <- makeNGLTempFile (head inputs) "concat" "tmp" $ \h ->
+                C.runConduit
+                    (mapM_ C.sourceFile inputs .| C.sinkHandle h)
             moveOrCopyCompress True fp' ofname
 
 
@@ -209,10 +207,11 @@ executeWrite (NGOCounts iout) args = do
                         .| CB.sinkFileCautious (woOFile opts)
         "csv" -> do
             let (fp,istream) = asStream iout
-            (comma,ohand) <- openNGLTempFile fp "wcomma" "csv"
-            runConduit $
-                ((commentC "# " comment .| linesC) >> istream) =$= CL.map tabToComma =$= byteLineSinkHandle ohand
-            liftIO $ hClose ohand
+            comma <- makeNGLTempFile fp "wcomma" "csv" $ \ohand ->
+                C.runConduit $
+                    ((commentC "# " comment .| linesC) >> istream)
+                        .| CL.map tabToComma
+                        .| byteLineSinkHandle ohand
             moveOrCopyCompress True comma (woOFile opts)
         f -> throwScriptError ("Invalid format in write: {"++T.unpack f++"}.\n\tWhen writing counts, only accepted values are {tsv} (TAB separated values; default) or {csv} (COMMA separated values).")
     return NGOVoid

@@ -12,8 +12,9 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
 import qualified Data.ByteString as B
 import qualified Data.List.Utils as LU
-import qualified Data.Conduit.Combinators as C
-import           Data.Conduit (($$))
+import qualified Data.Conduit as C
+import qualified Data.Conduit.Combinators as CC
+import           Data.Conduit ((.|))
 import           Control.Monad.Extra (whenJust)
 import GHC.Conc  (getNumCapabilities)
 
@@ -377,11 +378,10 @@ asBamFile fname
     | otherwise = return fname
 
 uncompressFile :: FilePath -> NGLessIO FilePath
-uncompressFile f = do
-    (newfp, hout) <- openNGLTempFile f "uncompress_" (takeBaseName f)
-    conduitPossiblyCompressedFile f $$ C.sinkHandle hout
-    liftIO $ hClose hout
-    return newfp
+uncompressFile f = makeNGLTempFile f "uncompress_" (takeBaseName f) $ \hout ->
+        C.runConduit $
+            conduitPossiblyCompressedFile f
+                .| CC.sinkHandle hout
 
 argsArguments :: Command -> KwArgsValues -> NGLessIO [String]
 argsArguments cmd args = concat <$> forM (additional cmd) a1

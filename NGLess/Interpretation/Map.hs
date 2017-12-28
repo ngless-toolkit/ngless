@@ -287,14 +287,13 @@ executeMapStats (NGOMappedReadSet name sami _) _ = do
     outputListLno' TraceOutput ["Computing mapstats on ", show sami]
     let (samfp, stream) = asSamStream sami
     (t, al, u) <- stream $$ samStatsC >>= runNGLess
-    (countfp, hout) <- openNGLTempFile samfp "sam_stats_" ".stats"
-    liftIO . hPutStr hout . concat $
-        [     "\t",  T.unpack name, "\n"
-        ,"total\t",   show  t, "\n"
-        ,"aligned\t", show al, "\n"
-        ,"unique\t",  show  u, "\n"
-        ]
-    liftIO $ hClose hout
+    countfp <- makeNGLTempFile samfp "sam_stats_" ".stats" $ \hout ->
+        liftIO . hPutStr hout . concat $
+            [     "\t",  T.unpack name, "\n"
+            ,"total\t",   show  t, "\n"
+            ,"aligned\t", show al, "\n"
+            ,"unique\t",  show  u, "\n"
+            ]
     return $! NGOCounts (File countfp)
 executeMapStats other _ = throwScriptError ("Wrong argument for mapstats: "++show other)
 

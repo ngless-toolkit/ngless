@@ -55,12 +55,11 @@ import Control.Error            (note)
 import Control.Applicative      ((<|>))
 import Data.Maybe
 
-import System.IO                (hClose)
 import Data.Convertible         (convert)
 
 import Data.GFF
 import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamGroupsC')
-import FileManagement (openNGLTempFile, expandPath)
+import FileManagement (makeNGLTempFile, expandPath)
 import NGLess.NGLEnvironment
 import ReferenceDatabases
 import NGLess.NGError
@@ -451,8 +450,7 @@ performCount samfp gname annotators0 opts = do
                 =$= sequenceSinks [CL.map (!! i) =$= performCount1Pass method mc | (i,mc) <- zip [0..] mcounts]
 
     results <- distributeScaleCounts (optNormMode opts) (optMMMethod opts) annotators mcounts toDistribute
-    (newfp,hout) <- openNGLTempFile samfp "counts." "txt"
-    liftIO $ do
+    makeNGLTempFile samfp "counts." "txt" $ \hout -> liftIO $ do
         BL.hPut hout (BL.fromChunks [delim, T.encodeUtf8 gname, "\n"])
         let maybeSkipM1
                 | optIncludeMinus1 opts = id
@@ -466,8 +464,6 @@ performCount samfp gname annotators0 opts = do
                     v = (VU.!) result i
                 when (v >= optMinCount opts) $
                     BB.hPutBuilder hout $ mconcat [BB.byteString h, tabB, BB.byteString (toShortest v), nlB]
-        hClose hout
-    return newfp
 
 
 distributeScaleCounts :: NMode -> MMMethod -> [Annotator] -> [VUM.IOVector Double] -> [[IG.IntGroups]] -> NGLessIO [VU.Vector Double]

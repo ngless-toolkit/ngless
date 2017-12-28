@@ -23,7 +23,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import Data.Conduit (($$), (=$=), (.|))
 
-import FileManagement (createTempDir, openNGLTempFile)
+import FileManagement (createTempDir, makeNGLTempFile)
 import Data.FastQ
 import NGLess
 import Language
@@ -57,12 +57,11 @@ performUnique fname enc mc = do
             $$ CL.mapM_ (multiplex k fhs)
         V.mapM_ (liftIO . hClose) fhs
         outputListLno' DebugOutput ["Wrote N Files to: ", dest]
-        (newfp,h) <- openNGLTempFile fname "" "fq.gz"
-        readNFiles enc mc dest
-            =$= fqEncodeC enc
-            $$  asyncGzipTo h
-        liftIO (hClose h)
-        return newfp
+        makeNGLTempFile fname "" "fq.gz" $ \h ->
+            C.runConduit $
+                readNFiles enc mc dest
+                    .| fqEncodeC enc
+                    .|  asyncGzipTo h
     where
         multiplex k fhs r = liftIO $
                 B.hPutStr (fhs V.! hashRead k r) (fqEncode enc r)

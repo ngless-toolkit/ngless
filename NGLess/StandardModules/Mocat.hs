@@ -16,7 +16,6 @@ import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
 import           Control.Monad.Extra (unlessM)
 import           System.Directory (doesDirectoryExist)
-import           System.IO
 import System.FilePath
 import System.FilePath.Glob
 import Data.List.Utils
@@ -95,14 +94,13 @@ executeLoad _ _ = throwShouldNotOccur "load_mocat_sample got the wrong arguments
 executeParseCoord :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeParseCoord (NGOString coordfp) _ = do
     let coordfp' = T.unpack coordfp
-    (newfp, hout) <- openNGLTempFile coordfp' "converted_" ".gtf"
-    C.runConduit $
-        conduitPossiblyCompressedFile coordfp'
-            .| linesCBounded
-            .| CL.mapM convertToGff
-            .| C.unlinesAscii
-            .| C.sinkHandle hout
-    liftIO $ hClose hout
+    newfp <- makeNGLTempFile coordfp' "converted_" ".gtf" $ \hout ->
+        C.runConduit $
+            conduitPossiblyCompressedFile coordfp'
+                .| linesCBounded
+                .| CL.mapM convertToGff
+                .| C.unlinesAscii
+                .| C.sinkHandle hout
     return (NGOString . T.pack $ newfp)
         where
             convertToGff :: ByteLine -> NGLessIO B.ByteString

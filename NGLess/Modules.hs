@@ -35,7 +35,7 @@ import Data.IORef
 import Data.Aeson
 import Data.Default
 
-import Utils.FindModules
+import Utils.FindModules (listKnownModules)
 import Language
 import NGLess
 

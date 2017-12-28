@@ -7,6 +7,7 @@ module FileManagement
     , createTempDir
     , openNGLTempFile
     , openNGLTempFile'
+    , makeNGLTempFile
     , removeFileIfExists
     , removeIfTemporary
     , setupHtmlViewer
@@ -84,6 +85,17 @@ openNGLTempFile base pre ext = snd <$> openNGLTempFile' base pre ext
 deleteTempFile (fp, h) = do
     hClose h
     removeFileIfExists fp
+
+-- | Create a temporary file
+-- The Handle is closed after the action is performed
+--
+-- See 'openNGLTempFile'
+makeNGLTempFile :: FilePath -> String -> String -> (Handle -> NGLessIO ()) -> NGLessIO FilePath
+makeNGLTempFile base pre ext act = do
+    (fpath, h) <- openNGLTempFile base pre ext
+    act h
+    liftIO $ hClose h
+    return fpath
 
 -- | removeIfTemporary removes files if (and only if):
 -- 1. this was a temporary file created by 'openNGLTempFile'

@@ -358,8 +358,7 @@ pasteCounts comments matchingRows headers inputs
             resth = drop maxNrOpenFiles headers
         first <- pasteCounts [] matchingRows currenth current
         pasteCounts comments matchingRows (snoc resth $ T.intercalate "\t" currenth) (snoc rest first)
-    | otherwise = do
-        (newfp,hout) <- openNGLTempFile "collected" "collected.counts." "txt"
+    | otherwise = makeNGLTempFile "collected" "collected.counts." "txt" $ \hout -> do
         C.runConduit (commentC "# " comments .| CB.sinkHandle hout)
         liftIO $ T.hPutStrLn hout (T.intercalate "\t" ("":headers))
         numCapabilities <- liftIO getNumCapabilities
@@ -386,8 +385,6 @@ pasteCounts comments matchingRows headers inputs
             else C.runConduit $
                     mergeCounts [conduitPossiblyCompressedFile f .|  linesC | f <- inputs]
                     .| byteLineSinkHandle hout
-        liftIO (hClose hout)
-        return newfp
 
 
 executePaste :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
