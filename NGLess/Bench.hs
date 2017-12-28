@@ -18,13 +18,12 @@ import NGLess (NGLessIO, testNGLessIO)
 import Tests.Utils (setupTestConfiguration)
 
 
-import Interpretation.Map (_samStats)
 import Interpretation.Count (performCount, MMMethod(..), loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), Annotator(..), NMode(..))
 import Interpretation.Substrim (substrim)
 import Interpret (interpret)
 import Parse (parsengless)
 import Language (Script(..))
-import Data.Sam (readSamLine, readSamGroupsC)
+import Data.Sam (readSamLine, readSamGroupsC, samStatsC)
 import Data.FastQ (statsFromFastQ, FastQEncoding(..), ShortRead(..), fqDecode)
 import Utils.Conduit (linesC)
 import Transform (transform)
@@ -71,6 +70,7 @@ count= loop (0 :: Int)
 
 basicCountOpts = CountOpts
         { optFeatures = []
+        , optSubFeatures = Nothing
         , optIntersectMode = annotationRule IntersectStrict
         , optStrandSpecific = False
         , optMinCount = 0.0
@@ -82,7 +82,7 @@ basicCountOpts = CountOpts
 
 main = setupTestConfiguration >> defaultMain [
     bgroup "sam-stats"
-        [ bench "sample" $ nfNGLessIO (_samStats "test_samples/sample.sam")
+        [ bench "sample" $ nfNGLessIO (CB.sourceFile "test_samples/sample.sam" =$= linesC $$ samStatsC)
         ]
     ,bgroup "fastq"
         [ bench "fastqStats" $ nfNGLessIO (statsFromFastQ "test_samples/sample.fq.gz" SangerEncoding)
