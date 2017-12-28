@@ -24,11 +24,12 @@ import System.IO.Unsafe (unsafePerformIO)
 import System.IO.SafeWrite (withOutputFile)
 import Data.Maybe
 import Data.IORef
-import Data.Aeson
+import           Data.Aeson ((.=))
+import qualified Data.Aeson as Aeson
 import Data.Aeson.TH (deriveToJSON, defaultOptions, Options(..))
 import Data.Time (getZonedTime, ZonedTime(..))
 import Data.Time.Format (formatTime, defaultTimeLocale)
-import System.Console.ANSI
+import qualified System.Console.ANSI as ANSI
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Extra (whenJust)
@@ -86,8 +87,8 @@ instance Show OutputType where
 
 data OutputLine = OutputLine !Int !OutputType !ZonedTime !String
 
-instance ToJSON OutputLine where
-    toJSON (OutputLine lno ot t m) = object
+instance Aeson.ToJSON OutputLine where
+    toJSON (OutputLine lno ot t m) = Aeson.object
                                         ["lno" .= lno
                                         , "time" .=  formatTime defaultTimeLocale "%a %d-%m-%Y %T" t
                                         , "otype" .= show ot
@@ -182,10 +183,10 @@ output !ot !lno !msg = do
         modifyIORef savedOutput (OutputLine lno ot t msg:)
         when sp $ do
             let st = if doColor
-                        then setSGRCode [SetColor Foreground Dull c]
+                        then ANSI.setSGRCode [ANSI.SetColor ANSI.Foreground ANSI.Dull c]
                         else ""
                 rst = if doColor
-                        then setSGRCode [Reset]
+                        then ANSI.setSGRCode [ANSI.Reset]
                         else ""
                 tformat = if traceSet -- when trace is set, output seconds
                                 then "%a %d-%m-%Y %T"
@@ -196,15 +197,15 @@ output !ot !lno !msg = do
                                 else "" :: String
             putStrLn $ printf "%s[%s]%s: %s%s" st tstr lineStr msg rst
 
-colorFor :: OutputType -> NGLessIO Color
+colorFor :: OutputType -> NGLessIO ANSI.Color
 colorFor = return . colorFor'
     where
-        colorFor' TraceOutput = White
-        colorFor' DebugOutput = White
-        colorFor' InfoOutput = Blue
-        colorFor' ResultOutput = Black
-        colorFor' WarningOutput = Yellow
-        colorFor' ErrorOutput = Red
+        colorFor' TraceOutput   = ANSI.White
+        colorFor' DebugOutput   = ANSI.White
+        colorFor' InfoOutput    = ANSI.Blue
+        colorFor' ResultOutput  = ANSI.Black
+        colorFor' WarningOutput = ANSI.Yellow
+        colorFor' ErrorOutput   = ANSI.Red
 
 
 encodeBPStats :: FQ.FQStatistics -> [BPosInfo]
@@ -247,21 +248,21 @@ outputMapStatistics mi@(MappingInfo _ _ ref total aligned unique) = do
 data InfoLink = HasQCInfo !Int
                 | HasStatsInfo !Int
     deriving (Eq, Show)
-instance ToJSON InfoLink where
-    toJSON (HasQCInfo lno) = object
+instance Aeson.ToJSON InfoLink where
+    toJSON (HasQCInfo lno) = Aeson.object
                                 [ "info_type" .= ("has_QCInfo" :: String)
                                 , "lno" .= show lno
                                 ]
-    toJSON (HasStatsInfo lno) = object
+    toJSON (HasStatsInfo lno) = Aeson.object
                                 [ "info_type" .= ("has_StatsInfo" :: String)
                                 , "lno" .= show lno
                                 ]
 
 data ScriptInfo = ScriptInfo String String [(Maybe InfoLink,T.Text)] deriving (Show, Eq)
-instance ToJSON ScriptInfo where
-   toJSON (ScriptInfo a b c) = object [ "name" .= a,
+instance Aeson.ToJSON ScriptInfo where
+   toJSON (ScriptInfo a b c) = Aeson.object [ "name" .= a,
                                             "time" .= b,
-                                            "script" .= toJSON c ]
+                                            "script" .= Aeson.toJSON c ]
 
 wrapScript :: [(Int, T.Text)] -> [FQInfo] -> [Int] -> [(Maybe InfoLink, T.Text)]
 wrapScript script tags stats = first annotate <$> script
@@ -282,7 +283,7 @@ writeOutputJS fname scriptName script = do
     withOutputFile fname $ \hout ->
         BL.hPutStr hout (BL.concat
                     ["var output = "
-                    , encode $ object
+                    , Aeson.encode $ Aeson.object
                         [ "output" .= fullOutput
                         , "processed" .= sInfo
                         , "fqStats" .= fqStats

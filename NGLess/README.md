@@ -14,7 +14,7 @@ self-contained except for relying on NGError.
 
 ### GHG Extensions
 
-Ngless is not against relying on GHC extensions. The following extensions are
+NGLess is not against relying on GHC extensions. The following extensions are
 turned on globally (ordered by how important they are):
 
  - OverloadedStrings
@@ -38,7 +38,8 @@ The following are conventional imports:
     import Data.Conduit as C
     import qualified Data.Conduit.List as CL
 
-Standard modules (such as `Data.Maybe`) are imported unqualified.
+Standard modules (such as `Data.Maybe`) are imported unqualified. This should
+only be done for modules that are part of ``base``.
 
 
 ### Tests
@@ -48,7 +49,7 @@ Tests come in two forms:
 1. unit tests (start in Tests.hs)
 2. behaviour tests (not in the code, see the tests/ directory).
 
-All else being equal, unit tests run much faster (a single invocation runs all
-of them), although behavioural tests are better at testing the whole programme
-and often easier to write.
+All else being equal, unit tests are prefered as they run much faster (a single
+invocation runs all of them). Behavioural tests are better at testing the whole
+programme and often easier to write.
 

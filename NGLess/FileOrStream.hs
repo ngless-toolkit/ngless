@@ -9,11 +9,9 @@ module FileOrStream
     , asSamStream
     ) where
 
-import           Control.Monad.Writer
 import           Data.Conduit ((.|), (=$=))
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as C
-import System.IO
 import System.FilePath
 
 import NGLess.NGError

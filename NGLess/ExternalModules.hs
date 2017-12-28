@@ -16,7 +16,10 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
 import           Data.Conduit ((.|))
 import           Control.Monad.Extra (whenJust)
-import GHC.Conc  (getNumCapabilities)
+import           GHC.Conc (getNumCapabilities)
+import           Data.Yaml ((.!=), (.:?), (.:))
+import qualified Data.Aeson as Aeson
+import qualified Data.Yaml as Yaml
 
 import Control.Applicative
 import Control.Monad
@@ -26,8 +29,6 @@ import System.Directory (getDirectoryContents, doesFileExist, doesDirectoryExist
 import System.Exit
 import System.IO
 import System.FilePath
-import Data.Aeson
-import Data.Yaml
 import Data.Maybe
 import Data.List (find, isSuffixOf)
 import Data.Default (def)
@@ -70,8 +71,8 @@ data FileTypeBase =
     | TSVFile
     deriving (Eq,Show)
 
-instance FromJSON FileTypeBase where
-    parseJSON = withText "filetypebase" $ \case
+instance Aeson.FromJSON FileTypeBase where
+    parseJSON = Aeson.withText "filetypebase" $ \case
         "fq1" -> return FastqFileSingle
         "fq2" -> return FastqFilePair
         "fq3" -> return FastqFileTriplet
@@ -88,8 +89,8 @@ data FileType = FileType
     , _canStream :: !Bool
     } deriving (Eq, Show)
 
-instance FromJSON FileType where
-    parseJSON = withObject "filetype" $ \o ->
+instance Aeson.FromJSON FileType where
+    parseJSON = Aeson.withObject "filetype" $ \o ->
         FileType
             <$> o .: "filetype"
             <*> o .:? "can_gzip" .!= False
@@ -107,8 +108,8 @@ data CommandArgument = CommandArgument
         }
     deriving (Eq, Show)
 
-instance FromJSON CommandArgument where
-    parseJSON = withObject "command argument" $ \o -> do
+instance Aeson.FromJSON CommandArgument where
+    parseJSON = Aeson.withObject "command argument" $ \o -> do
         argName <- o .:? "name" .!= ""
         argRequired <- o .:? "required" .!= False
         atype <- o .: "atype"
@@ -138,14 +139,14 @@ instance FromJSON CommandArgument where
         cargPayload <- case atype of
             "option" -> liftM FlagInfo <$> ((Just . (:[]) <$> o .: "when-true") <|> o .:? "when-true")
             _
-                | atype `elem` ["readset", "counts", "mappedreadset"] -> (Just . FileInfo <$> parseJSON (Object o)) <|> return Nothing
+                | atype `elem` ["readset", "counts", "mappedreadset"] -> (Just . FileInfo <$> Aeson.parseJSON (Aeson.Object o)) <|> return Nothing
                 | otherwise -> return Nothing
         return CommandArgument{..}
 
 newtype ReadNGLType = ReadNGLType { unwrapReadNGLType :: NGLType }
 
-instance FromJSON ReadNGLType where
-    parseJSON = withText "ngltype" $ \rtype -> do
+instance Aeson.FromJSON ReadNGLType where
+    parseJSON = Aeson.withText "ngltype" $ \rtype -> do
         ReadNGLType <$> case rtype of
             "void" -> return NGLVoid
             "counts" -> return NGLCounts
@@ -160,8 +161,8 @@ data CommandReturn = CommandReturn
                         }
     deriving (Eq, Show)
 
-instance FromJSON CommandReturn where
-    parseJSON = withObject "hidden argument" $ \o -> do
+instance Aeson.FromJSON CommandReturn where
+    parseJSON = Aeson.withObject "hidden argument" $ \o -> do
         t <- unwrapReadNGLType <$> o .: "rtype"
         if t == NGLVoid
             then return $! CommandReturn NGLVoid "" ""
@@ -175,8 +176,8 @@ data Command = Command
     , ret :: CommandReturn
     } deriving (Eq, Show)
 
-instance FromJSON Command where
-    parseJSON = withObject "function" $ \o ->
+instance Aeson.FromJSON Command where
+    parseJSON = Aeson.withObject "function" $ \o ->
         Command
             <$> o .: "nglName"
             <*> o .: "arg0"
@@ -194,8 +195,8 @@ data ExternalModule = ExternalModule
     , emCitations :: [T.Text]
     } deriving (Eq, Show)
 
-instance FromJSON ExternalModule where
-    parseJSON = withObject "module" $ \o -> do
+instance Aeson.FromJSON ExternalModule where
+    parseJSON = Aeson.withObject "module" $ \o -> do
         initO <- o .:? "init"
         (initCmd, initArgs) <- case initO of
             Nothing -> return (Nothing, [])
@@ -283,12 +284,12 @@ executeCommand basedir cmds funcname input args = do
     let groupName (NGOMappedReadSet g _ _) = g
         groupName (NGOReadSet g _) = g
         groupName _ = ""
-    return $ case moarg of
-        Nothing -> NGOVoid
+    case moarg of
+        Nothing -> return NGOVoid
         Just (newfp, _) -> case commandReturnType $ ret cmd of
-            NGLCounts -> NGOCounts (File newfp)
-            NGLMappedReadSet -> NGOMappedReadSet (groupName input) (File newfp) Nothing
-            _ -> error "NOT IMPLEMENTED"
+            NGLCounts -> return $ NGOCounts (File newfp)
+            NGLMappedReadSet -> return $ NGOMappedReadSet (groupName input) (File newfp) Nothing
+            ret -> throwShouldNotOccur ("Not implemented (ExternalModules.hs:executeCommand commandReturnType = "++show ret++")")
 
 asFilePaths :: NGLessObject -> Maybe CommandExtra -> NGLessIO  [FilePath]
 asFilePaths (NGOReadSet _ (ReadSet paired singles)) _ = do
@@ -493,7 +494,7 @@ findLoad modname version = do
             | (modname, version) `elem` downloadableModules -> Just <$> downloadModule modname version
         _ -> return found
     case found' of
-        Just mdir -> decodeEither <$> liftIO (B.readFile (mdir </> modfile)) >>= \case
+        Just mdir -> Yaml.decodeEither <$> liftIO (B.readFile (mdir </> modfile)) >>= \case
                         Right v -> do
                             checkCompatible modname version (emInfo v)
                             return (addPathToRep mdir v)

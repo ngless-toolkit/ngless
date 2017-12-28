@@ -38,7 +38,7 @@ import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Storable.Mutable as VSM
 import qualified Data.Vector.Unboxed.Mutable as VUM
 
-import Foreign.Ptr
+import Foreign.Ptr (Ptr, plusPtr)
 import Foreign.Storable (poke)
 import Foreign.C.Types
 import Foreign.C.String
