@@ -18,7 +18,7 @@ import Data.Maybe (mapMaybe)
 
 listKnownModules :: IO [String]
 listKnownModules = do
-    -- Go up the directory stack until you find "NGLess.cabal.m4"
+    -- Go up the directory stack until you find "stack.yaml"
     cwd <- getCurrentDirectory
     let parents = fmap joinPath . tails $ splitDirectories cwd
     Just startpoint <- findM (doesFileExist . (</> "stack.yaml")) parents
