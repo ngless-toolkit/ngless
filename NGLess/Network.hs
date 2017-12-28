@@ -7,19 +7,20 @@ module Network
     , downloadExpandTar
     ) where
 
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (liftIO, MonadIO(..))
 import qualified Data.Conduit as C
-import           Data.Conduit (($$+-), (=$=))
+import qualified Data.Conduit.List as CL
+import           Data.Conduit ((.|))
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString.Char8 as B
-import qualified Network.HTTP.Conduit as HTTP
 import qualified Network.HTTP.Client as HTTP
+import qualified Network.HTTP.Simple as HTTPSimple
 
-import Data.Conduit.Binary (sinkFile)
+import qualified Data.Conduit.Binary as CB
 import System.Directory (copyFile, createDirectoryIfMissing, removeFile)
 import Data.List (isPrefixOf)
 import System.Posix.Files (setFileMode)
@@ -40,16 +41,14 @@ downloadFile :: String -> FilePath -> NGLessIO ()
 downloadFile url destPath = do
     outputListLno' TraceOutput ["Downloading ", url]
     req <- HTTP.parseRequest url
-    manager <- liftIO $ HTTP.newManager HTTP.defaultManagerSettings
     let req' = req { HTTP.decompress = const False }
-    res <- HTTP.http req' manager
-
-    case lookup "Content-Length" (HTTP.responseHeaders res) of
-        Nothing -> throwSystemError "HTTP Response does not contain Content-Length header"
-        Just csize ->
+    liftIO $ HTTPSimple.withResponse req' $ \res ->
+        C.runConduitRes $
             HTTP.responseBody res
-                $$+- printProgress (read (B.unpack csize))
-                =$= sinkFile destPath
+                .| case lookup "Content-Length" (HTTP.responseHeaders res) of
+                    Nothing -> CL.map id
+                    Just csize -> printProgress (read (B.unpack csize))
+                .| CB.sinkFileCautious destPath
 
 -- Download a tar.gz file and expand it onto 'destdir'
 downloadExpandTar :: FilePath -> FilePath -> NGLessIO ()
@@ -79,7 +78,7 @@ downloadExpandTar url destdir = do
               _ -> throwSystemError ("Unexpected entry in megahit tarball: " ++ show e)
           expandTar next
 
-printProgress :: Int -> C.Conduit B.ByteString NGLessIO B.ByteString
+printProgress :: MonadIO m => Int -> C.Conduit B.ByteString m B.ByteString
 printProgress csize = liftIO (mkProgressBar 40) >>= loop 0
   where
     loop !len pbar = awaitJust $ \bs -> do
