@@ -35,7 +35,7 @@ import NGLess
 import Output
 import Utils.Utils
 import NGLess.NGLEnvironment
-import Utils.Samtools (convertSamToBam)
+import Utils.Samtools (convertSamToBam, convertBamToSam)
 import Utils.Conduit
 
 {- A few notes:
@@ -178,14 +178,20 @@ executeWrite (NGOReadSet _ rs) args = do
 executeWrite el@(NGOMappedReadSet _ iout  _) args = do
     opts <- parseWriteOptions args
     fp <- asFile iout
-    let guess :: String -> T.Text
-        guess "/dev/stdout" = "sam"
-        guess ofile
-            | endswith ".sam" ofile = "sam"
-            | endswith ".bam" ofile = "bam"
-            | otherwise = "bam"
-    orig <- case fromMaybe (guess $ woOFile opts) (woFormat opts) of
-        "sam" -> return fp
+    let guessFormat :: String -> NGLessIO T.Text
+        guessFormat "/dev/stdout" = return "sam"
+        guessFormat ofile
+            | endswith ".sam" ofile = return "sam"
+            | endswith ".sam.gz" ofile = return "sam"
+            | endswith ".sam.bz2" ofile = return "sam"
+            | endswith ".bam" ofile = return "bam"
+            | otherwise = do
+                outputListLno' WarningOutput ["Cannot determine format of MappedReadSet output based on filename ('", ofile, "'). Defaulting to BAM."]
+                return "bam"
+    orig <- maybe (guessFormat (woOFile opts)) return (woFormat opts) >>= \case
+        "sam"
+            | endswith ".bam" fp -> convertBamToSam fp
+            | otherwise -> return fp
         "bam"
             | endswith ".bam" fp -> return fp -- We already have a BAM, so just copy it
             | otherwise -> convertSamToBam fp

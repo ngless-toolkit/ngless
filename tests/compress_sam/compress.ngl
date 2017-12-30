@@ -1,0 +1,4 @@
+ngless '0.7'
+
+write(samfile('input.sam'), ofile='output.sam.gz')
+write(samfile('input.bam'), ofile='output.from.bam.sam.gz')
