@@ -210,7 +210,7 @@ ReadSet
 Return:
 ~~~~~~~
 
-Void
+ReadSet
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
