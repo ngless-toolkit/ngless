@@ -1,4 +1,4 @@
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2015-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, CPP #-}
@@ -41,11 +41,13 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit ((.|), (=$=), ($$+), ($$+-))
+import           Data.Conduit ((.|), (=$=))
 import qualified Data.Strict.Tuple as TU
 import           Data.Strict.Tuple (Pair(..))
 
+
 import Control.Monad
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
 import Data.List                (foldl1', foldl', sort)
@@ -58,7 +60,7 @@ import Data.Maybe
 import Data.Convertible         (convert)
 
 import Data.GFF
-import Data.Sam (SamLine(..), samLength, isAligned, isPositive, readSamGroupsC')
+import Data.Sam (SamLine(..), isSamHeaderString, samLength, isAligned, isPositive, readSamGroupsC')
 import FileManagement (makeNGLTempFile, expandPath)
 import NGLess.NGLEnvironment
 import ReferenceDatabases
@@ -431,23 +433,24 @@ performCount samfp gname annotators0 opts = do
         method = optMMMethod opts
         delim = optDelim opts
 
-    (samcontent, annotators) <-
+    (toDistribute, mcounts, annotators) <- C.runConduit $
         samBamConduit samfp
-            =$= linesC
-            $$+ C.takeWhile ((=='@') . B8.head . unwrapByteLine)
-            =$= annSamHeaderParser mapthreads annotators0 opts
-    outputListLno' TraceOutput ["Loaded headers. Starting parsing/distribution."]
-
-    mcounts <- forM annotators $ \ann -> do
-        let n_entries = annSize ann
-        liftIO $ VUM.replicate n_entries (0.0 :: Double)
-    toDistribute <-
-            samcontent
-                $$+- readSamGroupsC' mapthreads True
-                =$= asyncMapEitherC mapthreads (\samgroup -> forM annotators $ \ann -> do
-                                                                annotated <- V.mapM (annotateReadGroup opts ann) samgroup
-                                                                return $ splitSingletons method annotated)
-                =$= sequenceSinks [CL.map (!! i) =$= performCount1Pass method mc | (i,mc) <- zip [0..] mcounts]
+            .| linesC
+            .| do
+                annotators <-
+                    C.takeWhile (isSamHeaderString . unwrapByteLine)
+                        .| annSamHeaderParser mapthreads annotators0 opts
+                lift $ outputListLno' TraceOutput ["Loaded headers. Starting parsing/distribution."]
+                mcounts <- forM annotators $ \ann -> do
+                    let n_entries = annSize ann
+                    liftIO $ VUM.replicate n_entries (0.0 :: Double)
+                toDistribute <-
+                    readSamGroupsC' mapthreads True
+                        .| asyncMapEitherC mapthreads (\samgroup -> forM annotators $ \ann -> do
+                                                                    annotated <- V.mapM (annotateReadGroup opts ann) samgroup
+                                                                    return $ splitSingletons method annotated)
+                        .| sequenceSinks [CL.map (!! i) .| performCount1Pass method mc | (i,mc) <- zip [0..] mcounts]
+                return (toDistribute, mcounts, annotators)
 
     results <- distributeScaleCounts (optNormMode opts) (optMMMethod opts) annotators mcounts toDistribute
     makeNGLTempFile samfp "counts." "txt" $ \hout -> liftIO $ do
