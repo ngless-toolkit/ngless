@@ -497,8 +497,8 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
         env <- gets id
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
-        C.runConduit $
-            C.transPipe runNGLessIO istream
+        runNGLessIO . C.runConduit $
+            istream
                 .| (do
                     when outputHeader $
                         CC.takeWhile (isSamHeaderString . unwrapByteLine)
