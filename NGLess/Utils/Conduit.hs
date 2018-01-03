@@ -28,7 +28,7 @@ import qualified Data.Conduit as C
 import           Data.Conduit ((=$=))
 
 import           Control.Monad (when)
-import           Control.Monad.IO.Class (MonadIO)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Error.Class (MonadError(..))
 import           System.IO
 
@@ -78,7 +78,9 @@ linesCBounded =
         =$= CL.map ByteLine
 
 byteLineSinkHandle :: (MonadIO m) => Handle -> C.Sink ByteLine m ()
-byteLineSinkHandle h = CL.map unwrapByteLine =$= C.unlinesAscii =$= C.sinkHandle h
+byteLineSinkHandle h = CL.mapM_ (\(ByteLine val) -> liftIO (B.hPut h val >> B.hPut h nl))
+    where
+        nl = B.singleton 10
 
 zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
 
