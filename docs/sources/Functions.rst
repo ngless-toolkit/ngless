@@ -402,15 +402,35 @@ the "features" field.
 multiple attributes (or, in NGLess parlance, "subfeatures"). By default, NGLess
 will look for the ``"ID"`` or ``"gene_id"`` attributes.
 
-``mode`` indicates how to handle reads that partially overlap a features.
-Possible values for ``mode`` are ``{union}``, ``{intersection_strict}``, and
-``{intersection_non_empty}`` (default: ``{union}``). For each read position are
-obtained features that intersect it, which is known as sets. The different
-modes are:
+``mode`` indicates how to handle reads that (partially) overlap one or more features.
+Possible values for ``mode`` are ``{union}``, ``{intersection_non_empty}`` and
+``{intersection_strict}`` (default: ``{union}``). For every position of a mapped read,
+collect all features into a set. These sets of features are then handled in different modes.
 
--  ``{union}`` the union of all the sets.
--  ``{intersection_strict}`` the intersection of all the sets.
--  ``{intersection_non_empty}`` the intersection of all non-empty sets.
+-  ``{union}`` the union of all the sets. A read is counted for every feature it overlaps.
+-  ``{intersection_non_empty}`` the intersection of all non-empty sets. A read is only counted for features it exclusively overlaps, even if partially.
+-  ``{intersection_strict}`` the intersection of all the sets. A read is only counted if the entire read overlaps the same feature(s).
+
+Consider the following illustration of the effect of different ``mode`` options::
+
+    Reference *************************
+    Feature A      =======
+    Feature B            ===========
+    Feature C                 ========
+    Read_1       -----
+    Read_2             -----
+    Read_3                    -----
+    Position     12345 12345  12345
+
+    Read position          1    2    3    4    5
+    Read_1 feature sets    -    -    A    A    A
+    Read_2 feature sets    A    A  A,B    B    B
+    Read_3 feature sets  B,C  B,C  B,C  B,C  B,C
+
+               union  intersection_non_empty  intersection_strict
+    Read_1         A                       A                    -
+    Read_2     A & B                       -                    -
+    Read_3     B & C                   B & C                B & C
 
 How to handle multiple mappers (inserts which have more than one "hit" in the
 reference) is defined by the ``multiple`` argument:
