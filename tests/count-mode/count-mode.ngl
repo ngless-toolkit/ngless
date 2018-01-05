@@ -1,0 +1,12 @@
+ngless '0.6'
+
+input = fastq('reads.fq.gz')
+mapped = map(input, fafile='ref.fna.gz')
+
+union    = count(mapped, gff_file='features.gtf', features=['gene'], multiple={all1}, mode={union})
+nonempty = count(mapped, gff_file='features.gtf', features=['gene'], multiple={all1}, mode={intersection_non_empty})
+strict   = count(mapped, gff_file='features.gtf', features=['gene'], multiple={all1}, mode={intersection_strict})
+
+write(union, ofile='output.union.txt')
+write(strict, ofile='output.strict.txt')
+write(nonempty, ofile='output.non-empty.txt')

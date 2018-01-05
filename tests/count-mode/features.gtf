@@ -1,0 +1,4 @@
+reference	protein_coding	gene	40	100	.	+	.	gene_id "feature_A"; gene_name "featA";
+reference	protein_coding	gene	80	200	.	+	.	gene_id "feature_B"; gene_name "featB";
+reference	protein_coding	gene	130	270	.	+	.	gene_id "feature_C"; gene_name "featC";
+reference	protein_coding	gene	280	330	.	+	.	gene_id "feature_D"; gene_name "featD";

@@ -247,7 +247,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
     discardZeros <- lookupBoolOrScriptErrorDef (return False) "count argument parsing" "discard_zeros" args
     m <- liftM annotationRule $ decodeSymbolOrError "mode argument to count"
                     [("union", IntersectUnion)
-                    ,("intersection_strict", IntersectUnion)
+                    ,("intersection_strict", IntersectStrict)
                     ,("intersection_non_empty", IntersectNonEmpty)
                     ] =<< lookupSymbolOrScriptErrorDef (return "union") "mode argument to count" "mode" args
     delim <- T.encodeUtf8 <$> lookupStringOrScriptErrorDef (return "\t") "count hidden argument (should always be valid)" "__delim" args

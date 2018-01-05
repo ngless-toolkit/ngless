@@ -3,6 +3,7 @@ Version 0.6.1+
 	* Add `max_trim` argument to MappedReadSet.filter()
 	* Support saving compressed SAM files
 	* Much faster select() implementation with a block
+	* Fix count's mode {intersection_strict} to no longer behave as {union}
 
 Version 0.6.1 2017-12-10 by luispedro
 	* Add --check-install mode

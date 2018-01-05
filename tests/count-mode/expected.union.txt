@@ -1,0 +1,6 @@
+	reads.fq.gz
+-1	1
+feature_A	4
+feature_B	4
+feature_C	4
+feature_D	2

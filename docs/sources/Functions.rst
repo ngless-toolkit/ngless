@@ -403,14 +403,14 @@ multiple attributes (or, in NGLess parlance, "subfeatures"). By default, NGLess
 will look for the ``"ID"`` or ``"gene_id"`` attributes.
 
 ``mode`` indicates how to handle reads that partially overlap a features.
-Possible values for ``mode`` are ``{union}``, ``{intersection-strict}``, and
-``{intersection-nonempty}`` (default: ``{union}``). For each read position are
+Possible values for ``mode`` are ``{union}``, ``{intersection_strict}``, and
+``{intersection_non_empty}`` (default: ``{union}``). For each read position are
 obtained features that intersect it, which is known as sets. The different
 modes are:
 
 -  ``{union}`` the union of all the sets.
--  ``{intersection-strict}`` the intersection of all the sets.
--  ``{intersection-nonempty}`` the intersection of all non-empty sets.
+-  ``{intersection_strict}`` the intersection of all the sets.
+-  ``{intersection_non_empty}`` the intersection of all non-empty sets.
 
 How to handle multiple mappers (inserts which have more than one "hit" in the
 reference) is defined by the ``multiple`` argument:
