@@ -1,4 +1,4 @@
-{- Copyright 2016 NGLess Authors
+{- Copyright 2016-2018 NGLess Authors
  - License: MIT -}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -32,16 +32,17 @@ fromList gs = IntGroups values indices
         values = VU.fromList (concat gs)
         indices = VU.fromList (scanl (+) 0 $ map Prelude.length gs)
 
-toList :: IntGroups -> [[Int]]
+toList :: IntGroups -> [VU.Vector Int]
 toList (IntGroups values indices) = go 0
     where
         go ix
             | ix == VU.length indices - 1 = []
-            | otherwise = VU.toList (VU.slice st n values):go (ix+1)
+            | otherwise = VU.slice st n values:go (ix+1)
                 where
                     st = indices VU.! ix
                     e = indices VU.! (ix + 1)
                     n = e - st
+{-# INLINE toList #-}
 
 length (IntGroups _ indices) = VU.length indices - 1
 {-# INLINE length #-}
@@ -51,7 +52,7 @@ null (IntGroups values _) = VU.null values
 
 empty = IntGroups VU.empty VU.empty
 
-forM_ :: (Monad m) => IntGroups -> ([Int] -> m ()) -> m ()
+forM_ :: (Monad m) => IntGroups -> ((VU.Vector Int) -> m ()) -> m ()
 forM_ vs = Control.Monad.forM_ (toList vs)
 {-# INLINE forM_ #-}
 

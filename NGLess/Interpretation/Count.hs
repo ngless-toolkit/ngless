@@ -491,28 +491,28 @@ redistribute MMDist1 ocounts sizes indices = do
     normalizeCounts NMNormed fractCounts' sizes
     fractCounts <- liftIO $ VU.unsafeFreeze fractCounts'
     forM_ indices $ \vss -> IG.forM_ vss $ \vs -> do
-        let cs = map (VU.unsafeIndex fractCounts) vs
-            cs_sum = sum cs
-            n_cs = convert (length cs)
+        let cs = VU.map (VU.unsafeIndex fractCounts) vs
+            cs_sum = sum (VU.toList cs)
+            n_cs = convert (VU.length cs)
             adjust :: Double -> Double
             adjust = if cs_sum > 0.0
                         then (/ cs_sum)
                         else const  (1.0 / n_cs)
-        forM_ (zip vs cs) $ \(v,c) ->
+        forM_ (zip (VU.toList vs) (VU.toList cs)) $ \(v,c) ->
             liftIO $ unsafeIncrement' ocounts v (adjust c)
 redistribute _ _ _ _ = return ()
 
 incrementAll :: VUM.IOVector Double -> VU.Vector Int -> IO ()
 incrementAll counts vis = VU.forM_ vis $ \vi -> unsafeIncrement counts vi
 
-incrementAllV :: VUM.IOVector Double -> [Int] -> IO ()
-incrementAllV counts vis = forM_ vis $ \vi -> unsafeIncrement counts vi
+incrementAllV :: VUM.IOVector Double -> VU.Vector Int -> IO ()
+incrementAllV counts vis = VU.forM_ vis $ \vi -> unsafeIncrement counts vi
 
-increment1OverN :: VUM.IOVector Double -> [Int] -> IO ()
-increment1OverN counts vis = forM_ vis $ \vi -> unsafeIncrement' counts vi oneOverN
+increment1OverN :: VUM.IOVector Double -> VU.Vector Int -> IO ()
+increment1OverN counts vis = VU.forM_ vis $ \vi -> unsafeIncrement' counts vi oneOverN
     where
         oneOverN :: Double
-        oneOverN = 1.0 / convert (length vis)
+        oneOverN = 1.0 / convert (VU.length vis)
 
 normalizeCounts :: NMode -> VUM.IOVector Double -> VUM.IOVector Double -> NGLessIO ()
 normalizeCounts NMRaw _ _ = return ()
