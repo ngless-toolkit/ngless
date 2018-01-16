@@ -1,0 +1,4 @@
+ngless '0.0'
+local import "test" version "0.0"
+
+testing_searchdir("<data>/input.fq")
