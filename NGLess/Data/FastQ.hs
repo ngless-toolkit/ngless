@@ -9,7 +9,6 @@ module Data.FastQ
     , srLength
     , encodingOffset
     , encodingName
-    , fqDecode
     , fqDecodeVector
     , fqDecodeC
     , fqEncode
@@ -20,14 +19,13 @@ module Data.FastQ
     , qualityPercentiles
     ) where
 
-import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Unsafe as B
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString as B
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import           Control.DeepSeq (NFData(..))
-import           Data.Conduit ((=$=), (.|))
+import           Data.Conduit ((.|))
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Trans.Resource
@@ -100,7 +98,7 @@ encodingName SangerEncoding = "Sanger (33 offset)"
 encodingName SolexaEncoding = "Solexa (64 offset)"
 
 
--- | encode as a string
+-- | encode ShortRead as a ByteString (FastQ format)
 fqEncodeC :: (Monad m) => FastQEncoding -> C.Conduit ShortRead m B.ByteString
 fqEncodeC enc = CL.map (fqEncode enc)
 
@@ -146,21 +144,7 @@ fqDecodeC enc = C.awaitForever $ \(ByteLine rid) ->
                                 (f . unwrapByteLine)
 
 
--- | reads a sequence of short reads.
--- returns an error if there are any problems.
---
--- Note that the result of this function is not lazy! It will consume the whole
--- input before it produces the first output (because it needs to determine
--- whether an error occurred).
---
--- See 'fqDecodeC'
-fqDecode :: FastQEncoding -> BL.ByteString -> NGLess [ShortRead]
-fqDecode enc s = C.runConduit $
-    CL.sourceList (BL.toChunks s)
-        =$= linesCBounded
-        =$= fqDecodeC enc
-        =$= CL.consume
-
+-- | Decode a vector of ByteLines into a vector of ShortReads.
 fqDecodeVector :: FastQEncoding -> V.Vector ByteLine -> NGLess (V.Vector ShortRead)
 fqDecodeVector enc vs
         | V.length vs `mod` 4 /= 0 = throwDataError "Number of input lines in FastQ file is not a multiple of 4"

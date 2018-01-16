@@ -13,17 +13,36 @@ import Test.Framework.Providers.QuickCheck2
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector.Unboxed as VU
 import           Data.Int
+import           Data.Conduit ((.|))
+import qualified Data.Conduit as C
+import qualified Data.Conduit.List as CL
 
 import Interpretation.FastQ
 import Interpretation.Substrim
 import Tests.Utils
 import Data.FastQ
 import Utils.Here
+import Utils.Conduit
+import NGLess.NGError
 
 tgroup_FastQ = $(testGroupGenerator)
 
 case_parse_encode_sanger = encodeRecover SangerEncoding @?= Right reads3
 case_parse_encode_solexa = encodeRecover SolexaEncoding @?= Right reads3
+
+
+-- | reads a sequence of short reads.
+-- returns an error if there are any problems.
+--
+-- Note that the result of this function is not lazy! It will consume the whole
+-- input before it produces the first output (because it needs to determine
+-- whether an error occurred).
+fqDecode :: FastQEncoding -> BL.ByteString -> NGLess [ShortRead]
+fqDecode enc s = C.runConduit $
+    CL.sourceList (BL.toChunks s)
+        .| linesCBounded
+        .| fqDecodeC enc
+        .| CL.consume
 
 encodeRecover enc = fqDecode enc . BL.fromChunks $ map (fqEncode enc) reads3
 reads3 =
