@@ -50,7 +50,7 @@ references. A reference contains a ``fasta-file`` and (optionally) a
 Note that the paths are relative to the module directory. The GTF file may be
 gzipped.
 
-### Inialization
+### Initialization
 
 An `init` section defines an initialization command. This will be run
 **before** anything else in any script which imports this module. The intention
