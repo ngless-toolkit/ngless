@@ -20,7 +20,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as C
-import           Data.Conduit ((=$=), runConduit, ($$), (.|))
+import           Data.Conduit (runConduit, ($$), (.|))
 import           System.Directory (copyFile)
 import           Data.Maybe
 import Data.String.Utils
@@ -37,6 +37,7 @@ import Utils.Utils
 import NGLess.NGLEnvironment
 import Utils.Samtools (convertSamToBam, convertBamToSam)
 import Utils.Conduit
+import Utils.Utils (withOutputFile)
 
 {- A few notes:
     There is a transform pass which adds the argument __can_move to write() calls.
@@ -112,10 +113,12 @@ moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
         isGZ = endswith ".gz"
         igz = isGZ orig
         ogz = isGZ fname
-        uncompressTo oldfp newfp = runConduit $
-            conduitPossiblyCompressedFile oldfp =$= C.sinkFile newfp
-        compressTo oldfp newfp = runConduit $
-            C.sourceFile oldfp =$= asyncGzipToFile newfp
+        uncompressTo oldfp newfp = C.runConduit $
+            conduitPossiblyCompressedFile oldfp .| CB.sinkFileCautious newfp
+        compressTo oldfp newfp = liftIO $
+            withOutputFile newfp $ \hout ->
+                C.runConduitRes $
+                    C.sourceFile oldfp .| asyncGzipTo hout
 
         -- | copy file unless its the same file.
         maybeCopyFile :: FilePath -> FilePath -> NGLessIO ()
