@@ -141,6 +141,12 @@ tabDelim = SimpleParser $ \input -> do
     ix <- B8.elemIndex '\t' input
     return $! (B.take ix input :!: B.drop (ix+1) input)
 
+tabDelimOpts :: SimpleParser B.ByteString
+tabDelimOpts = SimpleParser $ \input -> do
+    case B8.elemIndex '\t' input of
+         Just (ix) -> return $! (B.take ix input :!: B.drop (ix+1) input)
+         Nothing -> return $! (B.empty :!: input)
+
 readIntTab = SimpleParser $ \b -> do
         (v,rest) <- B8.readInt b
         return $! (v :!: B.tail rest)
@@ -156,7 +162,7 @@ samP = SamLine
     <*> readIntTab
     <*> readIntTab
     <*> tabDelim
-    <*> tabDelim
+    <*> tabDelimOpts
     <*> restParser
 
 {--
