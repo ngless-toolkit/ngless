@@ -1,3 +1,7 @@
-ngless '0.0'
+ngless '0.7'
 write(as_reads(samfile('input.sam')),
         ofile='output.fq')
+
+write(as_reads(samfile('input.sam')),
+        ofile='output.interleaved.fq',
+        format_flags={interleaved})

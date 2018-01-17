@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -13,6 +13,7 @@ module Interpretation.Write
 
 
 import Control.Monad
+import Control.Monad.Except
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
@@ -20,6 +21,10 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as C
+#ifndef WINDOWS
+-- bzlib cannot compile on Windows (as of 2016/07/05)
+import qualified Data.Conduit.BZlib as CBZ2
+#endif
 import           Data.Conduit (runConduit, ($$), (.|))
 import           System.Directory (copyFile)
 import           Data.Maybe
@@ -33,11 +38,10 @@ import FileOrStream
 import FileManagement (makeNGLTempFile)
 import NGLess
 import Output
-import Utils.Utils
 import NGLess.NGLEnvironment
 import Utils.Samtools (convertSamToBam, convertBamToSam)
 import Utils.Conduit
-import Utils.Utils (withOutputFile)
+import Utils.Utils (withOutputFile, fmapMaybeM, moveOrCopy)
 
 {- A few notes:
     There is a transform pass which adds the argument __can_move to write() calls.
@@ -52,6 +56,7 @@ import Utils.Utils (withOutputFile)
 data WriteOptions = WriteOptions
                 { woOFile :: FilePath
                 , woFormat :: Maybe T.Text
+                , woFormatFlags :: Maybe T.Text
                 , woCanMove :: Bool
                 , woVerbose :: Bool
                 , woComment :: Maybe T.Text
@@ -82,9 +87,14 @@ parseWriteOptions args = do
                                                                 ,("hash", AutoResultHash)]) cs
                         _ -> throwScriptError "auto_comments argument to write() call must be a list of symbols"
     hash <- lookupStringOrScriptError "hidden __hash argument to write() function" "__hash" args
+    formatFlags <- case lookup "format_flags" args of
+                        Nothing -> return Nothing
+                        Just (NGOSymbol flag) -> return $ Just flag
+                        Just other -> throwScriptError $ "format_flags argument to write(): illegal argument ("++show other++")"
     return $! WriteOptions
                 { woOFile = ofile
                 , woFormat = format
+                , woFormatFlags = formatFlags
                 , woCanMove = canMove
                 , woVerbose = verbose
                 , woComment = comment
@@ -158,26 +168,45 @@ executeWrite (NGOReadSet _ rs) args = do
                 C.runConduit
                     (mapM_ C.sourceFile inputs .| C.sinkHandle h)
             moveOrCopyCompress True fp' ofname
+    if woFormatFlags opts == Just "interleaved"
+        then do
+            writer <- if endswith ".gz" ofile
+                        then return asyncGzipTo
+                        else if endswith ".bz2" ofile
+                            then
+#ifndef WINDOWS
+                                return (\hout -> CBZ2.bzip2 .| CB.sinkHandle hout)
+#else
+                                throwNotImplementedError "Compression of bzip2 files is not supported on Windows"
+#endif
 
-
-    case rs of
-        ReadSet [] singles -> do
-            moveOrCopyCompressFQs singles ofile
-            return NGOVoid
-        ReadSet pairs [] -> do
-            fname1 <- _formatFQOname ofile "pair.1"
-            fname2 <- _formatFQOname ofile "pair.2"
-            moveOrCopyCompressFQs (fst <$> pairs) fname1
-            moveOrCopyCompressFQs (snd <$> pairs) fname2
-            return NGOVoid
-        ReadSet pairs singletons -> do
-            fname1 <- _formatFQOname ofile "pair.1"
-            fname2 <- _formatFQOname ofile "pair.2"
-            fname3 <- _formatFQOname ofile "singles"
-            moveOrCopyCompressFQs (fst <$> pairs) fname1
-            moveOrCopyCompressFQs (snd <$> pairs) fname2
-            moveOrCopyCompressFQs singletons fname3
-            return NGOVoid
+                            else return CB.sinkHandle
+                    -- Newer versions of safeio have a more general
+                    -- 'withOutputFile', so this liftIO/runExceptT/case
+                    -- construct would not be necessary
+            errs <- liftIO $ withOutputFile ofile $ \hout -> do
+                let ReadSet pairs singles = rs
+                runExceptT .  C.runConduitRes $
+                    interleaveFQs pairs singles .| writer hout
+            case errs of
+                Right () -> return ()
+                Left err -> throwError err
+        else case rs of
+            ReadSet [] singles ->
+                moveOrCopyCompressFQs singles ofile
+            ReadSet pairs [] -> do
+                fname1 <- _formatFQOname ofile "pair.1"
+                fname2 <- _formatFQOname ofile "pair.2"
+                moveOrCopyCompressFQs (fst <$> pairs) fname1
+                moveOrCopyCompressFQs (snd <$> pairs) fname2
+            ReadSet pairs singletons -> do
+                fname1 <- _formatFQOname ofile "pair.1"
+                fname2 <- _formatFQOname ofile "pair.2"
+                fname3 <- _formatFQOname ofile "singles"
+                moveOrCopyCompressFQs (fst <$> pairs) fname1
+                moveOrCopyCompressFQs (snd <$> pairs) fname2
+                moveOrCopyCompressFQs singletons fname3
+    return NGOVoid
 executeWrite el@(NGOMappedReadSet _ iout  _) args = do
     opts <- parseWriteOptions args
     fp <- asFile iout

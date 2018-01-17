@@ -53,6 +53,8 @@ groupArgs =
 writeArgs =
     [ArgInformation "ofile" True NGLString [ArgCheckFileWritable]
     ,ArgInformation "format" False NGLSymbol [ArgCheckSymbol ["tsv", "csv", "bam", "sam"]]
+    ,ArgInformation "format_flags" False NGLSymbol [ArgCheckMinVersion (0,7)
+                                                   ,ArgCheckSymbol ["interleaved"]]
     ,ArgInformation "verbose" False NGLBool []
     ,ArgInformation "comment" False NGLString []
     ,ArgInformation "auto_comments" False (NGList NGLSymbol) [ArgCheckSymbol ["date", "script", "hash"]]

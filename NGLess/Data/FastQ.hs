@@ -17,8 +17,10 @@ module Data.FastQ
     , statsFromFastQ
     , fqStatsC
     , qualityPercentiles
+    , interleaveFQs
     ) where
 
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Unsafe as B
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString as B
@@ -233,6 +235,18 @@ fqStatsC = do
         findMinQValue = (flip (-) minQualityValue) . minimum . map findMinQValue'
         findMinQValue' :: VU.Vector Int -> Int
         findMinQValue' qs = fromMaybe 256 (VU.findIndex (/= 0) qs)
+
+interleaveFQs :: (Monad m, MonadError NGError m, MonadResource m, MonadBaseControl IO m) => [(FastQFilePath, FastQFilePath)] -> [FastQFilePath] -> C.Source m B.ByteString
+interleaveFQs pairs singletons = do
+            sequence_ [interleavePair f0 f1 | (FastQFilePath _ f0, FastQFilePath _ f1) <- pairs]
+            sequence_ [conduitPossiblyCompressedFile f | FastQFilePath _ f <- singletons]
+    where
+        interleavePair :: (Monad m, MonadError NGError m, MonadResource m, MonadBaseControl IO m) => FilePath -> FilePath -> C.Source m B.ByteString
+        interleavePair f0 f1 =
+                ((conduitPossiblyCompressedFile f0 .| linesCBounded .| CL.chunksOf 4) `zipSources` (conduitPossiblyCompressedFile f1 .| linesCBounded .| CL.chunksOf 4))
+                .| C.awaitForever (\(r0,r1) -> C.yield (ul r0) >> C.yield (ul r1))
+        zipSources a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
+        ul = B8.unlines . map unwrapByteLine
 
 gcFraction :: FQStatistics -> Double
 gcFraction res = gcCount / allBpCount
