@@ -21,6 +21,7 @@ module Data.Sam
 
     , samStatsC
     , samStatsC'
+    , samIntTag
     ) where
 
 import qualified Data.ByteString as B

@@ -32,7 +32,7 @@ import System.Directory
 import System.FilePath
 import System.PosixCompat.Files (createSymbolicLink)
 import System.IO.SafeWrite (withOutputFile)
-
+import Data.Maybe (fromMaybe)
 
 import Language
 import FileManagement
@@ -53,8 +53,12 @@ import Utils.Conduit
 import Configuration
 import Utils.LockFile
 
+fromRight d (Left _) = d
+fromRight _ (Right v) = v
 -- | internal type
 data ReferenceInfo = PackagedReference T.Text | FaFile FilePath
+
+data MergeStrategy = MSBestOnly
 
 -- | An object which represents a mapper
 data Mapper = Mapper
@@ -331,15 +335,15 @@ mergeSamFiles inputs = do
                 .| readSamGroupsC
                         | f <- inputs]
 
-        .| CL.mapM mergeSAMGroups
+        .| CL.mapM (mergeSAMGroups MSBestOnly)
 
 readSamHeaders :: C.Conduit ByteLine NGLessIO SamGroup
 readSamHeaders =
     CC.takeWhile (\(ByteLine line) -> B.null line || B.head line == 64)
                 .| CL.map (\(ByteLine line) -> [SamHeader line])
 
-mergeSAMGroups :: [SamGroup] -> NGLessIO SamGroup
-mergeSAMGroups groups
+mergeSAMGroups :: MergeStrategy -> [SamGroup] -> NGLessIO SamGroup
+mergeSAMGroups strategy groups
         | not (allSame . fmap samQName $ concat groups) = throwDataError "Merging unsynced SAM files (not implemented yet)"
         | otherwise = return $ group group1 ++ group group2 ++ group groupS
     where
@@ -353,5 +357,11 @@ mergeSAMGroups groups
         group [] = []
         group gs = case filter isAligned gs of
             [] -> [head gs]
-            gs' -> gs'
+            gs' -> pick strategy gs'
+        pick :: MergeStrategy -> [SamLine] -> [SamLine]
+        pick MSBestOnly gs =
+            let matchValue :: SamLine -> Int
+                matchValue samline = fromRight 0 (matchSize samline) - fromMaybe 0 (samIntTag samline "NM")
+                bestMatch = maximum (map matchValue gs)
+            in filter (\samline -> matchValue samline == bestMatch) gs
 
