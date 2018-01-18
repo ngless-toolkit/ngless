@@ -3,6 +3,7 @@ version:        '0.6.1'
 category:       Domain Specific Language
 author:         Luis Pedro Coelho and others (see AUTHORS)
 maintainer:     luis@luispedro.org
+github:         luispedro/ngless
 license:        MIT
 license-file:   COPYING
 c-sources:
