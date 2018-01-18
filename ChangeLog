@@ -5,7 +5,6 @@ Version 0.6.1+
 	* Much faster select() implementation with a block
 	* Fix count's mode {intersection_strict} to no longer behave as {union}
 	* Support for saving interleaved FastQ files
-	* count() mode={intersection_strict} behaved as {union}; fixed
 	* Lower memory usage
 	* More conservative SAM merging in split mode
 
