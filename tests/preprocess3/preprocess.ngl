@@ -6,5 +6,6 @@ input = preprocess(input) using |read|:
    if len(read) < 10:
        discard
 write(input, ofile='output.fq')
+write(input, ofile='output.fq.gz')
 
 write(qcstats({fastq}), ofile='output.fqstats.tsv')

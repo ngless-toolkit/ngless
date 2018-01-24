@@ -143,7 +143,7 @@ _formatFQOname :: FilePath -> FilePath -> NGLessIO FilePath
 _formatFQOname base insert
     | base `isInfixOf` "{index}" = return (replace base "{index}" ("." ++ insert ++ "."))
     | endswith ".fq" base = return $ removeEnd base ".fq" ++ "." ++ insert ++ ".fq"
-    | endswith ".fq.gz" base = return $ removeEnd base ".fq" ++ "." ++ insert ++ ".fq.gz"
+    | endswith ".fq.gz" base = return $ removeEnd base ".fq.gz" ++ "." ++ insert ++ ".fq.gz"
     | otherwise = throwScriptError ("Cannot handle filename " ++ base ++ " (expected extension .fq/.fq.gz/.fq.bz2).")
 
 
