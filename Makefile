@@ -104,7 +104,7 @@ static: $(NGLESS_EMBEDDED_TARGET)
 	stack build $(STACKOPTS) --ghc-options='-fPIC' --force-dirty --flag NGLess:embed
 
 fast:
-	stack build $(STACKOPTS) --ghc-options=-O0
+	stack build --fast $(STACKOPTS)
 
 dist: ngless-${VERSION}.tar.gz
 

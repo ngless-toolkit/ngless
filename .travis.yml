@@ -39,7 +39,7 @@ addons:
 
 script:
   - stack --no-terminal setup
-  - make
+  - make fast
   - make modules
   - make fastcheck
   - mkdir prefix-test
