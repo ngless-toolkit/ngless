@@ -28,7 +28,7 @@ import qualified Data.Conduit.BZlib as CBZ2
 import           Data.Conduit (runConduit, ($$), (.|))
 import           System.Directory (copyFile)
 import           Data.Maybe
-import Data.String.Utils
+import           Data.String.Utils (replace, endswith)
 import Data.List (isInfixOf)
 
 import Data.FastQ
@@ -139,9 +139,8 @@ moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
 removeEnd :: String -> String -> String
 removeEnd base suffix = take (length base - length suffix) base
 
-_formatFQOname :: FilePath -> FilePath -> NGLessIO FilePath
 _formatFQOname base insert
-    | base `isInfixOf` "{index}" = return (replace base "{index}" ("." ++ insert ++ "."))
+    | "{index}" `isInfixOf` base = return $ replace "{index}" insert base
     | endswith ".fq" base = return $ removeEnd base ".fq" ++ "." ++ insert ++ ".fq"
     | endswith ".fq.gz" base = return $ removeEnd base ".fq.gz" ++ "." ++ insert ++ ".fq.gz"
     | otherwise = throwScriptError ("Cannot handle filename " ++ base ++ " (expected extension .fq/.fq.gz/.fq.bz2).")

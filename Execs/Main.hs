@@ -1,4 +1,5 @@
-{- Copyright 2013-2017 NGLess Authors
+{-# LANGUAGE PackageImports #-}
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 module Main
@@ -74,7 +75,7 @@ import CmdArgs
 import FileManagement
 import StandardModules.NGLStdlib
 import Citations
-import Network
+import "NGLess" Network
 import Hooks
 import Utils.Batch
 import Utils.Suggestion

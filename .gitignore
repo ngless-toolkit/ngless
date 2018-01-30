@@ -1,5 +1,6 @@
 /.cabal-sandbox/
 /.stack-work/
+/.stack-work-test/
 /cabal.sandbox.config
 /dist/
 /docker/

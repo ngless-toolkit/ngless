@@ -51,6 +51,7 @@ import Tests.Count (tgroup_Count)
 import Tests.Parse (tgroup_Parse)
 import Tests.Vector (tgroup_Vector)
 import Tests.IntGroups (tgroup_IntGroups)
+import Tests.Write (tgroup_Write)
 import Tests.NGLessAPI (tgroup_NGLessAPI)
 
 test_FastQ      = [tgroup_FastQ]
@@ -61,7 +62,8 @@ test_Types      = [tgroup_Types]
 test_NGLessAPI  = [tgroup_NGLessAPI]
 test_Vector     = [tgroup_Vector]
 test_IntGroups  = [tgroup_IntGroups]
-test_Select  = [tgroup_Select]
+test_Select     = [tgroup_Select]
+test_Write      = [tgroup_Write]
 
 -- The main test driver sets up the config options then uses the automatically
 -- generated function

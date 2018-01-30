@@ -109,10 +109,11 @@ fast:
 dist: ngless-${VERSION}.tar.gz
 
 check:
-	stack test $(STACKOPTS)
+	stack test --work-dir .stack-work-test $(STACKOPTS)
 
 fastcheck:
-	stack test $(STACKOPTS) --ghc-options=-O0
+	stack test --fast --work-dir .stack-work-test $(STACKOPTS)
+
 # Synonym
 tests: check
 

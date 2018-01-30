@@ -1,5 +1,6 @@
 {- Copyright 2016
  - Licence: MIT -}
+module Bench (main) where
 import Criterion.Main
 
 
