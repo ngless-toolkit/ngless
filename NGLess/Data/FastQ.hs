@@ -191,7 +191,9 @@ fqStatsC = do
                 forM_ [0 .. 255] $ \j ->
                     VSM.read qcs (base + j) >>= VUM.write v j
                 VU.unsafeFreeze v
-            let lcT = findMinQValue qcs'
+            let lcT = if n > 0
+                            then findMinQValue qcs'
+                            else 0
             aCount <- getNoCaseV charCounts 'a'
             cCount <- getNoCaseV charCounts 'c'
             gCount <- getNoCaseV charCounts 'g'
