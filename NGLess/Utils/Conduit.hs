@@ -21,7 +21,6 @@ module Utils.Conduit
 
 import qualified Data.ByteString as B
 
-import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
