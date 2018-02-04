@@ -1,10 +1,14 @@
 {-# LANGUAGE FlexibleContexts, ScopedTypeVariables, MultiWayIf #-}
+{- Copyright 2013-2018 NGLess Authors
+ - License: MIT
+ -}
 
 module Data.FastQ
     ( ShortRead(..)
     , FastQEncoding(..)
     , FastQFilePath(..)
     , FQStatistics(..)
+    , nBasepairs
     , srSlice
     , srLength
     , encodingOffset
@@ -74,14 +78,19 @@ data FastQFilePath = FastQFilePath
 
 data FQStatistics = FQStatistics
                 { bpCounts :: (Int, Int, Int, Int) -- ^ number of (A, C, T, G)
-                , lc :: Int8 -- ^ lowest quality value
+                , lc :: !Int8 -- ^ lowest quality value
                 , qualCounts ::  [VU.Vector Int] -- ^ quality counts by position
-                , nSeq :: Int -- ^ number of sequences
+                , nSeq :: !Int -- ^ number of sequences
                 , seqSize :: (Int,Int) -- ^ min and max
                 } deriving(Eq,Show)
 
 instance NFData FQStatistics where
     rnf (FQStatistics (!_,!_,!_,!_) !_ qv !_ (!_,!_)) = rnf qv
+
+-- | Total number of base pairs
+-- Returns an Integer as it can be > 2³¹
+nBasepairs :: FQStatistics -> Integer
+nBasepairs fqstats = sum $ map (sum . map toInteger . VU.toList) $ qualCounts fqstats
 
 minQualityValue :: Num a => a
 minQualityValue = -5

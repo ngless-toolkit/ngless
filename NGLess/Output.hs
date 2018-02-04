@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, RecordWildCards #-}
@@ -107,10 +107,11 @@ $(deriveToJSON defaultOptions{fieldLabelModifier = drop 1} ''BPosInfo)
 data FQInfo = FQInfo
                 { fileName :: String
                 , scriptLno :: !Int
-                , gcContent :: Double
-                , encoding :: String
-                , numSeqs :: Int
-                , seqLength :: (Int,Int)
+                , gcContent :: !Double
+                , encoding :: !String
+                , numSeqs :: !Int
+                , numBasepairs :: !Integer
+                , seqLength :: !(Int,Int)
                 , perBaseQ :: [BPosInfo]
                 } deriving (Show)
 
@@ -221,7 +222,8 @@ outputFQStatistics fname stats enc = do
         gc'     = FQ.gcFraction stats
         st      = encodeBPStats stats
         lno     = fromMaybe 0 lno'
-        binfo   = FQInfo fname lno gc' enc' nSeq' sSize' st
+        nbps    = FQ.nBasepairs stats
+        binfo   = FQInfo fname lno gc' enc' nSeq' nbps sSize' st
     let p s0 s1  = outputListLno' DebugOutput [s0, s1]
     p "Simple Statistics completed for: " fname
     p "Number of base pairs: "      (show $ length (FQ.qualCounts stats))
@@ -316,8 +318,8 @@ writeOutputTSV transpose fqStatsFp mapStatsFp = do
         formatTSV1 header (i,contents) = BL.concat [BL8.concat [BL8.concat [BL8.pack . show $ i, ":", h], "\t", BL8.pack c, "\n"]
                                                                         | (h, c) <- zip header contents]
         asTSVline = BL8.intercalate "\t" . map BL8.pack
-        fqHeaders                = ["file"  , "encoding", "numSeqs",    "minSeqLen",         "maxSeqLen",        "gcContent"]
-        encodeFQStats FQInfo{..} = [fileName,  encoding, show numSeqs, show (fst seqLength), show (snd seqLength), show gcContent]
+        fqHeaders                = ["file"  , "encoding", "numSeqs",    "numBasepairs", "minSeqLen",         "maxSeqLen",        "gcContent"]
+        encodeFQStats FQInfo{..} = [fileName,  encoding, show numSeqs, show numBasepairs, show (fst seqLength), show (snd seqLength), show gcContent]
 
         msHeaders                      = [ "inputFile",  "lineNumber",  "reference",            "total",            "aligned",            "unique"]
         encodeMapStats MappingInfo{..} = [mi_inputFile,   show mi_lno, mi_reference, show mi_totalReads, show mi_totalAligned, show mi_totalUnique]
