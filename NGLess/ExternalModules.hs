@@ -57,6 +57,7 @@ downloadableModules = -- Should this be merged with knownModules?
     ,("specI", "0.0")
     ,("specI", "0.1")
     ,("igc", "0.0")
+    ,("igc", "0.5")
     ,("om-rgc", "0.0")
     ]
 

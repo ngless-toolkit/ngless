@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 module Network
@@ -42,15 +42,20 @@ downloadFile url destPath = do
     outputListLno' TraceOutput ["Downloading ", url]
     req <- HTTP.parseRequest url
     let req' = req { HTTP.decompress = const False }
-    liftIO $ HTTPSimple.withResponse req' $ \res ->
-        C.runConduitRes $
-            HTTP.responseBody res
-                .| case lookup "Content-Length" (HTTP.responseHeaders res) of
-                    Nothing -> CL.map id
-                    Just csize -> printProgress (read (B.unpack csize))
-                .| CB.sinkFileCautious destPath
+    r <- liftIO $ HTTPSimple.withResponse req' $ \res ->
+        case HTTPSimple.getResponseStatusCode res of
+            200 -> do
+                C.runConduitRes $
+                    HTTP.responseBody res
+                        .| case lookup "Content-Length" (HTTP.responseHeaders res) of
+                            Nothing -> CL.map id
+                            Just csize -> printProgress (read (B.unpack csize))
+                        .| CB.sinkFileCautious destPath
+                return $ Right ()
+            err -> return . throwSystemError $ "Could not connect to "++url++" (got error code: "++show err++")"
+    runNGLess (r :: NGLess ())
 
--- Download a tar.gz file and expand it onto 'destdir'
+-- | Download a tar.gz file and expand it onto 'destdir'
 downloadExpandTar :: FilePath -> FilePath -> NGLessIO ()
 downloadExpandTar url destdir = do
     let tarName = destdir <.> "tar.gz"

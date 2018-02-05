@@ -1,10 +1,10 @@
-version: '0.0.0'
+version: '0.5.0'
 name: 'IGC'
 references:
     -
         name: 'igc'
-        fasta-file: 'data/IGC.fna'
-        map-file: 'data/IGC.functional.map'
+        fasta-file: './IGC.fna'
+        map-file: './IGC.functional.map'
 citation: >
     An integrated catalog of reference genes in the human gut microbiome
     Junhua Li, Huijue Jia, Xianghang Cai, Huanzi Zhong, Qiang Feng,
