@@ -163,6 +163,9 @@ benchmarks:
   nglessbench:
     main: Bench.hs
     source-dirs: Execs/
+    other-modules: []
+    cc-options: -DNO_EMBED_SAMTOOLS_BWA
+    cpp-options: -DNO_EMBED_SAMTOOLS_BWA
     dependencies:
     - NGLess
     - HUnit >=1.3

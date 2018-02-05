@@ -1,13 +1,11 @@
 {- Copyright 2016
  - Licence: MIT -}
-module Bench (main) where
 import Criterion.Main
 
 
-
+import qualified Data.Vector as V
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
-import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Conduit as C
 import qualified Data.Text as T
 import           Data.Conduit ((=$=), ($$))
@@ -16,7 +14,6 @@ import           Control.DeepSeq (NFData)
 import Control.Monad.Trans.Resource (runResourceT)
 
 import NGLess (NGLessIO, testNGLessIO)
-import Tests.Utils (setupTestConfiguration)
 
 
 import Interpretation.Count (performCount, MMMethod(..), loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), Annotator(..), NMode(..))
@@ -25,9 +22,10 @@ import Interpret (interpret)
 import Parse (parsengless)
 import Language (Script(..))
 import Data.Sam (readSamLine, readSamGroupsC, samStatsC)
-import Data.FastQ (statsFromFastQ, FastQEncoding(..), ShortRead(..), fqDecode)
-import Utils.Conduit (linesC)
+import Data.FastQ (statsFromFastQ, FastQEncoding(..), ShortRead(..), fqDecodeVector)
+import Utils.Conduit (linesC, ByteLine(..))
 import Transform (transform)
+import NGLess.NGLEnvironment (setupTestEnvironment)
 
 nfNGLessIO :: (NFData a) => NGLessIO a -> Benchmarkable
 nfNGLessIO = nfIO . testNGLessIO
@@ -56,11 +54,11 @@ countRights = loop (0 :: Int)
 rightOrDie (Right r) = r
 rightOrDie err = error $ "Expected Right, got: " ++ show err
 exampleSR :: ShortRead
-exampleSR = head . rightOrDie . fqDecode SangerEncoding $ BL.fromChunks
-                ["@SRR867735.1 HW-ST997:253:C16APACXX:7:1101:2971:1948/1\n"
-                ,"NCCGCTGCTCGGGATCAAGACATACCGCGGGGGGAGGGGAGCGGGACCAC\n"
-                ,"+\n"
-                ,"#11ABDD6DFBDFHEGHDDGFFFHE?@GEEGA##################\n"]
+exampleSR = V.head . rightOrDie . fqDecodeVector SangerEncoding $ V.fromList
+                [ByteLine "@SRR867735.1 HW-ST997:253:C16APACXX:7:1101:2971:1948/1"
+                ,ByteLine "NCCGCTGCTCGGGATCAAGACATACCGCGGGGGGAGGGGAGCGGGACCAC"
+                ,ByteLine "+"
+                ,ByteLine "#11ABDD6DFBDFHEGHDDGFFFHE?@GEEGA##################"]
 
 
 count= loop (0 :: Int)
@@ -81,7 +79,7 @@ basicCountOpts = CountOpts
         , optIncludeMinus1 = True
         }
 
-main = setupTestConfiguration >> defaultMain [
+main = setupTestEnvironment >> defaultMain [
     bgroup "sam-stats"
         [ bench "sample" $ nfNGLessIO (CB.sourceFile "test_samples/sample.sam" =$= linesC $$ samStatsC)
         ]

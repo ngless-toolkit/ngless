@@ -7,7 +7,6 @@ module Tests.Utils
     , fromRight
     , asTempFile
     , testNGLessIO
-    , setupTestConfiguration
     ) where
 import Test.HUnit
 import qualified Data.Text as T
@@ -50,11 +49,5 @@ asTempFile sf ext = do
         hClose h
     return fp
 
-
-setupTestConfiguration :: IO ()
-setupTestConfiguration = do
-    config <- guessConfiguration
-    let config' = config { nConfTemporaryDirectory = "testing_tmp_dir", nConfKeepTemporaryFiles = True, nConfVerbosity = Quiet }
-    updateNglEnvironment' (\env -> env { ngleConfiguration = config' })
 
 

@@ -7,6 +7,7 @@ module NGLess.NGLEnvironment
     , updateNglEnvironment
     , updateNglEnvironment'
     , setQuiet
+    , setupTestEnvironment
     ) where
 
 import qualified Data.Text as T
@@ -57,3 +58,10 @@ setQuiet :: NGLessIO ()
 setQuiet = updateNglEnvironment (\e -> e { ngleConfiguration = setQuiet' (ngleConfiguration e) })
     where
         setQuiet' c = c { nConfVerbosity = Quiet }
+
+-- | setup an environment that can be used for testing
+setupTestEnvironment :: IO ()
+setupTestEnvironment = do
+    config <- guessConfiguration
+    let config' = config { nConfTemporaryDirectory = "testing_tmp_dir", nConfKeepTemporaryFiles = True, nConfVerbosity = Quiet }
+    updateNglEnvironment' (\env -> env { ngleConfiguration = config' })

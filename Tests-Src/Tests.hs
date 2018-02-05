@@ -32,6 +32,7 @@ import Interpret
 import Tokens
 import FileManagement
 import NGLess
+import NGLess.NGLEnvironment (setupTestEnvironment)
 
 import Interpretation.Unique
 
@@ -68,7 +69,7 @@ test_Write      = [tgroup_Write]
 -- The main test driver sets up the config options then uses the automatically
 -- generated function
 main = do
-    setupTestConfiguration
+    setupTestEnvironment
     $(defaultMainGenerator)
     removeDirectoryRecursive "testing_directory_tmp"
 
