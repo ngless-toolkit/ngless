@@ -217,12 +217,13 @@ loadScript (ScriptFilePath fname) =
             Left err -> Left (show err)
 
 
-parseVersion :: T.Text -> NGLess NGLVersion
-parseVersion "0.0" = return $ NGLVersion 0 0
-parseVersion "0.5" = return $ NGLVersion 0 5
-parseVersion "0.6" = return $ NGLVersion 0 6
-parseVersion "0.7" = return $ NGLVersion 0 7
-parseVersion v = throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 0.0/0.5-7 are available in this release)."]
+parseVersion :: Maybe T.Text -> NGLess NGLVersion
+parseVersion Nothing = return $ NGLVersion 0 7
+parseVersion (Just "0.0") = return $ NGLVersion 0 0
+parseVersion (Just "0.5") = return $ NGLVersion 0 5
+parseVersion (Just "0.6") = return $ NGLVersion 0 6
+parseVersion (Just "0.7") = return $ NGLVersion 0 7
+parseVersion (Just v) = throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 0.0/0.5-7 are available in this release)."]
 
 modeExec :: NGLessMode -> IO ()
 modeExec opts@DefaultMode{} = do
@@ -248,7 +249,7 @@ modeExec opts@DefaultMode{} = do
         updateNglEnvironment (\e -> e { ngleScriptText = ngltext })
         outputConfiguration
         sc' <- runNGLess $ parsengless fname reqversion ngltext >>= maybe_add_print
-        activeVersion <- runNGLess . parseVersion $ fromMaybe (T.pack versionStr) (nglVersion <$> nglHeader sc')
+        activeVersion <- runNGLess . parseVersion $ (nglVersion <$> nglHeader sc')
         updateNglEnvironment (\e -> e {ngleVersion = activeVersion })
         when (debug_mode opts == "ast") $ liftIO $ do
             forM_ (nglBody sc') $ \(lno,e) ->
