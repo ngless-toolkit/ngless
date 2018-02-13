@@ -8,6 +8,7 @@ Version 0.6.1+
 	* Lower memory usage
 	* More conservative SAM merging in split mode
 	* Compute #Basepairs in FastQ stats
+	* Fix as_reads() for single-end reads
 
 Version 0.6.1 2017-12-10 by luispedro
 	* Add --check-install mode

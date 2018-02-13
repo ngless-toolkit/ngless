@@ -1,4 +1,4 @@
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2015-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -16,9 +16,9 @@ import Control.Monad.Trans.Resource (release)
 import Data.Conduit ((=$=), ($$))
 import Control.Monad.Except
 import System.IO
-import Data.Default
-import Data.IORef
-import Data.Either.Combinators
+import Data.Default (def)
+import Data.IORef (newIORef, writeIORef, readIORef)
+import Data.Either.Combinators (rightToMaybe, leftToMaybe)
 
 import Language
 import FileManagement
@@ -86,7 +86,7 @@ samToFastQ fpsam stream = do
 
 
 asFQ :: [SamLine] -> Either B.ByteString (B.ByteString,B.ByteString)
-asFQ = postproc . asFQ' False False
+asFQ = postproc . asFQ' False False . filter hasSeq
     where
         postproc [(_,b)] = Left b
         postproc [(1,a),(2,b)] = Right (a,b)
@@ -100,6 +100,8 @@ asFQ = postproc . asFQ' False False
             | otherwise = asFQ' seen1 seen2 ss
         asFQ1 SamLine{samQName=qname, samSeq=short, samQual=qs} = B.concat ["@", qname, "\n", short, "\n+\n", qs, "\n"]
         asFQ1 SamHeader{} = error "Should not have seen a header in this place"
+        hasSeq SamHeader{} = False
+        hasSeq SamLine{samSeq=s} = s /= "*"
 
 
 as_reads_Function = Function
