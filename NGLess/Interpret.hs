@@ -493,21 +493,18 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
         outputHeader <- lookupBoolOrScriptErrorDef (return True) "select" "__output_header" args
         let (samfp, istream) = asSamStream isam
         runNGLessIO $ outputListLno' TraceOutput ["Executing blocked select on file ", samfp]
-        (oname, ohandle) <- runNGLessIO $ openNGLTempFile samfp "block_selected_" "sam"
         env <- gets id
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
-        runNGLessIO . C.runConduit $
-            istream
-                .| (do
+        oname <- runNGLessIO $ makeNGLTempFile samfp "block_selected_" "sam" $ \ohandle ->
+            C.runConduit $
+                istream .| do
                     when outputHeader $
                         CC.takeWhile (isSamHeaderString . unwrapByteLine)
-                            .| CL.map unwrapByteLine
-                            .| CC.unlinesAscii
+                            .| byteLineSinkHandle ohandle
                     readSamGroupsC' mapthreads paired
-                        .| asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . filterGroup)))
-                .| CB.sinkHandle ohandle
-        liftIO $ hClose ohandle
+                        .| asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . filterGroup))
+                        .| CB.sinkHandle ohandle
         return input { nglSamFile = File oname }
     where
         concatLines :: V.Vector [B.ByteString] -> B.ByteString
