@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -17,11 +17,11 @@ import           Control.Arrow
 import Data.Maybe
 import Control.Monad
 import Control.Monad.State.Strict
-import Control.Monad.Trans.Either
+import Control.Monad.Trans.Except
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Applicative
-import Data.String
+import           Data.String (fromString)
 import           Data.List (find, foldl')
 
 import Modules
@@ -34,7 +34,7 @@ import Utils.Utils
 
 type TypeMap = Map.Map T.Text NGLType
 type TypeMSt = StateT (Int, TypeMap)        -- ^ Current line & current type map (type map is inferred top-to-bottom)
-                (EitherT NGError            -- ^ to enable early exit for certain types of error
+                (ExceptT NGError            -- ^ to enable early exit for certain types of error
                     (ReaderT [Module]       -- ^ the modules passed in (fixed)
                         (Writer [T.Text]))) -- ^ we write out error messages
 
@@ -48,7 +48,7 @@ checktypes mods script@(Script _ exprs) = let
             addconst tm (name, val) = case typeOfObject val of
                 Just t -> Map.insert name t tm
                 Nothing -> tm
-            w = runEitherT (runStateT (inferScriptM exprs) (0,initial))
+            w = runExceptT (runStateT (inferScriptM exprs) (0,initial))
     in case runWriter (runReaderT w mods) of
         (Right (_,(_, tmap)), []) -> do
             typed <- addTypes tmap exprs
