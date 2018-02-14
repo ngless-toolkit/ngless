@@ -41,7 +41,7 @@ for testdir in tests/*; do
             fi
         else
             if test $ngless_exit -ne "0"; then
-                echo "Error exit in test"
+                echo "Error non-zero exit in test: $testdir"
                 cur_ok=no
             fi
         fi
