@@ -305,9 +305,18 @@ interpretFunction' f _ _ _ = throwShouldNotOccur . concat $ ["Interpretation of 
 executeSamfile expr@(NGOString fname) args = do
     traceExpr "samfile" expr
     gname <- lookupStringOrScriptErrorDef (return fname) "samfile group name" "name" args
-    err <- liftIO (checkFileReadable (T.unpack fname))
-    whenJust err (throwDataError . T.unpack)
-    return $ NGOMappedReadSet gname (File . T.unpack $ fname) Nothing
+    headers <- lookupStringOrScriptErrorDef (return "") "samfile headers" "headers" args
+    let headers' = T.unpack headers
+        fname' = T.unpack fname
+    let checkf f = do
+            err <- liftIO (checkFileReadable f)
+            whenJust err (throwDataError . T.unpack)
+    checkf fname'
+    if null headers'
+        then return $ NGOMappedReadSet gname (File fname') Nothing
+        else do
+            checkf headers'
+            return $ NGOMappedReadSet gname (Stream fname' ((CB.sourceFile headers' >> CB.sourceFile fname') .| linesCBounded)) Nothing
 executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show args)
 
 data PreprocessPairOutput = Paired !ShortRead !ShortRead | Single !ShortRead

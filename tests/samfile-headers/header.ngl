@@ -1,0 +1,3 @@
+ngless '0.7'
+write(samfile('headerless.sam', headers='headers'), ofile='output.sam')
+

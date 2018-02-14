@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 module BuiltinFunctions
@@ -89,6 +89,10 @@ fastqArgs =
 
 samfileArgs =
     [ArgInformation "name" False NGLString []
+    ,ArgInformation "headers" False NGLString
+                    [ArgCheckMinVersion (0,7)
+                    ,ArgCheckFileReadable
+                    ]
     ]
 pairedArgs =
     [ArgInformation "second" True NGLString []

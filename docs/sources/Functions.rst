@@ -104,12 +104,31 @@ Loads a SAM file::
 
     s = samfile('input.sam')
 
-This function takes no keyword arguments. BAM files are also supported (determined by the filename), as are ``sam.gz`` files.
+This function takes no keyword arguments. BAM files are also supported
+(determined by the filename), as are ``sam.gz`` files.
 
 Returns
 ~~~~~~~
 
 MappedReadSet
+
+Arguments by value:
+~~~~~~~~~~~~~~~~~~~
++---------------+----------------------+------------+----------------+
+| Name          | Type                 | Required   | Default Value  |
++===============+======================+============+================+
+| name          | String               |  no        | -              |
++---------------+----------------------+------------+----------------+
+| header        | String               |  no        | -              |
++---------------+----------------------+------------+----------------+
+
+.. versionadded:: 0.7
+    The ``header`` argument was added in version 0.7
+
+- The ``name`` argument names the group (for ``count()``, for example).
+- The ``headers`` argument can be used if the SAM headers are kept in a
+  separate file.
+
 
 qcstats
 -------
