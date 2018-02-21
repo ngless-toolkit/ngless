@@ -25,6 +25,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 
 import Interpretation.Count
+import FileOrStream (FileOrStream(..))
 import Tests.Utils
 import Utils.Here
 import NGLess
@@ -51,7 +52,7 @@ runSamGffAnnotation sam_content gff_content opts = do
     sam_fp <- asTempFile sam_content "sam"
     gff_fp <- asTempFile gff_content "gff"
     ann <- loadAnnotator (AnnotateGFF gff_fp) opts
-    p <- performCount sam_fp "testing" ann opts
+    p <- performCount (File sam_fp) "testing" ann opts
     liftIO $ readCountFile p
 
 listNub :: (Ord a) => [a] -> [a]
@@ -118,7 +119,7 @@ case_count_two = do
         gff <- asTempFile short1 "gff"
         samf <- asTempFile short_sam "sam"
         ann <- loadAnnotator (AnnotateGFF gff) opts
-        cfp <- performCount samf "testing" ann opts
+        cfp <- performCount (File samf) "testing" ann opts
         liftIO (readCountFile cfp)
     c @?= M.fromList [("WBGene00002254", 2)]
 

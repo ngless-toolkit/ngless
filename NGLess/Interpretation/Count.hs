@@ -73,7 +73,6 @@ import NGLess
 import Utils.Utils
 import Utils.Vector
 import Utils.Conduit
-import Utils.Samtools
 import Utils.Suggestion
 import qualified Utils.IntGroups as IG
 
@@ -270,7 +269,6 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
         Just (NGOString sf) -> return $ Just [sf]
         Just (NGOList subfeats') -> Just <$> mapM (stringOrTypeError "count subfeatures argument") subfeats'
         _ -> throwShouldNotOccur "executeAnnotation: TYPE ERROR"
-    samfp <- asFile istream
     let opts = CountOpts
             { optFeatures = map (B8.pack . T.unpack) fs
             , optSubFeatures = map (B8.pack . T.unpack) <$> subfeatures
@@ -286,7 +284,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
             }
     amode <- annotationMode (optFeatures opts) refinfo mocatMap gffFile
     annotators <- loadAnnotator amode opts
-    NGOCounts . File <$> performCount samfp rname annotators opts
+    NGOCounts . File <$> performCount istream rname annotators opts
 executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
 
@@ -425,17 +423,16 @@ splitSingletons method values = (singles, mms)
         larger1 _   = True
 
 
-performCount :: FilePath -> T.Text -> [Annotator] -> CountOpts -> NGLessIO FilePath
-performCount samfp gname annotators0 opts = do
+performCount :: FileOrStream -> T.Text -> [Annotator] -> CountOpts -> NGLessIO FilePath
+performCount istream gname annotators0 opts = do
     outputListLno' TraceOutput ["Starting count..."]
     numCapabilities <- liftIO getNumCapabilities
     let mapthreads = max 1 (numCapabilities - 1)
         method = optMMMethod opts
         delim = optDelim opts
-
+        (samfp, samStream) = asSamStream istream
     (toDistribute, mcounts, annotators) <- C.runConduit $
-        samBamConduit samfp
-            .| linesC
+        samStream
             .| do
                 annotators <-
                     C.takeWhile (isSamHeaderString . unwrapByteLine)

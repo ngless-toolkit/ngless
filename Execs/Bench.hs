@@ -19,6 +19,7 @@ import NGLess (NGLessIO, testNGLessIO)
 import Interpretation.Count (performCount, MMMethod(..), loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), Annotator(..), NMode(..))
 import Interpretation.Substrim (substrim)
 import Interpret (interpret)
+import FileOrStream (FileOrStream(..))
 import Parse (parsengless)
 import Language (Script(..))
 import Data.Sam (readSamLine, readSamGroupsC, samStatsC)
@@ -85,7 +86,7 @@ main = setupTestEnvironment >> defaultMain [
         ]
     ,bgroup "fastq"
         [ bench "fastqStats" $ nfNGLessIO (statsFromFastQ "test_samples/sample.fq.gz" SangerEncoding)
-        , bench "preprocess" $ nfNGLessScript "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
+        , bench "preprocess" $ nfNGLessScript                          "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
         , bench "preprocess-transformed" $ nfNGLessScriptWithTransform "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
         , bench "preprocess-pair" $ nfNGLessScript
                 "p = paired('test_samples/sample.fq.gz', 'test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n"
@@ -97,9 +98,9 @@ main = setupTestEnvironment >> defaultMain [
         ]
     ,bgroup "count"
         [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap "test_samples/functional.map" ["ko", "cog"])
-        , bench "annotate-seqname" . nfNGLessIO $ performCount "test_samples/sample.sam" "testing" [SeqNameAnnotator Nothing] basicCountOpts
+        , bench "annotate-seqname" . nfNGLessIO $ performCount (File "test_samples/sample.sam") "testing" [SeqNameAnnotator Nothing] basicCountOpts
         , bench "annotate-functionalmap" . nfNGLessIO $ do
                     amap <- loadFunctionalMap "test_samples/functional.map" ["ko", "cog"]
-                    performCount "test_samples/sample.sam" "testing" amap basicCountOpts
+                    performCount (File "test_samples/sample.sam") "testing" amap basicCountOpts
         ]
     ]
