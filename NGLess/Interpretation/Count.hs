@@ -5,6 +5,7 @@
 module Interpretation.Count
     ( executeCount
     , executeCountFile
+#ifdef IS_BUILDING_TEST
     , Annotator(..)
     , CountOpts(..)
     , AnnotationMode(..)
@@ -16,6 +17,7 @@ module Interpretation.Count
     , loadFunctionalMap
     , performCount
     , RefSeqInfo(..)
+#endif
     ) where
 
 import qualified Data.ByteString as B
@@ -44,9 +46,9 @@ import qualified Data.Conduit.List as CL
 import           Data.Conduit ((.|), (=$=))
 import qualified Data.Strict.Tuple as TU
 import           Data.Strict.Tuple (Pair(..))
+import           Control.Monad (when, unless, forM, forM_)
 
 
-import Control.Monad
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
@@ -244,7 +246,7 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
     mocatMap <- lookupFilePath "functional_map argument to count()" "functional_map" args
     gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
     discardZeros <- lookupBoolOrScriptErrorDef (return False) "count argument parsing" "discard_zeros" args
-    m <- liftM annotationRule $ decodeSymbolOrError "mode argument to count"
+    m <- fmap annotationRule $ decodeSymbolOrError "mode argument to count"
                     [("union", IntersectUnion)
                     ,("intersection_strict", IntersectStrict)
                     ,("intersection_non_empty", IntersectNonEmpty)
