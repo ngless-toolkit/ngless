@@ -333,7 +333,11 @@ performCount1Pass MMDist1 mcounts = loop []
 enumerate :: (Monad m) => C.Conduit a m (Int, a)
 enumerate = loop 0
     where
-        loop !n = awaitJust $ \v -> C.yield (n, v) >> loop (n+1)
+        loop !n = C.await >>= \case
+                                Nothing -> return ()
+                                Just v -> do
+                                    C.yield (n, v)
+                                    loop (n+1)
 
 
 -- | This is a version of C.sequenceSinks which optimizes the case where a
@@ -348,7 +352,7 @@ annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annS
     where
         annSamHeaderParser1 (SeqNameAnnotator Nothing) = do
             headers <-
-                asyncMapEitherC mapthreads (V.mapM seqNameSize)
+                asyncMapEitherC mapthreads (\(!vi,v) -> V.imapM (\ix ell -> seqNameSize (vi*32768+ix, ell)) v)
                 .| CC.sinkList
             vsorted <- liftIO $ do
                 v <- V.unsafeThaw $ V.concat headers
@@ -358,13 +362,13 @@ annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annS
         annSamHeaderParser1 (GeneMapAnnotator gmap isizes)
             | optNormMode opts == NMNormed = do
                 msizes <- liftIO $ V.thaw isizes
-                asyncMapEitherC mapthreads (\headers -> flattenVs <$> V.mapM (indexUpdates gmap) headers)
-                    =$= CL.mapM_ (liftIO . updateSizes msizes)
+                asyncMapEitherC mapthreads (\(!vi,headers) -> flattenVs <$> V.imapM (\ix ell -> indexUpdates gmap (vi*32768+ix, ell)) headers)
+                    .| CL.mapM_ (liftIO . updateSizes msizes)
                 GeneMapAnnotator gmap <$> liftIO (V.unsafeFreeze msizes)
         annSamHeaderParser1 ann = C.sinkNull >> return ann
         lineGroups = CL.filter (B.isPrefixOf "@SQ\tSN:" . unwrapByteLine)
-                    =$= enumerate
-                    =$= C.conduitVector 32768
+                    .| C.conduitVector 32768
+                    .| enumerate
         flattenVs :: VU.Unbox a => V.Vector [a] -> VU.Vector a
         flattenVs chunks = VU.unfoldr getNext (0,[])
             where
