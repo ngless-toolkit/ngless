@@ -425,6 +425,14 @@ splitSingletons method values = (singles, mms)
         larger1 _   = True
 
 
+takeWhileC :: Monad m => (a -> Bool) -> C.Conduit a m a
+takeWhileC f = loop
+    where
+        loop = C.await >>= maybe (return ()) (\v ->
+                    if f v
+                        then C.yield v >> loop
+                        else C.leftover v)
+
 performCount :: FileOrStream -> T.Text -> [Annotator] -> CountOpts -> NGLessIO FilePath
 performCount istream gname annotators0 opts = do
     outputListLno' TraceOutput ["Starting count..."]
@@ -437,7 +445,7 @@ performCount istream gname annotators0 opts = do
         samStream
             .| do
                 annotators <-
-                    C.takeWhile (isSamHeaderString . unwrapByteLine)
+                    takeWhileC (isSamHeaderString . unwrapByteLine)
                         .| annSamHeaderParser mapthreads annotators0 opts
                 lift $ outputListLno' TraceOutput ["Loaded headers. Starting parsing/distribution."]
                 mcounts <- forM annotators $ \ann -> do
