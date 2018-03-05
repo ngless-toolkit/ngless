@@ -16,12 +16,11 @@ module Interpretation.Count
     , loadAnnotator
     , loadFunctionalMap
     , performCount
-    , RefSeqInfo(..)
+    , RSV.RefSeqInfo(..)
 #endif
     ) where
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Short as BS
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as BL
@@ -29,7 +28,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
 import qualified Data.Vector as V
-import qualified Data.Vector.Mutable as VM
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Unboxed.Mutable as VUM
 import qualified Data.Vector.Algorithms.Intro as VA
@@ -39,7 +37,6 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
 import qualified Data.Conduit as C
-import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
@@ -77,6 +74,7 @@ import Utils.Vector
 import Utils.Conduit
 import Utils.Suggestion
 import qualified Utils.IntGroups as IG
+import qualified Interpretation.Count.RefSeqInfoVector as RSV
 
 #ifndef WINDOWS
 import Data.Double.Conversion.ByteString (toShortest)
@@ -131,37 +129,10 @@ data CountOpts =
 data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctionalMap FilePath
     deriving (Eq, Show)
 
-
-data RefSeqInfo = RefSeqInfo
-                        { rsiName :: {-# UNPACK #-} !BS.ShortByteString
-                        , rsiSize :: {-# UNPACK #-} !Double
-                        } deriving (Eq, Show)
-instance NFData RefSeqInfo where
-    rnf !_ = ()
-
-instance Ord RefSeqInfo where
-    compare RefSeqInfo{ rsiName = n0 } RefSeqInfo{ rsiName = n1 } = compare n0 n1
-
-
-compareShortLong  :: RefSeqInfo -> B.ByteString -> Ordering
-compareShortLong (RefSeqInfo short _) long = loop 0
-    where
-        n1 = BS.length short
-        n2 = B.length long
-        n = min n1 n2
-        loop i
-            | i == n = compare n1 n2
-            | otherwise = let cur = compare (BS.index short i) (B.index long i) in
-                                if cur == EQ
-                                    then loop (i + 1)
-                                    else cur
-
-
 data Annotator =
-                SeqNameAnnotator (Maybe (V.Vector RefSeqInfo)) -- ^ Just annotate by sequence names
+                SeqNameAnnotator (Maybe RSV.RefSeqInfoVector) -- ^ Just annotate by sequence names
                 | GFFAnnotator GFFAnnotationMap [B.ByteString] FeatureSizeMap -- ^ map reference regions to features + feature sizes
-                | GeneMapAnnotator GeneMapAnnotation (V.Vector RefSeqInfo) -- ^ map reference (gene names) to indices, indexing into the vector of refseqinfo
-    deriving (Eq, Show)
+                | GeneMapAnnotator GeneMapAnnotation RSV.RefSeqInfoVector -- ^ map reference (gene names) to indices, indexing into the vector of refseqinfo
 instance NFData Annotator where
     rnf (SeqNameAnnotator m) = rnf m
     rnf (GFFAnnotator amap headers szmap) = amap `seq` rnf headers `seq` rnf szmap -- amap is already strict
@@ -177,9 +148,9 @@ annotateReadGroup opts ann samlines = add1 . listNub <$> case ann of
         -- this is because "unmatched" is -1
         add1 [] = [0]
         add1 vs = (+ 1) <$> vs
-        getID :: V.Vector RefSeqInfo -> SamLine -> Either NGError (Maybe Int)
+        getID :: RSV.RefSeqInfoVector -> SamLine -> Either NGError (Maybe Int)
         getID szmap sr@SamLine{samRName = rname }
-            | isAligned sr = case binarySearchByExact compareShortLong szmap rname of
+            | isAligned sr = case RSV.lookup szmap rname of
                     Nothing -> throwDataError ("Unknown sequence id: " ++ show rname)
                     ix -> return ix
         getID _ _ = Right Nothing
@@ -194,7 +165,7 @@ annSizeOf (GFFAnnotator _ _ szmap) name = case M.lookup name szmap of
     Just s -> return s
     Nothing -> throwShouldNotOccur ("Header does not exist in sizes: "++show name)
 annSizeOf (GeneMapAnnotator _ ix) name = annSizeOfInRSVector name ix
-annSizeOfInRSVector name ix = rsiSize <$> note (NGError DataError $ "Could not find size of item ["++B8.unpack name++"]") (binaryFindBy compareShortLong ix name)
+annSizeOfInRSVector name vec = RSV.retrieveSize vec <$> note (NGError DataError $ "Could not find size of item ["++B8.unpack name++"]") (RSV.lookup vec name)
 
 
 annEnumerate :: Annotator -> [(B.ByteString, Int)]
@@ -202,12 +173,12 @@ annEnumerate (SeqNameAnnotator Nothing)   = error "Using unfinished annotator"
 annEnumerate (SeqNameAnnotator (Just ix)) = ("-1",0):enumerateRSVector ix
 annEnumerate (GeneMapAnnotator _ ix)      = ("-1",0):enumerateRSVector ix
 annEnumerate (GFFAnnotator _ headers _)   = zip ("-1":headers) [0..]
-enumerateRSVector ix = V.toList . flip V.imap ix $ \i rs -> (BS.fromShort $ rsiName rs, i + 1)
+enumerateRSVector rfv = [(RSV.retrieveName rfv i, i + 1) | i <- [0.. RSV.length rfv - 1]]
 
 -- Number of elements
 annSize :: Annotator -> Int
-annSize (SeqNameAnnotator (Just ix)) = V.length ix + 1
-annSize (GeneMapAnnotator _ ix) = V.length ix + 1
+annSize (SeqNameAnnotator (Just rfv)) = RSV.length rfv + 1
+annSize (GeneMapAnnotator _ rfv) = RSV.length rfv + 1
 annSize ann = length (annEnumerate ann)
 
 
@@ -330,8 +301,8 @@ performCount1Pass MMDist1 mcounts = loop []
                                 else acc
 
 -- | Equivalent to Python's enumerate
-enumerate :: (Monad m) => C.Conduit a m (Int, a)
-enumerate = loop 0
+enumerateC :: (Monad m) => C.Conduit a m (Int, a)
+enumerateC = loop 0
     where
         loop !n = C.await >>= \case
                                 Nothing -> return ()
@@ -351,24 +322,25 @@ annSamHeaderParser :: Int -> [Annotator] -> CountOpts -> C.Sink ByteLine NGLessI
 annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annSamHeaderParser1 anns)
     where
         annSamHeaderParser1 (SeqNameAnnotator Nothing) = do
-            headers <-
-                asyncMapEitherC mapthreads (\(!vi,v) -> V.imapM (\ix ell -> seqNameSize (vi*32768+ix, ell)) v)
-                .| CC.sinkList
+            rfvm <- liftIO RSV.newRefSeqInfoVector
+            asyncMapEitherC mapthreads (\(!vi, v) -> V.imapM (\ix ell -> seqNameSize (vi*32768+ix, ell)) v)
+                .| CL.mapM_ (\v -> liftIO $
+                                    V.forM_ v $ \(RSV.RefSeqInfo n val) ->
+                                        RSV.insert rfvm n val)
             vsorted <- liftIO $ do
-                v <- V.unsafeThaw $ V.concat headers
-                sortParallel mapthreads v
-                V.unsafeFreeze v
+                RSV.sort rfvm
+                RSV.unsafeFreeze rfvm
             return $! SeqNameAnnotator (Just vsorted)
         annSamHeaderParser1 (GeneMapAnnotator gmap isizes)
             | optNormMode opts == NMNormed = do
-                msizes <- liftIO $ V.thaw isizes
+                msizes <- liftIO $ RSV.unsafeThaw isizes
                 asyncMapEitherC mapthreads (\(!vi,headers) -> flattenVs <$> V.imapM (\ix ell -> indexUpdates gmap (vi*32768+ix, ell)) headers)
                     .| CL.mapM_ (liftIO . updateSizes msizes)
-                GeneMapAnnotator gmap <$> liftIO (V.unsafeFreeze msizes)
-        annSamHeaderParser1 ann = C.sinkNull >> return ann
+                GeneMapAnnotator gmap <$> liftIO (RSV.unsafeFreeze msizes)
+        annSamHeaderParser1 ann = CC.sinkNull >> return ann
         lineGroups = CL.filter (B.isPrefixOf "@SQ\tSN:" . unwrapByteLine)
-                    .| C.conduitVector 32768
-                    .| enumerate
+                    .| CC.conduitVector 32768
+                    .| enumerateC
         flattenVs :: VU.Unbox a => V.Vector [a] -> VU.Vector a
         flattenVs chunks = VU.unfoldr getNext (0,[])
             where
@@ -377,21 +349,21 @@ annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annS
                     | vi >= V.length chunks = Nothing
                     | otherwise = getNext (vi + 1, chunks V.! vi)
 
-        updateSizes :: VM.IOVector RefSeqInfo -> VU.Vector (Int,Double) -> IO ()
+        updateSizes :: RSV.RefSeqInfoVectorMutable -> VU.Vector (Int,Double) -> IO ()
         updateSizes msizes updates =
-            VU.forM_ updates $ \(ix,val) ->
-                VM.modify msizes (rsiAdd val) ix
-        rsiAdd !val rsi@RefSeqInfo{ rsiSize = cur } = rsi { rsiSize = cur + val }
+            VU.forM_ updates $ \(ix,val) -> do
+                cur <- RSV.retrieveSizeIO msizes ix
+                RSV.writeSizeIO msizes ix (cur + val)
 
         indexUpdates :: GeneMapAnnotation -> (Int, ByteLine) -> NGLess [(Int, Double)]
         indexUpdates gmap line = do
-            RefSeqInfo seqid val <- seqNameSize line
-            let ixs = fromMaybe [] $ M.lookup (BS.fromShort seqid) gmap
+            RSV.RefSeqInfo seqid val <- seqNameSize line
+            let ixs = fromMaybe [] $ M.lookup seqid gmap
             return [(ix,val) | ix <- ixs]
-        seqNameSize :: (Int, ByteLine) -> NGLess RefSeqInfo
+        seqNameSize :: (Int, ByteLine) -> NGLess RSV.RefSeqInfo
         seqNameSize (n, ByteLine h) = case B8.split '\t' h of
                 [_,seqname,sizestr] -> case B8.readInt (B.drop 3 sizestr) of
-                    Just (size, _) -> return $! RefSeqInfo (BS.toShort $ B.drop 3 seqname) (convert size)
+                    Just (size, _) -> return $! RSV.RefSeqInfo (B.drop 3 seqname) (convert size)
                     Nothing -> throwDataError ("Could not parse sequence length in header (line: " ++ show n ++ ")")
                 _ -> throwDataError ("SAM file does not contain the right number of tokens (line: " ++ show n ++ ")")
 
@@ -566,14 +538,14 @@ loadFunctionalMap fname columns = do
         anns <- C.runConduit $
                     CB.sourceFile fname
                     .| CB.lines
-                    .| enumerate
+                    .| enumerateC
                     .| (do
                         hline <- CL.head
                         cis <- case hline of
                             Nothing -> throwDataError ("Empty map file: "++fname)
                             Just (_, header) -> let headers = B8.split '\t' header
                                                     in runNGLess $ lookUpColumns headers
-                        C.conduitVector 8192
+                        CC.conduitVector 8192
                             .| asyncMapEitherC mapthreads (V.mapM (selectColumns cis)) -- after this we have vectors of (<gene name>, [<feature-name>])
                             .| sequenceSinks
                                 [finishFunctionalMap <$> CL.fold (V.foldl' (inserts1 c)) (LoadFunctionalMapState 0 M.empty M.empty) | c <- [0 .. length cis - 1]])
@@ -582,7 +554,7 @@ loadFunctionalMap fname columns = do
     where
         finishFunctionalMap (LoadFunctionalMapState _ gmap namemap) = GeneMapAnnotator
                                                                             (reindex gmap namemap)
-                                                                            (V.fromList [RefSeqInfo (BS.toShort n) 0.0 | n <- M.keys namemap])
+                                                                            (RSV.fromList [RSV.RefSeqInfo n 0.0 | n <- M.keys namemap])
         reindex :: M.Map B.ByteString [Int] -> M.Map B.ByteString Int -> M.Map B.ByteString [Int]
         reindex gmap namemap = M.map (map reindex1) gmap
             where

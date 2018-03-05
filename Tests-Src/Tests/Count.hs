@@ -11,7 +11,6 @@ import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Set as S
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
-import qualified Data.Vector as V
 import qualified Data.Map as M
 
 import qualified Data.Conduit.Combinators as C
@@ -25,6 +24,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 
 import Interpretation.Count
+import qualified Interpretation.Count.RefSeqInfoVector as RSV
 import FileOrStream (FileOrStream(..))
 import Tests.Utils
 import Utils.Here
@@ -210,6 +210,16 @@ case_gff_dist1_dist1_to_4 = do
     c <- testNGLessIO $ runSamGffAnnotation samAmbiguous3 gff1 defCountOpts { optFeatures  = ["gene"], optMMMethod = MMDist1 }
     c @?= M.fromList [("Gene100", 3.75), ("Gene300", 1.25)]
 
+case_rsv_1 = do
+    v <- RSV.newRefSeqInfoVector
+    RSV.insert v (B.take 5 "hello SLICE") 1.0 
+    RSV.insert v "world" 2.0 
+    RSV.sort v
+    fv <- RSV.unsafeFreeze v
+    RSV.length fv @?= 2
+    RSV.lookup fv "hello" @?= Just 0
+    RSV.retrieveSize fv 0 @?= 1.0
+
 
 simple_map = [here|
 #gene	cog	ko	module
@@ -222,4 +232,4 @@ case_load_map = do
         map_fp <- asTempFile simple_map "map"
         loadFunctionalMap map_fp ["ko"]
     let Just [ix] = M.lookup "gene1" nmap
-    rsiName (names V.! ix) @?= "NA"
+    RSV.retrieveName names ix @?= "NA"

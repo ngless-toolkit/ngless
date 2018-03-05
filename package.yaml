@@ -49,6 +49,8 @@ dependencies:
   - http-conduit
   - http-client
   - IntervalMap >=0.5
+  - inline-c
+  - inline-c-cpp
   - monad-control
   - mtl >=2.2
   - MissingH >=1.3
