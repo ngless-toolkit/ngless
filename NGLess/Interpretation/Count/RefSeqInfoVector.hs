@@ -32,13 +32,14 @@ import qualified Data.ByteString as B
 import           Foreign.Ptr
 import           Foreign.ForeignPtr
 import           System.IO.Unsafe (unsafeDupablePerformIO)
+import qualified Language.C.Inline.Context as C
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
 
 
 foreign import ccall "&rsiv_free" c_rsiv_free :: FunPtr (Ptr () -> IO ())
 
-C.context (C.baseCtx <> C.bsCtx <> C.cppCtx)
+C.context (C.baseCtx <> C.bsCtx <> C.fptrCtx <> C.cppCtx)
 C.include "RefSeqInfoVector.h"
 
 data RefSeqInfo = RefSeqInfo
@@ -65,15 +66,14 @@ newRefSeqInfoVector = do
     RefSeqInfoVectorMutable <$> newForeignPtr c_rsiv_free (p :: Ptr ())
 
 insert :: RefSeqInfoVectorMutable -> B.ByteString -> Double -> IO ()
-insert (RefSeqInfoVectorMutable f) bs val =
-    withForeignPtr f $ \p -> do
+insert (RefSeqInfoVectorMutable p) bs val = do
         let val' :: CDouble
             val' = CDouble val
-        [C.catchBlock| { static_cast<RefSeqInfoVector*>($(void* p))->insert(std::string($bs-ptr:bs, $bs-len:bs), $(double val')); } |]
+        [C.catchBlock| { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->insert(std::string($bs-ptr:bs, $bs-len:bs), $(double val')); } |]
 
 sort :: RefSeqInfoVectorMutable -> IO ()
-sort (RefSeqInfoVectorMutable f) = withForeignPtr f $ \p -> [C.block| void {
-            RefSeqInfoVector* vec = static_cast<RefSeqInfoVector*>($(void* p));
+sort (RefSeqInfoVectorMutable p) = [C.block| void {
+            RefSeqInfoVector* vec = static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p));
             vec->sort();
     }|]
 
@@ -87,8 +87,8 @@ lookup :: RefSeqInfoVector -> B.ByteString -> Maybe Int
 lookup r k = unsafeDupablePerformIO (lookupRefSeqInfoIO r k)
 
 lookupRefSeqInfoIO :: RefSeqInfoVector -> B.ByteString -> IO (Maybe Int)
-lookupRefSeqInfoIO (RefSeqInfoVector v) key = withForeignPtr v $ \p -> do
-    CInt ix <- [C.exp| int { static_cast<RefSeqInfoVector*>($(void* p))->find($bs-ptr:key) } |]
+lookupRefSeqInfoIO (RefSeqInfoVector p) key = do
+    CInt ix <- [C.exp| int { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->find($bs-ptr:key) } |]
     return $! if ix == -1
         then Nothing
         else Just (fromEnum ix)
@@ -97,25 +97,25 @@ retrieveSize :: RefSeqInfoVector -> Int -> Double
 retrieveSize (RefSeqInfoVector r) ix = unsafeDupablePerformIO (retrieveSizeIO (RefSeqInfoVectorMutable r) ix)
 
 retrieveSizeIO :: RefSeqInfoVectorMutable -> Int -> IO Double
-retrieveSizeIO (RefSeqInfoVectorMutable v) ix = withForeignPtr v $ \p -> do
+retrieveSizeIO (RefSeqInfoVectorMutable p) ix = do
     let ix' = toEnum ix
-    CDouble val <- [C.exp| double { static_cast<RefSeqInfoVector*>($(void* p))->at($(int ix')).val } |]
+    CDouble val <- [C.exp| double { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->at($(int ix')).val } |]
     return val
 
 writeSizeIO :: RefSeqInfoVectorMutable -> Int -> Double -> IO ()
-writeSizeIO (RefSeqInfoVectorMutable v) ix val = withForeignPtr v $ \p -> do
+writeSizeIO (RefSeqInfoVectorMutable p) ix val = do
     let val' = CDouble val
         ix' = toEnum ix
-    [C.catchBlock| { static_cast<RefSeqInfoVector*>($(void* p))->at($(int ix')).val = $(double val'); } |]
+    [C.catchBlock| { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->at($(int ix')).val = $(double val'); } |]
 
 length :: RefSeqInfoVector -> Int
-length (RefSeqInfoVector v) = unsafeDupablePerformIO $ withForeignPtr v $ \p ->
-    fromEnum <$> [C.exp| unsigned int { static_cast<RefSeqInfoVector*>($(void* p))->size() } |]
+length (RefSeqInfoVector p) = unsafeDupablePerformIO $
+    fromEnum <$> [C.exp| unsigned int { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->size() } |]
 
 retrieveName :: RefSeqInfoVector -> Int -> B.ByteString
-retrieveName (RefSeqInfoVector v) ix = unsafeDupablePerformIO $ withForeignPtr v $ \p -> do
+retrieveName (RefSeqInfoVector p) ix = unsafeDupablePerformIO $ do
     let ix' = toEnum ix
-    [C.exp| const char* {static_cast<RefSeqInfoVector*>($(void* p))->at($(int ix')).str.c_str() } |] >>= B.packCString
+    [C.exp| const char* {static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->at($(int ix')).str.c_str() } |] >>= B.packCString
 
 fromList :: [RefSeqInfo] -> RefSeqInfoVector
 fromList entries = unsafeDupablePerformIO $ do
