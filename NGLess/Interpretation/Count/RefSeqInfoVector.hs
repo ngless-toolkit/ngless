@@ -88,7 +88,7 @@ lookup r k = unsafeDupablePerformIO (lookupRefSeqInfoIO r k)
 
 lookupRefSeqInfoIO :: RefSeqInfoVector -> B.ByteString -> IO (Maybe Int)
 lookupRefSeqInfoIO (RefSeqInfoVector p) key = do
-    CInt ix <- [C.exp| int { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->find($bs-ptr:key) } |]
+    CInt ix <- [C.exp| int { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->find(std::string($bs-ptr:key, $bs-len:key).c_str()) } |]
     return $! if ix == -1
         then Nothing
         else Just (fromEnum ix)
@@ -115,7 +115,7 @@ length (RefSeqInfoVector p) = unsafeDupablePerformIO $
 retrieveName :: RefSeqInfoVector -> Int -> B.ByteString
 retrieveName (RefSeqInfoVector p) ix = unsafeDupablePerformIO $ do
     let ix' = toEnum ix
-    [C.exp| const char* {static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->at($(int ix')).str.c_str() } |] >>= B.packCString
+    [C.exp| const char* {static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->at($(int ix')).str } |] >>= B.packCString
 
 fromList :: [RefSeqInfo] -> RefSeqInfoVector
 fromList entries = unsafeDupablePerformIO $ do

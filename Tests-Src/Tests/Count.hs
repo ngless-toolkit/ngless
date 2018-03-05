@@ -218,7 +218,9 @@ case_rsv_1 = do
     fv <- RSV.unsafeFreeze v
     RSV.length fv @?= 2
     RSV.lookup fv "hello" @?= Just 0
+    RSV.lookup fv (B.take 5 "hello SLICE2") @?= Just 0
     RSV.retrieveSize fv 0 @?= 1.0
+    RSV.lookup fv "world" @?= Just 1
 
 
 simple_map = [here|

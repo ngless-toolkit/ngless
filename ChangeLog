@@ -11,6 +11,7 @@ Version 0.6.1+
 	* Fix as_reads() for single-end reads
 	* Add headers argument to samfile()
 	* For more situations, avoid intermediate copies in count()
+	* Much improved memory and speed performance of count()
 
 Version 0.6.1 2017-12-10 by luispedro
 	* Add --check-install mode
