@@ -62,6 +62,7 @@ downloadableModules = -- Should this be merged with knownModules?
     ]
 
 
+-- | Basic file types
 data FileTypeBase =
     FastqFileSingle
     | FastqFilePair
@@ -104,7 +105,7 @@ data CommandExtra = FlagInfo [T.Text]
 
 data CommandArgument = CommandArgument
         { cargInfo :: ArgInformation
-        , cargDef :: Maybe NGLessObject
+        , cargDef :: Maybe NGLessObject -- ^ default value
         , cargPayload :: Maybe CommandExtra
         }
     deriving (Eq, Show)
@@ -170,9 +171,9 @@ instance Aeson.FromJSON CommandReturn where
             else CommandReturn t <$> o .: "name" <*> o .: "extension"
 
 data Command = Command
-    { nglName :: T.Text
-    , arg0 :: FilePath
-    , arg1 :: CommandArgument
+    { nglName :: T.Text         -- ^ what function is called inside ngless
+    , arg0 :: FilePath          -- ^ what the script is
+    , arg1 :: CommandArgument   -- ^ all ngless functions take an argument
     , additional :: [CommandArgument]
     , ret :: CommandReturn
     } deriving (Eq, Show)
@@ -406,7 +407,7 @@ validateModule :: ExternalModule -> NGLessIO ()
 validateModule  em@ExternalModule{..} = do
     checkSyntax em
     whenJust initCmd $ \initCmd' -> do
-        outputListLno' TraceOutput ("Running initialization for module ":show emInfo:" ":initCmd':" ":initArgs)
+        outputListLno' DebugOutput ("Running initialization for module ":show emInfo:" ":initCmd':" ":initArgs)
         env <- nglessEnv modulePath
         (exitCode, out, err) <- liftIO $
             readCreateProcessWithExitCode (proc (modulePath </> initCmd') initArgs) { env = Just env } ""
