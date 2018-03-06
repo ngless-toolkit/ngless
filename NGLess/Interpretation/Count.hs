@@ -260,7 +260,8 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
     NGOCounts . File <$> performCount istream rname annotators opts
 executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
-
+-- | The include_minus1 argument defaulted to False up to version 0.5. Now, it
+-- defaults to true as it seems to be what most users expect.
 defaultMinus1 :: NGLessIO Bool
 defaultMinus1 = do
     v <- ngleVersion <$> nglEnvironment
