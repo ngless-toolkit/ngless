@@ -1,4 +1,4 @@
-Version 0.6.1+
+Version 0.7.0 2018-03-07 by luispedro
 	* Add 'failed' files to parallel lock1()
 	* Add `max_trim` argument to MappedReadSet.filter()
 	* Support saving compressed SAM files

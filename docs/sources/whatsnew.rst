@@ -3,11 +3,31 @@ What's New (History)
 ====================
 
 
-After version 0.6 (unreleased)
-------------------------------
+Version 0.7
+-----------
+
+Released Mar 7 2018
+
+New functionality in NGLess language
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 - Added `max_trim <methods.html>`__ argument to ``filter`` method of
   ``MappedReadSet``.
+- Support saving compressed SAM files
+- Support for saving interleaved FastQ files
+- Compute number Basepairs in FastQ stats
+- Add ``headers`` argument to `samfile function <Functions.html#samfile>`__
+
+Bug fixes
+~~~~~~~~~
+
+- Fix ``count``'s mode ``{intersection_strict}`` to no longer behave as ``{union}``
+- Fix ``as_reads()`` for single-end reads
+- Fix ``select()`` corner case
+
+In addition, this release also improves both speed and memory usage.
+
 
 Version 0.6
 -----------
