@@ -343,9 +343,11 @@ mergeCounts ss = do
         step :: CResSourceBPair -> NGLessIO (Maybe (B.ByteString, B.ByteString, CResSourceBPair))
         step s = do
             (s', val) <- s $$++ CC.head
-            return $! case val of
-              Just (h,v) -> Just (h, v, s')
-              Nothing -> Nothing
+            case val of
+              Just (h,v) -> return $ Just (h, v, s')
+              Nothing -> do
+                C.closeResumableSource s'
+                return Nothing
 
 pasteCounts :: [T.Text] -> Bool -> [T.Text] -> [FilePath] -> NGLessIO FilePath
 pasteCounts comments matchingRows headers inputs
