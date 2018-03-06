@@ -35,7 +35,7 @@ import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.TQueue as CA
 import           Control.Monad.ST
-import           Control.Monad.Extra (allM, unlessM)
+import           Control.Monad.Extra (allM, unlessM, whenJust)
 import           Control.DeepSeq
 import           Data.Traversable
 import           Control.Concurrent (threadDelay)
@@ -329,19 +329,17 @@ mergeCounts ss = do
         go sources = do
             let nextH :: Maybe B.ByteString
                 nextH = minimumBy compareMaybe (map ((fst3 <$>) . fst) sources)
-            case nextH of
-                Nothing -> return ()
-                Just header -> do
-                    cn <- forM sources $ \(s, p) -> case s of
-                        Nothing -> return (p, (s, p))
-                        Just (h, v, s')
-                            | header == h -> do
-                                s'' <- lift $ step s'
-                                return (v, (s'', p))
-                            | otherwise -> return (p, (s, p))
-                    let (cur, next) = unzip cn
-                    C.yield $ ByteLine (B.concat (header:cur))
-                    go next
+            whenJust nextH $ \header -> do
+                cn <- forM sources $ \(s, p) -> case s of
+                    Nothing -> return (p, (s, p))
+                    Just (h, v, s')
+                        | header == h -> do
+                            s'' <- lift $ step s'
+                            return (v, (s'', p))
+                        | otherwise -> return (p, (s, p))
+                let (cur, next) = unzip cn
+                C.yield $ ByteLine (B.concat (header:cur))
+                go next
         step :: CResSourceBPair -> NGLessIO (Maybe (B.ByteString, B.ByteString, CResSourceBPair))
         step s = do
             (s', val) <- s $$++ CC.head
