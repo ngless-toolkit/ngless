@@ -33,6 +33,7 @@ import           Foreign.Ptr
 import           Foreign.ForeignPtr
 import           System.IO.Unsafe (unsafeDupablePerformIO)
 import qualified Language.C.Inline.Context as C
+import qualified Language.C.Inline.Unsafe as CU
 import qualified Language.C.Inline.Cpp as C
 import qualified Language.C.Inline.Cpp.Exceptions as C
 
@@ -72,7 +73,7 @@ insert (RefSeqInfoVectorMutable p) bs val = do
         [C.catchBlock| { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->insert(std::string($bs-ptr:bs, $bs-len:bs), $(double val')); } |]
 
 sort :: RefSeqInfoVectorMutable -> IO ()
-sort (RefSeqInfoVectorMutable p) = [C.block| void {
+sort (RefSeqInfoVectorMutable p) = [CU.block| void {
             RefSeqInfoVector* vec = static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p));
             vec->sort();
     }|]
@@ -84,12 +85,9 @@ unsafeThaw :: RefSeqInfoVector -> IO RefSeqInfoVectorMutable
 unsafeThaw (RefSeqInfoVector v) = return $ RefSeqInfoVectorMutable v
 
 lookup :: RefSeqInfoVector -> B.ByteString -> Maybe Int
-lookup r k = unsafeDupablePerformIO (lookupRefSeqInfoIO r k)
-
-lookupRefSeqInfoIO :: RefSeqInfoVector -> B.ByteString -> IO (Maybe Int)
-lookupRefSeqInfoIO (RefSeqInfoVector p) key = do
-    CInt ix <- [C.exp| int { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->find(std::string($bs-ptr:key, $bs-len:key).c_str()) } |]
-    return $! if ix == -1
+lookup (RefSeqInfoVector p) key = let
+    CInt ix = [CU.pure| int { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->find(std::string($bs-ptr:key, $bs-len:key).c_str()) } |]
+    in if ix == -1
         then Nothing
         else Just (fromEnum ix)
 
@@ -99,7 +97,7 @@ retrieveSize (RefSeqInfoVector r) ix = unsafeDupablePerformIO (retrieveSizeIO (R
 retrieveSizeIO :: RefSeqInfoVectorMutable -> Int -> IO Double
 retrieveSizeIO (RefSeqInfoVectorMutable p) ix = do
     let ix' = toEnum ix
-    CDouble val <- [C.exp| double { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->at($(int ix')).val } |]
+    CDouble val <- [CU.exp| double { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->at($(int ix')).val } |]
     return val
 
 writeSizeIO :: RefSeqInfoVectorMutable -> Int -> Double -> IO ()
@@ -109,13 +107,13 @@ writeSizeIO (RefSeqInfoVectorMutable p) ix val = do
     [C.catchBlock| { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->at($(int ix')).val = $(double val'); } |]
 
 length :: RefSeqInfoVector -> Int
-length (RefSeqInfoVector p) = unsafeDupablePerformIO $
-    fromEnum <$> [C.exp| unsigned int { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->size() } |]
+length (RefSeqInfoVector p) =
+    fromEnum [CU.pure| unsigned int { static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->size() } |]
 
 retrieveName :: RefSeqInfoVector -> Int -> B.ByteString
 retrieveName (RefSeqInfoVector p) ix = unsafeDupablePerformIO $ do
     let ix' = toEnum ix
-    [C.exp| const char* {static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->at($(int ix')).str } |] >>= B.packCString
+    [CU.exp| const char* {static_cast<RefSeqInfoVector*>($fptr-ptr:(void* p))->at($(int ix')).str } |] >>= B.packCString
 
 fromList :: [RefSeqInfo] -> RefSeqInfoVector
 fromList entries = unsafeDupablePerformIO $ do
