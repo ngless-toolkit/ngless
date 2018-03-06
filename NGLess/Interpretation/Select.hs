@@ -1,4 +1,4 @@
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2015-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -59,18 +59,22 @@ _parseConditions args = do
 _matchConditions :: MatchCondition -> [(SamLine,B.ByteString)] -> [(SamLine, B.ByteString)]
 _matchConditions _ r@[(SamHeader _,_)] = r
 _matchConditions (DropIf []) slines = slines
-_matchConditions (DropIf (c:cs)) slines = _matchConditions (DropIf cs) (_drop1 c slines)
+_matchConditions (DropIf (c:cs)) slines = _matchConditions (DropIf cs) (drop1 c slines)
 
 _matchConditions (KeepIf []) slines = slines
-_matchConditions (KeepIf (c:cs)) slines = _matchConditions (KeepIf cs) (_keep1 c slines)
+_matchConditions (KeepIf (c:cs)) slines = _matchConditions (KeepIf cs) (keep1 c slines)
 
-_drop1 SelectUnmapped = filter (isAligned . fst)
-_drop1 SelectMapped = filter (not . isAligned . fst)
-_drop1 SelectUnique = \g -> if isGroupUnique (map fst g) then [] else g
+drop1 SelectUnmapped g = filter (isAligned . fst) g
+drop1 SelectMapped g = if any (isAligned . fst) g
+                            then []
+                            else g
+drop1 SelectUnique g = if isGroupUnique (map fst g) then [] else g
 
-_keep1 SelectMapped = filter (isAligned . fst)
-_keep1 SelectUnmapped = filter (not . isAligned . fst)
-_keep1 SelectUnique = \g -> if isGroupUnique (map fst g) then g else []
+keep1 SelectMapped g = filter (isAligned . fst) g
+keep1 SelectUnmapped g = if any (isAligned . fst) g
+                            then []
+                            else g
+keep1 SelectUnique g = if isGroupUnique (map fst g) then g else []
 
 -- readSamGroupsAsConduit :: (MonadIO m, MonadResource m) => FileOrStream -> C.Producer m [(SamLine, B.ByteString)]
 -- The reason we cannot just use readSamGroupsC is that we want to get the unparsed ByteString on the side

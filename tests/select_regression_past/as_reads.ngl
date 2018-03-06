@@ -1,0 +1,4 @@
+ngless "0.7"
+
+write(as_reads(samfile('test.sam')), ofile='output.fq')
+write(as_reads(select(samfile('test.sam'), drop_if=[{mapped}])), ofile='output.unmapped.fq')
