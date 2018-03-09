@@ -55,37 +55,37 @@ build-and-test-ubuntu-non-static:
     - PATH=${PWD}/prefix-test/bin:$PATH ./run-tests.sh
 
 
-build-and-test-ubuntu-rolling:
-    image: registry.gitlab.com/ngless/ngless/ubuntu-ghc-stack:rolling
-    stage: build
-
-    before_script:
-    - apt update
-    - apt upgrade -y
-    - stack upgrade
-    - mkdir bin
-    # Needed for tests that print UTF8 characters such as motus
-    # Same issue as https://github.com/commercialhaskell/stack/issues/793
-
-    variables:
-        LC_ALL: "C.UTF-8"
-        STACKOPTS: "--system-ghc --ghc-options '-fPIC' --flag NGLess:embed"
-
-    retry: 2
-
-    script:
-    - make static
-    - make modules
-    - make check
-    - make install prefix=${PWD}
-    - PATH=${PWD}/bin:$PATH ./run-tests.sh
-
-    artifacts:
-        when: on_success
-        paths:
-        - bin/ngless
-        - Modules/packages/
-        expire_in: 1 month
+# build-and-test-ubuntu-rolling:
+#     image: registry.gitlab.com/ngless/ngless/ubuntu-ghc-stack:rolling
+#     stage: build
+#
+#     before_script:
+#     - apt update
+#     - apt upgrade -y
+#     - stack upgrade
+#     - mkdir bin
+#     # Needed for tests that print UTF8 characters such as motus
+#     # Same issue as https://github.com/commercialhaskell/stack/issues/793
+#
+#     variables:
+#         LC_ALL: "C.UTF-8"
+#         STACKOPTS: "--system-ghc --ghc-options '-fPIC' --flag NGLess:embed"
+#
+#     retry: 2
+#
+#     script:
+#     - make static
+#     - make modules
+#     - make check
+#     - make install prefix=${PWD}
+#     - PATH=${PWD}/bin:$PATH ./run-tests.sh
+#
+#     artifacts:
+#         when: on_success
+#         paths:
+#         - bin/ngless
+#         - Modules/packages/
+#         expire_in: 1 month
 
 # Temporarily disable Alpine due to https://github.com/commercialhaskell/stack/issues/2387
 # build-and-test-alpine:
