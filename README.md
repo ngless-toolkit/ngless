@@ -61,9 +61,9 @@ code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?jo
 This should work across a wide range of Linux versions (please
 [report](https://github.com/luispedro/ngless/issues) any issues you encounter):
 
-    curl -O http://ngless.embl.de/releases/ngless-0.5.1-Linux64
-    chmod +x ngless-0.5.1-Linux64
-    ./ngless-0.5.1-Linux64
+    curl -O http://ngless.embl.de/releases/ngless-0.7.0-Linux64
+    chmod +x ngless-0.7.0-Linux64
+    ./ngless-0.7.0-Linux64
 
 This download bundles bwa, samtools and megahit (also statically linked).
 
