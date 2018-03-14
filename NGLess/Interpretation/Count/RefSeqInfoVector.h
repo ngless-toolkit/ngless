@@ -51,7 +51,7 @@ struct RefSeqInfoVector {
     RefSeqInfoVector() { }
     ~RefSeqInfoVector() { }
     void insert(std::string f, double v) {
-        data_.push_back(RefSeqInfo(strdup(f.c_str()), v));
+        data_.push_back(RefSeqInfo(pool_.strdup(f.c_str()), v));
     }
    RefSeqInfo& at(int ix) { return data_.at(ix); }
    int find(const char* f) {
