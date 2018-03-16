@@ -2,6 +2,7 @@
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, CPP #-}
+{-# OPTIONS_GHC -fno-full-laziness #-}
 module Interpretation.Count
     ( executeCount
     , executeCountFile
