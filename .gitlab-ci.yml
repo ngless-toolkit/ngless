@@ -7,6 +7,8 @@ build-and-test-ubuntu:
     - apt upgrade -y
     - stack upgrade
     - mkdir bin
+    # Workaround gitlab memory limits with a swapfile
+    - dd if=/dev/zero of=/var/tmp/swapfile bs=1M count=2048 && mkswap /var/tmp/swapfile && chmod 600 /var/tmp/swapfile && swapon /var/tmp/swapfile && free
     # Needed for tests that print UTF8 characters such as motus
     # Same issue as https://github.com/commercialhaskell/stack/issues/793
 
@@ -14,7 +16,7 @@ build-and-test-ubuntu:
         LC_ALL: "C.UTF-8"
         STACKOPTS: "--ghc-options '-fPIC' --flag NGLess:embed"
 
-    retry: 2
+    retry: 1
 
     script:
     - make static
@@ -39,13 +41,15 @@ build-and-test-ubuntu-non-static:
     - apt upgrade -y
     - stack upgrade
     - mkdir prefix-test
+    # Workaround gitlab memory limits with a swapfile
+    - dd if=/dev/zero of=/var/tmp/swapfile bs=1M count=2048 && mkswap /var/tmp/swapfile && chmod 600 /var/tmp/swapfile && swapon /var/tmp/swapfile && free
     # Needed for tests that print UTF8 characters such as motus
     # Same issue as https://github.com/commercialhaskell/stack/issues/793
 
     variables:
         LC_ALL: "C.UTF-8"
 
-    retry: 2
+    retry: 1
 
     script:
     - make
@@ -55,37 +59,39 @@ build-and-test-ubuntu-non-static:
     - PATH=${PWD}/prefix-test/bin:$PATH ./run-tests.sh
 
 
-# build-and-test-ubuntu-rolling:
-#     image: registry.gitlab.com/ngless/ngless/ubuntu-ghc-stack:rolling
-#     stage: build
-#
-#     before_script:
-#     - apt update
-#     - apt upgrade -y
-#     - stack upgrade
-#     - mkdir bin
-#     # Needed for tests that print UTF8 characters such as motus
-#     # Same issue as https://github.com/commercialhaskell/stack/issues/793
-#
-#     variables:
-#         LC_ALL: "C.UTF-8"
-#         STACKOPTS: "--system-ghc --ghc-options '-fPIC' --flag NGLess:embed"
-#
-#     retry: 2
-#
-#     script:
-#     - make static
-#     - make modules
-#     - make check
-#     - make install prefix=${PWD}
-#     - PATH=${PWD}/bin:$PATH ./run-tests.sh
-#
-#     artifacts:
-#         when: on_success
-#         paths:
-#         - bin/ngless
-#         - Modules/packages/
-#         expire_in: 1 month
+build-and-test-ubuntu-rolling:
+    image: registry.gitlab.com/ngless/ngless/ubuntu-ghc-stack:rolling
+    stage: build
+
+    before_script:
+    - apt update
+    - apt upgrade -y
+    - stack upgrade
+    - mkdir prefix-test
+    # Workaround gitlab memory limits with a swapfile
+    - dd if=/dev/zero of=/var/tmp/swapfile bs=1M count=2048 && mkswap /var/tmp/swapfile && chmod 600 /var/tmp/swapfile && swapon /var/tmp/swapfile && free
+    # Needed for tests that print UTF8 characters such as motus
+    # Same issue as https://github.com/commercialhaskell/stack/issues/793
+
+    variables:
+        LC_ALL: "C.UTF-8"
+        STACKOPTS: "--system-ghc --ghc-options '-fPIC' --flag NGLess:embed"
+
+    retry: 1
+
+    script:
+    - make static
+    - make modules
+    - make check
+    - make install prefix=${PWD}/prefix-test
+    - PATH=${PWD}/prefix-test/bin:$PATH ./run-tests.sh
+
+    artifacts:
+        when: on_success
+        paths:
+        - bin/ngless
+        - Modules/packages/
+        expire_in: 1 month
 
 # Temporarily disable Alpine due to https://github.com/commercialhaskell/stack/issues/2387
 # build-and-test-alpine:
@@ -100,10 +106,14 @@ build-and-test-ubuntu-non-static:
 #     # This has to be set on the parent shell before launching bash
 #     # More info at: http://www.openwall.com/lists/musl/2017/12/07/13
 #     - ulimit -u 1000
+#     # Workaround gitlab memory limits with a swapfile
+#     - dd if=/dev/zero of=/var/tmp/swapfile bs=1M count=2048 && mkswap /var/tmp/swapfile && chmod 600 /var/tmp/swapfile && swapon /var/tmp/swapfile && free
 #     - mkdir bin
 #
 #     variables:
 #         STACKOPTS: "--system-ghc --ghc-options '-fPIC' --flag NGLess:embed"
+#
+#     retry: 1
 #
 #     script:
 #     - make static
