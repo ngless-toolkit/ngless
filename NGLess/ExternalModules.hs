@@ -1,8 +1,8 @@
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2015-2018 NGLess Authors
  - License: MIT
  -}
 
-{-# LANGUAGE RecordWildCards, FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards, FlexibleContexts, MultiWayIf #-}
 
 module ExternalModules
     ( loadModule
@@ -138,9 +138,9 @@ instance Aeson.FromJSON CommandArgument where
                     return [ArgCheckSymbol allowed]
                 else return []
         let cargInfo = ArgInformation{..}
-        cargPayload <- case atype of
-            "option" -> liftM FlagInfo <$> ((Just . (:[]) <$> o .: "when-true") <|> o .:? "when-true")
-            _
+        cargPayload <-
+            if
+                | atype `elem` ["option", "flag"] -> liftM FlagInfo <$> ((Just . (:[]) <$> o .: "when-true") <|> o .:? "when-true")
                 | atype `elem` ["readset", "counts", "mappedreadset"] -> (Just . FileInfo <$> Aeson.parseJSON (Aeson.Object o)) <|> return Nothing
                 | otherwise -> return Nothing
         return CommandArgument{..}

@@ -1,5 +1,6 @@
 Version 0.7.0+
 	* Fix memory leak in count()
+	* Fix when-true flag usage with external modules
 
 Version 0.7.0 2018-03-07 by luispedro
 	* Add 'failed' files to parallel lock1()
