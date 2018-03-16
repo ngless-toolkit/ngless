@@ -1,0 +1,16 @@
+version: 0.0.0
+name: whentrue
+functions:
+    -
+        nglName: whentrue
+        arg0: ./run.sh
+
+        arg1: 
+            atype: str
+        additional:
+            -
+                name: argument_name
+                atype: flag
+                when-true: '--whentrueworks'
+        return:
+            rtype: void
