@@ -1,4 +1,4 @@
-NGLess v0.7.0 (C) NGLess authors
+NGLess v0.7.1 (C) NGLess authors
 http://ngless.embl.de/
 
 	input.sam

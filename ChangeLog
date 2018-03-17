@@ -1,4 +1,4 @@
-Version 0.7.0+
+Version 0.7.1 2018-03-17 by luispedro
 	* Fix memory leak in count()
 	* Fix when-true flag usage with external modules
 

@@ -2,6 +2,13 @@
 What's New (History)
 ====================
 
+Version 0.7.1
+-------------
+
+Released Mar 17 2018
+
+Improves memory usage in ``count()`` and the use the ``when-true`` flag in
+external modules.
 
 Version 0.7
 -----------

@@ -17,7 +17,7 @@ list](https://groups.google.com/forum/#!forum/ngless).
 
 ## Example
 
-    ngless "0.0"
+    ngless "0.7"
     input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
     input = preprocess(input) using |read|:
         read = read[5:]
@@ -102,6 +102,7 @@ the directory where you wish to install, default is `/usr/local`):
 - [Full documentation](http://ngless.embl.de/)
 - [Frequently Asked Questions (FAQ)](http://ngless.embl.de/faq.html)
 - [ngless mailing list](https://groups.google.com/forum/#!forum/ngless)
+- [What's new log](http://ngless.embl.de/whatsnew.html)
 
 ## Authors
 
