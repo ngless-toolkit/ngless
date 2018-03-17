@@ -1,4 +1,4 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE RankNTypes #-}
@@ -9,18 +9,19 @@ module StandardModules.Mappers.Bwa
     , callMapper
     ) where
 
-import System.Process
-import System.Exit
-import System.Directory
-import System.Posix (getFileStatus, fileSize, FileOffset)
-import Control.Monad.IO.Class (liftIO)
+import           System.Process (proc, readProcessWithExitCode)
+import           System.Exit (ExitCode(..))
+import           System.Directory (doesFileExist)
+import           System.Posix (getFileStatus, fileSize, FileOffset)
+import           Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.Char8 as BL8
 
 import qualified Data.Conduit.Process as CP
 import qualified Data.Conduit.List as CL
-import qualified Data.Conduit.Internal as C
-import           Control.Exception (bracket)
+import qualified Data.Conduit as C
+import           Control.Monad.Extra (allM)
+import           Control.Exception (bracket_)
 import           GHC.Conc (getNumCapabilities, setNumCapabilities)
 
 import Output
@@ -32,14 +33,8 @@ import FileManagement (bwaBin)
 -- | Checks whether all necessary files are present for a BWA index
 -- Does not change any file on disk.
 hasValidIndex :: FilePath -> NGLessIO Bool
-hasValidIndex basepath = doAllFilesExist indexRequiredFormats
+hasValidIndex basepath = liftIO $ allM (doesFileExist . (basepath ++)) indexRequiredFormats
     where
-        doAllFilesExist [] = return True
-        doAllFilesExist (x:xs) = do
-            isThere <- liftIO $ doesFileExist (basepath ++ x)
-            if isThere
-                then doAllFilesExist xs
-                else return False
         indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
 
 -- BWA's default indexing parameters are quite conservative. This leads to
@@ -91,13 +86,13 @@ callMapper refIndex fps extraArgs outC = do
         cmdargs =  concat [["mem", "-t", show bwathreads], extraArgs, [refIndex], fps]
         with1Thread :: IO a -> IO a
         with1Thread act
-            | strictThreads = bracket
+            | strictThreads = bracket_
                                 (setNumCapabilities 1)
-                                (const $ setNumCapabilities numCapabilities)
-                                (const act)
+                                (setNumCapabilities numCapabilities)
+                                act
             | otherwise = act
 
-    outputListLno' TraceOutput ["Calling binary ", bwaPath, " with args: ", unwords cmdargs]
+    outputListLno' TraceOutput ["Calling: ", bwaPath, unwords cmdargs]
     let cp = proc bwaPath cmdargs
     (exitCode, out, err) <- liftIO . with1Thread $
             CP.sourceProcessWithStreams cp
@@ -108,7 +103,7 @@ callMapper refIndex fps extraArgs outC = do
     outputListLno' DebugOutput ["BWA info: ", err']
     case exitCode of
         ExitSuccess -> do
-            outputListLno' InfoOutput ["Done mapping to ", refIndex]
+            outputListLno' InfoOutput ["Finished mapping to ", refIndex]
             return out
         ExitFailure code ->
             throwSystemError $ concat ["Failed mapping\n",
