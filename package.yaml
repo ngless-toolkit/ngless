@@ -1,5 +1,5 @@
 name:           NGLess
-version:        '0.7.0'
+version:        '0.7.1'
 category:       Domain Specific Language
 author:         Luis Pedro Coelho and others (see AUTHORS)
 maintainer:     luis@luispedro.org
@@ -58,8 +58,6 @@ dependencies:
   - parsec >=3.1
   - primitive >=0.6
   - process >=1.2.3
-  - old-locale
-  - random
   - regex
   - safe
   - strict
