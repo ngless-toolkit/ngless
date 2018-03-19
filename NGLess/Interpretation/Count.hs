@@ -41,7 +41,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
-import           Data.Conduit ((.|), (=$=))
+import           Data.Conduit ((.|))
 import qualified Data.Strict.Tuple as TU
 import           Data.Strict.Tuple (Pair(..))
 import           Control.Monad (when, unless, forM, forM_)
@@ -105,11 +105,10 @@ type GeneMapAnnotation = M.Map B8.ByteString [Int]
 type FeatureSizeMap = M.Map B.ByteString Double
 
 data MMMethod = MMCountAll | MM1OverN | MMDist1 | MMUniqueOnly
-    deriving (Eq, Show)
+    deriving (Eq)
 
 data NMode = NMRaw | NMNormed | NMScaled | NMFpkm
-    deriving (Eq, Show)
-
+    deriving (Eq)
 
 minDouble :: Double
 minDouble = (2.0 :: Double) ^^ fst (floatRange (1.0 :: Double))
@@ -128,7 +127,7 @@ data CountOpts =
     }
 
 data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctionalMap FilePath
-    deriving (Eq, Show)
+    deriving (Eq)
 
 data Annotator =
                 SeqNameAnnotator (Maybe RSV.RefSeqInfoVector) -- ^ Just annotate by sequence names
@@ -321,7 +320,7 @@ sequenceSinks [s] = (:[]) <$> s
 sequenceSinks ss = C.sequenceSinks ss
 
 annSamHeaderParser :: Int -> [Annotator] -> CountOpts -> C.Sink ByteLine NGLessIO [Annotator]
-annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annSamHeaderParser1 anns)
+annSamHeaderParser mapthreads anns opts = lineGroups .| sequenceSinks (map annSamHeaderParser1 anns)
     where
         annSamHeaderParser1 (SeqNameAnnotator Nothing) = do
             rfvm <- liftIO RSV.newRefSeqInfoVector
@@ -371,7 +370,12 @@ annSamHeaderParser mapthreads anns opts = lineGroups =$= sequenceSinks (map annS
 
 
 listNub :: (Ord a) => [a] -> [a]
-listNub = S.toList . S.fromList
+listNub [] = []
+listNub x@[_] = x
+listNub x@[a,b]
+    | a == b = [a]
+    | otherwise = x
+listNub other = S.toList . S.fromList $ other
 
 
 -- Takes a vector of [Int] and splits into singletons (which can be represented
@@ -403,14 +407,6 @@ splitSingletons method values = (singles, mms)
         larger1 _   = True
 
 
-takeWhileC :: Monad m => (a -> Bool) -> C.Conduit a m a
-takeWhileC f = loop
-    where
-        loop = C.await >>= maybe (return ()) (\v ->
-                    if f v
-                        then C.yield v >> loop
-                        else C.leftover v)
-
 performCount :: FileOrStream -> T.Text -> [Annotator] -> CountOpts -> NGLessIO FilePath
 performCount istream gname annotators0 opts = do
     outputListLno' TraceOutput ["Starting count..."]
@@ -423,7 +419,7 @@ performCount istream gname annotators0 opts = do
         samStream
             .| do
                 annotators <-
-                    takeWhileC (isSamHeaderString . unwrapByteLine)
+                    CC.takeWhile (isSamHeaderString . unwrapByteLine)
                         .| annSamHeaderParser mapthreads annotators0 opts
                 lift $ outputListLno' TraceOutput ["Loaded headers. Starting parsing/distribution."]
                 mcounts <- forM annotators $ \ann -> do
@@ -513,7 +509,7 @@ normalizeCounts NMNormed counts sizes = do
 normalizeCounts nmethod counts sizes
     | nmethod `elem` [NMScaled, NMFpkm] = do
         -- count vectors always include a -1 at this point (it is
-        -- ignored in output if the user does not request it, but
+        -- ignored in output if the user does not request it, but is
         -- always computed). Thus, we compute the sum without it and do
         -- not normalize it later:
         let totalCounts v = withVector v (VU.sum . VU.tail)
@@ -522,7 +518,7 @@ normalizeCounts nmethod counts sizes
         afternorm <- totalCounts counts
         let factor
                 | nmethod == NMScaled = initial / afternorm
-                | otherwise =  (1.0e9 / initial) --- 1e6 [million fragments] * 1e3 [kilo basepairs] = 1e9
+                | otherwise = 1.0e9 / initial --- 1e6 [million fragments] * 1e3 [kilo basepairs] = 1e9
         liftIO $ forM_ [1.. VUM.length counts - 1] (VUM.unsafeModify counts (* factor))
     | otherwise = error "This should be unreachable code [normalizeCounts]"
 
@@ -700,7 +696,7 @@ loadGFF gffFp opts = do
             where
                 headers = M.keys namemap -- these are sorted
                 reindexAI :: AnnotationInfo -> AnnotationInfo
-                reindexAI (s :!: v) = (s :!: fromJust (M.lookup v ix2ix))
+                reindexAI (s :!: v) = s :!: fromJust (M.lookup v ix2ix)
                 ix2ix = M.fromList $ zip (M.elems namemap) [0..]
 
         gffSize :: GffLine -> Int
