@@ -2,6 +2,22 @@
 What's New (History)
 ====================
 
+IN DEVELOPMENT
+--------------
+
+Support for `minimap2 <https://github.com/lh3/minimap2>`__ as alternative
+mapper. Import the ``minimap2`` module and specify the ``mapper`` when calling
+`map <Functions.html#map>`__. For example::
+
+
+    ngless '0.7'
+    import "minimap2" version "1.0"
+
+    input = paired('sample.1.fq', 'sample.2.fq', singles='sample.singles.fq')
+    mapped = map(input, fafile='ref.fna', mapper='minimap2')
+    write(mapped, ofile='output.sam')
+
+
 Version 0.7.1
 -------------
 

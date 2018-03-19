@@ -1,4 +1,4 @@
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2015-2018 NGLess Authors
  - License: MIT
  -}
 module Dependencies.Embedded
@@ -6,6 +6,7 @@ module Dependencies.Embedded
     , bwaData
     , prodigalData
     , megahitData
+    , minimap2Data
     ) where
 
 import qualified Data.ByteString as B
@@ -27,6 +28,9 @@ foreign import ccall safe "get_prodigal_data" c_get_prodigal_data :: CString
 foreign import ccall safe "get_megahit_len" c_get_megahit_len :: CUInt
 foreign import ccall safe "get_megahit_data" c_get_megahit_data :: CString
 
+foreign import ccall safe "get_minimap2_len" c_get_minimap2_len :: CUInt
+foreign import ccall safe "get_minimap2_data" c_get_minimap2_data :: CString
+
 samtoolsData :: IO B.ByteString
 samtoolsData =
     B.unsafePackCStringLen (c_get_samtools_data, convert c_get_samtools_len)
@@ -42,3 +46,9 @@ bwaData =
 megahitData :: IO B.ByteString
 megahitData =
     B.unsafePackCStringLen (c_get_megahit_data, convert c_get_megahit_len)
+
+minimap2Data :: IO B.ByteString
+minimap2Data =
+    B.unsafePackCStringLen (c_get_minimap2_data, convert c_get_minimap2_len)
+
+

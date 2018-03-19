@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, CPP #-}
@@ -16,6 +16,7 @@ module FileManagement
     , prodigalBin
     , megahitBin
     , bwaBin
+    , minimap2Bin
     , expandPath
 #ifdef IS_BUILDING_TEST
     , expandPath'
@@ -172,6 +173,13 @@ prodigalBin :: NGLessIO FilePath
 prodigalBin = findOrCreateBin "NGLESS_PRODIGAL_BIN" prodigalFname prodigalData
     where
         prodigalFname = "ngless-" ++ versionStr ++ "-prodigal" ++ binaryExtension
+
+-- | path to minimap2
+minimap2Bin :: NGLessIO FilePath
+minimap2Bin = findOrCreateBin "NGLESS_MINIMAP2_BIN" minimap2Fname minimap2Data
+    where
+        minimap2Fname = "ngless-" ++ versionStr ++ "-minimap2" ++ binaryExtension
+
 
 megahitBin :: NGLessIO FilePath
 megahitBin = liftIO (lookupEnv "NGLESS_MEGAHIT_BIN") >>= \case

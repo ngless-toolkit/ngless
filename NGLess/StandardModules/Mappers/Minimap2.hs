@@ -34,15 +34,13 @@ import Configuration
 import NGLess.NGLEnvironment
 import Utils.Vector (sortParallel)
 import Utils.Conduit (linesC, ByteLine(..))
-import FileManagement (makeNGLTempFile)
+import FileManagement (makeNGLTempFile, minimap2Bin)
 
 indexName :: FilePath -> FilePath
 indexName fp = fp ++ ".mm2.idx"
 
 hasValidIndex :: FilePath -> NGLessIO Bool
 hasValidIndex = liftIO . doesFileExist . indexName
-
-minimap2Bin = return "minimap2"
 
 createIndex :: FilePath -> NGLessIO ()
 createIndex fafile = do

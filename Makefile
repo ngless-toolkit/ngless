@@ -42,16 +42,24 @@ MEGAHIT_TAR = v1.1.1.tar.gz
 MEGAHIT_SHA1 = e82308db9a351ea0ccdaf4bebead86ca338a6f0c
 MEGAHIT_TARGET = megahit
 
+MINIMAP2_DIR = minimap2-2.9
+MINIMAP2_URL = https://github.com/lh3/minimap2/releases/download/v2.9/minimap2-2.9.tar.bz2
+MINIMAP2_TAR = minimap2-2.9.tar.bz2
+MINIMAP2_SHA1 = f419b2664d50c5120d65a801510629c9ac0224a1
+MINIMAP2_TARGET = ngless-minimap2
+MINIMAP2_TARGET_VERSIONED = ngless-${VERSION}-minimap2
+
 NGLESS_EMBEDDED_BINARIES := \
 		NGLess/Dependencies/samtools_data.c \
 		NGLess/Dependencies/prodigal_data.c \
 		NGLess/Dependencies/bwa_data.c \
-		NGLess/Dependencies/megahit_data.c
+		NGLess/Dependencies/megahit_data.c \
+		NGLess/Dependencies/minimap2_data.c
 NGLESS_EMBEDDED_TARGET = NGLess/Dependencies/embedded.c
 
 MEGAHIT_BINS := $(MEGAHIT_DIR)/megahit_asm_core $(MEGAHIT_DIR)/megahit_sdbg_build $(MEGAHIT_DIR)/megahit_toolkit $(MEGAHIT_DIR)/megahit
 NGLESS_EXT_BINS = $(BWA_DIR)/$(BWA_TARGET) $(SAM_DIR)/$(SAM_TARGET) $(PRODIGAL_DIR)/$(PRODIGAL_TARGET) $(MEGAHIT_BINS)
-NGLESS_EXT_BINS_VERSIONED = $(BWA_DIR)/$(BWA_TARGET_VERSIONED) $(SAM_DIR)/$(SAM_TARGET_VERSIONED) $(PRODIGAL_DIR)/$(PRODIGAL_TARGET_VERSIONED)
+NGLESS_EXT_BINS_VERSIONED = $(BWA_DIR)/$(BWA_TARGET_VERSIONED) $(SAM_DIR)/$(SAM_TARGET_VERSIONED) $(PRODIGAL_DIR)/$(PRODIGAL_TARGET_VERSIONED) $(MINIMAP2_DIR)/$(MINIMAP2_TARGET_VERSIONED)
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
@@ -226,6 +234,23 @@ $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged: $(MEGAHIT_DIR)/static-build
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged.tar.gz: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged
 	tar --create --file $@ --gzip $<
 
+$(MINIMAP2_DIR)/README.md:
+	wget $(MINIMAP2_URL) -O $(MINIMAP2_TAR)
+	sha1sum -c <(echo "$(MINIMAP2_SHA1)  $(MINIMAP2_TAR)")
+	tar xvf $(MINIMAP2_TAR)
+	cd $(MINIMAP2_DIR) && patch < ../build-scripts/minimap2-static-compile.patch
+	rm $(MINIMAP2_TAR)
+
+$(MINIMAP2_DIR)/$(MINIMAP2_TARGET)-static: $(MINIMAP2_DIR)/README.md
+	rm -f $@
+	cd $(MINIMAP2_DIR) && $(MAKE) CFLAGS="-static" && mv minimap2 ngless-minimap2-static
+
+$(MINIMAP2_DIR)/$(MINIMAP2_TARGET): $(MINIMAP2_DIR)/README.md
+	cd $(MINIMAP2_DIR) && $(MAKE) && mv minimap2 ngless-minimap2
+
+$(MINIMAP2_DIR)/$(MINIMAP2_TARGET_VERSIONED): $(MINIMAP2_DIR)/$(MINIMAP2_TARGET)
+	cp -pr $< $@
+
 NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/$(SAM_TARGET)-static
 	strip $<
 	ln -s $< $(<F)
@@ -245,6 +270,11 @@ NGLess/Dependencies/bwa_data.c: $(BWA_DIR)/$(BWA_TARGET)-static
 	rm -f $(<F)
 
 NGLess/Dependencies/megahit_data.c: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged.tar.gz
+	ln -s $< $(<F)
+	xxd -i $(<F) $@
+	rm -f $(<F)
+
+NGLess/Dependencies/minimap2_data.c: $(MINIMAP2_DIR)/$(MINIMAP2_TARGET)-static
 	ln -s $< $(<F)
 	xxd -i $(<F) $@
 	rm -f $(<F)

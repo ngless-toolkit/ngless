@@ -1,0 +1,6 @@
+ngless '0.7'
+import "minimap2" version "1.0"
+
+input = paired('sample.1.fq', 'sample.2.fq', singles='sample.singles.fq')
+mapped = map(input, fafile='ref.fna', mapper='minimap2')
+write(mapped, ofile='output.sam')
