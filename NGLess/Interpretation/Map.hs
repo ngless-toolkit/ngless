@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -20,7 +20,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit as C
-import           Data.Conduit (($$), (=$=), (.|))
+import           Data.Conduit ((.|))
 import           Control.Monad.Extra (unlessM)
 import           Data.List (foldl', sort)
 
@@ -43,6 +43,7 @@ import NGLess.NGLEnvironment
 
 import qualified StandardModules.Mappers.Bwa as Bwa
 import qualified StandardModules.Mappers.Soap as Soap
+import qualified StandardModules.Mappers.Minimap2 as Minimap2
 
 import Data.Sam
 import Data.Fasta
@@ -69,12 +70,14 @@ data Mapper = Mapper
 
 bwa = Mapper Bwa.createIndex Bwa.hasValidIndex Bwa.callMapper
 soap = Mapper Soap.createIndex Soap.hasValidIndex Soap.callMapper
+minimap2 = Mapper Minimap2.createIndex Minimap2.hasValidIndex Minimap2.callMapper
 
 getMapper :: T.Text -> NGLessIO Mapper
 getMapper request = do
         mappers <- ngleMappersActive <$> nglEnvironment
         if request `elem` mappers
             then return $! case request of
+                "minimap2" -> minimap2
                 "soap" -> soap
                 "bwa" -> bwa
                 _ -> error "should not be possible map:getMapper"
@@ -183,7 +186,7 @@ mapToReference mapper refIndex (ReadSet pairs singletons) extraArgs = do
                 callMapper mapper refIndex [fp] extraArgs (zipToStats out)
     liftIO $ hClose hout
     (newfp,) <$> combinestats statsp statss
-zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesC =$= samStatsC))
+zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesC .| samStatsC))
 
 splitFASTA :: Int -> FilePath -> FilePath -> NGLessIO [FilePath]
 splitFASTA megaBPS ifile ofileBase =
@@ -290,7 +293,7 @@ executeMapStats :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMapStats (NGOMappedReadSet name sami _) _ = do
     outputListLno' TraceOutput ["Computing mapstats on ", show sami]
     let (samfp, stream) = asSamStream sami
-    (t, al, u) <- stream $$ samStatsC >>= runNGLess
+    (t, al, u) <- C.runConduit (stream .| samStatsC) >>= runNGLess
     countfp <- makeNGLTempFile samfp "sam_stats_" ".stats" $ \hout ->
         liftIO . hPutStr hout . concat $
             [     "\t",  T.unpack name, "\n"
