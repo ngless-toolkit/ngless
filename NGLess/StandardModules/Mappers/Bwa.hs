@@ -92,7 +92,7 @@ callMapper refIndex fps extraArgs outC = do
                                 act
             | otherwise = act
 
-    outputListLno' TraceOutput ["Calling: ", bwaPath, unwords cmdargs]
+    outputListLno' TraceOutput ["Calling: ", unwords (bwaPath:cmdargs)]
     let cp = proc bwaPath cmdargs
     (exitCode, out, err) <- liftIO . with1Thread $
             CP.sourceProcessWithStreams cp
