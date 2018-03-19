@@ -1,4 +1,4 @@
-{- Copyright 2014-2017 NGLess Authors
+{- Copyright 2014-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
@@ -27,8 +27,8 @@ module Data.Sam
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.Conduit.Internal as CI
 import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Lift as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
 import           Data.Conduit ((=$=), (.|))
@@ -113,7 +113,7 @@ instance Applicative SimpleParser where
 
 encodeSamLine :: SamLine -> B.ByteString
 encodeSamLine (SamHeader b) = b
-encodeSamLine samline = B.intercalate "\t"
+encodeSamLine samline = B.intercalate (B.singleton 9) -- 9 is TAB. Writing it this way will trigger a rewrite RULE and optimize the intercalate call
     [ samQName samline
     , int2BS . samFlag $ samline
     , samRName samline
@@ -143,9 +143,9 @@ tabDelim = SimpleParser $ \input -> do
     return $! (B.take ix input :!: B.drop (ix+1) input)
 
 tabDelimOpts :: SimpleParser B.ByteString
-tabDelimOpts = SimpleParser $ \input -> do
+tabDelimOpts = SimpleParser $ \input ->
     case B8.elemIndex '\t' input of
-         Just (ix) -> return $! (B.take ix input :!: B.drop (ix+1) input)
+         Just ix -> return $! (B.take ix input :!: B.drop (ix+1) input)
          Nothing -> return $! (B.empty :!: input)
 
 readIntTab = SimpleParser $ \b -> do
@@ -279,7 +279,7 @@ readSamGroupsC' mapthreads respectPairs = do
             V.unsafeFreeze gs'
 
 samStatsC :: (MonadIO m) => C.Sink ByteLine m (NGLess (Int, Int, Int))
-samStatsC = runExceptC $ readSamGroupsC .| samStatsC'
+samStatsC = C.runExceptC $ readSamGroupsC .| samStatsC'
 
 samStatsC' :: (MonadError NGError m) => C.Sink SamGroup m (Int, Int, Int)
 samStatsC' = CL.foldM summarize (0, 0, 0)
@@ -298,20 +298,3 @@ samStatsC' = CL.foldM summarize (0, 0, 0)
                 ,add1if al aligned
                 ,add1if  u unique
                 )
-
--- | this is copied from runErrorC, using ExceptT as we do not want to have to
--- make `e` be of class `Error`.
-runExceptC :: (Monad m) => C.Sink i (ExceptT e m) r -> C.Sink i m (Either e r)
-runExceptC (CI.ConduitM c0) =
-    CI.ConduitM $ \rest ->
-        let go (CI.Done r) = rest (Right r)
-            go (CI.PipeM mp) = CI.PipeM $ do
-                eres <- runExceptT mp
-                return $! case eres of
-                    Left e -> rest $ Left e
-                    Right p -> go p
-            go (CI.Leftover p i) = CI.Leftover (go p) i
-            go (CI.HaveOutput p f o) = CI.HaveOutput (go p) (runExceptT f >> return ()) o
-            go (CI.NeedInput x y) = CI.NeedInput (go . x) (go . y)
-         in go (c0 CI.Done)
-
