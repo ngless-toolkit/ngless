@@ -320,7 +320,7 @@ tagSource ix = C.awaitForever $ \(ByteLine v) -> case splitAtTab v of
     Right (h, pay) -> C.yield $ SparseCountData h ix pay
 
 complete :: [B.ByteString] -> (SparseCountData,[SparseCountData]) -> ByteLine
-complete placeholders (hinput,inputs) = ByteLine $ B.intercalate (B.singleton 9) merged
+complete placeholders (hinput,inputs) = ByteLine $ B.concat merged
     where
         header = spdHeader hinput
         merged = header:complete' 0 placeholders (hinput:inputs)
