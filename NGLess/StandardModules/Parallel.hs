@@ -18,7 +18,6 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import           Data.Time (getZonedTime)
 import           Data.Time.Format (formatTime, defaultTimeLocale)
-import           Data.List (minimumBy)
 import           Data.List.Extra (snoc, chunksOf)
 
 #ifndef WINDOWS
@@ -35,8 +34,9 @@ import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.TQueue as CA
+import qualified Data.Conduit.Algorithms as CAlg
 import           Control.Monad.ST
-import           Control.Monad.Extra (allM, unlessM, whenJust)
+import           Control.Monad.Extra (allM, unlessM)
 import           Control.DeepSeq
 import           Data.Traversable
 import           Control.Concurrent (threadDelay)
@@ -58,7 +58,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
-import           Data.Conduit ((.|), (=$=), ($$), ($$+), ($$++))
+import           Data.Conduit ((.|), (=$=), ($$), ($$+))
 
 import Hooks
 import Output
@@ -300,55 +300,56 @@ sinkTBMQueue' q shouldClose = do
 maxNrOpenFiles = 512 :: Int
 
 
-type CResSourceBPair = C.ResumableSource NGLessIO (B.ByteString, B.ByteString)
+data SparseCountData = SparseCountData
+                            { spdHeader :: !B.ByteString
+                            , spdIndex :: !Int
+                            , spdPayload :: B.ByteString
+                            }
+    deriving (Eq)
+
+instance Ord SparseCountData where
+    compare (SparseCountData ah ai _) (SparseCountData bh bi _) = case compare ah bh of
+        EQ -> compare ai bi
+        LT -> LT
+        GT -> GT
+
+tagSource :: Int -> ByteLine -> NGLessIO SparseCountData
+tagSource ix (ByteLine v) = do
+    (h,pay) <- splitAtTab v
+    return $ SparseCountData h ix pay
+
+complete :: [B.ByteString] -> (SparseCountData,[SparseCountData]) -> ByteLine
+complete placeholders (hinput,inputs) = ByteLine $ B.intercalate (B.singleton 9) merged
+    where
+        header = spdHeader hinput
+        merged = header:complete' 0 placeholders (hinput:inputs)
+        complete' _ [] [] = []
+        complete' _ [] (_:_) = error "Logic error in StandardModules/parallel//complete"
+        complete' ix (p:ps) xs@(SparseCountData _ ix' pay:rest)
+            | ix == ix' = pay:complete' (ix+1) ps rest
+            | otherwise = p:complete' (ix+1) ps xs
+        complete' _ ps [] = ps
+
 mergeCounts :: [C.Source NGLessIO ByteLine] -> C.Source NGLessIO ByteLine
 mergeCounts [] = throwShouldNotOccur "Attempt to merge empty sources"
 mergeCounts ss = do
         start <- forM ss $ \s -> do
-            (s', v) <- lift $ (s .| CL.mapM (splitAtTab . unwrapByteLine)) $$+ CC.head
+            (s', v) <- lift $ s $$+ (CL.mapM (splitAtTab . unwrapByteLine) .| CC.head)
             case v of
                 Nothing -> throwShouldNotOccur "Trying to merge a headerless file"
                 Just (_,hs) -> do
                     let p = placeholder (B8.count '\t' hs)
-                    s'' <- lift $ step s'
-                    return (s'', p)
-        go start
-
+                    return (s', p)
+        let (ss', placeholders) = unzip start
+        (ss'',finalizers) <- unzip <$> lift (mapM C.unwrapResumable ss')
+        CAlg.mergeC [s .| CL.mapM (tagSource ix) | (s,ix) <- zip ss'' [0..]]
+            .| CL.groupOn1 spdHeader
+            .| CL.map (complete placeholders)
+        lift $ sequence_ finalizers
     where
-        -- Nothing is greater than anything else so it flows to the end
-        compareMaybe :: (Ord a) => Maybe a -> Maybe a -> Ordering
-        compareMaybe (Just a) (Just b) = compare a b
-        compareMaybe Just{} Nothing = LT
-        compareMaybe Nothing Just{} = GT
-        compareMaybe Nothing Nothing = EQ
-
         placeholder :: Int -> B.ByteString
         placeholder n = B.intercalate "\t" ("":["0" | _ <- [1..n]])
 
-        fst3 (a, _, _) = a
-        go :: [(Maybe (B.ByteString, B.ByteString, CResSourceBPair), B.ByteString)] -> C.Source NGLessIO ByteLine
-        go sources = do
-            let nextH :: Maybe B.ByteString
-                nextH = minimumBy compareMaybe (map ((fst3 <$>) . fst) sources)
-            whenJust nextH $ \header -> do
-                cn <- forM sources $ \(s, p) -> case s of
-                    Nothing -> return (p, (s, p))
-                    Just (h, v, s')
-                        | header == h -> do
-                            s'' <- lift $ step s'
-                            return (v, (s'', p))
-                        | otherwise -> return (p, (s, p))
-                let (cur, next) = unzip cn
-                C.yield $ ByteLine (B.concat (header:cur))
-                go next
-        step :: CResSourceBPair -> NGLessIO (Maybe (B.ByteString, B.ByteString, CResSourceBPair))
-        step s = do
-            (s', val) <- s $$++ CC.head
-            case val of
-              Just (h,v) -> return $ Just (h, v, s')
-              Nothing -> do
-                C.closeResumableSource s'
-                return Nothing
 
 pasteCounts :: [T.Text] -> Bool -> [T.Text] -> [FilePath] -> NGLessIO FilePath
 pasteCounts comments matchingRows headers inputs

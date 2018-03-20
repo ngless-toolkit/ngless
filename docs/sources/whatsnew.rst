@@ -17,6 +17,10 @@ mapper. Import the ``minimap2`` module and specify the ``mapper`` when calling
     mapped = map(input, fafile='ref.fna', mapper='minimap2')
     write(mapped, ofile='output.sam')
 
+Internal improvements
+---------------------
+
+- Faster `collect() <Functions.html#collect>`__
 
 Version 0.7.1
 -------------
