@@ -18,6 +18,7 @@ import NGLess (NGLessIO, testNGLessIO)
 
 import Interpretation.Count (performCount, MMMethod(..), loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), Annotator(..), NMode(..))
 import Interpretation.Substrim (substrim)
+import StandardModules.Parallel (pasteCounts)
 import Interpret (interpret)
 import FileOrStream (FileOrStream(..))
 import Parse (parsengless)
@@ -102,5 +103,11 @@ main = setupTestEnvironment >> defaultMain [
         , bench "annotate-functionalmap" . nfNGLessIO $ do
                     amap <- loadFunctionalMap "test_samples/functional.map" ["KEGG_ko", "eggNOG_OG"]
                     performCount (File "test_samples/sample.sam") "testing" amap basicCountOpts
+        ]
+    ,bgroup "parallel"
+        [ bench "paste-sparse"   $ nfNGLessIO (pasteCounts [] False ["sample" | i <- [0..127]]
+                                                                ["test_samples/merge/sp_sample_"++show i | i <- [0..127]])
+        , bench "paste-dense"    $ nfNGLessIO (pasteCounts [] True ["sample" | i <- [0..127]]
+                                                                ["test_samples/merge/sample_"++show i | i <- [0..127]])
         ]
     ]

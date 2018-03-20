@@ -1,4 +1,4 @@
-{- Copyright 2016-2017 NGLess Authors
+{- Copyright 2016-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -6,6 +6,7 @@
 
 module StandardModules.Parallel
     ( loadModule
+    , pasteCounts
     ) where
 
 import qualified Data.ByteString as B
