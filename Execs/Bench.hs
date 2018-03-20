@@ -1,4 +1,4 @@
-{- Copyright 2016
+{- Copyright 2016-2018
  - Licence: MIT -}
 import Criterion.Main
 
@@ -97,10 +97,10 @@ main = setupTestEnvironment >> defaultMain [
         , bench "samGroups" $ nfNGLessIO (CB.sourceFile "test_samples/sample.sam" =$= linesC =$= readSamGroupsC $$ count)
         ]
     ,bgroup "count"
-        [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap "test_samples/functional.map" ["ko", "cog"])
+        [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap "test_samples/functional.map" ["KEGG_ko", "eggNOG_OG"])
         , bench "annotate-seqname" . nfNGLessIO $ performCount (File "test_samples/sample.sam") "testing" [SeqNameAnnotator Nothing] basicCountOpts
         , bench "annotate-functionalmap" . nfNGLessIO $ do
-                    amap <- loadFunctionalMap "test_samples/functional.map" ["ko", "cog"]
+                    amap <- loadFunctionalMap "test_samples/functional.map" ["KEGG_ko", "eggNOG_OG"]
                     performCount (File "test_samples/sample.sam") "testing" amap basicCountOpts
         ]
     ]

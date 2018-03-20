@@ -6,7 +6,6 @@
 module Interpretation.Count
     ( executeCount
     , executeCountFile
-#ifdef IS_BUILDING_TEST
     , Annotator(..)
     , CountOpts(..)
     , AnnotationMode(..)
@@ -18,7 +17,6 @@ module Interpretation.Count
     , loadFunctionalMap
     , performCount
     , RSV.RefSeqInfo(..)
-#endif
     ) where
 
 import qualified Data.ByteString as B
