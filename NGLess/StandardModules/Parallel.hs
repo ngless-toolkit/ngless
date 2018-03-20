@@ -35,7 +35,8 @@ import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.TQueue as CA
 import qualified Data.Conduit.Algorithms as CAlg
-import           Control.Monad.ST
+import           Control.Monad.ST (runST)
+import           Control.Monad.Error (throwError)
 import           Control.Monad.Extra (allM, unlessM)
 import           Control.DeepSeq
 import           Data.Traversable
@@ -313,10 +314,10 @@ instance Ord SparseCountData where
         LT -> LT
         GT -> GT
 
-tagSource :: Int -> ByteLine -> NGLessIO SparseCountData
-tagSource ix (ByteLine v) = do
-    (h,pay) <- splitAtTab v
-    return $ SparseCountData h ix pay
+tagSource :: Int -> C.Conduit ByteLine NGLessIO SparseCountData
+tagSource ix = C.awaitForever $ \(ByteLine v) -> case splitAtTab v of
+    Left err -> lift $ throwError err
+    Right (h, pay) -> C.yield $ SparseCountData h ix pay
 
 complete :: [B.ByteString] -> (SparseCountData,[SparseCountData]) -> ByteLine
 complete placeholders (hinput,inputs) = ByteLine $ B.intercalate (B.singleton 9) merged
@@ -342,7 +343,7 @@ mergeCounts ss = do
                     return (s', p)
         let (ss', placeholders) = unzip start
         (ss'',finalizers) <- unzip <$> lift (mapM C.unwrapResumable ss')
-        CAlg.mergeC [s .| CL.mapM (tagSource ix) | (s,ix) <- zip ss'' [0..]]
+        CAlg.mergeC [s .| tagSource ix | (s,ix) <- zip ss'' [0..]]
             .| CL.groupOn1 spdHeader
             .| CL.map (complete placeholders)
         lift $ sequence_ finalizers
