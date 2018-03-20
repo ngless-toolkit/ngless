@@ -143,6 +143,7 @@ _formatFQOname base insert
     | "{index}" `isInfixOf` base = return $ replace "{index}" insert base
     | endswith ".fq" base = return $ removeEnd base ".fq" ++ "." ++ insert ++ ".fq"
     | endswith ".fq.gz" base = return $ removeEnd base ".fq.gz" ++ "." ++ insert ++ ".fq.gz"
+    | endswith ".fq.bz2" base = return $ removeEnd base ".fq.bz2" ++ "." ++ insert ++ ".fq.bz2"
     | otherwise = throwScriptError ("Cannot handle filename " ++ base ++ " (expected extension .fq/.fq.gz/.fq.bz2).")
 
 
