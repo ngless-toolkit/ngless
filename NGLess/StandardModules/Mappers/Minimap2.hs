@@ -28,6 +28,7 @@ import           Control.Exception (bracket_)
 import           GHC.Conc (getNumCapabilities, setNumCapabilities)
 import           Control.Monad.Trans.Class (lift)
 
+import Data.Sam (isSamHeaderString)
 import Output
 import NGLess
 import Configuration
@@ -90,19 +91,21 @@ callMapper refIndex fps extraArgs outC = do
                                 "Command line was::\n\t", unwords cmdargs, "\n",
                                 "minimap2 error code was ", show code, ".\n",
                                 "minimap2 stderr: ", err']
-    C.runConduit (sortSam usam .| C.transPipe liftIO outC)
+    C.runConduit $ sortSam usam
+                        .| CL.map (`B.snoc` 10)
+                        .| C.transPipe liftIO outC
 
 sortSam :: FilePath -> C.Source NGLessIO B.ByteString
-sortSam samfile = do
-        partials <- lift . C.runConduit $
-                CB.sourceFile samfile
-                    .| linesC
-                    .| CL.map unwrapByteLine
-                    .| samSorter []
-        mergeC partials .| CL.map addNL
+sortSam samfile =
+        CB.sourceFile samfile
+            .| linesC
+            .| CL.map unwrapByteLine
+            .| do
+                CC.takeWhile isSamHeaderString
+                partials <- samSorter []
+                C.toProducer (mergeC partials)
     where
-        addNL = flip B.snoc 10
-        samSorter :: [C.Source NGLessIO B.ByteString] -> C.Sink B.ByteString NGLessIO [C.Source NGLessIO B.ByteString]
+        samSorter :: [C.Source NGLessIO B.ByteString] -> C.ConduitM B.ByteString B.ByteString NGLessIO [C.Source NGLessIO B.ByteString]
         samSorter partials = do
                 block <- CC.sinkVectorN (1024*1024)
                 block' <- liftIO $ do
@@ -118,7 +121,7 @@ sortSam samfile = do
                             makeNGLTempFile samfile "partial" ".sam" $ \hout ->
                                 C.runConduit $
                                     CC.yieldMany block'
-                                        .| CL.map addNL
+                                        .| CL.map (`B.snoc` 10)
                                         .| CB.sinkHandle hout
                         samSorter ((CB.sourceFile partial .| linesC .| CL.map unwrapByteLine):partials)
 
