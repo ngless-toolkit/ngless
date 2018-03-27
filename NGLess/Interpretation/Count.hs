@@ -37,8 +37,8 @@ import qualified Data.Set as S
 
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
-import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Algorithms.Utils as CAlg
 import           Data.Conduit ((.|))
 import qualified Data.Strict.Tuple as TU
 import           Data.Strict.Tuple (Pair(..))
@@ -299,17 +299,6 @@ performCount1Pass MMDist1 mcounts = loop []
                                 then mms:acc
                                 else acc
 
--- | Equivalent to Python's enumerate
-enumerateC :: (Monad m) => C.Conduit a m (Int, a)
-enumerateC = loop 0
-    where
-        loop !n = C.await >>= \case
-                                Nothing -> return ()
-                                Just v -> do
-                                    C.yield (n, v)
-                                    loop (n+1)
-
-
 -- | This is a version of C.sequenceSinks which optimizes the case where a
 -- single element is passed (it makes a small, but noticeable difference in
 -- benchmarking)
@@ -339,7 +328,7 @@ annSamHeaderParser mapthreads anns opts = lineGroups .| sequenceSinks (map annSa
         annSamHeaderParser1 ann = CC.sinkNull >> return ann
         lineGroups = CL.filter (B.isPrefixOf "@SQ\tSN:" . unwrapByteLine)
                     .| CC.conduitVector 32768
-                    .| enumerateC
+                    .| CAlg.enumerateC
         flattenVs :: VU.Unbox a => V.Vector [a] -> VU.Vector a
         flattenVs chunks = VU.unfoldr getNext (0,[])
             where
@@ -532,14 +521,14 @@ loadFunctionalMap fname columns = do
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
         anns <- C.runConduit $
-                    CB.sourceFile fname
-                    .| CB.lines
-                    .| enumerateC
+                    conduitPossiblyCompressedFile fname
+                    .| linesC
+                    .| CAlg.enumerateC
                     .| (do
                         hline <- CL.head
                         cis <- case hline of
                             Nothing -> throwDataError ("Empty map file: "++fname)
-                            Just (_, header) -> let headers = B8.split '\t' header
+                            Just (_, ByteLine header) -> let headers = B8.split '\t' header
                                                     in runNGLess $ lookUpColumns headers
                         CC.conduitVector 8192
                             .| asyncMapEitherC mapthreads (V.mapM (selectColumns cis)) -- after this we have vectors of (<gene name>, [<feature-name>])
@@ -580,9 +569,12 @@ loadFunctionalMap fname columns = do
                 errormsg = concat (["Could not find column '", B8.unpack col, "'."]
                                 ++ case findSuggestion (T.pack $ B8.unpack col) (map (T.pack . B8.unpack) $ M.keys colmap) of
                                         Just (Suggestion valid reason) -> [" Did you mean '", T.unpack valid, "' (", T.unpack reason, ")?"]
-                                        Nothing -> [])
-        selectColumns :: [Int] -> (Int, B.ByteString) -> NGLess (B.ByteString, [[B.ByteString]])
-        selectColumns cols (line_nr, line) = case B8.split '\t' line of
+                                        Nothing -> []
+                                ++ ["\nAvailable columns are:\n"]
+                                ++ ["\t- '"++B8.unpack c ++ "'\n" | c <- M.keys colmap]
+                                )
+        selectColumns :: [Int] -> (Int, ByteLine) -> NGLess (B.ByteString, [[B.ByteString]])
+        selectColumns cols (line_nr, ByteLine line) = case B8.split '\t' line of
                     (gene:mapped) -> (gene,) . addTags columns <$> selectIds line_nr cols (zip [0..] mapped)
                     [] -> throwDataError ("Loading functional map file '" ++ fname ++ "' [line " ++ show (line_nr + 1)++ "]: empty line.")
 
