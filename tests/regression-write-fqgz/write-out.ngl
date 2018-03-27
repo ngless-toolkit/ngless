@@ -1,0 +1,5 @@
+ngless "0.7"
+import "mocat" version "0.0"
+
+input = load_mocat_sample('sample')
+write(input, ofile='output.fq')

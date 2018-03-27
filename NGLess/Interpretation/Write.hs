@@ -166,7 +166,7 @@ executeWrite (NGOReadSet _ rs) args = do
             let inputs = fqpathFilePath <$> multiple
             fp' <- makeNGLTempFile (head inputs) "concat" "tmp" $ \h ->
                 C.runConduit
-                    (mapM_ C.sourceFile inputs .| C.sinkHandle h)
+                    (mapM_ conduitPossiblyCompressedFile inputs .| C.sinkHandle h)
             moveOrCopyCompress True fp' ofname
     if woFormatFlags opts == Just "interleaved"
         then do
