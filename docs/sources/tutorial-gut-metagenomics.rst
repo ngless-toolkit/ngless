@@ -56,8 +56,8 @@ The rest of this tutorial is an explanation of the steps in this script.
 
 To run ngless, we need write a script. We start with a few imports::
 
-    ngless "0.0"
-    import "parallel" version "0.0"
+    ngless "0.7"
+    import "parallel" version "0.6"
     import "mocat" version "0.0"
     import "motus" version "0.1"
     import "igc" version "0.0"
@@ -93,7 +93,7 @@ First, we load the data (the FastQ files)::
 
 And, now, we preprocess the data::
 
-    preprocess(input, keep_singles=False) using |read|:
+    input = preprocess(input, keep_singles=False) using |read|:
         read = substrim(read, min_quality=25)
         if len(read) < 45:
             discard
@@ -183,8 +183,9 @@ run it from the command line::
 
     $ ngless process.ngl
 
-You also need to run it once for each sample. However, this can be done in
-parallel, taking advantage of high performance computing clusters.
+.. note:: **You need to run this script once for each sample**. However, this
+    can be done in parallel, taking advantage of high performance computing
+    clusters.
 
 
 Full script
@@ -192,8 +193,8 @@ Full script
 
 Here is the full script::
 
-    ngless "0.0"
-    import "parallel" version "0.0"
+    ngless "0.7"
+    import "parallel" version "0.6"
     import "mocat" version "0.0"
     import "motus" version "0.1"
     import "igc" version "0.0"
@@ -203,7 +204,7 @@ Here is the full script::
 
     input = load_mocat_sample(sample)
 
-    preprocess(input, keep_singles=False) using |read|:
+    input = preprocess(input, keep_singles=False) using |read|:
         read = substrim(read, min_quality=25)
         if len(read) < 45:
             discard
