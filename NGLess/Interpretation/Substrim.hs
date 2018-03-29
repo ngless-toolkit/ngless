@@ -1,4 +1,4 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE OverloadedStrings #-}
@@ -11,7 +11,7 @@ module Interpretation.Substrim
     , endstrimPos
     ) where
 
-import qualified Data.Vector.Unboxed as VU
+import qualified Data.Vector.Storable as VS
 
 import Data.Maybe
 import Data.Int
@@ -31,8 +31,8 @@ endstrim ends cutoff sr@(ShortRead _ _ rQ) = srSlice s n sr
 
 data S4 = S4 {-# UNPACK #-} !Int {-# UNPACK #-} !Int {-# UNPACK #-} !Int {-# UNPACK #-} !Int
 -- Receives a Quality array and returns a pair with the index and size of the subsequence which has the most consecutive bps respecting the cutoff.
-subtrimPos :: VU.Vector Int8 -> Int8 -> (Int,Int)
-subtrimPos quality cutoff = case VU.foldl' calcSubStrim' (S4 0 0 0 0) quality of
+subtrimPos :: VS.Vector Int8 -> Int8 -> (Int,Int)
+subtrimPos quality cutoff = case VS.foldl' calcSubStrim' (S4 0 0 0 0) quality of
                               S4 i s _ _ -> (i, s)
     where
         calcSubStrim' :: S4 -> Int8 -> S4
@@ -41,22 +41,22 @@ subtrimPos quality cutoff = case VU.foldl' calcSubStrim' (S4 0 0 0 0) quality of
           | n_s + 1 > s = S4 n_i (n_s + 1) n_i (n_s + 1)
           | otherwise = S4 i s n_i (n_s + 1)
 
-endstrimPos :: EndstrimEnds -> VU.Vector Int8 -> Int8 -> (Int, Int)
-endstrimPos method quality cutoff = (start, trim3p $ VU.drop start quality)
+endstrimPos :: EndstrimEnds -> VS.Vector Int8 -> Int8 -> (Int, Int)
+endstrimPos method quality cutoff = (start, trim3p $ VS.drop start quality)
     where
         start
-            | do5 = fromMaybe len $ VU.findIndex (>= cutoff) quality
+            | do5 = fromMaybe len $ VS.findIndex (>= cutoff) quality
             | otherwise = 0
         do5 = method `elem` [Endstrim5, EndstrimBoth]
         do3 = method `elem` [Endstrim3, EndstrimBoth]
-        len = VU.length quality
+        len = VS.length quality
         trim3p qs
-            | do3 = trim3p' (VU.length qs) qs
-            | otherwise = VU.length qs
-        trim3p' :: Int -> VU.Vector Int8 -> Int
+            | do3 = trim3p' (VS.length qs) qs
+            | otherwise = VS.length qs
+        trim3p' :: Int -> VS.Vector Int8 -> Int
         trim3p' 0 _ = 0
         trim3p' n qs
-            | qs VU.! (n - 1) >= cutoff = n
+            | qs VS.! (n - 1) >= cutoff = n
             | otherwise = trim3p' (n - 1) qs
 
 

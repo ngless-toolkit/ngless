@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, MultiWayIf #-}
@@ -16,7 +16,7 @@ import System.IO
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
-import qualified Data.Vector.Unboxed as VU
+import qualified Data.Vector.Storable as VS
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
@@ -220,6 +220,6 @@ getEncArgument fname args =
             "solexa" -> return $ Just SolexaEncoding
             other -> throwScriptError ("Unkown encoding for fastq " ++ T.unpack other)
 
-executeShortReadsMethod (MethodName "avg_quality") (ShortRead _ _ rQ) Nothing _ = return $! NGODouble $ fromIntegral (VU.foldl' (\acc n -> acc + toInteger n) (0 :: Integer) rQ) / fromIntegral (VU.length rQ)
-executeShortReadsMethod (MethodName "fraction_at_least") (ShortRead _ _ rQ) (Just (NGOInteger minq)) _ = return $! NGODouble $ fromIntegral (VU.foldl' (\acc q -> acc + fromEnum (q >= fromInteger minq)) (0 :: Int) rQ) / fromIntegral (VU.length rQ)
+executeShortReadsMethod (MethodName "avg_quality") (ShortRead _ _ rQ) Nothing _ = return $! NGODouble $ fromIntegral (VS.foldl' (\acc n -> acc + toInteger n) (0 :: Integer) rQ) / fromIntegral (VS.length rQ)
+executeShortReadsMethod (MethodName "fraction_at_least") (ShortRead _ _ rQ) (Just (NGOInteger minq)) _ = return $! NGODouble $ fromIntegral (VS.foldl' (\acc q -> acc + fromEnum (q >= fromInteger minq)) (0 :: Int) rQ) / fromIntegral (VS.length rQ)
 executeShortReadsMethod (MethodName other) _ _ _ = throwShouldNotOccur ("Unknown short read method: " ++ show other)

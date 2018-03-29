@@ -39,6 +39,7 @@ import Control.Exception
 
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
+import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
 import qualified Data.Vector.Unboxed.Mutable as VUM
 
@@ -63,7 +64,7 @@ foreign import ccall "updateCharCount" c_updateCharCount :: CUInt -> CString -> 
 data ShortRead = ShortRead
         { srHeader :: !B.ByteString
         , srSequence :: !B.ByteString
-        , srQualities :: !(VU.Vector Int8) -- ^ these have been decoded
+        , srQualities :: !(VS.Vector Int8) -- ^ these have been decoded
         } deriving (Eq, Show, Ord)
 
 instance NFData ShortRead where
@@ -98,7 +99,7 @@ minQualityValue = -5
 srLength = B.length . srSequence
 
 srSlice :: Int -> Int -> ShortRead -> ShortRead
-srSlice s n (ShortRead rId rS rQ) = assert (B.length rS >= s + n) $ ShortRead rId (B.take n $ B.drop s rS) (VU.slice s n rQ)
+srSlice s n (ShortRead rId rS rQ) = assert (B.length rS >= s + n) $ ShortRead rId (B.take n $ B.drop s rS) (VS.slice s n rQ)
 
 encodingOffset :: Num a => FastQEncoding -> a
 encodingOffset SangerEncoding = 33
@@ -115,18 +116,18 @@ fqEncodeC enc = CL.map (fqEncode enc)
 
 -- Using B.map instead of this function makes this loop be one of the functions
 -- with the highest memory allocation in ngless.
-bsAdd :: VU.Vector Int8 -> Int8 -> B.ByteString
+bsAdd :: VS.Vector Int8 -> Int8 -> B.ByteString
 bsAdd c delta = BI.unsafeCreate cn $ \p -> copyAddLoop p 0
     where
-        cn = VU.length c
+        cn = VS.length c
         copyAddLoop p i
             | i == cn = return ()
             | otherwise = do
-                poke (p `plusPtr` i) ((fromIntegral $ c VU.! i + delta) :: Word8)
+                poke (p `plusPtr` i) ((fromIntegral $ c VS.! i + delta) :: Word8)
                 copyAddLoop p (i + 1)
 
-vSub :: B.ByteString -> Int8 -> VU.Vector Int8
-vSub qs delta = VU.generate (B.length qs) $ \i -> fromIntegral (B.index qs i) - delta
+vSub :: B.ByteString -> Int8 -> VS.Vector Int8
+vSub qs delta = VS.generate (B.length qs) $ \i -> fromIntegral (B.index qs i) - delta
 
 fqEncode :: FastQEncoding -> ShortRead -> B.ByteString
 fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, "\n"]
@@ -229,7 +230,7 @@ fqStatsC = do
                 updateQCounts n i
                     | i == n = return ()
                     | otherwise = do
-                        let qi = 256*i - minQualityValue + fromIntegral (qs VU.! i)
+                        let qi = 256*i - minQualityValue + fromIntegral (qs VS.! i)
                         VSM.unsafeModify qcs' (+ 1) qi
                         updateQCounts n (i+1)
             updateQCounts (toEnum len) 0
