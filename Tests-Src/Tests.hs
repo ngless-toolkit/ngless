@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
@@ -19,11 +19,11 @@ import Text.Parsec.Combinator (eof)
 import System.Directory (removeDirectoryRecursive
                         ,doesFileExist
                         )
-import qualified Data.Vector.Unboxed as VU
+import qualified Data.Vector.Storable as VS
 import qualified Data.ByteString.Char8 as B
 
 import qualified Data.Conduit as C
-import           Data.Conduit ((=$=), ($$), (.|))
+import           Data.Conduit ((.|))
 import           Control.Monad.State.Strict (execState, modify')
 import           Data.Convertible (convert)
 
@@ -116,7 +116,7 @@ indent_space  = "ngless '0.0'\n\
 
 
 -- Type Validate pre process operations
-sr i s q = NGOShortRead (ShortRead i s $ VU.generate (B.length q) (convert . B.index q))
+sr i s q = NGOShortRead (ShortRead i s $ VS.generate (B.length q) (convert . B.index q))
 
 case_pre_process_indexation_1 = _evalIndex' (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [Just (NGOInteger 5), Nothing] @?= (sr "@IRIS" "CAA" "aaa")
 case_pre_process_indexation_2 = _evalIndex' (sr "@IRIS" "AGTACCAA" "aa`aaaaa") [Nothing, Just (NGOInteger 3)] @?= (sr "@IRIS" "AGT" "aa`")
@@ -219,10 +219,11 @@ countC = loop (0 :: Int)
 make_unique_test n = let enc = SolexaEncoding in do
     nuniq <- testNGLessIO $ do
         newfp <- performUnique "test_samples/data_set_repeated.fq" enc n
-        conduitPossiblyCompressedFile newfp
-                =$= linesC
-                =$= fqDecodeC enc
-                $$ countC
+        C.runConduit $
+            conduitPossiblyCompressedFile newfp
+                .| linesC
+                .| fqDecodeC enc
+                .| countC
     let n' = min n 4
     nuniq @?=  (n' * 54)
 

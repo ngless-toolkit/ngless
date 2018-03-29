@@ -11,7 +11,7 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck2
 
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.Vector.Unboxed as VU
+import qualified Data.Vector.Storable as VS
 import           Data.Int
 import           Data.Conduit ((.|))
 import qualified Data.Conduit as C
@@ -46,9 +46,9 @@ fqDecode enc s = C.runConduit $
 
 encodeRecover enc = fqDecode enc . BL.fromChunks $ map (fqEncode enc) reads3
 reads3 =
-    [ShortRead "x" "acttg" (VU.fromList [35,16,34,34,24])
-    ,ShortRead "y" "catgt" (VU.fromList [33,17,25,37,18])
-    ,ShortRead "z" "ccggg" (VU.fromList [32,16,20,32,17])
+    [ShortRead "x" "acttg" (VS.fromList [35,16,34,34,24])
+    ,ShortRead "y" "catgt" (VS.fromList [33,17,25,37,18])
+    ,ShortRead "z" "ccggg" (VS.fromList [32,16,20,32,17])
     ]
 
 simpleStats f = testNGLessIO $ do
@@ -99,48 +99,48 @@ genericTrimPos MSubstrim = subtrimPos
 genericTrimPos (MEndstrim ends) = endstrimPos ends
 
 
-newtype VU8 = VU8 (VU.Vector Int8)
+newtype VS8 = VS8 (VS.Vector Int8)
     deriving (Eq, Show)
 
-instance Arbitrary VU8 where
-    arbitrary = VU8 . VU.fromList <$> listOf1 (oneof (return <$> [-5 .. 40]))
+instance Arbitrary VS8 where
+    arbitrary = VS8 . VS.fromList <$> listOf1 (oneof (return <$> [-5 .. 40]))
 
 -- Test SUBSTRIM/ENDSTRIM
 --Property 1: For every s, the size must be always smaller than the input
-prop_trim_maxsize m (VU8 s) = st >= 0 && e <= VU.length s
+prop_trim_maxsize m (VS8 s) = st >= 0 && e <= VS.length s
     where (st,e) = genericTrimPos m s 20
 
 -- Property 2: substrim should be idempotent
-prop_strim_idempotent m (VU8 s) = st == 0 && n == VU.length s1
+prop_strim_idempotent m (VS8 s) = st == 0 && n == VS.length s1
     where
         (st0, n0) = genericTrimPos m s 20
-        s1 = VU.slice st0 n0 s
+        s1 = VS.slice st0 n0 s
         (st,n) = genericTrimPos m s1 20
 
-data SplitVU8 = SplitVU8 (VU.Vector Int8) Int Int
+data SplitVU8 = SplitVU8 (VS.Vector Int8) Int Int
     deriving (Show)
 
 instance Arbitrary SplitVU8 where
     arbitrary = do
-        qs <- VU.fromList <$> listOf1 arbitrary
-        st <- elements [0 .. VU.length qs - 1]
-        n <- elements [0 .. VU.length qs - st]
+        qs <- VS.fromList <$> listOf1 arbitrary
+        st <- elements [0 .. VS.length qs - 1]
+        n <- elements [0 .. VS.length qs - st]
         return $! SplitVU8 qs st n
 
 prop_substrim_no_better (SplitVU8 qs s n) = not valid || n' >= n
     where
         thr = 20
-        valid = VU.all (> thr) (VU.slice s n qs)
+        valid = VS.all (> thr) (VS.slice s n qs)
         (_, n') = subtrimPos qs thr
 
-case_substrim_normal_exec =  subtrimPos (VU.fromList [10,11,12,123,122,111,10,11,0]) 20 @?= (3,3)
-case_substrim_empty_quals = subtrimPos VU.empty 20 @?= (0,0)
+case_substrim_normal_exec =  subtrimPos (VS.fromList [10,11,12,123,122,111,10,11,0]) 20 @?= (3,3)
+case_substrim_empty_quals = subtrimPos VS.empty 20 @?= (0,0)
 
-case_endstrim_quals_allbad = snd (endstrimPos EndstrimBoth (VU.fromList [1,2,2,2,2,1,2,2]) 10) @?= 0
-case_endstrim_quals_allbad_tresh = snd (endstrimPos EndstrimBoth (VU.fromList [9,9,9,9]) 10) @?= 0
-case_endstrim_quals_allOK_tresh = endstrimPos EndstrimBoth (VU.fromList [10,10,10,10]) 10 @?= (0,4)
-case_endstrim_quals_one_OK = endstrimPos EndstrimBoth (VU.fromList [9,9,10,9]) 10 @?= (2,1)
-case_endstrim_quals_one_OK_3 = endstrimPos Endstrim3 (VU.fromList [9,9,10,9]) 10 @?= (0,3)
-case_endstrim_quals_one_OK_5 = endstrimPos Endstrim5 (VU.fromList [9,9,10,9]) 10 @?= (2,2)
-case_endstrim_1 = endstrimPos EndstrimBoth (VU.fromList [9,9,10,9,9,10,9]) 10 @?= (2,4)
+case_endstrim_quals_allbad = snd (endstrimPos EndstrimBoth (VS.fromList [1,2,2,2,2,1,2,2]) 10) @?= 0
+case_endstrim_quals_allbad_tresh = snd (endstrimPos EndstrimBoth (VS.fromList [9,9,9,9]) 10) @?= 0
+case_endstrim_quals_allOK_tresh = endstrimPos EndstrimBoth (VS.fromList [10,10,10,10]) 10 @?= (0,4)
+case_endstrim_quals_one_OK = endstrimPos EndstrimBoth (VS.fromList [9,9,10,9]) 10 @?= (2,1)
+case_endstrim_quals_one_OK_3 = endstrimPos Endstrim3 (VS.fromList [9,9,10,9]) 10 @?= (0,3)
+case_endstrim_quals_one_OK_5 = endstrimPos Endstrim5 (VS.fromList [9,9,10,9]) 10 @?= (2,2)
+case_endstrim_1 = endstrimPos EndstrimBoth (VS.fromList [9,9,10,9,9,10,9]) 10 @?= (2,4)
 

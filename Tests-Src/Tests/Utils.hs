@@ -13,14 +13,11 @@ import qualified Data.Text as T
 import qualified Data.ByteString as B
 import Control.Monad.IO.Class (liftIO)
 import System.IO
-import CmdArgs
 
 import Language
 import Parse
-import Configuration
 import FileManagement
 import NGLess
-import NGLess.NGLEnvironment
 
 isError :: Either a b -> Assertion
 isError = isErrorMsg "Error not caught"
