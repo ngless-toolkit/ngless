@@ -2,6 +2,7 @@ Version 0.7.1+
 	* Add minimap2 support as alternative mapper
 	* Faster collect()
 	* Fix writing of multiple compressed files to uncompressed format
+	* Add `n_to_zero_quality` method for short reads
 
 Version 0.7.1 2018-03-17 by luispedro
 	* Fix memory leak in count()

@@ -30,3 +30,13 @@ input = preprocess(input) using |read|:
     if read.avg_quality() < 31.9:
         discard
 write(input, ofile='output.endstrim31.fq')
+
+
+input = fastq('sample.fq')
+input = preprocess(input) using |read|:
+    read = read.n_to_zero_quality()
+    read = substrim(read, min_quality=20)
+    if len(read) < 10:
+        discard
+write(input, ofile='output.substrim.n_to_zero_quality.fq')
+

@@ -22,6 +22,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
 import qualified Control.Concurrent.Async as A
 import Control.Monad.Trans.Resource
 import Control.Monad.Except
@@ -222,4 +223,8 @@ getEncArgument fname args =
 
 executeShortReadsMethod (MethodName "avg_quality") (ShortRead _ _ rQ) Nothing _ = return $! NGODouble $ fromIntegral (VS.foldl' (\acc n -> acc + toInteger n) (0 :: Integer) rQ) / fromIntegral (VS.length rQ)
 executeShortReadsMethod (MethodName "fraction_at_least") (ShortRead _ _ rQ) (Just (NGOInteger minq)) _ = return $! NGODouble $ fromIntegral (VS.foldl' (\acc q -> acc + fromEnum (q >= fromInteger minq)) (0 :: Int) rQ) / fromIntegral (VS.length rQ)
+executeShortReadsMethod (MethodName "n_to_zero_quality") (ShortRead h sq rQ) Nothing _ = return . NGOShortRead . ShortRead h sq $ VS.generate (VS.length rQ) (\ix ->
+                                                                                                                            if B8.index sq ix == 'N' || B8.index sq ix == 'n'
+                                                                                                                                then 0
+                                                                                                                                else rQ VS.! ix)
 executeShortReadsMethod (MethodName other) _ _ _ = throwShouldNotOccur ("Unknown short read method: " ++ show other)

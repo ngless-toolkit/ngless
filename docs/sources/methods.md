@@ -10,6 +10,16 @@ They can also take arguments
     mapped = select(mapped) using |mr|:
         mr = mr.filter(min_match_size=30)
 
+## Short reads
+
+Short reads have the following methods:
+
+- `avg_quality()`: the average quality (as a double)
+- `fraction_at_least(q)`: the fraction of bases of quality greater or equal to `q`
+- `n_to_zero_quality()`: transform the quality scores so that any `N` (or `n`)
+  bases in the sequence get a quality of zero.
+
+
 ## Mapped reads
 
 Mapped reads contain several methods. *None of these methods changes its

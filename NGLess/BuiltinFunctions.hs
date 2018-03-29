@@ -138,6 +138,7 @@ builtinMethods =
     ,MethodInfo (MethodName "unique") NGLMappedRead Nothing NGLMappedRead [] True []
     ,MethodInfo (MethodName "avg_quality") NGLRead Nothing NGLDouble [] True []
     ,MethodInfo (MethodName "fraction_at_least") NGLRead (Just NGLInteger) NGLDouble [] True []
+    ,MethodInfo (MethodName "n_to_zero_quality") NGLRead Nothing NGLRead [] True []
     ]
 
 filterArgs =
