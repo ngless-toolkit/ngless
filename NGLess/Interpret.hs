@@ -1,12 +1,14 @@
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, CPP #-}
 module Interpret
     ( interpret
+#ifdef IS_BUILDING_TEST
     , _evalIndex
     , _evalUnary
-    , _evalBinary
+    , evalBinary
+#endif
     ) where
 
 {-| This is the interpreter module. The main function, 'interpet' expects an
@@ -78,6 +80,7 @@ import           Control.Error (note)
 
 import System.IO
 import System.Directory
+import System.FilePath ((</>))
 import Data.List (find)
 import GHC.Conc                 (getNumCapabilities)
 
@@ -245,7 +248,7 @@ interpretExpr (UnaryOp op v) = do
 interpretExpr (BinaryOp bop v1 v2) = do
     v1' <- interpretExpr v1
     v2' <- interpretExpr v2
-    runNGLess (_evalBinary bop v1' v2')
+    runNGLess (evalBinary bop v1' v2')
 interpretExpr (IndexExpression expr ie) = do
     expr' <- interpretExpr expr
     ie' <- interpretIndex ie
@@ -643,13 +646,17 @@ asDouble other = throwScriptError ("Expected numeric value, got: " ++ show other
 
 
 -- Binary Evaluation
-_evalBinary :: BOp ->  NGLessObject -> NGLessObject -> Either NGError NGLessObject
-_evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a + b)
-_evalBinary BOpAdd (NGOString a) (NGOString b) = Right $ NGOString (T.concat [a, b])
-_evalBinary BOpAdd a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
-_evalBinary BOpMul (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a * b)
-_evalBinary BOpMul a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
-_evalBinary op a b = do
+evalBinary :: BOp ->  NGLessObject -> NGLessObject -> Either NGError NGLessObject
+evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a + b)
+evalBinary BOpAdd (NGOString a) (NGOString b) = Right $ NGOString (T.concat [a, b])
+evalBinary BOpAdd a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
+evalBinary BOpMul (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a * b)
+evalBinary BOpMul a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
+evalBinary BOpPathAppend a b = case (a,b) of
+    (NGOString pa, NGOString pb) -> return . NGOString $! T.pack (T.unpack pa </> T.unpack pb)
+    _ -> nglTypeError ("Operator </>: invalid arguments" :: String)
+
+evalBinary op a b = do
         a' <- asDouble a
         b' <- asDouble b
         return . NGOBool $ cmp op a' b'

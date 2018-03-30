@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -50,7 +50,7 @@ data UOp = UOpLen | UOpMinus | UOpNot
     deriving (Eq, Ord, Show)
 
 -- | binary operators
-data BOp = BOpAdd | BOpMul | BOpGT | BOpGTE | BOpLT | BOpLTE | BOpEQ | BOpNEQ
+data BOp = BOpAdd | BOpMul | BOpGT | BOpGTE | BOpLT | BOpLTE | BOpEQ | BOpNEQ | BOpPathAppend
     deriving (Eq, Ord, Show)
 
 -- | index expression encodes what is inside an index variable

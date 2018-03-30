@@ -209,6 +209,7 @@ checkbop BOpLTE a b = checknum a *> checknum b *> return (Just NGLBool)
 checkbop BOpEQ  a b = checknum a *> checknum b *> return (Just NGLBool)
 checkbop BOpNEQ a b = checknum a *> checknum b *> return (Just NGLBool)
 
+checkbop BOpPathAppend a b = softCheck NGLString a *> softCheck NGLString b *> return (Just NGLString)
 
 softCheck :: NGLType -> Expression -> TypeMSt (Maybe NGLType)
 softCheck expected expr = do

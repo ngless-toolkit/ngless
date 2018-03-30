@@ -79,6 +79,8 @@ encodeBOp BOpLTE = "lte"
 encodeBOp BOpEQ = "eq"
 encodeBOp BOpNEQ = "neq"
 
+encodeBOp BOpPathAppend = "path_append"
+
 encodeUOp :: UOp -> String
 encodeUOp UOpLen = "len"
 encodeUOp UOpMinus = "negate"

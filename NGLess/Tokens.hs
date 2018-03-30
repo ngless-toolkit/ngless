@@ -131,6 +131,9 @@ boperator = choice [
                     | (long,short) <-
                     [ ("!=", BOpNEQ)
                     , ("==", BOpEQ)
+
+                    , ("</>", BOpPathAppend)
+
                     , ("<=", BOpLTE)
                     , ("<", BOpLT)
                     , (">=", BOpGTE)
