@@ -541,12 +541,9 @@ loadFunctionalMap fname columns = do
                                                                             (reindex gmap namemap)
                                                                             (RSV.fromList [RSV.RefSeqInfo n 0.0 | n <- M.keys namemap])
         reindex :: M.Map B.ByteString [Int] -> M.Map B.ByteString Int -> M.Map B.ByteString [Int]
-        reindex gmap namemap = M.map (map reindex1) gmap
+        reindex gmap namemap = M.map (map (ix2ix VU.!)) gmap
             where
-                reindex1 :: Int -> Int
-                reindex1 = fromJust . flip M.lookup remap
-                remap = M.fromList (zip (M.elems namemap) [0..])
-
+                ix2ix = revnamemap namemap
         inserts1 :: Int -> LoadFunctionalMapState -> (B.ByteString, [[B.ByteString]]) -> LoadFunctionalMapState
         inserts1 c (LoadFunctionalMapState first gmap namemap) (name, ids) = LoadFunctionalMapState first' gmap' namemap'
             where
@@ -607,6 +604,13 @@ annotationMode _ (Just ref) Nothing Nothing = do
         (Just _, Just _) -> throwDataError ("Reference " ++ T.unpack ref ++ " has both a GFF and a functional map file. Cannot figure out what to do.")
 annotationMode _ _ _ _ =
             throwScriptError "For counting, you must do one of\n1. use seqname mode\n2. pass in a GFF file using the argument 'gff_file'\n3. pass in a gene map using the argument 'functional_map'"
+
+
+revnamemap :: M.Map B.ByteString Int -> VU.Vector Int
+revnamemap namemap = VU.create $ do
+                r <- VUM.new (M.size namemap)
+                forM_ (zip (M.elems namemap) [0..]) $ uncurry (VUM.write r)
+                return r
 
 loadGFF :: FilePath -> CountOpts -> NGLessIO [Annotator]
 loadGFF gffFp opts = do
@@ -686,8 +690,9 @@ loadGFF gffFp opts = do
             where
                 headers = M.keys namemap -- these are sorted
                 reindexAI :: AnnotationInfo -> AnnotationInfo
-                reindexAI (s :!: v) = s :!: fromJust (M.lookup v ix2ix)
-                ix2ix = M.fromList $ zip (M.elems namemap) [0..]
+                reindexAI (s :!: v) = s :!: (ix2ix VU.! v)
+                ix2ix :: VU.Vector Int
+                ix2ix = revnamemap namemap
 
         gffSize :: GffLine -> Int
         gffSize g = (gffEnd g - gffStart g) + 1 -- gff format is inclusive at both ends!
