@@ -1,13 +1,15 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, CPP #-}
 
 -- | This module handles tokenization
 module Tokens
     ( Token(..)
     , tokenize
-    , _eol
+#ifdef IS_BUILDING_TEST
+    , eol
+#endif
     ) where
 
 import qualified Data.Text as T
@@ -56,12 +58,12 @@ ngltoken = comment
         <|> operator
         <|> indent
         <|> taberror
-        <|> _eol
+        <|> eol
 
-_eol = _semicolon <|> _real_eol
-
-_real_eol = ((char '\r' *> char '\n') <|> char '\n') *> pure TNewLine
-_semicolon = char ';' *> skipMany (char ' ') *> pure TNewLine
+eol = semicolon <|> real_eol
+    where
+        real_eol = ((char '\r' *> char '\n') <|> char '\n') *> pure TNewLine
+        semicolon = char ';' *> skipMany (char ' ') *> pure TNewLine
 
 try_string s = try (string s)
 
@@ -85,7 +87,7 @@ strtext term = T.pack <$> many (escapedchar <|> noneOf [term])
 comment = singlelinecomment <|> multilinecomment
 singlelinecomment = commentstart *> skiptoeol
     where commentstart = (void $ char '#') <|> (void . try $ string "//")
-skiptoeol = _eol  <|> (anyChar *> skiptoeol)
+skiptoeol = eol  <|> (anyChar *> skiptoeol)
 multilinecomment = (try_string "/*") *> skipmultilinecomment
 skipmultilinecomment = (try_string "*/" *> pure (TIndent 0))
             <|> (anyChar *> skipmultilinecomment)

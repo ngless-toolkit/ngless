@@ -76,7 +76,7 @@ main = do
 -- Test Tokens module
 tokenize' fn t = map snd <$> (tokenize fn t)
 
-case_tok_cr = TNewLine @=? (case parse (_eol <* eof) "test" "\r\n" of { Right t -> t; Left _ -> error "Parse failed"; })
+case_tok_cr = TNewLine @=? (case parse (Tokens.eol <* eof) "test" "\r\n" of { Right t -> t; Left _ -> error "Parse failed"; })
 case_tok_single_line_comment = tokenize' "test" with_comment @?= Right expected
     where
         with_comment = "a=0# comment\nb=1\n"

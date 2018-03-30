@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -20,7 +20,7 @@ import Text.Parsec.Error
 
 import NGLess.NGError
 import Language
-import Tokens
+import Tokens (tokenize, Token(..))
 
 
 sliceList :: Int -> Int -> [a] -> [a]
