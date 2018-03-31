@@ -9,11 +9,13 @@ module BuiltinModules.AsReads
     ) where
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
+import qualified Data.Conduit.Combinators as CC
 import Control.Monad.Trans.Resource (release)
-import Data.Conduit ((=$=), ($$))
+import Data.Conduit ((.|))
 import Control.Monad.Except
 import System.IO
 import Data.Default (def)
@@ -46,21 +48,20 @@ samToFastQ fpsam stream = do
     hasSingle <- liftIO (newIORef False)
     let writer sel var out =
             CL.mapMaybe sel
-                =$= (do
-                        awaitJust $ \val -> do
-                            liftIO (writeIORef var True)
-                            C.yield val
-                        C.awaitForever C.yield)
-                =$= asyncGzipTo out
-    void $
+                .| do
+                    empty <- CC.null
+                    unless empty $
+                        liftIO (writeIORef var True)
+                    asyncGzipTo out
+    [(),(),()] <- C.runConduit $
         stream
-        =$= readSamGroupsC
-        =$= CL.map asFQ
-        $$ C.sequenceSinks
-            [writer (liftM fst . rightToMaybe)  hasPaired ohand1
-            ,writer (liftM snd . rightToMaybe)  hasPaired ohand2
-            ,writer leftToMaybe                 hasSingle ohand3
-            ]
+            .|readSamGroupsC
+            .| CL.mapMaybeM asFQ
+            .| C.sequenceSinks
+                [writer (liftM fst . rightToMaybe)  hasPaired ohand1
+                ,writer (liftM snd . rightToMaybe)  hasPaired ohand2
+                ,writer leftToMaybe                 hasSingle ohand3
+                ]
     outputListLno' TraceOutput ["Finished as_reads"]
     liftIO $ forM_ [ohand1, ohand2, ohand3] hClose
     hasPaired' <- liftIO $ readIORef hasPaired
@@ -85,13 +86,24 @@ samToFastQ fpsam stream = do
             return $! ReadSet [(FastQFilePath SangerEncoding oname1,FastQFilePath SangerEncoding oname2)] []
 
 
-asFQ :: [SamLine] -> Either B.ByteString (B.ByteString,B.ByteString)
-asFQ = postproc . asFQ' False False . filter hasSeq
+-- return type is
+--    Nothing : no output
+--    Just (Left sr) : single-end short read
+--    Just (Right (sr0,sr1)) : paired-end short read
+asFQ :: [SamLine] -> NGLessIO (Maybe (Either B.ByteString (B.ByteString,B.ByteString)))
+asFQ sg = postproc (asFQ' False False . filter hasSeq $ sg)
     where
-        postproc [(_,b)] = Left b
-        postproc [(1,a),(2,b)] = Right (a,b)
-        postproc [(2,b),(1,a)] = Right (a,b)
-        postproc other = error ("Impossible argument to postproc: " ++ show other)
+        postproc :: [(Int, B.ByteString)] -> NGLessIO (Maybe (Either B.ByteString (B.ByteString, B.ByteString)))
+        postproc [(_,b)] = return . Just $ Left b
+        postproc [(1,a),(2,b)] = return . Just $ Right (a,b)
+        postproc [(2,b),(1,a)] = return . Just $ Right (a,b)
+        postproc [] = do
+            outputListLno' WarningOutput ["No sequence information for read ", readID]
+            return Nothing
+        postproc other = throwShouldNotOccur ("Impossible argument to postproc: " ++ show other)
+        readID = case sg of
+            (f@SamLine{}:_) -> B8.unpack (samQName f)
+            _ -> " [no read ID: this is likely a bug in ngless]"
         asFQ'  False False [s] = [(3 :: Int, asFQ1 s)]
         asFQ'  _ _ []= []
         asFQ' seen1 seen2 (s:ss)
