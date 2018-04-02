@@ -508,6 +508,13 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
         env <- gets id
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
+        doReinject <- runNGLessIO $ do
+                            v <- (ngleVersion <$> nglEnvironment)
+                            if v < NGLVersion 0 8
+                                then do
+                                    outputListLno' WarningOutput ["Select changed behaviour (for the better) in ngless 0.8. If possible, upgrade your version statement."]
+                                    return False
+                                else return True
         oname <- runNGLessIO $ makeNGLTempFile samfp "block_selected_" "sam" $ \ohandle ->
             C.runConduit $
                 istream .| do
@@ -515,25 +522,38 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
                         CC.takeWhile (isSamHeaderString . unwrapByteLine)
                             .| byteLineSinkHandle ohandle
                     readSamGroupsC' mapthreads paired
-                        .| asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . filterGroup))
+                        .| asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . (filterGroup doReinject)))
                         .| CB.sinkHandle ohandle
         return input { nglSamFile = File oname }
     where
         concatLines :: V.Vector [B.ByteString] -> B.ByteString
         concatLines = B8.unlines . concat . V.toList
 
-        filterGroup :: [SamLine] -> InterpretationROEnv [B.ByteString]
-        filterGroup [] = return []
-        filterGroup [SamHeader line] = return [line]
-        filterGroup mappedreads  = do
+        filterGroup :: Bool -> [SamLine] -> InterpretationROEnv [B.ByteString]
+        filterGroup _ [] = return []
+        filterGroup _ [SamHeader line] = return [line]
+        filterGroup doReinject mappedreads  = do
                     mrs' <- interpretBlock1 (BlockVariables1 var (NGOMappedRead mappedreads)) body
                     if blockStatus mrs' `elem` [BlockContinued, BlockOk]
                         then case lookupBlockVar var (blockValues mrs') of
                             Just (NGOMappedRead []) -> return []
-                            Just (NGOMappedRead rs) -> return (encodeSamLine <$> rs)
+                            Just (NGOMappedRead rs) -> return (encodeSamLine <$> (if doReinject then reinjectSequences mappedreads rs else rs))
                             _ -> nglTypeError ("Expected variable "++show var++" to contain a mapped read.")
 
                         else return []
+        reinjectSequences original filtered = case (split3 original, split3 filtered) of
+            ((o1, o2, os), (f1, f2, fs)) -> reinjectSequences' o1 f1 ++ reinjectSequences' o2 f2 ++ reinjectSequences' os fs
+        reinjectSequences' original f@(s@SamLine{}:rs)
+            | not (any hasSequence f) = case find hasSequence original of
+                    Just s' -> s { samSeq = samSeq s', samQual = samQual s'}:rs
+                    Nothing -> f
+        reinjectSequences' _ f = f
+        split3 :: [SamLine] -> ([SamLine], [SamLine], [SamLine])
+        split3 = foldl (\(f1,f2,fs) n -> if isFirstInPair n
+                                                    then (n:f1, f2, fs)
+                                                    else if isSecondInPair n
+                                                        then (f1, n:f2, fs)
+                                                        else (f1, f2, n:fs)) ([], [], [])
 executeSelectWBlock expr _ _ = unreachable ("Select with block, unexpected argument: " ++ show expr)
 
 

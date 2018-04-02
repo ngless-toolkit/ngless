@@ -9,7 +9,7 @@ IN DEVELOPMENT
   mapper. Import the ``minimap2`` module and specify the ``mapper`` when
   calling `map <Functions.html#map>`__. For example::
 
-    ngless '0.7'
+    ngless '0.8'
     import "minimap2" version "1.0"
 
     input = paired('sample.1.fq', 'sample.2.fq', singles='sample.singles.fq')
@@ -19,6 +19,11 @@ IN DEVELOPMENT
 - Added the ``</>`` operator. This can be used to concatenate filepaths. ``p0
   </> p1`` is short for ``p0 + "/" + p1`` (except that it avoids double forward
   slashes).
+
+- Fixed a bug in `select <Functions.html#select>`__ where in some edge cases,
+  the sequence would be incorrectly omitted from the result. Given that this is
+  a rare case, if a version prior to 0.8 is specified in the version header,
+  the old behaviour is emulated.
 
 Internal improvements
 ---------------------

@@ -16,6 +16,7 @@ module Data.Sam
     , isFirstInPair
     , isSecondInPair
     , isSamHeaderString
+    , hasSequence
     , matchSize
     , matchIdentity
 
@@ -97,6 +98,11 @@ isSecondInPair = (`testBit` 7) . samFlag
 
 isSamHeaderString :: B.ByteString -> Bool
 isSamHeaderString s = not (B.null s) && (B.head s == 64) -- 64 is '@'
+
+hasSequence :: SamLine -> Bool
+hasSequence SamHeader{} = False
+hasSequence SamLine{samSeq=s} = s /= "*"
+{-# INLINE hasSequence #-}
 
 newtype SimpleParser a = SimpleParser { runSimpleParser :: B.ByteString -> Maybe (Pair a B.ByteString) }
 instance Functor SimpleParser where

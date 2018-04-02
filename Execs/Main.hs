@@ -218,12 +218,13 @@ loadScript (ScriptFilePath fname) =
 
 
 parseVersion :: Maybe T.Text -> NGLess NGLVersion
-parseVersion Nothing = return $ NGLVersion 0 7
+parseVersion Nothing = return $ NGLVersion 0 8
 parseVersion (Just "0.0") = return $ NGLVersion 0 0
 parseVersion (Just "0.5") = return $ NGLVersion 0 5
 parseVersion (Just "0.6") = return $ NGLVersion 0 6
 parseVersion (Just "0.7") = return $ NGLVersion 0 7
-parseVersion (Just v) = throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 0.0/0.5-7 are available in this release)."]
+parseVersion (Just "0.8") = return $ NGLVersion 0 8
+parseVersion (Just v) = throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 0.0/0.5-8 are available in this release)."]
 
 modeExec :: NGLessMode -> IO ()
 modeExec opts@DefaultMode{} = do

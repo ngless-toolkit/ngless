@@ -91,7 +91,7 @@ samToFastQ fpsam stream = do
 --    Just (Left sr) : single-end short read
 --    Just (Right (sr0,sr1)) : paired-end short read
 asFQ :: [SamLine] -> NGLessIO (Maybe (Either B.ByteString (B.ByteString,B.ByteString)))
-asFQ sg = postproc (asFQ' False False . filter hasSeq $ sg)
+asFQ sg = postproc (asFQ' False False . filter hasSequence $ sg)
     where
         postproc :: [(Int, B.ByteString)] -> NGLessIO (Maybe (Either B.ByteString (B.ByteString, B.ByteString)))
         postproc [(_,b)] = return . Just $ Left b
@@ -112,8 +112,6 @@ asFQ sg = postproc (asFQ' False False . filter hasSeq $ sg)
             | otherwise = asFQ' seen1 seen2 ss
         asFQ1 SamLine{samQName=qname, samSeq=short, samQual=qs} = B.concat ["@", qname, "\n", short, "\n+\n", qs, "\n"]
         asFQ1 SamHeader{} = error "Should not have seen a header in this place"
-        hasSeq SamHeader{} = False
-        hasSeq SamLine{samSeq=s} = s /= "*"
 
 
 as_reads_Function = Function

@@ -18,7 +18,7 @@ import qualified Data.Text.Encoding as TE
 import           Data.Bits (Bits(..))
 import           Control.Monad.Except (throwError)
 import           Data.Either.Combinators (fromRight)
-import           Data.List (foldl')
+import           Data.List (foldl', find)
 
 import Data.Maybe
 
@@ -56,13 +56,25 @@ _parseConditions args = do
         asSC "unique" = return SelectUnique
         asSC c = throwShouldNotOccur ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
 
-_matchConditions :: MatchCondition -> [(SamLine,B.ByteString)] -> [(SamLine, B.ByteString)]
-_matchConditions _ r@[(SamHeader _,_)] = r
-_matchConditions (DropIf []) slines = slines
-_matchConditions (DropIf (c:cs)) slines = _matchConditions (DropIf cs) (drop1 c slines)
+matchConditions :: Bool -> MatchCondition -> [(SamLine,B.ByteString)] -> [(SamLine, B.ByteString)]
+matchConditions doReinject conds sg = reinjectSequences doReinject (matchConditions' conds sg)
+    where
+        reinjectSequences True f@((s@SamLine{}, _):rs)
+            | not (any (hasSequence . fst) f) && any (hasSequence . fst) sg
+                = let s' = addSequence s in (s', encodeSamLine s'):rs
+        reinjectSequences _ f = f
 
-_matchConditions (KeepIf []) slines = slines
-_matchConditions (KeepIf (c:cs)) slines = _matchConditions (KeepIf cs) (keep1 c slines)
+        addSequence s = case find hasSequence (fst <$> sg) of
+                            Just s' -> s { samSeq = samSeq s', samQual = samQual s' }
+                            Nothing -> s
+
+matchConditions' :: MatchCondition -> [(SamLine,B.ByteString)] -> [(SamLine, B.ByteString)]
+matchConditions' _ r@[(SamHeader _,_)] = r
+matchConditions' (DropIf []) slines = slines
+matchConditions' (DropIf (c:cs)) slines = matchConditions' (DropIf cs) (drop1 c slines)
+
+matchConditions' (KeepIf []) slines = slines
+matchConditions' (KeepIf (c:cs)) slines = matchConditions' (KeepIf cs) (keep1 c slines)
 
 drop1 SelectUnmapped g = filter (isAligned . fst) g
 drop1 SelectMapped g = if any (isAligned . fst) g
@@ -99,10 +111,17 @@ executeSelect (NGOMappedReadSet name istream ref) args = do
     paired <- lookupBoolOrScriptErrorDef (return True) "select" "paired" args
     conditions <- _parseConditions args
     Just lno <- ngleLno <$> nglEnvironment
+    doReinject <- do
+        v <- ngleVersion <$> nglEnvironment
+        if v < NGLVersion 0 8
+            then do
+                outputListLno' WarningOutput ["Select changed behaviour (for the better) in ngless 0.8. If possible, upgrade your version statement."]
+                return False
+            else return True
     let (fpsam, istream') = asSamStream istream
         stream =
             readSamGroupsAsConduit istream' paired
-                .| CL.map (_matchConditions conditions)
+                .| CL.map (matchConditions doReinject conditions)
                 .| streamedSamStats lno ("select_"++T.unpack name) ("select.lno"++show lno)
                 .| CL.map (map snd)
                 .| CL.concat
