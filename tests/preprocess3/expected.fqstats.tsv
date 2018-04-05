@@ -6,6 +6,7 @@
 0:minSeqLen	8
 0:maxSeqLen	36
 0:gcContent	0.3918918918918919
+0:nonATCGFraction	3.896103896103896e-2
 1:file	sample2.fq
 1:encoding	Solexa (64 offset)
 1:numSeqs	3
@@ -13,6 +14,7 @@
 1:minSeqLen	8
 1:maxSeqLen	36
 1:gcContent	0.3918918918918919
+1:nonATCGFraction	3.896103896103896e-2
 2:file	singles.fq
 2:encoding	Solexa (64 offset)
 2:numSeqs	3
@@ -20,6 +22,7 @@
 2:minSeqLen	8
 2:maxSeqLen	36
 2:gcContent	0.3918918918918919
+2:nonATCGFraction	3.896103896103896e-2
 3:file	preproc.lno4.pairs.1
 3:encoding	Solexa (64 offset)
 3:numSeqs	2
@@ -27,6 +30,7 @@
 3:minSeqLen	30
 3:maxSeqLen	33
 3:gcContent	0.38333333333333336
+3:nonATCGFraction	4.7619047619047616e-2
 4:file	preproc.lno4.pairs.2
 4:encoding	Solexa (64 offset)
 4:numSeqs	2
@@ -34,6 +38,7 @@
 4:minSeqLen	30
 4:maxSeqLen	33
 4:gcContent	0.38333333333333336
+4:nonATCGFraction	4.7619047619047616e-2
 5:file	preproc.lno4.singles
 5:encoding	Solexa (64 offset)
 5:numSeqs	2
@@ -41,3 +46,4 @@
 5:minSeqLen	30
 5:maxSeqLen	33
 5:gcContent	0.38333333333333336
+5:nonATCGFraction	4.7619047619047616e-2

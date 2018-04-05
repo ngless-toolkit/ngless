@@ -6,6 +6,7 @@ Version 0.7.1+
 	* Add </> operator for path manipulation
 	* Fix bug in select (corner case where sequences would be missing from
 	output)
+	* Add non-ATCG fraction field to FastQ statistics
 
 Version 0.7.1 2018-03-17 by luispedro
 	* Fix memory leak in count()

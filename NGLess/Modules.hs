@@ -61,6 +61,7 @@ data ArgCheck =
 data FunctionCheck =
             FunctionCheckMinNGLessVersion (Int, Int) -- ^ first version where this function can be used
             | FunctionCheckReturnAssigned -- ^ Function is pure
+            | FunctionCheckNGLVersionIncompatibleChange (Int, Int) -- ^ version when behaviour changed
             deriving (Eq, Show)
 
 -- | Basic information about argument to a function

@@ -2,8 +2,18 @@
 What's New (History)
 ====================
 
-IN DEVELOPMENT
---------------
+IN DEVELOPMENT (WILL BECOME 0.8)
+--------------------------------
+
+Incompatible changes
+~~~~~~~~~~~~~~~~~~~~
+
+- Added an extra field to the FastQ statistics, with the fraction of basepairs
+  that are not ATCG. This means that uses of `qcstats
+  <Functions.hml#qcstats>`__ must use an up-to-date version declaration.
+
+User-visible improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Support for `minimap2 <https://github.com/lh3/minimap2>`__ as alternative
   mapper. Import the ``minimap2`` module and specify the ``mapper`` when
@@ -26,7 +36,7 @@ IN DEVELOPMENT
   the old behaviour is emulated.
 
 Internal improvements
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 - Faster `collect() <Functions.html#collect>`__
 

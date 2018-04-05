@@ -6,6 +6,7 @@
 0:minSeqLen	40
 0:maxSeqLen	177
 0:gcContent	0.38936781609195403
+0:nonATCGFraction	8.547008547008548e-3
 1:file	split1.fq
 1:encoding	Sanger (33 offset)
 1:numSeqs	2
@@ -13,6 +14,7 @@
 1:minSeqLen	78
 1:maxSeqLen	177
 1:gcContent	0.3187250996015936
+1:nonATCGFraction	1.568627450980392e-2
 2:file	split2.fq
 2:encoding	Sanger (33 offset)
 2:numSeqs	8
@@ -20,3 +22,4 @@
 2:minSeqLen	40
 2:maxSeqLen	83
 2:gcContent	0.42921348314606744
+2:nonATCGFraction	4.4742729306487695e-3

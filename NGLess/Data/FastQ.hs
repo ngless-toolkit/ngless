@@ -18,6 +18,7 @@ module Data.FastQ
     , fqEncode
     , fqEncodeC
     , gcFraction
+    , nonATCGFrac
     , statsFromFastQ
     , fqStatsC
     , qualityPercentiles
@@ -78,7 +79,7 @@ data FastQFilePath = FastQFilePath
                         } deriving (Eq, Show, Ord)
 
 data FQStatistics = FQStatistics
-                { bpCounts :: (Int, Int, Int, Int) -- ^ number of (A, C, T, G)
+                { bpCounts :: (Int, Int, Int, Int, Int) -- ^ number of (A, C, T, G, OTHER)
                 , lc :: !Int8 -- ^ lowest quality value
                 , qualCounts ::  [VU.Vector Int] -- ^ quality counts by position
                 , nSeq :: !Int -- ^ number of sequences
@@ -86,7 +87,7 @@ data FQStatistics = FQStatistics
                 } deriving(Eq,Show)
 
 instance NFData FQStatistics where
-    rnf (FQStatistics (!_,!_,!_,!_) !_ qv !_ (!_,!_)) = rnf qv
+    rnf (FQStatistics (!_,!_,!_,!_,!_) !_ qv !_ (!_,!_)) = rnf qv
 
 -- | Total number of base pairs
 -- Returns an Integer as it can be > 2³¹
@@ -204,11 +205,13 @@ fqStatsC = do
             let lcT = if n > 0
                             then findMinQValue qcs'
                             else 0
-            aCount <- getNoCaseV charCounts 'a'
-            cCount <- getNoCaseV charCounts 'c'
-            gCount <- getNoCaseV charCounts 'g'
-            tCount <- getNoCaseV charCounts 't'
-            return $! FQStatistics (aCount, cCount, gCount, tCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq)
+            ccounts <- VS.unsafeFreeze charCounts
+            let aCount = getNoCaseV ccounts 'a'
+                cCount = getNoCaseV ccounts 'c'
+                gCount = getNoCaseV ccounts 'g'
+                tCount = getNoCaseV ccounts 't'
+                oCount = VS.sum ccounts - aCount - cCount - gCount - tCount
+            return $! FQStatistics (aCount, cCount, gCount, tCount, oCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq)
     where
 
         update :: VSM.IOVector Int -> VUM.IOVector Int -> IORef (VSM.IOVector Int) -> ShortRead -> m ()
@@ -239,10 +242,8 @@ fqStatsC = do
             VUM.unsafeModify stats (max len) 2
             return ()
 
-        getNoCaseV c p = do
-            lower <- VSM.read c (ord p)
-            upper <- VSM.read c (ord . toUpper $ p)
-            return (lower + upper)
+        getNoCaseV c p = c VS.! ord p + c VS.! (ord . toUpper $ p)
+
         findMinQValue :: [VU.Vector Int] -> Int
         findMinQValue = (flip (-) minQualityValue) . minimum . map findMinQValue'
         findMinQValue' :: VU.Vector Int -> Int
@@ -263,10 +264,14 @@ interleaveFQs pairs singletons = do
 gcFraction :: FQStatistics -> Double
 gcFraction res = gcCount / allBpCount
     where
-        (bpA,bpC,bpG,bpT) = bpCounts res
+        (bpA,bpC,bpG,bpT,_) = bpCounts res
         gcCount = fromIntegral $ bpC + bpG
         allBpCount = fromIntegral $ bpA + bpC + bpG + bpT
 
+nonATCGFrac :: FQStatistics -> Double
+nonATCGFrac fq = fromIntegral nO / fromIntegral (nA + nC + nT + nG + nO)
+    where
+        (nA, nC, nT, nG, nO) = bpCounts fq
 
 
 qualityPercentiles :: FQStatistics -> [(Int, Int, Int, Int)]

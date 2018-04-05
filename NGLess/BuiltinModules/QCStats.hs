@@ -1,4 +1,4 @@
-{- Copyright 2017 NGLess Authors
+{- Copyright 2017-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -39,7 +39,8 @@ qcStatsFunction = Function
     , funcRetType = NGLCounts
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False
-    , funcChecks = [FunctionCheckReturnAssigned]
+    , funcChecks = [FunctionCheckReturnAssigned
+                   ,FunctionCheckNGLVersionIncompatibleChange (0, 8)]
     }
 
 loadModule :: T.Text -> NGLessIO Module

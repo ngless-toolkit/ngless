@@ -1,7 +1,7 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE LambdaCase, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Validation
     ( validate
@@ -283,6 +283,7 @@ validateNGLessVersionUses mods sc = case nglVersion <$> nglHeader sc of
                 FunctionCall fname@(FuncName fname') _ kwargs _ ->
                     whenJust (findFunction mods fname) $ \finfo -> do
                         checkVersion ["Function ", fname'] $ minVersionFunction finfo
+                        checkVersionChanged ["Function ", fname'] $ minVersionFunctionChanged finfo
                         forM_ kwargs $ \(Variable name,_) ->
                             checkVersion ["Using argument ", name, " to function ", fname'] $ checkArg (funcKwArgs finfo) name
                 MethodCall mname@(MethodName mname') _ _ kwargs ->
@@ -292,14 +293,26 @@ validateNGLessVersionUses mods sc = case nglVersion <$> nglHeader sc of
                             checkVersion ["Using argument ", name, " to method ", mname'] $ checkArg (methodKwargsInfo minfo) name
                 _ -> return ()
             where
+                showV (a,b) = T.pack (show a ++ "." ++ show b)
                 checkVersion _ Nothing = return ()
                 checkVersion prefix (Just minV)
                     | versionLE minV version = return ()
-                    | otherwise = tell1lno lno (prefix ++ [" requires ngless version ", T.pack . show $ fst minV, ".", T.pack . show $ snd minV, " (version '", version, "' is active)."])
+                    | otherwise = tell1lno lno (prefix ++ [" requires ngless version ", showV minV, " (version '", version, "' is active)."])
+                checkVersionChanged _ Nothing = return ()
+                checkVersionChanged prefix (Just minV)
+                    | versionLE minV version = return ()
+                    | otherwise = tell1lno lno (prefix ++ [" changed behaviour in an incompatible fashion in version ", showV minV, " (version '", version, "' is active).\n",
+                                                           "See http://ngless.embl.de/whatsnew.html for details on changes."])
         minVersionFunction :: Function -> Maybe (Int, Int)
         minVersionFunction finfo =
             asum $ flip map (funcChecks finfo) $ \case
                             FunctionCheckMinNGLessVersion minV -> Just minV
+                            _ -> Nothing
+
+        minVersionFunctionChanged :: Function -> Maybe (Int, Int)
+        minVersionFunctionChanged finfo =
+            asum $ flip map (funcChecks finfo) $ \case
+                            FunctionCheckNGLVersionIncompatibleChange minV -> Just minV
                             _ -> Nothing
 
         minVersionMethod :: MethodInfo -> Maybe (Int, Int)
