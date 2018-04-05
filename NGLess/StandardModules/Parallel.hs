@@ -36,7 +36,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.TQueue as CA
 import qualified Data.Conduit.Algorithms as CAlg
 import           Control.Monad.ST (runST)
-import           Control.Monad.Error (throwError)
+import           Control.Monad.Except (throwError)
 import           Control.Monad.Extra (allM, unlessM)
 import           Control.DeepSeq
 import           Data.Traversable
