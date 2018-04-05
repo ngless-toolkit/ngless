@@ -1,4 +1,4 @@
-{- Copyright 2017 NGLess Authors
+{- Copyright 2017-2018 NGLess Authors
  - License: MIT
  -}
 module Citations
@@ -6,7 +6,8 @@ module Citations
     ) where
 
 import qualified Data.Text as T
-import Data.Maybe
+import qualified Data.Set as S
+import Data.Maybe (mapMaybe)
 
 import Modules
 import Language
@@ -25,4 +26,4 @@ collectCitations mods (Script _ sc) =
         useCits = flip mapMaybe (snd <$> sc) $ \case
             Assignment _ (FunctionCall (FuncName f) _ _ _) -> lookup f citations
             _ -> Nothing
-    in modCits ++ useCits
+    in (S.toList . S.fromList) (modCits ++ useCits)
