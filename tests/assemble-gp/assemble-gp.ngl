@@ -1,4 +1,4 @@
-ngless "0.6"
+ngless "0.8"
 
 input = fastq('sample.fq.gz')
 write(orf_find(assemble(input),

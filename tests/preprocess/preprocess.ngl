@@ -1,4 +1,4 @@
-ngless '0.5'
+ngless '0.8'
 input = fastq('sample.fq')
 trim = 3
 input = preprocess(input) using |read|:

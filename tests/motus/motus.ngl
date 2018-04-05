@@ -1,4 +1,4 @@
-ngless "0.0"
+ngless "0.8"
 import "motus" version "0.1"
 
 input = paired('input.1.fq.gz', 'input.2.fq.gz')

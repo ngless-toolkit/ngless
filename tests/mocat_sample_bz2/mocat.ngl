@@ -1,10 +1,10 @@
-ngless "0.0"
+ngless "0.8"
 import "mocat" version "0.0"
 
 input = load_mocat_sample('sample')
 
 trim = 3
-preprocess(input) using |read|:
+input = preprocess(input) using |read|:
    read = read[trim:]
    if len(read) < 10:
        discard
