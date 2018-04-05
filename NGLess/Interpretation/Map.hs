@@ -186,7 +186,7 @@ mapToReference mapper refIndex (ReadSet pairs singletons) extraArgs = do
                 callMapper mapper refIndex [fp] extraArgs (zipToStats out)
     liftIO $ hClose hout
     (newfp,) <$> combinestats statsp statss
-zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesC .| samStatsC))
+zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesUnBoundedC .| samStatsC))
 
 splitFASTA :: Int -> FilePath -> FilePath -> NGLessIO [FilePath]
 splitFASTA megaBPS ifile ofileBase =

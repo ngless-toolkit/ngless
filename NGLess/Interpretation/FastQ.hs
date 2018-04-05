@@ -26,7 +26,7 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Control.Concurrent.Async as A
 import Control.Monad.Trans.Resource
 import Control.Monad.Except
-import Data.Conduit (($$), (=$=))
+import Data.Conduit (($$), (=$=), (.|))
 import Data.Maybe
 import Data.Word
 
@@ -67,19 +67,19 @@ encodingFor fp = do
 
     C.runConduit $
         conduitPossiblyCompressedFile fp
-        =$= linesCBounded
-        =$= CL.chunksOf 4
-        =$= encodingC 255 0
+        .| linesC
+        .| CL.chunksOf 4
+        .| encodingC 255 0
 
 -- | Checks if file has no content
 --
 -- Note that this is more than checking if the file is empty: a compressed file
 -- with no content will not be empty.
-checkNoContent fp =
+checkNoContent fp = C.runConduit $
     conduitPossiblyCompressedFile fp
-        =$= linesCBounded
-        =$= CL.isolate 1
-        $$ CL.fold (\_ _ -> False) True
+        .| linesC
+        .| CL.isolate 1
+        .| CL.fold (\_ _ -> False) True
 
 
 -- | Drop every tenth FastQ group

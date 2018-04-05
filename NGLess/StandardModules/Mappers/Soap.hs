@@ -26,10 +26,11 @@ import qualified Data.Conduit.TQueue as CA
 import qualified Data.Conduit.Process as CP
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import           Data.Conduit (($$), (=$=))
+import           Data.Conduit (($$), (.|))
 import           Control.Monad.Extra (guard, allM, whenM)
 import           GHC.Conc (getNumCapabilities, setNumCapabilities)
 import           Data.List (isSuffixOf)
+import           Control.Monad.Except (MonadError)
 import           Control.Monad.Trans.Resource
 import           Control.Exception (bracket)
 
@@ -133,7 +134,9 @@ callMapper refIndex fps extraArgs outC = do
     -- all to work.
     q <- liftIO $ TQ.newTBMQueueIO 4
     out <- liftIO $ A.async (CA.sourceTBMQueue q $$ outC)
-    liftIO . runResourceT $ makeSAMHeader refIndex $$ CA.sinkTBMQueue q False
+    C.runConduitRes $
+        makeSAMHeader refIndex
+            .| CA.sinkTBMQueue q False
     (exitCode', (), err') <- liftIO $
         withFile otemp ReadMode $ \otemph ->
             withFile otemp2 ReadMode $ \otemp2h ->
@@ -153,8 +156,8 @@ callMapper refIndex fps extraArgs outC = do
                             "SOAP2SAM error code was ", show code, ".\n",
                             "Error output: ", B8.unpack (B8.intercalate "\n\t" err')]
 
-makeSAMHeader :: (MonadResource m, MonadBaseControl IO m) => FilePath -> C.Source m B.ByteString
-makeSAMHeader fafile = conduitPossiblyCompressedFile fafile =$= linesC =$= asSamHeader
+makeSAMHeader :: (MonadResource m, MonadBaseControl IO m, MonadError NGError m) => FilePath -> C.Source m B.ByteString
+makeSAMHeader fafile = conduitPossiblyCompressedFile fafile .| linesC .| asSamHeader
     where
         -- asSamHeader :: C.Conduit ByteLine IO B.ByteString
         asSamHeader = awaitJust $ \(ByteLine line) -> case readId line of

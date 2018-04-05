@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT -}
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts, CPP #-}
 
@@ -8,8 +8,8 @@ module Utils.Conduit
     , conduitPossiblyCompressedFile
     , asyncMapC
     , asyncMapEitherC
+    , linesUnBoundedC
     , linesC
-    , linesCBounded
     , awaitJust
     , asyncGzipTo
     , asyncGzipToFile
@@ -24,7 +24,7 @@ import qualified Data.ByteString as B
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import           Data.Conduit ((=$=))
+import           Data.Conduit ((.|))
 
 import           Control.Monad (when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -61,25 +61,28 @@ lineWindowsTerminated line = if not (B.null line) && B.index line (B.length line
                                 then B.take (B.length line - 1) line
                                 else line
                                     where carriage_return = 13
+{-# INLINE lineWindowsTerminated #-}
 
-linesC :: (Monad m) => C.Conduit B.ByteString m ByteLine
-linesC =
+
+linesUnBoundedC :: (Monad m) => C.Conduit B.ByteString m ByteLine
+linesUnBoundedC =
     CB.lines
-        =$= CL.map lineWindowsTerminated
-        =$= CL.map ByteLine
-{-# INLINE linesC #-}
+        .| CL.map lineWindowsTerminated
+        .| CL.map ByteLine
+{-# INLINE linesUnBoundedC #-}
 
 
-linesCBounded :: (MonadError NGError m) => C.Conduit B.ByteString m ByteLine
-linesCBounded =
+linesC :: (MonadError NGError m) => C.Conduit B.ByteString m ByteLine
+linesC =
     linesBounded 65536
-        =$= CL.map lineWindowsTerminated
-        =$= CL.map ByteLine
+        .| CL.map (ByteLine . lineWindowsTerminated)
+{-# INLINE linesC #-}
 
 byteLineSinkHandle :: (MonadIO m) => Handle -> C.Sink ByteLine m ()
 byteLineSinkHandle h = CL.mapM_ (\(ByteLine val) -> liftIO (B.hPut h val >> B.hPut h nl))
     where
         nl = B.singleton 10
+{-# INLINE byteLineSinkHandle #-}
 
 zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
 

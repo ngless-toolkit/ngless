@@ -319,7 +319,7 @@ executeSamfile expr@(NGOString fname) args = do
         then return $ NGOMappedReadSet gname (File fname') Nothing
         else do
             checkf headers'
-            return $ NGOMappedReadSet gname (Stream fname' ((CB.sourceFile headers' >> CB.sourceFile fname') .| linesCBounded)) Nothing
+            return $ NGOMappedReadSet gname (Stream fname' ((CB.sourceFile headers' >> CB.sourceFile fname') .| linesC)) Nothing
 executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show args)
 
 data PreprocessPairOutput = Paired !ShortRead !ShortRead | Single !ShortRead
@@ -401,7 +401,7 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
         let asSource [] = return ()
             asSource (FastQFilePath enc f:rest) =
                     let input = conduitPossiblyCompressedFile f
-                            .| linesCBounded
+                            .| linesC
                             .| C.conduitVector 4096
                             .| asyncMapEitherC mapthreads (fqDecodeVector enc)
                     in do

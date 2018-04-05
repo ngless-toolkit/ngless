@@ -40,7 +40,7 @@ case_parse_encode_solexa = encodeRecover SolexaEncoding @?= Right reads3
 fqDecode :: FastQEncoding -> BL.ByteString -> NGLess [ShortRead]
 fqDecode enc s = C.runConduit $
     CL.sourceList (BL.toChunks s)
-        .| linesCBounded
+        .| linesC
         .| fqDecodeC enc
         .| CL.consume
 

@@ -40,8 +40,8 @@ asFile (Stream fp istream) =
 
 asStream :: FileOrStream -> (FilePath, C.Source NGLessIO ByteLine)
 asStream (Stream fp istream) = (fp, istream)
-asStream (File fp) = (fp, C.sourceFile fp =$= linesCBounded)
+asStream (File fp) = (fp, C.sourceFile fp =$= linesC)
 
-asSamStream (File fname) = (fname, samBamConduit fname =$= linesCBounded)
+asSamStream (File fname) = (fname, samBamConduit fname =$= linesC)
 asSamStream (Stream fname istream) = (fname, istream)
 

@@ -97,7 +97,7 @@ executeParseCoord (NGOString coordfp) _ = do
     newfp <- makeNGLTempFile coordfp' "converted_" ".gtf" $ \hout ->
         C.runConduit $
             conduitPossiblyCompressedFile coordfp'
-                .| linesCBounded
+                .| linesC
                 .| CL.mapM convertToGff
                 .| C.unlinesAscii
                 .| C.sinkHandle hout

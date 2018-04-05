@@ -174,7 +174,7 @@ fqDecodeVector enc vs
 statsFromFastQ :: (MonadIO m, MonadError NGError m, MonadBaseControl IO m, MonadThrow m) => FilePath -> FastQEncoding -> m FQStatistics
 statsFromFastQ fp enc = C.runConduitRes $
         conduitPossiblyCompressedFile fp
-            .| linesCBounded
+            .| linesC
             .| fqDecodeC enc
             .| fqStatsC
 
@@ -256,7 +256,7 @@ interleaveFQs pairs singletons = do
     where
         interleavePair :: (Monad m, MonadError NGError m, MonadResource m, MonadBaseControl IO m) => FilePath -> FilePath -> C.Source m B.ByteString
         interleavePair f0 f1 =
-                ((conduitPossiblyCompressedFile f0 .| linesCBounded .| CL.chunksOf 4) `zipSources` (conduitPossiblyCompressedFile f1 .| linesCBounded .| CL.chunksOf 4))
+                ((conduitPossiblyCompressedFile f0 .| linesC .| CL.chunksOf 4) `zipSources` (conduitPossiblyCompressedFile f1 .| linesC .| CL.chunksOf 4))
                 .| C.awaitForever (\(r0,r1) -> C.yield (ul r0) >> C.yield (ul r1))
         zipSources a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
         ul = B8.unlines . map unwrapByteLine
