@@ -91,6 +91,8 @@ main = setupTestEnvironment >> defaultMain [
         , bench "preprocess-transformed" $ nfNGLessScriptWithTransform "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
         , bench "preprocess-pair" $ nfNGLessScript
                 "p = paired('test_samples/sample.fq.gz', 'test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n"
+        , bench "preprocess-pair-transformed" $ nfNGLessScriptWithTransform
+                "p = paired('test_samples/sample.fq.gz', 'test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n"
         , bench "substrim" $ nf (substrim 30) exampleSR
         ]
     ,bgroup "parse-sam"
@@ -105,9 +107,9 @@ main = setupTestEnvironment >> defaultMain [
                     performCount (File "test_samples/sample.sam") "testing" amap basicCountOpts
         ]
     ,bgroup "parallel"
-        [ bench "paste-sparse"   $ nfNGLessIO (pasteCounts [] False ["sample" | i <- [0..127]]
-                                                                ["test_samples/merge/sp_sample_"++show i | i <- [0..127]])
-        , bench "paste-dense"    $ nfNGLessIO (pasteCounts [] True ["sample" | i <- [0..127]]
-                                                                ["test_samples/merge/sample_"++show i | i <- [0..127]])
+        [ bench "paste-sparse"   $ nfNGLessIO (pasteCounts [] False ["sample" | _ <- [(0 :: Int)..127]]
+                                                                ["test_samples/merge/sp_sample_"++show i | i <- [(0 :: Int)..127]])
+        , bench "paste-dense"    $ nfNGLessIO (pasteCounts [] True ["sample" | _ <- [(0 :: Int)..127]]
+                                                                ["test_samples/merge/sample_"++show i | i <- [(0 :: Int)..127]])
         ]
     ]
