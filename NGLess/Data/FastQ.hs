@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts, ScopedTypeVariables, MultiWayIf #-}
+{-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
 {- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
@@ -33,10 +34,16 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import           Control.DeepSeq (NFData(..))
 import           Data.Conduit ((.|))
-import Control.Monad
+import           Data.Monoid ((<>))
+import           Control.Monad (forM_)
 import Control.Monad.Except
 import Control.Monad.Trans.Resource
 import Control.Exception
+
+import           System.IO.Unsafe (unsafeDupablePerformIO)
+import qualified Language.C.Inline.Unsafe as CU
+import qualified Language.C.Inline as C
+
 
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
@@ -59,7 +66,11 @@ import NGLess.NGError
 import Utils.Conduit
 import Utils.Vector (unsafeIncrement)
 
-foreign import ccall "updateCharCount" c_updateCharCount :: CUInt -> CString -> Ptr Int -> IO ()
+
+C.context (C.baseCtx <> C.bsCtx <> C.vecCtx)
+C.include "<stdint.h>"
+
+foreign import ccall unsafe "updateCharCount" c_updateCharCount :: CUInt -> CString -> Ptr Int -> IO ()
 
     -- | Represents a short read
 data ShortRead = ShortRead
@@ -128,7 +139,18 @@ bsAdd c delta = BI.unsafeCreate cn $ \p -> copyAddLoop p 0
                 copyAddLoop p (i + 1)
 
 vSub :: B.ByteString -> Int8 -> VS.Vector Int8
-vSub qs delta = VS.generate (B.length qs) $ \i -> fromIntegral (B.index qs i) - delta
+vSub qs delta = unsafeDupablePerformIO $ do
+    r <- VSM.new (B.length qs)
+    [CU.block| void {
+        int i;
+        int len = $bs-len:qs;
+        const char* in = $bs-ptr:qs;
+        int8_t* out = $vec-ptr:(int8_t* r);
+        for (i = 0; i < len; ++i) {
+            out[i] = in[i] - $(int8_t delta);
+        }
+    }|]
+    VS.unsafeFreeze r
 
 fqEncode :: FastQEncoding -> ShortRead -> B.ByteString
 fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, "\n"]
@@ -200,7 +222,7 @@ fqStatsC = do
                 v <- VUM.new 256
                 let base = i * 256
                 forM_ [0 .. 255] $ \j ->
-                    VSM.read qcs (base + j) >>= VUM.write v j
+                    VSM.read qcs (base + j) >>= VUM.write v j . fromEnum
                 VU.unsafeFreeze v
             let lcT = if n > 0
                             then findMinQValue qcs'
@@ -214,7 +236,7 @@ fqStatsC = do
             return $! FQStatistics (aCount, cCount, gCount, tCount, oCount) (fromIntegral lcT) qcs' n (minSeq, maxSeq)
     where
 
-        update :: VSM.IOVector Int -> VUM.IOVector Int -> IORef (VSM.IOVector Int) -> ShortRead -> m ()
+        update :: VSM.IOVector Int -> VUM.IOVector Int -> IORef (VSM.IOVector Int32) -> ShortRead -> m ()
         update !charCounts !stats qcs (ShortRead _ bps qs) = liftIO $ do
             let len = B.length bps
                 qlen = 256*len
@@ -229,14 +251,17 @@ fqStatsC = do
             B.unsafeUseAsCString bps $ \bps' ->
                 VSM.unsafeWith charCounts $ \charCounts' ->
                     c_updateCharCount (toEnum len) bps' charCounts'
-            let updateQCounts :: Int -> Int -> IO ()
-                updateQCounts n i
-                    | i == n = return ()
-                    | otherwise = do
-                        let qi = 256*i - minQualityValue + fromIntegral (qs VS.! i)
-                        VSM.unsafeModify qcs' (+ 1) qi
-                        updateQCounts n (i+1)
-            updateQCounts (toEnum len) 0
+            liftIO $ [CU.block| void {
+                int len = $bs-len:bps;
+                int minQ = $(int minQualityValue);
+                int8_t* qs = $vec-ptr:(int8_t* qs);
+                int32_t* qcs_ = $vec-ptr:(int32_t* qcs');
+                int i;
+                for (i = 0; i < len; ++i) {
+                    int ix = 256*i - minQ + qs[i];
+                    ++qcs_[ix];
+                }
+            }|]
             unsafeIncrement stats 0
             VUM.unsafeModify stats (min len) 1
             VUM.unsafeModify stats (max len) 2
