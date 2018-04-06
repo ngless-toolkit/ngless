@@ -93,6 +93,8 @@ main = setupTestEnvironment >> defaultMain [
                 "p = paired('test_samples/sample.fq.gz', 'test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n"
         , bench "preprocess-pair-transformed" $ nfNGLessScriptWithTransform
                 "p = paired('test_samples/sample.fq.gz', 'test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n"
+        , bench "preprocess-pair-nop" $ nfNGLessScriptWithTransform
+                "p = paired('test_samples/sample.fq.gz', 'test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = r\n"
         , bench "substrim" $ nf (substrim 30) exampleSR
         ]
     ,bgroup "parse-sam"
