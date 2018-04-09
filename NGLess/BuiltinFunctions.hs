@@ -73,6 +73,7 @@ countArgs =
     ,ArgInformation "discard_zeros" False NGLBool []
     ,ArgInformation "include_minus1" False NGLBool []
     ,ArgInformation "normalization" False NGLSymbol [ArgCheckSymbol ["raw", "normed", "scaled", "fpkm"]]
+    ,ArgInformation "reference" False NGLString [ArgCheckMinVersion (0,8)]
     ]
 
 selectArgs =

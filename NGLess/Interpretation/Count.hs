@@ -201,7 +201,7 @@ executeCountFile other _ = throwScriptError ("Unexpected argument to countfile()
 
 executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
-executeCount (NGOMappedReadSet rname istream refinfo) args = do
+executeCount (NGOMappedReadSet rname istream mappedref) args = do
     minCount <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
     method <- decodeSymbolOrError "multiple argument in count() function"
                     [("1overN", MM1OverN)
@@ -240,6 +240,9 @@ executeCount (NGOMappedReadSet rname istream refinfo) args = do
         Just (NGOString sf) -> return $ Just [sf]
         Just (NGOList subfeats') -> Just <$> mapM (stringOrTypeError "count subfeatures argument") subfeats'
         _ -> throwShouldNotOccur "executeAnnotation: TYPE ERROR"
+    refinfo <- case lookup "reference" args of
+        Nothing -> return mappedref
+        Just val -> Just <$> stringOrTypeError "reference for count()" val
     let opts = CountOpts
             { optFeatures = map (B8.pack . T.unpack) fs
             , optSubFeatures = map (B8.pack . T.unpack) <$> subfeatures

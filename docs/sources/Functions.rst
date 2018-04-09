@@ -402,6 +402,8 @@ Arguments by value:
 +-------------------+-----------------+------------+----------------+
 | discard_zeros     | Bool            | no         | false          |
 +-------------------+-----------------+------------+----------------+
+| reference         | String          | no         | ""             |
++-------------------+-----------------+------------+----------------+
 
 
 If the features to count are ``['seqname']``, then each read will be assigned
