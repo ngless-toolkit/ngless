@@ -27,7 +27,6 @@ module Data.Sam
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Lift as C
 import qualified Data.Conduit as C
@@ -190,10 +189,10 @@ matchSize = matchSize' . samCigar
 matchSize' cigar
     | B8.null cigar = return 0
     | otherwise = case B8.readInt cigar of
-        Nothing -> throwDataError ("could not parse cigar '"++S8.unpack cigar ++"'")
+        Nothing -> throwDataError ("could not parse cigar '"++B8.unpack cigar ++"'")
         Just (n,code_rest) -> do
-            let code = S8.head code_rest
-                rest = S8.tail code_rest
+            let code = B8.head code_rest
+                rest = B8.tail code_rest
                 n' = if code `elem` ("M=X" :: String) then n else 0
             r <- matchSize' rest
             return (n' + r)

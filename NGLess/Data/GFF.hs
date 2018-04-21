@@ -17,10 +17,8 @@ import Control.DeepSeq
 import           Control.Arrow (second)
 import           Control.Applicative ((<|>))
 
-import qualified Data.ByteString as S
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lex.Integral as I
 import qualified Data.ByteString.Lex.Fractional as F
 
@@ -50,28 +48,28 @@ instance NFData GffLine where
 
 gffId GffLine { gffAttrs = attrs } = fromMaybe "unknown" (lookup "ID" attrs <|> lookup "gene_id" attrs)
 
-_parseGffAttributes :: S.ByteString -> [(S.ByteString, S.ByteString)]
-_parseGffAttributes = map (second (S8.filter (/='\"') . S.tail))
-                        . map (\x -> S8.break (== (checkAttrTag x)) x)
+_parseGffAttributes :: B.ByteString -> [(B.ByteString, B.ByteString)]
+_parseGffAttributes = map (second (B8.filter (/='\"') . B.tail))
+                        . map (\x -> B8.break (== (checkAttrTag x)) x)
                         . map _trimString
-                        . S8.split ';'
+                        . B8.split ';'
                         . removeLastDel
                         . _trimString
 
     where
-        removeLastDel :: S8.ByteString -> S8.ByteString
-        removeLastDel s = case S8.last s of
-            ';' -> S8.init s
+        removeLastDel :: B8.ByteString -> B8.ByteString
+        removeLastDel s = case B8.last s of
+            ';' -> B8.init s
             _   -> s
 
 --Check if the atribution tag is '=' or ' '
-checkAttrTag :: S.ByteString -> Char
-checkAttrTag s = case S8.elemIndex '=' s of
+checkAttrTag :: B.ByteString -> Char
+checkAttrTag s = case B8.elemIndex '=' s of
     Nothing -> ' '
     _       -> '='
 
 -- remove ' ' from begining and end.
-_trimString :: S.ByteString -> S.ByteString
+_trimString :: B.ByteString -> B.ByteString
 _trimString = trimBeg . trimEnd
     where
         trimBeg = B8.dropWhile isSpace
