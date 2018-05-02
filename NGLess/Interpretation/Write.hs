@@ -181,16 +181,10 @@ executeWrite (NGOReadSet _ rs) args = do
 #endif
 
                             else return CB.sinkHandle
-                    -- Newer versions of safeio have a more general
-                    -- 'withOutputFile', so this liftIO/runExceptT/case
-                    -- construct would not be necessary
-            errs <- liftIO $ withOutputFile ofile $ \hout -> do
+            withOutputFile ofile $ \hout -> do
                 let ReadSet pairs singles = rs
-                runExceptT .  C.runConduitRes $
+                C.runConduitRes $
                     interleaveFQs pairs singles .| writer hout
-            case errs of
-                Right () -> return ()
-                Left err -> throwError err
         else case rs of
             ReadSet [] singles ->
                 moveOrCopyCompressFQs singles ofile

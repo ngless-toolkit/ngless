@@ -193,13 +193,12 @@ fqDecodeVector enc vs
                 rseq = unwrapByteLine $ vs V.! (i*4 + 1)
                 rqs  = unwrapByteLine $ vs V.! (i*4 + 3)
 
-statsFromFastQ :: (MonadIO m, MonadError NGError m, MonadBaseControl IO m, MonadThrow m) => FilePath -> FastQEncoding -> m FQStatistics
+statsFromFastQ :: (MonadIO m, MonadError NGError m, MonadThrow m, MonadUnliftIO m) => FilePath -> FastQEncoding -> m FQStatistics
 statsFromFastQ fp enc = C.runConduitRes $
         conduitPossiblyCompressedFile fp
             .| linesC
             .| fqDecodeC enc
             .| fqStatsC
-
 
 fqStatsC :: forall m. (MonadIO m) => C.Sink ShortRead m FQStatistics
 fqStatsC = do
@@ -274,12 +273,12 @@ fqStatsC = do
         findMinQValue' :: VU.Vector Int -> Int
         findMinQValue' qs = fromMaybe 256 (VU.findIndex (/= 0) qs)
 
-interleaveFQs :: (Monad m, MonadError NGError m, MonadResource m, MonadBaseControl IO m) => [(FastQFilePath, FastQFilePath)] -> [FastQFilePath] -> C.Source m B.ByteString
+interleaveFQs :: (Monad m, MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => [(FastQFilePath, FastQFilePath)] -> [FastQFilePath] -> C.Source m B.ByteString
 interleaveFQs pairs singletons = do
             sequence_ [interleavePair f0 f1 | (FastQFilePath _ f0, FastQFilePath _ f1) <- pairs]
             sequence_ [conduitPossiblyCompressedFile f | FastQFilePath _ f <- singletons]
     where
-        interleavePair :: (Monad m, MonadError NGError m, MonadResource m, MonadBaseControl IO m) => FilePath -> FilePath -> C.Source m B.ByteString
+        interleavePair :: (Monad m, MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => FilePath -> FilePath -> C.Source m B.ByteString
         interleavePair f0 f1 =
                 ((conduitPossiblyCompressedFile f0 .| linesC .| CL.chunksOf 4) `zipSources` (conduitPossiblyCompressedFile f1 .| linesC .| CL.chunksOf 4))
                 .| C.awaitForever (\(r0,r1) -> C.yield (ul r0) >> C.yield (ul r1))

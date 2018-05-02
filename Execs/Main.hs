@@ -42,7 +42,7 @@ import System.FilePath
 import System.Directory
 import Control.Monad.Extra (whenJust)
 import System.IO (stderr, hPutStrLn)
-import Control.Exception (catch, IOException)
+import Control.Exception (catch, IOException, try)
 import Control.Concurrent (setNumCapabilities)
 import System.Console.ANSI (setSGRCode, SGR(..), ConsoleLayer(..), Color(..), ColorIntensity(..))
 import System.Exit (exitSuccess, exitFailure)
@@ -123,7 +123,7 @@ whenStrictlyNormal act = do
     when (v == Normal) act
 
 runNGLessIO :: String -> NGLessIO a -> IO a
-runNGLessIO context (NGLessIO act) = runResourceT (runExceptT act) >>= \case
+runNGLessIO context (NGLessIO act) = try (runResourceT act) >>= \case
         Left (NGError NoErrorExit _) -> exitSuccess
         Left (NGError etype emsg) -> do
             triggerFailHook

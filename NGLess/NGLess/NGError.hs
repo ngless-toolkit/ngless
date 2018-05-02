@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, MultiParamTypeClasses, TypeFamilies, FlexibleContexts, UndecidableInstances #-}
 module NGLess.NGError
     ( NGError(..)
     , NGErrorType(..)
@@ -16,8 +16,10 @@ module NGLess.NGError
 import           Control.DeepSeq
 import           Control.Monad.Except
 import           Control.Monad.Trans.Resource
-import           Control.Monad.Trans.Control
-import           Control.Monad.Base
+import           Control.Monad.Primitive
+import           Control.Monad.Catch
+import           Control.Monad.IO.Unlift
+import           Control.Exception
 
 -- This file should be a leaf in the import graph (i.e., not import any other NGLess modules)
 
@@ -41,33 +43,34 @@ data NGError = NGError !NGErrorType !String
 instance NFData NGError where
     rnf !_ = ()
 
+instance Exception NGError
+
 type NGLess = Either NGError
 
-newtype NGLessIO a = NGLessIO { unwrapNGLessIO :: ExceptT NGError (ResourceT IO) a }
+newtype NGLessIO a = NGLessIO { unwrapNGLessIO :: ResourceT IO a }
                         deriving (Functor, Applicative, Monad, MonadIO,
-                        MonadError NGError, MonadResource, MonadThrow,
-                        MonadBase IO)
+                        MonadResource, MonadThrow, MonadCatch, MonadMask)
 
 
-newtype NGLessIOStM a = NGLessIOStM { unwrapNGLessIOStM :: StM (ExceptT NGError (ResourceT IO)) a }
+instance MonadError NGError NGLessIO where
+    throwError = liftIO . throwIO
+    catchError = error "CATCH"
 
-instance MonadBaseControl IO NGLessIO where
-    type StM NGLessIO a = NGLessIOStM a
-    liftBaseWith f =  NGLessIO $ liftBaseWith (\q -> f (fmap NGLessIOStM . q . unwrapNGLessIO))
-    restoreM = NGLessIO . restoreM . unwrapNGLessIOStM
+instance PrimMonad NGLessIO where
+    type PrimState NGLessIO = PrimState IO
+    primitive act = NGLessIO (primitive act)
 
+instance MonadUnliftIO NGLessIO where
+    askUnliftIO = NGLessIO $ do
+        u <- askUnliftIO
+        return $ UnliftIO (\(NGLessIO act) -> unliftIO u act)
 
 runNGLess :: (MonadError NGError m) => Either NGError a -> m a
 runNGLess (Left err) = throwError err
 runNGLess (Right v) = return v
 
 testNGLessIO :: NGLessIO a -> IO a
-testNGLessIO (NGLessIO act) = do
-        perr <- (runResourceT . runExceptT) act
-        return (showError perr)
-    where
-        showError (Right a) = a
-        showError (Left e) = error (show e)
+testNGLessIO (NGLessIO act) = runResourceT act
 
 -- | Internal bug: user is requested to submit a bug report
 throwShouldNotOccur :: (MonadError NGError m) => String -> m a

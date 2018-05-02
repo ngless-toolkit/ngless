@@ -35,6 +35,7 @@ import           Data.Conduit ((=$=), (.|))
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import           Data.Strict.Tuple (Pair(..))
+import           Control.Monad.Primitive
 import Data.Bits (testBit)
 import Control.Error (note)
 import Control.DeepSeq
@@ -235,7 +236,7 @@ readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
 --
 -- When respectPairs is False, then the two mates of the same fragment will be
 -- considered grouped in different blocks
-readSamGroupsC' :: forall m . (MonadError NGError m, MonadBase IO m, MonadIO m) => Int -> Bool -> C.Conduit ByteLine m (V.Vector [SamLine])
+readSamGroupsC' :: forall m . (MonadError NGError m, PrimMonad m, MonadIO m) => Int -> Bool -> C.Conduit ByteLine m (V.Vector [SamLine])
 readSamGroupsC' mapthreads respectPairs = do
         CC.dropWhile (isSamHeaderString . unwrapByteLine)
         CC.conduitVector 4096

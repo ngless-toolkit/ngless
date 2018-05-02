@@ -136,13 +136,13 @@ callMapper refIndex fps extraArgs outC = do
     out <- liftIO $ A.async (CA.sourceTBMQueue q $$ outC)
     C.runConduitRes $
         makeSAMHeader refIndex
-            .| CA.sinkTBMQueue q False
+            .| CA.sinkTBMQueue q
     (exitCode', (), err') <- liftIO $
         withFile otemp ReadMode $ \otemph ->
             withFile otemp2 ReadMode $ \otemp2h ->
                 CP.sourceProcessWithStreams soup2sam
                     (CB.sourceHandle otemph >> CB.sourceHandle otemp2h) -- stdin
-                    (C.toConsumer $ CA.sinkTBMQueue q True) -- stdout
+                    (C.toConsumer $ CA.sinkTBMQueue q) -- stdout
                     (CL.consume :: C.Consumer B.ByteString IO [B.ByteString])
     release rk
     release rk2
@@ -156,7 +156,7 @@ callMapper refIndex fps extraArgs outC = do
                             "SOAP2SAM error code was ", show code, ".\n",
                             "Error output: ", B8.unpack (B8.intercalate "\n\t" err')]
 
-makeSAMHeader :: (MonadResource m, MonadBaseControl IO m, MonadError NGError m) => FilePath -> C.Source m B.ByteString
+makeSAMHeader :: (MonadResource m, MonadUnliftIO m, MonadThrow m, MonadError NGError m) => FilePath -> C.Source m B.ByteString
 makeSAMHeader fafile = conduitPossiblyCompressedFile fafile .| linesC .| asSamHeader
     where
         -- asSamHeader :: C.Conduit ByteLine IO B.ByteString

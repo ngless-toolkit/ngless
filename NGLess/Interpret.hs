@@ -385,83 +385,83 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
         --    [read file *] -> [decode in blocks] -> [pre QC *] -> [preproc*] -> [post QC*] -> [encode & write *]
         -- where the starred (*) elements are done in a separate thread
         -- for the QC threads, this is done by using a queue & writing data there
-
-        keepSingles <- runNGLessIO $ lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args
-        qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__input_qc" args
-        numCapabilities <- liftIO getNumCapabilities
-        let mapthreads = max 1 (numCapabilities - 2)
-
-        [(q1, k1, s1), (q2, k2, s2), (q3, k3, s3)] <- replicateM 3 shortReadVectorStats
-
-
-        let inencs = fqpathEncoding <$> (fst <$> pairs) ++ (snd <$> pairs) ++ singles
-            outenc
-                | allSame inencs = head inencs
-                | otherwise = SangerEncoding
-        let asSource [] = return ()
-            asSource (FastQFilePath enc f:rest) =
-                    let input = conduitPossiblyCompressedFile f
-                            .| linesC
-                            .| C.conduitVector 4096
-                            .| asyncMapEitherC mapthreads (fqDecodeVector enc)
-                    in do
-                        if not qcInput
-                            then input
-                            else do
-                                (q, k, s) <- lift shortReadVectorStats
-                                input .| writeAndContinue q
-                                lift $ release k
-                                s' <- liftIO $ A.wait s
-                                lift . runNGLessIO $ outputFQStatistics f s' enc
-                        asSource rest
-
-
-            write nt h q =
-                    writeAndContinue q
-                        .| asyncMapC nt (B.concat . map (fqEncode outenc) . V.toList)
-                        .| asyncGzipTo h
-
         env <- gets id
-        let processpairs :: (V.Vector ShortRead, V.Vector ShortRead) -> NGLess (V.Vector ShortRead, V.Vector ShortRead, V.Vector ShortRead)
-            processpairs = liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles) . uncurry V.zip
-        (fp1', out1) <- runNGLessIO $ openNGLTempFile "" "preprocessed.1." ".fq.gz"
-        (fp2', out2) <- runNGLessIO $ openNGLTempFile "" "preprocessed.2." ".fq.gz"
-        (fp3', out3) <- runNGLessIO $ openNGLTempFile "" "preprocessed.singles." ".fq.gz"
+        liftNGLessIO $ do
+            keepSingles <- lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args
+            qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__input_qc" args
+            numCapabilities <- liftIO getNumCapabilities
+            let mapthreads = max 1 (numCapabilities - 2)
 
-        zipSource2 (asSource (fst <$> pairs)) (asSource (snd <$> pairs))
-            =$= asyncMapEitherC mapthreads processpairs
-            $$ void $ C.sequenceSinks
-                    [CL.map (\(a,_,_) -> a) =$= write mapthreads out1 q1
-                    ,CL.map (\(_,a,_) -> a) =$= write mapthreads out2 q2
-                    ,CL.map (\(_,_,a) -> a) =$= write mapthreads out3 q3
-                    ]
+            [(q1, k1, s1), (q2, k2, s2), (q3, k3, s3)] <- replicateM 3 shortReadVectorStats
 
-        asSource singles
-            =$= asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . interpretPBlock1 block var))
-            $$ void (write mapthreads out3 q3)
 
-        forM_ [k1, k2, k3] release
-        liftIO $ forM_ [out1, out2, out3] hClose
-        [s1',s2',s3'] <- forM [s1,s2,s3] (liftIO . A.wait)
+            let inencs = fqpathEncoding <$> (fst <$> pairs) ++ (snd <$> pairs) ++ singles
+                outenc
+                    | allSame inencs = head inencs
+                    | otherwise = SangerEncoding
+            let asSource [] = return ()
+                asSource (FastQFilePath enc f:rest) =
+                        let input = conduitPossiblyCompressedFile f
+                                .| linesC
+                                .| C.conduitVector 4096
+                                .| asyncMapEitherC mapthreads (fqDecodeVector enc)
+                        in do
+                            if not qcInput
+                                then input
+                                else do
+                                    (q, k, s) <- lift shortReadVectorStats
+                                    input .| writeAndContinue q
+                                    lift $ release k
+                                    s' <- liftIO $ A.wait s
+                                    lift $ outputFQStatistics f s' enc
+                            asSource rest
 
-        liftNGLessIO $ outputListLno' DebugOutput ["Preprocess finished"]
 
-        Just lno <- ngleLno <$> runNGLessIO nglEnvironment
-        runNGLessIO $ outputFQStatistics ("preproc.lno"++show lno++".pairs.1") s1' outenc
-        runNGLessIO $ outputFQStatistics ("preproc.lno"++show lno++".pairs.2") s2' outenc
-        runNGLessIO $ outputFQStatistics ("preproc.lno"++show lno++".singles") s3' outenc
-        NGOReadSet name <$> case (nSeq s1' > 0, nSeq s2' > 0, nSeq s3' > 0) of
-                    (True, True, False) -> do
-                        liftIO $ removeFile fp3'
-                        return $ ReadSet [(FastQFilePath outenc fp1', FastQFilePath outenc fp2')] []
-                    (False, False, True) -> do
-                        forM_ [fp1', fp2'] (liftIO . removeFile)
-                        return $ ReadSet [] [FastQFilePath outenc fp3']
-                    _
-                        | null pairs -> do
+                write nt h q =
+                        writeAndContinue q
+                            .| asyncMapC nt (B.concat . map (fqEncode outenc) . V.toList)
+                            .| asyncGzipTo h
+
+            let processpairs :: (V.Vector ShortRead, V.Vector ShortRead) -> NGLess (V.Vector ShortRead, V.Vector ShortRead, V.Vector ShortRead)
+                processpairs = liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles) . uncurry V.zip
+            (fp1', out1) <- openNGLTempFile "" "preprocessed.1." ".fq.gz"
+            (fp2', out2) <- openNGLTempFile "" "preprocessed.2." ".fq.gz"
+            (fp3', out3) <- openNGLTempFile "" "preprocessed.singles." ".fq.gz"
+
+            zipSource2 (asSource (fst <$> pairs)) (asSource (snd <$> pairs))
+                =$= asyncMapEitherC mapthreads processpairs
+                $$ void $ C.sequenceSinks
+                        [CL.map (\(a,_,_) -> a) =$= write mapthreads out1 q1
+                        ,CL.map (\(_,a,_) -> a) =$= write mapthreads out2 q2
+                        ,CL.map (\(_,_,a) -> a) =$= write mapthreads out3 q3
+                        ]
+
+            asSource singles
+                =$= asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . interpretPBlock1 block var))
+                $$ void (write mapthreads out3 q3)
+
+            forM_ [k1, k2, k3] release
+            liftIO $ forM_ [out1, out2, out3] hClose
+            [s1',s2',s3'] <- forM [s1,s2,s3] (liftIO . A.wait)
+
+            outputListLno' DebugOutput ["Preprocess finished"]
+
+            Just lno <- ngleLno <$> nglEnvironment
+            outputFQStatistics ("preproc.lno"++show lno++".pairs.1") s1' outenc
+            outputFQStatistics ("preproc.lno"++show lno++".pairs.2") s2' outenc
+            outputFQStatistics ("preproc.lno"++show lno++".singles") s3' outenc
+            NGOReadSet name <$> case (nSeq s1' > 0, nSeq s2' > 0, nSeq s3' > 0) of
+                        (True, True, False) -> do
+                            liftIO $ removeFile fp3'
+                            return $ ReadSet [(FastQFilePath outenc fp1', FastQFilePath outenc fp2')] []
+                        (False, False, True) -> do
                             forM_ [fp1', fp2'] (liftIO . removeFile)
                             return $ ReadSet [] [FastQFilePath outenc fp3']
-                        | otherwise -> return $ ReadSet [(FastQFilePath outenc fp1', FastQFilePath outenc fp2')] [FastQFilePath outenc fp3']
+                        _
+                            | null pairs -> do
+                                forM_ [fp1', fp2'] (liftIO . removeFile)
+                                return $ ReadSet [] [FastQFilePath outenc fp3']
+                            | otherwise -> return $ ReadSet [(FastQFilePath outenc fp1', FastQFilePath outenc fp2')] [FastQFilePath outenc fp3']
     where
         intercalate :: Bool -> (ShortRead, ShortRead) -> InterpretationROEnv (Maybe PreprocessPairOutput)
         intercalate keepSingles (r1, r2) = do

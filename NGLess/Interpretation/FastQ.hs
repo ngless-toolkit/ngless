@@ -25,6 +25,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Control.Concurrent.Async as A
 import Control.Monad.Trans.Resource
+import Control.Exception (try)
 import Control.Monad.Except
 import Data.Conduit (($$), (=$=), (.|))
 import Data.Maybe
@@ -189,8 +190,8 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
                 enc1 <- fromMaybe (encodingFor fp1') (return <$> enc)
                 enc2 <- fromMaybe (encodingFor fp1') (return <$> enc)
                 (es1,es2) <- liftIO $ A.concurrently
-                            (runExceptT $ statsFromFastQ fp1' enc1)
-                            (runExceptT $ statsFromFastQ fp2' enc2)
+                            (try $ testNGLessIO $ statsFromFastQ fp1' enc1)
+                            (try $ testNGLessIO $ statsFromFastQ fp2' enc2)
                 s1 <- runNGLess es1
                 s2 <- runNGLess es2
                 outputFQStatistics fp1' s1 enc1

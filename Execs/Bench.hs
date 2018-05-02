@@ -8,7 +8,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit as C
 import qualified Data.Text as T
-import           Data.Conduit ((=$=), ($$))
+import           Data.Conduit ((.|), (=$=), ($$))
 import           Control.DeepSeq (NFData)
 
 import Control.Monad.Trans.Resource (runResourceT)
@@ -25,7 +25,7 @@ import Parse (parsengless)
 import Language (Script(..))
 import Data.Sam (readSamLine, readSamGroupsC, samStatsC)
 import Data.FastQ (statsFromFastQ, FastQEncoding(..), ShortRead(..), fqDecodeVector)
-import Utils.Conduit (linesC, ByteLine(..))
+import Utils.Conduit (linesC, ByteLine(..), conduitPossiblyCompressedFile)
 import Transform (transform)
 import NGLess.NGLEnvironment (setupTestEnvironment)
 
@@ -86,7 +86,7 @@ main = setupTestEnvironment >> defaultMain [
         [ bench "sample" $ nfNGLessIO (CB.sourceFile "test_samples/sample.sam" =$= linesC $$ samStatsC)
         ]
     ,bgroup "fastq"
-        [ bench "fastqStats" $ nfNGLessIO (statsFromFastQ "test_samples/sample.fq.gz" SangerEncoding)
+        [ bench "fastqStats" $ nfNGLessIO (C.runConduitRes (conduitPossiblyCompressedFile "test_samples/sample.fq.gz" .| linesC .| count))
         , bench "preprocess" $ nfNGLessScript                          "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
         , bench "preprocess-transformed" $ nfNGLessScriptWithTransform "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
         , bench "preprocess-pair" $ nfNGLessScript
@@ -99,7 +99,7 @@ main = setupTestEnvironment >> defaultMain [
         ]
     ,bgroup "parse-sam"
         [ bench "readSamLine" $ nfRIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= CL.map readSamLine $$ countRights)
-        , bench "samGroups" $ nfNGLessIO (CB.sourceFile "test_samples/sample.sam" =$= linesC =$= readSamGroupsC $$ count)
+        , bench "samGroups" $ nfNGLessIO (C.runConduitRes (CB.sourceFile "test_samples/sample.sam" .| linesC .| readSamGroupsC .| count))
         ]
     ,bgroup "count"
         [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap "test_samples/functional.map" ["KEGG_ko", "eggNOG_OG"])

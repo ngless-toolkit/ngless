@@ -342,11 +342,10 @@ mergeCounts ss = do
                     let p = placeholder (B8.count '\t' hs)
                     return (s', p)
         let (ss', placeholders) = unzip start
-        (ss'',finalizers) <- unzip <$> lift (mapM C.unwrapResumable ss')
+            ss'' = map C.unsealConduitT ss'
         CAlg.mergeC [s .| tagSource ix | (s,ix) <- zip ss'' [0..]]
             .| CL.groupOn1 spdHeader
             .| CL.map (complete placeholders)
-        lift $ sequence_ finalizers
     where
         placeholder :: Int -> B.ByteString
         placeholder n = B.intercalate "\t" ("":["0" | _ <- [1..n]])
