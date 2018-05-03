@@ -43,6 +43,7 @@ import Utils.Conduit
 import FileOrStream
 import Utils.Suggestion
 import Utils.Utils
+import Utils.LockFile (LockParameters(..), WhenExistsStrategy(IfLockedRetry, timeBetweenRetries, nrLockRetries), withLockFile)
 import Language
 import Network
 import Modules
@@ -406,22 +407,29 @@ asInternalModule em@ExternalModule{..} = do
 validateModule :: ExternalModule -> NGLessIO ()
 validateModule  em@ExternalModule{..} = do
     checkSyntax em
-    whenJust initCmd $ \initCmd' -> do
-        outputListLno' DebugOutput ("Running initialization for module ":show emInfo:" ":initCmd':" ":initArgs)
-        env <- nglessEnv modulePath
-        (exitCode, out, err) <- liftIO $
-            readCreateProcessWithExitCode (proc (modulePath </> initCmd') initArgs) { env = Just env } ""
-        case (exitCode,out,err) of
-            (ExitSuccess, "", "") -> return ()
-            (ExitSuccess, msg, "") -> outputListLno' TraceOutput ["Module OK. information: ", msg]
-            (ExitSuccess, mout, merr) -> outputListLno' TraceOutput ["Module OK. information: ", mout, ". Warning: ", merr]
-            (ExitFailure code, _,_) -> do
-                outputListLno' WarningOutput ["Module loading failed for module ", show emInfo]
-                throwSystemError .concat $ ["Error loading module ", show emInfo, "\n",
-                    "When running the validation command (", initCmd', " with arguments ", show initArgs, ")\n",
-                    "\texit code = ", show code,"\n",
-                    "\tstdout='", out, "'\n",
-                    "\tstderr='", err, "'"]
+    withLockFile LockParameters
+        { lockFname = modulePath ++ ".ngless-init.lock"
+        , maxAge = hoursToDiffTime 24  -- init can compile/install stuff.
+        , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
+        } $ do
+            whenJust initCmd $ \initCmd' -> do
+                outputListLno' DebugOutput ("Running initialization for module ":show emInfo:" ":initCmd':" ":initArgs)
+                env <- nglessEnv modulePath
+                (exitCode, out, err) <- liftIO $
+                    readCreateProcessWithExitCode (proc (modulePath </> initCmd') initArgs) { env = Just env } ""
+                case (exitCode,out,err) of
+                    (ExitSuccess, "", "") -> return ()
+                    (ExitSuccess, msg, "") -> outputListLno' TraceOutput ["Module OK. information: ", msg]
+                    (ExitSuccess, mout, merr) -> outputListLno' TraceOutput ["Module OK. information: ", mout, ". Warning: ", merr]
+                    (ExitFailure code, _,_) -> do
+                        outputListLno' WarningOutput ["Module loading failed for module ", show emInfo]
+                        throwSystemError .concat $ ["Error loading module ", show emInfo, "\n",
+                            "When running the validation command (", initCmd', " with arguments ", show initArgs, ")\n",
+                            "\texit code = ", show code,"\n",
+                            "\tstdout='", out, "'\n",
+                            "\tstderr='", err, "'"]
+        where
+            hoursToDiffTime h = fromInteger (h * 3600)
 
 
 -- | Attempts to find bugs in its argument. When no errors are found, it does
