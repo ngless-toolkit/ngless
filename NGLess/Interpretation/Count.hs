@@ -657,11 +657,11 @@ loadGFF gffFp opts = do
                         -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
                         -> GffLine
                         -> (Int, GFFAnnotationMap, M.Map B.ByteString Int, M.Map B.ByteString Double)
-        insertg f sf cur@(!next, !gmap, !namemap, !szmap) gline
+        insertg f sf cur gline
                 | gffType gline /= f = cur
-                | otherwise = case lookupSubFeature sf of
-                    Nothing -> cur
-                    Just val -> let
+                | otherwise = foldr subfeatureMap cur $ lookupSubFeature sf
+            where
+                subfeatureMap val (!next, !gmap, !namemap, !szmap) = let
                             header
                                 | singleFeature = val
                                 | otherwise = B.concat $ [f, "\t"] ++(case sf of { Nothing -> []; Just s -> [s,"\t"]}) ++[val]
@@ -683,9 +683,13 @@ loadGFF gffFp opts = do
                             inserts1 :: Maybe Double -> Maybe Double
                             inserts1 cursize = Just $! convert (gffSize gline) + fromMaybe 0.0 cursize
                         in (next', gmap', namemap', szmap')
-            where
-                lookupSubFeature Nothing = lookup "ID" (gffAttrs gline) <|> lookup "gene_id" (gffAttrs gline)
-                lookupSubFeature (Just s) = lookup s (gffAttrs gline)
+
+                lookupSubFeature :: Maybe B.ByteString -> [B.ByteString]
+                lookupSubFeature Nothing = filterSubFeatures "ID" (gffAttrs gline) <|> filterSubFeatures "gene_id" (gffAttrs gline)
+                lookupSubFeature (Just s) = filterSubFeatures s (gffAttrs gline)
+
+                filterSubFeatures s sf' = map snd $ (filter ((s ==) . fst)) sf'
+
         -- First integer IDs are assigned "first come, first served"
         -- `reindex` makes them alphabetical
         reindex :: GFFAnnotationMap -> M.Map B.ByteString Int -> Pair GFFAnnotationMap [B.ByteString]

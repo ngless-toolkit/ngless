@@ -1,0 +1,11 @@
+##gff-version 3
+# 2 reads + 2 overlap with next
+reference	protein_coding	gene	40	100	.	+	.	gene_id=geneY;gene_name=feature_A,feature_B,feature_D
+# 0 reads + 2 overlap with previous
+reference	protein_coding	gene	110	130	.	+	.	gene_id=geneW;gene_name=feature_B
+# 1 read
+reference	protein_coding	gene	140	200	.	+	.	gene_id=geneX;gene_name=feature_A
+# 1 partial read + 1 overlap with next (where features also overlap)
+reference	protein_coding	gene	230	310	.	+	.	gene_id=geneY;gene_name=feature_C
+# 1 partial read + 1 overlap with previous (where features also overlap)
+reference	protein_coding	gene	280	360	.	+	.	gene_id=geneZ;gene_name=feature_D

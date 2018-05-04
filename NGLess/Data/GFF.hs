@@ -49,7 +49,8 @@ instance NFData GffLine where
 gffId GffLine { gffAttrs = attrs } = fromMaybe "unknown" (lookup "ID" attrs <|> lookup "gene_id" attrs)
 
 _parseGffAttributes :: B.ByteString -> [(B.ByteString, B.ByteString)]
-_parseGffAttributes = map (second (B8.filter (/='\"') . B.tail))
+_parseGffAttributes = foldMap (\(a, b) -> zip (repeat a) (B8.split ',' b))
+                        . map (second (B8.filter (/='\"') . B.tail))
                         . map (\x -> B8.break (== (checkAttrTag x)) x)
                         . map _trimString
                         . B8.split ';'
