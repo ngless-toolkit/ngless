@@ -1,25 +1,25 @@
 	stats
-0:file	sample.fq
 0:encoding	Sanger (33 offset)
-0:numSeqs	10
-0:numBasepairs	702
-0:minSeqLen	40
-0:maxSeqLen	177
+0:file	sample.fq
 0:gcContent	0.38936781609195403
+0:maxSeqLen	177
+0:minSeqLen	40
 0:nonATCGFraction	8.547008547008548e-3
-1:file	split1.fq
+0:numBasepairs	702
+0:numSeqs	10
 1:encoding	Sanger (33 offset)
-1:numSeqs	2
-1:numBasepairs	255
-1:minSeqLen	78
-1:maxSeqLen	177
+1:file	split1.fq
 1:gcContent	0.3187250996015936
+1:maxSeqLen	177
+1:minSeqLen	78
 1:nonATCGFraction	1.568627450980392e-2
-2:file	split2.fq
+1:numBasepairs	255
+1:numSeqs	2
 2:encoding	Sanger (33 offset)
-2:numSeqs	8
-2:numBasepairs	447
-2:minSeqLen	40
-2:maxSeqLen	83
+2:file	split2.fq
 2:gcContent	0.42921348314606744
+2:maxSeqLen	83
+2:minSeqLen	40
 2:nonATCGFraction	4.4742729306487695e-3
+2:numBasepairs	447
+2:numSeqs	8

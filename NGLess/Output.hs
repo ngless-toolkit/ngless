@@ -24,6 +24,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import System.IO.SafeWrite (withOutputFile)
 import Data.Maybe
 import Data.IORef
+import           Data.List (sort)
 import           Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import Data.Aeson.TH (deriveToJSON, defaultOptions, Options(..))
@@ -306,26 +307,40 @@ writeOutputTSV transpose fqStatsFp mapStatsFp = do
         mapStats <- reverse <$> readIORef savedMapOutput
         whenJust fqStatsFp $ \fp ->
             withOutputFile fp $ \hout ->
-                BL.hPut hout  . formatTSV fqHeaders $ encodeFQStats <$> fqStats
+                BL.hPut hout  . formatTSV $ encodeFQStats <$> fqStats
         whenJust mapStatsFp $ \fp ->
             withOutputFile fp $ \hout ->
-                BL.hPutStr hout . formatTSV msHeaders $ encodeMapStats <$> mapStats
+                BL.hPutStr hout . formatTSV $ encodeMapStats <$> mapStats
     where
-        formatTSV :: [BL.ByteString] -> [[String]] -> BL.ByteString
-        formatTSV header contents
-            | transpose = BL.concat ("\tstats\n":(formatTSV1 header <$> zip [0..] contents))
-            | otherwise = BL.concat [BL8.intercalate "\t" header, "\n",
-                                    BL8.intercalate "\n" (asTSVline <$> contents), "\n"]
-        formatTSV1 :: [BL.ByteString] -> (Int, [String]) -> BL.ByteString
-        formatTSV1 header (i,contents) = BL.concat [BL8.concat [BL8.concat [BL8.pack . show $ i, ":", h], "\t", BL8.pack c, "\n"]
-                                                                        | (h, c) <- zip header contents]
+        formatTSV :: [[(BL.ByteString, String)]] -> BL.ByteString
+        formatTSV [] = BL.empty
+        formatTSV contents@(h:_)
+            | transpose = BL.concat ("\tstats\n":(formatTSV1 <$> zip [0..] contents))
+            | otherwise = BL.concat [BL8.intercalate "\t" (fst <$> h), "\n",
+                                    BL8.intercalate "\n" (asTSVline . fmap snd <$> contents), "\n"]
+        formatTSV1 :: (Int, [(BL.ByteString, String)]) -> BL.ByteString
+        formatTSV1 (i, contents) = BL.concat [BL8.concat [BL8.concat [BL8.pack . show $ i, ":", h], "\t", BL8.pack c, "\n"]
+                                                                        | (h, c) <- contents]
         asTSVline = BL8.intercalate "\t" . map BL8.pack
-        fqHeaders                = ["file"  , "encoding",   "numSeqs",    "numBasepairs",          "minSeqLen",         "maxSeqLen",     "gcContent", "nonATCGFraction"]
-        encodeFQStats FQInfo{..} = [fileName,  encoding, show numSeqs, show numBasepairs, show (fst seqLength), show (snd seqLength), show gcContent, show nonATCGFrac]
 
-
-        msHeaders                      = [ "inputFile",  "lineNumber",  "reference",            "total",            "aligned",            "unique"]
-        encodeMapStats MappingInfo{..} = [mi_inputFile,   show mi_lno, mi_reference, show mi_totalReads, show mi_totalAligned, show mi_totalUnique]
+        encodeFQStats FQInfo{..} = sort
+                            [ ("file", fileName)
+                            , ("encoding", encoding)
+                            , ("numSeqs", show numSeqs)
+                            , ("numBasepairs", show numBasepairs)
+                            , ("minSeqLen", show (fst seqLength))
+                            , ("maxSeqLen", show (snd seqLength))
+                            , ("gcContent", show gcContent)
+                            , ("nonATCGFraction", show nonATCGFrac)
+                            ]
+        encodeMapStats MappingInfo{..} = sort
+                [ ("inputFile", mi_inputFile)
+                , ("lineNumber", show mi_lno)
+                , ("reference", mi_reference)
+                , ("total", show mi_totalReads)
+                , ("aligned", show mi_totalAligned)
+                , ("unique", show mi_totalUnique)
+                ]
 
 outputConfiguration :: NGLessIO ()
 outputConfiguration = do

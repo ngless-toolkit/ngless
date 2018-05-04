@@ -1,5 +1,0 @@
-ngless "0.7"
-import "parallel" version "0.6"
-
-__paste(['partial.SAMEA2581908.tsv.gz', 'partial.SRX1670084.tsv.gz'],
-    headers=['SAMEA2581908', 'SRX1670084'], ofile='output.txt')
