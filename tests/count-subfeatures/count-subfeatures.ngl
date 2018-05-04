@@ -1,0 +1,14 @@
+ngless '0.7'
+
+input = fastq('reads.fq.gz')
+mapped = map(input, fafile='ref.fna.gz')
+
+uniqueOnly  = count(mapped, gff_file='features.gtf', features=['gene'], subfeatures=['gene_name'], multiple={unique_only})
+allOne      = count(mapped, gff_file='features.gtf', features=['gene'], subfeatures=['gene_name'], multiple={all1})
+oneOverN    = count(mapped, gff_file='features.gtf', features=['gene'], subfeatures=['gene_name'], multiple={1overN})
+distOne     = count(mapped, gff_file='features.gtf', features=['gene'], subfeatures=['gene_name'], multiple={dist1})
+
+write(uniqueOnly, ofile='output.unique_only.txt')
+write(allOne,     ofile='output.all1.txt')
+write(oneOverN,   ofile='output.1overN.txt')
+write(distOne,    ofile='output.dist1.txt')
