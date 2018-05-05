@@ -7,14 +7,16 @@ prefix=/usr/local
 deps=$(prefix)/share/$(progname)
 exec=$(prefix)/bin
 
+WGET := wget
+
 # We can't depend on [BWA/SAM/MEGAHIT]_DIR as a build target.
 # These change every time a file inside is created/modified
 # As a workaround we target a file included in the tarball
-BWA_DIR = bwa-0.7.15
+BWA_DIR = bwa-0.7.17
 BWA_DIR_TARGET = $(BWA_DIR)/Makefile
-BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.15/bwa-0.7.15.tar.bz2
-BWA_TAR = bwa-0.7.15.tar.bz2
-BWA_SHA1 = b3a5606ecd2dd926e220edd311ff6eb16a47a2c0
+BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.17/bwa-0.7.17.tar.bz2
+BWA_TAR = bwa-0.7.17.tar.bz2
+BWA_SHA1 = d5640b5083a8d38878c385c23261c659ab3229ef
 BWA_TARGET = ngless-bwa
 BWA_TARGET_VERSIONED = ngless-${VERSION}-bwa
 
@@ -157,23 +159,23 @@ $(NGLESS_EMBEDDED_TARGET): $(NGLESS_EMBEDDED_BINARIES)
 	touch $(NGLESS_EMBEDDED_TARGET)
 
 $(BWA_DIR_TARGET):
-	wget $(BWA_URL) -O $(BWA_TAR)
+	$(WGET) $(BWA_URL) -O $(BWA_TAR)
 	sha1sum -c <(echo "$(BWA_SHA1)  $(BWA_TAR)")
 	tar xvf $(BWA_TAR)
 	rm $(BWA_TAR)
 	cd $(BWA_DIR) && curl https://patch-diff.githubusercontent.com/raw/lh3/bwa/pull/90.diff | patch -p1
 
 $(BWA_DIR)/$(BWA_TARGET): $(BWA_DIR_TARGET)
-	cd $(BWA_DIR) && $(MAKE) && cp -p bwa $(BWA_TARGET)
+	cd $(BWA_DIR) && $(MAKE) && mv bwa $(BWA_TARGET)
 
 $(BWA_DIR)/$(BWA_TARGET)-static: $(BWA_DIR_TARGET)
-	cd $(BWA_DIR) && $(MAKE) CFLAGS="-static"  LIBS="-lbwa -lm -lz -lrt -lpthread" && cp -p bwa $(BWA_TARGET)-static
+	cd $(BWA_DIR) && $(MAKE) CFLAGS="-O2 -static"  LIBS="-lbwa -lm -lz -lrt -lpthread" && cp -p bwa $(BWA_TARGET)-static
 
 $(BWA_DIR)/$(BWA_TARGET_VERSIONED): $(BWA_DIR)/$(BWA_TARGET)
 	cp $< $@
 
 $(SAM_DIR_TARGET):
-	wget $(SAM_URL) -O $(SAM_TAR)
+	$(WGET) $(SAM_URL) -O $(SAM_TAR)
 	sha1sum -c <(echo "$(SAM_SHA1)  $(SAM_TAR)")
 	tar xvf $(SAM_TAR)
 	rm $(SAM_TAR)
@@ -188,14 +190,14 @@ $(SAM_DIR)/$(SAM_TARGET_VERSIONED): $(SAM_DIR)/$(SAM_TARGET)
 	cp $< $@
 
 $(PRODIGAL_DIR_TARGET):
-	wget $(PRODIGAL_URL) -O $(PRODIGAL_TAR)
+	$(WGET) $(PRODIGAL_URL) -O $(PRODIGAL_TAR)
 	sha1sum -c <(echo "$(PRODIGAL_SHA1)  $(PRODIGAL_TAR)")
 	tar xvf $(PRODIGAL_TAR)
 	rm $(PRODIGAL_TAR)
 	cd $(PRODIGAL_DIR) && patch -p1 <../build-scripts/0001-Fix-undefined-behavior-causing-behavior.patch
 
 $(PRODIGAL_DIR)/$(PRODIGAL_TARGET)-static: $(PRODIGAL_DIR_TARGET)
-	cd $(PRODIGAL_DIR) && $(MAKE) CFLAGS="-static" && cp -p prodigal $(PRODIGAL_TARGET)-static
+	cd $(PRODIGAL_DIR) && $(MAKE) CFLAGS="-O2 -static" && cp -p prodigal $(PRODIGAL_TARGET)-static
 
 $(PRODIGAL_DIR)/$(PRODIGAL_TARGET): $(PRODIGAL_DIR_TARGET)
 	cd $(PRODIGAL_DIR) && $(MAKE) && cp -p prodigal $(PRODIGAL_TARGET)
@@ -204,7 +206,7 @@ $(PRODIGAL_DIR)/$(PRODIGAL_TARGET_VERSIONED): $(PRODIGAL_DIR)/$(PRODIGAL_TARGET)
 	cp $< $@
 
 $(MEGAHIT_DIR_TARGET):
-	wget $(MEGAHIT_URL) -O $(MEGAHIT_TAR)
+	$(WGET) $(MEGAHIT_URL) -O $(MEGAHIT_TAR)
 	sha1sum -c <(echo "$(MEGAHIT_SHA1)  $(MEGAHIT_TAR)")
 	tar xvf $(MEGAHIT_TAR)
 	rm $(MEGAHIT_TAR)
@@ -235,7 +237,7 @@ $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged.tar.gz: $(MEGAHIT_DIR)/$(MEGAHIT_TARGE
 	tar --create --file $@ --gzip $<
 
 $(MINIMAP2_DIR)/README.md:
-	wget $(MINIMAP2_URL) -O $(MINIMAP2_TAR)
+	$(WGET) $(MINIMAP2_URL) -O $(MINIMAP2_TAR)
 	sha1sum -c <(echo "$(MINIMAP2_SHA1)  $(MINIMAP2_TAR)")
 	tar xvf $(MINIMAP2_TAR)
 	cd $(MINIMAP2_DIR) && patch < ../build-scripts/minimap2-static-compile.patch
@@ -243,7 +245,7 @@ $(MINIMAP2_DIR)/README.md:
 
 $(MINIMAP2_DIR)/$(MINIMAP2_TARGET)-static: $(MINIMAP2_DIR)/README.md
 	rm -f $@
-	cd $(MINIMAP2_DIR) && $(MAKE) CFLAGS="-static" && mv minimap2 ngless-minimap2-static
+	cd $(MINIMAP2_DIR) && $(MAKE) CFLAGS="-O2 -static" && mv minimap2 ngless-minimap2-static
 
 $(MINIMAP2_DIR)/$(MINIMAP2_TARGET): $(MINIMAP2_DIR)/README.md
 	cd $(MINIMAP2_DIR) && $(MAKE) && mv minimap2 ngless-minimap2
@@ -279,29 +281,29 @@ NGLess/Dependencies/minimap2_data.c: $(MINIMAP2_DIR)/$(MINIMAP2_TARGET)-static
 	xxd -i $(<F) $@
 	rm -f $(<F)
 
-# We cannot depend on $(HTML_LIBS_DIR) as wget sets the mtime in the past
+# We cannot depend on $(HTML_LIBS_DIR) as $(WGET) sets the mtime in the past
 # and it would cause the download to happen at every make run
 $(HTML_LIBS_DIR)/%.js:
 	mkdir -p $(HTML_LIBS_DIR)
 	echo $(notdir $@)
-	wget -O $@ $($(notdir $@))
+	$(WGET) -O $@ $($(notdir $@))
 
 
 $(HTML_LIBS_DIR)/%.css:
 	mkdir -p $(HTML_LIBS_DIR)
 	echo $(notdir $@)
-	wget -O $@ $($(notdir $@))
+	$(WGET) -O $@ $($(notdir $@))
 
 
 $(HTML_FONTS_DIR)/%.woff:
 	mkdir -p $(HTML_FONTS_DIR)
 	echo $(notdir $@)
-	wget -O $@ $($(notdir $@))
+	$(WGET) -O $@ $($(notdir $@))
 
 $(HTML_FONTS_DIR)/%.ttf:
 	mkdir -p $(HTML_FONTS_DIR)
 	echo $(notdir $@)
-	wget -O $@ $($(notdir $@))
+	$(WGET) -O $@ $($(notdir $@))
 
 ngless-${VERSION}.tar.gz: ngless
 	mkdir -p $(distdir)/share $(distdir)/bin

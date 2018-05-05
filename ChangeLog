@@ -9,6 +9,7 @@ Version 0.7.1+
 	* Add non-ATCG fraction field to FastQ statistics
 	* Add reference argument to count()
 	* GFF based counting now expands multi-value sub-features
+	* Update to bwa 0.7.17
 
 Version 0.7.1 2018-03-17 by luispedro
 	* Fix memory leak in count()
