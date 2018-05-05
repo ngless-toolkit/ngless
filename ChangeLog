@@ -1,4 +1,4 @@
-Version 0.7.1+
+Version 0.8.0 2018-05-06 by luispedro
 	* Add minimap2 support as alternative mapper
 	* Faster collect()
 	* Fix writing of multiple compressed files to uncompressed format

@@ -2,8 +2,10 @@
 What's New (History)
 ====================
 
-IN DEVELOPMENT (WILL BECOME 0.8)
---------------------------------
+Version 0.8
+-----------
+
+Released May 6th 2018
 
 Incompatible changes
 ~~~~~~~~~~~~~~~~~~~~
@@ -12,8 +14,23 @@ Incompatible changes
   that are not ATCG. This means that uses of `qcstats
   <Functions.hml#qcstats>`__ must use an up-to-date version declaration.
 
+- In certain cases (see below), the output of count when using a GFF will change.
+
 User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Better handling of multiple features in a GFF. For example, using a GFF
+  containing "gene_name=nameA,nameB" would result in::
+
+      nameA,nameB    1
+
+    Now the same results in::
+
+      nameA          1
+      nameB          1
+
+  This follows after `https://git.io/vpagq <https://git.io/vpagq>`__ and the
+  case of *Parent=AF2312,AB2812,abc-3*
 
 - Support for `minimap2 <https://github.com/lh3/minimap2>`__ as alternative
   mapper. Import the ``minimap2`` module and specify the ``mapper`` when
@@ -35,10 +52,26 @@ User-visible improvements
   a rare case, if a version prior to 0.8 is specified in the version header,
   the old behaviour is emulated.
 
+- Added bzip2 support to `write <Functions.html#write>`__.
+
+- Added reference argument to `count <Functions.html#count>`__.
+
+Bug fixes
+~~~~~~~~~
+
+- Fix writing multiple compressed Fastq outputs.
+
+- Fix corner case in `select <Functions.html#select>__`. Previously, it was
+  possible that some sequences were wrongly removed from the output.
+
 Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~
 
 - Faster `collect() <Functions.html#collect>`__
+- Faster FastQ processing
+- Updated to bwa 0.7.17
+- External modules now call their init functions with a lock
+- Updated library collection to LTS-11.7
 
 Version 0.7.1
 -------------
