@@ -17,7 +17,7 @@ Converting a SAM file to a FASTQ file
 
 This is equivalent to the full script::
 
-    ngless "0.0" # <- version declaration, optional on the command line
+    ngless "0.8" # <- version declaration, optional on the command line
     samcontents = samfile("file.sam") # <- load a SAM/BAM file
     reads = as_reads(samcontents) # <- just get the reads (w quality scores)
     write(reads, ofname=STDOUT) # <- write them to STDOUT (default format: FASTQ)
@@ -25,7 +25,7 @@ This is equivalent to the full script::
 This only works if the data in the samfile is single ended as we pipe out a
 single FQ file. Otherwise, you can always do::
 
-    ngless "0.0"
+    ngless "0.8"
     write(as_read(samfile("file.sam")),
             ofile="output.fq")
 
@@ -43,7 +43,7 @@ unmapped reads::
 
 This is equivalent to the full script::
 
-    ngless "0.0" # <- version declaration, optional on the command line
+    ngless "0.8" # <- version declaration, optional on the command line
     samcontents = samfile("file.sam") # <- load a SAM/BAM file
     samcontents = select(samcontents, keep_if=[{mapped}]) # <- select only *mapped* reads
     reads = as_reads(samcontents) # <- just get the reads (w quality scores)

@@ -17,7 +17,7 @@ list](https://groups.google.com/forum/#!forum/ngless).
 
 ## Example
 
-    ngless "0.7"
+    ngless "0.8"
     input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
     input = preprocess(input) using |read|:
         read = read[5:]
@@ -48,7 +48,7 @@ The recommended way to install NGLess is through
 Alternatively, a docker container with NGLess is available at
 [biocontainers](https://quay.io/repository/biocontainers/ngless):
 
-    docker run -v $PWD:/workdir -w /workdir -it quay.io/biocontainers/ngless:0.7.1--py35_0 ngless --version
+    docker run -v $PWD:/workdir -w /workdir -it quay.io/biocontainers/ngless:0.8.0--py35_0 ngless --version
 
 Adapt the mount flags (``-v``) as needed.
 
