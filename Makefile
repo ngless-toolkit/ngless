@@ -110,7 +110,7 @@ ngless:
 modules:
 	cd Modules && $(MAKE)
 
-static: $(NGLESS_EMBEDDED_TARGET)
+static: $(NGLESS_EMBEDDED_TARGET) external-deps
 	stack build $(STACKOPTS) --ghc-options='-fPIC' --force-dirty --flag NGLess:embed
 
 fast:
