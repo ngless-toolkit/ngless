@@ -41,13 +41,12 @@ import Options.Applicative
 import System.FilePath
 import System.Directory
 import Control.Monad.Extra (whenJust)
-import System.IO (stderr, hPutStrLn)
+import System.IO (stdout, stderr, stdin, hPutStrLn, mkTextEncoding, hGetEncoding, Handle, hSetEncoding)
 import Control.Exception (catch, IOException, try)
 import Control.Concurrent (setNumCapabilities)
 import System.Console.ANSI (setSGRCode, SGR(..), ConsoleLayer(..), Color(..), ColorIntensity(..))
 import System.Exit (exitSuccess, exitFailure)
 
-import Control.Monad.Trans.Except
 import Control.Monad.Trans.Resource
 
 import qualified Data.Text as T
@@ -366,7 +365,17 @@ main' = do
     updateNglEnvironment' (\env -> env { ngleConfiguration = config })
     modeExec (mode args)
 
-main = catch main' $ \e -> do
+makeEncodingSafe :: Handle -> IO ()
+makeEncodingSafe h = do
+  ce' <- hGetEncoding h
+  case ce' of
+    Nothing -> return ()
+    Just ce -> mkTextEncoding (takeWhile (/= '/') (show ce) ++ "//TRANSLIT") >>=
+      hSetEncoding h
+
+main = do
+    mapM_ makeEncodingSafe [stdout, stdin, stderr]
+    catch main' $ \e -> do
             putStrLn ("Exiting after internal error. If you can reproduce this issue, please run your script "++
                     "with the --trace flag and report a bug at http://github.com/luispedro/ngless/issues")
             print (e :: IOException)

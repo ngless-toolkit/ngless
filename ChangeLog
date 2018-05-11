@@ -1,3 +1,6 @@
+Version 0.8.0+
+	* Add fallback for character encoding on systems with bad locale support
+
 Version 0.8.0 2018-05-06 by luispedro
 	* Add minimap2 support as alternative mapper
 	* Faster collect()
