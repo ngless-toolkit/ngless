@@ -259,7 +259,9 @@ executeCommand basedir cmds funcname input args = do
                 return
                 (find ((== funcname) . nglName) cmds)
     paths <- encodeArgument (arg1 cmd) (Just input)
-    paths' <- liftIO $ mapM canonicalizePath paths
+    -- FIXME if path includes an <expansion> but no searchdir is given or no file/folder is matched, the string is kept without expanding
+    paths' <- traverse (\x -> fmap (fromMaybe x) (expandPath x)) paths
+    paths'' <- liftIO $ mapM canonicalizePath paths'
     args' <- argsArguments cmd args
     moarg <- case ret cmd of
         CommandReturn NGLVoid _ _ -> return Nothing
@@ -269,7 +271,7 @@ executeCommand basedir cmds funcname input args = do
             let oarg = "--"++T.unpack name++"="++newfp
             return $ Just (newfp, [oarg])
     env <- nglessEnv basedir
-    let cmdline = paths' ++ args' ++ (fromMaybe [] (snd <$> moarg))
+    let cmdline = paths'' ++ args' ++ maybe [] snd moarg
         process = (proc (basedir </> arg0 cmd) cmdline) { env = Just env }
     outputListLno' TraceOutput ["executing command: ", arg0 cmd, " ", LU.join " " cmdline]
     (exitCode, out, err) <- liftIO $

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-if [ "$1" != "/somedir/input.fq" ]; then
-    echo "Expected '/somedir/input.fq' saw '$1'"
+EXPECTED="$(pwd)/somedir/input.fq"
+
+if [ "$1" != "$EXPECTED" ]; then
+    echo "Expected '$EXPECTED' saw '$1'"
     exit 1
 fi
