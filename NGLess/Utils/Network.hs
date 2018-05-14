@@ -1,7 +1,7 @@
 {- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
-module Network
+module Utils.Network
     ( downloadFile
     , downloadOrCopyFile
     , downloadExpandTar

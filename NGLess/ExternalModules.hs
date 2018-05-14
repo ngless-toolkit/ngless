@@ -44,8 +44,8 @@ import FileOrStream
 import Utils.Suggestion
 import Utils.Utils
 import Utils.LockFile (LockParameters(..), WhenExistsStrategy(IfLockedRetry, timeBetweenRetries, nrLockRetries), withLockFile)
+import Utils.Network (downloadExpandTar)
 import Language
-import Network
 import Modules
 import Output
 import NGLess

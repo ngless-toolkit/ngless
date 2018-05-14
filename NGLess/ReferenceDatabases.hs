@@ -30,10 +30,10 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource(release)
 
 import qualified StandardModules.Mappers.Bwa as Bwa
-import Network (downloadExpandTar, downloadOrCopyFile)
 import FileManagement (createTempDir, InstallMode(..))
 import NGLess.NGLEnvironment
 import Configuration
+import Utils.Network (downloadExpandTar, downloadOrCopyFile)
 import Utils.Utils
 import Modules
 import Version

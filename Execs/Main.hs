@@ -74,7 +74,7 @@ import CmdArgs
 import FileManagement
 import StandardModules.NGLStdlib
 import Citations
-import "NGLess" Network
+import Utils.Network
 import Hooks
 import Utils.Batch
 import Utils.Suggestion
