@@ -31,7 +31,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Lift as C
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
-import           Data.Conduit ((=$=), (.|))
+import           Data.Conduit ((.|))
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import           Data.Strict.Tuple (Pair(..))
@@ -39,7 +39,6 @@ import           Control.Monad.Primitive
 import Data.Bits (testBit)
 import Control.Error (note)
 import Control.DeepSeq
-import Control.Monad.Base
 
 import Data.Maybe
 import Data.Function (on)
@@ -220,8 +219,9 @@ samIntTag samline tname
 -- | take in *ByteLines* and transform them into groups of SamLines all refering to the same read
 --
 -- Header lines are silently ignored
-readSamGroupsC :: (MonadError NGError m) => C.Conduit ByteLine m [SamLine]
-readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
+readSamGroupsC :: (MonadError NGError m) => C.ConduitT ByteLine [SamLine] m ()
+readSamGroupsC = readSamLineOrDie
+                    .| CL.groupBy groupLine
     where
         readSamLineOrDie = C.awaitForever $ \(ByteLine line) ->
             case readSamLine line of
@@ -236,11 +236,11 @@ readSamGroupsC = readSamLineOrDie =$= CL.groupBy groupLine
 --
 -- When respectPairs is False, then the two mates of the same fragment will be
 -- considered grouped in different blocks
-readSamGroupsC' :: forall m . (MonadError NGError m, PrimMonad m, MonadIO m) => Int -> Bool -> C.Conduit ByteLine m (V.Vector [SamLine])
+readSamGroupsC' :: forall m . (MonadError NGError m, PrimMonad m, MonadIO m) => Int -> Bool -> C.ConduitT ByteLine (V.Vector [SamLine]) m ()
 readSamGroupsC' mapthreads respectPairs = do
         CC.dropWhile (isSamHeaderString . unwrapByteLine)
         CC.conduitVector 4096
-            .| asyncMapEitherC mapthreads (liftM groupByName . V.mapM (readSamLine . unwrapByteLine))
+            .| asyncMapEitherC mapthreads (fmap groupByName . V.mapM (readSamLine . unwrapByteLine))
             -- the groups may not be aligned on the group boundary, thus we need to fix them
             .| fixSamGroups
     where
@@ -262,13 +262,13 @@ readSamGroupsC' mapthreads respectPairs = do
                     where
                         cur = vs V.! ix
                         cur_tag = samQNameMate cur
-        fixSamGroups :: C.Conduit (V.Vector [SamLine]) m (V.Vector [SamLine])
+        fixSamGroups :: C.ConduitT (V.Vector [SamLine]) (V.Vector [SamLine]) m ()
         fixSamGroups = awaitJust fixSamGroups'
-        fixSamGroups' :: V.Vector [SamLine] -> C.Conduit (V.Vector [SamLine]) m (V.Vector [SamLine])
+        fixSamGroups' :: V.Vector [SamLine] -> C.ConduitT (V.Vector [SamLine]) (V.Vector [SamLine]) m ()
         fixSamGroups' prev = C.await >>= \case
             Nothing -> C.yield prev
             Just cur -> case (V.last prev, V.head cur) of
-                    ((lastprev:_),(curfirst:_))
+                    (lastprev:_, curfirst:_)
                         | samQNameMate lastprev /= samQNameMate curfirst -> do
                             -- lucky case, the groups align with the vector boundary
                             C.yield prev
@@ -284,10 +284,10 @@ readSamGroupsC' mapthreads respectPairs = do
             VM.modify gs' (prev ++ ) 0
             V.unsafeFreeze gs'
 
-samStatsC :: (MonadIO m) => C.Sink ByteLine m (NGLess (Int, Int, Int))
+samStatsC :: (MonadIO m) => C.ConduitT ByteLine C.Void m (NGLess (Int, Int, Int))
 samStatsC = C.runExceptC $ readSamGroupsC .| samStatsC'
 
-samStatsC' :: (MonadError NGError m) => C.Sink SamGroup m (Int, Int, Int)
+samStatsC' :: (MonadError NGError m) => C.ConduitT SamGroup C.Void m (Int, Int, Int)
 samStatsC' = CL.foldM summarize (0, 0, 0)
     where
         add1if !v True = v+1

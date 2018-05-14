@@ -1,4 +1,4 @@
-{- Copyright 2017 NGLess Authors
+{- Copyright 2017-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -36,10 +36,10 @@ faseqLength = B.length . seqdata
 greaterThanSign :: Word8
 greaterThanSign = 62
 
-faConduit :: (MonadIO m, MonadError NGError m) => C.Conduit B.ByteString m FastaSeq
+faConduit :: (MonadIO m, MonadError NGError m) => C.ConduitT B.ByteString FastaSeq m ()
 faConduit = linesC .| faConduit'
 
-faConduit' :: (MonadIO m, MonadError NGError m) => C.Conduit ByteLine m FastaSeq
+faConduit' :: (MonadIO m, MonadError NGError m) => C.ConduitT ByteLine FastaSeq m ()
 faConduit' = C.await >>= \case
                 Nothing -> return ()
                 Just (ByteLine header)
@@ -56,7 +56,7 @@ faConduit' = C.await >>= \case
                                             getdata (n+1) (B.drop 1 next) []
                                     | otherwise -> getdata (n+1) header (next:toks)
 
-faWriteC :: (Monad m) => C.Conduit FastaSeq m B.ByteString
+faWriteC :: (Monad m) => C.ConduitT FastaSeq B.ByteString m ()
 faWriteC = C.awaitForever $ \(FastaSeq h s) -> do
     C.yield ">"
     C.yield h
@@ -64,5 +64,5 @@ faWriteC = C.awaitForever $ \(FastaSeq h s) -> do
     C.yield s
     C.yield "\n"
 
-faWriteConduit :: (Monad m) => [FastaSeq] -> C.Source m B.ByteString
+faWriteConduit :: (Monad m) => [FastaSeq] -> C.ConduitT () B.ByteString m ()
 faWriteConduit fas = C.yieldMany fas .| faWriteC

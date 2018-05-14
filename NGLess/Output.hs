@@ -68,7 +68,7 @@ buildComment c ac rh = do
         buildAutoComment AutoResultHash = return [T.concat ["Output hash: ", rh]]
         addInitialIndent t = T.concat ["    ", t]
 
-commentC :: Monad m => B.ByteString -> [T.Text] -> C.Source m B.ByteString
+commentC :: Monad m => B.ByteString -> [T.Text] -> C.ConduitT () B.ByteString m ()
 commentC cmarker cs = forM_ cs $ \c -> do
                                 C.yield cmarker
                                 C.yield (TE.encodeUtf8 c)

@@ -40,7 +40,7 @@ import NGLess.NGError
 newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
                 deriving (Show)
 
-linesBounded:: (Monad m, MonadError NGError m) => Int -> C.Conduit B.ByteString m B.ByteString
+linesBounded:: (Monad m, MonadError NGError m) => Int -> C.ConduitT B.ByteString B.ByteString m ()
 linesBounded maxLineSize = continue 0 []
     where
         continue n toks
@@ -64,7 +64,7 @@ lineWindowsTerminated line = if not (B.null line) && B.index line (B.length line
 {-# INLINE lineWindowsTerminated #-}
 
 
-linesUnBoundedC :: (Monad m) => C.Conduit B.ByteString m ByteLine
+linesUnBoundedC :: (Monad m) => C.ConduitT B.ByteString ByteLine m ()
 linesUnBoundedC =
     CB.lines
         .| CL.map lineWindowsTerminated
@@ -72,13 +72,13 @@ linesUnBoundedC =
 {-# INLINE linesUnBoundedC #-}
 
 
-linesC :: (MonadError NGError m) => C.Conduit B.ByteString m ByteLine
+linesC :: (MonadError NGError m) => C.ConduitT B.ByteString ByteLine m ()
 linesC =
     linesBounded 65536
         .| CL.map (ByteLine . lineWindowsTerminated)
 {-# INLINE linesC #-}
 
-byteLineSinkHandle :: (MonadIO m) => Handle -> C.Sink ByteLine m ()
+byteLineSinkHandle :: (MonadIO m) => Handle -> C.ConduitT ByteLine C.Void m ()
 byteLineSinkHandle h = CL.mapM_ (\(ByteLine val) -> liftIO (B.hPut h val >> B.hPut h nl))
     where
         nl = B.singleton 10
@@ -86,6 +86,6 @@ byteLineSinkHandle h = CL.mapM_ (\(ByteLine val) -> liftIO (B.hPut h val >> B.hP
 
 zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
 
-zipSink2 :: (Monad m) => C.Sink i m a -> C.Sink i m b -> C.Sink i m (a,b)
+zipSink2 :: (Monad m) => C.ConduitT i C.Void m a -> C.ConduitT i C.Void m b -> C.ConduitT i C.Void m (a,b)
 zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
 

@@ -123,7 +123,7 @@ encodingName SolexaEncoding = "Solexa (64 offset)"
 
 
 -- | encode ShortRead as a ByteString (FastQ format)
-fqEncodeC :: (Monad m) => FastQEncoding -> C.Conduit ShortRead m B.ByteString
+fqEncodeC :: (Monad m) => FastQEncoding -> C.ConduitT ShortRead B.ByteString m ()
 fqEncodeC enc = CL.map (fqEncode enc)
 
 -- Using B.map instead of this function makes this loop be one of the functions
@@ -162,7 +162,7 @@ fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, 
 -- | Decode a FastQ file as a Conduit
 --
 -- Throws DataError if the stream is not in valid FastQ format
-fqDecodeC :: (MonadError NGError m) => FastQEncoding -> C.Conduit ByteLine m ShortRead
+fqDecodeC :: (MonadError NGError m) => FastQEncoding -> C.ConduitT ByteLine ShortRead m ()
 fqDecodeC enc = C.awaitForever $ \(ByteLine rid) ->
         lineOrError4 $ \rseq ->
             lineOrError4 $ \_ ->
@@ -200,7 +200,7 @@ statsFromFastQ fp enc = C.runConduitRes $
             .| fqDecodeC enc
             .| fqStatsC
 
-fqStatsC :: forall m. (MonadIO m) => C.Sink ShortRead m FQStatistics
+fqStatsC :: forall m. (MonadIO m) => C.ConduitT ShortRead C.Void m FQStatistics
 fqStatsC = do
         -- This is pretty ugly code, but threading the state through a foldM
         -- was >2x slower. In any case, all the ugliness is well hidden.
@@ -273,12 +273,12 @@ fqStatsC = do
         findMinQValue' :: VU.Vector Int -> Int
         findMinQValue' qs = fromMaybe 256 (VU.findIndex (/= 0) qs)
 
-interleaveFQs :: (Monad m, MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => [(FastQFilePath, FastQFilePath)] -> [FastQFilePath] -> C.Source m B.ByteString
+interleaveFQs :: (Monad m, MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => [(FastQFilePath, FastQFilePath)] -> [FastQFilePath] -> C.ConduitT () B.ByteString m ()
 interleaveFQs pairs singletons = do
             sequence_ [interleavePair f0 f1 | (FastQFilePath _ f0, FastQFilePath _ f1) <- pairs]
             sequence_ [conduitPossiblyCompressedFile f | FastQFilePath _ f <- singletons]
     where
-        interleavePair :: (Monad m, MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => FilePath -> FilePath -> C.Source m B.ByteString
+        interleavePair :: (Monad m, MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => FilePath -> FilePath -> C.ConduitT () B.ByteString m ()
         interleavePair f0 f1 =
                 ((conduitPossiblyCompressedFile f0 .| linesC .| CL.chunksOf 4) `zipSources` (conduitPossiblyCompressedFile f1 .| linesC .| CL.chunksOf 4))
                 .| C.awaitForever (\(r0,r1) -> C.yield (ul r0) >> C.yield (ul r1))

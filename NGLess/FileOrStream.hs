@@ -1,4 +1,4 @@
-{- Copyright 2016-2017 NGLess Authors
+{- Copyright 2016-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -9,7 +9,7 @@ module FileOrStream
     , asSamStream
     ) where
 
-import           Data.Conduit ((.|), (=$=))
+import           Data.Conduit ((.|))
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Binary as C
 import System.FilePath
@@ -20,7 +20,7 @@ import Utils.Samtools
 import FileManagement
 
 
-data FileOrStream = File FilePath | Stream FilePath (C.Source NGLessIO ByteLine)
+data FileOrStream = File FilePath | Stream FilePath (C.ConduitT () ByteLine NGLessIO ())
 
 instance Show FileOrStream where
     show (File fp) = "File " ++ fp
@@ -38,10 +38,10 @@ asFile (Stream fp istream) =
             istream .| byteLineSinkHandle hout
 
 
-asStream :: FileOrStream -> (FilePath, C.Source NGLessIO ByteLine)
+asStream :: FileOrStream -> (FilePath, C.ConduitT () ByteLine NGLessIO ())
 asStream (Stream fp istream) = (fp, istream)
-asStream (File fp) = (fp, C.sourceFile fp =$= linesC)
+asStream (File fp) = (fp, C.sourceFile fp .| linesC)
 
-asSamStream (File fname) = (fname, samBamConduit fname =$= linesC)
+asSamStream (File fname) = (fname, samBamConduit fname .| linesC)
 asSamStream (Stream fname istream) = (fname, istream)
 

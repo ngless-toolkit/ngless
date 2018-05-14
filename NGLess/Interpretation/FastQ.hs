@@ -24,10 +24,9 @@ import qualified Data.Conduit.List as CL
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Control.Concurrent.Async as A
-import Control.Monad.Trans.Resource
 import Control.Exception (try)
 import Control.Monad.Except
-import Data.Conduit (($$), (=$=), (.|))
+import Data.Conduit ((.|))
 import Data.Maybe
 import Data.Word
 
@@ -94,13 +93,13 @@ drop10 = loop (0 :: Int)
 
 performSubsample :: FilePath -> Handle -> IO ()
 performSubsample f h = do
-    runResourceT $
+    C.runConduitRes $
             conduitPossiblyCompressedFile f
-                =$= CB.lines
-                =$= drop10
-                =$= C.take 100000
-                =$= C.unlinesAscii
-                $$  asyncGzipTo h
+                .| CB.lines
+                .| drop10
+                .| C.take 100000
+                .| C.unlinesAscii
+                .|  asyncGzipTo h
     hClose h
 
 optionalSubsample :: FilePath -> NGLessIO FilePath

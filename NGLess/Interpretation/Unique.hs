@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -21,7 +21,7 @@ import qualified Data.ByteString as B
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
-import Data.Conduit (($$), (=$=), (.|))
+import Data.Conduit ((.|))
 
 import FileManagement (createTempDir, makeNGLTempFile)
 import Data.FastQ
@@ -51,10 +51,11 @@ performUnique fname enc mc = do
                 return . ceiling $! (fromInteger fsize / maxTempFileSize)
         fhs  <- liftIO $ V.generateM k $ \n ->
                             openFile (dest </> show n) AppendMode
-        conduitPossiblyCompressedFile fname
-            =$= linesC
-            =$= fqDecodeC enc
-            $$ CL.mapM_ (multiplex k fhs)
+        C.runConduitRes $
+            conduitPossiblyCompressedFile fname
+                .| linesC
+                .| fqDecodeC enc
+                .| CL.mapM_ (multiplex k fhs)
         V.mapM_ (liftIO . hClose) fhs
         outputListLno' DebugOutput ["Wrote N Files to: ", dest]
         makeNGLTempFile fname "" "fq.gz" $ \h ->
@@ -70,14 +71,14 @@ hashRead :: Int -> ShortRead -> Int
 hashRead k (ShortRead _ r _) = mod (hash r) k
 
 
-readNFiles :: FastQEncoding -> Int -> FilePath -> C.Source NGLessIO ShortRead
+readNFiles :: FastQEncoding -> Int -> FilePath -> C.ConduitT () ShortRead NGLessIO ()
 readNFiles enc k d = do
     fs <- liftIO $ getDirectoryContents d
     let fs' = map (d </>) (filter (`notElem` [".", ".."]) fs)
     mapM_ (readUniqueFile k enc) fs'
 
 
-readUniqueFile :: Int -> FastQEncoding -> FilePath -> C.Source NGLessIO ShortRead
+readUniqueFile :: Int -> FastQEncoding -> FilePath -> C.ConduitT () ShortRead NGLessIO ()
 readUniqueFile k enc fname =
     CC.sourceFile fname
         .| linesC
@@ -85,10 +86,10 @@ readUniqueFile k enc fname =
         .| filterUniqueUpTo k
 
 
-filterUniqueUpTo :: Int -> C.Conduit ShortRead NGLessIO ShortRead
-filterUniqueUpTo k = (liftIO H.new) >>= filterUniqueUpTo'
+filterUniqueUpTo :: Int -> C.ConduitT ShortRead ShortRead NGLessIO ()
+filterUniqueUpTo k = liftIO H.new >>= filterUniqueUpTo'
     where
-        filterUniqueUpTo' :: H.CuckooHashTable B.ByteString Int -> C.Conduit ShortRead NGLessIO ShortRead
+        filterUniqueUpTo' :: H.CuckooHashTable B.ByteString Int -> C.ConduitT ShortRead ShortRead NGLessIO ()
         filterUniqueUpTo' ht = awaitJust $ \sr -> do
             cur <- fromMaybe 0 <$> liftIO (H.lookup ht (srSequence sr))
             when (cur < k) $ do

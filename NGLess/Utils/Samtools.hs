@@ -1,4 +1,4 @@
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2015-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -19,8 +19,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Process as CP
 import qualified Control.Concurrent.Async as A
-import           Data.Conduit (($$))
-import           Control.Monad.Trans.Resource (runResourceT)
+import           Data.Conduit ((.|))
 import           Control.Monad.Except
 import           Control.Concurrent (getNumCapabilities)
 import           Data.List (isSuffixOf)
@@ -35,7 +34,7 @@ import Utils.Conduit
 
 -- | reads a SAM (possibly compressed) or BAM file (in the latter case by using
 -- 'samtools view' under the hood)
-samBamConduit :: FilePath -> C.Source NGLessIO B.ByteString
+samBamConduit :: FilePath -> C.ConduitT () B.ByteString NGLessIO ()
 samBamConduit samfp
   | ".bam" `isSuffixOf` samfp = do
         lift $ outputListLno' TraceOutput ["Starting samtools view of ", samfp]
@@ -47,7 +46,7 @@ samBamConduit samfp
                 ,hout
                 ,herr
                 ,sp) <- CP.streamingProcess cp
-            err <- A.async $ runResourceT (C.sourceHandle herr $$ CL.consume)
+            err <- A.async $ C.runConduitRes (C.sourceHandle herr .| CL.consume)
             A.link err
             return (hout, herr, err, sp)
         C.sourceHandle hout
@@ -85,6 +84,7 @@ convertBamToSam :: FilePath -> NGLessIO FilePath
 convertBamToSam bamfile = do
     (newfp, hout) <- openNGLTempFile bamfile "converted_" "sam"
     outputListLno' DebugOutput ["BAM->SAM Conversion start ('", bamfile, "' -> '", newfp, "')"]
-    samBamConduit bamfile $$ C.sinkHandle hout
+    C.runConduit $
+        samBamConduit bamfile .| C.sinkHandle hout
     liftIO $ hClose hout
     return newfp

@@ -83,7 +83,7 @@ downloadExpandTar url destdir = do
               _ -> throwSystemError ("Unexpected entry in megahit tarball: " ++ show e)
           expandTar next
 
-printProgress :: MonadIO m => Int -> C.Conduit B.ByteString m B.ByteString
+printProgress :: MonadIO m => Int -> C.ConduitT B.ByteString B.ByteString m ()
 printProgress csize = liftIO (mkProgressBar 40) >>= loop 0
   where
     loop !len pbar = awaitJust $ \bs -> do
