@@ -1,4 +1,4 @@
 ngless '0.0'
 local import "test" version "0.0"
 
-testing_searchdir("<data>/input.fq")
+testing_searchdir("<location>/input.fq", path2="<location>/input2.fq")

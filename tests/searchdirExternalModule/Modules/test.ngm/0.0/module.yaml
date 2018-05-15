@@ -7,3 +7,7 @@ functions:
 
         arg1:
             atype: 'str'
+        additional:
+            -
+                name: path2
+                atype: str

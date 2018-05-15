@@ -259,9 +259,7 @@ executeCommand basedir cmds funcname input args = do
                 return
                 (find ((== funcname) . nglName) cmds)
     paths <- encodeArgument (arg1 cmd) (Just input)
-    -- FIXME if path includes an <expansion> but no searchdir is given or no file/folder is matched, the string is kept without expanding
-    paths' <- traverse (\x -> fmap (fromMaybe x) (expandPath x)) paths
-    paths'' <- liftIO $ mapM canonicalizePath paths'
+    paths' <- liftIO $ mapM canonicalizePath paths
     args' <- argsArguments cmd args
     moarg <- case ret cmd of
         CommandReturn NGLVoid _ _ -> return Nothing
@@ -271,7 +269,7 @@ executeCommand basedir cmds funcname input args = do
             let oarg = "--"++T.unpack name++"="++newfp
             return $ Just (newfp, [oarg])
     env <- nglessEnv basedir
-    let cmdline = paths'' ++ args' ++ maybe [] snd moarg
+    let cmdline = paths' ++ args' ++ maybe [] snd moarg
         process = (proc (basedir </> arg0 cmd) cmdline) { env = Just env }
     outputListLno' TraceOutput ["executing command: ", arg0 cmd, " ", LU.join " " cmdline]
     (exitCode, out, err) <- liftIO $
@@ -354,7 +352,9 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
         _ -> throwScriptError ("Expected readset for argument in function call, got " ++ show v)
     | otherwise = do
         asStr <- case argType ai of
-            NGLString -> T.unpack <$> stringOrTypeError "in external module" v
+            NGLString -> do
+                str <- T.unpack <$> stringOrTypeError "in external module" v
+                fromMaybe str <$> expandPath str
             NGLSymbol -> T.unpack <$> symbolOrTypeError "in external module" v
             NGLInteger ->  show <$> integerOrTypeError "in external module" v
             NGLMappedReadSet -> case v of
