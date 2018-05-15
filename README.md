@@ -3,7 +3,7 @@
 Ngless is a domain-specific language for NGS (next-generation sequencing data)
 processing.
 
-[![Build Status](https://travis-ci.org/BigDataBiology/ngless.svg?branch=master)](https://travis-ci.org/BigDataBiology/ngless)
+[![Build Status](https://travis-ci.org/ngless-toolkit/ngless.svg?branch=master)](https://travis-ci.org/ngless-toolkit/ngless)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/hyperium/hyper/master/LICENSE)
 [![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/installer/conda.svg)](https://anaconda.org/bioconda/ngless)
 [![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/downloads.svg)](https://anaconda.org/bioconda/ngless)
