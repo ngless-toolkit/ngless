@@ -6,6 +6,7 @@
 /docker/
 /samtools-1.6/
 /bwa-0.7.15/
+/bwa-0.7.17/
 /megahit-1.1.1/
 /Prodigal-2.6.3/
 /minimap2-2.9/
@@ -28,4 +29,5 @@ NGLess/Dependencies/bwa_data.c
 NGLess/Dependencies/samtools_data.c
 NGLess/Dependencies/prodigal_data.c
 NGLess/Dependencies/megahit_data.c
+NGLess/Dependencies/minimap2_data.c
 NGLess.cabal
