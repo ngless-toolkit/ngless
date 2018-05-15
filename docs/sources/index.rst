@@ -168,6 +168,7 @@ Authors
    tutorial-assembly-gp
    tutorial-gut-metagenomics
    tutorial
+   command-line-options
    command-line-wrappers
    one-liners
    preprocess
@@ -182,7 +183,6 @@ Authors
    searchpath
    reproducible
    faq
-   releases
    nglesspy
    cwl
    advanced
