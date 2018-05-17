@@ -1,0 +1,11 @@
+ngless "0.8"
+import "parallel" version "0.6"
+
+samples = [
+    "projectA/sampleA1",
+    "projectB/sampleB1"
+]
+
+# Check if lock1 can handle paths containing / or \
+# throws an error it can't
+lock1(samples)

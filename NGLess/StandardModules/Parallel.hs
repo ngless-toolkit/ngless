@@ -51,6 +51,7 @@ import Control.Monad.State.Lazy
 import System.IO
 import Data.IORef
 import Data.Default
+import Data.Maybe (fromMaybe)
 import System.IO.Unsafe (unsafePerformIO)
 import System.Directory (createDirectoryIfMissing, doesFileExist, getDirectoryContents)
 
@@ -110,11 +111,19 @@ setupHashDirectory basename hash = do
         liftIO $ atomicWriteFile scriptfile sct
     return actiondir
 
+-- Beware that addition of characters here can lead to lock collisions
+-- as is "project/sample" clashes with "project_sample" but ... uncommon case
+unsafeCharMap = [('/', '_'),
+                 ('\\', '_')]
+
+sanitizeLock :: T.Text -> T.Text
+sanitizeLock = T.map (\x -> fromMaybe x (lookup x unsafeCharMap))
+
 executeLock1 (NGOList entries) kwargs  = do
     entries' <- mapM (stringOrTypeError "lock1") entries
     hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
     lockdir <- setupHashDirectory "ngless-locks" hash
-    (e,rk) <- getLock lockdir entries'
+    (e,rk) <- getLock lockdir (sanitizeLock <$> entries')
     outputListLno' InfoOutput ["lock1: Obtained lock file: '", lockdir </> T.unpack e ++ ".lock", "'"]
     reportbase <- setupHashDirectory "ngless-stats" hash
     let reportdir = reportbase </> T.unpack e
