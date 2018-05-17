@@ -1,0 +1,8 @@
+ngless '0.0'
+input = paired('sample.1.fq', 'sample.2.fq', singles='sample.singles.fq')
+
+mapped1 = map(input, fafile='<data>/ref1.fna')
+mapped2 = map(input, fafile='<data>/ref2.fna')
+
+write(mapped1, ofile='output1.sam')
+write(mapped2, ofile='output2.sam')

@@ -1,0 +1,12 @@
+output1.sam
+output2.sam
+subdir1/ref1.fna.amb
+subdir1/ref1.fna.ann
+subdir1/ref1.fna.bwt
+subdir1/ref1.fna.pac
+subdir1/ref1.fna.sa
+subdir2/ref2.fna.amb
+subdir2/ref2.fna.ann
+subdir2/ref2.fna.bwt
+subdir2/ref2.fna.pac
+subdir2/ref2.fna.sa
