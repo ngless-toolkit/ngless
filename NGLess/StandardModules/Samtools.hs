@@ -13,9 +13,10 @@ import Control.Exception
 import Control.Concurrent
 import Control.Monad
 
+import qualified Data.Conduit as C
+import           Data.Conduit ((.|))
 import qualified Data.Text as T
 import qualified Control.Concurrent.Async as A
-import           Data.Conduit (($$))
 import           Data.List.Extra (snoc)
 
 
@@ -70,7 +71,7 @@ executeSort (NGOMappedReadSet name istream rinfo) args = do
                         void (evaluate (length err))
                         hClose herr
                         return err
-            istream' $$ byteLineSinkHandle pipe_out
+            C.runConduit $ istream' .| byteLineSinkHandle pipe_out
             liftIO $ do
                 hClose pipe_out
                 A.waitBoth err samP

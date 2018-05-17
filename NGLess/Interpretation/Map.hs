@@ -65,7 +65,7 @@ data MergeStrategy = MSBestOnly
 data Mapper = Mapper
     { createIndex :: FilePath -> NGLessIO ()
     , hasValidIndex :: FilePath -> NGLessIO Bool
-    , callMapper :: forall a. FilePath -> [FilePath] -> [String] -> C.Consumer B.ByteString IO a -> NGLessIO a
+    , callMapper :: forall a. FilePath -> [FilePath] -> [String] -> C.ConduitT B.ByteString C.Void IO a -> NGLessIO a
     }
 
 bwa = Mapper Bwa.createIndex Bwa.hasValidIndex Bwa.callMapper
@@ -172,7 +172,7 @@ mapToReference :: Mapper -> FilePath -> ReadSet -> [String] -> NGLessIO (FilePat
 mapToReference mapper refIndex (ReadSet pairs singletons) extraArgs = do
     (newfp, hout) <- openNGLTempFile refIndex "mapped_" ".sam"
     let out1 = CB.sinkHandle hout
-        out2 :: C.Sink B.ByteString IO ()
+        out2 :: C.ConduitT B.ByteString C.Void IO ()
         out2 = CB.lines
                 .| CL.filter (\line -> not (B.null line) &&  B8.head line /= '@')
                 .| CC.unlinesAscii
@@ -322,7 +322,7 @@ executeMergeSams _ _ = throwScriptError "Wrong argument for internal function __
 
 
 
-mergeSamFiles :: [FilePath] -> C.Source NGLessIO SamGroup
+mergeSamFiles :: [FilePath] -> C.ConduitT () SamGroup NGLessIO ()
 mergeSamFiles [] = lift $ throwShouldNotOccur "empty input to mergeSamFiles"
 mergeSamFiles inputs = do
     lift $ outputListLno' TraceOutput ["Merging SAM files: ", show inputs]
@@ -340,7 +340,7 @@ mergeSamFiles inputs = do
 
         .| CL.mapM (mergeSAMGroups MSBestOnly)
 
-readSamHeaders :: C.Conduit ByteLine NGLessIO SamGroup
+readSamHeaders :: C.ConduitT ByteLine SamGroup NGLessIO ()
 readSamHeaders =
     CC.takeWhile (\(ByteLine line) -> B.null line || B.head line == 64)
                 .| CL.map (\(ByteLine line) -> [SamHeader line])

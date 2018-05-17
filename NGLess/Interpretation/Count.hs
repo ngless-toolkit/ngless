@@ -277,7 +277,7 @@ loadAnnotator (AnnotateFunctionalMap mm) opts = loadFunctionalMap mm (optFeature
 -- First pass over the data
 performCount1Pass :: MMMethod
                         -> VUM.IOVector Double -- ^ counts vector. Will be modified
-                        -> C.Sink (VU.Vector Int, IG.IntGroups) NGLessIO [IG.IntGroups]
+                        -> C.ConduitT (VU.Vector Int, IG.IntGroups) C.Void NGLessIO [IG.IntGroups]
 performCount1Pass MMUniqueOnly mcounts = do
     C.awaitForever $ \(singles, _) -> liftIO (incrementAll mcounts singles)
     return []
@@ -293,7 +293,7 @@ performCount1Pass MM1OverN mcounts = do
     return []
 performCount1Pass MMDist1 mcounts = loop []
     where
-        loop :: [IG.IntGroups] -> C.Sink (VU.Vector Int, IG.IntGroups) NGLessIO [IG.IntGroups]
+        loop :: [IG.IntGroups] -> C.ConduitT (VU.Vector Int, IG.IntGroups) C.Void NGLessIO [IG.IntGroups]
         loop acc = C.await >>= \case
             Nothing -> return acc
             Just (singles, mms) ->  do
@@ -305,11 +305,11 @@ performCount1Pass MMDist1 mcounts = loop []
 -- | This is a version of C.sequenceSinks which optimizes the case where a
 -- single element is passed (it makes a small, but noticeable difference in
 -- benchmarking)
-sequenceSinks :: (Monad m) => [C.Sink a m b] -> C.Sink a m [b]
+sequenceSinks :: (Monad m) => [C.ConduitT a C.Void m b] -> C.ConduitT a C.Void m [b]
 sequenceSinks [s] = (:[]) <$> s
 sequenceSinks ss = C.sequenceSinks ss
 
-annSamHeaderParser :: Int -> [Annotator] -> CountOpts -> C.Sink ByteLine NGLessIO [Annotator]
+annSamHeaderParser :: Int -> [Annotator] -> CountOpts -> C.ConduitT ByteLine C.Void NGLessIO [Annotator]
 annSamHeaderParser mapthreads anns opts = lineGroups .| sequenceSinks (map annSamHeaderParser1 anns)
     where
         annSamHeaderParser1 (SeqNameAnnotator Nothing) = do
@@ -638,7 +638,7 @@ loadGFF gffFp opts = do
                 Nothing -> True
                 Just [_] -> True
                 _ -> False
-        readAnnotationOrDie :: C.Conduit ByteLine NGLessIO GffLine
+        readAnnotationOrDie :: C.ConduitT ByteLine GffLine NGLessIO ()
         readAnnotationOrDie = C.awaitForever $ \(ByteLine line) ->
             unless (B8.head line == '#') $
                 case readGffLine line of

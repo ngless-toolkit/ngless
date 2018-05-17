@@ -11,7 +11,7 @@ module Interpretation.Select
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Conduit as C
-import           Data.Conduit ((=$=), (.|))
+import           Data.Conduit ((.|))
 import qualified Data.Conduit.List as CL
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -92,8 +92,8 @@ keep1 SelectUnique g = if isGroupUnique (map fst g) then g else []
 -- The reason we cannot just use readSamGroupsC is that we want to get the unparsed ByteString on the side
 readSamGroupsAsConduit istream paired =
         istream
-            =$= readSamLineOrDie
-            =$= CL.groupBy groupLine
+            .| readSamLineOrDie
+            .| CL.groupBy groupLine
     where
         readSamLineOrDie = C.awaitForever $ \(ByteLine line) ->
             case readSamLine line of
@@ -125,7 +125,7 @@ executeSelect (NGOMappedReadSet name istream ref) args = do
                 .| streamedSamStats lno ("select_"++T.unpack name) ("select.lno"++show lno)
                 .| CL.map (map snd)
                 .| CL.concat
-        out = Stream ("selected_" ++ takeBaseNameNoExtensions fpsam ++ ".sam") (stream =$= CL.map ByteLine)
+        out = Stream ("selected_" ++ takeBaseNameNoExtensions fpsam ++ ".sam") (stream .| CL.map ByteLine)
     return $! NGOMappedReadSet name out ref
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 

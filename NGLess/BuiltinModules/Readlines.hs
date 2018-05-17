@@ -14,7 +14,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
-import Data.Conduit ((=$=), ($$))
+import Data.Conduit ((.|))
 import Data.Default
 
 import Language
@@ -25,10 +25,10 @@ import NGLess
 executeReadlines :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeReadlines (NGOString fname) _ = do
     content <-
-        (CC.sourceFile (T.unpack fname) `C.catchC` (\(e :: IOError) ->
+        C.runConduit $ (CC.sourceFile (T.unpack fname) `C.catchC` (\(e :: IOError) ->
                                             throwDataError ("Could not read file '"++T.unpack fname++"': " ++ show e)))
-            =$= CB.lines
-            $$ CL.consume
+            .| CB.lines
+            .| CL.consume
     return $! NGOList [NGOString (T.pack . B8.unpack $ ell) | ell <- content]
 executeReadlines arg _ = throwShouldNotOccur ("executeReadlines called with argument: " ++ show arg)
 

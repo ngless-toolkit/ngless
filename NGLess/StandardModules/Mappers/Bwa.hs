@@ -74,7 +74,7 @@ createIndex fafile = do
         ExitSuccess -> return ()
         ExitFailure _err -> throwSystemError err
 
-callMapper :: FilePath -> [FilePath] -> [String] -> C.Consumer B.ByteString IO a -> NGLessIO a
+callMapper :: FilePath -> [FilePath] -> [String] -> C.ConduitT B.ByteString C.Void IO a -> NGLessIO a
 callMapper refIndex fps extraArgs outC = do
     outputListLno' InfoOutput ["Starting mapping to ", refIndex]
     bwaPath <- bwaBin

@@ -60,7 +60,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
-import           Data.Conduit ((.|), (=$=), ($$), ($$+))
+import           Data.Conduit ((.|), (.|), ($$+))
 
 import Hooks
 import Output
@@ -204,9 +204,9 @@ executeCollect (NGOCounts istream) kwargs = do
     (gzfp,gzout) <- openNGLTempFile "compress" "partial." "tsv.gz"
     C.runConduit $
         (snd . asStream $ istream)
-        =$= CL.map unwrapByteLine
-        =$= C.unlinesAscii
-        =$= asyncGzipTo gzout
+        .| CL.map unwrapByteLine
+        .| C.unlinesAscii
+        .| asyncGzipTo gzout
     let partialfile entry = hashdir </> "partial." ++ T.unpack entry <.> "tsv.gz"
     liftIO $ do
         hClose gzout
@@ -323,7 +323,7 @@ instance Ord SparseCountData where
         LT -> LT
         GT -> GT
 
-tagSource :: Int -> C.Conduit ByteLine NGLessIO SparseCountData
+tagSource :: Int -> C.ConduitT ByteLine SparseCountData NGLessIO ()
 tagSource ix = C.awaitForever $ \(ByteLine v) -> case splitAtTab v of
     Left err -> lift $ throwError err
     Right (h, pay) -> C.yield $ SparseCountData h ix pay
@@ -340,7 +340,7 @@ complete placeholders (hinput,inputs) = ByteLine $ B.concat merged
             | otherwise = p:complete' (ix+1) ps xs
         complete' _ ps [] = ps
 
-mergeCounts :: [C.Source NGLessIO ByteLine] -> C.Source NGLessIO ByteLine
+mergeCounts :: [C.ConduitT () ByteLine NGLessIO ()] -> C.ConduitT () ByteLine NGLessIO ()
 mergeCounts [] = throwShouldNotOccur "Attempt to merge empty sources"
 mergeCounts ss = do
         start <- forM ss $ \s -> do
@@ -377,21 +377,21 @@ pasteCounts comments matchingRows headers inputs
             then do
                 let sources =
                         [conduitPossiblyCompressedFile f
-                            =$= CB.lines
-                            =$= (CC.drop 1 >>
-                                C.conduitVector 2048 :: C.Conduit B.ByteString (ResourceT IO) (V.Vector B.ByteString))
+                            .| CB.lines
+                            .| (CC.drop 1 >>
+                                C.conduitVector 2048 :: C.ConduitT B.ByteString (V.Vector B.ByteString) (ResourceT IO) ())
                             | f <- inputs]
                     sourcesplits = nChunks numCapabilities sources
                 channels <- liftIO $ forM sourcesplits $ \ss -> do
                     ch <- TQ.newTBMQueueIO 4
-                    a <- A.async $ runResourceT (C.sequenceSources ss =$= CL.map (force . splitLines) $$ sinkTBMQueue' ch True)
+                    a <- A.async $ C.runConduitRes (C.sequenceSources ss .| CL.map (force . splitLines) .| sinkTBMQueue' ch True)
                     A.link a
                     return (CA.sourceTBMQueue ch, a)
                 C.runConduit $
                     C.sequenceSources (fst <$> channels)
-                    =$= asyncMapEitherC numCapabilities (sequence >=> concatPartials)
-                    =$= CL.concatMap BL.toChunks
-                    =$= CB.sinkHandle hout
+                    .| asyncMapEitherC numCapabilities (sequence >=> concatPartials)
+                    .| CL.concatMap BL.toChunks
+                    .| CB.sinkHandle hout
                 forM_ (snd <$> channels) (liftIO . A.wait)
             else C.runConduit $
                     mergeCounts [conduitPossiblyCompressedFile f .|  linesC | f <- inputs]

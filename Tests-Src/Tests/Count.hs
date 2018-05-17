@@ -18,8 +18,7 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import qualified Data.Strict.Tuple as TU
-import           Data.Conduit ((=$=), ($$))
-import           Control.Monad.Trans.Resource (runResourceT)
+import           Data.Conduit ((.|))
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 
@@ -36,11 +35,11 @@ tgroup_Count = $(testGroupGenerator)
 
 readCountFile :: FilePath -> IO (M.Map B.ByteString Double)
 readCountFile fp =
-    runResourceT $
+    C.runConduitRes $
         C.sourceFile fp
-            =$= CB.lines
-            =$= (C.await >> (C.awaitForever C.yield)) -- skip first line
-            $$ CL.foldMap parseLine
+            .| CB.lines
+            .| (C.await >> (C.awaitForever C.yield)) -- skip first line
+            .| CL.foldMap parseLine
     where
         parseLine line = case B8.split '\t' line of
             [h,val] -> M.singleton h (read $ B8.unpack val)

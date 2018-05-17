@@ -13,7 +13,6 @@ module Interpretation.Write
 
 
 import Control.Monad
-import Control.Monad.Except
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
@@ -25,7 +24,7 @@ import qualified Data.Conduit.Combinators as C
 -- bzlib cannot compile on Windows (as of 2016/07/05)
 import qualified Data.Conduit.BZlib as CBZ2
 #endif
-import           Data.Conduit (runConduit, ($$), (.|))
+import           Data.Conduit ((.|))
 import           System.Directory (copyFile)
 import           Data.Maybe
 import           Data.String.Utils (replace, endswith)
@@ -104,7 +103,7 @@ parseWriteOptions args = do
 
 
 moveOrCopyCompress :: Bool -> FilePath -> FilePath -> NGLessIO ()
-moveOrCopyCompress _ orig "/dev/stdout" = conduitPossiblyCompressedFile orig $$ C.stdout
+moveOrCopyCompress _ orig "/dev/stdout" = C.runConduit $ conduitPossiblyCompressedFile orig .| C.stdout
 moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
     where
         moveOrCopyCompress' :: FilePath -> FilePath -> NGLessIO ()
@@ -234,7 +233,7 @@ executeWrite (NGOCounts iout) args = do
             fp <- asFile iout
             case comment of
                 [] -> moveOrCopyCompress (woCanMove opts) fp (woOFile opts)
-                _ -> runConduit $
+                _ -> C.runConduit $
                         (commentC "# " comment >> CB.sourceFile fp)
                         .| CB.sinkFileCautious (woOFile opts)
         "csv" -> do

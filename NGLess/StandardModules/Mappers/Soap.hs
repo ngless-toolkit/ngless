@@ -26,7 +26,7 @@ import qualified Data.Conduit.TQueue as CA
 import qualified Data.Conduit.Process as CP
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import           Data.Conduit (($$), (.|))
+import           Data.Conduit ((.|))
 import           Control.Monad.Extra (guard, allM, whenM)
 import           GHC.Conc (getNumCapabilities, setNumCapabilities)
 import           Data.List (isSuffixOf)
@@ -74,7 +74,7 @@ createIndex fafile = do
                         outputListLno' WarningOutput ["SOAP indexing does not work on gzipped files directly. Gunzipping '", fafile, "'..."]
                         whenM (liftIO $ doesFileExist gunzipped) $
                             throwDataError ("SOAP indexing does not work on gzipped files (got argument '" ++ fafile ++ "' and gunzipped version already exists (so refusing to overwrite).")
-                        conduitPossiblyCompressedFile fafile $$ CB.sinkFile gunzipped
+                        C.runConduit $ conduitPossiblyCompressedFile fafile .| CB.sinkFile gunzipped
                         return gunzipped
                     else return fafile
     (exitCode, out, err) <- liftIO $
@@ -85,7 +85,7 @@ createIndex fafile = do
         ExitSuccess -> return ()
         ExitFailure _err -> throwSystemError err
 
-callMapper :: FilePath -> [FilePath] -> [String] -> C.Consumer B.ByteString IO a -> NGLessIO a
+callMapper :: FilePath -> [FilePath] -> [String] -> C.ConduitT B.ByteString C.Void IO a -> NGLessIO a
 callMapper refIndex fps extraArgs outC = do
     outputListLno' InfoOutput ["Starting mapping to ", refIndex]
     numCapabilities <- liftIO getNumCapabilities
@@ -133,7 +133,7 @@ callMapper refIndex fps extraArgs outC = do
     -- but without having a resumable sink, I do not see exactly how to get it
     -- all to work.
     q <- liftIO $ TQ.newTBMQueueIO 4
-    out <- liftIO $ A.async (CA.sourceTBMQueue q $$ outC)
+    out <- liftIO $ A.async (C.runConduit $ (CA.sourceTBMQueue q) .| outC)
     C.runConduitRes $
         makeSAMHeader refIndex
             .| CA.sinkTBMQueue q
@@ -143,7 +143,7 @@ callMapper refIndex fps extraArgs outC = do
                 CP.sourceProcessWithStreams soup2sam
                     (CB.sourceHandle otemph >> CB.sourceHandle otemp2h) -- stdin
                     (C.toConsumer $ CA.sinkTBMQueue q) -- stdout
-                    (CL.consume :: C.Consumer B.ByteString IO [B.ByteString])
+                    (CL.consume :: C.ConduitT B.ByteString C.Void IO [B.ByteString])
     release rk
     release rk2
     case exitCode' of
@@ -156,7 +156,7 @@ callMapper refIndex fps extraArgs outC = do
                             "SOAP2SAM error code was ", show code, ".\n",
                             "Error output: ", B8.unpack (B8.intercalate "\n\t" err')]
 
-makeSAMHeader :: (MonadResource m, MonadUnliftIO m, MonadThrow m, MonadError NGError m) => FilePath -> C.Source m B.ByteString
+makeSAMHeader :: (MonadResource m, MonadUnliftIO m, MonadThrow m, MonadError NGError m) => FilePath -> C.ConduitT () B.ByteString m ()
 makeSAMHeader fafile = conduitPossiblyCompressedFile fafile .| linesC .| asSamHeader
     where
         -- asSamHeader :: C.Conduit ByteLine IO B.ByteString

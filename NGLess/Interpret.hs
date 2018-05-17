@@ -67,7 +67,7 @@ import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import           Data.Conduit ((=$=), ($$), (.|))
+import           Data.Conduit (($$), (.|))
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.TQueue as CA
@@ -364,13 +364,13 @@ shortReadVectorStats :: (MonadIO m, MonadResource m) => m (TQ.TBMQueue (V.Vector
 shortReadVectorStats = do
     q <- liftIO $ TQ.newTBMQueueIO 8
     p <- liftIO . A.async $
-        CA.sourceTBMQueue q
+        C.runConduit $ CA.sourceTBMQueue q
             .| CC.concat
-            $$ fqStatsC
+            .| fqStatsC
     k <- register (atomically . TQ.closeTBMQueue $ q)
     return (q, k, p)
 
-writeAndContinue :: MonadIO m => TQ.TBMQueue (V.Vector ShortRead) -> C.Conduit (V.Vector ShortRead) m (V.Vector ShortRead)
+writeAndContinue :: MonadIO m => TQ.TBMQueue (V.Vector ShortRead) -> C.ConduitT (V.Vector ShortRead) (V.Vector ShortRead) m ()
 writeAndContinue q = C.mapM $ \v -> do
     liftIO . atomically $ TQ.writeTBMQueue q v
     return v
@@ -399,7 +399,8 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
                 outenc
                     | allSame inencs = head inencs
                     | otherwise = SangerEncoding
-            let asSource [] = return ()
+            let asSource :: [FastQFilePath] -> C.ConduitT () (V.Vector ShortRead) NGLessIO ()
+                asSource [] = return ()
                 asSource (FastQFilePath enc f:rest) =
                         let input = conduitPossiblyCompressedFile f
                                 .| linesC
@@ -429,15 +430,15 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
             (fp3', out3) <- openNGLTempFile "" "preprocessed.singles." ".fq.gz"
 
             zipSource2 (asSource (fst <$> pairs)) (asSource (snd <$> pairs))
-                =$= asyncMapEitherC mapthreads processpairs
+                .| asyncMapEitherC mapthreads processpairs
                 $$ void $ C.sequenceSinks
-                        [CL.map (\(a,_,_) -> a) =$= write mapthreads out1 q1
-                        ,CL.map (\(_,a,_) -> a) =$= write mapthreads out2 q2
-                        ,CL.map (\(_,_,a) -> a) =$= write mapthreads out3 q3
+                        [CL.map (\(a,_,_) -> a) .| write mapthreads out1 q1
+                        ,CL.map (\(_,a,_) -> a) .| write mapthreads out2 q2
+                        ,CL.map (\(_,_,a) -> a) .| write mapthreads out3 q3
                         ]
 
             asSource singles
-                =$= asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . interpretPBlock1 block var))
+                .| asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . interpretPBlock1 block var))
                 $$ void (write mapthreads out3 q3)
 
             forM_ [k1, k2, k3] release

@@ -39,7 +39,7 @@ executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeReads (NGOMappedReadSet name istream _) _ = NGOReadSet name <$> uncurry samToFastQ (asSamStream istream)
 executeReads arg _ = throwShouldNotOccur ("executeReads called with argument: " ++ show arg)
 
-samToFastQ :: FilePath -> C.Source NGLessIO ByteLine -> NGLessIO ReadSet
+samToFastQ :: FilePath -> C.ConduitT () ByteLine NGLessIO () -> NGLessIO ReadSet
 samToFastQ fpsam stream = do
     (rk1, (oname1,ohand1)) <- openNGLTempFile' fpsam "reads_" ".1.fq.gz"
     (rk2, (oname2,ohand2)) <- openNGLTempFile' fpsam "reads_" ".2.fq.gz"

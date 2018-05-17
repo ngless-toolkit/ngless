@@ -55,7 +55,7 @@ createIndex fafile = do
         ExitSuccess -> return ()
         ExitFailure _err -> throwSystemError err
 
-callMapper :: FilePath -> [FilePath] -> [String] -> C.Consumer B.ByteString IO a -> NGLessIO a
+callMapper :: FilePath -> [FilePath] -> [String] -> C.ConduitT B.ByteString C.Void IO a -> NGLessIO a
 callMapper refIndex fps extraArgs outC = do
     outputListLno' InfoOutput ["Starting mapping to ", refIndex, " (minimap2)"]
     minimap2Path <- minimap2Bin
@@ -95,7 +95,7 @@ callMapper refIndex fps extraArgs outC = do
                         .| CL.map (`B.snoc` 10)
                         .| C.transPipe liftIO outC
 
-sortSam :: FilePath -> C.Source NGLessIO B.ByteString
+sortSam :: FilePath -> C.ConduitT () B.ByteString NGLessIO ()
 sortSam samfile =
         CB.sourceFile samfile
             .| linesC
@@ -105,7 +105,7 @@ sortSam samfile =
                 partials <- samSorter []
                 C.toProducer (mergeC partials)
     where
-        samSorter :: [C.Source NGLessIO B.ByteString] -> C.ConduitM B.ByteString B.ByteString NGLessIO [C.Source NGLessIO B.ByteString]
+        samSorter :: [C.ConduitT () B.ByteString NGLessIO () ] -> C.ConduitM B.ByteString B.ByteString NGLessIO [C.ConduitT () B.ByteString NGLessIO ()]
         samSorter partials = do
                 block <- CC.sinkVectorN (1024*1024)
                 block' <- liftIO $ do
