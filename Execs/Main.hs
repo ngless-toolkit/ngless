@@ -344,7 +344,7 @@ modeExec CheckInstallMode = runNGLessIO "Checking install" $ do
 main' = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
         foottext = concat [
-                            "ngless v", versionStr, "(C) NGLess Authors 2013-2017\n",
+                            "ngless v", versionStr, "(C) NGLess Authors 2013-2018\n",
                             "For more information:\n",
                             "\thttp://ngless.embl.de/\n",
                             "For comments/discussion:\n",
