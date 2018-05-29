@@ -100,6 +100,7 @@ when:
       - -fno-warn-missing-signatures
       - -threaded
       - -O2
+      - -fno-full-laziness
       - -rtsopts
       - ! '"-with-rtsopts=-A64m -n4m -H"'
     else:
