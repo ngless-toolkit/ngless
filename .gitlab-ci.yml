@@ -1,3 +1,16 @@
+variables:
+    # gitlab only allows caching folders inside the project's directory
+    # stack keeps part of the cache in ~/.stack so to workaround this
+    # we tell stack to keep it's cache inside the project's location
+    STACK_ROOT: "${CI_PROJECT_DIR}/.stack"
+
+cache:
+    paths:
+        - .stack
+        - .stack-work
+    # CI_JOB_NAME creates one cache per build target (e.g. build-and-test-ubuntu)
+    key: "$CI_JOB_NAME"
+
 build-and-test-ubuntu:
     image: registry.gitlab.com/ngless/ngless/ubuntu-ghc-stack:latest
     stage: build
