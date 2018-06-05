@@ -2,6 +2,24 @@
 What's New (History)
 ====================
 
+Version 0.8.1
+-------------
+
+Released June 5th 2018
+
+This is a minor release and upgrading is recommended.
+
+Bugfixes
+~~~~~~~~
+
+- Fix for systems with non-working locale installations
+- Much faster `collect <Functions.html#count>`__ calls
+- Fixed `lock1
+  <http://ngless.embl.de/stdlib.html?highlight=lock1#parallel-module>`__ when
+  used with full paths (see `issue #68 <https://github.com/ngless-toolkit/ngless/issues/68>`__)
+- Fix expansion of searchdir with external modules (see `issue #56
+  <https://github.com/ngless-toolkit/ngless/issues/56>`__)
+
 Version 0.8
 -----------
 

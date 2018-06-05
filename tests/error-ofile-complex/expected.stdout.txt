@@ -1,4 +1,4 @@
-NGLess v0.8.0 (C) NGLess authors
+NGLess v0.8.1 (C) NGLess authors
 http://ngless.embl.de/
 
 Should print

@@ -1,6 +1,8 @@
-Version 0.8.0+
+Version 0.8.1 2018-06-05 by luispedro
 	* Update to LTS-11.12 (for faster conduit-algorithms used in collect())
 	* Add fallback for character encoding on systems with bad locale support
+	* Fixed lock1 when used with paths (#68)
+	* Fixed expansion of searchdir with external modules (#56)
 
 Version 0.8.0 2018-05-06 by luispedro
 	* Add minimap2 support as alternative mapper
