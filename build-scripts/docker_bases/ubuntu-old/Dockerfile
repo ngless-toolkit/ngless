@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:xenial
 
 LABEL maintainer "alves.rjc+docker@gmail.com"
 

@@ -1,4 +1,4 @@
-FROM ubuntu:rolling
+FROM ubuntu:devel
 
 LABEL maintainer "alves.rjc+docker@gmail.com"
 
