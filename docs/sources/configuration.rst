@@ -20,6 +20,17 @@ Ngless gets its configuration options from the following sources:
 In case an option is specified more than once, the order above determines
 priority: later options take precedence.
 
+Configuration file format
+-------------------------
+
+NGLess configuration files are text files using assignment syntax. Here is a
+simple example, setting the temporary directory and enabling auto-detection of
+the number of threads::
+
+    temporary-directory = "/local/ngless-temp/"
+    jobs = "auto"
+
+
 Options
 -------
 
