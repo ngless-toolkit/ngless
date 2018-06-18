@@ -1,0 +1,12 @@
+version: '0.9.0'
+name: 'DogGutCatalog'
+references:
+    -
+        name: 'dog-gut'
+        fasta-file: 'dog.fna'
+        map-file: 'dog.functional.map'
+citation: >
+    Coelho, L. P., Kultima, J. R., Costea, P. I., Fournier, C., Pan, Y.,
+    Czarnecki-Maulden, G., … Bork, P. (2018). Similarity of the dog and human
+    gut microbiomes in gene content and response to diet. Microbiome, 6(1), 72.
+    https://doi.org/10.1186/s40168-018-0450-3
