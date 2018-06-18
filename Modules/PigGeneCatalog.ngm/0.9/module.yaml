@@ -1,0 +1,13 @@
+version: '0.9.0'
+name: 'PigGutCatalog'
+references:
+    -
+        name: 'pig-gut'
+        fasta-file: 'pig.fna'
+        map-file: 'pig.functional.map'
+citation: >
+    Xiao, L., Estellé, J., Kiilerich, P., Ramayo-Caldas, Y., Xia, Z., Feng, Q., …
+    Wang, J. (2016). A reference gene catalogue of the pig gut microbiome.
+    Nature Microbiology, 1(12), 1–6.
+    https://doi.org/10.1038/nmicrobiol.2016.161
+
