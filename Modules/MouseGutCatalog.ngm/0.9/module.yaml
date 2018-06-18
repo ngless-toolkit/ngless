@@ -1,0 +1,11 @@
+version: '0.9.0'
+name: 'MouseGutCatalog'
+references:
+    -
+        name: 'mouse-gut'
+        fasta-file: 'mouse.fna'
+        map-file: 'mouse.functional.map'
+citation: >
+    Xiao, L., Feng, Q., Liang, S., Sonne, S. B., Xia, Z., Qiu, X., …
+    Kristiansen, K. (2015). A catalog of the mouse gut metagenome. Nature
+    Biotechnology, 33(10), 1103–1108. https://doi.org/10.1038/nbt.3353
