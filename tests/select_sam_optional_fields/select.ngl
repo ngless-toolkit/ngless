@@ -1,4 +1,4 @@
-ngless '0.0'
+ngless '0.8'
 mapped = samfile('input.sam')
 
 mapped_filtered_97 = select(mapped) using |mread|:
