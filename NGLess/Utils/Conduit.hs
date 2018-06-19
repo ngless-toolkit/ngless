@@ -84,8 +84,11 @@ byteLineSinkHandle h = CL.mapM_ (\(ByteLine val) -> liftIO (B.hPut h val >> B.hP
         nl = B.singleton 10
 {-# INLINE byteLineSinkHandle #-}
 
+zipSource2 :: Monad m => C.ConduitT () a m () -> C.ConduitT () b m () -> C.ConduitT () (a,b) m ()
 zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
+{-# INLINE zipSource2 #-}
 
 zipSink2 :: (Monad m) => C.ConduitT i C.Void m a -> C.ConduitT i C.Void m b -> C.ConduitT i C.Void m (a,b)
 zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)
+{-# INLINE zipSink2 #-}
 

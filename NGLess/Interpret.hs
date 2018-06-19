@@ -67,7 +67,7 @@ import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import           Data.Conduit (($$), (.|))
+import           Data.Conduit ((.|))
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.TQueue as CA
@@ -429,17 +429,19 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
             (fp2', out2) <- openNGLTempFile "" "preprocessed.2." ".fq.gz"
             (fp3', out3) <- openNGLTempFile "" "preprocessed.singles." ".fq.gz"
 
-            zipSource2 (asSource (fst <$> pairs)) (asSource (snd <$> pairs))
-                .| asyncMapEitherC mapthreads processpairs
-                $$ void $ C.sequenceSinks
+            C.runConduit $
+                zipSource2 (asSource (fst <$> pairs)) (asSource (snd <$> pairs))
+                    .| asyncMapEitherC mapthreads processpairs
+                    .| (void $ C.sequenceSinks
                         [CL.map (\(a,_,_) -> a) .| write mapthreads out1 q1
                         ,CL.map (\(_,a,_) -> a) .| write mapthreads out2 q2
                         ,CL.map (\(_,_,a) -> a) .| write mapthreads out3 q3
-                        ]
+                        ])
 
-            asSource singles
-                .| asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . interpretPBlock1 block var))
-                $$ void (write mapthreads out3 q3)
+            C.runConduit $
+                asSource singles
+                    .| asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . interpretPBlock1 block var))
+                    .| void (write mapthreads out3 q3)
 
             forM_ [k1, k2, k3] release
             liftIO $ forM_ [out1, out2, out3] hClose
