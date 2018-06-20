@@ -2,6 +2,12 @@
 What's New (History)
 ====================
 
+Development version
+-------------------
+
+Added ``allbest()`` method to MappedRead.
+
+
 Version 0.8.1
 -------------
 

@@ -1,3 +1,6 @@
+Version 0.8.1+
+	* Add allbest() method to mappedreads
+
 Version 0.8.1 2018-06-05 by luispedro
 	* Update to LTS-11.12 (for faster conduit-algorithms used in collect())
 	* Add fallback for character encoding on systems with bad locale support

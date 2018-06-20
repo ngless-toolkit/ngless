@@ -132,11 +132,16 @@ endstrimArgs =
 
 
 builtinMethods =
-    [MethodInfo (MethodName "flag")   NGLMappedRead (Just NGLSymbol) NGLBool flagArgs True []
+    [
+     -- NGLMappedReadSet
+     MethodInfo (MethodName "flag")   NGLMappedRead (Just NGLSymbol) NGLBool flagArgs True []
     ,MethodInfo (MethodName "filter") NGLMappedRead Nothing NGLMappedRead filterArgs True []
     ,MethodInfo (MethodName "pe_filter") NGLMappedRead Nothing NGLMappedRead [] True []
     ,MethodInfo (MethodName "some_match") NGLMappedRead (Just NGLString) NGLBool [] True []
     ,MethodInfo (MethodName "unique") NGLMappedRead Nothing NGLMappedRead [] True []
+    ,MethodInfo (MethodName "allbest") NGLMappedRead Nothing NGLMappedRead [] True []
+
+    -- NGLRead
     ,MethodInfo (MethodName "avg_quality") NGLRead Nothing NGLDouble [] True []
     ,MethodInfo (MethodName "fraction_at_least") NGLRead (Just NGLInteger) NGLDouble [] True []
     ,MethodInfo (MethodName "n_to_zero_quality") NGLRead Nothing NGLRead [] True [FunctionCheckMinNGLessVersion (0,8)]

@@ -19,6 +19,9 @@ import           Data.Bits (Bits(..))
 import           Control.Monad.Except (throwError)
 import           Data.Either.Combinators (fromRight)
 import           Data.List (foldl', find)
+import           Data.Either.Extra (eitherToMaybe)
+import           Data.Tuple.Extra (fst3)
+import           Data.Ratio (Ratio, (%))
 
 import Data.Maybe
 
@@ -210,6 +213,7 @@ executeMappedReadMethod (MethodName "filter") samlines Nothing kwargs = do
     let samlines' = applySelect (SelectGroupOptions (fromInteger minID / 100.0) minMatchSize maxTrim reverseTest action) samlines
     return (NGOMappedRead samlines')
 executeMappedReadMethod (MethodName "unique") samlines Nothing [] = return . NGOMappedRead . mUnique $ samlines
+executeMappedReadMethod (MethodName "allbest") samlines Nothing [] = return . NGOMappedRead . mBesthit $ samlines
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 filterPE :: [SamLine] -> [SamLine]
@@ -228,6 +232,35 @@ mUnique :: [SamLine] -> [SamLine]
 mUnique slines
     | isGroupUnique slines = slines
     | otherwise = []
+
+mBesthit :: [SamLine] -> [SamLine]
+mBesthit [] = []
+mBesthit sl@[_] = sl
+mBesthit slines = let (g1,g2,gs) = splitSamlines3 slines
+                    in mBesthit' g1 ++ mBesthit' g2 ++ mBesthit' gs
+
+mBesthit' :: [SamLine] -> [SamLine]
+mBesthit' [] = []
+mBesthit' sl@[_] = sl
+mBesthit' samlines = case mapMaybe extract samlines of
+        [] -> samlines
+        extracted ->
+            let
+                ms = maximum (fst3 <$> extracted)
+                -- fractional distance
+                ds :: Ratio Int
+                ds = minimum ((\(_, e, _) -> e % ms) <$> extracted)
+            in mapMaybe (\(_, e, sl) ->
+                        if e % ms <= ds
+                            then Just sl
+                            else Nothing) extracted
+
+    where
+        extract :: SamLine -> Maybe (Int, Int, SamLine)
+        extract sl = do
+            dist <- samIntTag sl "NM"
+            size <- eitherToMaybe (matchSize sl)
+            return (size, dist, sl)
 
 isGroupUnique :: [SamLine] -> Bool
 isGroupUnique [] = True

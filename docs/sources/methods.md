@@ -33,6 +33,11 @@ result to the same variable as before (see examples above).
   one of the mates mapped).
 - `some_match`: Takes a reference name and returns True if the read mapped to
   that reference name.
+- `allbest`: eliminates matches that are not as good as the best. For NGLess,
+  the number of errors (given by the `NM` field) divided by the length of the
+  longest match is the fractional distance of a match. Thus, a match with 3
+  errors over 100 bp is considered better than a match with 0 errors over
+  90bps.
 
 ### filter
 
