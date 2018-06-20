@@ -139,7 +139,7 @@ builtinMethods =
     ,MethodInfo (MethodName "pe_filter") NGLMappedRead Nothing NGLMappedRead [] True []
     ,MethodInfo (MethodName "some_match") NGLMappedRead (Just NGLString) NGLBool [] True []
     ,MethodInfo (MethodName "unique") NGLMappedRead Nothing NGLMappedRead [] True []
-    ,MethodInfo (MethodName "allbest") NGLMappedRead Nothing NGLMappedRead [] True []
+    ,MethodInfo (MethodName "allbest") NGLMappedRead Nothing NGLMappedRead [] True [FunctionCheckMinNGLessVersion (0,9)]
 
     -- NGLRead
     ,MethodInfo (MethodName "avg_quality") NGLRead Nothing NGLDouble [] True []
