@@ -13,26 +13,27 @@ module Output
     , outputListLno'
     , outputFQStatistics
     , outputMapStatistics
-    , writeOutputJS
+    , writeOutputJSImages
     , writeOutputTSV
     , outputConfiguration
     ) where
 
-import Text.Printf (printf)
-import System.IO
-import System.IO.Unsafe (unsafePerformIO)
-import System.IO.SafeWrite (withOutputFile)
-import Data.Maybe
-import Data.IORef
+import           Text.Printf (printf)
+import           System.IO (hIsTerminalDevice, stdout)
+import           System.IO.Unsafe (unsafePerformIO)
+import           System.IO.SafeWrite (withOutputFile)
+import           Data.Maybe (maybeToList, fromMaybe)
+import           Data.IORef (IORef, newIORef, modifyIORef, readIORef)
 import           Data.List (sort)
 import           Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
-import Data.Aeson.TH (deriveToJSON, defaultOptions, Options(..))
-import Data.Time (getZonedTime, ZonedTime(..))
-import Data.Time.Format (formatTime, defaultTimeLocale)
+import           System.FilePath ((</>))
+import           Data.Aeson.TH (deriveToJSON, defaultOptions, Options(..))
+import           Data.Time (getZonedTime, ZonedTime(..))
+import           Data.Time.Format (formatTime, defaultTimeLocale)
 import qualified System.Console.ANSI as ANSI
-import Control.Monad
-import Control.Monad.IO.Class (liftIO)
+import           Control.Monad
+import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Extra (whenJust)
 import           Numeric (showFFloat)
 import           Control.Arrow (first)
@@ -42,6 +43,8 @@ import qualified Data.Conduit as C
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.ByteString.Lazy as BL
+import qualified Graphics.Rendering.Chart.Easy as G
+import qualified Graphics.Rendering.Chart.Backend.Cairo as G
 
 
 import           Data.FastQ (FastQEncoding(..), encodingName)
@@ -277,15 +280,20 @@ wrapScript script tags stats = first annotate <$> script
             | i `elem` stats = Just (HasStatsInfo i)
             | otherwise =  Nothing
 
-writeOutputJS :: FilePath -> FilePath -> T.Text -> IO ()
-writeOutputJS fname scriptName script = do
+writeOutputJSImages :: FilePath -> FilePath -> T.Text -> IO ()
+writeOutputJSImages odir scriptName script = do
     fullOutput <- reverse <$> readIORef savedOutput
     fqStats <- reverse <$> readIORef savedFQOutput
     mapStats <- reverse <$> readIORef savedMapOutput
+    fqfiles <- forM (zip [(0::Int)..] fqStats) $ \(ix, q) -> do
+        let oname = "output"++show ix++".png"
+            bpos = perBaseQ q
+        drawBaseQs (odir </> oname) bpos
+        return oname
     t <- getZonedTime
     let script' = zip [1..] (T.lines script)
-        sInfo = ScriptInfo fname (show t) (wrapScript script' fqStats (mi_lno <$> mapStats))
-    withOutputFile fname $ \hout ->
+        sInfo = ScriptInfo (odir </> "output.js") (show t) (wrapScript script' fqStats (mi_lno <$> mapStats))
+    withOutputFile (odir </> "output.js") $ \hout ->
         BL.hPutStr hout (BL.concat
                     ["var output = "
                     , Aeson.encode $ Aeson.object
@@ -294,6 +302,7 @@ writeOutputJS fname scriptName script = do
                         , "fqStats" .= fqStats
                         , "mapStats" .= mapStats
                         , "scriptName" .= scriptName
+                        , "plots" .= fqfiles
                         ]
                     ,";\n"])
 
@@ -363,3 +372,15 @@ outputConfiguration = do
     outputListLno' DebugOutput ["\tsearch path:"]
     forM_ (nConfSearchPath cfg) $ \p ->
         outputListLno' DebugOutput ["\t\t", p]
+
+drawBaseQs :: FilePath -> [BPosInfo] -> IO ()
+drawBaseQs oname bpos = G.toFile G.def oname $ do
+    G.layout_title G..= "FastQ Quality Statistics"
+    G.plot (G.line "Mean" [
+                    [(ix, _mean bp) | (ix,bp) <- zip [1:: Integer ..] bpos]])
+    G.plot (G.line "Median" [
+                    [(ix, _median bp) | (ix,bp) <- zip [1:: Integer ..] bpos]])
+    G.plot (G.line "Upper Quartile" [
+                    [(ix, _upperQuartile bp) | (ix,bp) <- zip [1:: Integer ..] bpos]])
+    G.plot (G.line "Lower Quartile" [
+                    [(ix, _lowerQuartile bp) | (ix,bp) <- zip [1:: Integer ..] bpos]])

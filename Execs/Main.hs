@@ -293,7 +293,7 @@ modeExec opts@DefaultMode{} = do
         createDirectoryIfMissing False odir
         setupHtmlViewer odir
         T.writeFile (odir </> "script.ngl") ngltext
-        writeOutputJS (odir </> "output.js") fname ngltext
+        writeOutputJSImages odir fname ngltext
         writeOutputTSV False (Just $ odir </> "fq.tsv") (Just $ odir </> "mappings.tsv")
     exitSuccess
 

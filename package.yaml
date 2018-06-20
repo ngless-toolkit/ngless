@@ -33,6 +33,8 @@ dependencies:
   - configurator
   - containers
   - convertible
+  - Chart
+  - Chart-cairo
   - data-default
   - deepseq >=1.3
   - directory
