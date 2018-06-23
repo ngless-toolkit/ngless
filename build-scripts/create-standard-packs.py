@@ -32,10 +32,11 @@ for (ensembl_version, base_name, build, outputname) in datasets:
     if base_name in ["homo_sapiens", "mus_musculus"]:
         level = "primary_assembly"
 
+    a = "http://ftp.ensembl.org/pub/release-{ensembl_version}/gtf/{base_name}/{build}.{ensembl_version}.gtf.gz".format(**locals())
+
     if ensembl_version <= 75:
         g = "http://ftp.ensembl.org/pub/release-{ensembl_version}/fasta/{base_name}/dna/{build}.{ensembl_version}.dna.{level}.fa.gz".format(**locals())
-        a = "http://ftp.ensembl.org/pub/release-{ensembl_version}/gtf/{base_name}/{build}.{ensembl_version}.gtf.gz".format(**locals())
     else:
         g = "http://ftp.ensembl.org/pub/release-{ensembl_version}/fasta/{base_name}/dna/{build}.dna.{level}.fa.gz".format(**locals())
-        a = "http://ftp.ensembl.org/pub/release-{ensembl_version}/gtf/{base_name}/{build}.gtf.gz".format(**locals())
+
     print("ngless --create-reference-pack --output-name {outputname}.tar.gz --genome-url {g} --gtf-url {a}".format(outputname=outputname, g=g, a=a))
