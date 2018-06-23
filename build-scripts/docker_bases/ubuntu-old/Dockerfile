@@ -11,8 +11,12 @@ RUN apt update && \
     ghc \
     git \
     libbz2-dev \
+    libcairo2-dev \
+    libgif-dev \
+    libjpeg-dev \
     liblzma-dev \
     m4 \
+    pkg-config \
     python-dev \
     python-pip \
     vim \
