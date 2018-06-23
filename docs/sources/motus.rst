@@ -8,7 +8,7 @@ You can use ngless to compute `mOTU profiles
 
 This requires the use of the (standard) motus module::
 
-    ngless "0.0"
+    ngless "0.8"
     import "motus" version "0.1"
 
 This module (with the motus database) will be downloaded the first time you use
@@ -20,7 +20,7 @@ You can use all the ngless functionality to load and `preprocess
 
     input = paired('input.1.fq.gz', 'input.2.fq.gz')
 
-    preprocess(input, keep_singles=False) using |read|:
+    files = preprocess(input, keep_singles=False) using |read|:
         read = substrim(read, min_quality=25)
         if len(read) < 45:
             discard
@@ -30,7 +30,7 @@ Producing the motus tables is done in three steps.
 1. Map the samples against the ``motus`` reference (this reference comes with
    the motus module we imported earlier)::
 
-    mapped = map(as_reads(mapped), reference='motus', mode_all=True)
+    mapped = map(files, reference='motus', mode_all=True)
 
 2. call the built-in ``count`` function to summarize your reads at gene level::
 
