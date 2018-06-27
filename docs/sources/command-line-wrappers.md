@@ -62,7 +62,7 @@ from within NGLess.
 
     usage: ngless-map.py [-h] -i INPUT [-i2 INPUT_REVERSE] [-s INPUT_SINGLES] -o
                          OUTPUT [--auto-install] [--debug]
-                         (-r {sacCer3,ce10,dm3,gg4,canFam2,rn4,bosTau4,mm10,hg19} | -f FASTA)
+                         (-r {sacCer3,susScr11,ce10,dm3,gg4,canFam2,rn4,bosTau4,mm10,hg19} | -f FASTA)
 
     optional arguments:
       -h, --help            show this help message and exit
@@ -77,7 +77,7 @@ from within NGLess.
                             Output file/path for results
       --auto-install        Install NGLess if not found in PATH
       --debug               Prints the payload before submitting to ngless
-      -r {sacCer3,ce10,dm3,gg4,canFam2,rn4,bosTau4,mm10,hg19}, --reference {sacCer3,ce10,dm3,gg4,canFam2,rn4,bosTau4,mm10,hg19}
+      -r {sacCer3,susScr11,ce10,dm3,gg4,canFam2,rn4,bosTau4,mm10,hg19}, --reference {sacCer3,susScr11,ce10,dm3,gg4,canFam2,rn4,bosTau4,mm10,hg19}
                             Map against a builtin reference
       -f FASTA, --fasta FASTA
                             Map against a given fasta file (will be indexed if
