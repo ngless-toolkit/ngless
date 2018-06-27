@@ -5,6 +5,7 @@ Version 0.8.1+
 	* Added DogGutGeneCatalog module
 	* Added PigGeneCatalog module
 	* Added reference genome for Sus scrofa (pig)
+	* Update IGC module to 0.9
 
 Version 0.8.1 2018-06-05 by luispedro
 	* Update to LTS-11.12 (for faster conduit-algorithms used in collect())

@@ -1,0 +1,21 @@
+version: '0.9.0'
+name: 'IGC'
+references:
+    -
+        name: 'igc'
+        fasta-file: 'igc.fna'
+        map-file: 'igc.functional.map'
+citation: >
+    An integrated catalog of reference genes in the human gut microbiome
+    Junhua Li, Huijue Jia, Xianghang Cai, Huanzi Zhong, Qiang Feng,
+    Shinichi Sunagawa, Manimozhiyan Arumugam, Jens Roat Kultima, Edi Prifti,
+    Trine Nielsen, Agnieszka Sierakowska Juncker, Chaysavanh Manichanh,
+    Bing Chen, Wenwei Zhang, Florence Levenez, Juan Wang, Xun Xu, Liang
+    Xiao, Suisha Liang, Dongya Zhang, Zhaoxi Zhang, Weineng Chen, Hailong
+    Zhao, Jumana Yousuf Al-Aama, Sherif Edris, Huanming Yang, Jian Wang,
+    Torben Hansen, Henrik Bjørn Nielsen, Søren Brunak, Karsten
+    Kristiansen, Francisco Guarner, Oluf Pedersen, Joel Doré, S Dusko
+    Ehrlich, MetaHIT Consortium, Peer Bork & Jun Wang
+    Nature Biotechnology 32, 834–841 (2014) doi:10.1038/nbt.2942
+
+
