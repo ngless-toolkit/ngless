@@ -17,6 +17,7 @@ datasets = [
     (90, 'rattus_norvegicus', "Rattus_norvegicus.Rnor_6.0", "rn6"),
     (75, 'rattus_norvegicus', "Rattus_norvegicus.Rnor_5.0", "rn5"),
     (75, 'saccharomyces_cerevisiae', "Saccharomyces_cerevisiae.R64-1-1", "sacCer3"),
+    (90, 'sus_scrofa', "Sus_scrofa.Sscrofa11.1", "susScr11"),
 ]
 
 # NOTE: Ensembl gives the same "release name" to different sub-releases or patches

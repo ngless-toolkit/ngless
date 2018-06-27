@@ -69,6 +69,7 @@ builtinReferences = [Reference rn (Just alias) (T.concat [rn, "-", T.pack versio
                 , ("rn5", "Rattus_norvegicus_Rnor_5.0")
                 , ("rn6", "Rattus_norvegicus_Rnor_6.0")
                 , ("sacCer3", "Saccharomyces_cerevisiae_R64-1-1")
+                , ("susScr11", "Sus_scrofa.Sscrofa11.1")
                 ]]
 
 

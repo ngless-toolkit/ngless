@@ -50,6 +50,8 @@ The following table represents organisms provided by default:
 +-----------+-----------------------------+-------------------+---------+
 | sacCer3   | saccharomyces\_cerevisiae   | R64-1-1           | 75      |
 +-----------+-----------------------------+-------------------+---------+
+| susScr11  | sus\_scrofa                 | Sscrofa11.1       | 90      |
++-----------+-----------------------------+-------------------+---------+
 
 These archives are all created using versions 75, 85 and 90 of `Ensembl
 <http://www.ensembl.org/>`__.
