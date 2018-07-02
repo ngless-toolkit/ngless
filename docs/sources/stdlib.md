@@ -1,8 +1,5 @@
 # Standard library
 
-The standard library in ngless are a set of modules which are built in to the
-language.
-
 ## Parallel module
 
 This module allows you to run several parallel computations. It provides two
@@ -18,8 +15,8 @@ have and ngless will figure everything out.
 
 For example
 
-    ngless "0.0"
-    import "parallel" version "0.0"
+    ngless "0.6"
+    import "parallel" version "0.6"
 
     samples = ['Sample1', 'Sample2', 'Sample3']
     current = lock1(samples)
@@ -60,8 +57,8 @@ does ngless collect all the results into a single table.
 
 #### Full "parallel" example
 
-    ngless "0.0"
-    import "parallel" version "0.0"
+    ngless "0.8"
+    import "parallel" version "0.6"
 
     sample = lock1(readlines('input.txt'))
     input = fastq(sample)
@@ -120,7 +117,7 @@ the visible behaviour, only make the computation faster).
 
 ## Mocat module
 
-    import "mocat" version "0.0"
+    import "mocat" version "0.6"
 
 This is a [MOCAT](http://vm-lux.embl.de/~kultima/MOCAT) compatibility layer to
 make it easier to adapt projects from MOCAT to ngless.
@@ -138,8 +135,8 @@ indicate the two mate files.
 
 Example usage:
 
-    ngless "0.0"
-    import "mocat" version "0.0"
+    ngless "0.6"
+    import "mocat" version "0.6"
 
     sample = load_mocat_sample('Sample1')
     mapped = map(sampled, fafile='data/catalog.padded.fna')

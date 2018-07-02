@@ -17,7 +17,8 @@ option), its use for scripts is heavily discouraged and may trigger an error in
 the future.*
 
 Script-style (# to EOL), C-style (/* to \*/) and C++-style (// to EOL) comments
-are all recognised.
+are all recognised. Comments are effectively removed prior to any further
+parsing as are empty lines.
 
 Strings are denoted with single or double quotes and standard backslashed
 escapes apply (\\n for newline, ...).
@@ -30,18 +31,13 @@ Integers are specified as decimals ``[0-9]+`` or as hexadecimals
 
 ## Version declaration
 
-The first line of an NGLess file MUST be a version declaration:
+The first line (ignoring comments and empty lines) of an NGLess file MUST be a
+version declaration:
 
     ngless "0.9"
 
-### Blocks
 
-Blocks are defined by indentation in multiples of 4 spaces. To avoid confusion,
-TAB characters are not allowed.
-
-Blocks are used for conditionals and `using` statments.
-
-## Module Import Statments
+## Module Import Statements
 
 Following the version statement, optional import statements are allowed, using
 the syntax `import "<MODULE>" version "<VERSION>". For example:
@@ -51,7 +47,20 @@ the syntax `import "<MODULE>" version "<VERSION>". For example:
 This statement indicates that the ``batch`` module, version ``1.0`` should be
 used in this script. Module versions are independent of NGLess versions.
 
-Import statements are not legal except as the first block.
+Only a predefined set of modules can be imported (these are shipped with
+NGLess). To import user-written modules, the user MUST use the _local import_
+statement, e.g.:
+
+    local import "batch" version "1.0"
+
+Import statements MUST immediately follow the version declaration
+
+### Blocks
+
+Blocks are defined by indentation in multiples of 4 spaces. To avoid confusion,
+TAB characters are not allowed.
+
+Blocks are used for conditionals and `using` statements.
 
 ## Data types
 
@@ -138,6 +147,10 @@ returns a double. The following binary operators are used for arithmetic:
 
 The `+` operator can also perform concatenation of String objects.
 
+
+The `</>` operator is used to concatenate two Strings while also adding a '/'
+character between them. This is useful for concatenating file paths.
+
 ## Indexing
 
 Can be used to access only one element or a range of elements in a ShortRead.
@@ -177,14 +190,14 @@ Functions have a single positional parameter, all other must be given by name:
 The exception is constructs which take a block: they take a single positional
 parameter and a block. The block is passed using the using keyword:
 
-    preprocess(reads) using |read|:
+    reads = preprocess(reads) using |read|:
         block
         ...
 
 The `|read|` syntax defines an unnamed (lambda) function, which takes a
 variable called `read`. The function body is the following block.
 
-There is no possibility of defining new functions within the language. Only the
+There is no possibility of defining new functions within the language. Only
 built-in functions or those added by modules can be used.
 
 ## Methods
