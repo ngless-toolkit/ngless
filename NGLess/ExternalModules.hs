@@ -50,18 +50,6 @@ import Output
 import NGLess
 
 
-downloadableModules = -- Should this be merged with knownModules?
-    [("example-cmd", "0.0")
-    ,("motus", "0.0")
-    ,("motus", "0.1")
-    ,("specI", "0.0")
-    ,("specI", "0.1")
-    ,("igc", "0.0")
-    ,("igc", "0.5")
-    ,("om-rgc", "0.0")
-    ]
-
-
 -- | Basic file types
 data FileTypeBase =
     FastqFileSingle
@@ -495,7 +483,7 @@ findLoad modname version = do
             else Nothing
     found' <- case found of
         Nothing
-            | (modname, version) `elem` downloadableModules -> Just <$> downloadModule modname version
+            | modname `elem` knownModules -> Just <$> downloadModule modname version
         _ -> return found
     case found' of
         Just mdir -> Yaml.decodeEither <$> liftIO (B.readFile (mdir </> modfile)) >>= \case
