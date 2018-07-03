@@ -4,13 +4,16 @@ stdenv.mkDerivation {
 
   name = "nglessEnv";
 
-  buildInputs = with haskell.packages.ghc802; [
+  buildInputs = with haskell.packages.ghc822; [
     stack
     wget
+    gmp
     ghc
     m4
   ];
   propagatedBuildInputs = [
+    pkgconfig
+    cairo
     zlib
     bzip2
     lzma
