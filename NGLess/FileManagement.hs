@@ -199,6 +199,7 @@ createMegahitBin = do
                 { lockFname = destdir ++ "lock.megahit-expand"
                 , maxAge = 300
                 , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
+                , mtimeUpdate = True
                } $ do
         outputListLno' TraceOutput ["Expanding megahit binaries into ", destdir]
         unpackMegahit destdir $ Tar.read . GZip.decompress $ BL.fromChunks [megahitData']
@@ -273,6 +274,7 @@ writeBin fname bindata = do
                     { lockFname = fname' ++ ".expand.lock"
                     , maxAge = 300
                     , whenExistsStrategy = IfLockedRetry { nrLockRetries = 60, timeBetweenRetries = 60 }
+                    , mtimeUpdate = True
                     } $ liftIO $ do
         withOutputFile fname' (flip B.hPut bindata')
         p <- getPermissions fname'

@@ -5,8 +5,14 @@ What's New (History)
 Development version
 -------------------
 
-Added ``allbest()`` method to MappedRead.
+- Added ``allbest()`` method to MappedRead.
 
+Internal improvements
+~~~~~~~~~~~~~~~~~~~~~
+
+- All lock files now are continuously "touched" (i.e., their modification time
+  is updated every 10 minutes). This makes it easier to discover stale lock
+  files.
 
 Version 0.8.1
 -------------

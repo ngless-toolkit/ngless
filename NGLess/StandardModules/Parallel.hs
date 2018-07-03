@@ -23,7 +23,6 @@ import           Data.List.Extra (snoc, chunksOf)
 #ifndef WINDOWS
 import           System.Posix.Unistd (fileSynchronise)
 import           System.Posix.IO (openFd, defaultFileFlags, closeFd, OpenMode(..))
-import           System.Posix.Files (touchFile)
 import           Control.Exception (bracket)
 #endif
 
@@ -40,7 +39,6 @@ import           Control.Monad.Except (throwError)
 import           Control.Monad.Extra (allM, unlessM)
 import           Control.DeepSeq
 import           Data.Traversable
-import           Control.Concurrent (threadDelay)
 import           Control.Monad.Trans.Class
 import           System.AtomicWrite.Writer.Text (atomicWriteFile)
 
@@ -96,9 +94,6 @@ syncFile fname = do
 syncFile _ = return ()
 #endif
 
-#ifdef WINDOWS
-touchFile fname = writeFile fname "lock file"
-#endif
 
 setupHashDirectory :: FilePath -> T.Text -> NGLessIO FilePath
 setupHashDirectory basename hash = do
@@ -186,12 +181,10 @@ getLock' basedir (f:fs) = do
                                 -- every ten minutes if things are good (see
                                 -- thread below), this is an indication that
                                 -- the process has crashed
-                            , whenExistsStrategy = IfLockedNothing} >>= \case
+                            , whenExistsStrategy = IfLockedNothing
+                            , mtimeUpdate = True } >>= \case
             Nothing -> getLock' basedir fs
             Just rk -> do
-                let updateloop :: IO ()
-                    updateloop = threadDelay (10*60*1000*1000) >> touchFile lockname >> updateloop
-                void . liftIO . A.async $ updateloop
                 return $ Just (f,rk)
 
 executeCollect :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject

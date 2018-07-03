@@ -124,6 +124,7 @@ ensureIndexExists 0 mapper fafile = do
                             { lockFname = fafile' ++ ".ngless-index.lock"
                             , maxAge = hoursToDiffTime 36
                             , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
+                            , mtimeUpdate = True
                             } $
                 -- recheck if index exists with the lock in place
                 -- it may have been created in the meanwhile (especially if we slept waiting for the lock)
@@ -194,6 +195,7 @@ splitFASTA megaBPS ifile ofileBase =
                 { lockFname = ifile ++ "." ++ show megaBPS ++ "m.split.lock"
                 , maxAge = 36 * 3000
                 , whenExistsStrategy = IfLockedRetry { nrLockRetries = 120, timeBetweenRetries = 60 }
+                , mtimeUpdate = True
                 } $ C.runConduit $
             conduitPossiblyCompressedFile ifile
                 .| faConduit

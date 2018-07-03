@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, CPP #-}
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2015-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -13,13 +13,23 @@ module Utils.LockFile
     , removeFileIfExists
     ) where
 
+import qualified Control.Concurrent.Async as A
+
 #ifndef WINDOWS
-import System.Posix.Process
+import           System.Posix.Process
+import           System.Posix.Files (touchFile)
 #endif
 
+
 import System.IO.Error (isDoesNotExistError)
-import System.Directory
-import Data.Time
+import System.Directory (getModificationTime, removeFile)
+import Data.Time (NominalDiffTime
+                 , getZonedTime
+                 , formatTime
+                 , defaultTimeLocale
+                 , getCurrentTime
+                 , diffUTCTime
+                 )
 import Control.Monad.Except
 import Control.Exception
 import Control.Concurrent (threadDelay)
@@ -49,6 +59,7 @@ data LockParameters = LockParameters
                 { lockFname :: FilePath
                 , maxAge :: NominalDiffTime
                 , whenExistsStrategy :: WhenExistsStrategy
+                , mtimeUpdate :: Bool -- ^ start a thread which updates the mtime on the file every 10 minutes
                 } deriving (Eq, Show)
 
 data WhenExistsStrategy =
@@ -62,6 +73,10 @@ pidAsStr :: IO String
 pidAsStr = show <$> getProcessID
 #else
 pidAsStr = return "(PID is not available on Windows)"
+#endif
+
+#ifdef WINDOWS
+touchFile fname = writeFile fname "lock file"
 #endif
 
 -- | Executes the action specified with a lock file around it so that multiple
@@ -86,7 +101,7 @@ sleep = threadDelay . toMicroSeconds
 -- | Atomically create a lock file with a given name
 -- If file already exists, returns 'Nothing'
 acquireLock :: FilePath -> NGLessIO (Maybe ReleaseKey)
-acquireLock fname = acquireLock' LockParameters { lockFname = fname, whenExistsStrategy = IfLockedNothing, maxAge = 0 }
+acquireLock fname = acquireLock' LockParameters { lockFname = fname, whenExistsStrategy = IfLockedNothing, maxAge = 0, mtimeUpdate = True }
 
 -- | Atomically create a lock file
 acquireLock' :: LockParameters -> NGLessIO (Maybe ReleaseKey)
@@ -104,7 +119,13 @@ acquireLock' params@LockParameters{..} = liftIO (openLockFile lockFname) >>= \ca
                 tstr = formatTime defaultTimeLocale tformat t
             hPutStrLn h ("Lock file created for PID " ++ pid ++ " on hostname " ++ hostname ++ " at time " ++ tstr)
             release rkC
-            return (Just rk)
+        Just <$> if mtimeUpdate
+                then do
+                    let updateloop :: IO ()
+                        updateloop = threadDelay (10*60*1000*1000) >> touchFile lockFname >> updateloop
+                    (rk', _) <- allocate (A.async updateloop) A.cancel
+                    register (release rk' >> release rk)
+                else return rk
     Nothing -> liftIO (fileAge lockFname) >>= \case
         Nothing -> do
             outputListLno' InfoOutput ["Lock file ", lockFname, " existed but has been removed. Retrying."]
@@ -139,6 +160,7 @@ openLockFile lockFileName = do
             -- Failed to open lock file because it already exists
             return Nothing
 
+handleIf :: Exception e => (e -> Bool) -> IO a -> IO a -> IO a
 handleIf cond alt act = handleJust
     (\e -> if cond e then return (Just ()) else return Nothing)
     (const alt)
