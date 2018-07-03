@@ -13,9 +13,10 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Writer
 import qualified Data.Text as T
-import           Control.Monad.Extra (whenJust)
+import           Control.Monad.Extra (whenJust, whenM)
 
 import NGLess
+import Output
 import Modules
 import Language
 import BuiltinFunctions
@@ -140,4 +141,7 @@ checkOFileV :: T.Text -> ValidateIO ()
 checkOFileV ofile = do
     errors <- liftIO (checkOFile ofile)
     whenJust errors tell1
+    let ofile' = T.unpack ofile
+    whenM (liftIO $ doesFileExist ofile') $
+        liftNGLessIO $ outputListLno' WarningOutput ["Writing to file '", ofile', "' will overwrite existing file."]
 

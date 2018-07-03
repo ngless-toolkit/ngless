@@ -7,6 +7,11 @@ Development version
 
 - Added ``allbest()`` method to MappedRead.
 
+User-visible improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- NGLess will issue a warning before overwriting an existing file.
+
 Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~
 
