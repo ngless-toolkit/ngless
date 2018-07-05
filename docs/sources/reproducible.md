@@ -18,7 +18,7 @@ The `write()` function call supports the argument `auto_comments` which will
 add (as comments) meta information to the output. In particular, you can use
 the `{script}` auto comment to add the script to your output. For example:
 
-    ngless '0.0'
+    ngless '0.8'
     mapped = samfile('input.bam')
 
     counted = count(mapped, features=['seqname'])

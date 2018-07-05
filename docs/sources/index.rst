@@ -16,7 +16,7 @@ Example
 
 ::
 
-    ngless "0.5"
+    ngless "0.8"
     input = paired('ctrl1.fq', 'ctrl2.fq', singles='ctrl-singles.fq')
     input = preprocess(input) using |read|:
         read = read[5:]
@@ -167,7 +167,6 @@ Authors
    tutorial-ocean-metagenomics
    tutorial-assembly-gp
    tutorial-gut-metagenomics
-   tutorial
    command-line-options
    command-line-wrappers
    one-liners

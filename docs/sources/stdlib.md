@@ -86,21 +86,21 @@ hashed values which encode both the script and the position within the script
 (so that if you have more than one `collect()` call, they will not clash).
 
 Lock files have their modification times updated once every 10 minutes while
-ngless is running. This allows the programme to easily identify stale files.
+NGLess is running. This allows the programme to easily identify stale files.
 The software is very conservative, but any lock file with a modification time
-older than one hour is considered stale and removed. Note that because ngless
-is extremely careful about how writing its outputs atomically, the worse that
-can happen from mis-identifying a stale lock (for example, you had a compute
-node which lost network connectivity, but it comes back online after an hour
-and resumes processing) is that extra computation is wasted, **the processes
-will never interfere in a way that you get erroneous results**.
+older than one hour is considered stale and removed. Note that because NGLess
+will write always create its outputs atomically, the worse that can happen from
+mis-identifying a stale lock (for example, you had a compute node which lost
+network connectivity, but it comes back online after an hour and resumes
+processing) is that extra computation is wasted, **the processes will never
+interfere in a way that you get erroneous results**.
 
 ## Samtools module
 
 This module exposes the samtools sorting functionality through the
 `samtools_sort` function.
 
-    ngless '0.0'
+    ngless '0.8'
     import "samtools" version "0.0"
     to_sort = samfile('input.bam')
     sorted = samtools_sort(to_sort)

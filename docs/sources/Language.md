@@ -190,7 +190,7 @@ Functions have a single positional parameter, all other must be given by name:
     unique(reads, max_copies=2)
 
 The exception is constructs which take a block: they take a single positional
-parameter and a block. The block is passed using the using keyword:
+parameter and a block. The block is passed using the ``using`` keyword:
 
     reads = preprocess(reads) using |read|:
         block

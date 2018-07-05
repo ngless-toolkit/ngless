@@ -28,7 +28,7 @@ We now build an `NGLess.NGLess` object, giving it the version of ngless we wish
 
 
 ```python
-    sc = NGLess.NGLess('0.0')
+    sc = NGLess.NGLess('0.8')
 ```
 
 To simplify the rest of the script, we are going to use the short name `e` to
@@ -88,7 +88,7 @@ This will even install NGLess if it is not available in the PATH.
 ```python
     from ngless import NGLess
 
-    sc = NGLess.NGLess('0.0')
+    sc = NGLess.NGLess('0.8')
     e = sc.env
 
     sc.import_('mocat', '0.0')

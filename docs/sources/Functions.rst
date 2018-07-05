@@ -1,11 +1,11 @@
 
 .. _Functions:
 
-=========
-Functions
-=========
+========================
+NGLess Builtin Functions
+========================
 
-These are the built-in ngless functions. Make sure to check the `standard
+These are the built-in NGLess functions. Make sure to check the `standard
 library <stdlib.html>`__ as well.
 
 fastq
@@ -289,8 +289,9 @@ To use any of these, pass in the name as the reference value::
 
     mapped_hg19 = map(input, reference='hg19')
 
-Ngless does not ship with any of these datasets, but they are downloaded
-lazily: i.e., the first time you use them, ngless will download and cache them.
+NGLess does not ship with any of these datasets, but they are downloaded
+lazily: i.e., the first time you use them, NGLess will download and cache them.
+NGLess will also index any database used the first time it is used.
 
 The option ``block_size_megabases`` turns on low memory mode (see the
 corresponding section in the `mapping documentation <mapping.html>`__)
@@ -410,7 +411,8 @@ to the name of reference it matched and only an input set of mapped reads is
 necessary. For other features, you will need extra information. This can be
 passed using the ``gff_file`` or ``functional_map`` arguments. If you had
 previously used a ``reference`` argument for the ``map()`` function, then
-you can also leave this argument empty and ngless will do the right thing.
+you can also leave this argument empty and NGLess will use the corresponding
+annotation file.
 
 The ``gff_file`` and ``functional_map`` arguments support `search path
 expansion <searchpath.html>`__.

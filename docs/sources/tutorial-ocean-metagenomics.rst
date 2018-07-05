@@ -146,7 +146,7 @@ Full script
 
 Here is the full script::
 
-    ngless "0.0"
+    ngless "0.8"
     import "parallel" version "0.0"
     import "mocat" version "0.0"
     import "omrgc" version "0.0"
@@ -156,7 +156,7 @@ Here is the full script::
     sample = lock1(samples)
     input = load_mocat_sample(sample)
 
-    preprocess(input, keep_singles=False) using |read|:
+    input = preprocess(input, keep_singles=False) using |read|:
         read = substrim(read, min_quality=25)
         if len(read) < 45:
             discard

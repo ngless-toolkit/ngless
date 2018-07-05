@@ -1,6 +1,7 @@
-# Constants
+# NGLess Constants
 
-In _ngless_, any variable written in uppercase is a constant.
+In NGLess, any variable written in uppercase is a constant, i.e., can only be
+assigned to once. In addition, there are builtin constants defined by NGLess.
 
 ## Built in constants
 
@@ -18,7 +19,7 @@ Use in place of a filename to write to standard output
 
 For example:
 
-    ngless '0.0'
+    ngless '0.9'
 
     input = samfile(STDIN)
     input = select(input) using |mr|:

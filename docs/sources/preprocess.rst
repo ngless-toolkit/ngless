@@ -13,11 +13,11 @@ Filtering reads based on quality is performed with the ``preprocess`` function,
 which takes a block of code. This block of code will be executed for each read.
 For example::
 
-    ngless "0.0"
+    ngless "0.8"
 
     input = fastq('input.fq.gz')
 
-    preprocess(input) using |r|:
+    input = preprocess(input) using |r|:
         r = substrim(r, min_quality=20)
         if len(r) < 45:
             discard
