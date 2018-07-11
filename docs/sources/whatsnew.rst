@@ -5,12 +5,19 @@ What's New (History)
 Development version
 -------------------
 
-- Added ``allbest()`` method to MappedRead.
+Version 0.9
+-----------
+
+Released July 12th 2018
 
 User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Added ``allbest()`` method to MappedRead.
 - NGLess will issue a warning before overwriting an existing file.
+- Output directory contains PNG files with basic QC stats
+- Added modules for gut gene catalogs of `mouse <https://www.nature.com/articles/nbt.3353>`__, `pig <https://www.nature.com/articles/nmicrobiol2016161>`__, and `dog <https://microbiomejournal.biomedcentral.com/articles/10.1186/s40168-018-0450-3>`__
+- Updated the `integrated gene catalog <https://www.nature.com/articles/nbt.2942>`__
 
 Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~
@@ -18,6 +25,9 @@ Internal improvements
 - All lock files now are continuously "touched" (i.e., their modification time
   is updated every 10 minutes). This makes it easier to discover stale lock
   files.
+- The automated downloading of builtin references now uses versioned URLs, so
+  that, in the future, we can change them without breaking backwards
+  compatibility.
 
 Version 0.8.1
 -------------

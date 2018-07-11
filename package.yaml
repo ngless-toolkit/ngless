@@ -3,7 +3,7 @@ version:        '0.9.0'
 category:       Domain Specific Language
 author:         Luis Pedro Coelho and others (see AUTHORS)
 maintainer:     luis@luispedro.org
-github:         luispedro/ngless
+github:         ngless-toolkit/ngless
 license:        MIT
 license-file:   COPYING
 c-sources:
