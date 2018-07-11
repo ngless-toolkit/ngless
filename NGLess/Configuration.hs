@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE RecordWildCards, CPP #-}
@@ -21,7 +21,7 @@ import qualified Data.Configurator as CF
 import CmdArgs
 
 defaultBaseURL :: FilePath
-defaultBaseURL = "http://vm-lux.embl.de/~coelho/ngless-data/"
+defaultBaseURL = "http://ngless.embl.de/resources/"
 
 -- | ngless configuration options
 data NGLessConfiguration = NGLessConfiguration
