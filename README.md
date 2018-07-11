@@ -10,9 +10,7 @@ processing.
 [![Join the chat at https://gitter.im/luispedro/ngless](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/luispedro/ngless?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 
-**Note**: This is *pre-release* software, currently in beta (testing) It is
-stable enough to use, but there may still be some (minor) changes before an
-official release. For questions, you can also use the [ngless mailing
+For questions and discussions, please use the [ngless mailing
 list](https://groups.google.com/forum/#!forum/ngless).
 
 ## Example
