@@ -11,7 +11,7 @@ be in UTF-8.
 Both LF and CRLF are accepted as line endings (Unix-style LF is preferred).
 
 A semicolon (;) can be used as an alternative to a new line. Any spaces (and
-only space characters) following a semi-colon are ignored. *This feature is
+only space characters) following a semicolon are ignored. *This feature is
 intended for inline scripts at the command line (passed with the ``-e``
 option), its use for scripts is heavily discouraged and may trigger an error in
 the future.*
@@ -124,7 +124,7 @@ Assignment is performed with `=` operator:
 
     variable = value
 
-A variable that is all upper-case is a constant and can only be assigned to
+A variable that is all uppercase is a constant and can only be assigned to
 once.
 
 
