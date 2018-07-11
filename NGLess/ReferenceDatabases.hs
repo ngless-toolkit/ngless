@@ -177,8 +177,12 @@ installData (Just mode) refname = do
         Just u -> return u
         Nothing
             | isDefaultReference (refName ref) -> do
+                    version@(NGLVersion majV minV) <- (ngleVersion <$> nglEnvironment)
+                    let versionDirectory = if version < NGLVersion 0 9
+                                                then ""
+                                                else show majV ++ "." ++ show minV
                     baseURL <- nConfDownloadBaseURL <$> nglConfiguration
-                    return $ baseURL </> "References" </> T.unpack (refName ref) <.> "tar.gz"
+                    return $ baseURL </> "References" </> versionDirectory </> T.unpack (refName ref) <.> "tar.gz"
             | otherwise ->
                 throwScriptError ("Expected reference data, got "++T.unpack (refName ref))
     outputListLno' InfoOutput ["Starting download from ", url]
