@@ -4,17 +4,20 @@ NGLess: NGS Processing with Less Work
 NGLess is a domain-specific language for NGS (next-generation sequencing
 data) processing.
 
-**Note**: NGLess is *beta* software: it should work, but you may run into some
-rough edges.  Please `get in touch <mailto:coelho@embl.de>`__ if use it in your
-work. For questions, you can also use the `ngless mailing list
+For questions, you can also use the `ngless mailing list
 <https://groups.google.com/forum/#!forum/ngless>`__.
 
-NGLess is best illustrated by an example:
+NG-meta-profiler
+----------------
 
-Example
--------
+For metagenomics profiling, consider using `ng-meta-profiler
+<ng-meta-profiler.html>`__, which is a collection of predefined pipelines
+developed using NGLess.
 
-::
+NGLess
+------
+
+NGLess is best illustrated by an example::
 
     ngless "0.8"
     input = paired('ctrl1.fq', 'ctrl2.fq', singles='ctrl-singles.fq')
@@ -163,6 +166,7 @@ Authors
 
    introduction
    install
+   ng-meta-profiler
    whatsnew
    tutorial-ocean-metagenomics
    tutorial-assembly-gp

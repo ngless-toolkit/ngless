@@ -2,6 +2,13 @@
 Ocean Metagenomics Functional Profiling
 =======================================
 
+.. note::
+    If you are starting out with NGLess for metagenomics profiling, consider
+    using the predefined pipeline collection, `NG-meta-profiler
+    <ng-meta-profiler.html>`__. This tutorial is based on deconstructing a
+    pipeline very similar to those.
+
+
 In this tutorial, we will analyse a small dataset of oceanic microbial
 metagenomes.
 

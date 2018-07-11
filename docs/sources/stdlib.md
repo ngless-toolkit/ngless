@@ -126,9 +126,19 @@ make it easier to adapt projects from MOCAT to ngless.
 
 `load_mocat_sample :: string -> readset` this function takes a directory name
 and returns a set of reads by scanning the directory for (compressed) FastQ
-files. This is slightly more flexible than MOCAT2 as it also accepts files with
-the extension ``fastq`` or ``fastq.gz`` as well as ``_1`` and ``_2`` to
-indicate the two mate files.
+files. This is slightly more flexible than MOCAT2 in terms of the patterns in
+matches. In particular, the following extensions are accepted:
+
+- `fq`
+- `fq.gz`
+- `fq.bz2`
+- `fastq`
+- `fastq.gz`
+- `fastq.bz2`
+
+Paired-end reads are assumed to be split into two files, with matching names
+with `.1`/`.2` appended. `_1`/`_2` as is used by the European Nucleotide
+Archive (ENA) is also accepted.
 
 `coord_file_to_gtf :: string -> string` this function takes a MOCAT-style
 `.coord`, converts it internally to a GTF file and returns it.

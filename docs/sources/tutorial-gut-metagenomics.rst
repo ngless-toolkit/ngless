@@ -4,11 +4,18 @@ Human Gut Metagenomics Functional & Taxonomic Profiling
 =======================================================
 
 .. note::
-    This tutorial is also available as a `slide presentation
-    <http://ngless.embl.de/_static/gut-metagenomics-tutorial-presentation/gut_specI_tutorial.html>`__
+    If you are starting out with NGLess for metagenomics profiling, consider
+    using the predefined pipeline collection, `NG-meta-profiler
+    <ng-meta-profiler.html>`__. This tutorial is based on deconstructing a
+    pipeline very similar to those.
 
 In this tutorial, we will analyse a small dataset of human gut microbial
 metagenomes.
+
+
+.. note::
+    This tutorial is also available as a `slide presentation
+    <http://ngless.embl.de/_static/gut-metagenomics-tutorial-presentation/gut_specI_tutorial.html>`__
 
 1. Download the toy dataset
 
