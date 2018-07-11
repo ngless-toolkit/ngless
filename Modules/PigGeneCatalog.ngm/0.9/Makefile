@@ -2,7 +2,7 @@ VERSION := 0.9
 PACKAGE_CONTENTS := pig.fna pig.functional.map module.yaml
 
 pig-gut-${VERSION}.tar.gz: ${PACKAGE_CONTENTS}
-	tar -cz -f $@ --transform "s#^#Modules/PigGutCatalog/${VERSION}/#" $^
+	tar -cz -f $@ --transform "s#^#Modules/PigGutCatalog.ngm/${VERSION}/#" $^
 
 pig.functional.map:
 	curl https://zenodo.org/record/1295720/files/pig_287sample.emapper.annotations | grep -v '^# ' > $@

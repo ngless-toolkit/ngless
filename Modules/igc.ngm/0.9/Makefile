@@ -2,7 +2,7 @@ VERSION := 0.9
 PACKAGE_CONTENTS := igc.fna igc.functional.map module.yaml
 
 igc-${VERSION}.tar.gz: ${PACKAGE_CONTENTS}
-	tar -cz -f $@ --transform "s#^#Modules/igc/${VERSION}/#" $^
+	tar -cz -f $@ --transform "s#^#Modules/igc.ngm/${VERSION}/#" $^
 
 igc.functional.map:
 	curl https://zenodo.org/record/1299267/files/IGC_catalog.emapper.annotations | grep -v '^# ' > $@

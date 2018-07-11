@@ -2,7 +2,7 @@ VERSION := 0.9
 PACKAGE_CONTENTS := mouse.fna mouse.functional.map module.yaml
 
 mouse-gut-${VERSION}.tar.gz: ${PACKAGE_CONTENTS}
-	tar -cz -f $@ --transform "s#^#Modules/MouseGutCatalog/${VERSION}/#" $^
+	tar -cz -f $@ --transform "s#^#Modules/MouseGutCatalog.ngm/${VERSION}/#" $^
 
 mouse.functional.map:
 	curl https://zenodo.org/record/1295720/files/mouse_184samples.emapper.annotations | grep -v '^# ' > $@
