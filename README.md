@@ -13,6 +13,9 @@ processing.
 For questions and discussions, please use the [ngless mailing
 list](https://groups.google.com/forum/#!forum/ngless).
 
+
+![NGLess cartoon](docs/NGLess-cartoon.svg)
+
 ## Example
 
     ngless "0.8"
@@ -57,7 +60,7 @@ NGless 0.7.1](http://ngless.embl.de/releases/ngless-0.7.1-Linux64) or a [nighly
 build of the latest development
 code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
 This should work across a wide range of Linux versions (please
-[report](https://github.com/luispedro/ngless/issues) any issues you encounter):
+[report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
 
     curl -O http://ngless.embl.de/releases/ngless-0.7.1-Linux64
     chmod +x ngless-0.7.1-Linux64
@@ -73,7 +76,7 @@ which includes them.
 ### From Source
 
 Installing/compiling from source is also possible. Clone
-[http://github.com/luispedro/ngless](http://github.com/luispedro/ngless)
+[http://github.com/ngless-toolkit/ngless](http://github.com/ngless-toolkit/ngless)
 
 #### Dependencies
 
@@ -86,7 +89,7 @@ You should also have `gcc` installed (or another C-compiler).
 
 The following sequence of commands should download and build the software
 
-    git clone https://github.com/luispedro/ngless
+    git clone https://github.com/ngless-toolkit/ngless
     cd ngless
     make
 
