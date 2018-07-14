@@ -7,6 +7,17 @@ data) processing.
 For questions, you can also use the `ngless mailing list
 <https://groups.google.com/forum/#!forum/ngless>`__.
 
+
+.. note::
+
+    If you are using NGLess for generating results in a scientific publication, please cite
+
+        *NG-meta-profiler: fast processing of metagenomes using NGLess, a
+        domain-specific language* by Luis Pedro Coelho, Renato Alves, Paulo
+        Monteiro, Jaime Huerta-Cepas, Ana Teresa Freitas, Peer Bork bioRxiv
+        367755;
+        `https://doi.org/10.1101/367755 <https://doi.org/10.1101/367755>`__
+
 NG-meta-profiler
 ----------------
 
