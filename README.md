@@ -7,11 +7,19 @@ processing.
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/hyperium/hyper/master/LICENSE)
 [![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/installer/conda.svg)](https://anaconda.org/bioconda/ngless)
 [![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/downloads.svg)](https://anaconda.org/bioconda/ngless)
+[![Citation for NGLess](https://img.shields.io/badge/CITATION%20DOI-10.1101%2F367755-brightgreen.svg)](https://doi.org/10.1101/367755)
 [![Join the chat at https://gitter.im/luispedro/ngless](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/luispedro/ngless?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 
 For questions and discussions, please use the [ngless mailing
 list](https://groups.google.com/forum/#!forum/ngless).
+
+If you are using NGLess, please cite:
+
+> _NG-meta-profiler: fast processing of metagenomes using NGLess, a
+> domain-specific language_ by Luis Pedro Coelho, Renato Alves, Paulo Monteiro,
+> Jaime Huerta-Cepas, Ana Teresa Freitas, Peer Bork bioRxiv 367755; doi:
+> [https://doi.org/10.1101/367755](https://doi.org/10.1101/367755)
 
 
 ![NGLess cartoon](docs/NGLess-cartoon.svg)
