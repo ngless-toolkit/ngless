@@ -82,6 +82,16 @@ dependencies:
   - yaml
   - zlib
 
+ghc-options:
+  - -Wall
+  - -fwarn-tabs
+  - -fno-warn-missing-signatures
+  - -threaded
+  - -O2
+  - -fno-full-laziness
+  - -rtsopts
+  - ! '"-with-rtsopts=-A64m -n4m -H"'
+
 when:
   - condition: ! 'os(windows)'
     then:
@@ -94,26 +104,6 @@ when:
      - double-conversion
      - safeio >=0.0.2
      - unix
-  - condition: impl(ghc >=8.0)
-    then:
-      ghc-options:
-      - -Wall
-      - -fwarn-tabs
-      - -fno-warn-missing-signatures
-      - -threaded
-      - -O2
-      - -fno-full-laziness
-      - -rtsopts
-      - ! '"-with-rtsopts=-A64m -n4m -H"'
-    else:
-      ghc-options:
-      - -Wall
-      - -fwarn-tabs
-      - -fno-warn-missing-signatures
-      - -threaded
-      - -O2
-      - -rtsopts
-      - ! '"-with-rtsopts=-A64m -n4m -H -qg"'
 
 executables:
   ngless:
