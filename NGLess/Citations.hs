@@ -19,6 +19,10 @@ citations =
     ,("map", "Li, H., 2013. Aligning sequence reads, clone sequences and assembly contigs with BWA-MEM. arXiv preprint arXiv:1303.3997.")
     ]
 
+nglessCitation :: T.Text
+nglessCitation =
+    "Coelho, L.P., Alves, R., Monteiro, P., Huerta-Cepas, J., Freitas, A.T., and Bork, P., 2018.  NG-meta-profiler: fast processing of metagenomes using NGLess, a omain-specific language bioRxiv 367755 https://doi.org/10.1101/367755"
+
 
 collectCitations :: [Module] -> Script -> [T.Text]
 collectCitations mods (Script _ sc) =
@@ -26,4 +30,4 @@ collectCitations mods (Script _ sc) =
         useCits = flip mapMaybe (snd <$> sc) $ \case
             Assignment _ (FunctionCall (FuncName f) _ _ _) -> lookup f citations
             _ -> Nothing
-    in (S.toList . S.fromList) (modCits ++ useCits)
+    in nglessCitation : (S.toList . S.fromList) (modCits ++ useCits)

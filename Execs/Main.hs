@@ -351,7 +351,9 @@ main' = do
                             "For more information:\n",
                             "\thttp://ngless.embl.de/\n",
                             "For comments/discussion:\n",
-                            "\thttps://groups.google.com/forum/#!forum/ngless"
+                            "\thttps://groups.google.com/forum/#!forum/ngless\n",
+                            "Citation: LP Coelho et al., 2018. ",
+                            "https://doi.org/10.1101/367755.\n"
                             ]
         versioner =
             (infoOption ("ngless v" ++ versionStr ++ " (release date: " ++  dateStr ++ ")")
