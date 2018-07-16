@@ -163,7 +163,6 @@ $(BWA_DIR_TARGET):
 	sha1sum -c <(echo "$(BWA_SHA1)  $(BWA_TAR)")
 	tar xvf $(BWA_TAR)
 	rm $(BWA_TAR)
-	cd $(BWA_DIR) && curl https://patch-diff.githubusercontent.com/raw/lh3/bwa/pull/90.diff | patch -p1
 
 $(BWA_DIR)/$(BWA_TARGET): $(BWA_DIR_TARGET)
 	cd $(BWA_DIR) && $(MAKE) && mv bwa $(BWA_TARGET)
@@ -240,12 +239,11 @@ $(MINIMAP2_DIR)/README.md:
 	$(WGET) $(MINIMAP2_URL) -O $(MINIMAP2_TAR)
 	sha1sum -c <(echo "$(MINIMAP2_SHA1)  $(MINIMAP2_TAR)")
 	tar xvf $(MINIMAP2_TAR)
-	cd $(MINIMAP2_DIR) && patch < ../build-scripts/minimap2-static-compile.patch
 	rm $(MINIMAP2_TAR)
 
 $(MINIMAP2_DIR)/$(MINIMAP2_TARGET)-static: $(MINIMAP2_DIR)/README.md
 	rm -f $@
-	cd $(MINIMAP2_DIR) && $(MAKE) CFLAGS="-O2 -static" && mv minimap2 ngless-minimap2-static
+	cd $(MINIMAP2_DIR) && $(MAKE) CFLAGS="-O2 -DHAVE_GETOPT -static" && mv minimap2 ngless-minimap2-static
 
 $(MINIMAP2_DIR)/$(MINIMAP2_TARGET): $(MINIMAP2_DIR)/README.md
 	cd $(MINIMAP2_DIR) && $(MAKE) && mv minimap2 ngless-minimap2
