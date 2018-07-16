@@ -1,5 +1,12 @@
-NGLess v0.9.0 (C) NGLess authors
+NGLess v0.9.1 (C) NGLess authors
 http://ngless.embl.de/
+
+When publishing results from this script, please cite the following references:
+
+	 - Coelho, L.P., Alves, R., Monteiro, P., Huerta-Cepas, J., Freitas, A.T., and Bork, P., 2018.
+	 NG-meta-profiler: fast processing of metagenomes using NGLess, a omain-specific language bioRxiv
+	 367755 https://doi.org/10.1101/367755
+
 
 	input.sam
 total	7
