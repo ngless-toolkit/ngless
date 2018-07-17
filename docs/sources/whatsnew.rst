@@ -5,6 +5,14 @@ What's New (History)
 Development version
 -------------------
 
+Version 0.9.1
+-----------
+
+Released July 17th 2018
+
+- Added `NGLess preprint citation
+  <https://www.biorxiv.org/content/early/2018/07/13/367755>`__
+
 Version 0.9
 -----------
 
