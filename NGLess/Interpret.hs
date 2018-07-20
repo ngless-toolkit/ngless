@@ -371,9 +371,7 @@ shortReadVectorStats = do
     return (q, k, p)
 
 writeAndContinue :: MonadIO m => TQ.TBMQueue (V.Vector ShortRead) -> C.ConduitT (V.Vector ShortRead) (V.Vector ShortRead) m ()
-writeAndContinue q = C.mapM $ \v -> do
-    liftIO . atomically $ TQ.writeTBMQueue q v
-    return v
+writeAndContinue q = CL.iterM (liftIO . atomically . TQ.writeTBMQueue q)
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
