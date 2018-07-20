@@ -40,20 +40,29 @@ import NGLess.NGError
 newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
                 deriving (Show)
 
-linesBounded:: (Monad m, MonadError NGError m) => Int -> C.ConduitT B.ByteString B.ByteString m ()
-linesBounded maxLineSize = continue 0 []
+maxLineSize :: Int
+maxLineSize = 65536
+
+concatrevline :: B.ByteString -> [B.ByteString] -> ByteLine
+concatrevline line [] = ByteLine $ lineWindowsTerminated line
+concatrevline line toks = ByteLine . lineWindowsTerminated $ B.concat (reverse (line:toks))
+{-# INLINE concatrevline #-}
+
+linesC:: (Monad m, MonadError NGError m) => C.ConduitT B.ByteString ByteLine m ()
+linesC = continue 0 []
     where
         continue n toks
-            | n > maxLineSize = throwDataError ("Line too long (longer than " ++ show maxLineSize ++ " characters.")
-            | otherwise = C.await >>= \case
-                    Nothing -> when (n > 0) $ C.yield (B.concat $ reverse toks)
-                    Just tok -> emit n toks tok
+            | n > maxLineSize = throwDataError ("Line too long (length is " ++ show n ++ " characters).")
+            | otherwise = C.await >>= maybe
+                                        (when (n > 0) $ C.yield (concatrevline B.empty toks))
+                                        (emit n toks)
         emit n toks tok = case B.elemIndex 10 tok of
                 Nothing -> continue (n + B.length tok) (tok:toks)
                 Just ix -> let (start,rest) = B.splitAt ix tok in do
-                                C.yield (B.concat $ reverse (start:toks))
+                                C.yield (concatrevline start toks)
                                 emit 0 [] (B.tail rest)
 
+{-# INLINE linesC #-}
 
 -- | Remove trailing \r present when the original line terminator was \r\n (windows)
 lineWindowsTerminated :: B.ByteString -> B.ByteString
@@ -72,11 +81,6 @@ linesUnBoundedC =
 {-# INLINE linesUnBoundedC #-}
 
 
-linesC :: (MonadError NGError m) => C.ConduitT B.ByteString ByteLine m ()
-linesC =
-    linesBounded 65536
-        .| CL.map (ByteLine . lineWindowsTerminated)
-{-# INLINE linesC #-}
 
 byteLineSinkHandle :: (MonadIO m) => Handle -> C.ConduitT ByteLine C.Void m ()
 byteLineSinkHandle h = CL.mapM_ (\(ByteLine val) -> liftIO (B.hPut h val >> B.hPut h nl))
