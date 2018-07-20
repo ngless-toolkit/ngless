@@ -10,6 +10,7 @@ module Utils.Conduit
     , asyncMapEitherC
     , linesUnBoundedC
     , linesC
+    , linesVC
     , awaitJust
     , asyncGzipTo
     , asyncGzipToFile
@@ -25,6 +26,8 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
+import qualified Data.Vector         as V
+import qualified Data.Vector.Mutable as VM
 
 import           Control.Monad (when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -72,6 +75,45 @@ lineWindowsTerminated line = if not (B.null line) && B.index line (B.length line
                                     where carriage_return = 13
 {-# INLINE lineWindowsTerminated #-}
 
+-- | Equivalent to 'linesC .| CC.conduitVector nlines'
+linesVC :: (MonadIO m, Monad m, MonadError NGError m) => Int -> C.ConduitT B.ByteString (V.Vector ByteLine) m ()
+linesVC nlines = do
+            vec <- liftIO $ VM.new nlines
+            continue vec 0 0 []
+        where
+            continue vec vix n toks
+                | n > maxLineSize = throwDataError ("Line too long (length is " ++ show n ++ " characters).")
+                | otherwise = C.await >>= maybe (finish vec vix toks) (emit vec vix n toks)
+
+            finish   _   0 [] = return ()
+            finish vec vix [] = C.yield =<< liftIO (V.unsafeSlice 0 vix <$> V.unsafeFreeze vec)
+            finish vec vix toks = do
+                    liftIO $ VM.write vec vix (ByteLine . lineWindowsTerminated . B.concat $ reverse toks)
+                    finish vec (vix + 1) []
+
+            emit vec vix n toks tok = do
+                (done, vec', vix', n', toks') <- liftIO $ splitWrite [] vec vix n toks tok
+                CL.sourceList (reverse done)
+                continue vec' vix' n' toks'
+
+            -- splitWrite is in IO. This is a micro-optimization, but this code
+            -- can be in the inner loop, so it's worthwhile to micro-optimize.
+            --
+            -- Basically, moving up and down the transformer stack (with lift &
+            -- friends) can be expensive. Doing the inner loop in IO is
+            -- measurably faster.
+            splitWrite done vec vix !n toks tok
+                | vix >= nlines = do
+                    f <- V.unsafeFreeze vec
+                    vec' <- VM.new nlines
+                    splitWrite (f:done) vec' 0 n toks tok
+                | otherwise = case B.elemIndex 10 tok of
+                    Nothing -> return (done, vec, vix, n + B.length tok, (if not (B.null tok) then (tok:toks) else toks))
+                    Just ix -> do
+                        let (start, rest) = B.splitAt ix tok
+                        VM.write vec vix (concatrevline start toks)
+                        splitWrite done vec (vix + 1) 0 [] (B.tail rest)
+{-# INLINE linesVC #-}
 
 linesUnBoundedC :: (Monad m) => C.ConduitT B.ByteString ByteLine m ()
 linesUnBoundedC =

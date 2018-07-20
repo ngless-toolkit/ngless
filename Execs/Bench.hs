@@ -6,9 +6,11 @@ import Criterion.Main
 import qualified Data.Vector as V
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit as C
+import qualified Data.ByteString as B
 import qualified Data.Text as T
-import           Data.Conduit ((.|), (=$=), ($$))
+import           Data.Conduit ((.|))
 import           Control.DeepSeq (NFData)
 
 import Control.Monad.Trans.Resource (runResourceT)
@@ -24,8 +26,8 @@ import FileOrStream (FileOrStream(..))
 import Parse (parsengless)
 import Language (Script(..))
 import Data.Sam (readSamLine, readSamGroupsC, samStatsC)
-import Data.FastQ (statsFromFastQ, FastQEncoding(..), ShortRead(..), fqDecodeVector)
-import Utils.Conduit (linesC, ByteLine(..), conduitPossiblyCompressedFile)
+import Data.FastQ (FastQEncoding(..), ShortRead(..), fqDecodeVector)
+import Utils.Conduit (linesC, ByteLine(..), conduitPossiblyCompressedFile, linesVC)
 import Transform (transform)
 import NGLess.NGLEnvironment (setupTestEnvironment)
 
@@ -83,10 +85,10 @@ basicCountOpts = CountOpts
 
 main = setupTestEnvironment >> defaultMain [
     bgroup "sam-stats"
-        [ bench "sample" $ nfNGLessIO (CB.sourceFile "test_samples/sample.sam" =$= linesC $$ samStatsC)
+        [ bench "sample" $ nfNGLessIO (C.runConduit (CB.sourceFile "test_samples/sample.sam" .| linesC .| samStatsC))
         ]
     ,bgroup "fastq"
-        [ bench "fastqStats" $ nfNGLessIO (C.runConduitRes (conduitPossiblyCompressedFile "test_samples/sample.fq.gz" .| linesC .| count))
+        [ bench "fastqStats" $ nfNGLessIO (C.runConduit (conduitPossiblyCompressedFile "test_samples/sample.fq.gz" .| linesC .| count))
         , bench "preprocess" $ nfNGLessScript                          "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
         , bench "preprocess-transformed" $ nfNGLessScriptWithTransform "p = fastq('test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = substrim(r, min_quality=26)\n  if len(r) < 45:\n    discard"
         , bench "preprocess-pair" $ nfNGLessScript
@@ -97,9 +99,14 @@ main = setupTestEnvironment >> defaultMain [
                 "p = paired('test_samples/sample.fq.gz', 'test_samples/sample.fq.gz')\npreprocess(p) using |r|:\n  r = r\n"
         , bench "substrim" $ nf (substrim 30) exampleSR
         ]
+    ,bgroup "conduit"
+        [ bench "raw"      $ nfNGLessIO (C.runConduit (conduitPossiblyCompressedFile "test_samples/sample.sam.gz" .| CB.lines .| (CC.conduitVector 1024 :: C.ConduitT B.ByteString (V.Vector B.ByteString) NGLessIO ()) .| count))
+        , bench "linesC"   $ nfNGLessIO (C.runConduit (conduitPossiblyCompressedFile "test_samples/sample.sam.gz" .| linesC .| (CC.conduitVector 1024 :: C.ConduitT ByteLine (V.Vector ByteLine) NGLessIO ()) .| count))
+        , bench "linesVC"  $ nfNGLessIO (C.runConduit (conduitPossiblyCompressedFile "test_samples/sample.sam.gz" .| (linesVC 1024 :: C.ConduitT B.ByteString (V.Vector ByteLine) NGLessIO ()) .| count))
+        ]
     ,bgroup "parse-sam"
-        [ bench "readSamLine" $ nfRIO (CB.sourceFile "test_samples/sample.sam" =$= CB.lines =$= CL.map readSamLine $$ countRights)
-        , bench "samGroups" $ nfNGLessIO (C.runConduitRes (CB.sourceFile "test_samples/sample.sam" .| linesC .| readSamGroupsC .| count))
+        [ bench "readSamLine" $ nfRIO (C.runConduit (CB.sourceFile "test_samples/sample.sam" .| CB.lines .| CL.map readSamLine .| countRights))
+        , bench "samGroups" $ nfNGLessIO (C.runConduit (CB.sourceFile "test_samples/sample.sam" .| linesC .| readSamGroupsC .| count))
         ]
     ,bgroup "count"
         [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap "test_samples/functional.map" ["KEGG_ko", "eggNOG_OG"])

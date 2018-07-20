@@ -62,7 +62,6 @@ import qualified Data.Map as Map
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
@@ -401,8 +400,7 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
                 asSource [] = return ()
                 asSource (FastQFilePath enc f:rest) =
                         let input = conduitPossiblyCompressedFile f
-                                .| linesC
-                                .| C.conduitVector 4096
+                                .| linesVC 4096
                                 .| asyncMapEitherC mapthreads (fqDecodeVector enc)
                         in do
                             if not qcInput
