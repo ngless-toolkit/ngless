@@ -59,6 +59,7 @@ instance MonadError NGError NGLessIO where
 instance PrimMonad NGLessIO where
     type PrimState NGLessIO = PrimState IO
     primitive act = NGLessIO (primitive act)
+    {-# INLINE primitive #-}
 
 instance MonadUnliftIO NGLessIO where
     askUnliftIO = NGLessIO $ do
