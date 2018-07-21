@@ -26,6 +26,7 @@ module Data.Sam
     ) where
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Lift as C
@@ -37,6 +38,7 @@ import qualified Data.Vector.Mutable as VM
 import           Data.Strict.Tuple (Pair(..))
 import           Control.Monad.Primitive
 import Data.Bits (testBit)
+import Data.List (intersperse)
 import Control.Error (note)
 import Control.DeepSeq
 
@@ -116,23 +118,22 @@ instance Applicative SimpleParser where
                                 (g' :!: rest') <- runSimpleParser g rest
                                 return $! (f' g' :!: rest'))
 
-encodeSamLine :: SamLine -> B.ByteString
-encodeSamLine (SamHeader b) = b
-encodeSamLine samline = B.intercalate (B.singleton 9) -- 9 is TAB. Writing it this way will trigger a rewrite RULE and optimize the intercalate call
-    [ samQName samline
-    , int2BS . samFlag $ samline
-    , samRName samline
-    , int2BS . samPos $ samline
-    , int2BS . samMapq $ samline
-    , samCigar samline
-    , samRNext samline
-    , int2BS . samPNext $ samline
-    , int2BS . samTLen $ samline
-    , samSeq samline
-    , samQual samline
-    , samExtra samline
+encodeSamLine :: SamLine -> BB.Builder
+encodeSamLine (SamHeader b) = BB.byteString b
+encodeSamLine samline = mconcat . intersperse (BB.char7 '\t') $ map ($ samline)
+    [ BB.byteString . samQName
+    , BB.intDec     . samFlag
+    , BB.byteString . samRName
+    , BB.intDec     . samPos
+    , BB.intDec     . samMapq
+    , BB.byteString . samCigar
+    , BB.byteString . samRNext
+    , BB.intDec .     samPNext
+    , BB.intDec     . samTLen
+    , BB.byteString . samSeq
+    , BB.byteString . samQual
+    , BB.byteString . samExtra
     ]
-    where int2BS = B8.pack . show
 
 readSamLine :: B.ByteString -> Either NGError SamLine
 readSamLine line
@@ -219,8 +220,9 @@ samIntTag samline tname
 -- | take in *ByteLines* and transform them into groups of SamLines all refering to the same read
 --
 -- Header lines are silently ignored
-readSamGroupsC :: (MonadError NGError m) => C.ConduitT ByteLine [SamLine] m ()
-readSamGroupsC = readSamLineOrDie
+readSamGroupsC :: (MonadError NGError m) => C.ConduitT (V.Vector ByteLine) [SamLine] m ()
+readSamGroupsC = CC.concat
+                    .| readSamLineOrDie
                     .| CL.groupBy groupLine
     where
         readSamLineOrDie = C.awaitForever $ \(ByteLine line) ->
@@ -236,11 +238,10 @@ readSamGroupsC = readSamLineOrDie
 --
 -- When respectPairs is False, then the two mates of the same fragment will be
 -- considered grouped in different blocks
-readSamGroupsC' :: forall m . (MonadError NGError m, PrimMonad m, MonadIO m) => Int -> Bool -> C.ConduitT ByteLine (V.Vector [SamLine]) m ()
+readSamGroupsC' :: forall m . (MonadError NGError m, PrimMonad m, MonadIO m) => Int -> Bool -> C.ConduitT (V.Vector ByteLine) (V.Vector [SamLine]) m ()
 readSamGroupsC' mapthreads respectPairs = do
-        CC.dropWhile (isSamHeaderString . unwrapByteLine)
-        CC.conduitVector 4096
-            .| asyncMapEitherC mapthreads (fmap groupByName . V.mapM (readSamLine . unwrapByteLine))
+        CC.dropWhileE (isSamHeaderString . unwrapByteLine)
+        asyncMapEitherC mapthreads (fmap groupByName . V.mapM (readSamLine . unwrapByteLine))
             -- the groups may not be aligned on the group boundary, thus we need to fix them
             .| fixSamGroups
     where
@@ -284,7 +285,7 @@ readSamGroupsC' mapthreads respectPairs = do
             VM.modify gs' (prev ++ ) 0
             V.unsafeFreeze gs'
 
-samStatsC :: (MonadIO m) => C.ConduitT ByteLine C.Void m (NGLess (Int, Int, Int))
+samStatsC :: (MonadIO m) => C.ConduitT (V.Vector ByteLine) C.Void m (NGLess (Int, Int, Int))
 samStatsC = C.runExceptC $ readSamGroupsC .| samStatsC'
 
 samStatsC' :: (MonadError NGError m) => C.ConduitT SamGroup C.Void m (Int, Int, Int)

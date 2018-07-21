@@ -5,6 +5,7 @@
 module Utils.Conduit
     ( ByteLine(..)
     , byteLineSinkHandle
+    , byteLineVSinkHandle
     , conduitPossiblyCompressedFile
     , asyncMapC
     , asyncMapEitherC
@@ -129,6 +130,12 @@ byteLineSinkHandle h = CL.mapM_ (\(ByteLine val) -> liftIO (B.hPut h val >> B.hP
     where
         nl = B.singleton 10
 {-# INLINE byteLineSinkHandle #-}
+
+byteLineVSinkHandle :: (MonadIO m) => Handle -> C.ConduitT (V.Vector ByteLine) C.Void m ()
+byteLineVSinkHandle h = CL.mapM_ $ liftIO . V.mapM_ (\(ByteLine val) -> B.hPut h val >> B.hPut h nl)
+    where
+        nl = B.singleton 10
+{-# INLINE byteLineVSinkHandle #-}
 
 zipSource2 :: Monad m => C.ConduitT () a m () -> C.ConduitT () b m () -> C.ConduitT () (a,b) m ()
 zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)

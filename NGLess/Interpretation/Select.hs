@@ -2,15 +2,19 @@
  - License: MIT
  -}
 
-{-# LANGUAGE RankNTypes, FlexibleContexts #-}
+{-# LANGUAGE RankNTypes, FlexibleContexts, TypeFamilies #-}
 
 module Interpretation.Select
     ( executeSelect
     , executeMappedReadMethod
     ) where
 
-import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Builder as BB
+import qualified Data.Vector as V
 import qualified Data.Conduit as C
+import qualified Data.Conduit.Combinators as CC
 import           Data.Conduit ((.|))
 import qualified Data.Conduit.List as CL
 import qualified Data.Text as T
@@ -64,8 +68,11 @@ matchConditions doReinject conds sg = reinjectSequences doReinject (matchConditi
     where
         reinjectSequences True f@((s@SamLine{}, _):rs)
             | not (any (hasSequence . fst) f) && any (hasSequence . fst) sg
-                = let s' = addSequence s in (s', encodeSamLine s'):rs
+                = let s' = addSequence s in (s', toStrictBS $ encodeSamLine s'):rs
         reinjectSequences _ f = f
+
+        toStrictBS :: BB.Builder -> B.ByteString
+        toStrictBS = BL.toStrict . BB.toLazyByteString
 
         addSequence s = case find hasSequence (fst <$> sg) of
                             Just s' -> s { samSeq = samSeq s', samQual = samQual s' }
@@ -95,6 +102,7 @@ keep1 SelectUnique g = if isGroupUnique (map fst g) then g else []
 -- The reason we cannot just use readSamGroupsC is that we want to get the unparsed ByteString on the side
 readSamGroupsAsConduit istream paired =
         istream
+            .| CC.concat
             .| readSamLineOrDie
             .| CL.groupBy groupLine
     where
@@ -126,9 +134,9 @@ executeSelect (NGOMappedReadSet name istream ref) args = do
             readSamGroupsAsConduit istream' paired
                 .| CL.map (matchConditions doReinject conditions)
                 .| streamedSamStats lno ("select_"++T.unpack name) ("select.lno"++show lno)
-                .| CL.map (map snd)
-                .| CL.concat
-        out = Stream ("selected_" ++ takeBaseNameNoExtensions fpsam ++ ".sam") (stream .| CL.map ByteLine)
+                .| CL.map (V.fromList . map (ByteLine . snd))
+
+        out = Stream ("selected_" ++ takeBaseNameNoExtensions fpsam ++ ".sam") stream
     return $! NGOMappedReadSet name out ref
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 

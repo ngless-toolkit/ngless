@@ -71,7 +71,7 @@ executeSort (NGOMappedReadSet name istream rinfo) args = do
                         void (evaluate (length err))
                         hClose herr
                         return err
-            C.runConduit $ istream' .| byteLineSinkHandle pipe_out
+            C.runConduit $ istream' .| byteLineVSinkHandle pipe_out
             liftIO $ do
                 hClose pipe_out
                 A.waitBoth err samP

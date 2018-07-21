@@ -197,6 +197,7 @@ executeCollect (NGOCounts istream) kwargs = do
     (gzfp,gzout) <- openNGLTempFile "compress" "partial." "tsv.gz"
     C.runConduit $
         (snd . asStream $ istream)
+        .| CC.concat
         .| CL.map unwrapByteLine
         .| C.unlinesAscii
         .| asyncGzipTo gzout

@@ -13,10 +13,12 @@ module Interpretation.Map
 import qualified Data.Text as T
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Builder as BB
 import           Control.Monad
 import           Control.Monad.Except
 
 import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Lift as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit as C
@@ -187,7 +189,9 @@ mapToReference mapper refIndex (ReadSet pairs singletons) extraArgs = do
                 callMapper mapper refIndex [fp] extraArgs (zipToStats out)
     liftIO $ hClose hout
     (newfp,) <$> combinestats statsp statss
-zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesUnBoundedC .| samStatsC))
+
+zipToStats :: C.ConduitT B.ByteString C.Void IO () -> C.ConduitT B.ByteString C.Void IO (NGLess (Int, Int, Int))
+zipToStats out = snd <$> C.toConsumer (zipSink2 out (C.runExceptC (linesVC 4096 .| readSamGroupsC .| samStatsC')))
 
 splitFASTA :: Int -> FilePath -> FilePath -> NGLessIO [FilePath]
 splitFASTA megaBPS ifile ofileBase =
@@ -255,8 +259,8 @@ performMap mapper blockSize ref name rs extraArgs = do
                 mergeSamFiles partials
                 .| zipSink2 samStatsC'
                     (CL.concat
-                        .| CL.map (ByteLine . encodeSamLine)
-                        .| byteLineSinkHandle hout)
+                        .| CL.map ((`mappend` BB.char7 '\n') . encodeSamLine)
+                        .| CB.sinkHandleBuilder hout)
             liftIO $ hClose hout
             let refname = case ref of
                     FaFile fa -> fa
@@ -315,8 +319,8 @@ executeMergeSams (NGOList ifnames) _ = do
         mergeSamFiles partials
         .| zipSink2 samStatsC'
             (CL.concat
-                .| CL.map (ByteLine . encodeSamLine)
-                .| byteLineSinkHandle hout)
+                .| CL.map ((`mappend` BB.char7 '\n') . encodeSamLine)
+                .| CB.sinkHandleBuilder hout)
     outputMapStatistics (MappingInfo undefined sam "no-ref" total aligned unique)
     liftIO $ hClose hout
     return $! NGOMappedReadSet "test" (File sam) Nothing
@@ -336,7 +340,7 @@ mergeSamFiles inputs = do
     -- There are also obvious opportunities to make this code take advantage of parallelism
     C.sequenceSources
             [CB.sourceFile f
-                .| linesC
+                .| linesVC 4096
                 .| readSamGroupsC
                         | f <- inputs]
 

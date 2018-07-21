@@ -56,7 +56,8 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Trans.Resource
 
-import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString as B
 import qualified Data.Map as Map
 
@@ -80,7 +81,7 @@ import           Control.Error (note)
 import System.IO
 import System.Directory
 import System.FilePath ((</>))
-import Data.List (find)
+import Data.List (find, intersperse)
 import GHC.Conc                 (getNumCapabilities)
 
 import Language
@@ -318,7 +319,7 @@ executeSamfile expr@(NGOString fname) args = do
         then return $ NGOMappedReadSet gname (File fname') Nothing
         else do
             checkf headers'
-            return $ NGOMappedReadSet gname (Stream fname' ((CB.sourceFile headers' >> CB.sourceFile fname') .| linesC)) Nothing
+            return $ NGOMappedReadSet gname (Stream fname' ((CB.sourceFile headers' >> CB.sourceFile fname') .| linesVC 4096)) Nothing
 executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show args)
 
 data PreprocessPairOutput = Paired !ShortRead !ShortRead | Single !ShortRead
@@ -387,7 +388,7 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
             keepSingles <- lookupBoolOrScriptErrorDef (return True) "preprocess argument" "keep_singles" args
             qcInput <- lookupBoolOrScriptErrorDef (return False) "preprocess" "__input_qc" args
             numCapabilities <- liftIO getNumCapabilities
-            let mapthreads = max 1 (numCapabilities - 2)
+            let mapthreads = 4 * max 1 (numCapabilities - 2)
 
             [(q1, k1, s1), (q2, k2, s2), (q3, k3, s3)] <- replicateM 3 shortReadVectorStats
 
@@ -508,7 +509,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
         doReinject <- runNGLessIO $ do
-                            v <- (ngleVersion <$> nglEnvironment)
+                            v <- ngleVersion <$> nglEnvironment
                             if v < NGLVersion 0 8
                                 then do
                                     outputListLno' WarningOutput ["Select changed behaviour (for the better) in ngless 0.8. If possible, upgrade your version statement."]
@@ -518,19 +519,19 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
             C.runConduit $
                 istream .| do
                     when outputHeader $
-                        CC.takeWhile (isSamHeaderString . unwrapByteLine)
-                            .| byteLineSinkHandle ohandle
+                        CC.takeWhileE (isSamHeaderString . unwrapByteLine)
+                            .| byteLineVSinkHandle ohandle
                     readSamGroupsC' mapthreads paired
-                        .| asyncMapEitherC mapthreads (liftM concatLines . V.mapM (runInterpretationRO env . (filterGroup doReinject)))
-                        .| CB.sinkHandle ohandle
+                        .| asyncMapEitherC mapthreads (fmap concatLines . V.mapM (runInterpretationRO env . filterGroup doReinject))
+                        .| CL.mapM_ (liftIO . BL.hPut ohandle)
         return input { nglSamFile = File oname }
     where
-        concatLines :: V.Vector [B.ByteString] -> B.ByteString
-        concatLines = B8.unlines . concat . V.toList
+        concatLines :: V.Vector [BB.Builder] -> BL.ByteString
+        concatLines = BB.toLazyByteString . mconcat . intersperse (BB.char7 '\n') . concat . V.toList
 
-        filterGroup :: Bool -> [SamLine] -> InterpretationROEnv [B.ByteString]
+        filterGroup :: Bool -> [SamLine] -> InterpretationROEnv [BB.Builder]
         filterGroup _ [] = return []
-        filterGroup _ [SamHeader line] = return [line]
+        filterGroup _ [SamHeader line] = return [BB.byteString line]
         filterGroup doReinject mappedreads  = do
                     mrs' <- interpretBlock1 (BlockVariables1 var (NGOMappedRead mappedreads)) body
                     if blockStatus mrs' `elem` [BlockContinued, BlockOk]

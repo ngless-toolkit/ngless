@@ -409,7 +409,8 @@ performCount istream gname annotators0 opts = do
         samStream
             .| do
                 annotators <-
-                    CC.takeWhile (isSamHeaderString . unwrapByteLine)
+                    CC.takeWhileE (isSamHeaderString . unwrapByteLine)
+                        .| CC.concat
                         .| annSamHeaderParser mapthreads annotators0 opts
                 lift $ outputListLno' TraceOutput ["Loaded headers. Starting parsing/distribution."]
                 mcounts <- forM annotators $ \ann -> do

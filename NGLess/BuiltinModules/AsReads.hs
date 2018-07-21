@@ -2,7 +2,7 @@
  - License: MIT
  -}
 
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, TypeFamilies #-}
 
 module BuiltinModules.AsReads
     ( loadModule
@@ -11,6 +11,7 @@ module BuiltinModules.AsReads
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
+import qualified Data.Vector as V
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
@@ -20,7 +21,7 @@ import Control.Monad.Except
 import System.IO
 import Data.Default (def)
 import Data.IORef (newIORef, writeIORef, readIORef)
-import Data.Either.Combinators (rightToMaybe, leftToMaybe)
+import Control.Concurrent (getNumCapabilities)
 
 import Language
 import FileManagement
@@ -39,7 +40,12 @@ executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeReads (NGOMappedReadSet name istream _) _ = NGOReadSet name <$> uncurry samToFastQ (asSamStream istream)
 executeReads arg _ = throwShouldNotOccur ("executeReads called with argument: " ++ show arg)
 
-samToFastQ :: FilePath -> C.ConduitT () ByteLine NGLessIO () -> NGLessIO ReadSet
+data FQResult = NoResult
+                | Single !B.ByteString
+                | Paired !B.ByteString !B.ByteString
+            deriving (Eq)
+
+samToFastQ :: FilePath -> C.ConduitT () (V.Vector ByteLine) NGLessIO () -> NGLessIO ReadSet
 samToFastQ fpsam stream = do
     (rk1, (oname1,ohand1)) <- openNGLTempFile' fpsam "reads_" ".1.fq.gz"
     (rk2, (oname2,ohand2)) <- openNGLTempFile' fpsam "reads_" ".2.fq.gz"
@@ -47,20 +53,21 @@ samToFastQ fpsam stream = do
     hasPaired <- liftIO (newIORef False)
     hasSingle <- liftIO (newIORef False)
     let writer sel var out =
-            CL.mapMaybe sel
+            CL.map sel
                 .| do
-                    empty <- CC.null
+                    empty <- CC.nullE
                     unless empty $
                         liftIO (writeIORef var True)
-                    asyncGzipTo out
+                    CC.concat .| asyncGzipTo out
+    numCapabilities <- liftIO getNumCapabilities
     [(),(),()] <- C.runConduit $
         stream
-            .|readSamGroupsC
-            .| CL.mapMaybeM asFQ
+            .| readSamGroupsC' numCapabilities True
+            .| CL.mapM (fmap (V.filter (/= NoResult)) . V.mapM asFQ)
             .| C.sequenceSinks
-                [writer (liftM fst . rightToMaybe)  hasPaired ohand1
-                ,writer (liftM snd . rightToMaybe)  hasPaired ohand2
-                ,writer leftToMaybe                 hasSingle ohand3
+                [writer (V.mapMaybe (\r -> case r of Paired a _ -> Just a ; _ -> Nothing)) hasPaired ohand1
+                ,writer (V.mapMaybe (\r -> case r of Paired _ b -> Just b ; _ -> Nothing)) hasPaired ohand2
+                ,writer (V.mapMaybe (\r -> case r of Single a -> Just a; _ -> Nothing)) hasSingle ohand3
                 ]
     outputListLno' TraceOutput ["Finished as_reads"]
     liftIO $ forM_ [ohand1, ohand2, ohand3] hClose
@@ -86,20 +93,16 @@ samToFastQ fpsam stream = do
             return $! ReadSet [(FastQFilePath SangerEncoding oname1,FastQFilePath SangerEncoding oname2)] []
 
 
--- return type is
---    Nothing : no output
---    Just (Left sr) : single-end short read
---    Just (Right (sr0,sr1)) : paired-end short read
-asFQ :: [SamLine] -> NGLessIO (Maybe (Either B.ByteString (B.ByteString,B.ByteString)))
+asFQ :: [SamLine] -> NGLessIO FQResult
 asFQ sg = postproc (asFQ' False False . filter hasSequence $ sg)
     where
-        postproc :: [(Int, B.ByteString)] -> NGLessIO (Maybe (Either B.ByteString (B.ByteString, B.ByteString)))
-        postproc [(_,b)] = return . Just $ Left b
-        postproc [(1,a),(2,b)] = return . Just $ Right (a,b)
-        postproc [(2,b),(1,a)] = return . Just $ Right (a,b)
+        postproc :: [(Int, B.ByteString)] -> NGLessIO FQResult
+        postproc [(_,b)] = return $ Single b
+        postproc [(1,a),(2,b)] = return $ Paired a b
+        postproc [(2,b),(1,a)] = return $ Paired a b
         postproc [] = do
             outputListLno' WarningOutput ["No sequence information for read ", readID]
-            return Nothing
+            return NoResult
         postproc other = throwShouldNotOccur ("Impossible argument to postproc: " ++ show other)
         readID = case sg of
             (f@SamLine{}:_) -> B8.unpack (samQName f)

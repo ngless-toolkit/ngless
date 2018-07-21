@@ -173,7 +173,7 @@ case_template_id = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= takeBaseName
 case_template    = takeBaseNameNoExtensions "a/B/c/d/xpto_1.fq" @?= "xpto_1"
 
 samStats :: FilePath -> NGLessIO (Int, Int, Int)
-samStats fname = C.runConduit (samBamConduit fname .| linesC .| samStatsC) >>= runNGLess
+samStats fname = C.runConduit (samBamConduit fname .| linesVC 1024 .| samStatsC) >>= runNGLess
 
 case_sam20 = do
         sam <- testNGLessIO $ asTempFile sam20 "sam"  >>= samStats

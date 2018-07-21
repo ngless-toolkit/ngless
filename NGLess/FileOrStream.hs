@@ -10,7 +10,9 @@ module FileOrStream
     ) where
 
 import           Data.Conduit ((.|))
+import qualified Data.Vector as V
 import qualified Data.Conduit as C
+import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as C
 import System.FilePath
 
@@ -20,7 +22,7 @@ import Utils.Samtools
 import FileManagement
 
 
-data FileOrStream = File FilePath | Stream FilePath (C.ConduitT () ByteLine NGLessIO ())
+data FileOrStream = File FilePath | Stream FilePath (C.ConduitT () (V.Vector ByteLine) NGLessIO ())
 
 instance Show FileOrStream where
     show (File fp) = "File " ++ fp
@@ -35,13 +37,15 @@ asFile (File fp) = return fp
 asFile (Stream fp istream) =
     makeNGLTempFile "streamed_" (takeBaseNameNoExtensions fp) (takeExtensions fp) $ \hout ->
         C.runConduit $
-            istream .| byteLineSinkHandle hout
+            istream
+                .| CC.concat
+                .| byteLineSinkHandle hout
 
 
-asStream :: FileOrStream -> (FilePath, C.ConduitT () ByteLine NGLessIO ())
+asStream :: FileOrStream -> (FilePath, C.ConduitT () (V.Vector ByteLine) NGLessIO ())
 asStream (Stream fp istream) = (fp, istream)
-asStream (File fp) = (fp, C.sourceFile fp .| linesC)
+asStream (File fp) = (fp, C.sourceFile fp .| linesVC 4096)
 
-asSamStream (File fname) = (fname, samBamConduit fname .| linesC)
+asSamStream (File fname) = (fname, samBamConduit fname .| linesVC 4096)
 asSamStream (Stream fname istream) = (fname, istream)
 

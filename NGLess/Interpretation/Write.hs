@@ -16,9 +16,11 @@ import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
+import qualified Data.Vector as V
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Combinators as C
 #ifndef WINDOWS
 -- bzlib cannot compile on Windows (as of 2016/07/05)
@@ -240,8 +242,9 @@ executeWrite (NGOCounts iout) args = do
             let (fp,istream) = asStream iout
             comma <- makeNGLTempFile fp "wcomma" "csv" $ \ohand ->
                 C.runConduit $
-                    ((commentC "# " comment .| linesC) >> istream)
-                        .| CL.map tabToComma
+                    ((commentC "# " comment .| linesVC 1024) >> istream)
+                        .| CL.map (V.map tabToComma)
+                        .| CC.concat
                         .| byteLineSinkHandle ohand
             moveOrCopyCompress True comma (woOFile opts)
         f -> throwScriptError ("Invalid format in write: {"++T.unpack f++"}.\n\tWhen writing counts, only accepted values are {tsv} (TAB separated values; default) or {csv} (COMMA separated values).")

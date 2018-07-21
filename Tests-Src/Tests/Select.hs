@@ -6,6 +6,8 @@ module Tests.Select
 import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Builder as BB
 
 import Data.Sam
 import Tests.Utils
@@ -37,7 +39,7 @@ complex = [here|
 SRR070372.3	16	V	7198336	21	26M3D9M3D6M6D8M2D21M	*	0	0	CCCTTATGCAGGTCTTAACACAATTCTTGTATGTTCCATCGTTCTCCAGAATGAATATCAATGATACCAA	014<<BBBBDDFFFDDDDFHHFFD?@??DBBBB5555::?=BBBBDDF@BBFHHHHHHHFFFFFD@@@@@	NM:i:14	MD:Z:26^TTT9^TTC6^TTTTTT8^AA21	AS:i:3	XS:i:0|]
 
 case_read_one_Sam_Line = readSamLine samLineFlat @?= Right samLine
-case_encode = encodeSamLine samLine @?= samLineFlat
+case_encode = (BL.toStrict . BB.toLazyByteString . encodeSamLine $ samLine) @?= samLineFlat
 
 case_isAligned_raw = isAligned (fromRight . readSamLine $ complex) @? "Should be aligned"
 case_match_identity_soft = fromRight (matchIdentity samLine) == 0.975 @? "Soft clipped read (low identity)"
