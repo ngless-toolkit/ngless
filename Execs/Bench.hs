@@ -85,7 +85,7 @@ basicCountOpts = CountOpts
 
 main = setupTestEnvironment >> defaultMain [
     bgroup "sam-stats"
-        [ bench "sample" $ nfNGLessIO (C.runConduit (CB.sourceFile "test_samples/sample.sam" .| linesC .| samStatsC))
+        [ bench "sample" $ nfNGLessIO (C.runConduit (CB.sourceFile "test_samples/sample.sam" .| linesVC 4096 .| samStatsC))
         ]
     ,bgroup "fastq"
         [ bench "fastqStats" $ nfNGLessIO (C.runConduit (conduitPossiblyCompressedFile "test_samples/sample.fq.gz" .| linesC .| count))
@@ -106,7 +106,7 @@ main = setupTestEnvironment >> defaultMain [
         ]
     ,bgroup "parse-sam"
         [ bench "readSamLine" $ nfRIO (C.runConduit (CB.sourceFile "test_samples/sample.sam" .| CB.lines .| CL.map readSamLine .| countRights))
-        , bench "samGroups" $ nfNGLessIO (C.runConduit (CB.sourceFile "test_samples/sample.sam" .| linesC .| readSamGroupsC .| count))
+        , bench "samGroups" $ nfNGLessIO (C.runConduit (CB.sourceFile "test_samples/sample.sam" .| linesVC 2048 .| readSamGroupsC .| count))
         ]
     ,bgroup "count"
         [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap "test_samples/functional.map" ["KEGG_ko", "eggNOG_OG"])
