@@ -527,7 +527,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
         return input { nglSamFile = File oname }
     where
         concatLines :: V.Vector [BB.Builder] -> BL.ByteString
-        concatLines = BB.toLazyByteString . mconcat . intersperse (BB.char7 '\n') . concat . V.toList
+        concatLines = BB.toLazyByteString . mconcat . map (`mappend` BB.char7 '\n') . concat . V.toList
 
         filterGroup :: Bool -> [SamLine] -> InterpretationROEnv [BB.Builder]
         filterGroup _ [] = return []

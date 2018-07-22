@@ -241,7 +241,8 @@ readSamGroupsC = CC.concat
 readSamGroupsC' :: forall m . (MonadError NGError m, PrimMonad m, MonadIO m) => Int -> Bool -> C.ConduitT (V.Vector ByteLine) (V.Vector [SamLine]) m ()
 readSamGroupsC' mapthreads respectPairs = do
         CC.dropWhileE (isSamHeaderString . unwrapByteLine)
-        asyncMapEitherC mapthreads (fmap groupByName . V.mapM (readSamLine . unwrapByteLine))
+        CC.filter (not . V.null)
+            .| asyncMapEitherC mapthreads (fmap groupByName . V.mapM (readSamLine . unwrapByteLine))
             -- the groups may not be aligned on the group boundary, thus we need to fix them
             .| fixSamGroups
     where
