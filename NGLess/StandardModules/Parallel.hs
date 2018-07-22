@@ -12,6 +12,7 @@ module StandardModules.Parallel
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Builder as BB
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Vector as V
@@ -384,8 +385,8 @@ pasteCounts comments matchingRows headers inputs
                 C.runConduit $
                     C.sequenceSources (fst <$> channels)
                     .| asyncMapEitherC numCapabilities (sequence >=> concatPartials)
-                    .| CL.concatMap BL.toChunks
-                    .| CB.sinkHandle hout
+                    .| CL.map BB.lazyByteString
+                    .| CB.sinkHandleBuilder hout
                 forM_ (snd <$> channels) (liftIO . A.wait)
             else C.runConduit $
                     mergeCounts [conduitPossiblyCompressedFile f .|  linesC | f <- inputs]
