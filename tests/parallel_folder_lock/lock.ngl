@@ -8,4 +8,4 @@ samples = [
 
 # Check if lock1 can handle paths containing / or \
 # throws an error it can't
-lock1(samples)
+print(lock1(samples))
