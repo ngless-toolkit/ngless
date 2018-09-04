@@ -81,7 +81,7 @@ import           Control.Error (note)
 import System.IO
 import System.Directory
 import System.FilePath ((</>))
-import Data.List (find, intersperse)
+import Data.List (find)
 import GHC.Conc                 (getNumCapabilities)
 
 import Language
