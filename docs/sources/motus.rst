@@ -47,5 +47,5 @@ This function is the only special function introduced by the ``motus`` module,
 everything else is standard ngless.
 
 You can see a full worked out example in the `examples/motus.ngl recipe
-<https://github.com/luispedro/ngless/blob/master/examples/motus.ngl>`__
+<https://github.com/ngless-toolkit/ngless/blob/master/examples/motus.ngl>`__
 

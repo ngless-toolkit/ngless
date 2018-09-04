@@ -32,7 +32,7 @@ RUN wget -qO- https://get.haskellstack.org/ | sh
 RUN chmod 755 /usr/local/bin/stack
 RUN mkdir -p /usr/src/
 
-RUN git clone --depth=10 https://github.com/luispedro/ngless /usr/src/ngless
+RUN git clone --depth=10 https://github.com/ngless-toolkit/ngless /usr/src/ngless
 WORKDIR /usr/src/ngless
 
 # This will have all make calls use the ghc installed above

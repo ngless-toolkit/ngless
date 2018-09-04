@@ -23,7 +23,7 @@ provide.
 ## How to define an external module
 
 You can use the [example
-module](https://github.com/luispedro/ngless/blob/master/Modules/example-cmd.ngm/0.0/module.yaml)
+module](https://github.com/ngless-toolkit/ngless/blob/master/Modules/example-cmd.ngm/0.0/module.yaml)
 in the ngless source for inspiration. That is a complete, functional module.
 
 A module is defined by an ``YaML`` file.
@@ -226,7 +226,7 @@ This is very advanced as it requires writing Haskell code which can then
 interact very deeply with the rest of ngless.
 
 For an example, you can look at the [example internal
-module](https://github.com/luispedro/ngless/blob/master/NGLess/StandardModules/Example.hs).
+module](https://github.com/ngless-toolkit/ngless/blob/master/NGLess/StandardModules/Example.hs).
 If you want to get started, you can ask about details on the [ngless user
 mailing list](https://groups.google.com/forum/#!forum/ngless).
 

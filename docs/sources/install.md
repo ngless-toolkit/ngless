@@ -25,7 +25,7 @@ NGless 0.6.1](http://ngless.embl.de/releases/ngless-0.6.1-Linux64) or a [nighly 
 of the latest development
 code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
 This should work across a wide range of Linux versions (please
-[report](https://github.com/luispedro/ngless/issues) any issues you encounter):
+[report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
 
     curl -O http://ngless.embl.de/releases/ngless-0.6.0-Linux64
     chmod +x ngless-0.6.0-Linux64
@@ -42,7 +42,7 @@ which includes them.
 ## Windows
 
 NGLess [cannot currently compile on
-Windows](https://github.com/luispedro/ngless/issues/39).
+Windows](https://github.com/ngless-toolkit/ngless/issues/39).
 
 <!--
 
@@ -59,7 +59,7 @@ The Windows package includes [bwa](http://bio-bwa.sourceforge.net/) and
 available as `ngless-0.5.1-bwa` and `ngless-0.5.1-samtools`, respectively.  It
 has been tested on Windows 10, but this has not had as intensitive testing as
 the Linux/Mac OS X versions so any [bug
-reports](https://github.com/luispedro/ngless/issues) are appreciated.
+reports](https://github.com/ngless-toolkit/ngless/issues) are appreciated.
 
 -->
 
@@ -71,7 +71,7 @@ another C-compiler).
 
 The following sequence of commands should download and build the software
 
-    git clone https://github.com/luispedro/ngless
+    git clone https://github.com/ngless-toolkit/ngless
     cd ngless
     make
 

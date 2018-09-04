@@ -133,7 +133,7 @@ runNGLessIO context (NGLessIO act) = try (runResourceT act) >>= \case
                                         "Should Not Occur Error! This probably indicates a bug in ngless.\n" ++
                                         "\tPlease get in touch with the authors with a description of how this happened.\n" ++
                                         "\tIf possible run your script with the --trace flag and post the script and the resulting trace at \n"++
-                                        "\t\thttp://github.com/luispedro/ngless/issues\n" ++
+                                        "\t\thttp://github.com/ngless-toolkit/ngless/issues\n" ++
                                         "\tor email us at coelho@embl.de."
                 ScriptError ->
                         hPutStrLn stderr "Script Error"
@@ -382,6 +382,6 @@ main = do
     mapM_ makeEncodingSafe [stdout, stdin, stderr]
     catch main' $ \e -> do
             putStrLn ("Exiting after internal error. If you can reproduce this issue, please run your script "++
-                    "with the --trace flag and report a bug at http://github.com/luispedro/ngless/issues")
+                    "with the --trace flag and report a bug at http://github.com/ngless-toolkit/ngless/issues")
             print (e :: IOException)
             exitFailure

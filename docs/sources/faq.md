@@ -6,7 +6,7 @@ for questions about the ngless language.
 ## Why a new domain-specific language instead of a library in Python (or another existing language)?
 
 First of all, you can actually use NGLess through Python, using
-[NGLessPy](https://github.com/luispedro/nglesspy).
+[NGLessPy](https://github.com/ngless-toolkit/nglesspy).
 
 However, the native mode of NGLess is using its internal DSL (domain specific
 langugage).  There are several advantages to this approach:

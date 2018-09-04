@@ -1,6 +1,6 @@
 # Issue #59
 
-https://github.com/luispedro/ngless/issues/59
+https://github.com/ngless-toolkit/ngless/issues/59
 
 
 Given
