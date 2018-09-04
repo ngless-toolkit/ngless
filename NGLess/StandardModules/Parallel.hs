@@ -119,7 +119,12 @@ executeLock1 (NGOList entries) kwargs  = do
     entries' <- mapM (stringOrTypeError "lock1") entries
     hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
     lockdir <- setupHashDirectory "ngless-locks" hash
-    (e,rk) <- getLock lockdir (sanitizeLock <$> entries')
+    -- Keep a map of 'sane -> original' names used for locks to backtrace
+    -- what file was locked and return the unsanitized name
+    -- See also https://github.com/ngless-toolkit/ngless/issues/68
+    let saneentries = sanitizeLock <$> entries'
+        lockmap = zip saneentries entries'
+    (e,rk) <- getLock lockdir saneentries
     outputListLno' InfoOutput ["lock1: Obtained lock file: '", lockdir </> T.unpack e ++ ".lock", "'"]
     reportbase <- setupHashDirectory "ngless-stats" hash
     let reportdir = reportbase </> T.unpack e
@@ -138,7 +143,7 @@ executeLock1 (NGOList entries) kwargs  = do
         let logfile = lockdir </> T.unpack e ++ ".failed"
         withFile logfile WriteMode $ \h ->
             hPutStrLn h "Execution failed" -- TODO output log here
-    return $! NGOString e
+    return $! NGOString $ fromMaybe e $ lookup e lockmap
 
 executeLock1 arg _ = throwScriptError ("Wrong argument for lock1 (expected a list of strings, got `" ++ show arg ++ "`")
 
