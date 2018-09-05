@@ -42,7 +42,7 @@ exts = do
 pairedEnds :: [(String, String)]
 pairedEnds = do
     end <- exts
-    (s1,s2) <- [(".1", ".2") ,("_1", "_2")]
+    (s1,s2) <- [(".1", ".2") ,("_1", "_2"), ("_F", "_R")]
     return (s1 ++ "." ++ end, s2 ++ "." ++ end)
 
 buildSingle m1
