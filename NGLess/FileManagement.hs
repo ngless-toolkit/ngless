@@ -58,6 +58,18 @@ import Utils.Utils
 
 data InstallMode = User | Root deriving (Eq, Show)
 
+
+-- | Shorten filename if longer than 240 characters
+-- If base + ext is above 240 chars, avoid reaching the system limit of 255
+-- by shortening the middle part of the filename
+checkFilenameLength :: FilePath -> String -> String
+checkFilenameLength base ext = if len > 240
+                                  then shorten base
+                                  else base
+    where len = length base + length ext
+          -- Take first 1/3 and last 1/3 of the original base name
+          shorten f = take (div len 3) f ++ "..." ++ drop (div (2 * len) 3) f
+
 -- | open a temporary file
 -- This respects the preferences of the user (using the correct temporary
 -- directory and deleting the file when necessary)
@@ -71,8 +83,10 @@ openNGLTempFile' base prefix ext = do
     let cleanupAction = if not keepTempFiles
                 then deleteTempFile
                 else hClose . snd
+
+        filename = checkFilenameLength base ext
     (key,(fp,h)) <- allocate
-                (openTempFileWithDefaultPermissions tdir (prefix ++ takeBaseNameNoExtensions base ++ "." ++ ext))
+                (openTempFileWithDefaultPermissions tdir (prefix ++ takeBaseNameNoExtensions filename ++ "." ++ ext))
                 cleanupAction
     outputListLno' DebugOutput ["Created & opened temporary file ", fp]
     updateNglEnvironment $ \e -> e { ngleTemporaryFilesCreated = fp:(ngleTemporaryFilesCreated e) }

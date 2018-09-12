@@ -1,0 +1,69 @@
+ngless '0.8'
+input = fastq('sample.fq')
+
+mapped = map(input, fafile='ref.fna')
+
+# Filtering with increasing cuttoffs
+mapsel0 = select(mapped) using |mr|:
+    mr = mr.filter(min_identity_pc=100, action={unmatch})
+mapsel1 = select(mapsel0) using |mr|:
+    mr = mr.filter(min_identity_pc=99, action={unmatch})
+mapsel2 = select(mapsel1) using |mr|:
+    mr = mr.filter(min_identity_pc=98, action={unmatch})
+mapsel3 = select(mapsel2) using |mr|:
+    mr = mr.filter(min_identity_pc=97, action={unmatch})
+mapsel4 = select(mapsel3) using |mr|:
+    mr = mr.filter(min_identity_pc=96, action={unmatch})
+mapsel5 = select(mapsel4) using |mr|:
+    mr = mr.filter(min_identity_pc=95, action={unmatch})
+mapsel6 = select(mapsel5) using |mr|:
+    mr = mr.filter(min_identity_pc=94, action={unmatch})
+mapsel7 = select(mapsel6) using |mr|:
+    mr = mr.filter(min_identity_pc=93, action={unmatch})
+mapsel8 = select(mapsel7) using |mr|:
+    mr = mr.filter(min_identity_pc=92, action={unmatch})
+mapsel9 = select(mapsel8) using |mr|:
+    mr = mr.filter(min_identity_pc=91, action={unmatch})
+mapsel10 = select(mapsel9) using |mr|:
+    mr = mr.filter(min_identity_pc=90, action={unmatch})
+mapsel11 = select(mapsel10) using |mr|:
+    mr = mr.filter(min_identity_pc=89, action={unmatch})
+mapsel12 = select(mapsel11) using |mr|:
+    mr = mr.filter(min_identity_pc=88, action={unmatch})
+mapsel13 = select(mapsel12) using |mr|:
+    mr = mr.filter(min_identity_pc=87, action={unmatch})
+mapsel14 = select(mapsel13) using |mr|:
+    mr = mr.filter(min_identity_pc=86, action={unmatch})
+mapsel15 = select(mapsel14) using |mr|:
+    mr = mr.filter(min_identity_pc=85, action={unmatch})
+mapsel16 = select(mapsel15) using |mr|:
+    mr = mr.filter(min_identity_pc=84, action={unmatch})
+mapsel17 = select(mapsel16) using |mr|:
+    mr = mr.filter(min_identity_pc=83, action={unmatch})
+mapsel18 = select(mapsel17) using |mr|:
+    mr = mr.filter(min_identity_pc=82, action={unmatch})
+mapsel19 = select(mapsel18) using |mr|:
+    mr = mr.filter(min_identity_pc=81, action={unmatch})
+write(mapsel19, ofile='output-select.sam')
+
+# cycles of mapping -> filtering -> to fastq -> mapping
+mapfq1 = map(as_reads(select(mapped, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq2 = map(as_reads(select(mapfq1, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq3 = map(as_reads(select(mapfq2, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq4 = map(as_reads(select(mapfq3, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq5 = map(as_reads(select(mapfq4, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq6 = map(as_reads(select(mapfq5, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq7 = map(as_reads(select(mapfq6, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq8 = map(as_reads(select(mapfq7, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq9 = map(as_reads(select(mapfq8, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq10 = map(as_reads(select(mapfq9, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq11 = map(as_reads(select(mapfq10, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq12 = map(as_reads(select(mapfq11, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq13 = map(as_reads(select(mapfq12, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq14 = map(as_reads(select(mapfq13, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq15 = map(as_reads(select(mapfq14, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq16 = map(as_reads(select(mapfq15, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq17 = map(as_reads(select(mapfq16, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq18 = map(as_reads(select(mapfq17, keep_if=[{mapped}])) , fafile='ref.fna')
+mapfq19 = map(as_reads(select(mapfq18, keep_if=[{mapped}])) , fafile='ref.fna')
+write(mapfq19, ofile='output-map.sam')
