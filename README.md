@@ -88,12 +88,14 @@ Installing/compiling from source is also possible. Clone
 
 #### Dependencies
 
-[stack](http://docs.haskellstack.org/en/stable/README/) is highly recommended.
-Install it and running `make` should (1) download all dependencies with the
-correct versions and (2) build ngless. It will perform this task in its own
-sandbox so it will not interfere with any other work.
+The simplest way to get an environment will all the dependencies is to use conda:
 
-You should also have `gcc` installed (or another C-compiler).
+    conda create -n ngless
+    source activate ngless
+    conda config --add channels conda-forge
+    conda install stack cairo bzip2 gmp zlib perl wget xz pkg-config make
+
+You should have `gcc` installed (or another C-compiler).
 
 The following sequence of commands should download and build the software
 
