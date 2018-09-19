@@ -1,6 +1,10 @@
 ngless '0.0'
 import "samtools" version "0.0"
 to_sort = samfile('input.bam')
-sorted = samtools_sort(select(to_sort, keep_if=[{mapped}]))
+unsorted = select(to_sort, keep_if=[{mapped}])
+sorted = samtools_sort(unsorted)
+namesorted = samtools_sort(unsorted, by_name=True)
 
-write(sorted, ofile='output.bam')
+write(unsorted, ofile='output.unsorted.bam')
+write(sorted, ofile='output.pos_sorted.bam')
+write(namesorted, ofile='output.name_sorted.bam')

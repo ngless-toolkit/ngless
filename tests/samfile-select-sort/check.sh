@@ -10,6 +10,14 @@ else
     SAMTOOLS="$(which samtools)"
 fi
 
-if ! diff <($SAMTOOLS view -h output.bam) texpected.sam ; then
+if ! diff <($SAMTOOLS view -h output.unsorted.bam) texpected.unsorted.sam ; then
+    exit 1
+fi
+
+if ! diff <($SAMTOOLS view -h output.pos_sorted.bam) texpected.pos_sorted.sam ; then
+    exit 1
+fi
+
+if ! diff <($SAMTOOLS view -h output.name_sorted.bam) texpected.name_sorted.sam ; then
     exit 1
 fi

@@ -27,6 +27,7 @@ import System.IO
 
 import Control.Monad.IO.Class (liftIO)
 import Data.Default
+import Data.Semigroup ((<>))
 
 import FileManagement
 import FileOrStream
@@ -43,6 +44,7 @@ import Utils.Utils
 executeSort :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSort (NGOMappedReadSet name istream rinfo) args = do
     outBam <- lookupBoolOrScriptErrorDef (return False) "samtools_sort" "__output_bam" args
+    sortNames <- lookupBoolOrScriptErrorDef (return False) "samtools_sort" "by_name" args
     let oformat = if outBam then "bam" else "sam"
         fname = case istream of
                     File f -> f
@@ -51,7 +53,7 @@ executeSort (NGOMappedReadSet name istream rinfo) args = do
     (trk, tdirectory) <- createTempDir "samtools_sort_temp"
 
     numCapabilities <- liftIO getNumCapabilities
-    let cmdargs = ["sort", "-@", show numCapabilities, "-O", oformat, "-T", tdirectory </> "samruntmp"]
+    let cmdargs = ["sort"] <> ["-n" | sortNames] <> ["-@", show numCapabilities, "-O", oformat, "-T", tdirectory </> "samruntmp"]
     samtoolsPath <- samtoolsBin
     outputListLno' TraceOutput ["Calling binary ", samtoolsPath, " with args: ", unwords cmdargs]
     (err, exitCode) <- case istream of
@@ -162,7 +164,7 @@ samtools_sort_function = Function
     , funcArgType = Just NGLMappedReadSet
     , funcArgChecks = []
     , funcRetType = NGLMappedReadSet
-    , funcKwArgs = []
+    , funcKwArgs = [ArgInformation "by_name" False NGLBool []]
     , funcAllowsAutoComprehension = False
     , funcChecks = []
     }
