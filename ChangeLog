@@ -1,7 +1,7 @@
 Version 0.9.1+
 	* Fix to lock1's return value when used with paths (#68 - reopen)
 	* Support _F/_R suffixes for forward/reverse in load_mocat_sample
-	* samtools_sort() now accepts by_name=True to sort by read name
+	* samtools_sort() now accepts by={name} to sort by read name
 
 Version 0.9.1 2018-07-17 by luispedro
 	* Add biorxiv citation

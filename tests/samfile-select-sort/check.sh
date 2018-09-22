@@ -18,6 +18,10 @@ if ! diff <($SAMTOOLS view -h output.pos_sorted.bam) texpected.pos_sorted.sam ; 
     exit 1
 fi
 
+if ! diff <($SAMTOOLS view -h output.pos_sorted2.bam) texpected.pos_sorted.sam ; then
+    exit 1
+fi
+
 if ! diff <($SAMTOOLS view -h output.name_sorted.bam) texpected.name_sorted.sam ; then
     exit 1
 fi

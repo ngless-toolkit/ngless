@@ -104,7 +104,7 @@ This module exposes the samtools sorting functionality through the
     import "samtools" version "0.0"
     to_sort = samfile('input.bam')
     sorted = samtools_sort(to_sort)
-    name_sorted = samtools_sort(to_sort, by_name=True)
+    name_sorted = samtools_sort(to_sort, by={name})
     write(sorted, ofile='input.sorted.bam')
     write(name_sorted, ofile='input.name_sorted.bam')
 
