@@ -12,8 +12,7 @@ module Interpretation.Write
     ) where
 
 
-import Control.Monad
-import Control.Monad.IO.Class (liftIO)
+
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -30,7 +29,12 @@ import           Data.Conduit ((.|))
 import           System.Directory (copyFile)
 import           Data.Maybe
 import           Data.String.Utils (replace, endswith)
-import Data.List (isInfixOf)
+import           Control.Monad.IO.Unlift (MonadUnliftIO)
+import           Control.Monad (zipWithM_)
+import           Control.Monad.Catch (MonadMask)
+import           Control.Monad.IO.Class (liftIO, MonadIO)
+import           System.IO (Handle, stdout)
+import           Data.List (isInfixOf)
 
 import Data.FastQ
 import Language
@@ -64,6 +68,10 @@ data WriteOptions = WriteOptions
                 , woAutoComment :: [AutoComment]
                 , woHash :: T.Text
                 } deriving (Eq, Show)
+
+withOutputFile' :: (MonadUnliftIO m, MonadIO m, MonadMask m) => FilePath -> (Handle -> m a) -> m a
+withOutputFile' "/dev/stdout" = \inner -> inner stdout
+withOutputFile' fname = withOutputFile fname
 
 parseWriteOptions :: KwArgsValues -> NGLessIO WriteOptions
 parseWriteOptions args = do
@@ -127,7 +135,7 @@ moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
         uncompressTo oldfp newfp = C.runConduit $
             conduitPossiblyCompressedFile oldfp .| CB.sinkFileCautious newfp
         compressTo oldfp newfp = liftIO $
-            withOutputFile newfp $ \hout ->
+            withOutputFile' newfp $ \hout ->
                 C.runConduitRes $
                     C.sourceFile oldfp .| asyncGzipTo hout
 
@@ -182,7 +190,7 @@ executeWrite (NGOReadSet _ rs) args = do
 #endif
 
                             else return CB.sinkHandle
-            withOutputFile ofile $ \hout -> do
+            withOutputFile' ofile $ \hout -> do
                 let ReadSet pairs singles = rs
                 C.runConduitRes $
                     interleaveFQs pairs singles .| writer hout

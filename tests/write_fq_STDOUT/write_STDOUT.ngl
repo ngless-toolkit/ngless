@@ -1,0 +1,5 @@
+ngless "0.9"
+
+write(paired("pair.1.fq", "pair.2.fq", singles="singles.fq"),
+        ofile=STDOUT,
+        format_flags={interleaved})
