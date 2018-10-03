@@ -328,7 +328,7 @@ instance NFData PreprocessPairOutput where
     rnf (Single _) = ()
 
 splitPreprocessPair :: V.Vector PreprocessPairOutput -> (V.Vector ShortRead, V.Vector ShortRead, V.Vector ShortRead)
-splitPreprocessPair input = (vMapMaybe extract1 input, vMapMaybe extract2 input, vMapMaybe extractS input)
+splitPreprocessPair input = (V.mapMaybe extract1 input, V.mapMaybe extract2 input, V.mapMaybe extractS input)
     where
         extract1 = \case
             Paired sr _ -> Just sr
@@ -340,14 +340,6 @@ splitPreprocessPair input = (vMapMaybe extract1 input, vMapMaybe extract2 input,
             Single sr -> Just sr
             _ -> Nothing
 
-vMapMaybe :: (a -> Maybe b) -> V.Vector a -> V.Vector b
-vMapMaybe f v = V.unfoldr loop 0
-    where
-        loop i
-            | i < V.length v = case f (v V.! i) of
-                                    Just val -> Just (val, i + 1)
-                                    Nothing -> loop (i + 1)
-            | otherwise = Nothing
 
 vMapMaybeLifted :: (a -> Either e (Maybe b)) -> V.Vector a -> Either e (V.Vector b)
 vMapMaybeLifted f v = sequence $ V.unfoldr loop 0
