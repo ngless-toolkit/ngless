@@ -117,9 +117,6 @@ fatalError err = do
     hPutStrLn stderr $ setSGRCode [Reset]
     exitFailure
 
-whenStrictlyNormal act = do
-    v <- nConfVerbosity <$> nglConfiguration
-    when (v == Normal) act
 
 runNGLessIO :: String -> NGLessIO a -> IO a
 runNGLessIO context (NGLessIO act) = try (runResourceT act) >>= \case
@@ -261,8 +258,9 @@ modeExec opts@DefaultMode{} = do
         outputListLno' DebugOutput ["Loading modules..."]
         modules <- loadModules activeVersion (fromMaybe [] (nglModules <$> nglHeader sc'))
         sc <- runNGLess $ checktypes modules sc' >>= validate modules
-        when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $
-            whenStrictlyNormal setQuiet
+        when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $ do
+            outputListLno' DebugOutput ["Setting quiet mode as STDOUT is used"]
+            setQuiet
         shouldOutput <- nConfCreateReportDirectory <$> nglConfiguration
         shouldPrintHeader <- nConfPrintHeader <$> nglConfiguration
         outputListLno' DebugOutput ["Validating script..."]

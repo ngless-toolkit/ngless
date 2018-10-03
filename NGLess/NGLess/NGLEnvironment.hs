@@ -57,7 +57,7 @@ nglConfiguration = ngleConfiguration <$> nglEnvironment
 setQuiet :: NGLessIO ()
 setQuiet = updateNglEnvironment (\e -> e { ngleConfiguration = setQuiet' (ngleConfiguration e) })
     where
-        setQuiet' c = c { nConfVerbosity = Quiet }
+        setQuiet' c = c { nConfVerbosity = Quiet, nConfPrintHeader = False }
 
 -- | setup an environment that can be used for testing
 setupTestEnvironment :: IO ()
