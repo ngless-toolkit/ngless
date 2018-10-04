@@ -75,7 +75,7 @@ encodingFor fp = do
 --
 -- Note that this is more than checking if the file is empty: a compressed file
 -- with no content will not be empty.
-checkNoContent fp = C.runConduit $
+checkNoContent fp = C.runConduitRes $
     conduitPossiblyCompressedFile fp
         .| linesC
         .| CL.isolate 1
