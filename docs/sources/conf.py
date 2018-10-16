@@ -54,10 +54,9 @@ copyright = u'2013-2018, NGLess Authors'
 #
 p = subprocess.run(['./build-scripts/read-version.sh'],
                     cwd='../../',
-                    stdout=subprocess.PIPE,
-                    encoding='utf-8')
+                    stdout=subprocess.PIPE)
 # The full version, including alpha/beta/rc tags.
-release = p.stdout.strip()
+release = p.stdout.decode('utf-8').strip()
 
 # The short X.Y version.
 version = release.split('-')[0]
