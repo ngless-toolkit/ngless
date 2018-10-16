@@ -23,7 +23,7 @@ module Modules
  -
  - Modules add additional functions, constants, or references to ngless
  -
- - See https://ngless.readthedocs.io/en/latest/modules.html for user information.
+ - See https://ngless.embl.de/modules.html for user information.
  -
  - The data type 'Module' encapsulates all information about a module.
  -}
