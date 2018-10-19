@@ -12,51 +12,58 @@ WGET := wget
 # We can't depend on [BWA/SAM/MEGAHIT]_DIR as a build target.
 # These change every time a file inside is created/modified
 # As a workaround we target a file included in the tarball
-BWA_DIR = bwa-0.7.17
+BWA_VERSION = 0.7.17
+BWA_DIR = bwa-$(BWA_VERSION)
 BWA_DIR_TARGET = $(BWA_DIR)/Makefile
-BWA_URL = https://github.com/lh3/bwa/releases/download/v0.7.17/bwa-0.7.17.tar.bz2
-BWA_TAR = bwa-0.7.17.tar.bz2
+BWA_URL = https://github.com/lh3/bwa/releases/download/v$(BWA_VERSION)/bwa-$(BWA_VERSION).tar.bz2
+BWA_TAR = bwa-$(BWA_VERSION).tar.bz2
 BWA_SHA1 = d5640b5083a8d38878c385c23261c659ab3229ef
 BWA_TARGET = ngless-bwa
 BWA_TARGET_VERSIONED = ngless-${VERSION}-bwa
 
-SAM_DIR = samtools-1.6
+SAM_VERSION = 1.6
+SAM_DIR = samtools-$(SAM_VERSION)
 SAM_DIR_TARGET = $(SAM_DIR)/configure
-SAM_URL = https://github.com/samtools/samtools/releases/download/1.6/samtools-1.6.tar.bz2
-SAM_TAR = samtools-1.6.tar.bz2
+SAM_URL = https://github.com/samtools/samtools/releases/download/$(SAM_VERSION)/samtools-$(SAM_VERSION).tar.bz2
+SAM_TAR = samtools-$(SAM_VERSION).tar.bz2
 SAM_SHA1 = c72c059b0d6525d1b12acbe25cc1f69157d4da7a
 SAM_TARGET = ngless-samtools
 SAM_TARGET_VERSIONED = ngless-${VERSION}-samtools
 
-PRODIGAL_DIR = Prodigal-2.6.3
+PRODIGAL_VERSION = 2.6.3
+PRODIGAL_DIR = Prodigal-$(PRODIGAL_VERSION)
 PRODIGAL_DIR_TARGET = $(PRODIGAL_DIR)/Makefile
-PRODIGAL_URL = https://github.com/hyattpd/Prodigal/archive/v2.6.3.tar.gz
-PRODIGAL_TAR = v2.6.3.tar.gz
+PRODIGAL_URL = https://github.com/hyattpd/Prodigal/archive/v$(PRODIGAL_VERSION).tar.gz
+PRODIGAL_TAR = v$(PRODIGAL_VERSION).tar.gz
 PRODIGAL_SHA1 = 1259e999193cd0c095935baebfb8bcb0233e850f
 PRODIGAL_TARGET = ngless-prodigal
 PRODIGAL_TARGET_VERSIONED = ngless-${VERSION}-prodigal
 
-MEGAHIT_DIR = megahit-1.1.1
+MEGAHIT_VERSION = 1.1.1
+MEGAHIT_DIR = megahit-$(MEGAHIT_VERSION)
 # we can't target Makefile here cause we patch it after unpacking
 MEGAHIT_DIR_TARGET = $(MEGAHIT_DIR)/LICENSE
-MEGAHIT_URL = https://github.com/voutcn/megahit/archive/v1.1.1.tar.gz
-MEGAHIT_TAR = v1.1.1.tar.gz
+MEGAHIT_URL = https://github.com/voutcn/megahit/archive/v$(MEGAHIT_VERSION).tar.gz
+MEGAHIT_TAR = v$(MEGAHIT_VERSION).tar.gz
 MEGAHIT_SHA1 = e82308db9a351ea0ccdaf4bebead86ca338a6f0c
 MEGAHIT_TARGET = megahit
 
-MINIMAP2_DIR = minimap2-2.9
-MINIMAP2_URL = https://github.com/lh3/minimap2/releases/download/v2.9/minimap2-2.9.tar.bz2
-MINIMAP2_TAR = minimap2-2.9.tar.bz2
+MINIMAP2_VERSION = 2.9
+MINIMAP2_DIR = minimap2-$(MINIMAP2_VERSION)
+MINIMAP2_URL = https://github.com/lh3/minimap2/releases/download/v$(MINIMAP2_VERSION)/minimap2-$(MINIMAP2_VERSION).tar.bz2
+MINIMAP2_TAR = minimap2-$(MINIMAP2_VERSION).tar.bz2
 MINIMAP2_SHA1 = f419b2664d50c5120d65a801510629c9ac0224a1
 MINIMAP2_TARGET = ngless-minimap2
 MINIMAP2_TARGET_VERSIONED = ngless-${VERSION}-minimap2
 
+NGLESS_VERSIONS_TARGET = NGLess/Dependencies/Versions.hs
 NGLESS_EMBEDDED_BINARIES := \
 		NGLess/Dependencies/samtools_data.c \
 		NGLess/Dependencies/prodigal_data.c \
 		NGLess/Dependencies/bwa_data.c \
 		NGLess/Dependencies/megahit_data.c \
-		NGLess/Dependencies/minimap2_data.c
+		NGLess/Dependencies/minimap2_data.c \
+		$(NGLESS_VERSIONS_TARGET)
 NGLESS_EMBEDDED_TARGET = NGLess/Dependencies/embedded.c
 
 MEGAHIT_BINS := $(MEGAHIT_DIR)/megahit_asm_core $(MEGAHIT_DIR)/megahit_sdbg_build $(MEGAHIT_DIR)/megahit_toolkit $(MEGAHIT_DIR)/megahit
@@ -104,7 +111,7 @@ reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
 
 all: ngless
 
-ngless:
+ngless: $(NGLESS_VERSIONS_TARGET)
 	stack build $(STACKOPTS)
 
 modules:
@@ -113,15 +120,15 @@ modules:
 static: $(NGLESS_EMBEDDED_TARGET) external-deps
 	stack build $(STACKOPTS) --ghc-options='-fPIC' --force-dirty --flag NGLess:embed
 
-fast:
+fast: $(NGLESS_VERSIONS_TARGET)
 	stack build --fast $(STACKOPTS)
 
 dist: ngless-${VERSION}.tar.gz
 
-check:
+check: $(NGLESS_VERSIONS_TARGET)
 	stack test --work-dir .stack-work-test $(STACKOPTS)
 
-fastcheck:
+fastcheck: $(NGLESS_VERSIONS_TARGET)
 	stack test --fast --work-dir .stack-work-test $(STACKOPTS)
 
 # Synonym
@@ -130,7 +137,7 @@ tests: check
 bench:
 	stack bench $(STACKOPTS)
 
-profile:
+profile: $(NGLESS_VERSIONS_TARGET)
 	stack build $(STACKOPTS) --executable-profiling --library-profiling --ghc-options="-fprof-auto -rtsopts"
 
 install: ngless external-deps $(NGLESS_EXT_BINS_VERSIONED) $(MEGAHIT_BINS)
@@ -213,7 +220,7 @@ $(MEGAHIT_DIR_TARGET):
 
 $(MEGAHIT_DIR)/static-build: $(MEGAHIT_DIR_TARGET)
 	cd $(MEGAHIT_DIR) && $(MAKE) clean && $(MAKE) CXXFLAGS=-static
-	touch $(MEGAHIT_DIR)/static-build
+	touch $@
 
 $(MEGAHIT_DIR)/$(MEGAHIT_TARGET): $(MEGAHIT_DIR_TARGET)
 	cd $(MEGAHIT_DIR) && $(MAKE) clean && $(MAKE)
@@ -251,6 +258,39 @@ $(MINIMAP2_DIR)/$(MINIMAP2_TARGET): $(MINIMAP2_DIR)/README.md
 $(MINIMAP2_DIR)/$(MINIMAP2_TARGET_VERSIONED): $(MINIMAP2_DIR)/$(MINIMAP2_TARGET)
 	cp -pr $< $@
 
+# The following empty newline, VERSION_BODY and NGLESS_VERSIONS_TARGET
+# rule below are required to make versions available to NGLess during execution
+#
+# This approach was taken from https://stackoverflow.com/a/5887751
+define NEWLINE
+
+
+endef
+
+define VERSION_BODY
+module Dependencies.Versions
+    ( bwaVersion
+    , samtoolsVersion
+    , prodigalVersion
+    , megahitVersion
+    , minimap2Version
+    ) where
+
+bwaVersion :: String
+bwaVersion = "$(BWA_VERSION)"
+samtoolsVersion :: String
+samtoolsVersion = "$(SAM_VERSION)"
+prodigalVersion :: String
+prodigalVersion = "$(PRODIGAL_VERSION)"
+megahitVersion :: String
+megahitVersion = "$(MEGAHIT_VERSION)"
+minimap2Version :: String
+minimap2Version = "$(MINIMAP2_VERSION)"
+endef
+
+$(NGLESS_VERSIONS_TARGET): Makefile
+	@echo -e '$(subst $(NEWLINE),\n,${VERSION_BODY})' > $@
+
 NGLess/Dependencies/samtools_data.c: $(SAM_DIR)/$(SAM_TARGET)-static
 	strip $<
 	ln -s $< $(<F)
@@ -275,6 +315,7 @@ NGLess/Dependencies/megahit_data.c: $(MEGAHIT_DIR)/$(MEGAHIT_TARGET)-packaged.ta
 	rm -f $(<F)
 
 NGLess/Dependencies/minimap2_data.c: $(MINIMAP2_DIR)/$(MINIMAP2_TARGET)-static
+	strip $<
 	ln -s $< $(<F)
 	xxd -i $(<F) $@
 	rm -f $(<F)

@@ -30,4 +30,5 @@ NGLess/Dependencies/samtools_data.c
 NGLess/Dependencies/prodigal_data.c
 NGLess/Dependencies/megahit_data.c
 NGLess/Dependencies/minimap2_data.c
+NGLess/Dependencies/Versions.hs
 NGLess.cabal
