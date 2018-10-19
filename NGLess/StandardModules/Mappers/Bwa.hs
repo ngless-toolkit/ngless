@@ -13,6 +13,7 @@ import           System.Process (proc, readProcessWithExitCode)
 import           System.Exit (ExitCode(..))
 import           System.Directory (doesFileExist)
 import           System.Posix (getFileStatus, fileSize, FileOffset)
+import           System.Path (splitExt)
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.Char8 as BL8
@@ -28,14 +29,23 @@ import Output
 import NGLess
 import Configuration
 import NGLess.NGLEnvironment
+import Dependencies.Versions (bwaVersion)
 import FileManagement (bwaBin)
+
+-- | Appends bwa version to the index such that different versions
+-- of bwa use different indices
+indexPrefix :: FilePath -> NGLessIO FilePath
+indexPrefix base = do
+    let (basename, ext) = splitExt base
+    return $ basename ++ "-bwa-" ++ bwaVersion ++ ext
 
 -- | Checks whether all necessary files are present for a BWA index
 -- Does not change any file on disk.
 hasValidIndex :: FilePath -> NGLessIO Bool
-hasValidIndex basepath = liftIO $ allM (doesFileExist . (basepath ++)) indexRequiredFormats
-    where
-        indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
+hasValidIndex basepath = do
+    base <- indexPrefix basepath
+    let indexRequiredFormats = [".amb",".ann",".bwt",".pac",".sa"]
+    liftIO $ allM (doesFileExist . (base ++)) indexRequiredFormats
 
 -- BWA's default indexing parameters are quite conservative. This leads to
 -- a small memory footprint at the cost of more CPU hours.
@@ -65,9 +75,10 @@ createIndex :: FilePath -> NGLessIO ()
 createIndex fafile = do
     outputListLno' InfoOutput ["Start BWA index creation for ", fafile]
     blocksize <- liftIO $ customBlockSize fafile
+    prefix <- indexPrefix fafile
     bwaPath <- bwaBin
     (exitCode, out, err) <- liftIO $
-        readProcessWithExitCode bwaPath (["index"] ++ blocksize ++ [fafile]) []
+        readProcessWithExitCode bwaPath (["index"] ++ blocksize ++ ["-p", prefix, fafile]) []
     outputListLno' DebugOutput ["BWA-index stderr: ", err]
     outputListLno' DebugOutput ["BWA-index stdout: ", out]
     case exitCode of
@@ -78,12 +89,13 @@ callMapper :: FilePath -> [FilePath] -> [String] -> C.ConduitT B.ByteString C.Vo
 callMapper refIndex fps extraArgs outC = do
     outputListLno' InfoOutput ["Starting mapping to ", refIndex]
     bwaPath <- bwaBin
+    refIndex' <- indexPrefix refIndex
     numCapabilities <- liftIO getNumCapabilities
     strictThreads <- nConfStrictThreads <$> nglConfiguration
     let bwathreads
             | strictThreads && numCapabilities > 1 = numCapabilities - 1
             | otherwise = numCapabilities
-        cmdargs =  concat [["mem", "-t", show bwathreads], extraArgs, [refIndex], fps]
+        cmdargs =  concat [["mem", "-t", show bwathreads], extraArgs, [refIndex'], fps]
         with1Thread :: IO a -> IO a
         with1Thread act
             | strictThreads = bracket_

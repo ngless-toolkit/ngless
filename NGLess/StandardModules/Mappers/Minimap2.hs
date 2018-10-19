@@ -12,6 +12,7 @@ module StandardModules.Mappers.Minimap2
 import           System.Process (proc, readProcessWithExitCode)
 import           System.Exit (ExitCode(..))
 import           System.Directory (doesFileExist)
+import           System.Path (splitExt)
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.Vector as V
 import qualified Data.ByteString as B
@@ -32,13 +33,15 @@ import Data.Sam (isSamHeaderString)
 import Output
 import NGLess
 import Configuration
+import Dependencies.Versions (minimap2Version)
 import NGLess.NGLEnvironment
 import Utils.Vector (sortParallel)
 import Utils.Conduit (linesC, ByteLine(..))
 import FileManagement (makeNGLTempFile, minimap2Bin)
 
 indexName :: FilePath -> FilePath
-indexName fp = fp ++ ".mm2.idx"
+indexName fp = base ++ "-minimap2-" ++ minimap2Version ++ ext ++ ".mm2.idx"
+    where (base, ext) = splitExt fp
 
 hasValidIndex :: FilePath -> NGLessIO Bool
 hasValidIndex = liftIO . doesFileExist . indexName
