@@ -2,3 +2,13 @@ afterQC/
 beforeQC/
 output.*
 ngless-stats/
+**/ref*-bwa-*.fna.amb
+**/ref*-bwa-*.fna.ann
+**/ref*-bwa-*.fna.bwt
+**/ref*-bwa-*.fna.pac
+**/ref*-bwa-*.fna.sa
+**/ref.fna*-bwa-*.amb
+**/ref.fna*-bwa-*.ann
+**/ref.fna*-bwa-*.bwt
+**/ref.fna*-bwa-*.pac
+**/ref.fna*-bwa-*.sa

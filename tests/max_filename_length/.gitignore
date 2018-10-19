@@ -3,3 +3,5 @@ ref.fna.ann
 ref.fna.bwt
 ref.fna.pac
 ref.fna.sa
+output-map.sam
+output-select.sam
