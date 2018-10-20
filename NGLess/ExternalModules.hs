@@ -25,7 +25,7 @@ import Control.Applicative
 import Control.Monad
 import System.Process
 import System.Environment (getEnvironment, getExecutablePath)
-import System.Directory (getDirectoryContents, doesFileExist, doesDirectoryExist, canonicalizePath)
+import System.Directory (getDirectoryContents, doesFileExist, doesDirectoryExist)
 import System.Exit
 import System.IO
 import System.FilePath
@@ -246,7 +246,6 @@ executeCommand basedir cmds funcname input args = do
                 return
                 (find ((== funcname) . nglName) cmds)
     paths <- encodeArgument (arg1 cmd) (Just input)
-    paths' <- liftIO $ mapM canonicalizePath paths
     args' <- argsArguments cmd args
     moarg <- case ret cmd of
         CommandReturn NGLVoid _ _ -> return Nothing
@@ -256,7 +255,7 @@ executeCommand basedir cmds funcname input args = do
             let oarg = "--"++T.unpack name++"="++newfp
             return $ Just (newfp, [oarg])
     env <- nglessEnv basedir
-    let cmdline = paths' ++ args' ++ maybe [] snd moarg
+    let cmdline = paths ++ args' ++ maybe [] snd moarg
         process = (proc (basedir </> arg0 cmd) cmdline) { env = Just env }
     outputListLno' TraceOutput ["executing command: ", arg0 cmd, " ", LU.join " " cmdline]
     (exitCode, out, err) <- liftIO $

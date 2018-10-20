@@ -1,0 +1,9 @@
+version: '0.0.0'
+name: 'Test tool'
+functions:
+    -
+        nglName: "test"
+        arg0: './command.sh'
+
+        arg1:
+            atype: int
