@@ -6,6 +6,7 @@ Version 0.9.1+
 	* Fixed bug where writing interleaved FastQ to STDOUT did not work as
 	expected
 	* arg1 in external modules is no longer always treated as a path
+	* Added expand_searchdir to external modules API (closes #56)
 
 Version 0.9.1 2018-07-17 by luispedro
 	* Add biorxiv citation

@@ -204,6 +204,16 @@ of the output type.
 ``rtype`` must be one of ``"void"``, ``"counts"``, ``"readset"``, or
 ``"mappedreadset"``.
 
+If you plan to make use of [search path expansion](searchpath.html), in order
+for NGLess to expand the argument prior to passing it to the external module
+you need to set ``atype: "str"`` and ``expand_searchdir: true``.
+
+        additional:
+            -
+                atype: 'str'
+                name: 'reference'
+                expand_searchdir: true
+
 ### Citation
 
 Finally, if you wish to, you can add one or more citations:
@@ -220,6 +230,7 @@ provide a list:
     citations:
         - "Paper 1"
         - "Paper 2"
+
 ## Internal Modules
 
 This is very advanced as it requires writing Haskell code which can then
