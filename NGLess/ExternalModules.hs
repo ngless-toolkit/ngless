@@ -89,6 +89,7 @@ instance Aeson.FromJSON FileType where
 
 data CommandExtra = FlagInfo [T.Text]
             | FileInfo FileType
+            | ExpandSearchDir Bool
             deriving (Eq, Show)
 
 data CommandArgument = CommandArgument
@@ -126,17 +127,19 @@ instance Aeson.FromJSON CommandArgument where
                     return [ArgCheckSymbol allowed]
                 else return []
         let cargInfo = ArgInformation{..}
+        aexpand <- o .:? "expand_searchdir" .!= False
         cargPayload <-
             if
                 | atype `elem` ["option", "flag"] -> liftM FlagInfo <$> ((Just . (:[]) <$> o .: "when-true") <|> o .:? "when-true")
                 | atype `elem` ["readset", "counts", "mappedreadset"] -> (Just . FileInfo <$> Aeson.parseJSON (Aeson.Object o)) <|> return Nothing
+                | atype == "str" -> return $ Just (ExpandSearchDir aexpand)
                 | otherwise -> return Nothing
         return CommandArgument{..}
 
 newtype ReadNGLType = ReadNGLType { unwrapReadNGLType :: NGLType }
 
 instance Aeson.FromJSON ReadNGLType where
-    parseJSON = Aeson.withText "ngltype" $ \rtype -> do
+    parseJSON = Aeson.withText "ngltype" $ \rtype ->
         ReadNGLType <$> case rtype of
             "void" -> return NGLVoid
             "counts" -> return NGLCounts
@@ -340,7 +343,9 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
         asStr <- case argType ai of
             NGLString -> do
                 str <- T.unpack <$> stringOrTypeError "in external module" v
-                fromMaybe str <$> expandPath str
+                case payload of
+                     Just (ExpandSearchDir True) -> fromMaybe str <$> expandPath str
+                     _ -> return str
             NGLSymbol -> T.unpack <$> symbolOrTypeError "in external module" v
             NGLInteger ->  show <$> integerOrTypeError "in external module" v
             NGLMappedReadSet -> case v of
