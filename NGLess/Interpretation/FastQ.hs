@@ -187,7 +187,7 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
                  <*> asFQFilePathMayQC qcNeeded enc fp2'
             else do
                 enc1 <- fromMaybe (encodingFor fp1') (return <$> enc)
-                enc2 <- fromMaybe (encodingFor fp1') (return <$> enc)
+                enc2 <- fromMaybe (encodingFor fp2') (return <$> enc)
                 (es1,es2) <- liftIO $ A.concurrently
                             (try $ testNGLessIO $ statsFromFastQ fp1' enc1)
                             (try $ testNGLessIO $ statsFromFastQ fp2' enc2)
