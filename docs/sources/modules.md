@@ -206,13 +206,13 @@ of the output type.
 
 If you plan to make use of [search path expansion](searchpath.html), in order
 for NGLess to expand the argument prior to passing it to the external module
-you need to set ``atype: "str"`` and ``expand_searchdir: true``.
+you need to set ``atype: "str"`` and ``expand_searchpath: true``.
 
         additional:
             -
                 atype: 'str'
                 name: 'reference'
-                expand_searchdir: true
+                expand_searchpath: true
 
 ### Citation
 

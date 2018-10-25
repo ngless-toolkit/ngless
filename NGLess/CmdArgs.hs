@@ -154,7 +154,7 @@ mainArgs = DefaultMode
               <*> optional (strOption $ long "export-json" <> help "File to write JSON representation of script to") -- exportJSON :: Maybe FilePath
               <*> optional (strOption $ long "export-cwl" <> help "File to write CWL wrapper of given script") -- exportCWL :: Maybe FilePath
               <*> switch (long "check-deprecation" <> help "Check if ngless version or any used modules have been deprecated")-- deprecationCheck :: Bool
-              <*> many (strOption $ long "search-dir" <> help "Reference search directories (replace <references> in script)") -- searchPath :: [FilePath]
+              <*> many (strOption $ long "search-path" <> help "Reference search directories (replace <references> in script)") -- searchPath :: [FilePath]
               <*> optional (strOption $ long "index-path" <> help "Index path (directory where indices are stored)") -- indexPath :: Maybe FilePath
               <*> many (strArgument (metavar "ARGV")) -- extraArgs :: [String]
 

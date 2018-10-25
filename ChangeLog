@@ -7,7 +7,7 @@ Version 0.9.1+
 	expected
 	* Indices created by bwa and minimap2 are now versioned
 	* arg1 in external modules is no longer always treated as a path
-	* Added expand_searchdir to external modules API (closes #56)
+	* Added expand_searchpath to external modules API (closes #56)
 	* Fixed bug where detection of Fastq encoding was not performed on the second pair
 	* Fix saving fastq sets with --subsample (issue #85)
 	* Add __extra_megahit_args to assemble() (issue #86)
@@ -15,6 +15,7 @@ Version 0.9.1+
 	(issue #84)
 	* Support NO_COLOR environment variable (issue #83)
 	* Garbage collection for temporary files (issue #79)
+	* Rename --search-dir to --search-path for consistency with other API
 
 Version 0.9.1 2018-07-17 by luispedro
 	* Add biorxiv citation

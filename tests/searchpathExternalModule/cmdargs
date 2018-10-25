@@ -1,0 +1,1 @@
+--search-path location=somedir  --search-path fullpath=../searchpathExternalModule/somedir

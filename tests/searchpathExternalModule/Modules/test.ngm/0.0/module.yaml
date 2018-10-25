@@ -2,7 +2,7 @@ version: '0.0.0'
 name: 'Test tool'
 functions:
     -
-        nglName: "testing_searchdir_string"
+        nglName: "testing_searchpath_string"
         arg0: './command_string.sh'
 
         arg1:
@@ -20,22 +20,22 @@ functions:
                 atype: str
 
     -
-        nglName: "testing_searchdir_path"
+        nglName: "testing_searchpath_path"
         arg0: './command_path.sh'
 
         arg1:
             atype: str
-            expand_searchdir: true
+            expand_searchpath: true
 
         additional:
             -
                 name: ref
                 atype: str
-                expand_searchdir: true
+                expand_searchpath: true
             -
                 name: ref2
                 atype: str
-                expand_searchdir: true
+                expand_searchpath: true
             -
                 name: string
                 atype: str

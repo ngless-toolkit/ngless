@@ -78,7 +78,7 @@ Bugfixes
 - Fixed `lock1
   <http://ngless.embl.de/stdlib.html?highlight=lock1#parallel-module>`__ when
   used with full paths (see `issue #68 <https://github.com/ngless-toolkit/ngless/issues/68>`__)
-- Fix expansion of searchdir with external modules (see `issue #56
+- Fix expansion of searchpath with external modules (see `issue #56
   <https://github.com/ngless-toolkit/ngless/issues/56>`__)
 
 Version 0.8

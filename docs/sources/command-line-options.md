@@ -38,7 +38,7 @@ of free disk space:
                            Directory where to store temporary files
 
 
-  --search-dir ARG         Reference search directories (replace <references> in
+  --search-path ARG        Reference search directories (replace <references> in
                            script)
   --index-path ARG         Index path (directory where indices are stored)
 

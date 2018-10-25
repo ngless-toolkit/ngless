@@ -1,1 +1,1 @@
---search-dir subdir1  --search-dir subdir2
+--search-path subdir1  --search-path subdir2
