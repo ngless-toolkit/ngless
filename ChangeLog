@@ -8,6 +8,7 @@ Version 0.9.1+
 	* Indices created by bwa and minimap2 are now versioned
 	* arg1 in external modules is no longer always treated as a path
 	* Added expand_searchdir to external modules API (closes #56)
+	* Fixed bug where detection of Fastq encoding was not performed on the second pair
 	* Fix saving fastq sets with --subsample (issue #85)
 	* Add __extra_megahit_args to assemble() (issue #86)
 	* Better error message when user mis-specifies the ngless version string
