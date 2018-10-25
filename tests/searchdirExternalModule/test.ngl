@@ -1,5 +1,0 @@
-ngless '0.0'
-local import "test" version "0.0"
-
-testing_searchdir_path("<location>/input.fq", ref="<location>/input2.fq", ref2="<fullpath>/input2.fq", string="sentence")
-testing_searchdir_string("<location>/input.fq", ref="<location>/input2.fq", ref2="<fullpath>/input2.fq", string="sentence")

@@ -14,7 +14,7 @@ if [ "$2" != "$EXPECTED" ]; then
     exit 1
 fi
 
-EXPECTED="--ref2=../searchdirExternalModule/somedir/input2.fq"
+EXPECTED="--ref2=../searchpathExternalModule/somedir/input2.fq"
 
 if [ "$3" != "$EXPECTED" ]; then
     echo "3nd argument expected '$EXPECTED' saw '$3'"

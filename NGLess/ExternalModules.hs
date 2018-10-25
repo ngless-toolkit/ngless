@@ -89,7 +89,7 @@ instance Aeson.FromJSON FileType where
 
 data CommandExtra = FlagInfo [T.Text]
             | FileInfo FileType
-            | ExpandSearchDir Bool
+            | ExpandSearchPath Bool
             deriving (Eq, Show)
 
 data CommandArgument = CommandArgument
@@ -127,12 +127,12 @@ instance Aeson.FromJSON CommandArgument where
                     return [ArgCheckSymbol allowed]
                 else return []
         let cargInfo = ArgInformation{..}
-        aexpand <- o .:? "expand_searchdir" .!= False
+        aexpand <- o .:? "expand_searchpath" .!= False
         cargPayload <-
             if
                 | atype `elem` ["option", "flag"] -> liftM FlagInfo <$> ((Just . (:[]) <$> o .: "when-true") <|> o .:? "when-true")
                 | atype `elem` ["readset", "counts", "mappedreadset"] -> (Just . FileInfo <$> Aeson.parseJSON (Aeson.Object o)) <|> return Nothing
-                | atype == "str" -> return $ Just (ExpandSearchDir aexpand)
+                | atype == "str" -> return $ Just (ExpandSearchPath aexpand)
                 | otherwise -> return Nothing
         return CommandArgument{..}
 
@@ -344,7 +344,7 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
             NGLString -> do
                 str <- T.unpack <$> stringOrTypeError "in external module" v
                 case payload of
-                     Just (ExpandSearchDir True) -> fromMaybe str <$> expandPath str
+                     Just (ExpandSearchPath True) -> fromMaybe str <$> expandPath str
                      _ -> return str
             NGLSymbol -> T.unpack <$> symbolOrTypeError "in external module" v
             NGLInteger ->  show <$> integerOrTypeError "in external module" v

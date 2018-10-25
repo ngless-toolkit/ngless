@@ -1,0 +1,5 @@
+ngless '0.0'
+local import "test" version "0.0"
+
+testing_searchpath_path("<location>/input.fq", ref="<location>/input2.fq", ref2="<fullpath>/input2.fq", string="sentence")
+testing_searchpath_string("<location>/input.fq", ref="<location>/input2.fq", ref2="<fullpath>/input2.fq", string="sentence")
