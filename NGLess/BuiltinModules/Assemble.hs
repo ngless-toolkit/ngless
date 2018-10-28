@@ -1,4 +1,4 @@
-{- Copyright 2017 NGLess Authors
+{- Copyright 2017-2018 NGLess Authors
  - License: MIT
  -}
 
@@ -27,7 +27,7 @@ import Utils.Utils (readProcessErrorWithExitCode)
 
 
 executeAssemble :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeAssemble "assemble" expr [] = do
+executeAssemble "assemble" expr kwargs = do
     files <- case expr of
             NGOReadSet _ (ReadSet [] singles) -> do
                 FastQFilePath _ f <- concatenateFQs singles
@@ -45,6 +45,7 @@ executeAssemble "assemble" expr [] = do
     megahitPath <- megahitBin
     keepTempFiles <- nConfKeepTemporaryFiles <$> nglConfiguration
     nthreads <- liftIO getNumCapabilities
+    extraArgs <- map T.unpack <$> lookupStringListOrScriptErrorDef (return []) "extra megahit arguments" "__extra_megahit_args" kwargs
     (_, tdir) <- createTempDir "ngless-megahit-assembly"
     (_, mhtmpdir) <- createTempDir "ngless-megahit-tmpdir"
     let odir = tdir </> "megahit-output"
@@ -52,7 +53,7 @@ executeAssemble "assemble" expr [] = do
                         ["-o", odir
                         ,"--num-cpu-threads", show nthreads
                         ,"--tmp-dir", mhtmpdir
-                        ] ++ ["--keep-tmp-files" | keepTempFiles]
+                        ] ++ ["--keep-tmp-files" | keepTempFiles] ++ extraArgs
     outputListLno' DebugOutput ["Calling megahit: ", megahitPath, " ", unwords args]
     (errmsg, exitCode) <- liftIO $ readProcessErrorWithExitCode
                                     (proc megahitPath args)
@@ -69,7 +70,7 @@ assembleFunction = Function
     , funcArgType = Just NGLReadSet
     , funcArgChecks = []
     , funcRetType = NGLString
-    , funcKwArgs = []
+    , funcKwArgs = [ArgInformation "__extra_megahit_args" False (NGList NGLString) []]
     , funcAllowsAutoComprehension = False
     , funcChecks = [FunctionCheckReturnAssigned]
     }

@@ -645,6 +645,18 @@ Returns
 
 string : generated file
 
+Arguments by value:
+~~~~~~~~~~~~~~~~~~~
+
++-----------------------+-------------+------------+----------------+
+| Name                  | Type        | Required   | Default Value  |
++=======================+=============+============+================+
+| __extra_megahit_arg   | List of str | no         | []             |
++-----------------------+-------------+------------+----------------+
+
+``__extra_megahit_arg`` is passed directly to megahit with no checking.
+
+
 orf_find
 --------
 
