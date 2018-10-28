@@ -11,6 +11,7 @@ Version 0.9.1+
 	* Add __extra_megahit_args to assemble() (issue #86)
 	* Better error message when user mis-specifies the ngless version string
 	(issue #84)
+	* Support NO_COLOR environment variable (issue #83)
 
 Version 0.9.1 2018-07-17 by luispedro
 	* Add biorxiv citation

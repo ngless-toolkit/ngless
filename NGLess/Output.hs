@@ -22,7 +22,7 @@ import           Text.Printf (printf)
 import           System.IO (hIsTerminalDevice, stdout)
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.IO.SafeWrite (withOutputFile)
-import           Data.Maybe (maybeToList, fromMaybe)
+import           Data.Maybe (maybeToList, fromMaybe, isJust)
 import           Data.IORef (IORef, newIORef, modifyIORef, readIORef)
 import           Data.List (sort)
 import           Data.Aeson ((.=))
@@ -45,6 +45,7 @@ import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.ByteString.Lazy as BL
 import qualified Graphics.Rendering.Chart.Easy as G
 import qualified Graphics.Rendering.Chart.Backend.Cairo as G
+import           System.Environment (lookupEnv)
 
 
 import           Data.FastQ (FastQEncoding(..), encodingName)
@@ -175,6 +176,7 @@ shouldPrint True  ot Normal = ot >= InfoOutput
 output :: OutputType -> Int -> String -> NGLessIO ()
 output !ot !lno !msg = do
     isTerm <- liftIO $ hIsTerminalDevice stdout
+    hasNOCOLOR <- isJust <$> liftIO (lookupEnv "NO_COLOR")
     verb <- nConfVerbosity <$> nglConfiguration
     traceSet <- nConfTrace <$> nglConfiguration
     colorOpt <- nConfColor <$> nglConfiguration
@@ -182,7 +184,7 @@ output !ot !lno !msg = do
         doColor = case colorOpt of
             ForceColor -> True
             NoColor -> False
-            AutoColor -> isTerm
+            AutoColor -> isTerm && not hasNOCOLOR
     c <- colorFor ot
     liftIO $ do
         t <- getZonedTime
