@@ -59,7 +59,7 @@ import Control.Monad.Trans.Resource
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString as B
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -196,7 +196,7 @@ findFunction fname@(FuncName fname') = do
 
 -- | By necessity, this code has several unreachable corners
 
-unreachable :: ( MonadError NGError m) => String -> m a
+unreachable :: (MonadError NGError m) => String -> m a
 unreachable err = throwShouldNotOccur ("Reached code that was thought to be unreachable!\n"++err)
 nglTypeError err = throwShouldNotOccur ("Unexpected type error! This should have been caught by validation!\n"++err)
 
@@ -211,8 +211,42 @@ interpret modules es = do
 interpretIO :: [(Int, Expression)] -> InterpretationEnvIO ()
 interpretIO es = forM_ es $ \(ln,e) -> do
     setlno ln
+    gcTemps
     traceExpr "interpretIO" e
     interpretTop e
+
+gcTemps :: InterpretationEnvIO ()
+gcTemps = do
+    active <- gets $ \case
+                NGLInterpretEnv _ (VariableMapGlobal t) -> Map.elems t
+                _ -> error "gcTemps in BLOCK?!"
+    let extractFiles = \case
+                            NGOString _ -> []
+                            NGOBool _ -> []
+                            NGOInteger _ -> []
+                            NGODouble _ -> []
+                            NGOSymbol _ -> []
+                            NGOFilename f -> [f]
+                            NGOShortRead _ -> []
+                            NGOReadSet _ rs -> extractFilesRS rs
+                            NGOSequenceSet s -> origin s
+                            NGOMappedReadSet _ s _ -> origin s
+                            NGOMappedRead _ -> []
+                            NGOCounts s -> origin s
+                            NGOVoid -> []
+                            NGOList lst -> concatMap extractFiles lst
+                            NGOExpression _ -> error "gcTemps: NGOExpression in extractFiles"
+        extractFilesRS (ReadSet ps p3) = concatMap (extractFilesRS' . fst) ps
+                                                ++ concatMap (extractFilesRS' . snd) ps
+                                                ++ concatMap extractFilesRS' p3
+        extractFilesRS' (FastQFilePath _ f) = [f]
+        activeFiles = concatMap extractFiles active
+    runNGLessIO $ do
+        outputListLno' DebugOutput ["Running garbage collection."]
+        createdFiles <- ngleTemporaryFilesCreated <$> nglEnvironment
+        let garbage = filter (`notElem` activeFiles) createdFiles
+        -- Use removeIfTemporary because it respects command line flags &c
+        forM_ garbage removeIfTemporary
 
 interpretTop :: Expression -> InterpretationEnvIO ()
 interpretTop (Assignment (Variable var) val) = traceExpr "assignment" val >> interpretTopValue val >>= setVariableValue var
@@ -319,7 +353,11 @@ executeSamfile expr@(NGOString fname) args = do
         then return $ NGOMappedReadSet gname (File fname') Nothing
         else do
             checkf headers'
-            return $ NGOMappedReadSet gname (Stream fname' ((CB.sourceFile headers' >> CB.sourceFile fname') .| linesVC 4096)) Nothing
+            let out = Stream
+                            [File fname', File headers']
+                            fname'
+                            ((CB.sourceFile headers' >> CB.sourceFile fname') .| linesVC 4096)
+            return $ NGOMappedReadSet gname out Nothing
 executeSamfile e args = unreachable ("executeSamfile " ++ show e ++ " " ++ show args)
 
 data PreprocessPairOutput = Paired !ShortRead !ShortRead | Single !ShortRead

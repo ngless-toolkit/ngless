@@ -51,7 +51,7 @@ executeSort (NGOMappedReadSet name istream rinfo) args = do
     let oformat = if outBam then "bam" else "sam"
         fname = case istream of
                     File f -> f
-                    Stream f _ -> f
+                    Stream _ f _ -> f
     (rk, (newfp, hout)) <- openNGLTempFile' fname "sorted_" ("." ++ oformat)
     (trk, tdirectory) <- createTempDir "samtools_sort_temp"
 
@@ -63,7 +63,7 @@ executeSort (NGOMappedReadSet name istream rinfo) args = do
         File fpsam -> do
             let cp = (proc samtoolsPath (snoc cmdargs fpsam)) { std_out = UseHandle hout }
             liftIO $ readProcessErrorWithExitCode cp
-        Stream _ istream' -> do
+        Stream _ _ istream' -> do
             let cp = (proc samtoolsPath cmdargs) { std_in = CreatePipe, std_out = UseHandle hout, std_err = CreatePipe }
             (Just pipe_out, Nothing, Just herr, jHandle) <- liftIO $ createProcess cp
             samP <- liftIO . A.async $ waitForProcess jHandle

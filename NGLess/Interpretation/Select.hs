@@ -136,7 +136,7 @@ executeSelect (NGOMappedReadSet name istream ref) args = do
                 .| streamedSamStats lno ("select_"++T.unpack name) ("select.lno"++show lno)
                 .| CL.map (V.fromList . map (ByteLine . snd))
 
-        out = Stream ("selected_" ++ takeBaseNameNoExtensions fpsam ++ ".sam") stream
+        out = Stream [istream] ("selected_" ++ takeBaseNameNoExtensions fpsam ++ ".sam") stream
     return $! NGOMappedReadSet name out ref
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 

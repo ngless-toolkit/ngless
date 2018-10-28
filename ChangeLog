@@ -12,6 +12,7 @@ Version 0.9.1+
 	* Better error message when user mis-specifies the ngless version string
 	(issue #84)
 	* Support NO_COLOR environment variable (issue #83)
+	* Garbage collection for temporary files (issue #79)
 
 Version 0.9.1 2018-07-17 by luispedro
 	* Add biorxiv citation
