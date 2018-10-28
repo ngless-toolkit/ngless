@@ -148,7 +148,9 @@ moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
 removeEnd :: String -> String -> String
 removeEnd base suffix = take (length base - length suffix) base
 
+_formatFQOname :: FilePath -> FilePath -> NGLessIO FilePath
 _formatFQOname base insert
+    | endswith ".subsampled" base = _formatFQOname (take (length base - length (".subsampled" :: String)) base) (insert ++ ".subsampled")
     | "{index}" `isInfixOf` base = return $ replace "{index}" insert base
     | endswith ".fq" base = return $ removeEnd base ".fq" ++ "." ++ insert ++ ".fq"
     | endswith ".fq.gz" base = return $ removeEnd base ".fq.gz" ++ "." ++ insert ++ ".fq.gz"

@@ -7,6 +7,7 @@ Version 0.9.1+
 	expected
 	* arg1 in external modules is no longer always treated as a path
 	* Added expand_searchdir to external modules API (closes #56)
+	* Fix saving fastq sets with --subsample (issue #85)
 
 Version 0.9.1 2018-07-17 by luispedro
 	* Add biorxiv citation
