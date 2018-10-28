@@ -31,6 +31,7 @@ import           Data.Maybe
 import           Data.String.Utils (replace, endswith)
 import           Control.Monad.IO.Unlift (MonadUnliftIO)
 import           Control.Monad (zipWithM_)
+import           Control.Monad.Except
 import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class (liftIO, MonadIO)
 import           System.IO (Handle, stdout)
@@ -148,7 +149,7 @@ moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
 removeEnd :: String -> String -> String
 removeEnd base suffix = take (length base - length suffix) base
 
-_formatFQOname :: FilePath -> FilePath -> NGLessIO FilePath
+_formatFQOname :: MonadError NGError m => FilePath -> FilePath -> m FilePath
 _formatFQOname base insert
     | endswith ".subsampled" base = _formatFQOname (take (length base - length (".subsampled" :: String)) base) (insert ++ ".subsampled")
     | "{index}" `isInfixOf` base = return $ replace "{index}" insert base
