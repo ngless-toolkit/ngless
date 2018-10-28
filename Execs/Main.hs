@@ -221,7 +221,13 @@ parseVersion (Just "0.6") = return $ NGLVersion 0 6
 parseVersion (Just "0.7") = return $ NGLVersion 0 7
 parseVersion (Just "0.8") = return $ NGLVersion 0 8
 parseVersion (Just "0.9") = return $ NGLVersion 0 9
-parseVersion (Just v) = throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 0.0/0.5-9 are available in this release)."]
+parseVersion (Just v) = case T.splitOn "." v of
+                            [majV,minV,_] ->
+                                throwScriptError $ concat ["The NGLess version string at the top of the file should only\ncontain a major and a minor version, separated by a dot.\n\n"
+                                                        ,"You probably meant to write:\n\n"
+                                                        ,"ngless \"" , T.unpack majV, ".", T.unpack minV, "\"\n"]
+                            [_, _] -> throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 0.0/0.5-9 are available in this release)."]
+                            other -> throwScriptError $ concat ["Version ", T.unpack v, " could not be understood. The version string should look like \"0.9\" or similar"]
 
 modeExec :: NGLessMode -> IO ()
 modeExec opts@DefaultMode{} = do
