@@ -227,7 +227,7 @@ parseVersion (Just v) = case T.splitOn "." v of
                                                         ,"You probably meant to write:\n\n"
                                                         ,"ngless \"" , T.unpack majV, ".", T.unpack minV, "\"\n"]
                             [_, _] -> throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 0.0/0.5-9 are available in this release)."]
-                            other -> throwScriptError $ concat ["Version ", T.unpack v, " could not be understood. The version string should look like \"0.9\" or similar"]
+                            _ -> throwScriptError $ concat ["Version ", T.unpack v, " could not be understood. The version string should look like \"0.9\" or similar"]
 
 modeExec :: NGLessMode -> IO ()
 modeExec opts@DefaultMode{} = do
