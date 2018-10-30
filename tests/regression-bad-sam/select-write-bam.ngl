@@ -1,0 +1,5 @@
+ngless "0.8"
+
+input = samfile("input.sam")
+input = select(input, keep_if=[{mapped}])
+write(input, ofile='output.bam')
