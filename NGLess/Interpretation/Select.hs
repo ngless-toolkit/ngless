@@ -2,15 +2,19 @@
  - License: MIT
  -}
 
-{-# LANGUAGE RankNTypes, FlexibleContexts, TypeFamilies #-}
+{-# LANGUAGE RankNTypes, FlexibleContexts, TypeFamilies, CPP #-}
 
 module Interpretation.Select
     ( executeSelect
     , executeMappedReadMethod
+#ifdef IS_BUILDING_TEST
+    , _fixCigar
+#endif
     ) where
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Builder as BB
 import qualified Data.Vector as V
 import qualified Data.Conduit as C
@@ -63,20 +67,36 @@ _parseConditions args = do
         asSC "unique" = return SelectUnique
         asSC c = throwShouldNotOccur ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
 
-matchConditions :: Bool -> MatchCondition -> [(SamLine,B.ByteString)] -> [(SamLine, B.ByteString)]
+matchConditions :: Bool -> MatchCondition -> [(SamLine,B.ByteString)] -> NGLess [(SamLine, B.ByteString)]
 matchConditions doReinject conds sg = reinjectSequences doReinject (matchConditions' conds sg)
     where
         reinjectSequences True f@((s@SamLine{}, _):rs)
             | not (any (hasSequence . fst) f) && any (hasSequence . fst) sg
-                = let s' = addSequence s in (s', toStrictBS $ encodeSamLine s'):rs
-        reinjectSequences _ f = f
+                = do
+                    s' <- addSequence s
+                    return ((s', toStrictBS $ encodeSamLine s'):rs)
+        reinjectSequences _ f = return f
 
         toStrictBS :: BB.Builder -> B.ByteString
         toStrictBS = BL.toStrict . BB.toLazyByteString
 
         addSequence s = case find hasSequence (fst <$> sg) of
-                            Just s' -> s { samSeq = samSeq s', samQual = samQual s' }
-                            Nothing -> s
+                            Just s' -> do
+                                        cigar' <- _fixCigar (samCigar s) (B.length $ samSeq s')
+                                        return s { samSeq = samSeq s', samQual = samQual s', samCigar = cigar' }
+                            Nothing -> return s
+
+_fixCigar :: B.ByteString -> Int -> Either NGError B.ByteString
+_fixCigar prev n = do
+    prevM <- matchSize' prev
+    if prevM == n
+        then return prev
+        else do
+            let prev' = B8.map (\c -> if c == 'H' then 'S' else c) prev
+            prevM' <- matchSize' prev'
+            if prevM' == n
+                then return prev'
+                else throwDataError ("Cannot fix CIGAR string \"" ++ B8.unpack prev ++ "\" to represent a sequence of length " ++ show n)
 
 matchConditions' :: MatchCondition -> [(SamLine,B.ByteString)] -> [(SamLine, B.ByteString)]
 matchConditions' _ r@[(SamHeader _,_)] = r
@@ -132,7 +152,7 @@ executeSelect (NGOMappedReadSet name istream ref) args = do
     let (fpsam, istream') = asSamStream istream
         stream =
             readSamGroupsAsConduit istream' paired
-                .| CL.map (matchConditions doReinject conditions)
+                .| CL.mapM (runNGLess . matchConditions doReinject conditions)
                 .| streamedSamStats lno ("select_"++T.unpack name) ("select.lno"++show lno)
                 .| CL.map (V.fromList . map (ByteLine . snd))
 

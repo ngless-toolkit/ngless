@@ -18,6 +18,7 @@ module Data.Sam
     , isSamHeaderString
     , hasSequence
     , matchSize
+    , matchSize'
     , matchIdentity
 
     , samStatsC
@@ -76,26 +77,32 @@ instance NFData SamLine where
 isHeader SamHeader{} = True
 isHeader SamLine{} = False
 
+samLength :: SamLine -> Int
 samLength = B8.length . samSeq
 
 -- log 2 of N
 -- 4 -> 2
 isAligned :: SamLine -> Bool
 isAligned = not . (`testBit` 2) . samFlag
+{-# INLINE isAligned #-}
 
 -- 16 -> 4
 isNegative :: SamLine -> Bool
 isNegative = (`testBit` 4) . samFlag
+{-# INLINE isNegative #-}
 
 -- all others
 isPositive :: SamLine -> Bool
 isPositive = not . isNegative
+{-# INLINE isPositive #-}
 
 isFirstInPair :: SamLine -> Bool
 isFirstInPair = (`testBit` 6) . samFlag
+{-# INLINE isFirstInPair #-}
 
 isSecondInPair :: SamLine -> Bool
 isSecondInPair = (`testBit` 7) . samFlag
+{-# INLINE isSecondInPair #-}
 
 isSamHeaderString :: B.ByteString -> Bool
 isSamHeaderString s = not (B.null s) && (B.head s == 64) -- 64 is '@'
@@ -194,7 +201,7 @@ matchSize' cigar
         Just (n,code_rest) -> do
             let code = B8.head code_rest
                 rest = B8.tail code_rest
-                n' = if code `elem` ("M=X" :: String) then n else 0
+                n' = if code `elem` ("M=XS" :: String) then n else 0
             r <- matchSize' rest
             return (n' + r)
 
