@@ -32,7 +32,7 @@ Internal improvements
 - NGLess now pre-emptively garbage collects files when they are no longer needed (issue #79)
 
 Version 0.9.1
------------
+-------------
 
 Released July 17th 2018
 
