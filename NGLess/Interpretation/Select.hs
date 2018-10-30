@@ -141,7 +141,7 @@ executeSelect (NGOMappedReadSet name istream ref) args = do
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
 streamedSamStats lno ifile ref = C.passthroughSink (CL.map (map fst) .| samStatsC') $ \(total, aligned, unique) ->
-    outputMapStatistics (MappingInfo lno ifile ref total aligned unique)
+    outputMappedSetStatistics (MappingInfo lno ifile ref total aligned unique)
 
 
 splitSamlines3 = foldl' add1 ([],[],[])

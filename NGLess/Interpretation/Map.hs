@@ -250,7 +250,7 @@ performMap mapper blockSize ref name rs extraArgs = do
     case ref' of
         [single] -> do
             (samPath', (total, aligned, unique)) <- mapToReference mapper single rs extraArgs
-            outputMapStatistics (MappingInfo undefined samPath' single total aligned unique)
+            outputMappedSetStatistics (MappingInfo undefined samPath' single total aligned unique)
             return $ NGOMappedReadSet name (File samPath') mappedRef
         blocks -> do
             (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam"
@@ -265,7 +265,7 @@ performMap mapper blockSize ref name rs extraArgs = do
             let refname = case ref of
                     FaFile fa -> fa
                     PackagedReference r -> T.unpack r
-            outputMapStatistics (MappingInfo undefined sam refname total aligned unique)
+            outputMappedSetStatistics (MappingInfo undefined sam refname total aligned unique)
             return $! NGOMappedReadSet name (File sam) mappedRef
 
 
@@ -321,7 +321,7 @@ executeMergeSams (NGOList ifnames) _ = do
             (CL.concat
                 .| CL.map ((`mappend` BB.char7 '\n') . encodeSamLine)
                 .| CB.sinkHandleBuilder hout)
-    outputMapStatistics (MappingInfo undefined sam "no-ref" total aligned unique)
+    outputMappedSetStatistics (MappingInfo undefined sam "no-ref" total aligned unique)
     liftIO $ hClose hout
     return $! NGOMappedReadSet "test" (File sam) Nothing
 executeMergeSams _ _ = throwScriptError "Wrong argument for internal function __merge_samfiles"

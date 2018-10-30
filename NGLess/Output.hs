@@ -12,7 +12,7 @@ module Output
     , outputListLno
     , outputListLno'
     , outputFQStatistics
-    , outputMapStatistics
+    , outputMappedSetStatistics
     , writeOutputJSImages
     , writeOutputTSV
     , outputConfiguration
@@ -239,11 +239,11 @@ outputFQStatistics fname stats enc = do
     p "Number of sequences: "   (show $ FQ.nSeq stats)
     liftIO $ modifyIORef savedFQOutput (binfo:)
 
-outputMapStatistics :: MappingInfo -> NGLessIO ()
-outputMapStatistics mi@(MappingInfo _ _ ref total aligned unique) = do
+outputMappedSetStatistics :: MappingInfo -> NGLessIO ()
+outputMappedSetStatistics mi@(MappingInfo _ _ ref total aligned unique) = do
         lno <- ngleLno <$> nglEnvironment
         let out = outputListLno' ResultOutput
-        out ["Finished mapping to ", ref]
+        out ["Mapped readset stats (", ref, "):"]
         out ["Total reads: ", show total]
         out ["Total reads aligned: ", showNumAndPercentage aligned]
         out ["Total reads Unique map: ", showNumAndPercentage unique]
