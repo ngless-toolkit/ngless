@@ -1,12 +1,8 @@
 {- Copyright 2017 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE CPP #-}
 module CWL
     ( writeCWL
-#ifdef IS_TESTING
-    , buildCWL
-#endif
     ) where
 
 import qualified Data.ByteString as B
