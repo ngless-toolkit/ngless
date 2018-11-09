@@ -88,12 +88,12 @@ matchConditions doReinject conds sg = reinjectSequences doReinject (matchConditi
 
 _fixCigar :: B.ByteString -> Int -> Either NGError B.ByteString
 _fixCigar prev n = do
-    prevM <- matchSize' prev
+    prevM <- matchSize' True prev
     if prevM == n
         then return prev
         else do
             let prev' = B8.map (\c -> if c == 'H' then 'S' else c) prev
-            prevM' <- matchSize' prev'
+            prevM' <- matchSize' True prev'
             if prevM' == n
                 then return prev'
                 else throwDataError ("Cannot fix CIGAR string \"" ++ B8.unpack prev ++ "\" to represent a sequence of length " ++ show n)

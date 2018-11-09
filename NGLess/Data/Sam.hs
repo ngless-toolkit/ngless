@@ -193,16 +193,23 @@ X sequence mismatch.
 --}
 
 matchSize :: SamLine -> Either NGError Int
-matchSize = matchSize' . samCigar
-matchSize' cigar
+matchSize = matchSize' False . samCigar
+
+matchSize' includeSoft cigar
     | B8.null cigar = return 0
     | otherwise = case B8.readInt cigar of
         Nothing -> throwDataError ("could not parse cigar '"++B8.unpack cigar ++"'")
         Just (n,code_rest) -> do
             let code = B8.head code_rest
                 rest = B8.tail code_rest
-                n' = if code `elem` ("M=XS" :: String) then n else 0
-            r <- matchSize' rest
+                n' = case code of
+                            'M' -> n
+                            '=' -> n
+                            'X' -> n
+                            'S'
+                                | includeSoft -> n
+                            _ -> 0
+            r <- matchSize' includeSoft rest
             return (n' + r)
 
 matchIdentity :: SamLine -> Either NGError Double
