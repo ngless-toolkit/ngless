@@ -27,7 +27,7 @@ import Language
 import Modules
 import Output
 import NGLess
-import Utils.Utils
+import Utils.Utils (uniq, secondM)
 import NGLess.NGLEnvironment
 import BuiltinFunctions
 
@@ -261,7 +261,7 @@ addOFileChecks' ((lno,e):rest) = do
 
         extractExpressions :: (MonadWriter [(Variable, Expression)] m) =>  Maybe Expression -> m ()
         extractExpressions (Just ofile) = case ofile of
-            BinaryOp _ re le -> case validVariables re ++ validVariables le of
+            BinaryOp _ re le -> case uniq (validVariables re ++ validVariables le) of
                 [v] -> tell [(v, ofile)]
                 _ -> return ()
             _ -> return ()
