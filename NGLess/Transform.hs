@@ -229,19 +229,22 @@ addOFileChecks' [] = return []
 addOFileChecks' ((lno,e):rest) = do
         mods <- loadedModules
         vars <- runNGLess $ execWriterT (recursiveAnalyse (getOFileExpressions mods) e)
-        rest' <- addOFileChecks' (maybeAddChecks vars rest)
+        rest' <- addOFileChecks' (addCheck vars (maybeAddChecks vars rest))
         return ((lno,e):rest')
 
      where
+        addCheck [(_, oexpr)] = ((lno, checkOFileExpression oexpr):)
+        addCheck _ = id
+
         maybeAddChecks :: [(Variable,Expression)] -> [(Int, Expression)] -> [(Int, Expression)]
         maybeAddChecks _ [] = []
         maybeAddChecks vars@[(v,complete)] ((lno',e'):rest') = case e' of
             Assignment v' _
-                | v' == v -> ((lno', checkExpression complete):(lno', e'):rest')
+                | v' == v -> ((lno', checkOFileExpression complete):(lno', e'):rest')
             _ -> (lno',e') : maybeAddChecks vars rest'
         maybeAddChecks _ rest' = rest'
 
-        checkExpression complete = FunctionCall
+        checkOFileExpression complete = FunctionCall
                             (FuncName "__check_ofile")
                             complete
                             [(Variable "original_lno", ConstInt (toInteger lno))]

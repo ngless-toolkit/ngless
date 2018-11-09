@@ -17,6 +17,7 @@ Version 0.9.1+
 	* Garbage collection for temporary files (issue #79)
 	* Rename --search-dir to --search-path for consistency with other API
 	* Fix corner case with select() producing incorrect CIGAR strings (#92)
+	* Always check output file writability (#91)
 
 Version 0.9.1 2018-07-17 by luispedro
 	* Add biorxiv citation
