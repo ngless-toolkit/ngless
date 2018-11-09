@@ -156,8 +156,8 @@ instance Show Expression where
     show Continue = "continue"
     show Discard = "discard"
     show (UnaryOp UOpLen a) = "len("++show a++")"
-    show (UnaryOp op a) = show op ++ " " ++ show a
-    show (BinaryOp op a b) = show a ++ show op ++ show b
+    show (UnaryOp op a) = show op ++ "(" ++ show a ++ ")"
+    show (BinaryOp op a b) = "BinaryOp" ++ "(" ++ show a ++ " -" ++ show op ++ "- " ++ show b ++ ")"
     show (Condition c a b) = "if ["++show c ++"] then {"++show a++"} else {"++show b++"}"
     show (IndexExpression a ix) = show a ++ "[" ++ show ix ++ "]"
     show (Assignment (Variable v) a) = T.unpack v++" = "++show a
