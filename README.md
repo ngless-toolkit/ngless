@@ -26,7 +26,7 @@ If you are using NGLess, please cite:
 
 ## Example
 
-    ngless "0.9"
+    ngless "0.10"
     input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
     input = preprocess(input) using |read|:
         read = read[5:]

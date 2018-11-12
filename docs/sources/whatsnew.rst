@@ -2,14 +2,15 @@
 What's New (History)
 ====================
 
-Development version
--------------------
+Version 0.10.0
+--------------
+
+Released Nov 12 2018
 
 Bugfixes
 ~~~~~~~~
 - Fixed bug where header was printed even when STDOUT was used
 - Fix to lock1's return value when used with paths (`#68 - reopen <https://github.com/ngless-toolkit/ngless/issues/68>`__)
-- Support _F/_R suffixes for forward/reverse in load_mocat_sample
 - Fixed bug where writing interleaved FastQ to STDOUT did not work as expected
 - Fix saving fastq sets with --subsample (issue `#85 <https://github.com/ngless-toolkit/ngless/issues/85>`__)
 - Fix (hypothetical) case where the two mate files have different FastQ encodings
@@ -18,19 +19,21 @@ User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - samtools_sort() now accepts by={name} to sort by read name
+- Add __extra_megahit_args to assemble() (`issue #86 <https://github.com/ngless-toolkit/ngless/issues/86>`__)
 - arg1 in external modules is no longer always treated as a path
 - Added expand_searchdir to external modules API (`issue #56 <https://github.com/ngless-toolkit/ngless/issues/56/>`__)
-- Add __extra_megahit_args to assemble() (`issue #86 <https://github.com/ngless-toolkit/ngless/issues/86>`__)
+- Support _F/_R suffixes for forward/reverse in load_mocat_sample
 - Better error messages when version is mis-specified
 - Support `NO_COLOR <https://no-color.org/>`__ standard: when ``NO_COLOR`` is
   present in the environment, print no colours.
 - Always check output file writability (`issue #91 <https://github.com/ngless-toolkit/ngless/issues/91issue )
-
+- ``paired()`` now accepts ``encoding`` argument (it was documented to, but mis-implemented)
 
 Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~
 
-- NGLess now pre-emptively garbage collects files when they are no longer needed (issue #79)
+- NGLess now pre-emptively garbage collects files when they are no longer
+  needed (`issue #79 <https://github.com/ngless-toolkit/ngless/issues/79/>`__)
 
 Version 0.9.1
 -------------
