@@ -1,7 +1,7 @@
 {- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE TemplateHaskell, RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell, RecordWildCards, CPP #-}
 
 module Output
     ( OutputType(..)
@@ -43,8 +43,10 @@ import qualified Data.Conduit as C
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.ByteString.Lazy as BL
+#ifdef HAS_CAIRO
 import qualified Graphics.Rendering.Chart.Easy as G
 import qualified Graphics.Rendering.Chart.Backend.Cairo as G
+#endif
 import           System.Environment (lookupEnv)
 
 
@@ -376,6 +378,7 @@ outputConfiguration = do
         outputListLno' DebugOutput ["\t\t", p]
 
 drawBaseQs :: FilePath -> [BPosInfo] -> IO ()
+#ifdef HAS_CAIRO
 drawBaseQs oname bpos = G.toFile G.def oname $ do
     G.layout_title G..= "FastQ Quality Statistics"
     G.plot (G.line "Mean" [
@@ -386,3 +389,7 @@ drawBaseQs oname bpos = G.toFile G.def oname $ do
                     [(ix, _upperQuartile bp) | (ix,bp) <- zip [1:: Integer ..] bpos]])
     G.plot (G.line "Lower Quartile" [
                     [(ix, _lowerQuartile bp) | (ix,bp) <- zip [1:: Integer ..] bpos]])
+
+#else
+drawBaseQs _ _ = return ()
+#endif
