@@ -12,7 +12,7 @@ struct PoolC {
         }
     }
     const char* strdup(const char* input) {
-        const int len = std::strlen(input) + 1;
+        const unsigned int len = std::strlen(input) + 1;
         if (len > block_size) {
             char* n = static_cast<char*>(operator new(len));
             std::strcpy(n, input);
@@ -33,7 +33,7 @@ struct PoolC {
     private:
 
     std::vector<void*> data_;
-    int free_;
+    size_t free_;
 };
 
 
@@ -66,6 +66,6 @@ struct RefSeqInfoVector {
 };
 
 extern "C" {
-    void* rsiv_free(void* p) { delete static_cast<RefSeqInfoVector*>(p); }
+    void rsiv_free(void* p) { delete static_cast<RefSeqInfoVector*>(p); }
 }
 
