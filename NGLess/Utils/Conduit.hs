@@ -52,7 +52,7 @@ concatrevline line [] = ByteLine $ lineWindowsTerminated line
 concatrevline line toks = ByteLine . lineWindowsTerminated $ B.concat (reverse (line:toks))
 {-# INLINE concatrevline #-}
 
-linesC:: (Monad m, MonadError NGError m) => C.ConduitT B.ByteString ByteLine m ()
+linesC:: (MonadError NGError m) => C.ConduitT B.ByteString ByteLine m ()
 linesC = continue 0 []
     where
         continue n toks
@@ -77,7 +77,7 @@ lineWindowsTerminated line = if not (B.null line) && B.index line (B.length line
 {-# INLINE lineWindowsTerminated #-}
 
 -- | Equivalent to 'linesC .| CC.conduitVector nlines'
-linesVC :: (MonadIO m, Monad m, MonadError NGError m) => Int -> C.ConduitT B.ByteString (V.Vector ByteLine) m ()
+linesVC :: (MonadIO m, MonadError NGError m) => Int -> C.ConduitT B.ByteString (V.Vector ByteLine) m ()
 linesVC nlines = do
             vec <- liftIO $ VM.new nlines
             continue vec 0 0 []

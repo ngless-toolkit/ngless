@@ -33,7 +33,7 @@ import           Control.Monad.IO.Unlift (MonadUnliftIO)
 import           Control.Monad (zipWithM_)
 import           Control.Monad.Except
 import           Control.Monad.Catch (MonadMask)
-import           Control.Monad.IO.Class (liftIO, MonadIO)
+import           Control.Monad.IO.Class (liftIO)
 import           System.IO (Handle, stdout)
 import           Data.List (isInfixOf)
 
@@ -70,7 +70,7 @@ data WriteOptions = WriteOptions
                 , woHash :: T.Text
                 } deriving (Eq, Show)
 
-withOutputFile' :: (MonadUnliftIO m, MonadIO m, MonadMask m) => FilePath -> (Handle -> m a) -> m a
+withOutputFile' :: (MonadUnliftIO m, MonadMask m) => FilePath -> (Handle -> m a) -> m a
 withOutputFile' "/dev/stdout" = \inner -> inner stdout
 withOutputFile' fname = withOutputFile fname
 

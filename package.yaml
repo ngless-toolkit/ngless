@@ -29,7 +29,6 @@ dependencies:
   - conduit >= 1.3
   - conduit-algorithms >=0.0.3.0
   - conduit-extra >=1.1.12
-  - conduit-combinators
   - configurator
   - containers
   - convertible
@@ -52,7 +51,6 @@ dependencies:
   - IntervalMap >=0.5
   - inline-c
   - inline-c-cpp
-  - monad-control
   - mtl >=2.2
   - MissingH >=1.3
   - network
@@ -71,9 +69,7 @@ dependencies:
   - text >=1.2
   - time >=1.5
   - transformers
-  - transformers-base
   - unix-compat
-  - unliftio
   - unliftio-core
   - vector >=0.11
   - vector-algorithms
@@ -91,6 +87,7 @@ when:
 
 ghc-options:
   - -Wall
+  - -Wcompat
   - -fwarn-tabs
   - -fno-warn-missing-signatures
   - -threaded

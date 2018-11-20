@@ -182,12 +182,13 @@ findFunction :: FuncName -> InterpretationEnvIO (NGLessObject -> KwArgsValues ->
 findFunction fname@(FuncName fname') = do
         mods <- gets ieModules
         case filter hasF mods of
-            [m] -> do
-                let Just func = find ((== fname) . funcName) (modFunctions m)
-                    wrap = if funcAllowsAutoComprehension func
-                                then autoComprehendNB
-                                else id
-                return $ wrap $ (runFunction m) fname'
+            [m] -> case find ((== fname) . funcName) (modFunctions m) of
+                    Just func -> do
+                        let wrap = if funcAllowsAutoComprehension func
+                                        then autoComprehendNB
+                                        else id
+                        return $ wrap $ (runFunction m) fname'
+                    _ ->  throwShouldNotOccur . T.unpack $ T.concat ["Function '", fname', "' not found (not builtin and not in any loaded module), even though it should have."]
             [] -> throwShouldNotOccur . T.unpack $ T.concat ["Function '", fname', "' not found (not builtin and not in any loaded module)"]
             ms -> throwShouldNotOccur . T.unpack $ T.concat (["Function '", T.pack $ show fname, "' found in multiple modules! ("] ++ [T.concat [modname, ":"] | modname <- modName . modInfo <$> ms])
     where
@@ -638,7 +639,9 @@ interpretBlock1 vs (Assignment (Variable n) val) = do
 interpretBlock1 vs Discard = return (BlockResult BlockDiscarded vs)
 interpretBlock1 vs Continue = return (BlockResult BlockContinued vs)
 interpretBlock1 vs (Condition c ifT ifF) = do
-    NGOBool v' <- interpretBlockExpr vs c
+    v' <- interpretBlockExpr vs c >>= \case
+                    NGOBool c' -> return c'
+                    _ -> throwShouldNotOccur "Wrong type for condition (Interpret.hs:interpretBlock1)"
     interpretBlock1 vs (if v' then ifT else ifF)
 interpretBlock1 vs (Sequence expr) = interpretBlock vs expr -- interpret [expr]
 interpretBlock1 vs x = unreachable ("interpretBlock1: This should not have happened " ++ show vs ++ " " ++ show x)
@@ -648,14 +651,18 @@ interpretBlockExpr vs val = local (\(NGLInterpretEnv mods (VariableMapGlobal sm)
 
 interpretPreProcessExpr :: Expression -> InterpretationROEnv NGLessObject
 interpretPreProcessExpr (FunctionCall (FuncName "substrim") var args _) = do
-    NGOShortRead r <- interpretExpr var
+    r <- interpretExpr var >>= \case
+                        NGOShortRead r -> return r
+                        _ -> throwShouldNotOccur "Wrong type in Interpret.hs:interpretExpr"
     args' <- forM args $ \(Variable v, e) -> do
         e' <- interpretExpr e
         return (v, e')
     mq <- fromInteger <$> lookupIntegerOrScriptErrorDef (return 0) "substrim argument" "min_quality" args'
     return . NGOShortRead $ substrim mq r
 interpretPreProcessExpr (FunctionCall (FuncName "endstrim") var args _) = do
-    NGOShortRead r <- interpretExpr var
+    r <- interpretExpr var >>= \case
+                        NGOShortRead r -> return r
+                        _ -> throwShouldNotOccur "Wrong type in Interpret.hs:interpretExpr"
     args' <- forM args $ \(Variable v, e) -> do
         e' <- interpretExpr e
         return (v, e')

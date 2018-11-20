@@ -81,10 +81,10 @@ matchConditions doReinject conds sg = reinjectSequences doReinject (matchConditi
         toStrictBS = BL.toStrict . BB.toLazyByteString
 
         addSequence s = case find hasSequence (fst <$> sg) of
-                            Just s' -> do
+                            Just s'@SamLine{} -> do
                                         cigar' <- _fixCigar (samCigar s) (B.length $ samSeq s')
                                         return s { samSeq = samSeq s', samQual = samQual s', samCigar = cigar' }
-                            Nothing -> return s
+                            _ -> return s
 
 _fixCigar :: B.ByteString -> Int -> Either NGError B.ByteString
 _fixCigar prev n = do

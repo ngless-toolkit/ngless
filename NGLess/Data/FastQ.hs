@@ -273,12 +273,12 @@ fqStatsC = do
         findMinQValue' :: VU.Vector Int -> Int
         findMinQValue' qs = fromMaybe 256 (VU.findIndex (/= 0) qs)
 
-interleaveFQs :: (Monad m, MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => [(FastQFilePath, FastQFilePath)] -> [FastQFilePath] -> C.ConduitT () B.ByteString m ()
+interleaveFQs :: (MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => [(FastQFilePath, FastQFilePath)] -> [FastQFilePath] -> C.ConduitT () B.ByteString m ()
 interleaveFQs pairs singletons = do
             sequence_ [interleavePair f0 f1 | (FastQFilePath _ f0, FastQFilePath _ f1) <- pairs]
             sequence_ [conduitPossiblyCompressedFile f | FastQFilePath _ f <- singletons]
     where
-        interleavePair :: (Monad m, MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => FilePath -> FilePath -> C.ConduitT () B.ByteString m ()
+        interleavePair :: (MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => FilePath -> FilePath -> C.ConduitT () B.ByteString m ()
         interleavePair f0 f1 =
                 ((conduitPossiblyCompressedFile f0 .| linesC .| CL.chunksOf 4) `zipSources` (conduitPossiblyCompressedFile f1 .| linesC .| CL.chunksOf 4))
                 .| C.awaitForever (\(r0,r1) -> C.yield (ul r0) >> C.yield (ul r1))

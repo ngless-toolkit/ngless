@@ -17,6 +17,7 @@ import           Control.DeepSeq
 import           Control.Monad.Except
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Primitive
+import           Control.Monad.Fail (MonadFail(..))
 import           Control.Monad.Catch
 import           Control.Monad.IO.Unlift
 import           Control.Exception
@@ -65,6 +66,9 @@ instance MonadUnliftIO NGLessIO where
     askUnliftIO = NGLessIO $ do
         u <- askUnliftIO
         return $ UnliftIO (\(NGLessIO act) -> unliftIO u act)
+
+instance MonadFail NGLessIO where
+    fail err = throwShouldNotOccur err
 
 runNGLess :: (MonadError NGError m) => Either NGError a -> m a
 runNGLess (Left err) = throwError err

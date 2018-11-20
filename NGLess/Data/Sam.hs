@@ -37,7 +37,6 @@ import           Data.Conduit ((.|))
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
 import           Data.Strict.Tuple (Pair(..))
-import           Control.Monad.Primitive
 import Data.Bits (testBit)
 import Data.List (intersperse)
 import Control.Error (note)
@@ -252,7 +251,7 @@ readSamGroupsC = CC.concat
 --
 -- When respectPairs is False, then the two mates of the same fragment will be
 -- considered grouped in different blocks
-readSamGroupsC' :: forall m . (MonadError NGError m, PrimMonad m, MonadIO m) => Int -> Bool -> C.ConduitT (V.Vector ByteLine) (V.Vector [SamLine]) m ()
+readSamGroupsC' :: forall m . (MonadError NGError m, MonadIO m) => Int -> Bool -> C.ConduitT (V.Vector ByteLine) (V.Vector [SamLine]) m ()
 readSamGroupsC' mapthreads respectPairs = do
         CC.dropWhileE (isSamHeaderString . unwrapByteLine)
         CC.filter (not . V.null)
