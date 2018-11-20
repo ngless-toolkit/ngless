@@ -8,6 +8,7 @@ cache:
     paths:
         - .stack
         - .stack-work
+        - .stack-work-test
     # CI_JOB_NAME creates one cache per build target (e.g. build-and-test-ubuntu)
     key: "$CI_JOB_NAME"
 
