@@ -69,8 +69,8 @@ build-and-test-ubuntu-non-static:
     - make
     - make modules
     - make check
-    - make install prefix=${PWD}/prefix-test
-    - PATH=${PWD}/prefix-test/bin:$PATH ./run-tests.sh
+    - make install prefix=${PWD}
+    - PATH=${PWD}/bin:$PATH ./run-tests.sh
 
 
 build-and-test-ubuntu-devel:
@@ -97,8 +97,8 @@ build-and-test-ubuntu-devel:
     - make static
     - make modules
     - make check
-    - make install prefix=${PWD}/prefix-test
-    - PATH=${PWD}/prefix-test/bin:$PATH ./run-tests.sh
+    - make install prefix=${PWD}
+    - PATH=${PWD}/bin:$PATH ./run-tests.sh
 
     artifacts:
         when: on_success
