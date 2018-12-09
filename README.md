@@ -1,7 +1,7 @@
 # NGLess: NGS Processing with Less Work
 
-Ngless is a domain-specific language for NGS (next-generation sequencing data)
-processing.
+![NGLess logo](NGLess-logo-128x64.png) Ngless is a domain-specific language for
+NGS (next-generation sequencing data) processing.
 
 [![Build Status](https://travis-ci.org/ngless-toolkit/ngless.svg?branch=master)](https://travis-ci.org/ngless-toolkit/ngless)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/hyperium/hyper/master/LICENSE)
