@@ -2,7 +2,7 @@
  - License: MIT
  -}
 
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 
 module StandardModules.Samtools
     ( loadModule
@@ -173,14 +173,78 @@ samtools_sort_function = Function
     }
 
 
+executeView :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeView (NGOMappedReadSet name istream rinfo) args = do
+    outBam <- lookupBoolOrScriptErrorDef (return False) "samtools_view" "__output_bam" args
+    bedFile <- lookupStringOrScriptError "coordinates in BED format" "bed_file" args
+
+    let oformat = if outBam then "bam" else "sam"
+        fname = case istream of
+                    File f -> f
+                    Stream _ f _ -> f
+
+    (rk, (newfp, hout)) <- openNGLTempFile' fname "subset_" ("." ++ oformat)
+
+    numCapabilities <- liftIO getNumCapabilities
+    let cmdargs = ["view", "-h", "-@", show numCapabilities, "-O", oformat, "-L", T.unpack bedFile]
+    samtoolsPath <- samtoolsBin
+    outputListLno' TraceOutput ["Calling binary ", samtoolsPath, " with args: ", unwords cmdargs]
+    (err, exitCode) <- case istream of
+        File fpsam -> do
+            let cp = (proc samtoolsPath (snoc cmdargs fpsam)) { std_out = UseHandle hout }
+            liftIO $ readProcessErrorWithExitCode cp
+        Stream _ _ istream' -> do
+            let cp = (proc samtoolsPath cmdargs) { std_in = CreatePipe, std_out = UseHandle hout, std_err = CreatePipe }
+            (Just pipe_out, Nothing, Just herr, jHandle) <- liftIO $ createProcess cp
+            samP <- liftIO . A.async $ waitForProcess jHandle
+            err <- liftIO . A.async $ do
+                        -- In a separate thread, consume all the error input.
+                        -- the same pattern is used in the implementation of
+                        -- readProcessWithErrorCode (which cannot be used here
+                        -- as we want control over stdin/stdout)
+                        err <- hGetContents herr
+                        void (evaluate (length err))
+                        hClose herr
+                        return err
+            C.runConduit $ istream' .| byteLineVSinkHandle pipe_out
+            liftIO $ do
+                hClose pipe_out
+                A.waitBoth err samP
+    outputListLno' DebugOutput ["Samtools err output: ", err]
+    liftIO $ hClose hout
+    case exitCode of
+        ExitSuccess -> do
+            outputListLno' InfoOutput ["Done samtools view"]
+            return (NGOMappedReadSet name (File newfp) rinfo)
+        ExitFailure code -> do
+            release rk
+            throwSystemError $ concat ["Failed samtools view\n",
+                            "Executable used::\t", samtoolsPath,"\n",
+                            "Command line was::\n\t", unwords cmdargs, "\n",
+                            "Samtools exit code was ", show code, "."]
+executeView _ _ = throwScriptError "Unexpected arguments for samtools_view function"
+
+samtools_view_function = Function
+    { funcName = FuncName "samtools_view"
+    , funcArgType = Just NGLMappedReadSet
+    , funcArgChecks = []
+    , funcRetType = NGLMappedReadSet
+    , funcKwArgs = [ArgInformation "bed_file" True NGLString [ArgCheckFileReadable]]
+    , funcAllowsAutoComprehension = False
+    , funcChecks = []
+    }
+
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
         return def
-        { modInfo = ModInfo "stdlib.samtools" "0.0"
+        { modInfo = ModInfo "stdlib.samtools" "0.1"
         , modCitations = [citation]
-        , modFunctions = [samtools_sort_function]
+        , modFunctions = [samtools_sort_function, samtools_view_function]
         , modTransform = sortOFormat >=> checkUnique
-        , runFunction = const executeSort
+        , runFunction = \case
+                        "samtools_sort" -> executeSort
+                        "samtools_view" -> executeView
+                        other -> \_ _ -> throwShouldNotOccur ("samtools runction called with wrong arguments: " ++ show other)
         }
     where
         citation = T.concat

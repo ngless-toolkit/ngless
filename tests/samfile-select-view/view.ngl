@@ -1,0 +1,6 @@
+ngless '0.0'
+import "samtools" version "0.1"
+
+mapped = samfile('sample.sam.gz')
+region_reads = samtools_view(mapped, bed_file="short.bed.gz")
+write(region_reads, ofile='output.bam')

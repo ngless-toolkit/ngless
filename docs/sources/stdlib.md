@@ -97,8 +97,17 @@ interfere in a way that you get erroneous results**.
 
 ## Samtools module
 
-This module exposes the samtools sorting functionality through the
-`samtools_sort` function.
+This module exposes two samtools functionalities: sorting (`samtools_sort`) and
+selecting reads in regions of interest (`samtools_view`).
+
+    ngless '0.8'
+    import "samtools" version "0.0"
+    input = samfile('input.bam')
+    sam_regions = samtools_view(input, bed_file="interesting_regions.bed")
+    write(sam_regions, ofile='interesting.sam')
+
+`samtools_view :: mappedreadset -> mappedreadset` returns a subset of the
+mapped reads that overlap with the regions specified in the BED file.
 
     ngless '0.8'
     import "samtools" version "0.0"
@@ -111,7 +120,7 @@ This module exposes the samtools sorting functionality through the
 `samtools_sort :: mappedreadset -> mappedreadset` returns a sorted version of
 the dataset.
 
-Internally, this function calls ngless' version of samtools while respecting
+Internally, both function call ngless' version of samtools while respecting
 your settings for the use of threads and temporary disk space. When combined
 with other functionality, ngless can also often stream data into/from samtools
 instead of relying on intermediate files (these optimizations should not change

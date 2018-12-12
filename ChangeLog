@@ -1,6 +1,7 @@
 Version 0.10.0+
 	* Disable Cairo dependency when building statically
 	* Update minimap2 version to 2.14
+	* Module samtools (version 0.1) now includes samtools_view
 
 Version 0.10.0 2018-11-12 by luispedro
 	* Fix to lock1's return value when used with paths (#68 - reopen)
