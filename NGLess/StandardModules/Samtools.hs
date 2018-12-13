@@ -235,17 +235,27 @@ samtools_view_function = Function
     }
 
 loadModule :: T.Text -> NGLessIO Module
-loadModule _ =
-        return def
-        { modInfo = ModInfo "stdlib.samtools" "0.1"
-        , modCitations = [citation]
-        , modFunctions = [samtools_sort_function, samtools_view_function]
-        , modTransform = sortOFormat >=> checkUnique
-        , runFunction = \case
-                        "samtools_sort" -> executeSort
-                        "samtools_view" -> executeView
-                        other -> \_ _ -> throwShouldNotOccur ("samtools runction called with wrong arguments: " ++ show other)
-        }
+loadModule v
+    | v == "0.0" = return def
+                   { modInfo = ModInfo "stdlib.samtools" "0.0"
+                   , modCitations = [citation]
+                   , modFunctions = [samtools_sort_function]
+                   , modTransform = sortOFormat >=> checkUnique
+                   , runFunction = \case
+                                   "samtools_sort" -> executeSort
+                                   other -> \_ _ -> throwShouldNotOccur ("samtools runction called with wrong arguments: " ++ show other)
+                   }
+    | v == "0.1" = return def
+                   { modInfo = ModInfo "stdlib.samtools" "0.1"
+                   , modCitations = [citation]
+                   , modFunctions = [samtools_sort_function, samtools_view_function]
+                   , modTransform = sortOFormat >=> checkUnique
+                   , runFunction = \case
+                                   "samtools_sort" -> executeSort
+                                   "samtools_view" -> executeView
+                                   other -> \_ _ -> throwShouldNotOccur ("samtools runction called with wrong arguments: " ++ show other)
+                                   }
+    | otherwise = throwScriptError ("samtools module version " ++ T.unpack v ++ " doesn't exist")
     where
         citation = T.concat
             ["'The Sequence Alignment/Map format and SAMtools' "
