@@ -5,8 +5,8 @@ This document describes the NGLess language.
 ## Tokenization
 
 Tokenization follows the standard C-family rules. A word is anything that
-matches `[A-Za-z_]`. The language is case-sensitive. All files are assumed to
-be in UTF-8.
+matches `[A-Za-z_][A-Za-z_0-9]*`. The language is case-sensitive. All files are
+assumed to be in UTF-8.
 
 Both LF and CRLF are accepted as line endings (Unix-style LF is preferred).
 
@@ -206,4 +206,123 @@ built-in functions or those added by modules can be used.
 
 Methods are called using the syntax `object . methodName ( <ARGS> )`. As with
 functions, one argument may be unnamed, all others must be passed by name.
+
+## Grammar
+
+
+This is the extended Backus-Naur form grammar for the NGLess language (using
+the [ISO
+14977](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form)
+conventions). Briefly,  the comma (`,`) is used for concatenation, `[x]`
+denotes _optional_, and `{x}` denotes _zero or more of `x`_.
+
+
+    string = ? a quoted string, produced by the tokenizer ? ;
+    word = ? a word produced by the tokenizer ? ;
+    
+    eol =
+        ';'
+        | '\n' {'\n'}
+        ;
+    
+    
+    ngless = [header], body;
+    
+    header = {eol}, ngless_version, {eol}, {import}, {eol}
+    
+    ngless_version = "ngless", string, eol ;
+    
+    import = ["local"],  "import", string, "version", string, eol ;
+    
+    body = {expression, eol} ;
+    
+    expression =
+                conditional
+                | "discard"
+                | "continue"
+                | assignment
+                | innerexpression
+                ;
+    
+    innerexpression = left_expression, binop, innerexpression
+                        | left_expression
+                        ;
+    
+    left_expression =  uoperator
+                        | method_call
+                        | indexexpr
+                        | base_expression
+                        ;
+    
+    base_expression = pexpression
+                       | funccall
+                       | listexpr
+                       | constant
+                       | variable
+                       ;
+    
+    pexpression = '(', innerexpression, ')' ;
+    
+    constant =
+            "true"
+            | "True"
+            | "false"
+            | "False"
+            | double
+            | integer
+            | symbol
+            ;
+    
+    double = integer, '.', integer ;
+    integer = digit, {digit} ;
+    digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' ;
+    symbol = '{', word, '}' ;
+    
+    
+    indentation = ' ', {' '} ;
+    binop = '+' | '-' | '*' | "!=" | "==" | "</>" | "<=" | "<" | ">=" | ">" | "+" | "-" ;
+    
+    uoperator =
+            lenop
+            | unary_minus
+            | not_expr
+            ;
+    
+    lenop = "len", '(', expression, ')'
+    unary_minus = '-', base_expression ;
+    not_expr = "not", innerexpression ;
+    
+    funccall = paired
+            | word,  '(', innerexpression, kwargs, ')', [ funcblock ]
+            ;
+    
+    (* paired is a special-case function with two arguments *)
+    paired = "paired", '(', innerexpression, ',', innerexpression,  kwargs ;
+
+    funcblock = "using", '|', [ variablelist ], '|', ':', block ;
+    
+    
+    kwargs = {',', variable, '=', innerexpression} ;
+    
+    assignment = variable, '=', expression ;
+    
+    method_call = base_expression, '.', word, '(', [ method_args ], ')';
+    method_args =
+            innerexpression, kwargs
+            | variable, '=', innerexpression, kwargs
+            ; (* note that kwargs is defined as starting with a comma *)
+    
+    indexexpr = base_expression, '[', [ indexing ], ']' ;
+    
+    indexing = [ innerexpression  ], ':', [ innerexpression ] ;
+    
+    listexpr = '[', [ list_contents ] , ']' ;
+    list_contents = innerexpression, {',', innerexpression } ;
+    
+    conditional = "if",  innerexpression, ':',  block, [ elseblock ] ;
+    elseblock = "else", ':', block ;
+    block = eol, indentation, expression, eol, {indentation, expression, eol} ;
+    
+    variablelist = variable, {',', variable} ;
+    variable = word ;
 

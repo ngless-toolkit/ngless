@@ -122,7 +122,7 @@ base_expression = pexpression
                     <|> rawexpr
                     <|> (Lookup Nothing <$> variable)
 
-pexpression = operator '(' *> expression <* operator ')'
+pexpression = operator '(' *> innerexpression <* operator ')'
 
 tokf ::  (Token -> Maybe a) -> Parser a
 tokf f = token (show .snd) fst (f . snd)
