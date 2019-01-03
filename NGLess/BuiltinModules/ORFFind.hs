@@ -1,4 +1,4 @@
-{- Copyright 2017 NGLess Authors
+{- Copyright 2017-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -68,8 +68,8 @@ orfFindFunction = Function
     , funcRetType = NGLFilename
     , funcKwArgs =
             [ArgInformation "is_metagenome" True NGLBool []
-            ,ArgInformation "coords_out" False NGLFilename [ArgCheckFileWritable]
-            ,ArgInformation "prots_out" False NGLFilename [ArgCheckFileWritable]
+            ,ArgInformation "coords_out" False NGLString [ArgCheckFileWritable]
+            ,ArgInformation "prots_out" False NGLString [ArgCheckFileWritable]
             ]
     , funcAllowsAutoComprehension = False
     , funcChecks = [FunctionCheckReturnAssigned]

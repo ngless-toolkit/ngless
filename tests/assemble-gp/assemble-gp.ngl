@@ -2,5 +2,6 @@ ngless "0.8"
 
 input = fastq('sample.fq.gz')
 write(orf_find(assemble(input),
-                is_metagenome=True),
+                is_metagenome=True,
+                prots_out='output.orfs.faa'),
     ofile='output.orfs.fna')
