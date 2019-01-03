@@ -1,4 +1,4 @@
-{- Copyright 2018 NGLess Authors
+{- Copyright 2018-2019 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE RankNTypes #-}
@@ -23,12 +23,13 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit as C
+import qualified UnliftIO as U
 import           Data.Conduit ((.|))
 import           Data.Conduit.Algorithms (mergeC)
-import           Control.Exception (bracket_)
 import           GHC.Conc (getNumCapabilities, setNumCapabilities)
 import           Control.Monad.Trans.Class (lift)
 
+import Data.FastQ
 import Data.Sam (isSamHeaderString)
 import Output
 import NGLess
@@ -58,8 +59,8 @@ createIndex fafile = do
         ExitSuccess -> return ()
         ExitFailure _err -> throwSystemError err
 
-callMapper :: FilePath -> [FilePath] -> [String] -> C.ConduitT B.ByteString C.Void IO a -> NGLessIO a
-callMapper refIndex fps extraArgs outC = do
+callMapper :: FilePath -> ReadSet -> [String] -> C.ConduitT B.ByteString C.Void NGLessIO a -> NGLessIO a
+callMapper refIndex rs extraArgs outC = do
     outputListLno' InfoOutput ["Starting mapping to ", refIndex, " (minimap2)"]
     minimap2Path <- minimap2Bin
     numCapabilities <- liftIO getNumCapabilities
@@ -67,20 +68,19 @@ callMapper refIndex fps extraArgs outC = do
     let minimap2threads
             | strictThreads && numCapabilities > 1 = numCapabilities - 1
             | otherwise = numCapabilities
-        with1Thread :: IO a -> IO a
         with1Thread act
-            | strictThreads = bracket_
-                                (setNumCapabilities 1)
-                                (setNumCapabilities numCapabilities)
+            | strictThreads = U.bracket_
+                                (liftIO $ setNumCapabilities 1)
+                                (liftIO $ setNumCapabilities numCapabilities)
                                 act
             | otherwise = act
-        cmdargs =  concat [["-t", show minimap2threads, "-a"], extraArgs, [refIndex], fps]
+        cmdargs =  concat [["-t", show minimap2threads, "-a"], extraArgs, [refIndex, "-"]]
     outputListLno' TraceOutput ["Calling: ", minimap2Path, unwords cmdargs]
     let cp = proc minimap2Path cmdargs
-    usam <- makeNGLTempFile (head fps) "minimap2." "sam" $ \hout -> do
-        (exitCode, _, err) <- liftIO . with1Thread $
+    usam <- makeNGLTempFile "fastq" "minimap2." "sam" $ \hout -> do
+        (exitCode, _, err) <- with1Thread $
                 CP.sourceProcessWithStreams cp
-                    (return ()) -- stdin
+                    (interleaveFQs rs) -- stdin
                     (CB.sinkHandle hout) -- stdout
                     CL.consume -- stderr
         let err' = BL8.unpack $ BL8.fromChunks err
@@ -96,7 +96,7 @@ callMapper refIndex fps extraArgs outC = do
                                 "minimap2 stderr: ", err']
     C.runConduit $ sortSam usam
                         .| CL.map (`B.snoc` 10)
-                        .| C.transPipe liftIO outC
+                        .| outC
 
 sortSam :: FilePath -> C.ConduitT () B.ByteString NGLessIO ()
 sortSam samfile =

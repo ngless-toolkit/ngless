@@ -21,12 +21,13 @@ import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Conduit.Process as CP
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
+import qualified UnliftIO as U
 import           Control.Monad.Extra (allM)
-import           Control.Exception (bracket_)
 import           GHC.Conc (getNumCapabilities, setNumCapabilities)
 
 import Output
 import NGLess
+import Data.FastQ
 import Configuration
 import NGLess.NGLEnvironment
 import Dependencies.Versions (bwaVersion)
@@ -85,8 +86,8 @@ createIndex fafile = do
         ExitSuccess -> return ()
         ExitFailure _err -> throwSystemError err
 
-callMapper :: FilePath -> [FilePath] -> [String] -> C.ConduitT B.ByteString C.Void IO a -> NGLessIO a
-callMapper refIndex fps extraArgs outC = do
+callMapper :: FilePath -> ReadSet -> [String] -> C.ConduitT B.ByteString C.Void NGLessIO a -> NGLessIO a
+callMapper refIndex rs extraArgs outC = do
     outputListLno' InfoOutput ["Starting mapping to ", refIndex]
     bwaPath <- bwaBin
     refIndex' <- indexPrefix refIndex
@@ -95,20 +96,19 @@ callMapper refIndex fps extraArgs outC = do
     let bwathreads
             | strictThreads && numCapabilities > 1 = numCapabilities - 1
             | otherwise = numCapabilities
-        cmdargs =  concat [["mem", "-t", show bwathreads], extraArgs, [refIndex'], fps]
-        with1Thread :: IO a -> IO a
+        cmdargs =  concat [["mem", "-t", show bwathreads], extraArgs, [refIndex', "-p", "-"]]
         with1Thread act
-            | strictThreads = bracket_
-                                (setNumCapabilities 1)
-                                (setNumCapabilities numCapabilities)
+            | strictThreads = U.bracket_
+                                (liftIO $ setNumCapabilities 1)
+                                (liftIO $ setNumCapabilities numCapabilities)
                                 act
             | otherwise = act
 
     outputListLno' TraceOutput ["Calling: ", unwords (bwaPath:cmdargs)]
     let cp = proc bwaPath cmdargs
-    (exitCode, out, err) <- liftIO . with1Thread $
+    (exitCode, out, err) <- with1Thread $
             CP.sourceProcessWithStreams cp
-                (return ()) -- stdin
+                (interleaveFQs rs) -- stdin
                 outC -- stdout
                 CL.consume -- stderr
     let err' = BL8.unpack $ BL8.fromChunks err

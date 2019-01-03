@@ -71,6 +71,7 @@ dependencies:
   - transformers
   - unix-compat
   - unliftio-core
+  - unliftio
   - vector >=0.11
   - vector-algorithms
   - yaml

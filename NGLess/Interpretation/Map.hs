@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -18,13 +18,12 @@ import           Control.Monad
 import           Control.Monad.Except
 
 import qualified Data.Conduit.List as CL
-import qualified Data.Conduit.Lift as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
 import           Control.Monad.Extra (unlessM)
-import           Data.List (foldl', sort)
+import           Data.List (sort)
 
 
 import System.IO
@@ -49,7 +48,6 @@ import qualified StandardModules.Mappers.Minimap2 as Minimap2
 
 import Data.Sam
 import Data.Fasta
-import Data.FastQ
 import FileOrStream
 import Utils.Utils
 import Utils.Conduit
@@ -67,7 +65,7 @@ data MergeStrategy = MSBestOnly
 data Mapper = Mapper
     { createIndex :: FilePath -> NGLessIO ()
     , hasValidIndex :: FilePath -> NGLessIO Bool
-    , callMapper :: forall a. FilePath -> [FilePath] -> [String] -> C.ConduitT B.ByteString C.Void IO a -> NGLessIO a
+    , callMapper :: forall a. FilePath -> ReadSet -> [String] -> C.ConduitT B.ByteString C.Void NGLessIO a -> NGLessIO a
     }
 
 bwa = Mapper Bwa.createIndex Bwa.hasValidIndex Bwa.callMapper
@@ -172,26 +170,14 @@ lookupReference args = do
 
 
 mapToReference :: Mapper -> FilePath -> ReadSet -> [String] -> NGLessIO (FilePath, (Int, Int, Int))
-mapToReference mapper refIndex (ReadSet pairs singletons) extraArgs = do
+mapToReference mapper refIndex rs extraArgs = do
     (newfp, hout) <- openNGLTempFile refIndex "mapped_" ".sam"
-    let out1 = CB.sinkHandle hout
-        out2 :: C.ConduitT B.ByteString C.Void IO ()
-        out2 = CB.lines
-                .| CL.filter (\line -> not (B.null line) &&  B8.head line /= '@')
-                .| CC.unlinesAscii
-                .| CB.sinkHandle hout
-    statsp <- forM (zip pairs (out1:repeat out2)) $ \((FastQFilePath _ fp1, FastQFilePath _ fp2), out) ->
-                callMapper mapper refIndex [fp1, fp2] extraArgs (zipToStats out)
-    let outs = if null statsp
-                    then out1:repeat out2
-                    else repeat out2
-    statss <- forM (zip singletons outs) $ \(FastQFilePath _ fp, out) ->
-                callMapper mapper refIndex [fp] extraArgs (zipToStats out)
+    statsp <- callMapper mapper refIndex rs extraArgs (zipToStats $ CB.sinkHandle hout)
     liftIO $ hClose hout
-    (newfp,) <$> combinestats statsp statss
+    return (newfp, statsp)
 
-zipToStats :: C.ConduitT B.ByteString C.Void IO () -> C.ConduitT B.ByteString C.Void IO (NGLess (Int, Int, Int))
-zipToStats out = snd <$> C.toConsumer (zipSink2 out (C.runExceptC (linesVC 4096 .| readSamGroupsC .| samStatsC')))
+zipToStats :: C.ConduitT B.ByteString C.Void NGLessIO () -> C.ConduitT B.ByteString C.Void NGLessIO (Int, Int, Int)
+zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesVC 4096 .| readSamGroupsC .| samStatsC'))
 
 splitFASTA :: Int -> FilePath -> FilePath -> NGLessIO [FilePath]
 splitFASTA megaBPS ifile ofileBase =
@@ -232,16 +218,6 @@ splitFASTA megaBPS ifile ofileBase =
                                 else do
                                     C.yield fa
                                     getNbps' (faseqLength fa + sofar)
-
-
-combinestats first second = do
-        first' <- runNGLess $ sequence first
-        second' <- runNGLess $ sequence second
-        return $ foldl' add3 (0,0,0) (first' ++ second')
-    where
-        add3 :: (Int, Int, Int) -> (Int, Int, Int) -> (Int, Int, Int)
-        add3 (!a,!b,!c) (!a',!b',!c') = (a + a', b + b', c + c')
-
 
 
 performMap :: Mapper -> Int -> ReferenceInfo -> T.Text -> ReadSet -> [String] -> NGLessIO NGLessObject
