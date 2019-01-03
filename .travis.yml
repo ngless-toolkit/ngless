@@ -45,4 +45,3 @@ script:
   - mkdir prefix-test
   - make install prefix=${PWD}/prefix-test
   - PATH=${PWD}/prefix-test/bin:$PATH ./run-tests.sh
-  - ./run-benchmarks.sh
