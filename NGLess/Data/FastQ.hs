@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts, ScopedTypeVariables, MultiWayIf #-}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -8,6 +8,7 @@ module Data.FastQ
     ( ShortRead(..)
     , FastQEncoding(..)
     , FastQFilePath(..)
+    , ReadSet(..)
     , FQStatistics(..)
     , nBasepairs
     , srSlice
@@ -88,6 +89,11 @@ data FastQFilePath = FastQFilePath
                         { fqpathEncoding :: !FastQEncoding -- ^ encoding
                         , fqpathFilePath :: FilePath -- ^ file_on_disk
                         } deriving (Eq, Show, Ord)
+
+data ReadSet = ReadSet
+                { pairedSamples :: [(FastQFilePath, FastQFilePath)]
+                , singleSamples :: [FastQFilePath]
+                } deriving (Eq, Show, Ord)
 
 data FQStatistics = FQStatistics
                 { bpCounts :: (Int, Int, Int, Int, Int) -- ^ number of (A, C, T, G, OTHER)
@@ -273,8 +279,8 @@ fqStatsC = do
         findMinQValue' :: VU.Vector Int -> Int
         findMinQValue' qs = fromMaybe 256 (VU.findIndex (/= 0) qs)
 
-interleaveFQs :: (MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => [(FastQFilePath, FastQFilePath)] -> [FastQFilePath] -> C.ConduitT () B.ByteString m ()
-interleaveFQs pairs singletons = do
+interleaveFQs :: (MonadError NGError m, MonadResource m, MonadUnliftIO m, MonadThrow m) => ReadSet -> C.ConduitT () B.ByteString m ()
+interleaveFQs (ReadSet pairs singletons) = do
             sequence_ [interleavePair f0 f1 | (FastQFilePath _ f0, FastQFilePath _ f1) <- pairs]
             sequence_ [conduitPossiblyCompressedFile f | FastQFilePath _ f <- singletons]
     where

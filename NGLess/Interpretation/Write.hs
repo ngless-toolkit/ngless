@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -193,10 +193,9 @@ executeWrite (NGOReadSet _ rs) args = do
 #endif
 
                             else return CB.sinkHandle
-            withOutputFile' ofile $ \hout -> do
-                let ReadSet pairs singles = rs
+            withOutputFile' ofile $ \hout ->
                 C.runConduitRes $
-                    interleaveFQs pairs singles .| writer hout
+                    interleaveFQs rs .| writer hout
         else case rs of
             ReadSet [] singles ->
                 moveOrCopyCompressFQs singles ofile

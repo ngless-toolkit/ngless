@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -86,10 +86,6 @@ data NGLType =
         | NGList !NGLType
     deriving (Eq, Ord, Show)
 
-data ReadSet = ReadSet
-                { pairedSamples :: [(FastQFilePath, FastQFilePath)]
-                , singleSamples :: [FastQFilePath]
-                } deriving (Eq, Show, Ord)
 
 data NGLessObject =
         NGOString !T.Text
