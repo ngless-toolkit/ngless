@@ -1,5 +1,5 @@
 {-# LANGUAGE PackageImports #-}
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
 module Main
@@ -342,11 +342,16 @@ modeExec (PrintPathMode exec) = runNGLessIO "finding internal path" $ do
       _ -> throwSystemError ("Unknown binary " ++ exec ++ ".")
     liftIO $ putStrLn path
 
-modeExec CheckInstallMode = runNGLessIO "Checking install" $ do
-    void samtoolsBin
-    void prodigalBin
-    void megahitBin
-    void bwaBin
+modeExec (CheckInstallMode verbose) = runNGLessIO "Checking install" $ do
+    let checkPath tool pathA
+            | verbose = do
+                path <- pathA
+                liftIO $ putStrLn (tool ++ ": `" ++ path ++ "`")
+            | otherwise = void pathA
+    checkPath "samtools" samtoolsBin
+    checkPath "prodigal" prodigalBin
+    checkPath "megahit" megahitBin
+    checkPath "bwa" bwaBin
     liftIO $ putStrLn "Install OK"
 
 main' = do

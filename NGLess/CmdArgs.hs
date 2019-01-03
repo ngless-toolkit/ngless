@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2015-2019 NGLess Authors
  - License: MIT
  -}
 module CmdArgs
@@ -98,6 +98,8 @@ data NGLessMode =
               { pathDesired :: String
               }
         | CheckInstallMode
+              { checkInstallVerbose :: Bool
+              }
            deriving (Eq, Show)
 
 parseVerbosity = option (eitherReader readVerbosity) (long "verbosity" <> short 'v' <> value Normal)
@@ -183,6 +185,7 @@ printPathArgs = flag' PrintPathMode (long "print-path")
                         <*> strArgument (metavar "EXEC")
 
 checkInstallArgs = flag' CheckInstallMode (long "check-install" <> help "Check if ngless is correctly installed")
+                          <*> switch (long "verbose" <> short 'v' <> help "Print paths")
 
 nglessArgs :: Parser NGLessArgs
 nglessArgs = NGLessArgs

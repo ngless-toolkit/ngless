@@ -5,6 +5,7 @@ Version 0.10.0+
 	* Update to LTS-13 (GHC 8.6)
 	* Fix bug with orf_find & prots_out argument
 	* Call bwa/minimap2 with interleaved fastq files
+	* Add --verbose flag to check-install mode
 
 Version 0.10.0 2018-11-12 by luispedro
 	* Fix to lock1's return value when used with paths (#68 - reopen)
