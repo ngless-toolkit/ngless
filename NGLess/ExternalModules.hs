@@ -490,11 +490,11 @@ findLoad modname version = do
             | modname `elem` knownModules -> Just <$> downloadModule modname version
         _ -> return found
     case found' of
-        Just mdir -> Yaml.decodeEither <$> liftIO (B.readFile (mdir </> modfile)) >>= \case
+        Just mdir -> Yaml.decodeEither' <$> liftIO (B.readFile (mdir </> modfile)) >>= \case
                         Right v -> do
                             checkCompatible modname version (emInfo v)
                             return (addPathToRep mdir v)
-                        Left err -> throwSystemError ("Could not load module file "++ mdir </> modfile ++ ". Error was `" ++ err ++ "`")
+                        Left err -> throwSystemError ("Could not load module file "++ mdir </> modfile ++ ". Error was `" ++ show err ++ "`")
         Nothing -> do
                 others <- forM [".", globalDir, userDir] $ \basedir -> do
                     let dname = basedir </> modpath'
