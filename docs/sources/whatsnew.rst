@@ -26,7 +26,7 @@ User-visible improvements
 - Better error messages when version is mis-specified
 - Support `NO_COLOR <https://no-color.org/>`__ standard: when ``NO_COLOR`` is
   present in the environment, print no colours.
-- Always check output file writability (`issue #91 <https://github.com/ngless-toolkit/ngless/issues/91issue )
+- Always check output file writability (`issue #91 <https://github.com/ngless-toolkit/ngless/issues/91>`__)
 - ``paired()`` now accepts ``encoding`` argument (it was documented to, but mis-implemented)
 
 Internal improvements

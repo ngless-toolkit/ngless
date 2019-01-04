@@ -34,28 +34,28 @@ NGLess can generate large temporary files. By default it uses the system's
 temporary directory, but it is often a good idea to set it to a path with a lot
 of free disk space:
 
-  -t,--temporary-directory ARG
-                           Directory where to store temporary files
-
-
-  --search-path ARG        Reference search directories (replace <references> in
-                           script)
-  --index-path ARG         Index path (directory where indices are stored)
+   -t,--temporary-directory ARG
+                            Directory where to store temporary files
+   
+   
+   --search-path ARG        Reference search directories (replace <references> in
+                            script)
+   --index-path ARG         Index path (directory where indices are stored)
 
 
 ## Debugging
 
 A few options are useful for debugging:
 
-  -n,--validate-only       Only validate input, do not run script
-  --subsample              Subsample mode: quickly test a pipeline by discarding
-                           99% of the input
-  --trace                  Set highest verbosity mode
-  --no-trace               opposite of --trace
-  --keep-temporary-files   Whether to keep temporary files (default is delete
-                           them)
-  --no-keep-temporary-files
-                           opposite of --keep-temporary-files
+   -n,--validate-only       Only validate input, do not run script
+   --subsample              Subsample mode: quickly test a pipeline by discarding
+                            99% of the input
+   --trace                  Set highest verbosity mode
+   --no-trace               opposite of --trace
+   --keep-temporary-files   Whether to keep temporary files (default is delete
+                            them)
+   --no-keep-temporary-files
+                            opposite of --keep-temporary-files
 
 
 ## QC Reporting
