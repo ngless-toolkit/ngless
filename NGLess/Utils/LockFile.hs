@@ -50,7 +50,7 @@ import System.Posix.Internals
     , withFilePath
     )
 import Control.Monad.Trans.Resource
-import Network.BSD (getHostName)
+import Network.HostName (getHostName)
 
 import NGLess.NGError
 import Output

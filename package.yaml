@@ -46,6 +46,7 @@ dependencies:
   - gitrev
   - hashable
   - hashtables
+  - hostname
   - http-conduit
   - http-client
   - IntervalMap >=0.5
