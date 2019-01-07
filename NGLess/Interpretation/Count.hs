@@ -1,4 +1,4 @@
-{- Copyright 2015-2018 NGLess Authors
+{- Copyright 2015-2019 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, CPP #-}
@@ -39,6 +39,7 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Algorithms.Utils as CAlg
+import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import           Data.Conduit ((.|))
 import qualified Data.Strict.Tuple as TU
 import           Data.Strict.Tuple (Pair(..))

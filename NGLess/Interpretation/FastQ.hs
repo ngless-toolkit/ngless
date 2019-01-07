@@ -24,9 +24,11 @@ import qualified Data.Conduit.List as CL
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Control.Concurrent.Async as A
+import           Data.Conduit ((.|))
+import           Data.Conduit.Algorithms.Async (withPossiblyCompressedFile)
+import           Control.Monad.Trans.Resource (runResourceT)
 import Control.Exception (try)
 import Control.Monad.Except
-import Data.Conduit ((.|))
 import Data.Maybe
 import Data.Word
 
@@ -65,18 +67,21 @@ encodingFor fp = do
                     _ -> throwDataError ("Malformed file '" ++ fp ++ "': number of lines is not a multiple of 4.")
 
 
-    C.runConduit $
-        conduitPossiblyCompressedFile fp
-        .| linesC
-        .| CL.chunksOf 4
-        .| encodingC 255 0
+    withPossiblyCompressedFile fp $ \src ->
+        C.runConduit $
+            src
+            .| linesC
+            .| CL.chunksOf 4
+            .| encodingC 255 0
 
 -- | Checks if file has no content
 --
 -- Note that this is more than checking if the file is empty: a compressed file
 -- with no content will not be empty.
-checkNoContent fp = C.runConduitRes $
-    conduitPossiblyCompressedFile fp
+checkNoContent :: FilePath -> NGLessIO Bool
+checkNoContent fp = runResourceT $ withPossiblyCompressedFile fp $ \src ->
+    C.runConduit $
+        src
         .| linesC
         .| CL.isolate 1
         .| CL.fold (\_ _ -> False) True
@@ -93,13 +98,14 @@ drop10 = loop (0 :: Int)
 
 performSubsample :: FilePath -> Handle -> IO ()
 performSubsample f h = do
-    C.runConduitRes $
-            conduitPossiblyCompressedFile f
-                .| CB.lines
-                .| drop10
-                .| C.take 100000
-                .| C.unlinesAscii
-                .|  asyncGzipTo h
+    runResourceT $ withPossiblyCompressedFile f $ \src ->
+        C.runConduit $
+            src
+            .| CB.lines
+            .| drop10
+            .| C.take 100000
+            .| C.unlinesAscii
+            .| asyncGzipTo h
     hClose h
 
 optionalSubsample :: FilePath -> NGLessIO FilePath

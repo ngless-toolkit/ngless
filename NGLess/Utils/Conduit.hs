@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT -}
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts, CPP #-}
 
@@ -6,7 +6,6 @@ module Utils.Conduit
     ( ByteLine(..)
     , byteLineSinkHandle
     , byteLineVSinkHandle
-    , conduitPossiblyCompressedFile
     , asyncMapC
     , asyncMapEitherC
     , linesUnBoundedC

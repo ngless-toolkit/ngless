@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -21,7 +21,8 @@ import qualified Data.ByteString as B
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
-import Data.Conduit ((.|))
+import           Data.Conduit ((.|))
+import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 
 import FileManagement (createTempDir, makeNGLTempFile)
 import Data.FastQ

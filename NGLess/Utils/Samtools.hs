@@ -20,6 +20,7 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Process as CP
 import qualified Control.Concurrent.Async as A
 import           Data.Conduit ((.|))
+import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import           Control.Monad.Except
 import           Control.Concurrent (getNumCapabilities)
 import           Data.List (isSuffixOf)
@@ -30,7 +31,6 @@ import FileManagement
 import NGLess.NGError
 
 import Utils.Utils (readProcessErrorWithExitCode)
-import Utils.Conduit
 
 -- | reads a SAM (possibly compressed) or BAM file (in the latter case by using
 -- 'samtools view' under the hood)

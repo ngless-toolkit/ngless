@@ -1,4 +1,4 @@
-{- Copyright 2016-2017 NGLess Authors
+{- Copyright 2016-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -14,6 +14,7 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
+import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import           Control.Monad.Extra (unlessM)
 import           System.Directory (doesDirectoryExist)
 import System.FilePath

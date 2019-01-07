@@ -26,6 +26,7 @@ import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
 import           Control.Monad.State.Strict (execState, modify')
 import           Data.Convertible (convert)
+import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 
 import Language
 import Interpret

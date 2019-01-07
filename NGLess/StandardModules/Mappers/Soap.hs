@@ -29,6 +29,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import qualified UnliftIO as U
 import           Data.Conduit ((.|))
+import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import           Control.Monad.Extra (guard, allM, whenM)
 import           GHC.Conc (getNumCapabilities, setNumCapabilities)
 import           Data.List (isSuffixOf)

@@ -1,4 +1,4 @@
-{- Copyright 2016-2018 NGLess Authors
+{- Copyright 2016-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -35,6 +35,7 @@ import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.TQueue as CA
 import qualified Data.Conduit.Algorithms as CAlg
+import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import           Control.Monad.ST (runST)
 import           Control.Monad.Except (throwError)
 import           Control.Monad.Extra (allM, unlessM)

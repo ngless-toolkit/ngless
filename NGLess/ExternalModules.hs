@@ -1,4 +1,4 @@
-{- Copyright 2015-2018 NGLess Authors
+{- Copyright 2015-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -15,6 +15,7 @@ import qualified Data.List.Utils as LU
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
 import           Data.Conduit ((.|))
+import           Data.Conduit.Algorithms.Async (withPossiblyCompressedFile)
 import           Control.Monad.Extra (whenJust)
 import           GHC.Conc (getNumCapabilities)
 import           Data.Yaml ((.!=), (.:?), (.:))
@@ -39,7 +40,6 @@ import NGLess.NGLEnvironment
 import FileManagement
 import Utils.Samtools
 import Configuration
-import Utils.Conduit
 import FileOrStream
 import Utils.Suggestion
 import Utils.Utils
@@ -376,9 +376,8 @@ asBamFile fname
 
 uncompressFile :: FilePath -> NGLessIO FilePath
 uncompressFile f = makeNGLTempFile f "uncompress_" (takeBaseName f) $ \hout ->
-        C.runConduit $
-            conduitPossiblyCompressedFile f
-                .| CC.sinkHandle hout
+        withPossiblyCompressedFile f $ \src ->
+            C.runConduit (src .| CC.sinkHandle hout)
 
 argsArguments :: Command -> KwArgsValues -> NGLessIO [String]
 argsArguments cmd args = concat <$> forM (additional cmd) a1

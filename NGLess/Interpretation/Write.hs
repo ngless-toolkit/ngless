@@ -21,6 +21,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Combinators as C
+import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 #ifndef WINDOWS
 -- bzlib cannot compile on Windows (as of 2016/07/05)
 import qualified Data.Conduit.BZlib as CBZ2
