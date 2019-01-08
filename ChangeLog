@@ -7,6 +7,7 @@ Version 0.10.0+
 	* Call bwa/minimap2 with interleaved fastq files
 	* Add --verbose flag to check-install mode
 	* Avoid leaving open file descriptors after FastQ encoding detection
+	* Fix bug in garbage collection
 
 Version 0.10.0 2018-11-12 by luispedro
 	* Fix to lock1's return value when used with paths (#68 - reopen)

@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, CPP #-}
@@ -125,7 +125,7 @@ removeIfTemporary fp = do
     unless (keepTempFiles || fp `notElem` createdFiles) $ do
         outputListLno' DebugOutput ["Removing temporary file: ", fp]
         liftIO $ removeFileIfExists fp
-        updateNglEnvironment $ \e -> e { ngleTemporaryFilesCreated = filter (==fp) (ngleTemporaryFilesCreated e) }
+        updateNglEnvironment $ \e -> e { ngleTemporaryFilesCreated = filter (/=fp) (ngleTemporaryFilesCreated e) }
 
 
 -- | This is a version of 'takeBaseName' which drops all extension
