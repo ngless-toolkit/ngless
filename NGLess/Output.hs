@@ -1,7 +1,7 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE TemplateHaskell, RecordWildCards, CPP #-}
+{-# LANGUAGE TemplateHaskell, RecordWildCards, CPP, FlexibleContexts #-}
 
 module Output
     ( OutputType(..)
@@ -43,10 +43,11 @@ import qualified Data.Conduit as C
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.ByteString.Lazy as BL
-#ifdef HAS_CAIRO
-import qualified Graphics.Rendering.Chart.Easy as G
-import qualified Graphics.Rendering.Chart.Backend.Cairo as G
-#endif
+
+import qualified Diagrams.Backend.SVG as D
+import qualified Diagrams.TwoD.Size as D
+import qualified Diagrams.Prelude as D
+
 import           System.Environment (lookupEnv)
 
 
@@ -290,7 +291,7 @@ writeOutputJSImages odir scriptName script = do
     fqStats <- reverse <$> readIORef savedFQOutput
     mapStats <- reverse <$> readIORef savedMapOutput
     fqfiles <- forM (zip [(0::Int)..] fqStats) $ \(ix, q) -> do
-        let oname = "output"++show ix++".png"
+        let oname = "output"++show ix++".svg"
             bpos = perBaseQ q
         drawBaseQs (odir </> oname) bpos
         return oname
@@ -378,18 +379,35 @@ outputConfiguration = do
         outputListLno' DebugOutput ["\t\t", p]
 
 drawBaseQs :: FilePath -> [BPosInfo] -> IO ()
-#ifdef HAS_CAIRO
-drawBaseQs oname bpos = G.toFile G.def oname $ do
-    G.layout_title G..= "FastQ Quality Statistics"
-    G.plot (G.line "Mean" [
-                    [(ix, _mean bp) | (ix,bp) <- zip [1:: Integer ..] bpos]])
-    G.plot (G.line "Median" [
-                    [(ix, _median bp) | (ix,bp) <- zip [1:: Integer ..] bpos]])
-    G.plot (G.line "Upper Quartile" [
-                    [(ix, _upperQuartile bp) | (ix,bp) <- zip [1:: Integer ..] bpos]])
-    G.plot (G.line "Lower Quartile" [
-                    [(ix, _lowerQuartile bp) | (ix,bp) <- zip [1:: Integer ..] bpos]])
+drawBaseQs oname bpos = D.renderSVG oname (D.mkSizeSpec2D (Just (800.0 :: Double)) (Just 800.0)) $
+        plot ("Mean" :: String) meanValues'
+            <> plot "Median" medianValues'
+            <> plot "Upper Quartile" uqValues'
+            <> plot "Lower Quartile" lqValues'
+    where
+        plot _ ps = let ps' = D.p2 <$> ps
+                    in (D.strokeP $ D.fromVertices ps')
+                         `D.beneath` mconcat [ D.square 0.01 D.# D.moveTo p | p <- ps' ]
 
-#else
-drawBaseQs _ _ = return ()
-#endif
+        meanValues = [(ix, fromIntegral $ _mean bp) | (ix,bp) <- zip [1:: Integer ..] bpos]
+        medianValues = [(ix, fromIntegral $ _median bp) | (ix,bp) <- zip [1:: Integer ..] bpos]
+        uqValues =  [(ix, fromIntegral $ _upperQuartile bp) | (ix,bp) <- zip [1:: Integer ..] bpos]
+        lqValues = [(ix, fromIntegral $ _lowerQuartile bp) | (ix,bp) <- zip [1:: Integer ..] bpos]
+
+        [meanValues', medianValues', uqValues', lqValues'] = rescale [meanValues, medianValues, uqValues, lqValues]
+        rescale :: [[(Integer, Integer)]] -> [[(Double, Double)]]
+        rescale values = let
+                            max0 = maximum (concat (map (map fst) values))
+                            max1 = maximum (concat (map (map snd) values))
+                            min0 = minimum (concat (map (map fst) values))
+                            min1 = minimum (concat (map (map snd) values))
+                            rescale' vs = [(rescale1 min0 max0 x, rescale1 min1 max1 y) | (x,y) <- vs]
+                            rescale1 :: Integer -> Integer -> Integer -> Double
+                            rescale1 m0 m1 x = let
+                                                m0' = fromInteger m0
+                                                s = fromInteger (m1 - m0)
+                                                x' = fromInteger x
+                                            in (x'-m0')/s
+                         in map rescale' values
+
+

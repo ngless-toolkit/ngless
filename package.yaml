@@ -77,15 +77,9 @@ dependencies:
   - vector-algorithms
   - yaml
   - zlib
-
-when:
-- condition: ! '!(flag(embed))'
-  then:
-    cc-options: -DHAS_CAIRO
-    cpp-options: -DHAS_CAIRO
-    dependencies:
-      - Chart
-      - Chart-cairo
+  - diagrams-lib
+  - diagrams-svg
+  - diagrams-core
 
 ghc-options:
   - -Wall

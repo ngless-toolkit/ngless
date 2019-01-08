@@ -1,5 +1,5 @@
 Version 0.10.0+
-	* Disable Cairo dependency when building statically
+	* Switch to diagrams package for plotting
 	* Update minimap2 version to 2.14
 	* Module samtools (version 0.1) now includes samtools_view
 	* Update to LTS-13 (GHC 8.6)
