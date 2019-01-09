@@ -8,7 +8,6 @@ module FileManagement
     , openNGLTempFile
     , openNGLTempFile'
     , makeNGLTempFile
-    , removeFileIfExists
     , removeIfTemporary
     , setupHtmlViewer
     , takeBaseNameNoExtensions
@@ -28,12 +27,12 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
-import           Text.RE.TDFA.String
+import qualified Text.RE.TDFA.String as RE
 import           Data.List (isPrefixOf)
-import System.FilePath
-import Control.Monad
-import System.Posix.Files (setFileMode)
-import System.Posix.Internals (c_getpid)
+import           System.FilePath (dropExtensions, takeBaseName, takeDirectory, (</>), (<.>))
+import           Control.Monad (unless, forM_, when)
+import           System.Posix.Files (setFileMode)
+import           System.Posix.Internals (c_getpid)
 
 import System.Directory
 import System.IO
@@ -126,6 +125,7 @@ removeIfTemporary fp = do
         outputListLno' DebugOutput ["Removing temporary file: ", fp]
         liftIO $ removeFileIfExists fp
         updateNglEnvironment $ \e -> e { ngleTemporaryFilesCreated = filter (/=fp) (ngleTemporaryFilesCreated e) }
+{-# NOINLINE removeIfTemporary #-}
 
 
 -- | This is a version of 'takeBaseName' which drops all extension
@@ -332,7 +332,7 @@ expandPath fbase = do
             val -> return val
 
 expandPath' :: FilePath -> [FilePath] -> [FilePath]
-expandPath' fbase search = case matchedText $ fbase ?=~ [re|<(@{%id})?>|] of
+expandPath' fbase search = case RE.matchedText $ fbase RE.?=~ [RE.re|<(@{%id})?>|] of
         Nothing -> [fbase]
         Just c -> mapMaybe (expandPath'' $ trim c) search
     where
@@ -344,7 +344,7 @@ expandPath' fbase search = case matchedText $ fbase ?=~ [re|<(@{%id})?>|] of
             | '=' `notElem` path = Just path
             | (c++"=")`isPrefixOf` path = Just $ drop (length c + 1) path
             | otherwise = Nothing
-        fbase' = removeSlash1 $ fbase *=~/ [ed|<(@{%id})?>///|]
+        fbase' = removeSlash1 $ fbase RE.*=~/ [RE.ed|<(@{%id})?>///|]
         removeSlash1 "" = ""
         removeSlash1 ('/':p) = removeSlash1 p
         removeSlash1 p = p
