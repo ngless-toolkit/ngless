@@ -40,7 +40,7 @@ version declaration:
 ## Module Import Statements
 
 Following the version statement, optional import statements are allowed, using
-the syntax `import "<MODULE>" version "<VERSION>". For example:
+the syntax `import "<MODULE>" version "<VERSION>"`. For example:
 
     import "batch" version "1.0"
 
@@ -160,15 +160,9 @@ between brackets. (e.g, x[10]).
 To obtain a range, is required an identifier and two expressions separated by a
 ':' and between brackets. Example:
 
-+============+================================================+
-| Expression | Semantics                                      |
-+============+================================================+
-| `x[:]`     | from position 0 until length of variable x     |
-+------------+------------------------------------------------+
-| `x[10:]`   | from position 10 util length of variable x     |
-+------------+------------------------------------------------+
-| `x[:10]`   | from position 0 until 10                       |
-+------------+------------------------------------------------+
+* `x[:]` - from position 0 until length of variable x
+* `x[10:]` - from position 10 until length of variable x
+* `x[:10]` - from position 0 until 10
 
 ## Conditionals
 
