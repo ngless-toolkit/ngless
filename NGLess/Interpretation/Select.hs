@@ -1,4 +1,4 @@
-{- Copyright 2015-2018 NGLess Authors
+{- Copyright 2015-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -160,7 +160,7 @@ executeSelect (NGOMappedReadSet name istream ref) args = do
     return $! NGOMappedReadSet name out ref
 executeSelect o _ = throwShouldNotOccur ("NGLESS type checking error (Select received " ++ show o ++ ")")
 
-streamedSamStats lno ifile ref = C.passthroughSink (CL.map (map fst) .| samStatsC') $ \(total, aligned, unique) ->
+streamedSamStats lno ifile ref = C.passthroughSink (CL.map (V.singleton . map fst) .| samStatsC') $ \(total, aligned, unique) ->
     outputMappedSetStatistics (MappingInfo lno ifile ref total aligned unique)
 
 

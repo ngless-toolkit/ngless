@@ -1,4 +1,4 @@
-{- Copyright 2014-2018 NGLess Authors
+{- Copyright 2014-2019 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
@@ -6,7 +6,6 @@ module Data.Sam
     ( SamLine(..)
     , SamGroup
     , samLength
-    , readSamGroupsC
     , readSamGroupsC'
     , readSamLine
     , encodeSamLine
@@ -43,7 +42,6 @@ import Control.Error (note)
 import Control.DeepSeq
 
 import Data.Maybe
-import Data.Function (on)
 import Control.Monad.Except
 import NGLess.NGError
 import Utils.Utils
@@ -230,28 +228,19 @@ samIntTag samline tname
                     && (fst <$> B8.uncons (B.drop 3 match)) == Just 'i' = fst <$> B8.readInt (B.drop 5 match)
             | otherwise = Nothing
 
--- | take in *ByteLines* and transform them into groups of SamLines all refering to the same read
+-- | take in *ByteLines* and transform them into groups of SamLines all
+-- refering to the same read
+--
+-- This works in chunks (vectors) for efficiency
 --
 -- Header lines are silently ignored
-readSamGroupsC :: (MonadError NGError m) => C.ConduitT (V.Vector ByteLine) [SamLine] m ()
-readSamGroupsC = CC.concat
-                    .| readSamLineOrDie
-                    .| CL.groupBy groupLine
-    where
-        readSamLineOrDie = C.awaitForever $ \(ByteLine line) ->
-            case readSamLine line of
-                Left err -> throwError err
-                Right parsed@SamLine{} -> C.yield parsed
-                _ -> return ()
-        groupLine = (==) `on` samQName
-
-
-
--- | a chunked variation of readSamGroupsC which uses multiple threads
 --
 -- When respectPairs is False, then the two mates of the same fragment will be
 -- considered grouped in different blocks
-readSamGroupsC' :: forall m . (MonadError NGError m, MonadIO m) => Int -> Bool -> C.ConduitT (V.Vector ByteLine) (V.Vector [SamLine]) m ()
+readSamGroupsC' :: forall m . (MonadError NGError m, MonadIO m) =>
+            Int -- ^ number of threads
+            -> Bool -- respectPairs
+            -> C.ConduitT (V.Vector ByteLine) (V.Vector [SamLine]) m ()
 readSamGroupsC' mapthreads respectPairs = do
         CC.dropWhileE (isSamHeaderString . unwrapByteLine)
         CC.filter (not . V.null)
@@ -300,13 +289,18 @@ readSamGroupsC' mapthreads respectPairs = do
             V.unsafeFreeze gs'
 
 samStatsC :: (MonadIO m) => C.ConduitT (V.Vector ByteLine) C.Void m (NGLess (Int, Int, Int))
-samStatsC = C.runExceptC $ readSamGroupsC .| samStatsC'
+samStatsC = C.runExceptC $ readSamGroupsC' 1 True .| samStatsC'
 
-samStatsC' :: (MonadError NGError m) => C.ConduitT SamGroup C.Void m (Int, Int, Int)
-samStatsC' = CL.foldM summarize (0, 0, 0)
+samStatsC' :: forall m. (MonadError NGError m) => C.ConduitT (V.Vector SamGroup) C.Void m (Int, Int, Int)
+samStatsC' = CL.foldM summarizeV (0, 0, 0)
     where
         add1if !v True = v+1
         add1if !v False = v
+
+        summarizeV :: (Int, Int, Int) -> V.Vector SamGroup -> m (Int, Int, Int)
+        summarizeV c vs = V.foldM summarize c vs
+
+        summarize :: (Int, Int, Int) -> SamGroup -> m (Int, Int, Int)
         summarize c [] = return c
         summarize c (samline:_)
             | isHeader samline = return c

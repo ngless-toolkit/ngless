@@ -178,7 +178,7 @@ mapToReference mapper refIndex rs extraArgs = do
     return (newfp, statsp)
 
 zipToStats :: C.ConduitT B.ByteString C.Void NGLessIO () -> C.ConduitT B.ByteString C.Void NGLessIO (Int, Int, Int)
-zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesVC 4096 .| readSamGroupsC .| samStatsC'))
+zipToStats out = snd <$> C.toConsumer (zipSink2 out (linesVC 4096 .| readSamGroupsC' 1 True .| samStatsC'))
 
 splitFASTA :: Int -> FilePath -> FilePath -> NGLessIO [FilePath]
 splitFASTA megaBPS ifile ofileBase =
@@ -234,7 +234,7 @@ performMap mapper blockSize ref name rs extraArgs = do
             partials <- forM blocks (\block -> fst <$> mapToReference mapper block rs extraArgs)
             ((total, aligned, unique), ()) <- C.runConduit $
                 mergeSamFiles partials
-                .| zipSink2 samStatsC'
+                .| zipSink2 (CC.conduitVector 4096 .| samStatsC')
                     (CL.concat
                         .| CL.map ((`mappend` BB.char7 '\n') . encodeSamLine)
                         .| CB.sinkHandleBuilder hout)
@@ -294,7 +294,7 @@ executeMergeSams (NGOList ifnames) _ = do
     (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam"
     ((total, aligned, unique), ()) <- C.runConduit $
         mergeSamFiles partials
-        .| zipSink2 samStatsC'
+        .| zipSink2 (CC.conduitVector 4096 .| samStatsC')
             (CL.concat
                 .| CL.map ((`mappend` BB.char7 '\n') . encodeSamLine)
                 .| CB.sinkHandleBuilder hout)
@@ -318,7 +318,8 @@ mergeSamFiles inputs = do
     C.sequenceSources
             [CB.sourceFile f
                 .| linesVC 4096
-                .| readSamGroupsC
+                .| readSamGroupsC' 1 True
+                .| CC.concat -- TODO: Remove this and adapt `mergeSAMGroups` to work directly on vectors
                         | f <- inputs]
 
         .| CL.mapM (mergeSAMGroups MSBestOnly)
