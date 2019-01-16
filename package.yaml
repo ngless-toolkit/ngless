@@ -27,7 +27,7 @@ dependencies:
   - bytestring-lexing
   - optparse-applicative
   - conduit >= 1.3
-  - conduit-algorithms >=0.0.3.0
+  - conduit-algorithms >=0.0.9.0
   - conduit-extra >=1.1.12
   - configurator
   - containers
@@ -70,6 +70,7 @@ dependencies:
   - text >=1.2
   - time >=1.5
   - transformers
+  - tar-conduit >= 0.3.2
   - unix-compat
   - unliftio-core
   - unliftio
