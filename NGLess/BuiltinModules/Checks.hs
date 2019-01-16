@@ -1,4 +1,4 @@
-{- Copyright 2016 NGLess Authors
+{- Copyright 2016-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -20,6 +20,7 @@ import Language
 
 import Modules
 import NGLess
+import           Utils.Suggestion (checkFileReadable)
 
 checkOFile :: T.Text -> IO (Maybe T.Text)
 checkOFile ofile = do
@@ -39,6 +40,12 @@ executeChecks "__check_ofile" expr args = do
     oname <- stringOrTypeError "o file check" expr
     lno <- lookupIntegerOrScriptError "o file lno" "original_lno" args
     liftIO (checkOFile oname) >>= \case
+        Nothing -> return NGOVoid
+        Just err -> throwSystemError $! concat [T.unpack err, " (used in line ", show lno, ")."]
+executeChecks "__check_ifile" expr args = do
+    oname <- stringOrTypeError "input file check" expr
+    lno <- lookupIntegerOrScriptError "inputo file lno" "original_lno" args
+    liftIO (checkFileReadable $ T.unpack oname) >>= \case
         Nothing -> return NGOVoid
         Just err -> throwSystemError $! concat [T.unpack err, " (used in line ", show lno, ")."]
 executeChecks "__check_index_access" (NGOList vs) args = do
@@ -76,10 +83,20 @@ oFileCheck = Function
     , funcChecks = []
     }
 
+iFileCheck = Function
+    { funcName = FuncName "__check_ifile"
+    , funcArgType = Just NGLString
+    , funcArgChecks = []
+    , funcRetType = NGLVoid
+    , funcKwArgs = [ArgInformation "original_lno" True NGLInteger []]
+    , funcAllowsAutoComprehension = False
+    , funcChecks = []
+    }
+
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ = return def
     { modInfo = ModInfo "builtin.checks" "0.0"
-    , modFunctions = [oFileCheck, indexCheck]
+    , modFunctions = [oFileCheck, iFileCheck, indexCheck]
     , runFunction = executeChecks
     }
 

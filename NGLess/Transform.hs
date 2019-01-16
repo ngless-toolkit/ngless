@@ -1,4 +1,4 @@
-{- Copyright 2016-2017 NGLess Authors
+{- Copyright 2016-2019 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -67,7 +67,7 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , qcInPreprocess
                 , ifLenDiscardSpecial
                 , substrimReassign
-                , addOFileChecks
+                , addFileChecks
                 , addIndexChecks
                 ]
 
@@ -206,7 +206,7 @@ substrimReassign = pureTransform $ \case
         e -> e
 
 
--- | 'addOFileChecks' implements the following transformation
+-- | 'addFileChecks' implements the following transformation
 --
 -- variable = <non constant expression>
 --
@@ -222,51 +222,59 @@ substrimReassign = pureTransform $ \case
 -- <code>
 --
 -- write(input, ofile="output/"+variable+".sam")
-addOFileChecks :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
-addOFileChecks sc = reverse <$> addOFileChecks' (reverse sc) -- this is easier to do on the reversed script
-addOFileChecks' :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
-addOFileChecks' [] = return []
-addOFileChecks' ((lno,e):rest) = do
+addFileChecks :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
+                    -- this is easier to do on the reversed script
+addFileChecks sc = reverse <$> (checkIFiles (reverse sc) >>= checkOFiles)
+    where
+        -- This could be combined into a single pass
+        -- For script preprocessing, we generally disregard performance, however
+        checkIFiles = addFileChecks' "__check_ifile" ArgCheckFileReadable
+        checkOFiles = addFileChecks' "__check_ofile" ArgCheckFileWritable
+
+addFileChecks' :: T.Text -> ArgCheck -> [(Int,Expression)] -> NGLessIO [(Int, Expression)]
+addFileChecks' _ _ [] = return []
+addFileChecks' checkFname tag ((lno,e):rest) = do
         mods <- loadedModules
-        vars <- runNGLess $ execWriterT (recursiveAnalyse (getOFileExpressions mods) e)
-        rest' <- addOFileChecks' (addCheck vars (maybeAddChecks vars rest))
+        vars <- runNGLess $ execWriterT (recursiveAnalyse (getFileExpressions mods) e)
+        rest' <- addFileChecks' checkFname tag (addCheck vars (maybeAddChecks vars rest))
         return ((lno,e):rest')
 
      where
-        addCheck [(_, oexpr)] = ((lno, checkOFileExpression oexpr):)
+        addCheck [(_, oexpr)] = ((lno, checkFileExpression oexpr):)
         addCheck _ = id
 
         maybeAddChecks :: [(Variable,Expression)] -> [(Int, Expression)] -> [(Int, Expression)]
         maybeAddChecks _ [] = []
         maybeAddChecks vars@[(v,complete)] ((lno',e'):rest') = case e' of
             Assignment v' _
-                | v' == v -> ((lno', checkOFileExpression complete):(lno', e'):rest')
+                | v' == v -> ((lno', checkFileExpression complete):(lno', e'):rest')
             _ -> (lno',e') : maybeAddChecks vars rest'
         maybeAddChecks _ rest' = rest'
 
-        checkOFileExpression complete = FunctionCall
-                            (FuncName "__check_ofile")
+        checkFileExpression complete = FunctionCall
+                            (FuncName checkFname)
                             complete
                             [(Variable "original_lno", ConstInt (toInteger lno))]
                             Nothing
 
         -- returns the variables used and expressions that depend on them
-        getOFileExpressions :: [Module] -> Expression -> (WriterT [(Variable,Expression)] NGLess) ()
-        getOFileExpressions mods (FunctionCall f expr args _) = case findFunction mods f of
+        getFileExpressions :: [Module] -> Expression -> (WriterT [(Variable,Expression)] NGLess) ()
+        getFileExpressions mods (FunctionCall f expr args _) = case findFunction mods f of
             Just finfo -> do
-                when (ArgCheckFileWritable `elem` funcArgChecks finfo) $
+                when (tag `elem` funcArgChecks finfo) $
                     extractExpressions (Just expr)
                 forM_ (funcKwArgs finfo) $ \ainfo ->
-                    when (ArgCheckFileWritable `elem` argChecks ainfo) $
+                    when (tag `elem` argChecks ainfo) $
                         extractExpressions (lookup (Variable $ argName ainfo) args)
-            Nothing -> throwShouldNotOccur ("Transform.getOFileExpressions: Unknown function: " ++ show f ++ ". This should have been caught before")
-        getOFileExpressions _ _ = return ()
+            Nothing -> throwShouldNotOccur ("Transform.getFileExpressions: Unknown function: " ++ show f ++ ". This should have been caught before")
+        getFileExpressions _ _ = return ()
 
         extractExpressions :: (MonadWriter [(Variable, Expression)] m) =>  Maybe Expression -> m ()
         extractExpressions (Just ofile) = case ofile of
             BinaryOp _ re le -> case uniq (validVariables re ++ validVariables le) of
                 [v] -> tell [(v, ofile)]
                 _ -> return ()
+            Lookup _ v -> tell [(v, ofile)]
             _ -> return ()
         extractExpressions Nothing = return ()
 
@@ -303,7 +311,7 @@ addIndexChecks' ((lno,e):rest) = do
         return ((lno,e):rest')
 
      where
-        -- The similarity of this code and the code for addOFileChecks hints at
+        -- The similarity of this code and the code for addFileChecks hints at
         -- a possible merging with a good abstraction
         maybeAddChecks :: [(Variable,Expression)] -> [(Int, Expression)] -> [(Int, Expression)]
         maybeAddChecks [(v,ix)] [] = [(0, indexCheckExpr v ix)]
