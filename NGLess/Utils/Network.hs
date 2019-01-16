@@ -7,7 +7,8 @@ module Utils.Network
     , downloadExpandTar
     ) where
 
-import Control.Monad.IO.Class (liftIO, MonadIO(..))
+import           Control.Monad.IO.Class (liftIO, MonadIO(..))
+import           Control.Monad (void)
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import           Data.Conduit ((.|))
