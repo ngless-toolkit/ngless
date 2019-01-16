@@ -21,6 +21,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit as C
+import qualified Data.Conduit.Algorithms.Async as CAlg
 import           Data.Conduit ((.|))
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import           Control.Monad.Extra (unlessM)
@@ -172,8 +173,8 @@ lookupReference args = do
 
 mapToReference :: Mapper -> FilePath -> ReadSet -> [String] -> NGLessIO (FilePath, (Int, Int, Int))
 mapToReference mapper refIndex rs extraArgs = do
-    (newfp, hout) <- openNGLTempFile refIndex "mapped_" ".sam"
-    statsp <- callMapper mapper refIndex rs extraArgs (zipToStats $ CB.sinkHandle hout)
+    (newfp, hout) <- openNGLTempFile refIndex "mapped_" ".sam.zstd"
+    statsp <- callMapper mapper refIndex rs extraArgs (zipToStats $ CAlg.asyncZstdTo 3 hout)
     liftIO $ hClose hout
     return (newfp, statsp)
 
@@ -230,14 +231,15 @@ performMap mapper blockSize ref name rs extraArgs = do
             outputMappedSetStatistics (MappingInfo undefined samPath' single total aligned unique)
             return $ NGOMappedReadSet name (File samPath') mappedRef
         blocks -> do
-            (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam"
+            (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam.zstd"
             partials <- forM blocks (\block -> fst <$> mapToReference mapper block rs extraArgs)
             ((total, aligned, unique), ()) <- C.runConduit $
                 mergeSamFiles partials
                 .| zipSink2 (CC.conduitVector 4096 .| samStatsC')
                     (CL.concat
                         .| CL.map ((`mappend` BB.char7 '\n') . encodeSamLine)
-                        .| CB.sinkHandleBuilder hout)
+                        .| CC.builderToByteString
+                        .| CAlg.asyncZstdTo 3 hout)
             liftIO $ hClose hout
             let refname = case ref of
                     FaFile fa -> fa
@@ -291,13 +293,14 @@ executeMergeSams :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMergeSams (NGOList ifnames) _ = do
     outputListLno' WarningOutput ["Calling internal function __merge_samfiles"]
     partials <- mapM (fmap T.unpack . stringOrTypeError "__merge_samfiles") ifnames
-    (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam"
+    (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam.zstd"
     ((total, aligned, unique), ()) <- C.runConduit $
         mergeSamFiles partials
         .| zipSink2 (CC.conduitVector 4096 .| samStatsC')
             (CL.concat
                 .| CL.map ((`mappend` BB.char7 '\n') . encodeSamLine)
-                .| CB.sinkHandleBuilder hout)
+                .| CC.builderToByteString
+                .| CAlg.asyncZstdTo 3 hout)
     outputMappedSetStatistics (MappingInfo undefined sam "no-ref" total aligned unique)
     liftIO $ hClose hout
     return $! NGOMappedReadSet "test" (File sam) Nothing

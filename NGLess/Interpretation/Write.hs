@@ -120,8 +120,8 @@ moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
     where
         moveOrCopyCompress' :: FilePath -> FilePath -> NGLessIO ()
         moveOrCopyCompress'
-            | igz && ogz = moveIfCan
-            | igz = uncompressTo
+            | icomp && ogz = moveIfCan
+            | icomp = uncompressTo
             | ogz = compressTo
             | otherwise = moveIfCan
 
@@ -131,9 +131,9 @@ moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
                        else maybeCopyFile
 
         liftIO2 f a b = liftIO (f a b)
-        isGZ = endswith ".gz"
-        igz = isGZ orig
-        ogz = isGZ fname
+        isCompressed f = endswith ".gz" f || endswith ".zstd" f
+        icomp = isCompressed orig
+        ogz = isCompressed fname
         uncompressTo oldfp newfp = C.runConduit $
             conduitPossiblyCompressedFile oldfp .| CB.sinkFileCautious newfp
         compressTo oldfp newfp = liftIO $
@@ -222,6 +222,7 @@ executeWrite el@(NGOMappedReadSet _ iout  _) args = do
             | endswith ".sam" ofile = return "sam"
             | endswith ".sam.gz" ofile = return "sam"
             | endswith ".sam.bz2" ofile = return "sam"
+            | endswith ".sam.zstd" ofile = return "sam"
             | endswith ".bam" ofile = return "bam"
             | otherwise = do
                 outputListLno' WarningOutput ["Cannot determine format of MappedReadSet output based on filename ('", ofile, "'). Defaulting to BAM."]
