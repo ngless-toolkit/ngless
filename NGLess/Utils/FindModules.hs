@@ -1,4 +1,4 @@
-{- Copyright 2017 NGLess Authors
+{- Copyright 2017-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -20,8 +20,9 @@ listKnownModules = do
     -- Go up the directory stack until you find "stack.yaml"
     cwd <- getCurrentDirectory
     let parents = fmap joinPath . tails $ splitDirectories cwd
-    Just startpoint <- findM (doesFileExist . (</> "stack.yaml")) parents
-    mapMaybe asModName <$> listDirectory (startpoint </> "Modules")
+    findM (doesFileExist . (</> "stack.yaml")) parents >>= \case
+        Just startpoint -> mapMaybe asModName <$> listDirectory (startpoint </> "Modules")
+        Nothing -> error "Running in wrong directory?"
 
 
 asModName m
