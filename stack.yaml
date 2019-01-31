@@ -4,13 +4,12 @@
 
 # NOTE: When bumping stack's lts version, remember to rebuild and upload the
 # docker images (build-scripts/docker_bases/) used by GitLab
-resolver: lts-13.3
+resolver: lts-13.5
 compiler-check: newer-minor
 
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
-extra-deps:
-    - tar-conduit-0.3.2
+extra-deps: []
 
 allow-newer: true
 
