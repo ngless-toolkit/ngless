@@ -130,7 +130,7 @@ runNGLessIO context (NGLessIO act) = try (runResourceT act) >>= \case
                                         "Should Not Occur Error! This probably indicates a bug in ngless.\n" ++
                                         "\tPlease get in touch with the authors with a description of how this happened.\n" ++
                                         "\tIf possible run your script with the --trace flag and post the script and the resulting trace at \n"++
-                                        "\t\thttp://github.com/ngless-toolkit/ngless/issues\n" ++
+                                        "\t\thttps://github.com/ngless-toolkit/ngless/issues\n" ++
                                         "\tor email us at coelho@embl.de."
                 ScriptError ->
                         hPutStrLn stderr "Script Error"
@@ -165,7 +165,7 @@ loadModules av mods  = do
 
 headerStr :: String
 headerStr = "NGLess v"++versionStr++" (C) NGLess authors\n"++
-            "http://ngless.embl.de/\n"++
+            "https://ngless.embl.de/\n"++
             "\n"
 
 formatCitation :: T.Text -> String
@@ -323,7 +323,7 @@ modeExec (DownloadDemoMode demo) = do
     let known = ["gut-short", "ocean-short"]
     if demo `elem` known
         then do
-            let url = "http://vm-lux.embl.de/~coelho/ngless-data/Demos/" ++ demo ++ ".tar.gz"
+            let url = "https://ngless.embl.de/resources/Demos/" ++ demo ++ ".tar.gz"
             runNGLessIO "downloading a demo" $ downloadExpandTar url "."
             putStrLn ("\nDemo downloaded to " ++ demo)
         else do
@@ -359,7 +359,7 @@ main' = do
         foottext = concat [
                             "ngless v", versionStr, "(C) NGLess Authors 2013-2018\n",
                             "For more information:\n",
-                            "\thttp://ngless.embl.de/\n",
+                            "\thttps://ngless.embl.de/\n",
                             "For comments/discussion:\n",
                             "\thttps://groups.google.com/forum/#!forum/ngless\n",
                             "Citation: LP Coelho et al., 2018. ",
@@ -392,6 +392,6 @@ main = do
     mapM_ makeEncodingSafe [stdout, stdin, stderr]
     catch main' $ \e -> do
             putStrLn ("Exiting after internal error. If you can reproduce this issue, please run your script "++
-                    "with the --trace flag and report a bug at http://github.com/ngless-toolkit/ngless/issues")
+                    "with the --trace flag and report a bug at https://github.com/ngless-toolkit/ngless/issues")
             print (e :: IOException)
             exitFailure

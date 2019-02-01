@@ -42,7 +42,7 @@ If you are using NGLess, please cite:
 
 ## Installing
 
-See the [install documentation](http://ngless.embl.de/install.html) for more
+See the [install documentation](https://ngless.embl.de/install.html) for more
 information.
 
 ### Bioconda
@@ -64,13 +64,13 @@ Adapt the mount flags (``-v``) as needed.
 ### Linux
 
 You can get a [statically linked version of
-NGless 0.8.1](http://ngless.embl.de/releases/ngless-0.8.1-Linux64) or a [nighly
+NGless 0.8.1](https://ngless.embl.de/releases/ngless-0.8.1-Linux64) or a [nighly
 build of the latest development
 code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
 This should work across a wide range of Linux versions (please
 [report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
 
-    curl -O http://ngless.embl.de/releases/ngless-0.8.1-Linux64
+    curl -O https://ngless.embl.de/releases/ngless-0.8.1-Linux64
     chmod +x ngless-0.8.1-Linux64
     ./ngless-0.8.1-Linux64
 
@@ -84,7 +84,7 @@ which includes them.
 ### From Source
 
 Installing/compiling from source is also possible. Clone
-[http://github.com/ngless-toolkit/ngless](http://github.com/ngless-toolkit/ngless)
+[https://github.com/ngless-toolkit/ngless](https://github.com/ngless-toolkit/ngless)
 
 #### Dependencies
 
@@ -110,10 +110,10 @@ the directory where you wish to install, default is `/usr/local`):
 
 ## More information
 
-- [Full documentation](http://ngless.embl.de/)
-- [Frequently Asked Questions (FAQ)](http://ngless.embl.de/faq.html)
+- [Full documentation](https://ngless.embl.de/)
+- [Frequently Asked Questions (FAQ)](https://ngless.embl.de/faq.html)
 - [ngless mailing list](https://groups.google.com/forum/#!forum/ngless)
-- [What's new log](http://ngless.embl.de/whatsnew.html)
+- [What's new log](https://ngless.embl.de/whatsnew.html)
 
 ## Authors
 

@@ -80,7 +80,7 @@ Bugfixes
 - Fix for systems with non-working locale installations
 - Much faster `collect <Functions.html#count>`__ calls
 - Fixed `lock1
-  <http://ngless.embl.de/stdlib.html?highlight=lock1#parallel-module>`__ when
+  <https://ngless.embl.de/stdlib.html?highlight=lock1#parallel-module>`__ when
   used with full paths (see `issue #68 <https://github.com/ngless-toolkit/ngless/issues/68>`__)
 - Fix expansion of searchpath with external modules (see `issue #56
   <https://github.com/ngless-toolkit/ngless/issues/56>`__)

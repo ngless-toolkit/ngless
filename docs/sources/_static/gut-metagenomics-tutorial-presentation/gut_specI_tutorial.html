@@ -79,7 +79,7 @@ This will retrieve data and a script for a short demo based on metagenomes from
 the human gut ([Zeller et al, 2014](https://dx.doi.org/10.15252/msb.20145645)).
 
 There is a text-version of this tutorial at
-[http://ngless.embl.de/tutorial-gut-metagenomics.html](http://ngless.embl.de/tutorial-gut-metagenomics.html).
+[https://ngless.embl.de/tutorial-gut-metagenomics.html](https://ngless.embl.de/tutorial-gut-metagenomics.html).
 
 ---
 
@@ -173,7 +173,7 @@ Typical preprocessing pipeline
     $ ngless 1_preproc.ngl
 
     NGLess v0.0.0 (C) NGLess authors
-    http://ngless.embl.de/
+    https://ngless.embl.de/
 
     When publishing results from this script, please cite the following references:
 
@@ -228,7 +228,7 @@ write(mapped, ofile='mapped.bam')
 
 1. The `map()` function transforms a `ShortRead` to a `MappedShortRead`. In
    this case, we are using the builtin `'hg19'` reference.
-2. With [select()](http://ngless.embl.de/Functions.html#select), we can process
+2. With [select()](https://ngless.embl.de/Functions.html#select), we can process
 these `MappedShortRead`.
 
 We need to add a minimal match size to avoid random, spurious matches (45
@@ -299,8 +299,8 @@ write(motus(counted),
 
 
 1. We again `select()` to extract high quality mappings only.
-2. We use [count()](http://ngless.embl.de/Functions.html#count) to aggregate  
-3. Finally, we use the `motus()` special function to summarize by 
+2. We use [count()](https://ngless.embl.de/Functions.html#count) to aggregate
+3. Finally, we use the `motus()` special function to summarize by
 
 ---
 
@@ -358,7 +358,7 @@ collect(motus_table,
 [4_parallel.ngl](scripts/4_parallel.ngl)
 
 
-The [parallel module](http://ngless.embl.de/stdlib.html#parallel-module) has a
+The [parallel module](https://ngless.embl.de/stdlib.html#parallel-module) has a
 few utility functions to help handle large scale projects:
 
 - `lock1()` : select a sample from a pool of tasks
@@ -427,8 +427,8 @@ sc.run()
 ---
 # More information
 
-- [NGLess webpage](http://ngless.embl.de)
-- [Code on github](http://github.com/ngless-toolkit/ngless)
+- [NGLess webpage](https://ngless.embl.de)
+- [Code on github](https://github.com/ngless-toolkit/ngless)
 - [Google user group](https://groups.google.com/forum/#!forum/ngless)
 
 ---

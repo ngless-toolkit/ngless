@@ -21,7 +21,7 @@ import qualified Data.Configurator as CF
 import CmdArgs
 
 defaultBaseURL :: FilePath
-defaultBaseURL = "http://ngless.embl.de/resources/"
+defaultBaseURL = "https://ngless.embl.de/resources/"
 
 -- | ngless configuration options
 data NGLessConfiguration = NGLessConfiguration

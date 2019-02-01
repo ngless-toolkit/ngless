@@ -99,7 +99,7 @@ Generally speaking, it does not. It can be used with HPC clusters, whereby you
 simply run a job that calls the ngless binary.
 
 The [parallel
-module](http://ngless.embl.de/stdlib.html?highlight=parallel#parallel-module)
+module](https://ngless.embl.de/stdlib.html?highlight=parallel#parallel-module)
 can be used to split large jobs in many tasks, so that you can run multiple
 ngless instances and they collaborate. It is written such that does not depend
 on the HPC scheduler and can, thus, be used in any HPC system (or even, for

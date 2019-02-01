@@ -21,13 +21,13 @@ Adapt the mount flags (``-v``) as needed.
 ## Linux (binary)
 
 You can get a [statically linked version of
-NGless 0.6.1](http://ngless.embl.de/releases/ngless-0.6.1-Linux64) or a [nighly build
+NGless 0.6.1](https://ngless.embl.de/releases/ngless-0.6.1-Linux64) or a [nighly build
 of the latest development
 code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
 This should work across a wide range of Linux versions (please
 [report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
 
-    curl -O http://ngless.embl.de/releases/ngless-0.6.0-Linux64
+    curl -O https://ngless.embl.de/releases/ngless-0.6.0-Linux64
     chmod +x ngless-0.6.0-Linux64
     ./ngless-0.6.0-Linux64
 
@@ -47,7 +47,7 @@ Windows](https://github.com/ngless-toolkit/ngless/issues/39).
 <!--
 
 Download and run the [Windows
-Installer](http://ngless.embl.de/releases/ngless-0.5.1-Windows.exe)
+Installer](https://ngless.embl.de/releases/ngless-0.5.1-Windows.exe)
 The result is a command line utility, so you need to run it on the command
 line. After running the installer, typing `ngless` on the terminal should work
 as the installer will add the right directories to the path variable; you may
@@ -65,7 +65,7 @@ reports](https://github.com/ngless-toolkit/ngless/issues) are appreciated.
 
 ## From source
 
-[Stack](http://docs.haskellstack.org/en/stable/README.html) is the simplest way
+[Stack](https://docs.haskellstack.org/en/stable/README.html) is the simplest way
 to install the necessary requirements. You should also have `gcc` installed (or
 another C-compiler).
 
@@ -81,7 +81,7 @@ dependencies. After this ngless is ready to use!
 
 ## With Nix
 
-If you use [nix](http://nixos.org), you can easily build and install ngless
+If you use [nix](https://nixos.org), you can easily build and install ngless
 using it (these scripts also install all necessary dependencies):
 
     nix-env -i -f https://github.com/luispedro/ngless-nix/archive/master.tar.gz

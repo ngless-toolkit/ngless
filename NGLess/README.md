@@ -1,5 +1,5 @@
 This is a README about the code, i.e., the implementation of ngless. For user
-documentation (i.e., how to use ngless), see http://ngless.rtfd.io
+documentation (i.e., how to use ngless), see https://ngless.rtfd.io
 
 
 # Code structure
