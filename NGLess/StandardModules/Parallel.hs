@@ -73,7 +73,9 @@ import Configuration
 import FileManagement
 import NGLess.NGLEnvironment
 
-import Utils.Utils
+import Interpretation.Write (moveOrCopyCompress)
+
+import Utils.Utils (fmapMaybeM, allSame, moveOrCopy)
 import Utils.Conduit
 import Utils.LockFile
 
@@ -223,19 +225,19 @@ executeCollect (NGOCounts istream) kwargs = do
     autoComments <- case lookup "auto_comments" kwargs of
                         Nothing -> return []
                         Just (NGOList cs) -> mapM (\s -> do
-                                                        let errmsg = "auto_comments argument in write() call"
+                                                        let errmsg = "auto_comments argument in collect() call"
                                                         symbolOrTypeError errmsg s >>=
                                                             decodeSymbolOrError errmsg
                                                                 [("date", AutoDate)
                                                                 ,("script", AutoScript)
                                                                 ,("hash", AutoResultHash)]) cs
-                        _ -> throwScriptError "auto_comments argument to write() call must be a list of symbols"
+                        _ -> throwScriptError "auto_comments argument to collect() call must be a list of symbols"
     comment <- buildComment manualComment autoComments hash
 
     if canCollect
         then do
             newfp <- pasteCounts comment False allentries (map partialfile allentries)
-            liftIO $ moveOrCopy newfp (T.unpack ofile)
+            moveOrCopyCompress True newfp (T.unpack ofile)
         else outputListLno' TraceOutput ["Cannot collect (not all files present yet), wrote partial file to ", partialfile current]
     return NGOVoid
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)

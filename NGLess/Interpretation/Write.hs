@@ -6,6 +6,7 @@
 
 module Interpretation.Write
     ( executeWrite
+    , moveOrCopyCompress
 #ifdef IS_BUILDING_TEST
     , _formatFQOname
 #endif
