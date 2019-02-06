@@ -1,6 +1,15 @@
 ngless "0.8"
 
 input = samfile("input.sam")
-input = select(input, keep_if=[{mapped}])
-write(input, ofile='output.sam')
-write(input, ofile='output.bam')
+filtered = select(input, keep_if=[{mapped}])
+write(filtered, ofile='output.sam')
+write(filtered, ofile='output.bam')
+
+
+input = samfile("input.sam")
+filtered = select(input) using |mr|:
+    mr = mr.filter(min_identity_pc=95)
+write(filtered, ofile='output.block.sam')
+write(filtered, ofile='output.block.bam')
+
+
