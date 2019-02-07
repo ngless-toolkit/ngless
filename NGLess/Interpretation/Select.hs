@@ -7,6 +7,7 @@
 module Interpretation.Select
     ( executeSelect
     , executeMappedReadMethod
+    , splitSamlines3
 #ifdef IS_BUILDING_TEST
     , _fixCigar
 #endif

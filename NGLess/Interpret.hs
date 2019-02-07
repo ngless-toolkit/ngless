@@ -100,7 +100,7 @@ import Interpretation.Map
 import Interpretation.Count
 import Interpretation.FastQ
 import Interpretation.Write
-import Interpretation.Select
+import Interpretation.Select (executeSelect, executeMappedReadMethod, splitSamlines3)
 import Interpretation.Unique
 import Interpretation.Substrim
 import Utils.Utils
@@ -573,19 +573,14 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
                             _ -> nglTypeError ("Expected variable "++show var++" to contain a mapped read.")
 
                         else return []
-        reinjectSequences original filtered = case (split3 original, split3 filtered) of
+        reinjectSequences :: [SamLine] -> [SamLine] -> [SamLine]
+        reinjectSequences original filtered = case (splitSamlines3 original, splitSamlines3 filtered) of
             ((o1, o2, os), (f1, f2, fs)) -> reinjectSequences' o1 f1 ++ reinjectSequences' o2 f2 ++ reinjectSequences' os fs
         reinjectSequences' original f@(s@SamLine{}:rs)
             | not (any hasSequence f) = case find hasSequence original of
                     Just s' -> s { samSeq = samSeq s', samQual = samQual s'}:rs
                     Nothing -> f
         reinjectSequences' _ f = f
-        split3 :: [SamLine] -> ([SamLine], [SamLine], [SamLine])
-        split3 = foldl (\(f1,f2,fs) n -> if isFirstInPair n
-                                                    then (n:f1, f2, fs)
-                                                    else if isSecondInPair n
-                                                        then (f1, n:f2, fs)
-                                                        else (f1, f2, n:fs)) ([], [], [])
 executeSelectWBlock expr _ _ = unreachable ("Select with block, unexpected argument: " ++ show expr)
 
 
