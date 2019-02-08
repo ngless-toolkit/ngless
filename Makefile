@@ -134,6 +134,9 @@ fastcheck: $(NGLESS_VERSIONS_TARGET)
 # Synonym
 tests: check
 
+all_tests: check
+	PATH=$(stack path --bin-path):${PATH} ./run-tests.sh
+
 bench:
 	stack bench $(STACKOPTS)
 
@@ -356,4 +359,4 @@ ngless-${VERSION}.tar.gz: ngless
 	tar -zcvf $(distdir).tar.gz $(distdir)
 	rm -rf $(distdir)
 
-.PHONY: all build clean check tests distclean dist static fast fastcheck modules external-deps megahit
+.PHONY: all build clean check tests all_tests distclean dist static fast fastcheck modules external-deps megahit
