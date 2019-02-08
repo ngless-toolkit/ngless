@@ -12,6 +12,7 @@ Version 0.10.0+
 	* Tar extraction uses much less memory (#77)
 	* Add early checks for input files in more situations (#33)
 	* Support compression in collect() output (#42)
+	* Fix CIGAR (#92) for select() blocks
 
 Version 0.10.0 2018-11-12 by luispedro
 	* Fix to lock1's return value when used with paths (#68 - reopen)

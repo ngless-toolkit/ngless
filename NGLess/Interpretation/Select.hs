@@ -2,15 +2,13 @@
  - License: MIT
  -}
 
-{-# LANGUAGE RankNTypes, FlexibleContexts, TypeFamilies, CPP #-}
+{-# LANGUAGE RankNTypes, FlexibleContexts, TypeFamilies #-}
 
 module Interpretation.Select
     ( executeSelect
     , executeMappedReadMethod
     , splitSamlines3
-#ifdef IS_BUILDING_TEST
-    , _fixCigar
-#endif
+    , fixCigar
     ) where
 
 import qualified Data.ByteString as B
@@ -83,12 +81,12 @@ matchConditions doReinject conds sg = reinjectSequences doReinject (matchConditi
 
         addSequence s = case find hasSequence (fst <$> sg) of
                             Just s'@SamLine{} -> do
-                                        cigar' <- _fixCigar (samCigar s) (B.length $ samSeq s')
+                                        cigar' <- fixCigar (samCigar s) (B.length $ samSeq s')
                                         return s { samSeq = samSeq s', samQual = samQual s', samCigar = cigar' }
                             _ -> return s
 
-_fixCigar :: B.ByteString -> Int -> Either NGError B.ByteString
-_fixCigar prev n = do
+fixCigar :: B.ByteString -> Int -> NGLess B.ByteString
+fixCigar prev n = do
     prevM <- matchSize' True prev
     if prevM == n
         then return prev

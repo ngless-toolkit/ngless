@@ -9,7 +9,7 @@ import Test.Framework.Providers.HUnit
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as BB
 
-import Interpretation.Select (_fixCigar)
+import Interpretation.Select (fixCigar)
 import Data.Sam
 import Tests.Utils
 import Utils.Here
@@ -49,5 +49,6 @@ case_matchSize1 = fromRight (matchSize =<< readSamLine complex) @?= (26+  9+  6+
                                                                    --26M3D9M3D6M6D8M2D21M
 case_matchSize2 = fromRight (matchSize =<< readSamLine simple) @?= 69
 
-case_cigarOK = _fixCigar "9M" 9 @?= Right "9M"
-case_cigarH = _fixCigar "4H5M" 9 @?= Right "4S5M"
+case_cigarOK = fixCigar "9M" 9 @?= Right "9M"
+case_cigarH = fixCigar "4H5M" 9 @?= Right "4S5M"
+case_cigarH2 = fixCigar "4H5M2H" 11 @?= Right "4S5M2S"

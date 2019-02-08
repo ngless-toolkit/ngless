@@ -100,7 +100,7 @@ import Interpretation.Map
 import Interpretation.Count
 import Interpretation.FastQ
 import Interpretation.Write
-import Interpretation.Select (executeSelect, executeMappedReadMethod, splitSamlines3)
+import Interpretation.Select (executeSelect, executeMappedReadMethod, splitSamlines3, fixCigar)
 import Interpretation.Unique
 import Interpretation.Substrim
 import Utils.Utils
@@ -569,18 +569,27 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
                     if blockStatus mrs' `elem` [BlockContinued, BlockOk]
                         then case lookupBlockVar var (blockValues mrs') of
                             Just (NGOMappedRead []) -> return []
-                            Just (NGOMappedRead rs) -> return (encodeSamLine <$> (if doReinject then reinjectSequences mappedreads rs else rs))
+                            Just (NGOMappedRead rs) -> do
+                                rs' <- runNGLess $ reinjectSequences mappedreads rs
+                                return (encodeSamLine <$> (if doReinject then rs' else rs))
                             _ -> nglTypeError ("Expected variable "++show var++" to contain a mapped read.")
 
                         else return []
-        reinjectSequences :: [SamLine] -> [SamLine] -> [SamLine]
+        reinjectSequences :: [SamLine] -> [SamLine] -> NGLess [SamLine]
         reinjectSequences original filtered = case (splitSamlines3 original, splitSamlines3 filtered) of
-            ((o1, o2, os), (f1, f2, fs)) -> reinjectSequences' o1 f1 ++ reinjectSequences' o2 f2 ++ reinjectSequences' os fs
+            ((o1, o2, os), (f1, f2, fs)) -> do
+                r1 <- reinjectSequences' o1 f1
+                r2 <- reinjectSequences' o2 f2
+                ss <- reinjectSequences' os fs
+                return (r1 ++ r2 ++ ss)
+        reinjectSequences' :: Foldable t => t SamLine -> [SamLine] -> NGLess [SamLine]
         reinjectSequences' original f@(s@SamLine{}:rs)
             | not (any hasSequence f) = case find hasSequence original of
-                    Just s' -> s { samSeq = samSeq s', samQual = samQual s'}:rs
-                    Nothing -> f
-        reinjectSequences' _ f = f
+                    Just s' -> do
+                        cigar <- fixCigar (samCigar s) (B.length $ samSeq s')
+                        return (s { samSeq = samSeq s', samQual = samQual s', samCigar = cigar }:rs)
+                    Nothing -> return f
+        reinjectSequences' _ f = return f
 executeSelectWBlock expr _ _ = unreachable ("Select with block, unexpected argument: " ++ show expr)
 
 
