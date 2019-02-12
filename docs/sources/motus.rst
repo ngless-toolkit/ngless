@@ -32,7 +32,9 @@ Producing the motus tables is done in three steps.
 
     mapped = map(files, reference='motus', mode_all=True)
 
-2. call the built-in ``count`` function to summarize your reads at gene level::
+2. call the built-in ``count`` function to summarize your reads at gene level,
+   optionally adding ``include_minus1=true`` if you want to also obtain the
+   fraction of unknown reads (``-1``). This is the default behavior from version ``0.6`` onwards::
 
     counted = count(mapped, features=['gene'], multiple={dist1})
 
