@@ -43,7 +43,7 @@ import BuiltinFunctions
   - is re-written to the equivalent of:
   -
   -     temp$0 = samfile('input.sam')
-  -     temp$1 = mapstats(temp$1)
+  -     temp$1 = mapstats(temp$0)
   -     write(temp$1, ofile='stats.txt')
   -
   - Note that "temp$xx" are not valid ngless variable names. Thus, these
