@@ -95,6 +95,32 @@ The ``encoding`` argument has the same meaning as for the ``fastq()`` function:
   This is used for older Illumina/Solexa machines.
 - ``{auto}``: use auto detection. This is the default.
 
+group
+-----
+
+Groups a list of ReadSet objects into a single ReadSet::
+
+    rs1 = paired('data0.1.fq.gz', 'data0.2.fq.gz')
+    rs2 = paired('data1.1.fq.gz', 'data1.2.fq.gz')
+    rs = group([rs1, rs2], name='input')
+
+Arguments by value:
+~~~~~~~~~~~~~~~~~~~
++------------+--------------+------------+----------------+
+| Name       | Type         | Required   | Default Value  |
++============+==============+============+================+
+| name       | String       |  no        | ""             |
++------------+--------------+------------+----------------+
+
+Argument
+~~~~~~~~
+
+List of ReadSet
+
+Returns
+~~~~~~~
+
+ReadSet
 
 samfile
 -------
