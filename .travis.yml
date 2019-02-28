@@ -35,6 +35,9 @@ addons:
       - libgmp-dev
       - liblzma-dev
       - libcurl4-openssl-dev
+      - gzip
+      - bzip2
+      - zstd
 
 
 script:
