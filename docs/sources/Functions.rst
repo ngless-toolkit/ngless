@@ -573,6 +573,58 @@ Arguments
 
 ``min_quality`` parameter defines the minimum quality value.
 
+smoothtrim
+----------
+
+This trims with the same algorithm as substrim but uses a sliding window
+to average base qualities. For example::
+
+    read = smoothtrim(read, min_quality=15, window=4)
+
+Quality values of bases at the edges of each read are repeated to allow
+averaging with quality centered on each base. For instance a read::
+
+    Sequence   A  T  C  G    with a window     A  A  T  C  G  G
+    Quality   28 25 14 12  of size 3 becomes  28 28 25 14 12 12
+
+and is smoothed::
+
+    Seq        A  A  T  C  G  G   smoothed quality   A  T  C  G
+    Qual      28 28 25 14 12 12         --->        27 22 17 13
+    Windows    |-----|            (28 + 28 + 25) / 3 = 27     ^
+     ...          |-----|         (28 + 25 + 14) / 3 = 22     |
+                     |-----|      (25 + 14 + 12) / 3 = 17     !
+                        |-----|   (14 + 12 + 12) / 3 = 13 ----+
+
+at which point ``substrim`` is applied for trimming.
+
+Quality scores are returned to their original value after trimming.
+
+Argument:
+~~~~~~~~~
+
+ShortRead
+
+Return:
+~~~~~~~
+
+ShortRead
+
+Arguments
+~~~~~~~~~
+
++-------------------------+--------------+------------+----------------+
+| Name                    | Type         | Required   | Default Value  |
++=========================+==============+============+================+
+| min_quality             | Integer      |  yes       |	               |
++-------------------------+--------------+------------+----------------+
+| window                  | Integer      |  yes       |	               |
++-------------------------+--------------+------------+----------------+
+
+``min_quality`` parameter defines the minimum quality accepted for the
+sub-sequence.
+``window`` parameter defines the number of bases to average over.
+
 write
 -----
 

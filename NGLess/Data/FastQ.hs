@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts, ScopedTypeVariables, MultiWayIf #-}
-{-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell, QuasiQuotes, CPP #-}
 {- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
@@ -25,6 +25,9 @@ module Data.FastQ
     , fqStatsC
     , qualityPercentiles
     , interleaveFQs
+#ifdef IS_BUILDING_TEST
+    , vSub
+#endif
     ) where
 
 import qualified Data.ByteString.Char8 as B8

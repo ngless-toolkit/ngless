@@ -679,6 +679,16 @@ interpretPreProcessExpr (FunctionCall (FuncName "endstrim") var args _) = do
         "5" -> return Endstrim5
         other -> throwScriptError ("Illegal argument for `from_ends`: "++show other)
     return . NGOShortRead $ endstrim ends' mq r
+interpretPreProcessExpr (FunctionCall (FuncName "smoothtrim") var args _) = do
+    r <- interpretExpr var >>= \case
+                        NGOShortRead r -> return r
+                        _ -> throwShouldNotOccur "Wrong type in Interpret.hs:interpretExpr"
+    args' <- forM args $ \(Variable v, e) -> do
+        e' <- interpretExpr e
+        return (v, e')
+    mq <- fromInteger <$> lookupIntegerOrScriptErrorDef (return 0) "smoothtrim argument" "min_quality" args'
+    w <- fromInteger <$> lookupIntegerOrScriptErrorDef (return 0) "smoothtrim argument" "window" args'
+    return . NGOShortRead $ smoothtrim w mq r
 
 interpretPreProcessExpr expr = interpretExpr expr
 

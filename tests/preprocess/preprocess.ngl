@@ -24,6 +24,13 @@ write(input, ofile='output.endstrim.fq')
 
 input = fastq('sample.fq')
 input = preprocess(input) using |read|:
+    read = smoothtrim(read, min_quality=20, window=4)
+    if len(read) < 10:
+        discard
+write(input, ofile='output.smoothtrim.fq')
+
+input = fastq('sample.fq')
+input = preprocess(input) using |read|:
     read = endstrim(read, min_quality=20)
     if len(read) < 10:
         discard

@@ -144,3 +144,9 @@ case_endstrim_quals_one_OK_3 = endstrimPos Endstrim3 (VS.fromList [9,9,10,9]) 10
 case_endstrim_quals_one_OK_5 = endstrimPos Endstrim5 (VS.fromList [9,9,10,9]) 10 @?= (2,2)
 case_endstrim_1 = endstrimPos EndstrimBoth (VS.fromList [9,9,10,9,9,10,9]) 10 @?= (2,4)
 
+case_smoothtrim_empty_quals = smoothtrimPos 4 VS.empty 20 @?= (0,0)
+case_smoothtrim_normal_exec =  smoothtrimPos 4 (VS.fromList [10,11,12,123,122,111,10,11,0]) 20 @?= (1,6)
+case_smoothtrim_middle_bad = smoothtrimPos 4 (VS.fromList [32,32,14,32,32,14,14,2,14,14,32,32]) 20 @?= (0,5)
+case_smoothtrim_isolated = smoothtrimPos 4 (VS.fromList [32,32,32,1,32,32,32]) 20 @?= (0,7)
+case_smoothtrim_window_4 = smoothtrimPos 4 (VS.fromList [24,2,24,24,24,24,2,24,24,24,24,2,24]) 20 @?= (3,1)
+case_smoothtrim_window_10 = smoothtrimPos 10 (VS.fromList [24,2,24,24,24,24,2,24,24,24,24,2,24]) 20 @?= (0,13)

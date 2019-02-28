@@ -31,10 +31,12 @@ Within the preprocess block, you can modify the read in several ways:
 
 - you can trim it with the indexing operator: ``r[trim5:]`` or ``r[:-trim3]``
 
-- you can call ``substrim`` or ``endstrim`` to trim the read based on quality
-  scores. ``substrim`` finds the longest substring such that all bases are
-  above a minimum quality (hence the name, which phonetically combines
-  substring and trim). ``endstrim`` just chops bases off the ends.
+- you can call ``substrim``, ``endstrim`` or ``smoothtrim`` to trim the read
+  based on quality scores. ``substrim`` finds the longest substring such that
+  all bases are above a minimum quality (hence the name, which phonetically
+  combines substring and trim). ``endstrim`` chops bases off the ends and
+  ``smoothtrim`` averages quality scores using a sliding window before applying
+  ``substrim``.
 
 - you can test for the length of the sequence (before or after trimming). For
   this, you use the ``len`` function (see example above).
