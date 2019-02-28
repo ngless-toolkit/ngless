@@ -1,5 +1,6 @@
 sudo: false
 language: python
+dist: xenial
 
 cache:
   directories:
@@ -38,7 +39,6 @@ addons:
       - gzip
       - bzip2
       - zstd
-
 
 script:
   - stack --no-terminal setup
