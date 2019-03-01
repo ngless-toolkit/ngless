@@ -23,7 +23,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import qualified UnliftIO as U
 import           Control.Monad.Extra (allM)
-import           GHC.Conc (getNumCapabilities, setNumCapabilities)
+import           Control.Concurrent (getNumCapabilities, setNumCapabilities)
 
 import Output
 import NGLess
