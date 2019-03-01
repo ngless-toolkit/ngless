@@ -1,5 +1,0 @@
-ngless "0.8"
-
-input = fastq('sample.fq.gz')
-write(assemble(input), ofile='output.fna')
-
