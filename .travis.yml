@@ -19,6 +19,7 @@ before_install:
   - export PATH=$HOME/.local/bin:$PATH
   - export PATH=/usr/lib/ccache:$PATH
   - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+  - .travis/add_O0_option.sh
 
 env:
   global:
