@@ -23,10 +23,7 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Combinators as C
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
-#ifndef WINDOWS
--- bzlib cannot compile on Windows (as of 2016/07/05)
-import qualified Data.Conduit.BZlib as CBZ2
-#endif
+import qualified Data.Conduit.Algorithms.Async as CAsync
 import           Data.Conduit ((.|))
 import           System.Directory (copyFile)
 import           Data.Maybe
@@ -70,7 +67,30 @@ data WriteOptions = WriteOptions
                 , woComment :: Maybe T.Text
                 , woAutoComment :: [AutoComment]
                 , woHash :: T.Text
-                } deriving (Eq, Show)
+                } deriving (Eq)
+
+
+data Compression = NoCompression
+                | GzipCompression
+                | BZ2Compression
+                | XZCompression
+                | ZStdCompression
+                deriving (Eq)
+
+inferCompression :: FilePath -> Compression
+inferCompression fp
+    | endswith ".gz" fp = GzipCompression
+    | endswith ".bz2" fp = BZ2Compression
+    | endswith ".xz"  fp = XZCompression
+    | endswith ".zstd" fp = ZStdCompression
+    | otherwise = NoCompression
+
+ostream fp = case inferCompression fp of
+    NoCompression -> CB.sinkHandle
+    GzipCompression -> CAsync.asyncGzipTo
+    BZ2Compression -> CAsync.asyncBzip2To
+    XZCompression -> CAsync.asyncXzTo
+    ZStdCompression -> CAsync.asyncZstdTo 3 -- compression level
 
 withOutputFile' :: (MonadUnliftIO m, MonadMask m) => FilePath -> (Handle -> m a) -> m a
 withOutputFile' "/dev/stdout" = \inner -> inner stdout
@@ -116,37 +136,28 @@ parseWriteOptions args = do
 
 
 moveOrCopyCompress :: Bool -> FilePath -> FilePath -> NGLessIO ()
-moveOrCopyCompress _ orig "/dev/stdout" = C.runConduit $ conduitPossiblyCompressedFile orig .| C.stdout
-moveOrCopyCompress canMove orig fname = moveOrCopyCompress' orig fname
+moveOrCopyCompress _ ifile "/dev/stdout" = C.runConduit $ conduitPossiblyCompressedFile ifile .| C.stdout
+moveOrCopyCompress moveAllowed ifile ofile
+        | ifile == ofile = return () -- trivial case. Can happen.
+#ifdef WINDOWS
+        | ocompression == BZ2Compression = throwNotImplementedError "Compression of bzip2 files is not supported on Windows"
+        | icompression == BZ2Compression = throwNotImplementedError "Decompression of bzip2 files is not supported on Windows"
+#endif
+        | icompression == ocompression = moveIfAllowed
+        | otherwise = convertCompression
     where
-        moveOrCopyCompress' :: FilePath -> FilePath -> NGLessIO ()
-        moveOrCopyCompress'
-            | icomp && ogz = moveIfCan
-            | icomp = uncompressTo
-            | ogz = compressTo
-            | otherwise = moveIfCan
+        moveIfAllowed :: NGLessIO ()
+        moveIfAllowed
+            | moveAllowed = liftIO (moveOrCopy ifile ofile)
+            | otherwise = liftIO (copyFile ifile ofile)
 
-        moveIfCan :: FilePath -> FilePath -> NGLessIO ()
-        moveIfCan = if canMove
-                       then liftIO2 moveOrCopy
-                       else maybeCopyFile
+        icompression = inferCompression ifile
+        ocompression = inferCompression ofile
 
-        liftIO2 f a b = liftIO (f a b)
-        isCompressed f = endswith ".gz" f || endswith ".zstd" f
-        icomp = isCompressed orig
-        ogz = isCompressed fname
-        uncompressTo oldfp newfp = C.runConduit $
-            conduitPossiblyCompressedFile oldfp .| CB.sinkFileCautious newfp
-        compressTo oldfp newfp = liftIO $
-            withOutputFile' newfp $ \hout ->
-                C.runConduitRes $
-                    C.sourceFile oldfp .| asyncGzipTo hout
+        convertCompression = liftIO $
+            withOutputFile' ofile $ \hout ->
+                C.runConduitRes (conduitPossiblyCompressedFile ifile .| ostream ofile hout)
 
-        -- | copy file unless its the same file.
-        maybeCopyFile :: FilePath -> FilePath -> NGLessIO ()
-        maybeCopyFile old new
-            | new == old = return()
-            | otherwise = liftIO (copyFile old new)
 
 removeEnd :: String -> String -> String
 removeEnd base suffix = take (length base - length suffix) base
@@ -183,21 +194,10 @@ executeWrite (NGOReadSet _ rs) args = do
                     (mapM_ conduitPossiblyCompressedFile inputs .| C.sinkHandle h)
             moveOrCopyCompress True fp' ofname
     if woFormatFlags opts == Just "interleaved"
-        then do
-            writer <- if endswith ".gz" ofile
-                        then return asyncGzipTo
-                        else if endswith ".bz2" ofile
-                            then
-#ifndef WINDOWS
-                                return (\hout -> CBZ2.bzip2 .| CB.sinkHandle hout)
-#else
-                                throwNotImplementedError "Compression of bzip2 files is not supported on Windows"
-#endif
-
-                            else return CB.sinkHandle
+        then
             withOutputFile' ofile $ \hout ->
                 C.runConduitRes $
-                    interleaveFQs rs .| writer hout
+                    interleaveFQs rs .| ostream ofile hout
         else case rs of
             ReadSet [] singles ->
                 moveOrCopyCompressFQs singles ofile

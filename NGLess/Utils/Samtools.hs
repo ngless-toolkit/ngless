@@ -1,4 +1,4 @@
-{- Copyright 2015-2018 NGLess Authors
+{- Copyright 2015-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -13,24 +13,26 @@ import System.Exit
 import System.IO
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Process as CP
 import qualified Control.Concurrent.Async as A
+import qualified UnliftIO as U
 import           Data.Conduit ((.|))
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import           Control.Monad.Except
-import           Control.Concurrent (getNumCapabilities)
+import           Control.Concurrent (getNumCapabilities, setNumCapabilities)
 import           Data.List (isSuffixOf)
-import           System.Process (proc, CreateProcess(..), StdStream(..))
+import           System.Process (proc)
 
+import NGLess.NGLEnvironment
+import Configuration
 import Output
 import FileManagement
 import NGLess.NGError
-
-import Utils.Utils (readProcessErrorWithExitCode)
 
 -- | reads a SAM (possibly compressed) or BAM file (in the latter case by using
 -- 'samtools view' under the hood)
@@ -65,15 +67,32 @@ samBamConduit samfp
 convertSamToBam :: FilePath -> NGLessIO FilePath
 convertSamToBam samfile = do
     samPath <- samtoolsBin
+    strictThreads <- nConfStrictThreads <$> nglConfiguration
     (newfp, hout) <- openNGLTempFile samfile "converted_" "bam"
-    outputListLno' DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
-    (errmsg, exitCode) <- liftIO $ do
-        numCapabilities <- getNumCapabilities
-        readProcessErrorWithExitCode (proc samPath ["view", "-@", show numCapabilities, "-bS", samfile]) { std_out = UseHandle hout }
-    if null errmsg
-        then outputListLno' DebugOutput ["No output from samtools."]
-        else outputListLno' InfoOutput ["Message from samtools: ", errmsg]
+    -- We could probably change the code below to use `hout` directly
     liftIO $ hClose hout
+    outputListLno' DebugOutput ["SAM->BAM Conversion start ('", samfile, "' -> '", newfp, "')"]
+    numCapabilities <- liftIO getNumCapabilities
+    let samtoolsthreads
+            | strictThreads && numCapabilities > 1 = numCapabilities - 1
+            | otherwise = numCapabilities
+        with1Thread act
+            | strictThreads = U.bracket_
+                                (liftIO $ setNumCapabilities 1)
+                                (liftIO $ setNumCapabilities numCapabilities)
+                                act
+            | otherwise = act
+    (exitCode, outmsg, errmsg) <- with1Thread $
+        CP.sourceProcessWithStreams (proc samPath ["view", "-@", show samtoolsthreads, "-bS", "-o", newfp])
+            (samBamConduit samfile)
+            CL.consume -- stdout
+            CL.consume -- stderr
+    if null errmsg
+        then outputListLno' DebugOutput ["No output from samtools (stderr)."]
+        else outputListLno' InfoOutput ["Message from samtools (stderr): ", concat (B8.unpack <$> errmsg)]
+    if null outmsg
+        then return ()
+        else outputListLno' InfoOutput ["Message from samtools (stdout): ", concat (B8.unpack <$> outmsg)]
     case exitCode of
        ExitSuccess -> return newfp
        ExitFailure err -> throwSystemError ("Failure on converting sam to bam" ++ show err)
