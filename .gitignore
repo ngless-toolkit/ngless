@@ -13,6 +13,7 @@
 /minimap2-2.14/
 /*.tar.bz2
 /*.tar.gz
+/build-scripts/docker_bases/*.log
 
 *.o
 *.hi

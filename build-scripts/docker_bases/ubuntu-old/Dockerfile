@@ -22,7 +22,8 @@ RUN apt update && \
     vim \
     wget \
     xz-utils \
-    zlib1g-dev && \
+    zlib1g-dev \
+    zstd && \
     apt clean && \
     rm -rf /var/lib/apt/lists && \
     wget -qO- https://get.haskellstack.org/ | sh && \

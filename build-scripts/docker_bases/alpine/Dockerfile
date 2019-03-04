@@ -25,7 +25,8 @@ RUN apk --no-cache add \
     vim \
     xz \
     xz-dev \
-    zlib-dev && \
+    zlib-dev \
+    zstd && \
     wget -qO- https://get.haskellstack.org/ | sh && \
     chmod 755 /usr/local/bin/stack && \
     pip install tox
