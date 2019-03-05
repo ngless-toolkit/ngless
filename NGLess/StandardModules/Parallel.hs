@@ -102,7 +102,8 @@ syncFile _ = return ()
 setupHashDirectory :: FilePath -> T.Text -> NGLessIO FilePath
 setupHashDirectory basename hash = do
     prefix <- liftIO $ readIORef prefixRef
-    let actiondir = basename </> prefix ++ take 8 (T.unpack hash)
+    isSubsample <- nConfSubsample <$> nglConfiguration
+    let actiondir = basename </> prefix ++ take 8 (T.unpack hash) ++ (if isSubsample then "-subsample" else "")
         scriptfile = actiondir </> "script.ngl"
     liftIO $ createDirectoryIfMissing True actiondir
     unlessM (liftIO $ doesFileExist scriptfile) $ do
@@ -198,6 +199,7 @@ getLock' basedir (f:fs) = do
 
 executeCollect :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
 executeCollect (NGOCounts istream) kwargs = do
+    isSubsample <- nConfSubsample <$> nglConfiguration
     current <- lookupStringOrScriptError "collect arguments" "current" kwargs
     allentries <- lookupStringListOrScriptError "collect arguments" "allneeded" kwargs
     ofile <- lookupStringOrScriptError "collect arguments" "ofile" kwargs
@@ -237,7 +239,7 @@ executeCollect (NGOCounts istream) kwargs = do
     if canCollect
         then do
             newfp <- pasteCounts comment False allentries (map partialfile allentries)
-            moveOrCopyCompress True newfp (T.unpack ofile)
+            moveOrCopyCompress True newfp (T.unpack ofile ++ (if isSubsample then ".subsample" else ""))
         else outputListLno' TraceOutput ["Cannot collect (not all files present yet), wrote partial file to ", partialfile current]
     return NGOVoid
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)
@@ -466,16 +468,14 @@ pasteHiddenFunction = Function
     }
 
 addLockHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
-addLockHash script = do
-        isSubsample <- nConfSubsample <$> nglConfiguration
-        pureTransform (addLockHash' isSubsample) script
+addLockHash script = pureTransform addLockHash' script
     where
-        addLockHash' :: Bool -> Expression -> Expression
-        addLockHash' isSubsample (FunctionCall (FuncName "lock1") expr kwargs block) =
+        addLockHash' :: Expression -> Expression
+        addLockHash' (FunctionCall (FuncName "lock1") expr kwargs block) =
             FunctionCall (FuncName "lock1") expr ((Variable "__hash", ConstStr h):kwargs) block
             where
-                h = T.pack . (++ (if isSubsample then "-subsample" else "")) . MD5.md5s . MD5.Str . show $ map snd script
-        addLockHash' _ e = e
+                h = T.pack . MD5.md5s . MD5.Str . show $ map snd script
+        addLockHash' e = e
 
 
 
