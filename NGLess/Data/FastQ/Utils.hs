@@ -32,8 +32,8 @@ concatenateFQs (FastQFilePath enc fp:rest) = do
                                 .| fqDecodeC enc'
                                 .| fqEncodeC enc
                                 .| asyncGzipTo h
-            | ".gz" `isSuffixOf` ".gz" = CB.sourceFile f .| CB.sinkHandle h
-            | otherwise = conduitPossiblyCompressedFile f .| CB.sinkHandle h
+            | ".gz" `isSuffixOf` f = CB.sourceFile f .| CB.sinkHandle h
+            | otherwise = conduitPossiblyCompressedFile f .| asyncGzipTo h
     C.runConduitRes $ catTo fp enc
     forM_ rest $ \(FastQFilePath enc' f') ->
         C.runConduitRes (catTo f' enc')
