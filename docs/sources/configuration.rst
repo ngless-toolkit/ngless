@@ -4,7 +4,7 @@ Configuration
 
 .. note:: ngless' results do not change because of configuration or command
     line options. **The ngless script always has complete information on what
-    is computed**. What configuration options change are details of _how_ the
+    is computed**. What configuration options change are details of *how* the
     results are computed such as where to store intermediate files and how many
     CPU cores to use.
 
