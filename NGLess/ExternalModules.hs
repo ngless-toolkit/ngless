@@ -343,7 +343,7 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
                 Just (FlagInfo flags) -> map T.unpack flags
                 _ -> ["--" ++ T.unpack (argName ai)]
     | argType ai == NGLReadSet = case v of
-        NGOReadSet{} -> asFilePaths v undefined
+        NGOReadSet{} -> asFilePaths v payload
         _ -> throwScriptError ("Expected readset for argument in function call, got " ++ show v)
     | otherwise = do
         asStr <- case argType ai of
