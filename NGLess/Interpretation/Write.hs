@@ -40,7 +40,7 @@ import Data.FastQ
 import Language
 import Configuration
 import FileOrStream
-import FileManagement (makeNGLTempFile)
+import FileManagement (makeNGLTempFile, inferCompression, Compression(..))
 import NGLess
 import Output
 import NGLess.NGLEnvironment
@@ -69,21 +69,6 @@ data WriteOptions = WriteOptions
                 , woHash :: T.Text
                 } deriving (Eq)
 
-
-data Compression = NoCompression
-                | GzipCompression
-                | BZ2Compression
-                | XZCompression
-                | ZStdCompression
-                deriving (Eq)
-
-inferCompression :: FilePath -> Compression
-inferCompression fp
-    | endswith ".gz" fp = GzipCompression
-    | endswith ".bz2" fp = BZ2Compression
-    | endswith ".xz"  fp = XZCompression
-    | endswith ".zstd" fp = ZStdCompression
-    | otherwise = NoCompression
 
 ostream fp = case inferCompression fp of
     NoCompression -> CB.sinkHandle

@@ -37,7 +37,7 @@ import Data.Default (def)
 import Data.FastQ.Utils (concatenateFQs)
 import Data.FastQ
 import NGLess.NGLEnvironment
-import FileManagement
+import FileManagement (makeNGLTempFile, inferCompression, Compression(..), expandPath, openNGLTempFile)
 import Utils.Samtools
 import Configuration
 import FileOrStream
@@ -283,40 +283,46 @@ executeCommand basedir cmds funcname input args = do
             NGLMappedReadSet -> return $ NGOMappedReadSet (groupName input) (File newfp) Nothing
             ret -> throwShouldNotOccur ("Not implemented (ExternalModules.hs:executeCommand commandReturnType = "++show ret++")")
 
+adjustCompression :: Maybe CommandExtra -> FilePath -> NGLessIO FilePath
+adjustCompression (Just (FileInfo (FileType _ gz bz2 _))) f =
+    case inferCompression f of
+        NoCompression -> return f
+        GzipCompression
+            | gz -> return f
+        BZ2Compression
+            | bz2 -> return f
+        _ -> uncompressFile f
+adjustCompression _ f = return f
+
 asFilePaths :: NGLessObject -> Maybe CommandExtra -> NGLessIO  [FilePath]
-asFilePaths (NGOReadSet _ (ReadSet paired singles)) _ = do
+asFilePaths (NGOReadSet _ (ReadSet paired singles)) argOptions = do
     let concatenateFQs' [] = return Nothing
         concatenateFQs' rs = Just <$> concatenateFQs rs
     fq1 <- concatenateFQs' (fst <$> paired)
     fq2 <- concatenateFQs' (snd <$> paired)
     fq3 <- concatenateFQs' singles
-    case (fq1, fq2, fq3) of
+    fqs <- case (fq1, fq2, fq3) of
         (Nothing, Nothing, Just f)  -> return [fqpathFilePath f]
         (Just f1, Just f2, Nothing) -> return [fqpathFilePath f1, fqpathFilePath f2]
         (Just f1, Just f2, Just f3) -> return [fqpathFilePath f1, fqpathFilePath f2, fqpathFilePath f3]
         _ -> throwScriptError "Malformed input argument to asFilePaths"
+    mapM (adjustCompression argOptions) fqs
 asFilePaths input@(NGOCounts _) argOptions = (:[]) <$> asCountsFile input argOptions
 asFilePaths (NGOMappedReadSet _ input _) payload = (:[]) <$> do
     filepath <- asFile input
     case payload of
         Nothing -> return filepath
-        Just (FileInfo (FileType fb gz bz2 _)) -> case fb of
-            SamFile -> asSamFile filepath gz bz2
+        Just (FileInfo (FileType fb _ _ _)) -> case fb of
+            SamFile -> asSamFile filepath payload
             BamFile -> asBamFile filepath
-            SamOrBamFile -> return filepath
+            SamOrBamFile -> adjustCompression payload filepath
             _ -> throwScriptError "Unexpected combination of arguments"
         Just other -> throwShouldNotOccur ("encodeArgument: unexpected payload: "++show other)
 asFilePaths invalid _ = throwShouldNotOccur ("AsFile path got "++show invalid)
 
 asCountsFile :: NGLessObject -> Maybe CommandExtra -> NGLessIO String
-asCountsFile (NGOCounts icounts) Nothing = asFile icounts
-asCountsFile (NGOCounts icounts) (Just (FileInfo (FileType _ gz bz2 _))) = do
-    icounts' <- asFile icounts
-    let igz = ".gz" `isSuffixOf` icounts'
-        ibz2 = ".bz2" `isSuffixOf` icounts'
-    if (igz && not gz) || (ibz2 && not bz2)
-        then uncompressFile icounts'
-        else return icounts'
+asCountsFile (NGOCounts icounts) payload =
+    asFile icounts >>= adjustCompression payload
 asCountsFile v a = throwScriptError ("Expected counts for argument in function call, got " ++ show v ++ ". " ++ show a)
 
 -- Encodes the argument for the command line, performing any necessary
@@ -358,19 +364,16 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
                     else [concat ["--", T.unpack (argName ai), "=", asStr]]
 
 -- As (possibly compressed) sam file
-asSamFile fname gz bz2
-    | ".sam" `isSuffixOf` fname = return fname
-    | ".sam.gz" `isSuffixOf` fname = if gz
-        then return fname
-        else uncompressFile fname
-    | ".sam.bz2" `isSuffixOf` fname = if bz2
-        then return fname
-        else uncompressFile fname
+asSamFile fname payload
     | ".bam" `isSuffixOf` fname = convertBamToSam fname
-    | otherwise = return fname
+    | otherwise = adjustCompression payload fname
 
 asBamFile fname
     | ".bam" `isSuffixOf` fname = return fname
+    | ".sam.gz" `isSuffixOf` fname = convertSamToBam fname
+    | ".sam.bz2" `isSuffixOf` fname = convertSamToBam fname
+    | ".sam.zstd" `isSuffixOf` fname = convertSamToBam fname
+    | ".sam.xz" `isSuffixOf` fname = convertSamToBam fname
     | ".sam" `isSuffixOf` fname = convertSamToBam fname
     | otherwise = return fname
 

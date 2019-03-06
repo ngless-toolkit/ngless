@@ -17,6 +17,8 @@ module FileManagement
     , bwaBin
     , minimap2Bin
     , expandPath
+    , inferCompression
+    , Compression(..)
 #ifdef IS_BUILDING_TEST
     , expandPath'
 #endif
@@ -33,6 +35,7 @@ import           System.FilePath (dropExtensions, takeBaseName, takeDirectory, (
 import           Control.Monad (unless, forM_, when)
 import           System.Posix.Files (setFileMode)
 import           System.Posix.Internals (c_getpid)
+import           Data.String.Utils (endswith)
 
 import System.Directory
 import System.IO
@@ -56,6 +59,21 @@ import Utils.Utils
 
 
 data InstallMode = User | Root deriving (Eq, Show)
+
+data Compression = NoCompression
+                | GzipCompression
+                | BZ2Compression
+                | XZCompression
+                | ZStdCompression
+                deriving (Eq)
+
+inferCompression :: FilePath -> Compression
+inferCompression fp
+    | endswith ".gz" fp = GzipCompression
+    | endswith ".bz2" fp = BZ2Compression
+    | endswith ".xz"  fp = XZCompression
+    | endswith ".zstd" fp = ZStdCompression
+    | otherwise = NoCompression
 
 
 -- | Shorten filename if longer than 240 characters
