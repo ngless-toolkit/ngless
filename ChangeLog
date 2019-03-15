@@ -1,3 +1,6 @@
+Version 0.11.0+
+	* Compress SAM files after select() calls
+
 Version 0.11.0 2019-03-15 by luispedro
 	* Switch to diagrams package for plotting
 	* Update minimap2 version to 2.14
