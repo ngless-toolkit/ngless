@@ -214,7 +214,7 @@ loadScript (ScriptFilePath fname) =
 
 
 parseVersion :: Maybe T.Text -> NGLess NGLVersion
-parseVersion Nothing = return $ NGLVersion 0 10
+parseVersion Nothing = return $ NGLVersion 0 11
 parseVersion (Just "0.0") = return $ NGLVersion 0 0
 parseVersion (Just "0.5") = return $ NGLVersion 0 5
 parseVersion (Just "0.6") = return $ NGLVersion 0 6
@@ -222,13 +222,14 @@ parseVersion (Just "0.7") = return $ NGLVersion 0 7
 parseVersion (Just "0.8") = return $ NGLVersion 0 8
 parseVersion (Just "0.9") = return $ NGLVersion 0 9
 parseVersion (Just "0.10") = return $ NGLVersion 0 10
+parseVersion (Just "0.11") = return $ NGLVersion 0 11
 parseVersion (Just v) = case T.splitOn "." v of
                             [majV,minV,_] ->
                                 throwScriptError $ concat ["The NGLess version string at the top of the file should only\ncontain a major and a minor version, separated by a dot.\n\n"
                                                         ,"You probably meant to write:\n\n"
                                                         ,"ngless \"" , T.unpack majV, ".", T.unpack minV, "\"\n"]
-                            [_, _] -> throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 0.0/0.5-10 are available in this release)."]
-                            _ -> throwScriptError $ concat ["Version ", T.unpack v, " could not be understood. The version string should look like \"0.10\" or similar"]
+                            [_, _] -> throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 0.0/0.5-11 are available in this release)."]
+                            _ -> throwScriptError $ concat ["Version ", T.unpack v, " could not be understood. The version string should look like \"0.11\" or similar"]
 
 modeExec :: NGLessMode -> IO ()
 modeExec opts@DefaultMode{} = do
@@ -255,8 +256,8 @@ modeExec opts@DefaultMode{} = do
         outputConfiguration
         sc' <- runNGLess $ parsengless fname reqversion ngltext >>= maybe_add_print
         activeVersion <- runNGLess . parseVersion $ (nglVersion <$> nglHeader sc')
-        when (activeVersion <= NGLVersion 0 7) $
-            outputListLno' WarningOutput ["Using old version (in compatibility mode). If possible, upgrade your version statement."]
+        when (activeVersion <= NGLVersion 0 10) $
+            outputListLno' WarningOutput ["Using old version (in compatibility mode). If possible, upgrade your version statement to ngless \"0.11\"."]
         updateNglEnvironment (\e -> e {ngleVersion = activeVersion })
         when (debug_mode opts == "ast") $ liftIO $ do
             forM_ (nglBody sc') $ \(lno,e) ->

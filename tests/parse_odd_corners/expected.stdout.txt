@@ -1,4 +1,4 @@
-NGLess v0.10.0 (C) NGLess authors
+NGLess v0.11.0 (C) NGLess authors
 https://ngless.embl.de/
 
 When publishing results from this script, please cite the following references:

@@ -30,7 +30,7 @@ NGLess
 
 NGLess is best illustrated by an example::
 
-    ngless "0.8"
+    ngless "0.11"
     input = paired('ctrl1.fq', 'ctrl2.fq', singles='ctrl-singles.fq')
     input = preprocess(input) using |read|:
         read = read[5:]
@@ -103,7 +103,7 @@ This is equivalent to the full script:
 
 ::
 
-    ngless "0.7" # <- version declaration, optional on the command line
+    ngless "0.11" # <- version declaration, optional on the command line
     samcontents = samfile("file.sam") # <- load a SAM/BAM file
     reads = as_reads(samcontents) # <- just get the reads (w quality scores)
     write(reads, ofname=STDOUT) # <- write them to STDOUT (default format: FASTQ)
@@ -113,7 +113,7 @@ out a single FQ file. Otherwise, you can always do:
 
 ::
 
-    ngless "0.7"
+    ngless "0.11"
     write(as_read(samfile("file.sam")),
             ofile="output.fq")
 
@@ -135,7 +135,7 @@ This is equivalent to the full script:
 
 ::
 
-    ngless "0.7" # <- version declaration, optional on the command line
+    ngless "0.11" # <- version declaration, optional on the command line
     samcontents = samfile("file.sam") # <- load a SAM/BAM file
     samcontents = select(samcontents, keep_if=[{mapped}]) # <- select only *mapped* reads
     reads = as_reads(samcontents) # <- just get the reads (w quality scores)

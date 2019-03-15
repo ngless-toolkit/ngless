@@ -1,4 +1,4 @@
-Version 0.10.0+
+Version 0.11.0 2019-03-15 by luispedro
 	* Switch to diagrams package for plotting
 	* Update minimap2 version to 2.14
 	* Module samtools (version 0.1) now includes samtools_view

@@ -2,6 +2,37 @@
 What's New (History)
 ====================
 
+Version 0.11.0
+--------------
+
+Released March 15 2019
+
+User-visible improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Module samtools (version 0.1) now includes `samtools_view`
+- Add `--verbose` flag to check-install mode (`ngless --check-install --verbose`)
+- Add early checks for input files in more situations (`#33 <https://github.com/ngless-toolkit/ngless/issues/33>`__)
+- Support compression in `collect()` output (`#42 <https://github.com/ngless-toolkit/ngless/issues/42>`__)
+- Add `smoothtrim() <https://ngless.embl.de/Functions.html#smoothtrim>`__ function
+
+Bugfixes
+~~~~~~~~
+- Fix bug with `orf_find` & `prots_out` argument
+- Fix bug in garbage collection where intermediate files were often left on disk for far longer than necessary.
+- Fix CIGAR (`#92 <https://github.com/ngless-toolkit/ngless/issues/92>`__) for select() blocks
+
+Internal improvements
+~~~~~~~~~~~~~~~~~~~~~
+- Switched to diagrams package for plotting. This should make building easier as cairo was often a complicated dependency.
+- Update to LTS-13 (GHC 8.6)
+- Update minimap2 version to 2.14
+- Call bwa/minimap2 with interleaved fastq files. This avoids calling it twice (which would mean that the indices were read twice).
+- Avoid leaving open file descriptors after FastQ encoding detection
+- Compress intermediate SAM files. In some situations this should even speed up the process as Zstandard compression is used and the process was often IO bound (`#22 <https://github.com/ngless-toolkit/ngless/issues/22>`__)
+- Tar extraction uses much less memory now (`#77 <https://github.com/ngless-toolkit/ngless/issues/77>`__)
+
+
 Version 0.10.0
 --------------
 
