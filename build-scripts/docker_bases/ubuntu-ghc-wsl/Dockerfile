@@ -47,7 +47,6 @@ ENV LANG=C.UTF-8 \
     PATH=/root/.cabal/bin:/root/.local/bin:/opt/ghc/$GHC_VERSION/bin:$PATH
 
 # Build ngless dependencies to save time during build
-# We need to use GHC from stack here because ubuntu:latest ships with GHC-7
 RUN git clone --depth=2 https://gitlab.com/ngless/ngless && \
     cd ngless && \
     stack setup --system-ghc && \
