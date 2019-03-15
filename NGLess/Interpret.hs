@@ -548,18 +548,25 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
                                     return False
                                 else return True
         oname <- runNGLessIO $ makeNGLTempFile samfp "block_selected_" "sam.zstd" $ \ohandle ->
-            C.runConduit $
-                istream .| do
-                    when outputHeader $
-                        CC.takeWhileE (isSamHeaderString . unwrapByteLine)
-                            .| byteLineVSinkHandle ohandle
-                    readSamGroupsC' mapthreads paired
-                        .| asyncMapEitherC mapthreads (fmap concatLines . V.mapM (runInterpretationRO env . filterGroup doReinject))
+                C.runConduit $
+                    istream
+                        .| do
+                            when outputHeader $
+                                CC.takeWhileE (isSamHeaderString . unwrapByteLine)
+                                .| CL.map concatBytelines
+                            readSamGroupsC' mapthreads paired
+                                .| asyncMapEitherC mapthreads (fmap concatLines . V.mapM (runInterpretationRO env . filterGroup doReinject))
                         .| asyncZstdTo 3 ohandle
         return input { nglSamFile = File oname }
     where
+        concatBytelines :: V.Vector ByteLine -> B.ByteString
+        concatBytelines =  concatLines' . map (BB.byteString . unwrapByteLine) . V.toList
+
         concatLines :: V.Vector [BB.Builder] -> B.ByteString
-        concatLines = BL.toStrict . BB.toLazyByteString . mconcat . map (`mappend` BB.char7 '\n') . concat . V.toList
+        concatLines = concatLines' . concat . V.toList
+
+        concatLines' :: [BB.Builder] -> B.ByteString
+        concatLines' = BL.toStrict . BB.toLazyByteString . mconcat . map (`mappend` BB.char7 '\n')
 
         filterGroup :: Bool -> [SamLine] -> InterpretationROEnv [BB.Builder]
         filterGroup _ [] = return []
