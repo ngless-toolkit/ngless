@@ -32,7 +32,7 @@ RUN apt update && \
 
 # Build ngless dependencies to save time during build
 # We need to use GHC from stack here because ubuntu:latest ships with GHC-7
-RUN git clone https://gitlab.com/ngless/ngless && \
+RUN git clone --depth=2 https://gitlab.com/ngless/ngless && \
     cd ngless && \
     stack setup && \
     STACKOPTS="--only-dependencies" make ngless && \

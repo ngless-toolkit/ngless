@@ -32,7 +32,7 @@ RUN apk --no-cache add \
     pip install tox
 
 # Build ngless dependencies to save time during build
-RUN git clone https://gitlab.com/ngless/ngless && \
+RUN git clone --depth=2 https://gitlab.com/ngless/ngless && \
     cd ngless && \
     STACKOPTS="--system-ghc --only-dependencies" make ngless && \
     STACKOPTS="--system-ghc --only-dependencies" make tests && \

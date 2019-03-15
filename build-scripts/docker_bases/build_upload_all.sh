@@ -14,3 +14,8 @@ echo "Building ubuntu-old"
 ( cd ubuntu-old && ./build.sh ) &> ubuntu-old-build.log
 echo "Uploading ubuntu-old"
 ( cd ubuntu-old && ./upload.sh ) &> ubuntu-old-upload.log
+
+echo "Building ubuntu-ghc-wsl"
+( cd ubuntu-ghc-wsl && ./build.sh ) &> ubuntu-ghc-wsl-build.log
+echo "Uploading ubuntu-ghc-wsl"
+( cd ubuntu-ghc-wsl && ./upload.sh ) &> ubuntu-ghc-wsl-upload.log
