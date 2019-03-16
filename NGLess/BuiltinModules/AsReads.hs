@@ -47,9 +47,9 @@ data FQResult = NoResult
 
 samToFastQ :: FilePath -> C.ConduitT () (V.Vector ByteLine) NGLessIO () -> NGLessIO ReadSet
 samToFastQ fpsam stream = do
-    (rk1, (oname1,ohand1)) <- openNGLTempFile' fpsam "reads_" ".1.fq.gz"
-    (rk2, (oname2,ohand2)) <- openNGLTempFile' fpsam "reads_" ".2.fq.gz"
-    (rk3, (oname3,ohand3)) <- openNGLTempFile' fpsam "reads_" ".singles.fq.gz"
+    (rk1, (oname1,ohand1)) <- openNGLTempFile' fpsam "reads_" "1.fq.gz"
+    (rk2, (oname2,ohand2)) <- openNGLTempFile' fpsam "reads_" "2.fq.gz"
+    (rk3, (oname3,ohand3)) <- openNGLTempFile' fpsam "reads_" "singles.fq.gz"
     hasPaired <- liftIO (newIORef False)
     hasSingle <- liftIO (newIORef False)
     let writer sel var out =

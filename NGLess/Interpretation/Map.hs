@@ -173,7 +173,7 @@ lookupReference args = do
 
 mapToReference :: Mapper -> FilePath -> ReadSet -> [String] -> NGLessIO (FilePath, (Int, Int, Int))
 mapToReference mapper refIndex rs extraArgs = do
-    (newfp, hout) <- openNGLTempFile refIndex "mapped_" ".sam.zstd"
+    (newfp, hout) <- openNGLTempFile refIndex "mapped_" "sam.zstd"
     statsp <- callMapper mapper refIndex rs extraArgs (zipToStats $ CAlg.asyncZstdTo 3 hout)
     liftIO $ hClose hout
     return (newfp, statsp)
@@ -231,7 +231,7 @@ performMap mapper blockSize ref name rs extraArgs = do
             outputMappedSetStatistics (MappingInfo undefined samPath' single total aligned unique)
             return $ NGOMappedReadSet name (File samPath') mappedRef
         blocks -> do
-            (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam.zstd"
+            (sam, hout) <- openNGLTempFile "merging" "merged_" "sam.zstd"
             partials <- forM blocks (\block -> fst <$> mapToReference mapper block rs extraArgs)
             ((total, aligned, unique), ()) <- C.runConduit $
                 mergeSamFiles partials
@@ -279,7 +279,7 @@ executeMapStats (NGOMappedReadSet name sami _) _ = do
     outputListLno' TraceOutput ["Computing mapstats on ", show sami]
     let (samfp, stream) = asSamStream sami
     (t, al, u) <- C.runConduit (stream .| samStatsC) >>= runNGLess
-    countfp <- makeNGLTempFile samfp "sam_stats_" ".stats" $ \hout ->
+    countfp <- makeNGLTempFile samfp "sam_stats_" "stats" $ \hout ->
         liftIO . hPutStr hout . concat $
             [     "\t",  T.unpack name, "\n"
             ,"total\t",   show  t, "\n"
@@ -293,7 +293,7 @@ executeMergeSams :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMergeSams (NGOList ifnames) _ = do
     outputListLno' WarningOutput ["Calling internal function __merge_samfiles"]
     partials <- mapM (fmap T.unpack . stringOrTypeError "__merge_samfiles") ifnames
-    (sam, hout) <- openNGLTempFile "merging" "merged_" ".sam.zstd"
+    (sam, hout) <- openNGLTempFile "merging" "merged_" "sam.zstd"
     ((total, aligned, unique), ()) <- C.runConduit $
         mergeSamFiles partials
         .| zipSink2 (CC.conduitVector 4096 .| samStatsC')

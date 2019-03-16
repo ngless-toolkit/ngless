@@ -121,7 +121,7 @@ sortSam samfile =
                     then return (CC.yieldMany block':partials)
                     else do
                         partial <- lift $
-                            makeNGLTempFile samfile "partial" ".sam" $ \hout ->
+                            makeNGLTempFile samfile "partial" "sam" $ \hout ->
                                 C.runConduit $
                                     CC.yieldMany block'
                                         .| CL.map (`B.snoc` 10)

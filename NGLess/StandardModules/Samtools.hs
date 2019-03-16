@@ -52,7 +52,7 @@ executeSort (NGOMappedReadSet name istream rinfo) args = do
         fname = case istream of
                     File f -> f
                     Stream _ f _ -> f
-    (rk, (newfp, hout)) <- openNGLTempFile' fname "sorted_" ("." ++ oformat)
+    (rk, (newfp, hout)) <- openNGLTempFile' fname "sorted_" oformat
     (trk, tdirectory) <- createTempDir "samtools_sort_temp"
 
     numCapabilities <- liftIO getNumCapabilities
@@ -183,7 +183,7 @@ executeView (NGOMappedReadSet name istream rinfo) args = do
                     File f -> f
                     Stream _ f _ -> f
 
-    (rk, (newfp, hout)) <- openNGLTempFile' fname "subset_" ("." ++ oformat)
+    (rk, (newfp, hout)) <- openNGLTempFile' fname "subset_" oformat
 
     numCapabilities <- liftIO getNumCapabilities
     let cmdargs = ["view", "-h", "-@", show numCapabilities, "-O", oformat, "-L", T.unpack bedFile]

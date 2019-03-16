@@ -1,4 +1,4 @@
-{- Copyright 2017-2018 NGLess Authors
+{- Copyright 2017-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -23,7 +23,7 @@ import FileOrStream
 
 executeStats :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeStats (NGOSymbol statsType) [] = do
-        (fp, h) <- openNGLTempFile "" "qcstats" ".tsv"
+        (fp, h) <- openNGLTempFile "" "qcstats" "tsv"
         liftIO $ hClose h
         case statsType of
             "mapping" -> liftIO $ writeOutputTSV True Nothing (Just fp)

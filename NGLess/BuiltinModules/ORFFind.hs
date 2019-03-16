@@ -33,7 +33,7 @@ executeORFFind "orf_find" expr kwargs = do
     aaOut <- fmapMaybeM (stringOrTypeError "prots_out argument for orf_find") $ lookup "prots_out" kwargs
     prodigalPath <- prodigalBin
     fp <- asFile input
-    (dnaout, h) <- openNGLTempFile fp "gene_predict" ".fna"
+    (dnaout, h) <- openNGLTempFile fp "gene_predict" "fna"
     liftIO $ hClose h
     let args = ["-i", fp,
                 "-d", dnaout]

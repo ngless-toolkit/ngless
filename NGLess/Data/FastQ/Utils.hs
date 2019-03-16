@@ -24,7 +24,7 @@ concatenateFQs :: [FastQFilePath] -> NGLessIO FastQFilePath
 concatenateFQs [] = throwShouldNotOccur "Empty argument to concatenateFQs"
 concatenateFQs [f] = return f
 concatenateFQs (FastQFilePath enc fp:rest) = do
-    (fres, h) <- openNGLTempFile "concatenate" fp ".fq.gz"
+    (fres, h) <- openNGLTempFile "concatenate" fp "fq.gz"
     let catTo f enc'
             | enc /= enc' =
                             conduitPossiblyCompressedFile f

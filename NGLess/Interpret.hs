@@ -454,9 +454,9 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
 
             let processpairs :: (V.Vector ShortRead, V.Vector ShortRead) -> NGLess (V.Vector ShortRead, V.Vector ShortRead, V.Vector ShortRead)
                 processpairs = liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles) . uncurry V.zip
-            (fp1', out1) <- openNGLTempFile "" "preprocessed.1." ".fq.gz"
-            (fp2', out2) <- openNGLTempFile "" "preprocessed.2." ".fq.gz"
-            (fp3', out3) <- openNGLTempFile "" "preprocessed.singles." ".fq.gz"
+            (fp1', out1) <- openNGLTempFile "" "preprocessed.1." "fq.gz"
+            (fp2', out2) <- openNGLTempFile "" "preprocessed.2." "fq.gz"
+            (fp3', out3) <- openNGLTempFile "" "preprocessed.singles." "fq.gz"
 
             C.runConduit $
                 zipSource2 (asSource (fst <$> pairs)) (asSource (snd <$> pairs))

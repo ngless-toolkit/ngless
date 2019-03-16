@@ -95,7 +95,7 @@ executeLoad _ _ = throwShouldNotOccur "load_mocat_sample got the wrong arguments
 executeParseCoord :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeParseCoord (NGOString coordfp) _ = do
     let coordfp' = T.unpack coordfp
-    newfp <- makeNGLTempFile coordfp' "converted_" ".gtf" $ \hout ->
+    newfp <- makeNGLTempFile coordfp' "converted_" "gtf" $ \hout ->
         C.runConduit $
             conduitPossiblyCompressedFile coordfp'
                 .| linesC
