@@ -1,0 +1,9 @@
+ngless "0.11"
+
+mapped = samfile('reinject.sam')
+mappedBlock = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=97, action={drop})
+    if not mr.flag({mapped}):
+        discard
+
+mappedCall = select(mapped, keep_if=[{mapped}])

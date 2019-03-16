@@ -1,5 +1,6 @@
 Version 0.11.0+
 	* Compress SAM files after select() calls
+	* Fix reinjectSequence in select() call with blocks
 
 Version 0.11.0 2019-03-15 by luispedro
 	* Switch to diagrams package for plotting

@@ -589,13 +589,17 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
                 r2 <- reinjectSequences' o2 f2
                 ss <- reinjectSequences' os fs
                 return (r1 ++ r2 ++ ss)
-        reinjectSequences' :: Foldable t => t SamLine -> [SamLine] -> NGLess [SamLine]
+        reinjectSequences' :: [SamLine] -> [SamLine] -> NGLess [SamLine]
         reinjectSequences' original f@(s@SamLine{}:rs)
-            | not (any hasSequence f) = case find hasSequence original of
-                    Just s' -> do
-                        cigar <- fixCigar (samCigar s) (B.length $ samSeq s')
-                        return (s { samSeq = samSeq s', samQual = samQual s', samCigar = cigar }:rs)
-                    Nothing -> return f
+            | not (any hasSequence f) = let
+                        fixed = flip map (filter hasSequence original) $ \s' -> do
+                            cigar <- fixCigar (samCigar s) (samLength s')
+                            return (s { samSeq = samSeq s', samQual = samQual s', samCigar = cigar }:rs)
+                        asum' [] = return f
+                        asum' (x:xs) = case x of
+                            Right{} -> x
+                            Left{} -> asum' xs
+                    in asum' fixed
         reinjectSequences' _ f = return f
 executeSelectWBlock expr _ _ = unreachable ("Select with block, unexpected argument: " ++ show expr)
 
