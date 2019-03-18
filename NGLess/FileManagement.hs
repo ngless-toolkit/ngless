@@ -72,6 +72,7 @@ inferCompression fp
     | endswith ".gz" fp = GzipCompression
     | endswith ".bz2" fp = BZ2Compression
     | endswith ".xz"  fp = XZCompression
+    | endswith ".zst" fp = ZStdCompression
     | endswith ".zstd" fp = ZStdCompression
     | otherwise = NoCompression
 

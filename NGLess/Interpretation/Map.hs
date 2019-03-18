@@ -173,8 +173,8 @@ lookupReference args = do
 
 mapToReference :: Mapper -> FilePath -> ReadSet -> [String] -> NGLessIO (FilePath, (Int, Int, Int))
 mapToReference mapper refIndex rs extraArgs = do
-    (newfp, hout) <- openNGLTempFile refIndex "mapped_" "sam.zstd"
-    statsp <- callMapper mapper refIndex rs extraArgs (zipToStats $ CAlg.asyncZstdTo 3 hout)
+    (newfp, hout) <- openNGLTempFile refIndex "mapped_" "sam"
+    statsp <- callMapper mapper refIndex rs extraArgs (zipToStats $ CB.sinkHandle hout)
     liftIO $ hClose hout
     return (newfp, statsp)
 
@@ -231,15 +231,14 @@ performMap mapper blockSize ref name rs extraArgs = do
             outputMappedSetStatistics (MappingInfo undefined samPath' single total aligned unique)
             return $ NGOMappedReadSet name (File samPath') mappedRef
         blocks -> do
-            (sam, hout) <- openNGLTempFile "merging" "merged_" "sam.zstd"
+            (sam, hout) <- openNGLTempFile "merging" "merged_" "sam"
             partials <- forM blocks (\block -> fst <$> mapToReference mapper block rs extraArgs)
             ((total, aligned, unique), ()) <- C.runConduit $
                 mergeSamFiles partials
                 .| zipSink2 (CC.conduitVector 4096 .| samStatsC')
                     (CL.concat
                         .| CL.map ((`mappend` BB.char7 '\n') . encodeSamLine)
-                        .| CC.builderToByteString
-                        .| CAlg.asyncZstdTo 3 hout)
+                        .| CB.sinkHandleBuilder hout)
             liftIO $ hClose hout
             let refname = case ref of
                     FaFile fa -> fa
@@ -293,14 +292,13 @@ executeMergeSams :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMergeSams (NGOList ifnames) _ = do
     outputListLno' WarningOutput ["Calling internal function __merge_samfiles"]
     partials <- mapM (fmap T.unpack . stringOrTypeError "__merge_samfiles") ifnames
-    (sam, hout) <- openNGLTempFile "merging" "merged_" "sam.zstd"
+    (sam, hout) <- openNGLTempFile "merging" "merged_" "sam"
     ((total, aligned, unique), ()) <- C.runConduit $
         mergeSamFiles partials
         .| zipSink2 (CC.conduitVector 4096 .| samStatsC')
             (CL.concat
                 .| CL.map ((`mappend` BB.char7 '\n') . encodeSamLine)
-                .| CC.builderToByteString
-                .| CAlg.asyncZstdTo 3 hout)
+                .| CB.sinkHandleBuilder hout)
     outputMappedSetStatistics (MappingInfo undefined sam "no-ref" total aligned unique)
     liftIO $ hClose hout
     return $! NGOMappedReadSet "test" (File sam) Nothing
