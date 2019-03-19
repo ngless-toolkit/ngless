@@ -517,8 +517,9 @@ Unmapped inserts are included in the output if ``{include_minus1}`` is true
 substrim
 --------
 
-Given a read, returns another that is the biggest sub-sequence with a
-given minimum quality. For example::
+Given a read finds the longest substring, such that all bases are of at least
+the given quality. The name is a constraction of "substring trim".  For
+example::
 
     read = substrim(read, min_quality=25)
 
@@ -541,8 +542,7 @@ Arguments
 | min_quality             | Integer      |  yes       |	               |
 +-------------------------+--------------+------------+----------------+
 
-``min_quality`` parameter defines the minimum quality accepted for the
-sub-sequence.
+``min_quality`` parameter defines the minimum quality accepted.
 
 endstrim
 --------
