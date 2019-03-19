@@ -1,7 +1,6 @@
-{- Copyright 2014-2016 NGLess Authors
+{- Copyright 2014-2019 NGLess Authors
  - License: MIT
  -}
-
 
 module Utils.ProgressBar
     ( mkProgressBar
@@ -13,13 +12,15 @@ import System.IO
 import Control.Monad
 
 data ProgressBar = ProgressBar
-    { cur :: Rational
+    { pbarName :: String
+    , cur :: Rational
     , width :: Int
     , pbarActive :: Bool
     } deriving (Eq, Show)
 
 
-noProgress = ProgressBar (-1) (-1) False
+noProgress :: ProgressBar
+noProgress = ProgressBar "" (-1) (-1) False
 
 -- | Redraw progress bar
 updateProgressBar :: ProgressBar -- ^ previous progressbar
@@ -30,6 +31,8 @@ updateProgressBar bar _
 updateProgressBar bar progress = do
     when (percent progress /= percent (cur bar)) $ do
         let s = drawProgressBar (width bar) progress ++ " " ++ printPercentage progress
+        putStr (pbarName bar)
+        putStr ": "
         putStr s
         putStr "\r"
     return $ bar { cur = progress }
@@ -38,13 +41,13 @@ updateProgressBar bar progress = do
 -- This function also checks if 'stdout' is a terminal device.
 -- If it is not, then it returns a null progress bar,
 -- one which does not draw on the screen.
-mkProgressBar :: Int -> IO ProgressBar
-mkProgressBar w = do
+mkProgressBar :: String -> Int -> IO ProgressBar
+mkProgressBar name w = do
     isTerm <- hIsTerminalDevice stdout
     if isTerm
         then do
             hSetBuffering stdout NoBuffering
-            return $ ProgressBar (-1) w True
+            return $ ProgressBar name (-1) w True
         else return noProgress
 
 drawProgressBar :: Int -> Rational -> String

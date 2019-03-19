@@ -47,7 +47,7 @@ downloadFile url destPath = do
                     HTTP.responseBody res
                         .| case lookup "Content-Length" (HTTP.responseHeaders res) of
                             Nothing -> CL.map id
-                            Just csize -> printProgress (read (B.unpack csize))
+                            Just csize -> printProgress ("Downloading "++url) (read (B.unpack csize))
                         .| CB.sinkFileCautious destPath
                 return $ Right ()
             err -> return . throwSystemError $ "Could not connect to "++url++" (got error code: "++show err++")"
@@ -68,8 +68,8 @@ downloadExpandTar url destdir = do
         removeFile tarName
 
 
-printProgress :: MonadIO m => Int -> C.ConduitT B.ByteString B.ByteString m ()
-printProgress csize = liftIO (mkProgressBar 40) >>= loop 0
+printProgress :: MonadIO m => String -> Int -> C.ConduitT B.ByteString B.ByteString m ()
+printProgress msg csize = liftIO (mkProgressBar msg 40) >>= loop 0
   where
     loop !len pbar = awaitJust $ \bs -> do
             let len' = len + B.length bs
