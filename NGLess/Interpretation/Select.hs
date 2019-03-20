@@ -66,6 +66,20 @@ _parseConditions args = do
         asSC "unique" = return SelectUnique
         asSC c = throwShouldNotOccur ("Check failed.  Should not have seen this condition: '" ++ show c ++ "'")
 
+-- Notes on "Sequence reinjection"
+--
+-- Here is the case where it is necessary:
+--  1) the aligner includes the sequence in SamLine 1 (typically, the best hit, by its standards)
+--  2) we filter out SamLine 1, but keep SamLine 2 (this is a rare case, a few in a million)
+--  3) SamLine 2 does not have sequence information, so we need to reinject it
+--
+-- Here is why we need to rewrite the CIGAR string:
+--  1) there are two forms of trimming in CIGAR: hard & soft. Hard means that
+--  the bases were removed from the reads, whilst soft means that they are
+--  kept. If one of the lines uses hard trimming and the other one uses soft
+--  trimming, the read length may not match correctly
+--  2) we want to keep the full sequence, so we want to use soft trimming (if
+--  at all possible)
 matchConditions :: Bool -> MatchCondition -> [(SamLine,B.ByteString)] -> NGLess [(SamLine, B.ByteString)]
 matchConditions doReinject conds sg = reinjectSequences doReinject (matchConditions' conds sg)
     where
@@ -85,6 +99,7 @@ matchConditions doReinject conds sg = reinjectSequences doReinject (matchConditi
                                         return s { samSeq = samSeq s', samQual = samQual s', samCigar = cigar' }
                             _ -> return s
 
+-- See note above on "Sequence reinjection" about why this function is necessary
 fixCigar :: B.ByteString -> Int -> NGLess B.ByteString
 fixCigar prev n = do
     prevM <- matchSize' True prev

@@ -540,6 +540,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
         env <- gets id
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
+        -- See "Notes on 'Sequence reinjection'" in NGLess/Environment/Select.hs
         doReinject <- runNGLessIO $ do
                             v <- ngleVersion <$> nglEnvironment
                             if v < NGLVersion 0 8
@@ -555,7 +556,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
                                 CC.takeWhileE (isSamHeaderString . unwrapByteLine)
                                 .| CL.map concatBytelines
                             readSamGroupsC' mapthreads paired
-                                .| asyncMapEitherC mapthreads (fmap concatLines . V.mapM (runInterpretationRO env . filterGroup doReinject))
+                                .| asyncMapEitherC mapthreads (fmap concatLines . V.mapM (runInterpretationRO env . selectBlock doReinject))
                         .|  CB.sinkHandle ohandle
         return input { nglSamFile = File oname }
     where
@@ -568,10 +569,10 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
         concatLines' :: [BB.Builder] -> B.ByteString
         concatLines' = BL.toStrict . BB.toLazyByteString . mconcat . map (`mappend` BB.char7 '\n')
 
-        filterGroup :: Bool -> [SamLine] -> InterpretationROEnv [BB.Builder]
-        filterGroup _ [] = return []
-        filterGroup _ [SamHeader line] = return [BB.byteString line]
-        filterGroup doReinject mappedreads  = do
+        selectBlock :: Bool -> [SamLine] -> InterpretationROEnv [BB.Builder]
+        selectBlock _ [] = return []
+        selectBlock _ [SamHeader line] = return [BB.byteString line]
+        selectBlock doReinject mappedreads  = do
                     mrs' <- interpretBlock1 (BlockVariables1 var (NGOMappedRead mappedreads)) body
                     if blockStatus mrs' `elem` [BlockContinued, BlockOk]
                         then case lookupBlockVar var (blockValues mrs') of
