@@ -163,8 +163,9 @@ streamedSamStats lno ifile ref = C.passthroughSink (CL.map (V.singleton . map fs
     outputMappedSetStatistics (MappingInfo lno ifile ref total aligned unique)
 
 
-splitSamlines3 = foldl' add1 ([],[],[])
+splitSamlines3 = reverse3 . foldl' add1 ([],[],[])
     where
+        reverse3 (g1, g2, gs) = (reverse g1, reverse g2, reverse gs)
         add1 (g1,g2,gs) s
             | isFirstInPair s = (s:g1,g2,gs)
             | isSecondInPair s = (g1, s:g2, gs)

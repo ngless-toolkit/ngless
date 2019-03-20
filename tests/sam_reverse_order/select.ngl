@@ -1,0 +1,13 @@
+ngless "0.10"
+
+mapped = samfile('input.sam')
+mappedBlock = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=1, min_identity_pc=1, action={drop})
+    if not mr.flag({mapped}):
+        discard
+
+write(mappedBlock, ofile="output.select_block.sam")
+
+mappedCall = select(mapped, keep_if=[{mapped}])
+
+write(mappedCall, ofile="output.select_call.sam")
