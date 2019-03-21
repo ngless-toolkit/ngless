@@ -1,8 +1,8 @@
-Version 0.11.0+
-	* Compress SAM files after select() calls
+Version 0.11.1 2019-03-21 by luispedro
 	* Fix reinjectSequence in select() call with blocks
 	* Remove zstd compression
 	* Fix SAM order switching in select() call with blocks (#105)
+	* Compress SAM files after select() calls
 
 Version 0.11.0 2019-03-15 by luispedro
 	* Switch to diagrams package for plotting

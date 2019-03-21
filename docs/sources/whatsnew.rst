@@ -2,10 +2,14 @@
 What's New (History)
 ====================
 
-Version 0.11.0
---------------
+Version 0.11
+------------
 
-Released March 15 2019
+Released March 15 2019 (**0.11.0**) and March 21 2019 (**0.11.1**).
+
+Version 0.11.0 used ZStdandard compression, which was not reliable (the
+official haskell zstd wrapper has issues). Thus, it was removed in v0.11.1.
+Using v0.11.0 is **not recommended**.
 
 User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -29,7 +33,6 @@ Internal improvements
 - Update minimap2 version to 2.14
 - Call bwa/minimap2 with interleaved fastq files. This avoids calling it twice (which would mean that the indices were read twice).
 - Avoid leaving open file descriptors after FastQ encoding detection
-- Compress intermediate SAM files. In some situations this should even speed up the process as Zstandard compression is used and the process was often IO bound (`#22 <https://github.com/ngless-toolkit/ngless/issues/22>`__)
 - Tar extraction uses much less memory now (`#77 <https://github.com/ngless-toolkit/ngless/issues/77>`__)
 
 

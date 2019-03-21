@@ -57,22 +57,22 @@ The recommended way to install NGLess is through
 Alternatively, a docker container with NGLess is available at
 [biocontainers](https://quay.io/repository/biocontainers/ngless):
 
-    docker run -v $PWD:/workdir -w /workdir -it quay.io/biocontainers/ngless:0.11.0--py35_0 ngless --version
+    docker run -v $PWD:/workdir -w /workdir -it quay.io/biocontainers/ngless:0.11.1--py35_0 ngless --version
 
 Adapt the mount flags (``-v``) as needed.
 
 ### Linux
 
 You can get a [statically linked version of
-NGless 0.11.0](https://ngless.embl.de/releases/ngless-0.11.0-Linux64) or a [nighly
+NGless 0.11.1](https://ngless.embl.de/releases/ngless-0.11.1-Linux64) or a [nighly
 build of the latest development
 code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
 This should work across a wide range of Linux versions (please
 [report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
 
-    curl -O https://ngless.embl.de/releases/ngless-0.11.0-Linux64
-    chmod +x ngless-0.11.0-Linux64
-    ./ngless-0.11.0-Linux64
+    curl -O https://ngless.embl.de/releases/ngless-0.11.1-Linux64
+    chmod +x ngless-0.11.1-Linux64
+    ./ngless-0.11.1-Linux64
 
 This download bundles bwa, samtools and megahit (also statically linked).
 
