@@ -12,3 +12,4 @@ ngless-stats/
 **/ref.fna*-bwa-*.bwt
 **/ref.fna*-bwa-*.pac
 **/ref.fna*-bwa-*.sa
+**/*.fna.mm2.idx
