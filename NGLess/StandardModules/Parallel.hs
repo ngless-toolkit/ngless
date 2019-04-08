@@ -263,36 +263,36 @@ splitAtTab ell = case B.elemIndex 9 ell of -- 9 is TAB
     Nothing -> throwDataError "Line does not have a TAB character"
     Just tix -> return $ B.splitAt tix ell
 
-splitLines :: [V.Vector B.ByteString] -> NGLess (V.Vector B.ByteString, V.Vector B.ByteString)
-splitLines [] = throwShouldNotOccur "splitLines called with empty vector"
-splitLines (first_ell:ells) = runST $ do
+-- partialPaste pastes a set of inputs, returning both the indices (row
+-- headers) and the pasted row content
+partialPaste :: [V.Vector B.ByteString] -> NGLess (V.Vector B.ByteString, V.Vector B.ByteString)
+partialPaste [] = throwShouldNotOccur "partialPaste called with empty vector"
+partialPaste vs
+    | not (allSame $ V.length <$> vs) = throwDataError $ "collect(): inputs have differing number of rows"
+partialPaste (first_ell:ells) = runST $ do
         indices <- VM.new n
         contents <- VM.new n
-        ok <- fillData 0 indices contents
-        case ok of
-            Left err -> return $ Left err
-            Right () -> do
+        fillData 0 indices contents
+    where
+        n = V.length first_ell
+        splitCheck :: Int -> B.ByteString -> V.Vector B.ByteString -> NGLess B.ByteString
+        splitCheck !ix !h e
+            | B.isPrefixOf h (e V.! ix) = return $! B.drop (B.length h) (e V.! ix)
+            | otherwise = throwDataError $
+                                "Inconsistent row index in files for collect() [expected index entry '"++B8.unpack h++"', saw '"++B8.unpack (e V.! ix)++"']."
+        fillData !ix indices contents
+            | ix == n = do
                 indices' <- V.unsafeFreeze indices
                 contents' <- V.unsafeFreeze contents
                 return . Right $ (indices', contents')
-    where
-        n = V.length first_ell
-        fillData !ix indices contents
-            | ix == n = return $ Right ()
             | otherwise = case splitAtTab (first_ell V.! ix) of
                     Left err -> return $ Left err
-                    Right (!h,!c) -> do
-                        let splitCheck :: V.Vector B.ByteString -> NGLess B.ByteString
-                            splitCheck e
-                                | B.isPrefixOf h (e V.! ix) = return $! B.drop (B.length h) (e V.! ix)
-                                | otherwise = throwDataError $
-                                                    "Inconsistent index in files for collect() [expected index entry '"++B8.unpack h++"', saw '"++B8.unpack (e V.! ix)++"']."
-                        case forM ells splitCheck of
-                            Left err -> return $ Left err
-                            Right cs -> do
-                                VM.write indices ix h
-                                VM.write contents ix $! B.concat (c:cs)
-                                fillData (ix + 1) indices contents
+                    Right (!h,!c) -> case forM ells (splitCheck ix h) of
+                        Left err -> return $ Left err
+                        Right cs -> do
+                            VM.write indices ix h
+                            VM.write contents ix $! B.concat (c:cs)
+                            fillData (ix + 1) indices contents
 
 concatPartials :: [(V.Vector B.ByteString, V.Vector B.ByteString)] -> NGLess BL.ByteString
 concatPartials [] = throwShouldNotOccur "concatPartials of empty set"
@@ -315,10 +315,51 @@ sinkTBMQueue' q shouldClose = do
 maxNrOpenFiles = 512 :: Int
 
 
+{- Now there is a whole lot of complicated code to efficiently solve the
+ - following problem:
+ -
+ - INPUT 0
+ -
+ -       h0
+ - row1 c01
+ - row2 c02
+ - row3 c03
+ -
+ - INPUT 1
+ -
+ -       h1
+ - row0 c11
+ - row2 c12
+ - row4 c14
+ -
+ - INPUT 2
+ -
+ -       h2
+ - row0 c21
+ - row1 c21
+ - row3 c23
+ -
+ - should produce
+ -
+ - OUTPUT
+ -
+ -       h0  h1  h2
+ - row0 c00 c10 c20
+ - row1 c01 c11 c21
+ - row2 c02 c12 c22
+ - row3 c03 c13 c23
+ - row4 c04 c14 c24
+ -
+ - Where the missing values (e.g., c00) are assumed to be 0
+ -
+ - A further complication is that each individual input file may itself have
+ - multiple columns.
+ -}
+
 data SparseCountData = SparseCountData
                             { spdHeader :: !B.ByteString
-                            , spdIndex :: !Int
-                            , spdPayload :: B.ByteString
+                            , spdIndex :: {-# UNPACK #-} !Int
+                            , spdPayload :: !B.ByteString
                             }
     deriving (Eq)
 
@@ -333,6 +374,16 @@ tagSource ix = C.awaitForever $ \(ByteLine v) -> case splitAtTab v of
     Left err -> lift $ throwError err
     Right (h, pay) -> C.yield $ SparseCountData h ix pay
 
+-- complete takes a set of SparseCountData and fills in missing columns from
+-- the placeholder set.
+--
+-- Example
+--      placeholder = [p_0, p_1, p_2, p_3, p_4]
+--      hinput = ...
+--      inputs = [h_0 0 l_0, h_2 2 l_2, h_3 3 l_3]
+--
+--      output = [l_0, p_1, l_2, l_3, p_4]
+--
 complete :: [B.ByteString] -> (SparseCountData,[SparseCountData]) -> ByteLine
 complete placeholders (hinput,inputs) = ByteLine $ B.concat merged
     where
@@ -345,6 +396,8 @@ complete placeholders (hinput,inputs) = ByteLine $ B.concat merged
             | otherwise = p:complete' (ix+1) ps xs
         complete' _ ps [] = ps
 
+-- Merge input lines by index (first element). The input lines are assumed to
+-- be sorted, but not necessary identical (i.e., some may be missing).
 mergeCounts :: [C.ConduitT () ByteLine NGLessIO ()] -> C.ConduitT () ByteLine NGLessIO ()
 mergeCounts [] = throwShouldNotOccur "Attempt to merge empty sources"
 mergeCounts ss = do
@@ -365,7 +418,23 @@ mergeCounts ss = do
         placeholder n = B.intercalate "\t" ("":["0" | _ <- [1..n]])
 
 
-pasteCounts :: [T.Text] -> Bool -> [T.Text] -> [FilePath] -> NGLessIO FilePath
+{- There are two modes:
+ -
+ - 1) The rows match (i.e., row headers are always identical). This is the easy
+ - case, and it is like the `paste` command
+ -
+ - 2) The rows do not match. In this case, NGLess assumes that they are sorted
+ - [in "C" locale] and merges them.
+ -}
+pasteCounts :: [T.Text]
+            -- ^ comment text
+            -> Bool
+            -- ^ whether rows match
+            -> [T.Text]
+            -- ^ headers
+            -> [FilePath]
+            -- ^ input files
+            -> NGLessIO FilePath
 pasteCounts comments matchingRows headers inputs
     | length inputs > maxNrOpenFiles = do
         let current = take maxNrOpenFiles inputs
@@ -389,7 +458,7 @@ pasteCounts comments matchingRows headers inputs
                     sourcesplits = nChunks numCapabilities sources
                 channels <- liftIO $ forM sourcesplits $ \ss -> do
                     ch <- TQ.newTBMQueueIO 4
-                    a <- A.async $ C.runConduitRes (C.sequenceSources ss .| CL.map (force . splitLines) .| sinkTBMQueue' ch True)
+                    a <- A.async $ C.runConduitRes (C.sequenceSources ss .| CL.map (force . partialPaste) .| sinkTBMQueue' ch True)
                     A.link a
                     return (CA.sourceTBMQueue ch, a)
                 C.runConduit $
