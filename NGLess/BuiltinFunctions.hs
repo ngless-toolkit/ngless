@@ -35,7 +35,7 @@ builtinFunctions =
     ,Function (FuncName "preprocess") (Just NGLReadSet) [] NGLReadSet preprocessArgs False [FunctionCheckReturnAssigned]
     ,Function (FuncName "substrim") (Just NGLRead) [] NGLRead substrimArgs False [FunctionCheckReturnAssigned]
     ,Function (FuncName "endstrim") (Just NGLRead) [] NGLRead endstrimArgs False [FunctionCheckReturnAssigned]
-    ,Function (FuncName "smoothtrim") (Just NGLRead) [] NGLRead smoothtrimArgs False [FunctionCheckReturnAssigned]
+    ,Function (FuncName "smoothtrim") (Just NGLRead) [] NGLRead smoothtrimArgs False [FunctionCheckReturnAssigned, FunctionCheckMinNGLessVersion (0, 11)]
     ,Function (FuncName "map") (Just NGLReadSet) [] NGLMappedReadSet mapArgs False [FunctionCheckReturnAssigned]
     ,Function (FuncName "mapstats") (Just NGLMappedReadSet) [] NGLCounts mapStatsArgs False []
     ,Function (FuncName "select") (Just NGLMappedReadSet) [] NGLMappedReadSet selectArgs False []
