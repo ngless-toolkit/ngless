@@ -2,6 +2,21 @@
 What's New (History)
 ====================
 
+Post 0.11
+---------
+
+User-visible improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The handling of multiple annotations in `count
+  <https://ngless.embl.de/Functions.html#count>`__ (i.e., when the user
+  requests multiple ``features`` and/or ``subfeatures``) has changed. The
+  previous model caused a few issues (`#63
+  <https://github.com/ngless-toolkit/ngless/issues/63>`__, but also mixing with
+  `collect() <https://ngless.embl.de/Functions.html#collect>`__. Unfortunately,
+  this means that scripts asking for the old behaviour in their version
+  declaration are no longer supported if they use multiple features.
+
 Version 0.11
 ------------
 

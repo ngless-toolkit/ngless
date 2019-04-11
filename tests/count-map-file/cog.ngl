@@ -1,4 +1,4 @@
-ngless '0.0'
+ngless '0.11'
 mapped = samfile('basic.sam')
 
 counted = count(mapped, features=['ko'], multiple={all1}, functional_map='122_DCM_0d2-0d45_scaffold97490_1_gene122702.map')
@@ -27,6 +27,12 @@ write(counted, ofile='output.ko.dist1.txt')
 
 counted = count(mapped, features=['ko', 'pfamA'], multiple={dist1}, functional_map='122_DCM_0d2-0d45_scaffold97490_1_gene122702.map')
 write(counted, ofile='output.ko.pfamA.dist1.txt')
+
+counted = count(mapped, features=['ko', 'pfamA'], multiple={dist1}, functional_map='122_DCM_0d2-0d45_scaffold97490_1_gene122702_alt.map')
+write(counted, ofile='output.ko.pfamA.alt.dist1.txt')
+
+counted = count(mapped, features=['pfamA', 'ko'], multiple={dist1}, functional_map='122_DCM_0d2-0d45_scaffold97490_1_gene122702.map')
+write(counted, ofile='output.pfamA.ko.dist1.txt')
 
 # Regression test: this used to trigger an error:
 counted = count(mapped,

@@ -1,0 +1,1 @@
+expected.ko.pfamA.dist1.txt

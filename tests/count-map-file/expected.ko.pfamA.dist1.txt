@@ -1,7 +1,9 @@
 	basic.sam
+ko:-1	0
 ko:K00564	0
 ko:K06160	0
 ko:NA	2
+pfamA:-1	0
 pfamA:PF01344.20	0.2222222222222222
 pfamA:PF03602.10	0
 pfamA:PF05175.9	0
