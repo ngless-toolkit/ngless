@@ -11,6 +11,7 @@ import qualified Data.IntervalMap.Strict as IM
 import qualified Data.Set as S
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
+import qualified Data.Vector.Unboxed as VU
 import qualified Data.Map as M
 
 import qualified Data.Conduit.Combinators as C
@@ -19,6 +20,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import qualified Data.Strict.Tuple as TU
 import           Data.Conduit ((.|))
+import           Data.List (elemIndex)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 
@@ -79,8 +81,11 @@ case_load_very_short = do
     length (listNub usedIDs) @?= length headers
     minimum usedIDs @?= 0
     maximum usedIDs @?= length headers - 1
-    M.size szmap @?= length headers
-    M.lookup "WBGene00010199" szmap @?= Just (721-119+1)
+    VU.length szmap @?= length headers
+    let mix = do
+            ix <- elemIndex "WBGene00010199" headers
+            return $! szmap VU.! ix
+    mix @?= Just (721-119+1)
 
 
 short3 :: B.ByteString
@@ -229,8 +234,9 @@ gene2	COG2813	K00564	NA
 |]
 
 case_load_map = do
-    [GeneMapAnnotator nmap names] <- testNGLessIO $ do
+    [GeneMapAnnotator tag nmap names] <- testNGLessIO $ do
         map_fp <- asTempFile simple_map "map"
         loadFunctionalMap map_fp ["ko"]
     let Just [ix] = M.lookup "gene1" nmap
     RSV.retrieveName names ix @?= "NA"
+    tag @?= B.empty
