@@ -7,10 +7,9 @@
 /samtools-1.6/
 /bwa-0.7.15/
 /bwa-0.7.17/
-/megahit-1.1.1/
+/megahit-1.1.4/
 /Prodigal-2.6.3/
-/minimap2-2.9/
-/minimap2-2.14/
+/minimap2-2.16/
 /*.tar.bz2
 /*.tar.gz
 /build-scripts/docker_bases/*.log
