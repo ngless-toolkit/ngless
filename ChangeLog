@@ -1,5 +1,6 @@
 Post 0.11.1
 	* Fix multiple features usage (#63)
+	* Update minimap2/megahit to latest versions
 
 Version 0.11.1 2019-03-21 by luispedro
 	* Fix reinjectSequence in select() call with blocks
