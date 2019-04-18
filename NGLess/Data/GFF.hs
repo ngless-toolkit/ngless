@@ -25,7 +25,7 @@ import qualified Data.ByteString.Lex.Fractional as F
 import NGLess.NGError
 
 data GffStrand = GffPosStrand | GffNegStrand | GffUnknownStrand | GffUnStranded
-            deriving (Eq, Show, Read, Enum)
+            deriving (Eq, Show, Enum)
 
 instance NFData GffStrand where
     rnf !_ = ()
