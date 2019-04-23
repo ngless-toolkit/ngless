@@ -2,7 +2,7 @@
 # Ngless used to choke if first line was not "ngless"
 # Ignoring comments seems more natural & allows having a she-bang line
 
-ngless "0.8"
+ngless "1.0"
 
 line0 = readlines('input.txt')[0]
 print(line0)

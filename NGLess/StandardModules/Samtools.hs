@@ -1,4 +1,4 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -245,8 +245,8 @@ loadModule v
                                    "samtools_sort" -> executeSort
                                    other -> \_ _ -> throwShouldNotOccur ("samtools runction called with wrong arguments: " ++ show other)
                    }
-    | v == "0.1" = return def
-                   { modInfo = ModInfo "stdlib.samtools" "0.1"
+    | v `elem` ["1.0", "0.1"] = return def
+                   { modInfo = ModInfo "stdlib.samtools" "1.0"
                    , modCitations = [citation]
                    , modFunctions = [samtools_sort_function, samtools_view_function]
                    , modTransform = sortOFormat >=> checkUnique

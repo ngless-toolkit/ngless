@@ -147,7 +147,7 @@ coordToGtf = Function
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ =
         return def
-        { modInfo = ModInfo "stdlib.mocat" "0.0"
+        { modInfo = ModInfo "stdlib.mocat" "1.0"
         , modCitations = citations
         , modFunctions = [mocatLoadSample, coordToGtf]
         , runFunction = \case

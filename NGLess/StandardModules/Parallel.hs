@@ -550,11 +550,11 @@ addLockHash script = pureTransform addLockHash' script
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule v
-    | v /= "0.6" = throwScriptError ("The behaviour of the parallel module changed.\n"++
-                                    "Only version 0.6 is now supported (currently attempting to import version '"++T.unpack v++"')")
+    | v `notElem` ["1.0", "0.6"] = throwScriptError ("The behaviour of the parallel module changed.\n"++
+                                    "Only versions 1.0 & 0.6 is now supported (currently attempting to import version '"++T.unpack v++"')")
     | otherwise =
         return def
-        { modInfo = ModInfo "stdlib.parallel" "0.6"
+        { modInfo = ModInfo "stdlib.parallel" "1.0"
         , modFunctions =
             [ lock1
             , collectFunction

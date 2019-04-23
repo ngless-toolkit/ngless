@@ -38,7 +38,7 @@ exampleFunction = Function
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ = return def
-    { modInfo = ModInfo "stdlib.example" "0.0"
+    { modInfo = ModInfo "stdlib.example" "1.0"
     , modConstants =
             [("EXAMPLE_0", NGOInteger 0)
             ,("EXAMPLE_TRUE", NGOBool True)

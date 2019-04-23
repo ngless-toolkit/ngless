@@ -1,4 +1,4 @@
-ngless "0.8"
+ngless "1.0"
 
 input = readlines('input.txt')
 print(input[0])

@@ -1,4 +1,4 @@
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2015-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -38,7 +38,7 @@ loadModule _ = liftIO $ do
     when (isJust ncpus) $
         setNumCapabilities (fromJust ncpus)
     return def
-        { modInfo = ModInfo "stdlib.batch" "0.0"
+        { modInfo = ModInfo "stdlib.batch" "1.0"
         , modConstants =
                 [("JOBINDEX_OR_0", NGOInteger (fromMaybe 0 job_id))
                 ,("JOBINDEX_VALID", NGOBool (isJust job_id))

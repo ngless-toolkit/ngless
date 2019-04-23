@@ -1,4 +1,4 @@
-ngless "0.12"
+ngless "1.0"
 import "parallel" version "0.6"
 
 samples = readlines("samplefile")

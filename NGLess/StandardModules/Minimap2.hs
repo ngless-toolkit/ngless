@@ -1,4 +1,4 @@
-{- Copyright 2018 NGLess Authors
+{- Copyright 2018-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -17,7 +17,7 @@ loadModule :: T.Text -> NGLessIO Module
 loadModule _ = do
     updateNglEnvironment addMinimap2
     return def
-        { modInfo = ModInfo "stdlib.minimap2" "0.0"
+        { modInfo = ModInfo "stdlib.minimap2" "1.0"
         , modCitations = [citation]
         , modFunctions = []
         , runFunction = \_ _ _ -> throwShouldNotOccur "minimap2 has no functions!"

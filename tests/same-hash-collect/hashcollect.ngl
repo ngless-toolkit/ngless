@@ -1,5 +1,5 @@
-ngless "0.8"
-import "parallel" version "0.6"
+ngless "1.0"
+import "parallel" version "1.0"
 
 samples = ['basic']
 sample = lock1(samples)

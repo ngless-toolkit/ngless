@@ -7,7 +7,7 @@ NGS (next-generation sequencing data) processing.
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/hyperium/hyper/master/LICENSE)
 [![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/installer/conda.svg)](https://anaconda.org/bioconda/ngless)
 [![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/downloads.svg)](https://anaconda.org/bioconda/ngless)
-[![Citation for NGLess](https://img.shields.io/badge/CITATION%20DOI-10.1101%2F367755-brightgreen.svg)](https://doi.org/10.1101/367755)
+[![Citation for NGLess](https://img.shields.io/badge/CITATION%20DOI-10.1186%2Fs40168-019-0684-8-brightgreen.svg)](https://doi.org/10.1186/s40168-019-0684-8)
 [![Join the chat at https://gitter.im/luispedro/ngless](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/luispedro/ngless?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 
@@ -18,15 +18,14 @@ If you are using NGLess, please cite:
 
 > _NG-meta-profiler: fast processing of metagenomes using NGLess, a
 > domain-specific language_ by Luis Pedro Coelho, Renato Alves, Paulo Monteiro,
-> Jaime Huerta-Cepas, Ana Teresa Freitas, Peer Bork bioRxiv 367755; doi:
-> [https://doi.org/10.1101/367755](https://doi.org/10.1101/367755)
-
+> Jaime Huerta-Cepas, Ana Teresa Freitas, Peer Bork, Microbiome (2019)
+> [https://doi.org/10.1186/s40168-019-0684-8]((https://doi.org/10.1186/s40168-019-0684-8)
 
 ![NGLess cartoon](docs/NGLess-cartoon.svg)
 
 ## Example
 
-    ngless "0.11"
+    ngless "1.0"
     input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
     input = preprocess(input) using |read|:
         read = read[5:]
@@ -64,15 +63,15 @@ Adapt the mount flags (``-v``) as needed.
 ### Linux
 
 You can get a [statically linked version of
-NGless 0.11.1](https://ngless.embl.de/releases/ngless-0.11.1-Linux64) or a [nighly
+NGless 1.0.0](https://ngless.embl.de/releases/ngless-1.0.0-Linux64) or a [nighly
 build of the latest development
 code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
 This should work across a wide range of Linux versions (please
 [report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
 
-    curl -O https://ngless.embl.de/releases/ngless-0.11.1-Linux64
-    chmod +x ngless-0.11.1-Linux64
-    ./ngless-0.11.1-Linux64
+    curl -O https://ngless.embl.de/releases/ngless-1.0.0-Linux64
+    chmod +x ngless-1.0.0-Linux64
+    ./ngless-1.0.0-Linux64
 
 This download bundles bwa, samtools and megahit (also statically linked).
 

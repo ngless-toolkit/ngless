@@ -1,11 +1,11 @@
-NGLess v0.11.1 (C) NGLess authors
+NGLess v1.0.0 (C) NGLess authors
 https://ngless.embl.de/
 
 When publishing results from this script, please cite the following references:
 
-	 - Coelho, L.P., Alves, R., Monteiro, P., Huerta-Cepas, J., Freitas, A.T., and Bork, P., 2018.
-	 NG-meta-profiler: fast processing of metagenomes using NGLess, a domain-specific language bioRxiv
-	 367755 https://doi.org/10.1101/367755
+	 - Coelho, L.P., Alves, R., Monteiro, P., Huerta-Cepas, J., Freitas, A.T., and Bork, P., 2019.
+	 NG-meta-profiler: fast processing of metagenomes using NGLess, a domain-specific language.
+	 Microbiome. DOI: http://doi.org/10.1186/s40168-019-0684-8
 
 
 Should print

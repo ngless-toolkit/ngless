@@ -2,8 +2,8 @@
 What's New (History)
 ====================
 
-Post 0.11
----------
+Version 1.0
+-----------
 
 User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~

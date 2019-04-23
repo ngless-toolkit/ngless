@@ -21,7 +21,7 @@ citations =
 
 nglessCitation :: T.Text
 nglessCitation =
-    "Coelho, L.P., Alves, R., Monteiro, P., Huerta-Cepas, J., Freitas, A.T., and Bork, P., 2018.  NG-meta-profiler: fast processing of metagenomes using NGLess, a domain-specific language bioRxiv 367755 https://doi.org/10.1101/367755"
+    "Coelho, L.P., Alves, R., Monteiro, P., Huerta-Cepas, J., Freitas, A.T., and Bork, P., 2019.  NG-meta-profiler: fast processing of metagenomes using NGLess, a domain-specific language. Microbiome. DOI: http://doi.org/10.1186/s40168-019-0684-8"
 
 
 collectCitations :: [Module] -> Script -> [T.Text]
