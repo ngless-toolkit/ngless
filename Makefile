@@ -67,8 +67,10 @@ NGLESS_EMBEDDED_BINARIES := \
 NGLESS_EMBEDDED_TARGET = NGLess/Dependencies/embedded.c
 
 MEGAHIT_BINS := $(MEGAHIT_DIR)/megahit_asm_core $(MEGAHIT_DIR)/megahit_sdbg_build $(MEGAHIT_DIR)/megahit_toolkit $(MEGAHIT_DIR)/megahit
-NGLESS_EXT_BINS = $(BWA_DIR)/$(BWA_TARGET) $(SAM_DIR)/$(SAM_TARGET) $(PRODIGAL_DIR)/$(PRODIGAL_TARGET) $(MEGAHIT_BINS)
-NGLESS_EXT_BINS_VERSIONED = $(BWA_DIR)/$(BWA_TARGET_VERSIONED) $(SAM_DIR)/$(SAM_TARGET_VERSIONED) $(PRODIGAL_DIR)/$(PRODIGAL_TARGET_VERSIONED) $(MINIMAP2_DIR)/$(MINIMAP2_TARGET_VERSIONED)
+NGLESS_EXT_BINS_VERSIONED = $(BWA_DIR)/$(BWA_TARGET_VERSIONED) \
+							$(SAM_DIR)/$(SAM_TARGET_VERSIONED) \
+							$(PRODIGAL_DIR)/$(PRODIGAL_TARGET_VERSIONED) \
+							$(MINIMAP2_DIR)/$(MINIMAP2_TARGET_VERSIONED)
 
 HTML = Html
 HTML_LIBS_DIR = $(HTML)/htmllibs
@@ -152,7 +154,7 @@ install: ngless external-deps $(NGLESS_EXT_BINS_VERSIONED) $(MEGAHIT_BINS)
 	mkdir -p $(deps)/bin/ngless-${VERSION}-megahit
 	cp -prf $(MEGAHIT_BINS) $(deps)/bin/ngless-${VERSION}-megahit
 
-external-deps: $(NGLESS_EXT_BINS) $(reqhtmllibs) $(reqfonts)
+external-deps: $(NGLESS_EXT_BINS_VERSIONED) $(reqhtmllibs) $(reqfonts)
 
 clean:
 	rm -f $(NGLESS_EMBEDDED_BINARIES)
