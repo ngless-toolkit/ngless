@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -334,7 +334,7 @@ check1arg ferr arginfo (Variable v, e) = do
         (Nothing, _) -> errorInLineC $
             ["Bad argument '", T.unpack v, "' for ",  ferr, ".\n"
             ,T.unpack $ suggestionMessage v (argName <$> arginfo)
-            ,"This function takes the following arguments:\n"]
+            ,"\nThis function takes the following arguments:\n"]
             ++ map ((\aname -> "\t"++aname++"\n") . T.unpack . argName) arginfo
         (_, Nothing) -> return () -- Could not infer type of argument. Maybe an error, but maybe not
         (Just ainfo', Just t') ->
