@@ -53,23 +53,23 @@ dataDirectory User = nConfUserDataDirectory   <$> nglConfiguration
 -- These references were obtained from Ensembl
 -- Check build-scripts/create-standard-packs.py for additional information
 builtinReferences :: [Reference]
-builtinReferences = [Reference rn (Just alias) (T.concat [rn, "-", T.pack versionStr]) Nothing True False | (rn, alias) <-
-                [ ("bosTau4", "Bos_taurus_UMD3.1")
-                , ("ce10", "Caenorhabditis_elegans_WBcel235")
-                , ("canFam3", "Canis_familiaris_CanFam3.1")
-                , ("dm5", "Drosophila_melanogaster_BDGP5")
-                , ("dm6", "Drosophila_melanogaster_BDGP6")
-                , ("gg4", "Gallus_gallus_Galgal4")
-                , ("gg5", "Gallus_gallus_5.0")
-                , ("hg19", "Homo_sapiens_GRCh37.p13")
-                , ("hg38.p7", "Homo_sapiens_GRCh38.p7")
-                , ("hg38.p10", "Homo_sapiens_GRCh38.p10")
-                , ("mm10.p2", "Mus_musculus_GRCm38.p2")
-                , ("mm10.p5", "Mus_musculus_GRCm38.p5")
-                , ("rn5", "Rattus_norvegicus_Rnor_5.0")
-                , ("rn6", "Rattus_norvegicus_Rnor_6.0")
-                , ("sacCer3", "Saccharomyces_cerevisiae_R64-1-1")
-                , ("susScr11", "Sus_scrofa.Sscrofa11.1")
+builtinReferences = [Reference rn (Just alias) (T.concat [rn, "-v", ver, "-", T.pack versionStr]) Nothing True False | (rn, alias, ver) <-
+                [ ("bosTau4", "Bos_taurus_UMD3.1", "1.0")
+                , ("ce10", "Caenorhabditis_elegans_WBcel235", "1.0")
+                , ("canFam3", "Canis_familiaris_CanFam3.1", "1.0")
+                , ("dm5", "Drosophila_melanogaster_BDGP5", "1.0")
+                , ("dm6", "Drosophila_melanogaster_BDGP6", "1.0")
+                , ("gg4", "Gallus_gallus_Galgal4", "1.0")
+                , ("gg5", "Gallus_gallus_5.0", "1.0")
+                , ("hg19", "Homo_sapiens_GRCh37.p13", "1.0")
+                , ("hg38.p7", "Homo_sapiens_GRCh38.p7", "1.0")
+                , ("hg38.p10", "Homo_sapiens_GRCh38.p10", "1.0")
+                , ("mm10.p2", "Mus_musculus_GRCm38.p2", "1.0")
+                , ("mm10.p5", "Mus_musculus_GRCm38.p5", "1.0")
+                , ("rn5", "Rattus_norvegicus_Rnor_5.0", "1.0")
+                , ("rn6", "Rattus_norvegicus_Rnor_6.0", "1.0")
+                , ("sacCer3", "Saccharomyces_cerevisiae_R64-1-1", "1.0")
+                , ("susScr11", "Sus_scrofa.Sscrofa11.1", "1.0")
                 ]]
 
 
