@@ -4,7 +4,7 @@
 
 # NOTE: When bumping stack's lts version, remember to rebuild and upload the
 # docker images (build-scripts/docker_bases/) used by GitLab
-resolver: lts-13.5
+resolver: lts-13.23
 compiler-check: newer-minor
 
 

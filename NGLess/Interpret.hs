@@ -68,7 +68,7 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
-import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
+import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile, asyncZstdTo)
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.TQueue as CA
@@ -548,7 +548,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
                                     outputListLno' WarningOutput ["Select changed behaviour (for the better) in ngless 0.8. If possible, upgrade your version statement."]
                                     return False
                                 else return True
-        oname <- runNGLessIO $ makeNGLTempFile samfp "block_selected_" "sam" $ \ohandle ->
+        oname <- runNGLessIO $ makeNGLTempFile samfp "block_selected_" "sam.zst" $ \ohandle ->
                 C.runConduit $
                     istream
                         .| do
@@ -557,7 +557,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
                                 .| CL.map concatBytelines
                             readSamGroupsC' mapthreads paired
                                 .| asyncMapEitherC mapthreads (fmap concatLines . V.mapM (runInterpretationRO env . selectBlock doReinject))
-                        .|  CB.sinkHandle ohandle
+                        .|  asyncZstdTo 3 ohandle
         return input { nglSamFile = File oname }
     where
         concatBytelines :: V.Vector ByteLine -> B.ByteString

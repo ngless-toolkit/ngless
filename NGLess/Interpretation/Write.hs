@@ -208,6 +208,7 @@ executeWrite el@(NGOMappedReadSet _ iout  _) args = do
             | endswith ".sam" ofile = return "sam"
             | endswith ".sam.gz" ofile = return "sam"
             | endswith ".sam.bz2" ofile = return "sam"
+            | endswith ".sam.zst" ofile = return "sam"
             | endswith ".sam.zstd" ofile = return "sam"
             | endswith ".bam" ofile = return "bam"
             | otherwise = do

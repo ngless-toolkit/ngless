@@ -4,7 +4,7 @@ stdenv.mkDerivation {
 
   name = "nglessEnv";
 
-  buildInputs = with haskell.packages.ghc822; [
+  buildInputs = with haskell.packages.ghc865; [
     stack
     wget
     gmp

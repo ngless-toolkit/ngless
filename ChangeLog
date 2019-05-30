@@ -1,3 +1,6 @@
+Version 1.0.0+
+	* Reintroduce zstd compression (after fixes upstream)
+
 Version 1.0.0 2019-04-24 by luispedro
 	* Fix multiple features usage (#63)
 	* Update minimap2/megahit to latest versions

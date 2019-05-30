@@ -372,6 +372,7 @@ asBamFile fname
     | ".bam" `isSuffixOf` fname = return fname
     | ".sam.gz" `isSuffixOf` fname = convertSamToBam fname
     | ".sam.bz2" `isSuffixOf` fname = convertSamToBam fname
+    | ".sam.zst" `isSuffixOf` fname = convertSamToBam fname
     | ".sam.zstd" `isSuffixOf` fname = convertSamToBam fname
     | ".sam.xz" `isSuffixOf` fname = convertSamToBam fname
     | ".sam" `isSuffixOf` fname = convertSamToBam fname
