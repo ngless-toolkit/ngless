@@ -548,7 +548,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
                                     outputListLno' WarningOutput ["Select changed behaviour (for the better) in ngless 0.8. If possible, upgrade your version statement."]
                                     return False
                                 else return True
-        oname <- runNGLessIO $ makeNGLTempFile samfp "block_selected_" "sam.zst" $ \ohandle ->
+        oname <- runNGLessIO $ makeNGLTempFile samfp "block_selected_" "sam.zstd" $ \ohandle ->
                 C.runConduit $
                     istream
                         .| do

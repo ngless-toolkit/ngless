@@ -173,7 +173,7 @@ lookupReference args = do
 
 mapToReference :: Mapper -> FilePath -> ReadSet -> [String] -> NGLessIO (FilePath, (Int, Int, Int))
 mapToReference mapper refIndex rs extraArgs = do
-    (newfp, hout) <- openNGLTempFile refIndex "mapped_" "sam.zst"
+    (newfp, hout) <- openNGLTempFile refIndex "mapped_" "sam.zstd"
     statsp <- callMapper mapper refIndex rs extraArgs (zipToStats $ CAlg.asyncZstdTo 3 hout)
     liftIO $ hClose hout
     return (newfp, statsp)
