@@ -1,0 +1,1 @@
+../preprocess3/check.sh
