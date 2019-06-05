@@ -54,9 +54,9 @@ The recommended way to install NGLess is through
 ### Docker
 
 Alternatively, a docker container with NGLess is available at
-[biocontainers](https://quay.io/repository/biocontainers/ngless):
+[docker hub](https://hub.docker.com/r/nglesstoolkit/ngless):
 
-    docker run -v $PWD:/workdir -w /workdir -it quay.io/biocontainers/ngless:0.11.1--py35_0 ngless --version
+    docker run -v $PWD:/workdir -w /workdir -it nglesstoolkit/ngless:1.0.0 ngless --version
 
 Adapt the mount flags (``-v``) as needed.
 
