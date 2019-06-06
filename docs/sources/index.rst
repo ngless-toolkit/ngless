@@ -14,9 +14,18 @@ For questions, you can also use the `ngless mailing list
 
         *NG-meta-profiler: fast processing of metagenomes using NGLess, a
         domain-specific language* by Luis Pedro Coelho, Renato Alves, Paulo
-        Monteiro, Jaime Huerta-Cepas, Ana Teresa Freitas, Peer Bork bioRxiv
-        367755;
+        Monteiro, Jaime Huerta-Cepas, Ana Teresa Freitas, Peer Bork -
+        Microbiome 2019 7:84;
+        `https://doi.org/10.1186/s40168-019-0684-8 <https://doi.org/10.1186/s40168-019-0684-8>`__
+
+    previously also available as a pre-print at:
+
+        *NG-meta-profiler: fast processing of metagenomes using NGLess, a
+        domain-specific language* by Luis Pedro Coelho, Renato Alves, Paulo
+        Monteiro, Jaime Huerta-Cepas, Ana Teresa Freitas, Peer Bork -
+        bioRxiv 367755;
         `https://doi.org/10.1101/367755 <https://doi.org/10.1101/367755>`__
+
 
 NG-meta-profiler
 ----------------
