@@ -1,0 +1,10 @@
+ngless "1.0"
+import "samtools" version "0.0"
+
+mapped = samfile("filter.sam")
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=97, action={drop})
+
+mapped = samtools_sort(mapped, by={name})
+
+write(mapped, ofile='result.sam')
