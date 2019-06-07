@@ -1,0 +1,7 @@
+ngless '1.0'
+import "samtools" version "0.0"
+
+input = paired('sample.1.fq', 'sample.2.fq', singles='sample.singles.fq', encoding={auto})
+mapped = map(input, fafile='ref.fna')
+mapped = samtools_sort(mapped, by={name})
+write(mapped, ofile='output.sam')
