@@ -7,4 +7,4 @@ mapped = select(mapped) using |mr|:
 
 mapped = samtools_sort(mapped, by={name})
 
-write(mapped, ofile='result.sam')
+write(mapped, ofile='output.result.sam')

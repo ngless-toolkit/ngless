@@ -203,6 +203,7 @@ matchSize' includeSoft cigar
                             'M' -> n
                             '=' -> n
                             'X' -> n
+                            'I' -> n
                             'S'
                                 | includeSoft -> n
                             _ -> 0
