@@ -1,5 +1,14 @@
-ngless '0.0'
-import "samtools" version "0.0"
+ngless "1.0"
+import "samtools" version "1.0"
+
 to_sort = samfile('input.bam')
 sorted = samtools_sort(to_sort)
-write(sorted, ofile='output.bam')
+write(sorted, ofile='output.1.bam')
+
+to_sort = samfile('input.sam.zst')
+sorted = samtools_sort(to_sort)
+write(sorted, ofile='output.2.sam.gz')
+
+to_sort = samfile('input.sam.gz')
+sorted = samtools_sort(to_sort)
+write(sorted, ofile='output.3.sam.gz')

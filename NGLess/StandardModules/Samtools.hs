@@ -17,7 +17,6 @@ import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
 import qualified Data.Text as T
 import qualified Control.Concurrent.Async as A
-import           Data.List.Extra (snoc)
 
 
 import System.FilePath
@@ -41,6 +40,32 @@ import Utils.Conduit
 import Utils.Utils
 
 
+-- This function is necessary because we cannot call readProcessWithErrorCode directly (see comment below)
+callSamtools :: FileOrStream -> [String] -> Handle -> NGLessIO ExitCode
+callSamtools istream cmdargs hout = do
+    samtoolsPath <- samtoolsBin
+    outputListLno' TraceOutput ["Calling binary ", samtoolsPath, " with args: ", unwords cmdargs]
+    let (_, istream') = asSamStream istream
+        cp = (proc samtoolsPath cmdargs) { std_in = CreatePipe, std_out = UseHandle hout, std_err = CreatePipe }
+    (Just pipe_out, Nothing, Just herr, jHandle) <- liftIO $ createProcess cp
+    samP <- liftIO . A.async $ waitForProcess jHandle
+    errP <- liftIO . A.async $ do
+                -- In a separate thread, consume all the error input.
+                -- the same pattern is used in the implementation of
+                -- readProcessWithErrorCode (which cannot be used here
+                -- as we want control over stdin/stdout)
+                err <- hGetContents herr
+                void (evaluate (length err))
+                hClose herr
+                return err
+    C.runConduit $ istream' .| byteLineVSinkHandle pipe_out
+    (err,exitCode) <- liftIO $ do
+        hClose pipe_out
+        A.waitBoth errP samP
+    outputListLno' DebugOutput ["Samtools err output: ", err]
+    liftIO $ hClose hout
+    return exitCode
+
 executeSort :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeSort (NGOMappedReadSet name istream rinfo) args = do
     outBam <- lookupBoolOrScriptErrorDef (return False) "samtools_sort" "__output_bam" args
@@ -57,31 +82,7 @@ executeSort (NGOMappedReadSet name istream rinfo) args = do
 
     numCapabilities <- liftIO getNumCapabilities
     let cmdargs = ["sort"] <> ["-n" | sortByName] <> ["-@", show numCapabilities, "-O", oformat, "-T", tdirectory </> "samruntmp"]
-    samtoolsPath <- samtoolsBin
-    outputListLno' TraceOutput ["Calling binary ", samtoolsPath, " with args: ", unwords cmdargs]
-    (err, exitCode) <- case istream of
-        File fpsam -> do
-            let cp = (proc samtoolsPath (snoc cmdargs fpsam)) { std_out = UseHandle hout }
-            liftIO $ readProcessErrorWithExitCode cp
-        Stream _ _ istream' -> do
-            let cp = (proc samtoolsPath cmdargs) { std_in = CreatePipe, std_out = UseHandle hout, std_err = CreatePipe }
-            (Just pipe_out, Nothing, Just herr, jHandle) <- liftIO $ createProcess cp
-            samP <- liftIO . A.async $ waitForProcess jHandle
-            err <- liftIO . A.async $ do
-                        -- In a separate thread, consume all the error input.
-                        -- the same pattern is used in the implementation of
-                        -- readProcessWithErrorCode (which cannot be used here
-                        -- as we want control over stdin/stdout)
-                        err <- hGetContents herr
-                        void (evaluate (length err))
-                        hClose herr
-                        return err
-            C.runConduit $ istream' .| byteLineVSinkHandle pipe_out
-            liftIO $ do
-                hClose pipe_out
-                A.waitBoth err samP
-    outputListLno' DebugOutput ["Samtools err output: ", err]
-    liftIO $ hClose hout
+    exitCode <- callSamtools istream cmdargs hout
     release trk
     case exitCode of
         ExitSuccess -> do
@@ -89,6 +90,7 @@ executeSort (NGOMappedReadSet name istream rinfo) args = do
             return (NGOMappedReadSet name (File newfp) rinfo)
         ExitFailure code -> do
             release rk
+            samtoolsPath <- samtoolsBin
             throwSystemError $ concat ["Failed samtools sort\n",
                             "Executable used::\t", samtoolsPath,"\n",
                             "Command line was::\n\t", unwords cmdargs, "\n",
@@ -187,37 +189,14 @@ executeView (NGOMappedReadSet name istream rinfo) args = do
 
     numCapabilities <- liftIO getNumCapabilities
     let cmdargs = ["view", "-h", "-@", show numCapabilities, "-O", oformat, "-L", T.unpack bedFile]
-    samtoolsPath <- samtoolsBin
-    outputListLno' TraceOutput ["Calling binary ", samtoolsPath, " with args: ", unwords cmdargs]
-    (err, exitCode) <- case istream of
-        File fpsam -> do
-            let cp = (proc samtoolsPath (snoc cmdargs fpsam)) { std_out = UseHandle hout }
-            liftIO $ readProcessErrorWithExitCode cp
-        Stream _ _ istream' -> do
-            let cp = (proc samtoolsPath cmdargs) { std_in = CreatePipe, std_out = UseHandle hout, std_err = CreatePipe }
-            (Just pipe_out, Nothing, Just herr, jHandle) <- liftIO $ createProcess cp
-            samP <- liftIO . A.async $ waitForProcess jHandle
-            err <- liftIO . A.async $ do
-                        -- In a separate thread, consume all the error input.
-                        -- the same pattern is used in the implementation of
-                        -- readProcessWithErrorCode (which cannot be used here
-                        -- as we want control over stdin/stdout)
-                        err <- hGetContents herr
-                        void (evaluate (length err))
-                        hClose herr
-                        return err
-            C.runConduit $ istream' .| byteLineVSinkHandle pipe_out
-            liftIO $ do
-                hClose pipe_out
-                A.waitBoth err samP
-    outputListLno' DebugOutput ["Samtools err output: ", err]
-    liftIO $ hClose hout
+    exitCode <- callSamtools istream cmdargs hout
     case exitCode of
         ExitSuccess -> do
             outputListLno' InfoOutput ["Done samtools view"]
             return (NGOMappedReadSet name (File newfp) rinfo)
         ExitFailure code -> do
             release rk
+            samtoolsPath <- samtoolsBin
             throwSystemError $ concat ["Failed samtools view\n",
                             "Executable used::\t", samtoolsPath,"\n",
                             "Command line was::\n\t", unwords cmdargs, "\n",
