@@ -46,12 +46,12 @@ case_read_one_Sam_Line = readSamLine samLineFlat @?= Right samLine
 case_encode = (BL.toStrict . BB.toLazyByteString . encodeSamLine $ samLine) @?= samLineFlat
 
 case_isAligned_raw = isAligned (fromRight . readSamLine $ complex) @? "Should be aligned"
-case_match_identity_soft = fromRight (matchIdentity samLine) == 0.975 @? "Soft clipped read (low identity)"
+case_match_identity_soft = fromRight (matchIdentity True samLine) == 0.975 @? "Soft clipped read (low identity)"
 
-case_matchSize1 = fromRight (matchSize =<< readSamLine complex) @?= (26+  9+  6+  8+  21)
+case_matchSize1 = fromRight (matchSize True =<< readSamLine complex) @?= (26+  9+  6+  8+  21)
                                                                    --26M3D9M3D6M6D8M2D21M
-case_matchSize2 = fromRight (matchSize =<< readSamLine simple) @?= 69
-case_matchSize3 = fromRight (matchSize =<< readSamLine refinsert) @?= 46
+case_matchSize2 = fromRight (matchSize True =<< readSamLine simple) @?= 69
+case_matchSize3 = fromRight (matchSize True =<< readSamLine refinsert) @?= 46
 
 case_cigarOK = fixCigar "9M" 9 @?= Right "9M"
 case_cigarH = fixCigar "4H5M" 9 @?= Right "4S5M"
