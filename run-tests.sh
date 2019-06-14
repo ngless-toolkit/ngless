@@ -14,6 +14,7 @@ fi
 echo ">>> Running tests with: $(ngless --version-debug) <<<"
 
 ok="yes"
+failed_tests=""
 for testdir in tests/*; do
     if test -d "$testdir"; then
         cur_ok=yes
@@ -66,6 +67,7 @@ for testdir in tests/*; do
             cat output.stdout.txt
             cat output.stderr.txt
             ok=no
+            failed_tests="${failed_tests} ${testdir}"
         fi
 
         if test -x ./cleanup.sh; then
@@ -81,6 +83,9 @@ done
 if test $ok = "yes"; then
     echo "All done."
 else
-    echo "An error occurred."
+    echo "The following tests failed:"
+    for f in $failed_tests; do
+        echo " - $f"
+    done
     exit 1
 fi

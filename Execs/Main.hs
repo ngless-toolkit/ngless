@@ -63,22 +63,22 @@ import Language
 import Types
 import Parse
 import Configuration
-import Version
+import qualified Version
 import ReferenceDatabases
 import Output
 import NGLess
 import NGLess.NGError
 import NGLess.NGLEnvironment
 import Modules
-import CmdArgs
+import qualified CmdArgs
 import FileManagement
 import StandardModules.NGLStdlib
-import Citations
+import Citations (collectCitations)
 import Utils.Network
-import Hooks
+import Hooks (triggerHook, triggerFailHook, Hook(..))
 import Utils.Batch
 import Utils.Suggestion
-import CWL
+import CWL (writeCWL)
 
 import qualified BuiltinModules.Argv as ModArgv
 import qualified BuiltinModules.Assemble as ModAssemble
@@ -164,7 +164,7 @@ loadModules av mods  = do
 
 
 headerStr :: String
-headerStr = "NGLess v"++versionStr++" (C) NGLess authors\n"++
+headerStr = "NGLess v"++Version.versionStr++" (C) NGLess authors\n"++
             "https://ngless.embl.de/\n"++
             "\n"
 
@@ -193,10 +193,10 @@ printHeader citations = liftIO $ do
             putStrLn (formatCitation c)
         putStr "\n"
 
-loadScript :: NGLessInput -> IO (Either String T.Text)
-loadScript (InlineScript s) = return . Right . T.pack $ s
-loadScript (ScriptFilePath "") = return . Left $ "Either a filename (including - for stdin) or a --script argument must be given to ngless"
-loadScript (ScriptFilePath fname) =
+loadScript :: CmdArgs.NGLessInput -> IO (Either String T.Text)
+loadScript (CmdArgs.InlineScript s) = return . Right . T.pack $ s
+loadScript (CmdArgs.ScriptFilePath "") = return . Left $ "Either a filename (including - for stdin) or a --script argument must be given to ngless"
+loadScript (CmdArgs.ScriptFilePath fname) =
         --Note that the input for ngless is always UTF-8.
         --Always. This means that we cannot use T.readFile
         --which is locale aware.
@@ -232,26 +232,26 @@ parseVersion (Just v) = case T.splitOn "." v of
                             [_, _] -> throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 1.0 and 0.0/0.5-12 are available in this release)."]
                             _ -> throwScriptError $ concat ["Version ", T.unpack v, " could not be understood. The version string should look like \"1.0\" or similar"]
 
-modeExec :: NGLessMode -> IO ()
-modeExec opts@DefaultMode{} = do
-    when (not (experimentalFeatures opts) && isJust (exportJSON opts)) $
+modeExec :: CmdArgs.NGLessMode -> IO ()
+modeExec opts@CmdArgs.DefaultMode{} = do
+    when (not (CmdArgs.experimentalFeatures opts) && isJust (CmdArgs.exportJSON opts)) $
         fatalError ("The use of --export-json requires the --experimental-features flag\n"++
                     "This feature may change at any time.\n")
-    when (not (experimentalFeatures opts) && isJust (exportCWL opts)) $
+    when (not (CmdArgs.experimentalFeatures opts) && isJust (CmdArgs.exportCWL opts)) $
         fatalError ("The use of --export-cwl requires the --experimental-features flag\n"++
                     "This feature may change at any time.\n")
-    let (fname,reqversion) = case input opts of
-                ScriptFilePath fp -> (fp,True)
-                InlineScript _ -> ("inline",False)
-    case nThreads opts of
-        NThreads n -> setNumCapabilities n
-        NThreadsAuto -> getNcpus >>= \case
+    let (fname,reqversion) = case CmdArgs.input opts of
+                CmdArgs.ScriptFilePath fp -> (fp,True)
+                CmdArgs.InlineScript _ -> ("inline",False)
+    case CmdArgs.nThreads opts of
+        CmdArgs.NThreads n -> setNumCapabilities n
+        CmdArgs.NThreadsAuto -> getNcpus >>= \case
             Just n -> setNumCapabilities n
             Nothing -> fatalError "Could not determine number of CPUs"
-    ngltext <- loadScript (input opts) >>= \case
+    ngltext <- loadScript (CmdArgs.input opts) >>= \case
         Right t -> return t
         Left err ->  fatalError err
-    let maybe_add_print = (if print_last opts then wrapPrint else return)
+    let maybe_add_print = (if CmdArgs.print_last opts then wrapPrint else return)
     (shouldOutput,odir) <- runNGLessIO "loading and running script" $ do
         updateNglEnvironment (\e -> e { ngleScriptText = ngltext })
         outputConfiguration
@@ -260,7 +260,7 @@ modeExec opts@DefaultMode{} = do
         when (activeVersion < NGLVersion 1 0) $
             outputListLno' WarningOutput ["Using old version (in compatibility mode). If possible, upgrade your version statement to ngless \"1.0\"."]
         updateNglEnvironment (\e -> e {ngleVersion = activeVersion })
-        when (debug_mode opts == "ast") $ liftIO $ do
+        when (CmdArgs.debug_mode opts == "ast") $ liftIO $ do
             forM_ (nglBody sc') $ \(lno,e) ->
                 putStrLn ((if lno < 10 then " " else "")++show lno++": "++show e)
             exitSuccess
@@ -277,21 +277,21 @@ modeExec opts@DefaultMode{} = do
         when (isJust errs) $ do
             let errormessage = T.intercalate "\n\n" (fromJust errs)
             liftIO $ fatalError (T.unpack errormessage)
-        when (validateOnly opts) $ do
+        when (CmdArgs.validateOnly opts) $ do
             outputListLno' InfoOutput ["Script OK."]
             liftIO exitSuccess
         outputListLno' TraceOutput ["Transforming script..."]
-        when (debug_mode opts == "transform") $
+        when (CmdArgs.debug_mode opts == "transform") $
             liftIO (print sc)
         transformed <- transform modules sc
-        when (debug_mode opts == "transform") $
+        when (CmdArgs.debug_mode opts == "transform") $
             liftIO (print transformed)
         when shouldPrintHeader $
             printHeader (collectCitations modules transformed)
-        whenJust (exportJSON opts) $ \jsoname -> liftIO $ do
+        whenJust (CmdArgs.exportJSON opts) $ \jsoname -> liftIO $ do
             writeScriptJSON jsoname sc transformed
             exitSuccess
-        whenJust (exportCWL opts) $ \cwlname -> liftIO $ do
+        whenJust (CmdArgs.exportCWL opts) $ \cwlname -> liftIO $ do
             writeCWL sc fname cwlname
             exitSuccess
         outputListLno' InfoOutput ["Script OK. Starting interpretation..."]
@@ -309,19 +309,19 @@ modeExec opts@DefaultMode{} = do
 
 
 -- if user uses the flag -i he will install a Reference Genome to all users
-modeExec (InstallGenMode ref)
+modeExec (CmdArgs.InstallGenMode ref)
     | isDefaultReference ref = void . runNGLessIO "installing data" $ installData Nothing ref
     | otherwise =
         error (concat ["Reference ", T.unpack ref, " is not a known reference."])
 
-modeExec (CreateReferencePackMode ofile gen mgtf mfunc) = runNGLessIO "creating reference package" $ do
+modeExec (CmdArgs.CreateReferencePackMode ofile gen mgtf mfunc) = runNGLessIO "creating reference package" $ do
         outputListLno' InfoOutput ["Starting packaging (will download and index genomes)..."]
         createReferencePack ofile gen mgtf mfunc
 
-modeExec (DownloadFileMode url local) = runNGLessIO "download a file" $
+modeExec (CmdArgs.DownloadFileMode url local) = runNGLessIO "download a file" $
     downloadFile url local
 
-modeExec (DownloadDemoMode demo) = do
+modeExec (CmdArgs.DownloadDemoMode demo) = do
     let known = ["gut-short", "ocean-short"]
     if demo `elem` known
         then do
@@ -335,7 +335,7 @@ modeExec (DownloadDemoMode demo) = do
             forM_ known $ hPutStrLn stderr . ("\t- " ++)
             exitFailure
 
-modeExec (PrintPathMode exec) = runNGLessIO "finding internal path" $ do
+modeExec (CmdArgs.PrintPathMode exec) = runNGLessIO "finding internal path" $ do
     path <- case exec of
       "samtools" -> samtoolsBin
       "prodigal" -> prodigalBin
@@ -344,7 +344,7 @@ modeExec (PrintPathMode exec) = runNGLessIO "finding internal path" $ do
       _ -> throwSystemError ("Unknown binary " ++ exec ++ ".")
     liftIO $ putStrLn path
 
-modeExec (CheckInstallMode verbose) = runNGLessIO "Checking install" $ do
+modeExec (CmdArgs.CheckInstallMode verbose) = runNGLessIO "Checking install" $ do
     let checkPath tool pathA
             | verbose = do
                 path <- pathA
@@ -359,28 +359,28 @@ modeExec (CheckInstallMode verbose) = runNGLessIO "Checking install" $ do
 main' = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
         foottext = concat [
-                            "ngless v", versionStr, "(C) NGLess Authors 2013-2018\n",
+                            "ngless v", Version.versionStr, "(C) NGLess Authors 2013-2019\n",
                             "For more information:\n",
                             "\thttps://ngless.embl.de/\n",
                             "For comments/discussion:\n",
                             "\thttps://groups.google.com/forum/#!forum/ngless\n",
-                            "Citation: LP Coelho et al., 2018. ",
-                            "https://doi.org/10.1101/367755.\n"
+                            "Citation: LP Coelho et al., 2019. ",
+                            "https://doi.org/10.1186/s40168-019-0684-8.\n"
                             ]
         versioner =
-            (infoOption ("ngless v" ++ versionStr ++ " (release date: " ++  dateStr ++ ")")
+            (infoOption ("ngless v" ++ Version.versionStr ++ " (release date: " ++ Version.dateStr ++ ")")
                 (long "version" <> short 'V' <> help "print version and exit"))
             <*>
-            (infoOption versionStr (long "version-short" <> help "print just version string (useful for scripting)"))
+            (infoOption Version.versionStr (long "version-short" <> help "print just version string (useful for scripting)"))
             <*>
-            (infoOption ("ngless v" ++ versionStr ++ " (release date: " ++  dateStr ++ "; git revision: " ++ gitHashStr ++ "; compilation date: " ++ compilationDateStr ++ "; embedded binaries: " ++ embeddedStr ++ ")")
+            (infoOption ("ngless v" ++ Version.versionStr ++ " (release date: " ++ Version.dateStr ++ "; git revision: " ++ Version.gitHashStr ++ "; compilation date: " ++ Version.compilationDateStr ++ "; embedded binaries: " ++ Version.embeddedStr ++ ")")
                 (long "version-debug" <> help "print detailed version information"))
             <*>
-            (infoOption dateStr (long "date-short" <> help "print just release date string (useful for scripting)"))
-    args <- execParser (info (versioner <*> helper <*> nglessArgs) metainfo)
+            (infoOption Version.dateStr (long "date-short" <> help "print just release date string (useful for scripting)"))
+    args <- execParser (info (versioner <*> helper <*> CmdArgs.nglessArgs) metainfo)
     config <- initConfiguration args
     updateNglEnvironment' (\env -> env { ngleConfiguration = config })
-    modeExec (mode args)
+    modeExec (CmdArgs.mode args)
 
 makeEncodingSafe :: Handle -> IO ()
 makeEncodingSafe h = do
