@@ -335,7 +335,15 @@ readSamHeaders =
 mergeSAMGroups :: MergeStrategy -> [SamGroup] -> NGLessIO SamGroup
 mergeSAMGroups strategy groups
         | not (allSame . fmap samQName $ concat groups) = throwDataError "Merging unsynced SAM files (not implemented yet)"
-        | otherwise = return $ group group1 ++ group group2 ++ group groupS
+        | otherwise = do
+            useNewer <- do
+                v <- ngleVersion <$> nglEnvironment
+                if v < NGLVersion 1 1
+                    then do
+                        outputListLno' WarningOutput ["SAM merging changed behaviour (for the better) in ngless 1.1. Using the old method for backwards-compatibility."]
+                        return False
+                    else return True
+            return $ group useNewer group1 ++ group useNewer group2 ++ group useNewer groupS
     where
         (group1, group2, groupS) = foldl (\(g1,g2,gS) s ->
                                                 (if isFirstInPair s
@@ -343,15 +351,15 @@ mergeSAMGroups strategy groups
                                                     else if isSecondInPair s
                                                         then (g1, s:g2, gS)
                                                         else (g1, g2, s:gS))) ([], [], []) $ concat groups
-        group :: [SamLine] -> [SamLine]
-        group [] = []
-        group gs = case filter isAligned gs of
+        group :: Bool -> [SamLine] -> [SamLine]
+        group _ [] = []
+        group useNewer gs = case filter isAligned gs of
             [] -> [head gs]
-            gs' -> pick strategy gs'
-        pick :: MergeStrategy -> [SamLine] -> [SamLine]
-        pick MSBestOnly gs =
+            gs' -> pick useNewer strategy gs'
+        pick :: Bool -> MergeStrategy -> [SamLine] -> [SamLine]
+        pick useNewer MSBestOnly gs =
             let matchValue :: SamLine -> Int
-                matchValue samline = fromRight 0 (matchSize samline) - fromMaybe 0 (samIntTag samline "NM")
+                matchValue samline = fromRight 0 (matchSize useNewer samline) - fromMaybe 0 (samIntTag samline "NM")
                 bestMatch = maximum (map matchValue gs)
             in filter (\samline -> matchValue samline == bestMatch) gs
 

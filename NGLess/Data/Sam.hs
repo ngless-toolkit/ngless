@@ -189,10 +189,10 @@ P padding (silent deletion from padded reference).
 X sequence mismatch.
 --}
 
-matchSize :: SamLine -> Either NGError Int
-matchSize = matchSize' False . samCigar
+matchSize :: Bool -> SamLine -> Either NGError Int
+matchSize includeI = matchSize' includeI False . samCigar
 
-matchSize' includeSoft cigar
+matchSize' includeI includeSoft cigar
     | B8.null cigar = return 0
     | otherwise = case B8.readInt cigar of
         Nothing -> throwDataError ("could not parse cigar '"++B8.unpack cigar ++"'")
@@ -203,18 +203,19 @@ matchSize' includeSoft cigar
                             'M' -> n
                             '=' -> n
                             'X' -> n
-                            'I' -> n
                             'S'
                                 | includeSoft -> n
+                            'I'
+                                | includeI -> n
                             _ -> 0
-            r <- matchSize' includeSoft rest
+            r <- matchSize' includeI includeSoft rest
             return (n' + r)
 
-matchIdentity :: SamLine -> Either NGError Double
-matchIdentity samline = do
+matchIdentity :: Bool -> SamLine -> Either NGError Double
+matchIdentity useNewer samline = do
     let errmsg = "Could not get NM tag for samline " ++ B8.unpack (samQName samline) ++ ", extra tags were: "++ B8.unpack (samExtra samline)
     errors <- note (NGError DataError errmsg) $ samIntTag samline "NM"
-    len <- matchSize samline
+    len <- matchSize useNewer samline
     let toDouble = fromInteger . toInteger
         mid = toDouble (len - errors) / toDouble len
     return mid

@@ -69,6 +69,7 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , substrimReassign
                 , addFileChecks
                 , addIndexChecks
+                , addUseNewer
                 ]
 
 pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression
@@ -446,3 +447,34 @@ reassignPreprocess sc = do
 reassignPreprocess' :: Expression -> Expression
 reassignPreprocess' e@(FunctionCall (FuncName "preprocess") (Lookup _ v) _ _) = Assignment v e
 reassignPreprocess' e = e
+
+
+-- | addUseNewer
+-- 
+-- Implements the following transformation:
+--
+-- mapped = select(mapped) using |mr|:
+--      mr = mr.filter(...)
+--
+--
+-- mapped = select(mapped) using |mr|:
+--      mr = mr.filter(..., __version11_or_higher=True)
+--
+--
+-- if the ngless declaration asks for "ngless 1.1" or higher
+addUseNewer :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+addUseNewer exprs = do
+    v <- ngleVersion <$> nglEnvironment
+    if v >= NGLVersion 1 1
+        then do
+            return exprs
+        else do
+            let addUseNewer' e = flip recursiveTransform e $ \case
+                    (MethodCall mname@(MethodName mname') arg0 arg1 kwargs)
+                        | mname' `elem` ["filter", "allbest"] -> do
+                            outputListLno' WarningOutput ["The filter() and allbest() methods have changed behaviour in NGLess 1.1. Now using old behaviour for compatibility, but, if possible, upgrade your version statement. This refers to how a corner case in computing match sizes/identities is handled and will have no practical impacts on almost all datasets."]
+                            return (MethodCall mname arg0 arg1 ((Variable "__version11_or_higher", ConstBool True):kwargs))
+                    e' -> return e'
+            mapM (secondM addUseNewer') exprs
+
+

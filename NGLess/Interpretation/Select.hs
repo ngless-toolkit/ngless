@@ -102,12 +102,12 @@ matchConditions doReinject conds sg = reinjectSequences doReinject (matchConditi
 -- See note above on "Sequence reinjection" about why this function is necessary
 fixCigar :: B.ByteString -> Int -> NGLess B.ByteString
 fixCigar prev n = do
-    prevM <- matchSize' True prev
+    prevM <- matchSize' True True prev
     if prevM == n
         then return prev
         else do
             let prev' = B8.map (\c -> if c == 'H' then 'S' else c) prev
-            prevM' <- matchSize' True prev'
+            prevM' <- matchSize' True True prev'
             if prevM' == n
                 then return prev'
                 else throwDataError ("Cannot fix CIGAR string \"" ++ B8.unpack prev ++ "\" to represent a sequence of length " ++ show n)
@@ -196,28 +196,29 @@ data SelectGroupOptions = SelectGroupOptions
     !Bool -- ^ reverse
     !FilterAction
 
-applySelect :: SelectGroupOptions -> SamGroup -> SamGroup
-applySelect (SelectGroupOptions minID minMatchSize (-1) rev act) =
+applySelect :: Bool -> SelectGroupOptions -> SamGroup -> SamGroup
+applySelect useNewer (SelectGroupOptions minID minMatchSize (-1) rev act) =
                     case act of
                         FADrop -> filter passTest
                         FAUnmatch -> map (unmatchUnless passTest)
     where
         okID
             | minID < 0.0 = const True
-            | otherwise = \s -> fromRight 0.0 (matchIdentity s) >= minID
+            | otherwise = \s -> fromRight 0.0 (matchIdentity useNewer s) >= minID
+        okSize :: SamLine -> Bool
         okSize
             | minMatchSize == -1 = const True
-            | otherwise = \s -> fromRight 0 (matchSize s) >= minMatchSize
+            | otherwise = \s -> fromRight 0 (matchSize useNewer s) >= minMatchSize
         rawTest s = okID s && okSize s
         passTest
             | rev = not . rawTest
             | otherwise = rawTest
-applySelect (SelectGroupOptions minID minMatch maxTrim rev act) = \samlines ->
-                    let samlines' = applySelect (SelectGroupOptions minID minMatch (-1) rev act) samlines
+applySelect useNewer (SelectGroupOptions minID minMatch maxTrim rev act) = \samlines ->
+                    let samlines' = applySelect useNewer (SelectGroupOptions minID minMatch (-1) rev act) samlines
                         (g1,g2,gs) = splitSamlines3 samlines'
                         (s1,s2,ss) = (seqSize g1, seqSize g2, seqSize gs)
                         okTrim :: Int -> SamLine -> Bool
-                        okTrim seqlen = \s -> (seqlen - fromRight 0 (matchSize s) <= maxTrim)
+                        okTrim seqlen = \s -> (seqlen - fromRight 0 (matchSize useNewer s) <= maxTrim)
                         in case act of
                             FADrop -> filter (okTrim s1) g1 ++ filter (okTrim s2) g2 ++ filter (okTrim ss) gs
                             FAUnmatch -> map (unmatchUnless $ okTrim s1) g1 ++ map (unmatchUnless $ okTrim s2) g2 ++ map (unmatchUnless $ okTrim ss) gs
@@ -249,14 +250,17 @@ executeMappedReadMethod (MethodName "filter") samlines Nothing kwargs = do
     minMatchSize <- fromInteger <$> lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "min_match_size" kwargs
     maxTrim <- fromInteger <$> lookupIntegerOrScriptErrorDef (return (-1)) "filter method" "max_trim" kwargs
     reverseTest <- lookupBoolOrScriptErrorDef (return False) "filter method" "reverse" kwargs
+    useNewer <- lookupBoolOrScriptErrorDef (return False) "filter method" "__version11_or_higher" kwargs
     action <- lookupSymbolOrScriptErrorDef (return "drop") "filter method" "action" kwargs >>= \case
         "drop" -> return FADrop
         "unmatch" -> return FAUnmatch
         other -> throwScriptError ("unknown action in filter(): `" ++ T.unpack other ++"`.\nAllowed values are:\n\tdrop\n\tunmatch\n\tkeep\n")
-    let samlines' = applySelect (SelectGroupOptions (fromInteger minID / 100.0) minMatchSize maxTrim reverseTest action) samlines
+    let samlines' = applySelect useNewer (SelectGroupOptions (fromInteger minID / 100.0) minMatchSize maxTrim reverseTest action) samlines
     return (NGOMappedRead samlines')
 executeMappedReadMethod (MethodName "unique") samlines Nothing [] = return . NGOMappedRead . mUnique $ samlines
-executeMappedReadMethod (MethodName "allbest") samlines Nothing [] = return . NGOMappedRead . mBesthit $ samlines
+executeMappedReadMethod (MethodName "allbest") samlines Nothing kwargs = do
+    useNewer <- lookupBoolOrScriptErrorDef (return False) "filter method" "__version11_or_higher" kwargs
+    return . NGOMappedRead . mBesthit useNewer $ samlines
 executeMappedReadMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 filterPE :: [SamLine] -> [SamLine]
@@ -276,16 +280,16 @@ mUnique slines
     | isGroupUnique slines = slines
     | otherwise = []
 
-mBesthit :: [SamLine] -> [SamLine]
-mBesthit [] = []
-mBesthit sl@[_] = sl
-mBesthit slines = let (g1,g2,gs) = splitSamlines3 slines
-                    in mBesthit' g1 ++ mBesthit' g2 ++ mBesthit' gs
+mBesthit :: Bool -> [SamLine] -> [SamLine]
+mBesthit _ [] = []
+mBesthit _ sl@[_] = sl
+mBesthit useNewer slines = let (g1,g2,gs) = splitSamlines3 slines
+                    in mBesthit' useNewer g1 ++ mBesthit' useNewer g2 ++ mBesthit' useNewer gs
 
-mBesthit' :: [SamLine] -> [SamLine]
-mBesthit' [] = []
-mBesthit' sl@[_] = sl
-mBesthit' samlines = case mapMaybe extract samlines of
+mBesthit' :: Bool -> [SamLine] -> [SamLine]
+mBesthit' _ [] = []
+mBesthit' _ sl@[_] = sl
+mBesthit' useNewer samlines = case mapMaybe extract samlines of
         [] -> samlines
         extracted ->
             let
@@ -302,7 +306,7 @@ mBesthit' samlines = case mapMaybe extract samlines of
         extract :: SamLine -> Maybe (Int, Int, SamLine)
         extract sl = do
             dist <- samIntTag sl "NM"
-            size <- eitherToMaybe (matchSize sl)
+            size <- eitherToMaybe (matchSize useNewer sl)
             return (size, dist, sl)
 
 isGroupUnique :: [SamLine] -> Bool
