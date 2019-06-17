@@ -30,11 +30,10 @@ updateProgressBar bar _
     | not (pbarActive bar) = return bar
 updateProgressBar bar progress = do
     when (percent progress /= percent (cur bar)) $ do
-        let s = drawProgressBar (width bar) progress ++ " " ++ printPercentage progress
-        putStr (pbarName bar)
-        putStr ": "
-        putStr s
-        putStr "\r"
+        let pmessage = drawProgressBar (width bar) progress ++ " " ++ printPercentage progress
+            m = pbarName bar ++ pmessage ++ "\r"
+        putStr m
+        hFlush stdout
     return $ bar { cur = progress }
 
 -- | create a new 'ProgressBar' object
@@ -44,11 +43,9 @@ updateProgressBar bar progress = do
 mkProgressBar :: String -> Int -> IO ProgressBar
 mkProgressBar name w = do
     isTerm <- hIsTerminalDevice stdout
-    if isTerm
-        then do
-            hSetBuffering stdout NoBuffering
-            return $ ProgressBar name (-1) w True
-        else return noProgress
+    return $! if isTerm
+        then ProgressBar name (-1) w True
+        else noProgress
 
 drawProgressBar :: Int -> Rational -> String
 drawProgressBar w progress =
