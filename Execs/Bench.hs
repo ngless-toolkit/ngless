@@ -1,4 +1,4 @@
-{- Copyright 2016-2018
+{- Copyright 2016-2019
  - Licence: MIT -}
 import Criterion.Main
 
@@ -6,6 +6,7 @@ import Criterion.Main
 import qualified Data.Vector as V
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
+import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit as C
 import qualified Data.ByteString as B
@@ -25,9 +26,9 @@ import Interpret (interpret)
 import FileOrStream (FileOrStream(..))
 import Parse (parsengless)
 import Language (Script(..))
-import Data.Sam (readSamLine, readSamGroupsC, samStatsC)
+import Data.Sam (readSamLine, readSamGroupsC', samStatsC)
 import Data.FastQ (FastQEncoding(..), ShortRead(..), fqDecodeVector)
-import Utils.Conduit (linesC, ByteLine(..), conduitPossiblyCompressedFile, linesVC)
+import Utils.Conduit (linesC, ByteLine(..), linesVC)
 import Transform (transform)
 import NGLess.NGLEnvironment (setupTestEnvironment)
 
@@ -106,7 +107,7 @@ main = setupTestEnvironment >> defaultMain [
         ]
     ,bgroup "parse-sam"
         [ bench "readSamLine" $ nfRIO (C.runConduit (CB.sourceFile "test_samples/sample.sam" .| CB.lines .| CL.map readSamLine .| countRights))
-        , bench "samGroups" $ nfNGLessIO (C.runConduit (CB.sourceFile "test_samples/sample.sam" .| linesVC 2048 .| readSamGroupsC .| count))
+        , bench "samGroups" $ nfNGLessIO (C.runConduit (CB.sourceFile "test_samples/sample.sam" .| linesVC 2048 .| readSamGroupsC' 1 True .| count))
         ]
     ,bgroup "count"
         [ bench "load-map"      $ nfNGLessIO (loadFunctionalMap "test_samples/functional.map" ["KEGG_ko", "eggNOG_OG"])
