@@ -45,8 +45,8 @@ source_suffix = ['.rst', '.md']
 master_doc = 'index'
 
 # General information about the project.
-project = u'ngless'
-copyright = u'2013-2018, NGLess Authors'
+project = u'NGLess'
+copyright = u'2013-2019, NGLess Authors'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -234,7 +234,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'ngless', u'ngless Documentation',
+    ('index', 'NGLess', u'NGLess Documentation',
      [u'NGLess Authors'], 1)
 ]
 
@@ -248,8 +248,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'ngless', u'ngless Documentation',
-   u'NGLess Authors', 'ngless', 'One line description of project.',
+  ('index', 'NGLess', u'NGLess Documentation',
+   u'NGLess Authors', 'NGLess', 'One line description of project.',
    'Miscellaneous'),
 ]
 

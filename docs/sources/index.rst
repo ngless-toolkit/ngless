@@ -18,14 +18,6 @@ For questions, you can also use the `ngless mailing list
         Microbiome 2019 7:84;
         `https://doi.org/10.1186/s40168-019-0684-8 <https://doi.org/10.1186/s40168-019-0684-8>`__
 
-    previously also available as a pre-print at:
-
-        *NG-meta-profiler: fast processing of metagenomes using NGLess, a
-        domain-specific language* by Luis Pedro Coelho, Renato Alves, Paulo
-        Monteiro, Jaime Huerta-Cepas, Ana Teresa Freitas, Peer Bork -
-        bioRxiv 367755;
-        `https://doi.org/10.1101/367755 <https://doi.org/10.1101/367755>`__
-
 
 NG-meta-profiler
 ----------------
@@ -39,7 +31,7 @@ NGLess
 
 NGLess is best illustrated by an example::
 
-    ngless "0.11"
+    ngless "1.0"
     input = paired('ctrl1.fq', 'ctrl2.fq', singles='ctrl-singles.fq')
     input = preprocess(input) using |read|:
         read = read[5:]
@@ -112,7 +104,7 @@ This is equivalent to the full script:
 
 ::
 
-    ngless "0.11" # <- version declaration, optional on the command line
+    ngless "1.0" # <- version declaration, optional on the command line
     samcontents = samfile("file.sam") # <- load a SAM/BAM file
     reads = as_reads(samcontents) # <- just get the reads (w quality scores)
     write(reads, ofname=STDOUT) # <- write them to STDOUT (default format: FASTQ)
@@ -122,7 +114,7 @@ out a single FQ file. Otherwise, you can always do:
 
 ::
 
-    ngless "0.11"
+    ngless "1.0"
     write(as_read(samfile("file.sam")),
             ofile="output.fq")
 
@@ -144,7 +136,7 @@ This is equivalent to the full script:
 
 ::
 
-    ngless "0.11" # <- version declaration, optional on the command line
+    ngless "1.0" # <- version declaration, optional on the command line
     samcontents = samfile("file.sam") # <- load a SAM/BAM file
     samcontents = select(samcontents, keep_if=[{mapped}]) # <- select only *mapped* reads
     reads = as_reads(samcontents) # <- just get the reads (w quality scores)
@@ -188,6 +180,7 @@ Authors
    install
    ng-meta-profiler
    whatsnew
+   backwards
    tutorial-ocean-metagenomics
    tutorial-assembly-gp
    tutorial-gut-metagenomics
