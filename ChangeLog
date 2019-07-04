@@ -1,6 +1,7 @@
 Version 1.0.0+
 	* Reintroduce zstd compression (after fixes upstream)
 	* Fix CIGAR interpretation (#109) occurring when I is present
+	* Fix bug with external modules and multiple fastQ inputs
 
 Version 1.0.0 2019-04-24 by luispedro
 	* Fix multiple features usage (#63)

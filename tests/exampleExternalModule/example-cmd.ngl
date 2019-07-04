@@ -1,7 +1,8 @@
-ngless '0.0'
+ngless '1.0'
 import "example-cmd" version "0.0"
+import "mocat" version "0.6"
 
-input = fastq('sample.fq')
+input = load_mocat_sample('sample')
 
 testing(input)
 

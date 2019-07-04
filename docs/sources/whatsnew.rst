@@ -2,6 +2,19 @@
 What's New (History)
 ====================
 
+Post Version 1.0
+----------------
+
+User-visible improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~
+- ZSTD compression is available for output and intermediate files use it for
+  reduced temporary space usage (and possibly faster processing).
+
+Bugfixes
+~~~~~~~~
+
+- Fix bug with external modules and multiple fastQ inputs.
+
 Version 1.0
 -----------
 

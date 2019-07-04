@@ -27,7 +27,7 @@ import Control.Monad
 import System.Process
 import System.Environment (getEnvironment, getExecutablePath)
 import System.Directory (getDirectoryContents, doesFileExist, doesDirectoryExist)
-import System.Exit
+import System.Exit (ExitCode(..))
 import System.IO
 import System.FilePath
 import Data.Maybe
