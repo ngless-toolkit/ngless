@@ -1,3 +1,6 @@
+Version 1.0.0+
+	* Fix bug with external modules and multiple fastQ inputs
+
 Version 1.0.0 2019-04-24 by luispedro
 	* Fix multiple features usage (#63)
 	* Update minimap2/megahit to latest versions

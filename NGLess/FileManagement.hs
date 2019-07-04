@@ -93,7 +93,10 @@ checkFilenameLength base ext = if len > 240
 -- directory and deleting the file when necessary)
 --
 -- These files will be auto-removed when ngless exits
-openNGLTempFile' :: FilePath -> String -> String -> NGLessIO (ReleaseKey, (FilePath, Handle))
+openNGLTempFile' :: FilePath -- ^ basename
+                        -> String -- ^ prefix
+                        -> String -- ^ extension
+                        -> NGLessIO (ReleaseKey, (FilePath, Handle))
 openNGLTempFile' base prefix ext = do
     tdir <- nConfTemporaryDirectory <$> nglConfiguration
     liftIO $ createDirectoryIfMissing True tdir
