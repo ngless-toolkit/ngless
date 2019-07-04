@@ -5,7 +5,6 @@
 {-# OPTIONS_GHC -fno-full-laziness #-}
 module Interpretation.Count
     ( executeCount
-    , executeCountFile
     , Annotator(..)
     , CountOpts(..)
     , AnnotationMode(..)
@@ -214,10 +213,6 @@ annotationRule IntersectUnion = union
 annotationRule IntersectStrict = intersection_strict
 annotationRule IntersectNonEmpty = intersection_non_empty
 
-
-executeCountFile :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeCountFile (NGOString st) _ = return $ NGOCounts (File (T.unpack st))
-executeCountFile other _ = throwScriptError ("Unexpected argument to countfile(): expected str, got " ++ show other)
 
 executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e

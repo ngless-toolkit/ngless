@@ -9,6 +9,9 @@ User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 - ZSTD compression is available for output and intermediate files use it for
   reduced temporary space usage (and possibly faster processing).
+- The `countfile
+  <https://ngless.embl.de/Functions.html#countfile>`__ now reorders its input
+  if it is not ordered. This is necessary for correct usage.
 
 Bugfixes
 ~~~~~~~~

@@ -8,6 +8,7 @@ NGLess can change its behaviour depending on the version used in the script.
 - The way that CIGAR sequence lengths are computed has changed to match
   samtools. This implies that the computation of `min_match_size` and
   `min_identity_pc` have slightly changed.
+- Starting in NGLess 1.1, `countfile` reorders its input if necessary.
 
 ## &lt; NGLess 0.8
 

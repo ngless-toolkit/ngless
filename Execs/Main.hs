@@ -215,6 +215,7 @@ loadScript (CmdArgs.ScriptFilePath fname) =
 
 parseVersion :: Maybe T.Text -> NGLess NGLVersion
 parseVersion Nothing = return $ NGLVersion 1 0
+parseVersion (Just "1.1") = return $ NGLVersion 1 1
 parseVersion (Just "1.0") = return $ NGLVersion 1 0
 parseVersion (Just "0.0") = return $ NGLVersion 0 0
 parseVersion (Just "0.5") = return $ NGLVersion 0 5

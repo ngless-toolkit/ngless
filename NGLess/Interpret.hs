@@ -97,7 +97,8 @@ import NGLess.NGLEnvironment
 import NGLess.NGError
 
 import Interpretation.Map
-import Interpretation.Count
+import Interpretation.Count (executeCount)
+import Interpretation.CountFile (executeCountFile)
 import Interpretation.FastQ
 import Interpretation.Write
 import Interpretation.Select (executeSelect, executeMappedReadMethod, splitSamlines3, fixCigar)
