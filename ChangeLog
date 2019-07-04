@@ -1,5 +1,7 @@
 Version 1.0.0+
 	* Fix bug with external modules and multiple fastQ inputs
+	* Fix bug with resaving input files where the original file was sometimes
+	moved (thus removing it).
 
 Version 1.0.0 2019-04-24 by luispedro
 	* Fix multiple features usage (#63)
