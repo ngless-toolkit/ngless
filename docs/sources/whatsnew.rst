@@ -14,6 +14,8 @@ Bugfixes
 ~~~~~~~~
 
 - Fix bug with external modules and multiple fastQ inputs.
+- Fix bug with resaving input files where the original file was sometimes
+  moved (thus removing it).
 
 Version 1.0
 -----------

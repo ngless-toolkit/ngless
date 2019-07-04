@@ -132,9 +132,11 @@ moveOrCopyCompress moveAllowed ifile ofile
         | otherwise = convertCompression
     where
         moveIfAllowed :: NGLessIO ()
-        moveIfAllowed
-            | moveAllowed = liftIO (moveOrCopy ifile ofile)
-            | otherwise = liftIO (copyFile ifile ofile)
+        moveIfAllowed = do
+                createdFiles <- ngleTemporaryFilesCreated <$> nglEnvironment
+                if moveAllowed && ifile `elem` createdFiles
+                    then liftIO (moveOrCopy ifile ofile)
+                    else liftIO (copyFile ifile ofile)
 
         icompression = inferCompression ifile
         ocompression = inferCompression ofile
