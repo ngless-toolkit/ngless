@@ -10,6 +10,11 @@ User-visible improvements
 - ZSTD compression is available for output and intermediate files use it for
   reduced temporary space usage (and possibly faster processing).
 
+Version 1.0.1
+-------------
+
+This is a bugfix release and results should not change.
+
 Bugfixes
 ~~~~~~~~
 
