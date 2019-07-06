@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE RankNTypes #-}
@@ -96,7 +96,9 @@ callMapper refIndex rs extraArgs outC = do
     let bwathreads
             | strictThreads && numCapabilities > 1 = numCapabilities - 1
             | otherwise = numCapabilities
-        cmdargs =  concat [["mem", "-t", show bwathreads], extraArgs, [refIndex', "-p", "-"]]
+                                                    -- -K 100000000 is a hidden option to set the chunk size
+                                                    -- this makes the output independent of the number of threads
+        cmdargs =  concat [["mem", "-t", show bwathreads, "-K", "100000000"], extraArgs, [refIndex', "-p", "-"]]
         with1Thread act
             | strictThreads = U.bracket_
                                 (liftIO $ setNumCapabilities 1)
