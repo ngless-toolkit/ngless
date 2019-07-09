@@ -756,20 +756,25 @@ SequenceSet
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 
-+-----------------+-------------+------------+----------------+
-| Name            | Type        | Required   | Default Value  |
-+=================+=============+============+================+
-| is_metagenome   | Bool        | yes        | -              |
-+-----------------+-------------+------------+----------------+
-| coords_out      | FilePath    | no         | -              |
-+-----------------+-------------+------------+----------------+
-| prots_out       | FilePath    | no         | -              |
-+-----------------+-------------+------------+----------------+
++---------------------+-------------+------------+----------------+
+| Name                | Type        | Required   | Default Value  |
++=====================+=============+============+================+
+| is_metagenome       | Bool        | yes        | -              |
++---------------------+-------------+------------+----------------+
+| include_fragments   | Bool        | no         | True           |
++---------------------+-------------+------------+----------------+
+| coords_out          | FilePath    | no         | -              |
++---------------------+-------------+------------+----------------+
+| prots_out           | FilePath    | no         | -              |
++---------------------+-------------+------------+----------------+
+
+- ``is_metagenome``: whether input should be treated as a metagenome
+- ``include_fragments``: whether to include partial genes in the output
 
 Implementation
 ~~~~~~~~~~~~~~
 
 NGLess uses `Prodigal
 <https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/>`__ as the underlying
-gene finder.
+gene finder. ``is_metagenome=True`` maps to anonymous mode.
 

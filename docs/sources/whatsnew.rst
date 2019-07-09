@@ -12,6 +12,8 @@ User-visible improvements
 - The `countfile
   <https://ngless.embl.de/Functions.html#countfile>`__ now reorders its input
   if it is not ordered. This is necessary for correct usage.
+- Added ``include_fragments`` option to `orf_find()
+  <Functions.html#orf_find>`__.
 
 Bugfixes
 ~~~~~~~~

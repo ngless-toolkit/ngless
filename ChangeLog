@@ -6,6 +6,7 @@ Version 1.0.0+
 	moved (thus removing it).
 	* Call bwa mem so that it behaves in a deterministic way (independently of
 	the number of threads used)
+	* Add `include_fragments` option to orf_find
 
 Version 1.0.0 2019-04-24 by luispedro
 	* Fix multiple features usage (#63)

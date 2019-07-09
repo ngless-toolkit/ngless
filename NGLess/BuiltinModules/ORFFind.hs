@@ -31,6 +31,7 @@ executeORFFind "orf_find" expr kwargs = do
     isMetagenome <- lookupBoolOrScriptError "orf_find" "is_metagenome" kwargs
     coordsOut <- fmapMaybeM (stringOrTypeError "coords_out argument for orf_find") $ lookup "coords_out" kwargs
     aaOut <- fmapMaybeM (stringOrTypeError "prots_out argument for orf_find") $ lookup "prots_out" kwargs
+    includeFragments <- lookupBoolOrScriptErrorDef (return True) "include_fragments arg for orf_find" "include_fragments" kwargs
     prodigalPath <- prodigalBin
     fp <- asFile input
     (dnaout, h) <- openNGLTempFile fp "gene_predict" "fna"
@@ -46,6 +47,7 @@ executeORFFind "orf_find" expr kwargs = do
                 ++ (case aaOut of
                         Nothing -> []
                         Just ao -> ["-a", T.unpack ao])
+                ++ ["-c" | not includeFragments]
 
     outputListLno' DebugOutput ["Calling prodigal: ", prodigalPath, " ", unwords args]
     (errmsg, exitCode) <- liftIO $ readProcessErrorWithExitCode
@@ -68,6 +70,7 @@ orfFindFunction = Function
     , funcRetType = NGLFilename
     , funcKwArgs =
             [ArgInformation "is_metagenome" True NGLBool []
+            ,ArgInformation "include_fragments" False NGLBool [ArgCheckMinVersion (1,1)]
             ,ArgInformation "coords_out" False NGLString [ArgCheckFileWritable]
             ,ArgInformation "prots_out" False NGLString [ArgCheckFileWritable]
             ]
@@ -77,7 +80,7 @@ orfFindFunction = Function
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ = return def
-    { modInfo = ModInfo "builtin.orffind" "0.6"
+    { modInfo = ModInfo "builtin.orffind" "1.1"
     , modFunctions = [orfFindFunction]
     , runFunction = executeORFFind
     }
