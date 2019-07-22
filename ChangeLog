@@ -1,12 +1,14 @@
-Version 1.0.0+
+Version 1.0.1+
 	* Reintroduce zstd compression (after fixes upstream)
 	* Fix CIGAR interpretation (#109) occurring when I is present
-	* Fix bug with external modules and multiple fastQ inputs
-	* Fix bug with resaving input files where the original file was sometimes
-	moved (thus removing it).
 	* Call bwa mem so that it behaves in a deterministic way (independently of
 	the number of threads used)
 	* Add `include_fragments` option to orf_find
+
+Version 1.0.1 2019-07-05 by luispedro
+	* Fix bug with external modules and multiple fastQ inputs
+	* Fix bug with resaving input files where the original file was sometimes
+	moved (thus removing it).
 
 Version 1.0.0 2019-04-24 by luispedro
 	* Fix multiple features usage (#63)

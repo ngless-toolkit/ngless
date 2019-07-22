@@ -2,18 +2,23 @@
 What's New (History)
 ====================
 
-Post Version 1.0
-----------------
+Post Version 1.0.1
+------------------
 
 User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 - ZSTD compression is available for output and intermediate files use it for
   reduced temporary space usage (and possibly faster processing).
-- The `countfile
-  <https://ngless.embl.de/Functions.html#countfile>`__ now reorders its input
-  if it is not ordered. This is necessary for correct usage.
+- The `countfile <https://ngless.embl.de/Functions.html#countfile>`__ now
+  reorders its input if it is not ordered. This is necessary for correct usage.
 - Added ``include_fragments`` option to `orf_find()
   <Functions.html#orf_find>`__.
+
+
+Version 1.0.1
+-------------
+
+This is a bugfix release and results should not change.
 
 Bugfixes
 ~~~~~~~~
