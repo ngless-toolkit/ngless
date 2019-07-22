@@ -13,6 +13,10 @@ User-visible improvements
   reorders its input if it is not ordered. This is necessary for correct usage.
 - Added ``include_fragments`` option to `orf_find()
   <Functions.html#orf_find>`__.
+- More flexible loading of ``functional_map`` arguments in `count
+  <https://ngless.embl.de/Functions.html#count>`__ to accept multiple comment
+  lines at the top of the file as produced by `eggnog-mapper
+  <http://eggnog-mapper.embl.de/>`__.
 
 
 Version 1.0.1

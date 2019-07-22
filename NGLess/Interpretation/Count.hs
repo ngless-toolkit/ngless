@@ -549,12 +549,13 @@ loadFunctionalMap fname columns = do
         outputListLno' InfoOutput ["Loading map file ", fname]
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
+        v <- ngleVersion <$> nglEnvironment
         anns <- C.runConduit $
                     conduitPossiblyCompressedFile fname
                     .| linesC
                     .| CAlg.enumerateC
                     .| (do
-                        hline <- CL.head
+                        hline <- lastCommentOrHeader (v >= NGLVersion 1 1)
                         (cis,tags) <- case hline of
                             Nothing -> throwDataError ("Empty map file: "++fname)
                             Just (_, ByteLine header) -> let headers = B8.split '\t' header
@@ -567,6 +568,35 @@ loadFunctionalMap fname columns = do
         outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
         return $! sortOn (\(GeneMapAnnotator tag _ _) -> tag) anns
     where
+        -- lastCommentOrHeader :: Monad m => C.ConduitT (Int, ByteLine) () m (Maybe (Int, ByteLine))
+        lastCommentOrHeader newAPI = C.await >>= \case
+                            Nothing -> return Nothing
+                            Just f@(_,ByteLine line) ->
+                                if isComment line
+                                    then lastCommentOrHeader' (Just f)
+                                    else return (Just f)
+            where
+                lastCommentOrHeader' prev = C.await >>= \case
+                                Nothing -> return prev
+                                Just f@(_, ByteLine line)
+                                    | isComment line ->
+                                        if newAPI
+                                            then lastCommentOrHeader' (Just f)
+                                            else do
+                                                lift $ outputListLno' WarningOutput versionChangeWarning
+                                                C.leftover f
+                                                return (Just f)
+                                    | otherwise -> do
+                                        C.leftover f
+                                        return prev
+                isComment line
+                    | B.null line = True
+                    | otherwise = B8.head line == '#'
+                versionChangeWarning =
+                    ["Loading '", fname, "': found several lines at the top starting with '#'.\n",
+                     "The interpretation of these changed in NGLess 1.1 (they are now considered comment lines).\n",
+                     "Using the older version for backwards compatibility.\n"]
+
         finishFunctionalMap :: B.ByteString -> LoadFunctionalMapState -> Annotator
         finishFunctionalMap tag (LoadFunctionalMapState _ gmap namemap) = GeneMapAnnotator
                                                                             tag
