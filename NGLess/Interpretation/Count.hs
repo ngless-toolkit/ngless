@@ -132,6 +132,7 @@ data CountOpts =
     CountOpts
     { optFeatures :: [B.ByteString] -- ^ list of features to condider
     , optSubFeatures :: Maybe [B.ByteString] -- ^ list of sub-features to condider
+    , optAnnotationMode :: !AnnotationMode
     , optIntersectMode :: AnnotationRule
     , optStrandSpecific :: !Bool
     , optMinCount :: !Double
@@ -213,10 +214,8 @@ annotationRule IntersectUnion = union
 annotationRule IntersectStrict = intersection_strict
 annotationRule IntersectNonEmpty = intersection_non_empty
 
-
-executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
-executeCount (NGOMappedReadSet rname istream mappedref) args = do
+parseOptions :: Maybe (Maybe T.Text) -> KwArgsValues -> NGLessIO CountOpts
+parseOptions mappedref args = do
     minCount <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
     method <- decodeSymbolOrError "multiple argument in count() function"
                     [("1overN", MM1OverN)
@@ -257,10 +256,35 @@ executeCount (NGOMappedReadSet rname istream mappedref) args = do
         _ -> throwShouldNotOccur "executeAnnotation: TYPE ERROR"
     refinfo <- case lookup "reference" args of
         Nothing -> return mappedref
-        Just val -> Just <$> stringOrTypeError "reference for count()" val
-    let opts = CountOpts
-            { optFeatures = map (B8.pack . T.unpack) fs
+        Just val -> Just . Just <$> stringOrTypeError "reference for count()" val
+    let features = map (B8.pack . T.unpack) fs
+        parseAnnotationMode :: [B.ByteString] -> Maybe (Maybe T.Text) -> Maybe FilePath -> Maybe FilePath -> NGLessIO AnnotationMode
+        parseAnnotationMode _ _ (Just _) (Just _) =
+            throwScriptError "Cannot simultaneously pass a gff_file and an annotation_file for count() function"
+        parseAnnotationMode ["seqname"] _ _ _ = return AnnotateSeqName
+        parseAnnotationMode _ _ (Just r) _ = return (AnnotateFunctionalMap r)
+        parseAnnotationMode _ _ _ (Just g) = return (AnnotateGFF g)
+        parseAnnotationMode _ (Just (Just ref)) Nothing Nothing = do
+            outputListLno' InfoOutput ["Annotate with reference: ", show ref]
+            ReferenceFilePaths _ mgffpath mfuncpath <- ensureDataPresent ref
+            case (mgffpath, mfuncpath) of
+                (Just gffpath, Nothing) -> return $! AnnotateGFF gffpath
+                (Nothing, Just fmpath) -> return $! AnnotateFunctionalMap fmpath
+                (Nothing, Nothing) -> throwScriptError ("Could not find annotation file for '" ++ T.unpack ref ++ "'")
+                (Just _, Just _) -> throwDataError ("Reference " ++ T.unpack ref ++ " has both a GFF and a functional map file. Cannot figure out what to do.")
+        parseAnnotationMode _ Nothing _ _ = return AnnotateSeqName -- placeholder, but will only happen in __check_count call
+        parseAnnotationMode _ _ _ _ =
+            throwScriptError ("For counting, you must do one of\n" ++
+                              "1. use seqname mode\n" ++
+                              "2. pass in a GFF file using the argument 'gff_file'\n" ++
+                              "3. pass in a gene map using the argument 'functional_map'")
+
+
+    amode <- parseAnnotationMode features refinfo mocatMap gffFile
+    return $! CountOpts
+            { optFeatures = features
             , optSubFeatures = map (B8.pack . T.unpack) <$> subfeatures
+            , optAnnotationMode = amode
             , optIntersectMode = m
             , optStrandSpecific = strand_specific
             , optMinCount = if discardZeros
@@ -271,8 +295,12 @@ executeCount (NGOMappedReadSet rname istream mappedref) args = do
             , optNormMode = normMode
             , optIncludeMinus1 = include_minus1
             }
-    amode <- annotationMode (optFeatures opts) refinfo mocatMap gffFile
-    annotators <- loadAnnotator amode opts
+
+executeCount :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeCount (NGOList e) args = NGOList <$> mapM (`executeCount` args) e
+executeCount (NGOMappedReadSet rname istream mappedref) args = do
+    opts <- parseOptions (Just mappedref) args
+    annotators <- loadAnnotator (optAnnotationMode opts) opts
     NGOCounts . File <$> performCount istream rname annotators opts
 executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
@@ -652,23 +680,6 @@ loadFunctionalMap fname columns = do
             | fi == ci = (v:) <$> selectIds line_nr rest vs
             | otherwise = selectIds line_nr fs vs
         selectIds line_nr _ _ = throwDataError ("Loading functional map file '" ++ fname ++ "' [line " ++ show (line_nr + 1)++ "]: wrong number of columns") -- humans count lines in 1-based systems
-
-
-annotationMode :: [B.ByteString] -> Maybe T.Text -> Maybe FilePath -> Maybe FilePath -> NGLessIO AnnotationMode
-annotationMode _ _ (Just _) (Just _) = throwScriptError "Cannot simmultaneously pass a gff_file and an annotation_file for count() function"
-annotationMode ["seqname"] _ _ _ = return AnnotateSeqName
-annotationMode _ _ (Just r) _ = return (AnnotateFunctionalMap r)
-annotationMode _ _ _ (Just g) = return (AnnotateGFF g)
-annotationMode _ (Just ref) Nothing Nothing = do
-    outputListLno' InfoOutput ["Annotate with reference: ", show ref]
-    ReferenceFilePaths _ mgffpath mfuncpath <- ensureDataPresent ref
-    case (mgffpath, mfuncpath) of
-        (Just gffpath, Nothing) -> return $! AnnotateGFF gffpath
-        (Nothing, Just fmpath) -> return $! AnnotateFunctionalMap fmpath
-        (Nothing, Nothing) -> throwScriptError ("Could not find annotation file for '" ++ T.unpack ref ++ "'")
-        (Just _, Just _) -> throwDataError ("Reference " ++ T.unpack ref ++ " has both a GFF and a functional map file. Cannot figure out what to do.")
-annotationMode _ _ _ _ =
-            throwScriptError "For counting, you must do one of\n1. use seqname mode\n2. pass in a GFF file using the argument 'gff_file'\n3. pass in a gene map using the argument 'functional_map'"
 
 
 revnamemap :: M.Map B.ByteString Int -> VU.Vector Int

@@ -64,6 +64,7 @@ defCountOpts =
     { optFeatures = []
     , optSubFeatures = Nothing
     , optIntersectMode = annotationRule IntersectUnion
+    , optAnnotationMode = AnnotateSeqName
     , optStrandSpecific = False
     , optMinCount = 0.0
     , optMMMethod = MMUniqueOnly
