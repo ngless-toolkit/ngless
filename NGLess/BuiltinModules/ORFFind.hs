@@ -80,7 +80,7 @@ orfFindFunction = Function
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ = return def
-    { modInfo = ModInfo "builtin.orffind" "1.1"
+    { modInfo = ModInfo "builtin.orffind" "0.6"
     , modFunctions = [orfFindFunction]
     , runFunction = executeORFFind
     }
