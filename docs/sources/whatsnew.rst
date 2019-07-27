@@ -17,6 +17,10 @@ User-visible improvements
   <https://ngless.embl.de/Functions.html#count>`__ to accept multiple comment
   lines at the top of the file as produced by `eggnog-mapper
   <http://eggnog-mapper.embl.de/>`__.
+- Faster check for column headers in ``functional_map`` argument to `count()
+  <https://ngless.embl.de/Functions.html#count>`__ function: now it is
+  performed *as soon as possible* (including at the top of the script if the
+  arguments are literal strings), thus NGLess can fail faster.
 
 
 Version 1.0.1

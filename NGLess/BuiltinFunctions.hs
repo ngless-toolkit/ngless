@@ -40,6 +40,7 @@ builtinFunctions =
     ,Function (FuncName "mapstats") (Just NGLMappedReadSet) [] NGLCounts mapStatsArgs False []
     ,Function (FuncName "select") (Just NGLMappedReadSet) [] NGLMappedReadSet selectArgs False []
     ,Function (FuncName "count") (Just NGLMappedReadSet) [] NGLCounts countArgs False [FunctionCheckReturnAssigned]
+    ,Function (FuncName "__check_count") (Just NGLMappedReadSet) [] NGLCounts countCheckArgs False []
     ,Function (FuncName "countfile") (Just NGLString) [ArgCheckFileReadable] NGLCounts [] False [FunctionCheckReturnAssigned]
     ,Function (FuncName "write") (Just NGLAny) [] NGLVoid writeArgs False []
     ,Function (FuncName "print") (Just NGLAny) [] NGLVoid [] False []
@@ -76,6 +77,11 @@ countArgs =
     ,ArgInformation "normalization" False NGLSymbol [ArgCheckSymbol ["raw", "normed", "scaled", "fpkm"]]
     ,ArgInformation "reference" False NGLString [ArgCheckMinVersion (0,8)]
     ]
+
+countCheckArgs = countArgs ++
+    [ArgInformation "original_lno" False NGLInteger []
+    ]
+
 
 selectArgs =
     [ArgInformation "keep_if" False (NGList NGLSymbol) [ArgCheckSymbol ["mapped", "unmapped", "unique"]]

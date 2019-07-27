@@ -5,6 +5,7 @@
 {-# OPTIONS_GHC -fno-full-laziness #-}
 module Interpretation.Count
     ( executeCount
+    , executeCountCheck
     , Annotator(..)
     , CountOpts(..)
     , AnnotationMode(..)
@@ -304,6 +305,32 @@ executeCount (NGOMappedReadSet rname istream mappedref) args = do
     NGOCounts . File <$> performCount istream rname annotators opts
 executeCount err _ = throwScriptError ("Invalid Type. Should be used NGOList or NGOAnnotatedSet but type was: " ++ show err)
 
+executeCountCheck :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeCountCheck _ kwargs = do
+    opts <- parseOptions Nothing kwargs
+    lno <- lookupIntegerOrScriptErrorDef (return 0) "hidden lno argument" "original_lno" kwargs
+    case optAnnotationMode opts of
+        AnnotateFunctionalMap fname -> do
+            columns <- C.runConduit $
+                    conduitPossiblyCompressedFile fname
+                    .| linesC
+                    .| CAlg.enumerateC
+                    .| (lastCommentOrHeader fname True >>= \case
+                            Nothing -> return []
+                            Just (_,ByteLine line) -> return $ B8.split '\t' line)
+            let missing = [f | f <- optFeatures opts, f `notElem` columns]
+            case missing of
+                [] -> return ()
+                ms -> do
+                    let errormsg = [
+                                "In call to count() [line ",
+                                show lno,
+                                "], missing features:"
+                                ] ++ concat [[" ", B8.unpack f]  | f <- ms]
+                    throwDataError (concat errormsg)
+        _ -> return ()
+    return NGOVoid
+
 -- | The include_minus1 argument defaulted to False up to version 0.5. Now, it
 -- defaults to true as it seems to be what most users expect.
 defaultMinus1 :: NGLessIO Bool
@@ -557,6 +584,37 @@ normalizeCounts nmethod counts sizes
         liftIO $ forM_ [1.. VUM.length counts - 1] (VUM.unsafeModify counts (* factor))
     | otherwise = error "This should be unreachable code [normalizeCounts]"
 
+
+
+-- lastCommentOrHeader :: Monad m => C.ConduitT (Int, ByteLine) () m (Maybe (Int, ByteLine))
+lastCommentOrHeader fname newAPI = C.await >>= \case
+                    Nothing -> return Nothing
+                    Just f@(_,ByteLine line) ->
+                        if isComment line
+                            then lastCommentOrHeader' (Just f)
+                            else return (Just f)
+    where
+        lastCommentOrHeader' prev = C.await >>= \case
+                        Nothing -> return prev
+                        Just f@(_, ByteLine line)
+                            | isComment line ->
+                                if newAPI
+                                    then lastCommentOrHeader' (Just f)
+                                    else do
+                                        lift $ outputListLno' WarningOutput versionChangeWarning
+                                        C.leftover f
+                                        return (Just f)
+                            | otherwise -> do
+                                C.leftover f
+                                return prev
+        isComment line
+            | B.null line = True
+            | otherwise = B8.head line == '#'
+        versionChangeWarning =
+            ["Loading '", fname, "': found several lines at the top starting with '#'.\n",
+             "The interpretation of these changed in NGLess 1.1 (they are now considered comment lines).\n",
+             "Using the older version for backwards compatibility.\n"]
+
 {- This object keeps the state for iterating over the lines in the annotation
  - file.
  -}
@@ -583,7 +641,7 @@ loadFunctionalMap fname columns = do
                     .| linesC
                     .| CAlg.enumerateC
                     .| (do
-                        hline <- lastCommentOrHeader (v >= NGLVersion 1 1)
+                        hline <- lastCommentOrHeader fname (v >= NGLVersion 1 1)
                         (cis,tags) <- case hline of
                             Nothing -> throwDataError ("Empty map file: "++fname)
                             Just (_, ByteLine header) -> let headers = B8.split '\t' header
@@ -596,34 +654,6 @@ loadFunctionalMap fname columns = do
         outputListLno' TraceOutput ["Loading of map file '", fname, "' complete"]
         return $! sortOn (\(GeneMapAnnotator tag _ _) -> tag) anns
     where
-        -- lastCommentOrHeader :: Monad m => C.ConduitT (Int, ByteLine) () m (Maybe (Int, ByteLine))
-        lastCommentOrHeader newAPI = C.await >>= \case
-                            Nothing -> return Nothing
-                            Just f@(_,ByteLine line) ->
-                                if isComment line
-                                    then lastCommentOrHeader' (Just f)
-                                    else return (Just f)
-            where
-                lastCommentOrHeader' prev = C.await >>= \case
-                                Nothing -> return prev
-                                Just f@(_, ByteLine line)
-                                    | isComment line ->
-                                        if newAPI
-                                            then lastCommentOrHeader' (Just f)
-                                            else do
-                                                lift $ outputListLno' WarningOutput versionChangeWarning
-                                                C.leftover f
-                                                return (Just f)
-                                    | otherwise -> do
-                                        C.leftover f
-                                        return prev
-                isComment line
-                    | B.null line = True
-                    | otherwise = B8.head line == '#'
-                versionChangeWarning =
-                    ["Loading '", fname, "': found several lines at the top starting with '#'.\n",
-                     "The interpretation of these changed in NGLess 1.1 (they are now considered comment lines).\n",
-                     "Using the older version for backwards compatibility.\n"]
 
         finishFunctionalMap :: B.ByteString -> LoadFunctionalMapState -> Annotator
         finishFunctionalMap tag (LoadFunctionalMapState _ gmap namemap) = GeneMapAnnotator

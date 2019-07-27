@@ -97,7 +97,7 @@ import NGLess.NGLEnvironment
 import NGLess.NGError
 
 import Interpretation.Map
-import Interpretation.Count (executeCount)
+import Interpretation.Count (executeCount, executeCountCheck)
 import Interpretation.CountFile (executeCountFile)
 import Interpretation.FastQ
 import Interpretation.Write
@@ -273,6 +273,7 @@ interpretExpr (Lookup _ (Variable v)) = lookupVariable v >>= \case
         Just r' -> return r'
 interpretExpr (BuiltinConstant (Variable "STDIN")) = return (NGOString "/dev/stdin")
 interpretExpr (BuiltinConstant (Variable "STDOUT")) = return (NGOString "/dev/stdout")
+interpretExpr (BuiltinConstant (Variable "__VOID")) = return NGOVoid
 interpretExpr (BuiltinConstant (Variable v)) = throwShouldNotOccur ("Unknown builtin constant '" ++ show v ++ "': it should not have been accepted.")
 interpretExpr (ConstStr t) = return (NGOString t)
 interpretExpr (ConstBool b) = return (NGOBool b)
@@ -330,6 +331,7 @@ interpretFunction' (FuncName "mapstats")  expr args Nothing = runNGLessIO (execu
 interpretFunction' (FuncName "__merge_samfiles")  expr args Nothing = runNGLessIO (executeMergeSams expr args)
 interpretFunction' (FuncName "select")    expr args Nothing = runNGLessIO (executeSelect expr args)
 interpretFunction' (FuncName "count")     expr args Nothing = runNGLessIO (executeCount expr args)
+interpretFunction' (FuncName "__check_count") expr args Nothing = runNGLessIO (executeCountCheck expr args)
 interpretFunction' (FuncName "countfile") expr args Nothing = runNGLessIO (executeCountFile expr args)
 interpretFunction' (FuncName "print")     expr args Nothing = executePrint expr args
 interpretFunction' (FuncName "paired")   mate1 args Nothing = runNGLessIO (executePaired mate1 args)

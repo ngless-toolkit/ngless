@@ -4,6 +4,7 @@ Version 1.0.1+
 	* Call bwa mem so that it behaves in a deterministic way (independently of
 	the number of threads used)
 	* Add `include_fragments` option to orf_find
+	* Add early check for column headers in `count()`
 
 Version 1.0.1 2019-07-05 by luispedro
 	* Fix bug with external modules and multiple fastQ inputs

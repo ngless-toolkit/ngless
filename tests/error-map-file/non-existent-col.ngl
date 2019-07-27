@@ -1,0 +1,11 @@
+ngless '1.1'
+mapped = samfile('basic.sam')
+
+# The first count() function is correct, but the second one contains an error
+# ("kot" is a non-existent)
+
+counted = count(mapped, features=['ko'], multiple={all1}, functional_map='functional.map')
+write(counted, ofile='should.not.be.created.txt')
+
+counted = count(mapped, features=['kot'], multiple={all1}, functional_map='functional.map')
+write(counted, ofile='error.txt')

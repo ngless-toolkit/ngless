@@ -70,6 +70,7 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , addFileChecks
                 , addIndexChecks
                 , addUseNewer
+                , addCountsCheck
                 ]
 
 pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression
@@ -226,6 +227,7 @@ substrimReassign = pureTransform $ \case
 addFileChecks :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
                     -- this is easier to do on the reversed script
 addFileChecks sc = reverse <$> (checkIFiles (reverse sc) >>= checkOFiles)
+    -- convert to genericCheckUpfloat
     where
         -- This could be combined into a single pass
         -- For script preprocessing, we generally disregard performance, however
@@ -301,7 +303,7 @@ addFileChecks' checkFname tag ((lno,e):rest) = do
 --
 -- write(input, ofile="output/"+variable+".sam")
 addIndexChecks :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
-addIndexChecks sc = reverse <$> addIndexChecks' (reverse sc)
+addIndexChecks sc = reverse <$> addIndexChecks' (reverse sc) -- TODO: convert to genericCheckUpfloat
 addIndexChecks' :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
 addIndexChecks' [] = return []
 addIndexChecks' ((lno,e):rest) = do
@@ -312,8 +314,6 @@ addIndexChecks' ((lno,e):rest) = do
         return ((lno,e):rest')
 
      where
-        -- The similarity of this code and the code for addFileChecks hints at
-        -- a possible merging with a good abstraction
         maybeAddChecks :: [(Variable,Expression)] -> [(Int, Expression)] -> [(Int, Expression)]
         maybeAddChecks [(v,ix)] [] = [(0, indexCheckExpr v ix)]
         maybeAddChecks vars@[(v,ix)] ((lno',e'):rest') = case e' of
@@ -329,6 +329,31 @@ addIndexChecks' ((lno,e):rest) = do
                             ,(Variable "index1", ix1)]
                             Nothing
 
+
+genericCheckUpfloat :: ((Int, Expression) -> Maybe ([Variable],Expression))
+                        -> [(Int, Expression)]
+                        -> NGLessIO [(Int, Expression)]
+genericCheckUpfloat f exprs = reverse <$> genericCheckUpfloat' f (reverse exprs)
+genericCheckUpfloat' _ [] = return []
+genericCheckUpfloat' f (c:rest) = do
+    let rest' = case recursiveCall f c of
+                    Nothing -> rest
+                    Just (vars, ne) -> floatDown vars (fst c,ne) rest
+    rest'' <- genericCheckUpfloat' f rest'
+    return (c:rest'')
+
+recursiveCall :: ((Int, Expression) -> Maybe a) -> (Int, Expression) -> Maybe a
+recursiveCall f (lno, e) = evalCont $ callCC $ \exit -> do
+    flip recursiveAnalyse e (\sub -> case f (lno, sub) of
+                                        Nothing -> return ()
+                                        j -> exit j)
+    return Nothing
+
+floatDown :: [Variable] -> (Int, Expression) -> [(Int, Expression)] -> [(Int, Expression)]
+floatDown _ e [] = [e]
+floatDown vars e (c:rest)
+    | any (`isVarUsed1` (snd c)) vars = (e:c:rest)
+    | otherwise = (c:floatDown vars e rest)
 
 -- | Implements addition of temp$nn variables to simplify expressions
 --
@@ -478,3 +503,15 @@ addUseNewer exprs = do
             mapM (secondM addUseNewer') exprs
 
 
+addCountsCheck :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+addCountsCheck = genericCheckUpfloat countCheck
+    where
+        countCheck (lno, FunctionCall (FuncName "count") _ kwargs Nothing) = Just (extractVars kwargs, buildCheck lno kwargs)
+        countCheck _ = Nothing
+        buildCheck lno kwargs =
+            FunctionCall
+                (FuncName "__check_count")
+                (BuiltinConstant (Variable "__VOID"))
+                ((Variable "original_lno", ConstInt (toInteger lno)):kwargs)
+                Nothing
+        extractVars kwargs = concat (usedVariables . snd <$> kwargs)
