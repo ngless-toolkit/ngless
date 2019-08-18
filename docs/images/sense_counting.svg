@@ -1,0 +1,1044 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:xhtml="http://www.w3.org/1999/xhtml"
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.1"
+   width="533.61646"
+   height="252.75685"
+   viewBox="-0.5 -0.6 532.93523 252.75686"
+   content="&lt;mxfile modified=&quot;2019-06-19T14:56:16.335Z&quot; host=&quot;www.draw.io&quot; agent=&quot;Mozilla/5.0 (X11; Linux x86_64; rv:65.0) Gecko/20100101 Firefox/65.0&quot; etag=&quot;hscecpz_pK3HS5oBzdh9&quot; version=&quot;10.7.8&quot; type=&quot;device&quot;&gt;&lt;diagram id=&quot;erU6p4rkyV5gAQPmadxq&quot; name=&quot;Page-1&quot;&gt;7Zvdb6M4EMD/GnRPXYHN52OT7N5Jq0qr9qS9eyTgJGgJ5ozTpvvXnx0ggO18NOEjTdKHFk/MQObn8YzHrgbHy/WfxE8XTzhEsQb0cK3BiQaA7TjsNxe85wLoGrlgTqIwF9UEL9FvlAutQriKQpQ1+lGMYxqlTWGAkwQFtCHzCcFvzW4zHDcfmvpzJAleAj+WpT+jkC5yqQucSv4XiuaL8smG7eWfLP2ys54LsoUf4reaCH7V4JhgTPOr5XqMYm660iz5fd92fLp9MYISeswNweyX9+3JfMqm/06zhzVezCbfH4zCzK9+vCq+cfG29L00AUrCR25J1kpwwoSjBV3GrGWwy7w3CiUrVq9lbL8sGyMILxEl76zLW2VOqzDRombJUkZQ7NPotaneL6jOt+q2T/iBI/ZgoBfjD5iFnmL4AVdvqsjwigSouKtuPkGRaepf9NqPsV8t9ckcUUktM6T/XuuW8g5ZvQe7qJmpEm1ofoCscxgsG5Epv8woShnKFJGIPRWRQvSjao/eFhFFL6kf8P5vzNGbo2AWrVHpu9WoeEWEovVHx0UJzhbAOUW7Nm4cxbgBAoj6EGnY+KMGNeCNuQrUT3eV/YoGdw53SOcgmDJMOGHNB4PNG624C7QEd/H6c5fvxIv9f8jj82jxbD3HY5glP1WRZY4SNJIMzb4zbRqMoCz67U83Hbh5/BXFWWU/P47m3HgBM83G/txwEQvZj8UHyygM+c2jYgCxx1gjzZpsWMTxGMeYVB6aUYJ/IUFI8CoJUVi8wA4YCmR7+DhCwHAlPirf7o6PfeZ0VjelBuDMDVAQSPZkn0xdy7T2mlGYEwebAMWQY1unTYDAs/Yr2jEBnjC9qdkeEfxvja0rILFOZAuBvl9R12yPiF23xtYR/fbExAXqot8el7i0xbYcWm2xDS3khqaKrQum0LY/IVtonOq3AltJUddsjTtbEYnrfTkQKI9ecgDzkKqu+YI7X4kvaGdeNg1nv6Ku2Z679L9CtmKufHI+JebKPedT8M72UK4MxUXoqbmypKhrtma7bK8gV4ZOS2xNY2C25+5cXCFb+0CKezRb/UDS3R5bZXlWlUrZMa8ShtErf42i0Mek/634/tmoqAVu2+xqzv9af5R3shfZ3JzLpaFyuAopFxN31CVjNKOKqiTFvC6cpX4QJfO/eWPyYLa0VwLsZgxV7JUAxbjrbK9ENe+eBhDeJkDXGxaganK9e+BugOKW1+AAVdX9uwd+AGCPU6gyv5FL+Hz77PEEq1/D9hlwzCYeW/avrrbP1KcBZAfLUJKhDRziJ+EFuccMJ7SxDh3V16HnbTvbulh3K5UMdk5D9hw/odFnoTNqrjbOPRQg0oEyHa9XOqrtqzy8cENo/CRfaYsqEsH8zJUcnJ6RH2YaP22XpsysGj8dqPGX30asXOvFhawOqQPLEzzSlpgbeq/QvWsLZucBgsI63ZSdstdgpth3/ORnddrlY8kO1C8f1d5hLZsvZjdnlAc5Z9Jaxn4VON1m7gjLs+WD4TxQ39rirPKWO9JmYgPF4rOMtNekExwomOS0itwTtgezp/SkSL/acUcTCOycgd3xQK1k645TzN7v7olNT/TE/STZE02rT5ry8g9crmO1uhbXhTinSCt7rUECea0HbxSFIoPsF4W8Artgr2i1BiIcVBkcBZQXWxfsFZ2iGHqCgvK6yrpcFG0mYaYBLgyFvCa6VRTdTVCsWf2/cX5Yo/qfbfj1fw==&lt;/diagram&gt;&lt;/mxfile&gt;"
+   id="svg160"
+   sodipodi:docname="strand_counting.svg"
+   inkscape:version="0.92.4 (5da689c313, 2019-01-14)">
+  <metadata
+     id="metadata164">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1916"
+     inkscape:window-height="1036"
+     id="namedview162"
+     showgrid="true"
+     inkscape:zoom="1"
+     inkscape:cx="254.99608"
+     inkscape:cy="333.43761"
+     inkscape:window-x="0"
+     inkscape:window-y="42"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg160"
+     showguides="false"
+     viewbox-width="234.7"
+     fit-margin-top="5"
+     fit-margin-left="5"
+     fit-margin-right="5"
+     fit-margin-bottom="5">
+    <inkscape:grid
+       type="xygrid"
+       id="grid195"
+       originx="132.51552"
+       originy="63.405217" />
+  </sodipodi:namedview>
+  <defs
+     id="defs2">
+    <marker
+       inkscape:stockid="Arrow2Send"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="marker3140"
+       style="overflow:visible"
+       inkscape:isstock="true">
+      <path
+         id="path3138"
+         style="fill:#82b366;fill-opacity:1;fill-rule:evenodd;stroke:#82b366;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
+         transform="matrix(-0.3,0,0,-0.3,0.69,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:isstock="true"
+       style="overflow:visible"
+       id="marker3004"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow2Send"
+       inkscape:collect="always">
+      <path
+         transform="matrix(-0.3,0,0,-0.3,0.69,0)"
+         d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
+         style="fill:#82b366;fill-opacity:1;fill-rule:evenodd;stroke:#82b366;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         id="path3002"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:isstock="true"
+       style="overflow:visible"
+       id="marker2874"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow2Sstart">
+      <path
+         transform="matrix(0.3,0,0,0.3,-0.69,0)"
+         d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
+         style="fill:#82b366;fill-opacity:1;fill-rule:evenodd;stroke:#82b366;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         id="path2872"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:isstock="true"
+       style="overflow:visible"
+       id="marker2750"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow2Sstart">
+      <path
+         transform="matrix(0.3,0,0,0.3,-0.69,0)"
+         d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
+         style="fill:#b85450;fill-opacity:1;fill-rule:evenodd;stroke:#b85450;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         id="path2748"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:isstock="true"
+       style="overflow:visible"
+       id="marker2632"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow2Sstart">
+      <path
+         transform="matrix(0.3,0,0,0.3,-0.69,0)"
+         d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
+         style="fill:#b85450;fill-opacity:1;fill-rule:evenodd;stroke:#b85450;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         id="path2630"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:stockid="Arrow2Send"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="marker2496"
+       style="overflow:visible"
+       inkscape:isstock="true">
+      <path
+         id="path2494"
+         style="fill:#b85450;fill-opacity:1;fill-rule:evenodd;stroke:#b85450;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
+         transform="matrix(-0.3,0,0,-0.3,0.69,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:isstock="true"
+       style="overflow:visible"
+       id="marker2366"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow2Send"
+       inkscape:collect="always">
+      <path
+         transform="matrix(-0.3,0,0,-0.3,0.69,0)"
+         d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
+         style="fill:#b85450;fill-opacity:1;fill-rule:evenodd;stroke:#b85450;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         id="path2364"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:stockid="Arrow2Send"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow2Send"
+       style="overflow:visible"
+       inkscape:isstock="true"
+       inkscape:collect="always">
+      <path
+         id="path1035"
+         style="fill:#b85450;fill-opacity:1;fill-rule:evenodd;stroke:#b85450;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
+         transform="matrix(-0.3,0,0,-0.3,0.69,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:stockid="Arrow2Lend"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow2Lend"
+       style="overflow:visible"
+       inkscape:isstock="true">
+      <path
+         id="path1023"
+         style="fill:#b85450;fill-opacity:1;fill-rule:evenodd;stroke:#b85450;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
+         transform="matrix(-1.1,0,0,-1.1,-1.1,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:stockid="Arrow2Sstart"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow2Sstart"
+       style="overflow:visible"
+       inkscape:isstock="true"
+       inkscape:collect="always">
+      <path
+         id="path1032"
+         style="fill:#b85450;fill-opacity:1;fill-rule:evenodd;stroke:#b85450;stroke-width:0.625;stroke-linejoin:round;stroke-opacity:1"
+         d="M 8.7185878,4.0337352 -2.2072895,0.01601326 8.7185884,-4.0017078 c -1.7454984,2.3720609 -1.7354408,5.6174519 -6e-7,8.035443 z"
+         transform="matrix(0.3,0,0,0.3,-0.69,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:isstock="true"
+       style="overflow:visible"
+       id="marker2026"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow1Sstart">
+      <path
+         transform="matrix(0.2,0,0,0.2,1.2,0)"
+         style="fill:#b85450;fill-opacity:1;fill-rule:evenodd;stroke:#b85450;stroke-width:1.00000003pt;stroke-opacity:1"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path2024"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:stockid="Arrow1Sstart"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="marker1950"
+       style="overflow:visible"
+       inkscape:isstock="true">
+      <path
+         id="path1948"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#b85450;fill-opacity:1;fill-rule:evenodd;stroke:#b85450;stroke-width:1.00000003pt;stroke-opacity:1"
+         transform="matrix(0.2,0,0,0.2,1.2,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:isstock="true"
+       style="overflow:visible"
+       id="marker1886"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow1Sstart">
+      <path
+         transform="matrix(0.2,0,0,0.2,1.2,0)"
+         style="fill:#b85450;fill-opacity:1;fill-rule:evenodd;stroke:#b85450;stroke-width:1.00000003pt;stroke-opacity:1"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path1884"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:stockid="Arrow1Sstart"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="marker1822"
+       style="overflow:visible"
+       inkscape:isstock="true"
+       inkscape:collect="always">
+      <path
+         id="path1820"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#82b366;fill-opacity:1;fill-rule:evenodd;stroke:#82b366;stroke-width:1.00000003pt;stroke-opacity:1"
+         transform="matrix(0.2,0,0,0.2,1.2,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:isstock="true"
+       style="overflow:visible"
+       id="marker1788"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow1Sstart"
+       inkscape:collect="always">
+      <path
+         transform="matrix(0.2,0,0,0.2,1.2,0)"
+         style="fill:#82b366;fill-opacity:1;fill-rule:evenodd;stroke:#82b366;stroke-width:1.00000003pt;stroke-opacity:1"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path1786"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:stockid="Arrow1Sstart"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow1Sstart"
+       style="overflow:visible"
+       inkscape:isstock="true"
+       inkscape:collect="always">
+      <path
+         id="path1014"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#82b366;fill-opacity:1;fill-rule:evenodd;stroke:#82b366;stroke-width:1.00000003pt;stroke-opacity:1"
+         transform="matrix(0.2,0,0,0.2,1.2,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:isstock="true"
+       style="overflow:visible"
+       id="marker1668"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow1Mstart">
+      <path
+         transform="matrix(0.4,0,0,0.4,4,0)"
+         style="fill:#82b366;fill-opacity:1;fill-rule:evenodd;stroke:#82b366;stroke-width:1.00000003pt;stroke-opacity:1"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path1666"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:isstock="true"
+       style="overflow:visible"
+       id="marker1604"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow1Mstart">
+      <path
+         transform="matrix(0.4,0,0,0.4,4,0)"
+         style="fill:#82b366;fill-opacity:1;fill-rule:evenodd;stroke:#82b366;stroke-width:1.00000003pt;stroke-opacity:1"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path1602"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:stockid="Arrow1Mstart"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow1Mstart"
+       style="overflow:visible"
+       inkscape:isstock="true">
+      <path
+         id="path1008"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#82b366;fill-opacity:1;fill-rule:evenodd;stroke:#82b366;stroke-width:1.00000003pt;stroke-opacity:1"
+         transform="matrix(0.4,0,0,0.4,4,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+    <marker
+       inkscape:stockid="Arrow1Lstart"
+       orient="auto"
+       refY="0"
+       refX="0"
+       id="Arrow1Lstart"
+       style="overflow:visible"
+       inkscape:isstock="true">
+      <path
+         id="path1002"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         style="fill:#82b366;fill-opacity:1;fill-rule:evenodd;stroke:#82b366;stroke-width:1.00000003pt;stroke-opacity:1"
+         transform="matrix(0.8,0,0,0.8,10,0)"
+         inkscape:connector-curvature="0" />
+    </marker>
+  </defs>
+  <g
+     id="g158"
+     transform="matrix(2,0,0,2,-0.76608078,-59.075138)">
+    <path
+       d="M 14,59 H 214"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path4"
+       inkscape:connector-curvature="0"
+       style="fill:none;stroke:#000000;stroke-miterlimit:10" />
+    <path
+       d="m 34,49 h 70.35124 V 69 H 34 Z"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path6"
+       inkscape:connector-curvature="0"
+       style="fill:#ffffff;stroke:#000000;stroke-miterlimit:10"
+       sodipodi:nodetypes="ccccc" />
+    <path
+       d="M 14,79 H 214"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path8"
+       inkscape:connector-curvature="0"
+       style="fill:none;stroke:#000000;stroke-miterlimit:10" />
+    <path
+       d="m 129,69 h 70.35124 V 89 H 129 Z"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path6-7"
+       inkscape:connector-curvature="0"
+       style="fill:#ffffff;stroke:#000000;stroke-miterlimit:10"
+       sodipodi:nodetypes="ccccc" />
+    <g
+       transform="translate(149.30746,70.032227)"
+       id="g16">
+      <switch
+         id="switch14">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="30"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap; text-align: center;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">geneB</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="15"
+           y="12"
+           font-size="12px"
+           id="text12"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">geneB</text>
+      </switch>
+    </g>
+    <path
+       d="m 39.19282,104 h 35"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path18"
+       style="fill:none;stroke:#b85450;stroke-miterlimit:10;marker-start:url(#Arrow2Sstart)"
+       inkscape:connector-curvature="0" />
+    <path
+       d="m 64.19282,93.999999 h 35"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path20"
+       style="fill:none;stroke:#b85450;stroke-miterlimit:10;marker-start:url(#marker2750)"
+       inkscape:connector-curvature="0" />
+    <path
+       d="m 49.19282,98.999999 h 35"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path22"
+       style="fill:none;stroke:#b85450;stroke-miterlimit:10;marker-start:url(#marker2632)"
+       inkscape:connector-curvature="0" />
+    <path
+       d="M 44,35.999997 H 79"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path24"
+       style="fill:none;stroke:#82b366;stroke-miterlimit:10;marker-end:url(#marker3004)"
+       inkscape:connector-curvature="0" />
+    <path
+       d="m 162.2018,104 h 35"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path26"
+       style="fill:none;stroke:#82b366;stroke-miterlimit:10;marker-start:url(#marker1822)"
+       inkscape:connector-curvature="0" />
+    <path
+       d="m 154.7018,98.999999 h 35"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path28"
+       style="fill:none;stroke:#82b366;stroke-miterlimit:10;marker-start:url(#Arrow1Sstart)"
+       inkscape:connector-curvature="0" />
+    <path
+       d="m 132.7018,93.999999 h 35"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path30"
+       style="fill:none;stroke:#82b366;stroke-width:1;stroke-miterlimit:2.29999995;stroke-dasharray:none;marker-start:url(#marker1788)"
+       inkscape:connector-curvature="0" />
+    <path
+       d="M 59,40.999997 H 94"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path32"
+       style="fill:none;stroke:#82b366;stroke-miterlimit:10;marker-end:url(#marker3140)"
+       inkscape:connector-curvature="0" />
+    <path
+       d="m 149,40.999996 h 35"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path34"
+       style="fill:none;stroke:#b85450;stroke-miterlimit:10;marker-end:url(#marker2366)"
+       inkscape:connector-curvature="0" />
+    <path
+       d="m 139,35.999996 h 35"
+       stroke-miterlimit="10"
+       pointer-events="none"
+       id="path36"
+       style="fill:none;stroke:#b85450;stroke-miterlimit:10;marker-end:url(#Arrow2Send)"
+       inkscape:connector-curvature="0" />
+    <g
+       transform="translate(3.5,51.5)"
+       id="g42">
+      <switch
+         id="switch40">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="8"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">
+              <xhtml:div
+                 align="center">5'</xhtml:div>
+            </xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="4"
+           y="12"
+           font-size="12px"
+           id="text38"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">5'</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(3.5,70.5)"
+       id="g48">
+      <switch
+         id="switch46">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="8"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">
+              <xhtml:div
+                 align="center">3'</xhtml:div>
+            </xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="4"
+           y="12"
+           font-size="12px"
+           id="text44"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">3'</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(217.5,70.5)"
+       id="g54">
+      <switch
+         id="switch52">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="8"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">
+              <xhtml:div
+                 align="center">5'</xhtml:div>
+            </xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="4"
+           y="12"
+           font-size="12px"
+           id="text50"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">5'</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(217.5,51.5)"
+       id="g60">
+      <switch
+         id="switch58">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="8"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">
+              <xhtml:div
+                 align="center">3'</xhtml:div>
+            </xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="4"
+           y="12"
+           font-size="12px"
+           id="text56"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">3'</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(52.979331,50.032227)"
+       id="g66">
+      <switch
+         id="switch64">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="31"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap; text-align: center;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">geneA</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="16"
+           y="12"
+           font-size="12px"
+           id="text62"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">geneA</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(34.5,7.5)"
+       id="g84">
+      <switch
+         id="switch82">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="85"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(184, 84, 80); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">
+              <xhtml:font
+                 color="#000000">Reads mapping to </xhtml:font>
+            </xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="43"
+           y="12"
+           font-size="12px"
+           id="text80"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#b85450">
+          <tspan
+             style="fill:#000000"
+             id="tspan166" />
+        </text>
+      </switch>
+    </g>
+    <g
+       transform="translate(19.154297,123.5)"
+       id="g90">
+      <switch
+         id="switch88">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="31"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap; text-align: center;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">geneA</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="16"
+           y="12"
+           font-size="12px"
+           id="text86"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">geneA</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(20.482422,138.5)"
+       id="g96">
+      <switch
+         id="switch94">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="30"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap; text-align: center;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">geneB</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="15"
+           y="12"
+           font-size="12px"
+           id="text92"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">geneB</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(63.5,107.5)"
+       id="g102">
+      <switch
+         id="switch100">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="38"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap; text-align: center;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">
+              <xhtml:div>{sense}</xhtml:div>
+            </xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="19"
+           y="12"
+           font-size="12px"
+           id="text98"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">{sense}</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(119.5,107.5)"
+       id="g108">
+      <switch
+         id="switch106">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="55"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap; text-align: center;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">
+              <xhtml:div>{antisense}</xhtml:div>
+            </xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="28"
+           y="12"
+           font-size="12px"
+           id="text104"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">{antisense}</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(17.5,108.5)"
+       id="g114">
+      <switch
+         id="switch112">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="36"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">
+              <xhtml:div>strand=</xhtml:div>
+            </xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="18"
+           y="12"
+           font-size="12px"
+           id="text110"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">sense=</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(190.5,107.5)"
+       id="g120">
+      <switch
+         id="switch118">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="33"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap; text-align: center;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">
+              <xhtml:div>{both}</xhtml:div>
+            </xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="17"
+           y="12"
+           font-size="12px"
+           id="text116"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">{both}</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(79.5,122.5)"
+       id="g126">
+      <switch
+         id="switch124">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="6"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(130, 179, 102); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">2</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="3"
+           y="12"
+           font-size="12px"
+           id="text122"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#82b366">2</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(79.5,137.5)"
+       id="g132">
+      <switch
+         id="switch130">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="6"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(130, 179, 102); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">3</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="3"
+           y="12"
+           font-size="12px"
+           id="text128"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#82b366">3</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(143.5,137.5)"
+       id="g138">
+      <switch
+         id="switch136">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="6"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(184, 84, 80); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">2</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="3"
+           y="12"
+           font-size="12px"
+           id="text134"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#b85450">2</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(143.5,122.5)"
+       id="g144">
+      <switch
+         id="switch142">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="6"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(184, 84, 80); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">3</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="3"
+           y="12"
+           font-size="12px"
+           id="text140"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#b85450">3</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(203.5,122.5)"
+       id="g150">
+      <switch
+         id="switch148">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="6"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">5</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="3"
+           y="12"
+           font-size="12px"
+           id="text146"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">5</text>
+      </switch>
+    </g>
+    <g
+       transform="translate(203.5,137.5)"
+       id="g156">
+      <switch
+         id="switch154">
+        <foreignObject
+           style="overflow:visible;"
+           pointer-events="all"
+           width="6"
+           height="12"
+           requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+          <xhtml:div
+             style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; vertical-align: top; white-space: nowrap;">
+            <xhtml:div
+               style="display:inline-block;text-align:inherit;text-decoration:inherit;">5</xhtml:div>
+          </xhtml:div>
+        </foreignObject>
+        <text
+           x="3"
+           y="12"
+           font-size="12px"
+           id="text152"
+           style="font-size:12px;font-family:Helvetica;text-anchor:middle;fill:#000000">5</text>
+      </switch>
+    </g>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:20px;line-height:1.25000002%;font-family:'Noto Serif Malayalam';-inkscape-font-specification:'Noto Serif Malayalam';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       x="2.5"
+       y="42.057838"
+       id="text3294"><tspan
+         sodipodi:role="line"
+         id="tspan3292"
+         x="2.5"
+         y="42.057838"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.66666704px;line-height:1.25000002%;font-family:Helvetica;-inkscape-font-specification:Helvetica">Reads</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:20px;line-height:25%;font-family:'Noto Serif Malayalam';-inkscape-font-specification:'Noto Serif Malayalam';text-align:center;letter-spacing:0px;word-spacing:0px;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       x="248.20929"
+       y="39.654236"
+       id="text3294-5"><tspan
+         sodipodi:role="line"
+         x="249.90721"
+         y="39.654236"
+         style="font-size:10.66666698px;line-height:25%;text-align:center;text-anchor:middle;-inkscape-font-specification:Helvetica;font-family:Helvetica;font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal"
+         id="tspan7094">GFF </tspan><tspan
+         sodipodi:role="line"
+         x="248.20929"
+         y="44.654236"
+         style="font-size:10.66666698px;line-height:25%;text-align:center;text-anchor:middle;-inkscape-font-specification:Helvetica;font-family:Helvetica;font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal"
+         id="tspan7100" /><tspan
+         sodipodi:role="line"
+         x="248.20929"
+         y="49.654236"
+         style="font-size:10.66666698px;line-height:25%;text-align:center;text-anchor:middle;-inkscape-font-specification:Helvetica;font-family:Helvetica;font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal"
+         id="tspan7098">strand</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:13.33333302px;line-height:125%;font-family:'Noto Serif Malayalam';-inkscape-font-specification:'Noto Serif Malayalam';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       x="243.53873"
+       y="64.71875"
+       id="text3294-5-5"><tspan
+         sodipodi:role="line"
+         id="tspan3292-3-6"
+         x="243.53873"
+         y="64.71875"
+         style="font-size:16px">+</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:13.33333302px;line-height:125%;font-family:'Noto Serif Malayalam';-inkscape-font-specification:'Noto Serif Malayalam';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       x="245.53091"
+       y="83.359375"
+       id="text3294-5-5-2"><tspan
+         sodipodi:role="line"
+         id="tspan3292-3-6-9"
+         x="245.53091"
+         y="83.359375"
+         style="font-size:16px">-</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.99999809px;line-height:1.25000002%;font-family:'Noto Serif Malayalam';-inkscape-font-specification:'Noto Serif Malayalam';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       x="2.5"
+       y="101.05784"
+       id="text3294-37"><tspan
+         sodipodi:role="line"
+         id="tspan3292-1"
+         x="2.5"
+         y="101.05784"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.66666704px;line-height:1.25000002%;font-family:Helvetica;-inkscape-font-specification:Helvetica;stroke-width:1px">Reads</tspan></text>
+  </g>
+</svg>

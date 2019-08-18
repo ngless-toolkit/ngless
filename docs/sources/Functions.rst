@@ -503,6 +503,10 @@ determines which strands should be considered:
 If you have strand-specific data, then ``{sense}`` is probably appropriate, but
 with some protocols ``{antisense}`` is actually the correct version.
 
+The following illustration exemplifies how counting would be performed.
+
+.. image:: ../images/sense_counting.svg
+
 **Note**: before version **1.1**, there was an argument ``strand`` which was
 either ``True`` or ``False`` mapping to ``{sense}`` and ``{both}``
 respectively. ``strand`` is still supported, but deprecated.
