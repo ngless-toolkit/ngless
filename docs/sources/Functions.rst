@@ -418,7 +418,7 @@ Arguments by value:
 +-------------------+-----------------+------------+----------------+
 | multiple          | Symbol          | no         | {dist1}        |
 +-------------------+-----------------+------------+----------------+
-| strand            | Bool            | no         | false          |
+| sense             | Symbol          | no         | {both}         |
 +-------------------+-----------------+------------+----------------+
 | normalization     | Symbol          | no         | {raw}          |
 +-------------------+-----------------+------------+----------------+
@@ -493,11 +493,19 @@ reference) is defined by the ``multiple`` argument:
 - ``{1overN}``: fractionally distribute multiple mappers. An insert mapping to 4 locations adds 0.25 to each location
 - ``{dist1}``: distribute multiple reads based on uniquely mapped reads. An insert mapping to 4 locations adds to these in proportion to how uniquely mapped inserts are distributed among these 4 locations.
 
-Argument ``strand`` represents whether the data are from a strand-specific
-(default is ``false``). When the data is not strand-specific, a read is always
-overlapping with a feature independently of whether maps to the same or the
-opposite strand. For strand-specific data, the read has to be mapped to the
-same strand as the feature.
+The argument ``sense`` should be used when the data are strand-specific and
+determines which strands should be considered:
+
+- ``{both}`` (default): a read is considered overlapping with a feature independently of whether maps to the same or the opposite strand.
+- ``{sense}``: a read has to map to the same strand as the feature to be considered overlapping.
+- ``{antisense}``: a read has to map to the **opposite** strand to be considered overlapping.
+
+If you have strand-specific data, then ``{sense}`` is probably appropriate, but
+with some protocols ``{antisense}`` is actually the correct version.
+
+**Note**: before version **1.1**, there was an argument ``strand`` which was
+either ``True`` or ``False`` mapping to ``{sense}`` and ``{both}``
+respectively. ``strand`` is still supported, but deprecated.
 
 ``min`` defines the minimum amount of overlaps a given feature must have, at
 least, to be kept (default: 0, i.e., keep all counts). If you just want to

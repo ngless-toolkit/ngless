@@ -21,7 +21,13 @@ User-visible improvements
   <https://ngless.embl.de/Functions.html#count>`__ function: now it is
   performed *as soon as possible* (including at the top of the script if the
   arguments are literal strings), thus NGLess can fail faster.
-
+- Added ``sense`` argument to the `count
+  <https://ngless.embl.de/Functions.html#count>`__ function, generalizing the
+  previous ``strand`` argument (which is deprecated). Whereas before it was
+  only possible to consider features either to be present on both strands or
+  only on the strand to which they are annotated, now it is also possible to
+  consider them present only on the opposite strand (which is necessary for
+  some strand-specific protocols as they produce the opposite strand).
 
 Version 1.0.1
 -------------

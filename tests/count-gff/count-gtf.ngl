@@ -1,8 +1,39 @@
-ngless '0.0'
+ngless '1.1'
 
 mapped = samfile('sample.sam.gz')
-counts = count(mapped, gff_file='short.gtf', features=['gene'], min=1, strand=True, mode={union}, include_minus1=True)
+counts = count(mapped,
+                gff_file='short.gtf',
+                features=['gene'],
+                min=1,
+                strand=True,
+                mode={union},
+                include_minus1=True)
 write(counts, ofile='output.txt')
 
-counts = count(mapped, gff_file='short.gtf', features=['gene'], min=1, strand=True, mode={union}, include_minus1=True, normalization={scaled})
+counts = count(mapped,
+                gff_file='short.gtf',
+                features=['gene'],
+                min=1,
+                sense={sense},
+                mode={union},
+                include_minus1=True)
+write(counts, ofile='output.sense.txt')
+
+counts = count(mapped,
+                gff_file='short.gtf',
+                features=['gene'],
+                min=1,
+                sense={antisense},
+                mode={union},
+                include_minus1=True)
+write(counts, ofile='output.antisense.txt')
+
+counts = count(mapped,
+                gff_file='short.gtf',
+                features=['gene'],
+                min=1,
+                strand=True,
+                mode={union},
+                include_minus1=True,
+                normalization={scaled})
 write(counts, ofile='output.scaled.txt')

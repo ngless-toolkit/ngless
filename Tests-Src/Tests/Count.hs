@@ -65,7 +65,7 @@ defCountOpts =
     , optSubFeatures = Nothing
     , optIntersectMode = annotationRule IntersectUnion
     , optAnnotationMode = AnnotateSeqName
-    , optStrandSpecific = False
+    , optStrandMode = SMBoth
     , optMinCount = 0.0
     , optMMMethod = MMUniqueOnly
     , optDelim = "\t"
@@ -172,11 +172,11 @@ case_gff_match = do
     c @?= M.fromList [("Gene100", 1), ("Gene300", 0)]
 
 case_gff_strand_check = do
-    c <- testNGLessIO $ runSamGffAnnotation sam1 gff1 defCountOpts { optFeatures = ["gene"], optStrandSpecific = True }
+    c <- testNGLessIO $ runSamGffAnnotation sam1 gff1 defCountOpts { optFeatures = ["gene"], optStrandMode = SMSense }
     c @?= M.fromList [("Gene100", 1), ("Gene300", 0)]
 
 case_gff_strand_check_negstrand = do
-    c <- testNGLessIO $ runSamGffAnnotation sam1neg gff1 defCountOpts { optFeatures = ["gene"], optStrandSpecific = True }
+    c <- testNGLessIO $ runSamGffAnnotation sam1neg gff1 defCountOpts { optFeatures = ["gene"], optStrandMode = SMSense }
     c @?= M.fromList [("Gene100", 0), ("Gene300", 0)]
 
 case_gff_feature_mismatch = do

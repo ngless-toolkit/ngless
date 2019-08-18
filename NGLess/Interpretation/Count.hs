@@ -12,6 +12,7 @@ module Interpretation.Count
     , AnnotationIntersectionMode(..)
     , MMMethod(..)
     , NMode(..)
+    , StrandMode(..)
     , annotationRule
     , loadAnnotator
     , loadFunctionalMap
@@ -126,6 +127,9 @@ data MMMethod = MMCountAll | MM1OverN | MMDist1 | MMUniqueOnly
 data NMode = NMRaw | NMNormed | NMScaled | NMFpkm
     deriving (Eq)
 
+data StrandMode = SMBoth | SMSense | SMAntisense
+    deriving (Eq)
+
 minDouble :: Double
 minDouble = (2.0 :: Double) ^^ fst (floatRange (1.0 :: Double))
 
@@ -135,7 +139,7 @@ data CountOpts =
     , optSubFeatures :: Maybe [B.ByteString] -- ^ list of sub-features to condider
     , optAnnotationMode :: !AnnotationMode
     , optIntersectMode :: AnnotationRule
-    , optStrandSpecific :: !Bool
+    , optStrandMode :: !StrandMode
     , optMinCount :: !Double
     , optMMMethod :: !MMMethod
     , optDelim :: !B.ByteString
@@ -217,6 +221,10 @@ annotationRule IntersectNonEmpty = intersection_non_empty
 
 parseOptions :: Maybe (Maybe T.Text) -> KwArgsValues -> NGLessIO CountOpts
 parseOptions mappedref args = do
+    when ("strand" `elem` (map fst args) && "sense" `elem` (map fst args)) $
+        (case lookup "original_lno" args of
+            Just (NGOInteger lno) -> flip outputListLno (Just $ fromIntegral lno)
+            _ -> outputListLno') WarningOutput ["Both `strand` and `sense` arguments passed to count() function. The `strand` argument will be ignored.\n"]
     minCount <- lookupIntegerOrScriptErrorDef (return 0) "count argument parsing" "min" args
     method <- decodeSymbolOrError "multiple argument in count() function"
                     [("1overN", MM1OverN)
@@ -226,6 +234,11 @@ parseOptions mappedref args = do
                     ] =<< lookupSymbolOrScriptErrorDef (return "dist1")
                                     "multiple argument to count " "multiple" args
     strand_specific <- lookupBoolOrScriptErrorDef (return False) "count function" "strand" args
+    smode <- decodeSymbolOrError "strand argument to count() function"
+                    [("both", SMBoth)
+                    ,("sense", SMSense)
+                    ,("antisense", SMAntisense)
+                    ] =<< lookupSymbolOrScriptErrorDef (return (if strand_specific then "sense" else "both")) "count function" "sense" args
     include_minus1 <- lookupBoolOrScriptErrorDef defaultMinus1 "count function" "include_minus1" args
     mocatMap <- lookupFilePath "functional_map argument to count()" "functional_map" args
     gffFile <- lookupFilePath "gff_file argument to count()" "gff_file" args
@@ -287,7 +300,7 @@ parseOptions mappedref args = do
             , optSubFeatures = map (B8.pack . T.unpack) <$> subfeatures
             , optAnnotationMode = amode
             , optIntersectMode = m
-            , optStrandSpecific = strand_specific
+            , optStrandMode = smode
             , optMinCount = if discardZeros
                                 then minDouble
                                 else fromInteger minCount
@@ -644,8 +657,8 @@ loadFunctionalMap fname columns = do
                         hline <- lastCommentOrHeader fname (v >= NGLVersion 1 1)
                         (cis,tags) <- case hline of
                             Nothing -> throwDataError ("Empty map file: "++fname)
-                            Just (_, ByteLine header) -> let headers = B8.split '\t' header
-                                                    in runNGLess $ lookUpColumns headers
+                            Just (!line_nr, ByteLine header) -> let headers = B8.split '\t' header
+                                                    in runNGLess $ lookUpColumns line_nr headers
                         CC.conduitVector 8192
                             .| asyncMapEitherC mapthreads (V.mapM (selectColumns cis)) -- after this we have vectors of (<gene name>, [<feature-name>])
                             .| sequenceSinks
@@ -676,9 +689,9 @@ loadFunctionalMap fname columns = do
                     Nothing -> (next + 1, M.insert n next curmap, next:ns')
 
 
-        lookUpColumns :: [B.ByteString] -> NGLess ([Int], [B.ByteString])
-        lookUpColumns [] = throwDataError ("Loading functional map file '" ++ fname ++ "': Header line missing!")
-        lookUpColumns headers = do
+        lookUpColumns :: Int -> [B.ByteString] -> NGLess ([Int], [B.ByteString])
+        lookUpColumns line_nr [] = throwDataError ("Loading functional map file '" ++ fname ++ "' (line " ++ show line_nr ++ "): Header line missing!")
+        lookUpColumns _ headers = do
             cis <- mapM (lookUpColumns' $ M.fromList (zip (tail headers) [0..])) columns
             return $ unzip $ sort $ zip cis columns
 
@@ -778,6 +791,7 @@ loadGFF gffFp opts = do
                                 VUM.write f i v
                             return f
 
+        -- update GffLoadingState
         insertg :: B.ByteString -- ^ feature
                         -> Maybe B.ByteString -- ^ subfeature
                         -> GffLoadingState
@@ -832,6 +846,10 @@ loadGFF gffFp opts = do
 
 
 
+-- annotateSamLineGFF: Annotate a SamLine with the annotation map taking into
+-- account the relevant options:
+--    - the intersection rules
+--    - the strandness rules
 annotateSamLineGFF :: CountOpts -> GFFAnnotationMap -> SamLine -> [Int]
 annotateSamLineGFF opts amap samline = case M.lookup rname amap of
         Nothing -> []
@@ -840,12 +858,16 @@ annotateSamLineGFF opts amap samline = case M.lookup rname amap of
         rname = samRName samline
         sStart = samPos samline
         sEnd   = sStart + samLength samline - 1
+        -- GffUnStranded matches everything (see 'filterStrand')
         lineStrand :: GffStrand
-        lineStrand
-            | optStrandSpecific opts = if isPositive samline
-                                            then GffPosStrand
-                                            else GffNegStrand
-            | otherwise = GffUnStranded
+        lineStrand = case optStrandMode opts of
+                            SMBoth -> GffUnStranded
+                            SMSense
+                                | isPositive samline -> GffPosStrand
+                                | otherwise -> GffNegStrand
+                            SMAntisense -- reverse strandness
+                                | isPositive samline -> GffNegStrand
+                                | otherwise -> GffPosStrand
 
 filterStrand :: GffStrand -> IM.IntervalMap Int [AnnotationInfo] -> IM.IntervalMap Int [AnnotationInfo]
 filterStrand GffUnStranded = id

@@ -6,6 +6,7 @@ Version 1.0.1+
 	* Add `include_fragments` option to orf_find
 	* Add early check for column headers in `count()`
 	* Update to LTS-14.1 (fixes #116)
+	* Add ``sense`` argument to `count()`
 
 Version 1.0.1 2019-07-05 by luispedro
 	* Fix bug with external modules and multiple fastQ inputs

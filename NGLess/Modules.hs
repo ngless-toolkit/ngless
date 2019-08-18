@@ -55,6 +55,7 @@ data ArgCheck =
             | ArgCheckFileReadable -- ^ file should be readable
             | ArgCheckFileWritable -- ^ file should be writeable (i.e., this is an output file)
             | ArgCheckMinVersion (Int, Int) -- ^ first version where this argument can be used
+            | ArgDeprecated (Int, Int) T.Text -- ^ deprecated since given version
             deriving (Eq,Show)
 
 -- | Checks for a function
