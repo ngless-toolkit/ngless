@@ -76,6 +76,7 @@ buildComment c ac rh = do
         buildAutoComment AutoResultHash = return [T.concat ["Output hash: ", rh]]
         addInitialIndent t = T.concat ["    ", t]
 
+-- Output a comment as a conduit
 commentC :: Monad m => B.ByteString -> [T.Text] -> C.ConduitT () B.ByteString m ()
 commentC cmarker cs = forM_ cs $ \c -> do
                                 C.yield cmarker
@@ -157,7 +158,7 @@ outputListLno :: OutputType      -- ^ Level at which to output
                     -> NGLessIO ()
 outputListLno ot lno ms = output ot (fromMaybe 0 lno) (concat ms)
 
--- | Output a message.
+-- | Output a message using the global line number.
 -- This function takes a list as it is often a more convenient interface
 outputListLno' :: OutputType      -- ^ Level at which to output
                     -> [String]   -- ^ output. Will be 'concat' together (without any spaces or similar in between)
@@ -313,9 +314,10 @@ writeOutputJSImages odir scriptName script = do
                     ,";\n"])
 
 
+-- | Writes QC stats to the given filepaths.
 writeOutputTSV :: Bool -- ^ whether to transpose matrix
-                -> Maybe FilePath
-                -> Maybe FilePath
+                -> Maybe FilePath -- ^ FastQ statistics
+                -> Maybe FilePath -- ^ Mapping statistics
                 -> IO ()
 writeOutputTSV transpose fqStatsFp mapStatsFp = do
         fqStats <- reverse <$> readIORef savedFQOutput
@@ -382,6 +384,8 @@ outputConfiguration = do
 
 type Diagram = D.QDiagram D.SVG D.V2 Double D.Any
 -- Draw a chart of the base qualities
+--
+-- The code is very empirical in magic numbers
 drawBaseQs :: FilePath -> [BPosInfo] -> IO ()
 drawBaseQs oname bpos = D.renderSVG oname (D.mkSizeSpec2D (Just (1200.0 :: Double)) (Just 800.0)) $
         D.padX 1.2 $ D.padY 1.1 $ D.centerXY $
