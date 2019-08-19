@@ -33,3 +33,4 @@ NGLess/Dependencies/megahit_data.c
 NGLess/Dependencies/minimap2_data.c
 NGLess/Dependencies/Versions.hs
 NGLess.cabal
+stack.yaml.lock
