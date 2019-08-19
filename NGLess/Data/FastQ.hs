@@ -13,7 +13,6 @@ module Data.FastQ
     , nBasepairs
     , srSlice
     , srLength
-    , encodingOffset
     , encodingName
     , fqDecodeVector
     , fqDecodeC
@@ -118,9 +117,16 @@ nBasepairs fqstats = sum $ map (sum . map toInteger . VU.toList) $ qualCounts fq
 minQualityValue :: Num a => a
 minQualityValue = -5
 
+-- short read length
+srLength :: ShortRead -> Int
 srLength = B.length . srSequence
 
-srSlice :: Int -> Int -> ShortRead -> ShortRead
+-- slice a short read
+srSlice ::
+        Int -- ^ start pos
+        -> Int -- ^ length of result
+        -> ShortRead
+        -> ShortRead
 srSlice s n (ShortRead rId rS rQ) = assert (B.length rS >= s + n) $ ShortRead rId (B.take n $ B.drop s rS) (VS.slice s n rQ)
 
 encodingOffset :: Num a => FastQEncoding -> a
@@ -190,14 +196,20 @@ fqDecodeC enc = C.awaitForever $ \(ByteLine rid) ->
 
 
 -- | Decode a vector of ByteLines into a vector of ShortReads.
-fqDecodeVector :: FastQEncoding -> V.Vector ByteLine -> NGLess (V.Vector ShortRead)
-fqDecodeVector enc vs
-        | V.length vs `mod` 4 /= 0 = throwDataError "Number of input lines in FastQ file is not a multiple of 4"
-        | otherwise = return $! V.generate (V.length vs `div` 4) parse1
+fqDecodeVector :: Int -- ^ line number of first line (for error messages)
+                -> FastQEncoding
+                -> V.Vector ByteLine
+                -> NGLess (V.Vector ShortRead)
+fqDecodeVector lno enc vs
+        | V.length vs `mod` 4 /= 0 = throwDataError $
+                                        "Number of input lines in FastQ file is not a multiple of 4 (" ++ (show $ 1 + lno + V.length vs) ++ " lines)"
+        | otherwise = runNGLess $! V.generateM (V.length vs `div` 4) parse1
     where
         offset :: Int8
         offset = encodingOffset enc
-        parse1 i = ShortRead rid rseq (vSub rqs offset)
+        parse1 i
+                | B.length rseq == B.length rqs = return $ ShortRead rid rseq (vSub rqs offset)
+                | otherwise = throwDataError $ "Length of quality line is not the same as sequence (line " ++ show (1 + i*4 + lno) ++ ")"
             where
                 rid  = unwrapByteLine $ vs V.! (i*4)
                 rseq = unwrapByteLine $ vs V.! (i*4 + 1)

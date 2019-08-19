@@ -68,6 +68,7 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
+import qualified Data.Conduit.Algorithms.Utils as CAlg
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile, asyncZstdTo)
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
@@ -437,7 +438,8 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
                 asSource (FastQFilePath enc f:rest) =
                         let input = conduitPossiblyCompressedFile f
                                 .| linesVC 4096
-                                .| asyncMapEitherC mapthreads (fqDecodeVector enc)
+                                .| CAlg.enumerateC
+                                .| asyncMapEitherC mapthreads (\(!i,v) -> fqDecodeVector (4096*i) enc v)
                         in do
                             if not qcInput
                                 then input
