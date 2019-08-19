@@ -24,7 +24,7 @@ import Output
 import NGLess.NGLEnvironment (NGLVersion(..), NGLEnvironment(..), nglEnvironment)
 import FileOrStream (FileOrStream(..))
 import FileManagement (makeNGLTempFile)
-import Utils.Conduit
+import Utils.Conduit (ByteLine(..), linesC, byteLineSinkHandle)
 
 executeCountFile :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeCountFile (NGOString st) _ = do

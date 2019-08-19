@@ -19,7 +19,16 @@ import Control.Monad.Trans.Resource (runResourceT)
 import NGLess (NGLessIO, testNGLessIO)
 
 
-import Interpretation.Count (performCount, MMMethod(..), loadFunctionalMap, CountOpts(..), annotationRule, AnnotationIntersectionMode(..), Annotator(..), NMode(..))
+import Interpretation.Count (performCount
+                            , MMMethod(..)
+                            , loadFunctionalMap
+                            , CountOpts(..)
+                            , AnnotationMode(..)
+                            , StrandMode(..)
+                            , annotationRule
+                            , AnnotationIntersectionMode(..)
+                            , Annotator(..)
+                            , NMode(..))
 import Interpretation.Substrim (substrim)
 import StandardModules.Parallel (pasteCounts)
 import Interpret (interpret)
@@ -59,7 +68,7 @@ countRights = loop (0 :: Int)
 rightOrDie (Right r) = r
 rightOrDie err = error $ "Expected Right, got: " ++ show err
 exampleSR :: ShortRead
-exampleSR = V.head . rightOrDie . fqDecodeVector SangerEncoding $ V.fromList
+exampleSR = V.head . rightOrDie . fqDecodeVector 0 SangerEncoding $ V.fromList
                 [ByteLine "@SRR867735.1 HW-ST997:253:C16APACXX:7:1101:2971:1948/1"
                 ,ByteLine "NCCGCTGCTCGGGATCAAGACATACCGCGGGGGGAGGGGAGCGGGACCAC"
                 ,ByteLine "+"
@@ -76,7 +85,8 @@ basicCountOpts = CountOpts
         { optFeatures = []
         , optSubFeatures = Nothing
         , optIntersectMode = annotationRule IntersectStrict
-        , optStrandSpecific = False
+        , optAnnotationMode = AnnotateSeqName
+        , optStrandMode = SMBoth
         , optMinCount = 0.0
         , optMMMethod = MMDist1
         , optDelim = "\t"

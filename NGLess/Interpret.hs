@@ -69,6 +69,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
 import qualified Data.Conduit.Algorithms.Utils as CAlg
+import qualified Data.Conduit.Algorithms.Async as CAlg
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile, asyncZstdTo)
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
@@ -439,7 +440,7 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
                         let input = conduitPossiblyCompressedFile f
                                 .| linesVC 4096
                                 .| CAlg.enumerateC
-                                .| asyncMapEitherC mapthreads (\(!i,v) -> fqDecodeVector (4096*i) enc v)
+                                .| CAlg.asyncMapEitherC mapthreads (\(!i,v) -> fqDecodeVector (4096*i) enc v)
                         in do
                             if not qcInput
                                 then input
@@ -454,8 +455,8 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
 
                 write nt h q =
                         writeAndContinue q
-                            .| asyncMapC nt (B.concat . map (fqEncode outenc) . V.toList)
-                            .| asyncGzipTo h
+                            .| CAlg.asyncMapC nt (B.concat . map (fqEncode outenc) . V.toList)
+                            .| CAlg.asyncGzipTo h
 
             let processpairs :: (V.Vector ShortRead, V.Vector ShortRead) -> NGLess (V.Vector ShortRead, V.Vector ShortRead, V.Vector ShortRead)
                 processpairs = liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles) . uncurry V.zip
@@ -465,7 +466,7 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
 
             C.runConduit $
                 zipSource2 (asSource (fst <$> pairs)) (asSource (snd <$> pairs))
-                    .| asyncMapEitherC mapthreads processpairs
+                    .| CAlg.asyncMapEitherC mapthreads processpairs
                     .| (void $ C.sequenceSinks
                         [CL.map (\(a,_,_) -> a) .| write mapthreads out1 q1
                         ,CL.map (\(_,a,_) -> a) .| write mapthreads out2 q2
@@ -474,7 +475,7 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variabl
 
             C.runConduit $
                 asSource singles
-                    .| asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . interpretPBlock1 block var))
+                    .| CAlg.asyncMapEitherC mapthreads (vMapMaybeLifted (runInterpretationRO env . interpretPBlock1 block var))
                     .| void (write mapthreads out3 q3)
 
             forM_ [k1, k2, k3] release
@@ -561,7 +562,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
                                 CC.takeWhileE (isSamHeaderString . unwrapByteLine)
                                 .| CL.map concatBytelines
                             readSamGroupsC' mapthreads paired
-                                .| asyncMapEitherC mapthreads (fmap concatLines . V.mapM (runInterpretationRO env . selectBlock doReinject))
+                                .| CAlg.asyncMapEitherC mapthreads (fmap concatLines . V.mapM (runInterpretationRO env . selectBlock doReinject))
                         .|  asyncZstdTo 3 ohandle
         return input { nglSamFile = File oname }
     where

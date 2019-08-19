@@ -8,7 +8,7 @@ module BuiltinModules.Remove
     ) where
 
 import qualified Data.Text as T
-import Control.Monad
+import Control.Monad (forM_)
 import Data.Default (def)
 
 import Data.FastQ

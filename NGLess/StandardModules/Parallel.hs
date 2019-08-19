@@ -35,6 +35,7 @@ import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.TQueue as CA
 import qualified Data.Conduit.Algorithms as CAlg
+import qualified Data.Conduit.Algorithms.Async as CAlg
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import           Control.Monad.ST (runST)
 import           Control.Monad.Except (throwError)
@@ -211,7 +212,7 @@ executeCollect (NGOCounts istream) kwargs = do
         .| CC.concat
         .| CL.map unwrapByteLine
         .| C.unlinesAscii
-        .| asyncGzipTo gzout
+        .| CAlg.asyncGzipTo gzout
     let partialfile entry = hashdir </> "partial." ++ T.unpack entry <.> "tsv.gz"
     liftIO $ do
         hClose gzout
@@ -463,7 +464,7 @@ pasteCounts comments matchingRows headers inputs
                     return (CA.sourceTBMQueue ch, a)
                 C.runConduit $
                     C.sequenceSources (fst <$> channels)
-                    .| asyncMapEitherC numCapabilities (sequence >=> concatPartials)
+                    .| CAlg.asyncMapEitherC numCapabilities (sequence >=> concatPartials)
                     .| CL.map BB.lazyByteString
                     .| CB.sinkHandleBuilder hout
                 forM_ (snd <$> channels) (liftIO . A.wait)

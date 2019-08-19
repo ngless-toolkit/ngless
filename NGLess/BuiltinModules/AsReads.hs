@@ -15,6 +15,7 @@ import qualified Data.Vector as V
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
+import qualified Data.Conduit.Algorithms.Async as CAlg
 import Control.Monad.Trans.Resource (release)
 import Data.Conduit ((.|))
 import Control.Monad.Except
@@ -34,7 +35,7 @@ import Modules
 import Output
 import NGLess
 import FileOrStream
-import Utils.Conduit
+import Utils.Conduit (ByteLine(..))
 
 executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeReads (NGOMappedReadSet name istream _) _ = NGOReadSet name <$> uncurry samToFastQ (asSamStream istream)
@@ -58,7 +59,7 @@ samToFastQ fpsam stream = do
                     empty <- CC.nullE
                     unless empty $
                         liftIO (writeIORef var True)
-                    CC.concat .| asyncGzipTo out
+                    CC.concat .| CAlg.asyncGzipTo out
     numCapabilities <- liftIO getNumCapabilities
     [(),(),()] <- C.runConduit $
         stream

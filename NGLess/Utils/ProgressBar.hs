@@ -9,7 +9,7 @@ module Utils.ProgressBar
 
 import Text.Printf
 import System.IO
-import Control.Monad
+import Control.Monad (when)
 
 data ProgressBar = ProgressBar
     { pbarName :: String

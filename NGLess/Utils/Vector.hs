@@ -1,3 +1,7 @@
+{- Copyright 2015-2019 NGLess Authors
+ - License: MIT
+ -}
+
 module Utils.Vector
  ( unsafeIncrement
  , unsafeIncrement'
@@ -10,14 +14,13 @@ module Utils.Vector
  , binaryFindBy
 
  , sortParallel
- , mergeSorted
 
  , withVector
  ) where
 
-import Control.Monad
-import Control.Monad.Primitive
-import Control.Monad.IO.Class
+import           Control.Monad (guard)
+import           Control.Monad.Primitive (PrimMonad(..))
+import           Control.Monad.IO.Class (MonadIO(..), liftIO)
 import qualified Control.Concurrent.Async as A
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
@@ -26,13 +29,15 @@ import qualified Data.Vector.Unboxed.Mutable as VUM
 import qualified Data.Vector.Generic.Mutable as VGM
 import           Data.Vector.Algorithms.Intro (sortByBounds)
 
-import Utils.Utils (mapMaybeM)
-
+-- | increment by 1
 unsafeIncrement :: (Num a, PrimMonad m, VUM.Unbox a) => VUM.MVector (PrimState m) a -> Int -> m ()
 unsafeIncrement v i = unsafeIncrement' v i 1
+{-# INLINE unsafeIncrement #-}
 
+-- | increment by given value
 unsafeIncrement' :: (Num a, PrimMonad m, VUM.Unbox a) => VUM.MVector (PrimState m) a -> Int -> a -> m ()
 unsafeIncrement' v i inc = VUM.unsafeModify v (+ inc) i
+{-# INLINE unsafeIncrement' #-}
 
 binarySearch :: (Ord a) => V.Vector a -> a -> Int
 binarySearch v = binarySearchByRange 0 (V.length v) compare v
@@ -99,25 +104,6 @@ pivot v start end = do
 
 unstablePartition f v start end = (+ start) <$> VGM.unstablePartition f (VM.unsafeSlice start (end - start) v)
 
-
-mergeSorted :: (Ord a) => [V.Vector a] -> V.Vector a
-mergeSorted = mergeSorted' . filter (not . null)
-mergeSorted' [] = V.empty
-mergeSorted' [v] = v
-mergeSorted' vs = V.create $ do
-    let n = sum (map V.length vs)
-        vsv = V.fromList vs
-    r <- VM.new n
-    pos <- VUM.replicate (V.length vsv) (0 :: Int)
-    forM_ [0 .. n - 1] $ \ri -> do
-        (val, i) <- minimum <$> (flip mapMaybeM [0 .. VUM.length pos - 1] $ \j -> do
-            p <- VUM.read pos j
-            return $! if p >= V.length (vsv V.! j)
-                then Nothing
-                else Just ((vsv V.! j) V.! p, j))
-        VUM.modify pos (+1) i
-        VM.write r ri val
-    return r
 
 withVector :: (MonadIO m, VUM.Unbox a) => VUM.IOVector a -> (VU.Vector a -> b) -> m b
 withVector v f = liftIO $ do

@@ -17,6 +17,7 @@ import qualified Data.Conduit.Tar as CTar
 import qualified Data.ByteString.Char8 as B
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Simple as HTTPSimple
+import           Data.Conduit.Algorithms.Utils (awaitJust)
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 
 import qualified Data.Conduit.Binary as CB
@@ -26,7 +27,6 @@ import System.FilePath
 
 import Output
 import NGLess
-import Utils.Conduit
 import Utils.ProgressBar
 
 downloadOrCopyFile :: FilePath -> FilePath -> NGLessIO ()

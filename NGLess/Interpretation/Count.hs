@@ -39,6 +39,7 @@ import qualified Data.Set as S
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Algorithms.Async as CAlg
 import qualified Data.Conduit.Algorithms.Utils as CAlg
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import           Data.Conduit ((.|))
@@ -397,7 +398,7 @@ annSamHeaderParser mapthreads anns opts = lineGroups .| sequenceSinks (map annSa
     where
         annSamHeaderParser1 (SeqNameAnnotator Nothing) = do
             rfvm <- liftIO RSV.newRefSeqInfoVector
-            asyncMapEitherC mapthreads (\(!vi, v) -> V.imapM (\ix ell -> seqNameSize (vi*32768+ix, ell)) v)
+            CAlg.asyncMapEitherC mapthreads (\(!vi, v) -> V.imapM (\ix ell -> seqNameSize (vi*32768+ix, ell)) v)
                 .| CL.mapM_ (\v -> liftIO $
                                     V.forM_ v $ \(RSV.RefSeqInfo n val) ->
                                         RSV.insert rfvm n val)
@@ -408,7 +409,7 @@ annSamHeaderParser mapthreads anns opts = lineGroups .| sequenceSinks (map annSa
         annSamHeaderParser1 (GeneMapAnnotator tag gmap isizes)
             | optNormMode opts == NMNormed = do
                 msizes <- liftIO $ RSV.unsafeThaw isizes
-                asyncMapEitherC mapthreads (\(!vi,headers) -> flattenVs <$> V.imapM (\ix ell -> indexUpdates gmap (vi*32768+ix, ell)) headers)
+                CAlg.asyncMapEitherC mapthreads (\(!vi,headers) -> flattenVs <$> V.imapM (\ix ell -> indexUpdates gmap (vi*32768+ix, ell)) headers)
                     .| CL.mapM_ (liftIO . updateSizes msizes)
                 GeneMapAnnotator tag gmap <$> liftIO (RSV.unsafeFreeze msizes)
         annSamHeaderParser1 ann = CC.sinkNull >> return ann
@@ -501,7 +502,7 @@ performCount istream gname annotators0 opts = do
                     liftIO $ VUM.replicate n_entries (0.0 :: Double)
                 toDistribute <-
                     readSamGroupsC' mapthreads True
-                        .| asyncMapEitherC mapthreads (\samgroup -> forM annotators $ \ann -> do
+                        .| CAlg.asyncMapEitherC mapthreads (\samgroup -> forM annotators $ \ann -> do
                                                                     annotated <- V.mapM (annotateReadGroup opts ann) samgroup
                                                                     return $ splitSingletons method annotated)
                         .| sequenceSinks [CL.map (!! i) .| performCount1Pass method mc | (i,mc) <- zip [0..] mcounts]
@@ -660,7 +661,7 @@ loadFunctionalMap fname columns = do
                             Just (!line_nr, ByteLine header) -> let headers = B8.split '\t' header
                                                     in runNGLess $ lookUpColumns line_nr headers
                         CC.conduitVector 8192
-                            .| asyncMapEitherC mapthreads (V.mapM (selectColumns cis)) -- after this we have vectors of (<gene name>, [<feature-name>])
+                            .| CAlg.asyncMapEitherC mapthreads (V.mapM (selectColumns cis)) -- after this we have vectors of (<gene name>, [<feature-name>])
                             .| sequenceSinks
                                 [finishFunctionalMap (getTag tags c) <$> CL.fold (V.foldl' (inserts1 c)) (LoadFunctionalMapState 0 M.empty M.empty)
                                         | c <- [0 .. length cis - 1]])

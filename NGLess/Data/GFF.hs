@@ -1,21 +1,20 @@
+{- Copyright 2013-2019 NGLess Authors
+ - License: MIT -}
 {-# LANGUAGE CPP #-}
 
 module Data.GFF
     ( GffLine(..)
     , GffStrand(..)
     , readGffLine
-    , gffId
 #if IS_BUILDING_TEST
     , _parseGffAttributes
     , _trimString
 #endif
     ) where
 
-import Data.Maybe
 import Control.Monad
 import Control.DeepSeq
 import           Control.Arrow (second)
-import           Control.Applicative ((<|>))
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
@@ -46,8 +45,6 @@ instance NFData GffLine where
     -- All but the score and attrs are bang annotated
     rnf GffLine{ gffScore = sc, gffAttrs = attrs } = rnf sc `seq` rnf attrs
 
-gffId GffLine { gffAttrs = attrs } = fromMaybe "unknown" (lookup "ID" attrs <|> lookup "gene_id" attrs)
-
 _parseGffAttributes :: B.ByteString -> [(B.ByteString, B.ByteString)]
 _parseGffAttributes = foldMap (\(a, b) -> zip (repeat a) (B8.split ',' b))
                         . map (second (B8.filter (/='\"') . B.tail))
@@ -59,9 +56,11 @@ _parseGffAttributes = foldMap (\(a, b) -> zip (repeat a) (B8.split ',' b))
 
     where
         removeLastDel :: B8.ByteString -> B8.ByteString
-        removeLastDel s = case B8.last s of
-            ';' -> B8.init s
-            _   -> s
+        removeLastDel s
+            | B.null s = s
+            | otherwise = case B8.last s of
+                ';' -> B8.init s
+                _   -> s
 
 --Check if the atribution tag is '=' or ' '
 checkAttrTag :: B.ByteString -> Char

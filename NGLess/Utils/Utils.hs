@@ -1,4 +1,4 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -16,7 +16,6 @@ module Utils.Utils
     , passthrough
     , moveOrCopy
     , secondM
-    , headtails
     , dropEnd
     , withOutputFile
     ) where
@@ -31,8 +30,8 @@ import System.IO.Error
 import Control.Exception
 import GHC.IO.Exception (IOErrorType(..))
 
-import Data.List (group, uncons, tails)
-import Data.Maybe (fromMaybe, catMaybes, mapMaybe)
+import Data.List (group)
+import Data.Maybe (fromMaybe, catMaybes)
 #ifdef WINDOWS
 import           System.AtomicWrite.Internal (tempFileFor, closeAndRename)
 #else
@@ -105,9 +104,6 @@ findM (x:xs) f = f x >>= \case
 
 secondM :: Monad m => (a -> m b) -> (c,a) -> m (c,b)
 secondM f (a,c) = (a,) <$> f c
-
-headtails :: [a] -> [(a,[a])]
-headtails = mapMaybe uncons . tails
 
 dropEnd :: Int -> [a] -> [a]
 dropEnd v a = take (length a - v) a -- take of a negative is the empty sequence, which is correct in this case

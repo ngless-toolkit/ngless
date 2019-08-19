@@ -31,6 +31,8 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Lift as C
 import qualified Data.Conduit as C
+import           Data.Conduit.Algorithms.Async as CAlg
+import           Data.Conduit.Algorithms.Utils (awaitJust)
 import qualified Data.Conduit.Combinators as CC
 import           Data.Conduit ((.|))
 import qualified Data.Vector as V
@@ -45,7 +47,7 @@ import Data.Maybe
 import Control.Monad.Except
 import NGLess.NGError
 import Utils.Utils
-import Utils.Conduit
+import Utils.Conduit (ByteLine(..))
 
 
 type SamGroup = [SamLine]
@@ -73,9 +75,11 @@ instance NFData SamLine where
 
 isHeader SamHeader{} = True
 isHeader SamLine{} = False
+{-# INLINE isHeader #-}
 
 samLength :: SamLine -> Int
 samLength = B8.length . samSeq
+{-# INLINE samLength #-}
 
 -- log 2 of N
 -- 4 -> 2
@@ -103,6 +107,7 @@ isSecondInPair = (`testBit` 7) . samFlag
 
 isSamHeaderString :: B.ByteString -> Bool
 isSamHeaderString s = not (B.null s) && (B.head s == 64) -- 64 is '@'
+{-# INLINE isSamHeaderString #-}
 
 hasSequence :: SamLine -> Bool
 hasSequence SamHeader{} = False

@@ -1,4 +1,6 @@
-{-# LANGUAGE FlexibleContexts #-}
+{- Copyright 2016-2019 NGLess Authors
+ - License: MIT
+ -}
 module NGLess.NGLEnvironment
     ( NGLVersion(..)
     , NGLEnvironment(..)
@@ -18,7 +20,7 @@ import Data.IORef
 
 import NGLess.NGError
 import Configuration
-import CmdArgs
+import CmdArgs (Verbosity(..))
 
 data NGLVersion = NGLVersion !Int !Int
                         deriving (Eq, Show)

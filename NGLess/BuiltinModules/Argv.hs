@@ -1,4 +1,4 @@
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2015-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -7,7 +7,7 @@ module BuiltinModules.Argv
     ) where
 
 import qualified Data.Text as T
-import Data.Default
+import           Data.Default (def)
 
 import Language
 

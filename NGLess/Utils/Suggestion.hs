@@ -10,12 +10,12 @@ module Utils.Suggestion
     ) where
 
 import qualified Data.Text as T
-import           Text.EditDistance
-import           Control.Monad
-import           Control.Applicative
+import qualified Text.EditDistance as TED
+import           Control.Monad (msum, guard)
+import           Control.Applicative ((<|>))
 import           System.IO.Error (catchIOError)
 import           System.FilePath (takeDirectory)
-import           System.Directory
+import           System.Directory (doesFileExist, getDirectoryContents, getPermissions, readable)
 
 data Suggestion = Suggestion
                         !T.Text
@@ -46,7 +46,7 @@ findSuggestion used possible = matchCase <|> bestMatch
             return $! Suggestion s "closest match"
 
 dist :: T.Text -> T.Text -> Int
-dist a b = levenshteinDistance defaultEditCosts (T.unpack a) (T.unpack b)
+dist a b = TED.levenshteinDistance TED.defaultEditCosts (T.unpack a) (T.unpack b)
 
 -- | Like 'findSuggestion': If there is a possible suggestion for the given
 -- input, returns a possible message for the user (or empty if no suggestion is

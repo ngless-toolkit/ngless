@@ -1,13 +1,16 @@
 {- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
+{-# LANGUAGE CPP #-}
 
 module Parse
     ( parsengless
+#ifdef IS_BUILDING_TEST
     , _nglbody
     , _cleanupindents
     , _indexexpr
     , _listexpr
+#endif
     ) where
 
 import Control.Monad

@@ -22,13 +22,15 @@ import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import           Data.Conduit ((.|))
+import           Data.Conduit.Algorithms.Utils (awaitJust)
+import qualified Data.Conduit.Algorithms.Async as CAlg
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 
 import FileManagement (createTempDir, makeNGLTempFile)
 import Data.FastQ
 import NGLess
 import Language
-import Utils.Conduit
+import Utils.Conduit (linesC)
 import Output
 
 import qualified Data.HashTable.IO as H
@@ -63,7 +65,7 @@ performUnique fname enc mc = do
             C.runConduit $
                 readNFiles enc mc dest
                     .| fqEncodeC enc
-                    .|  asyncGzipTo h
+                    .| CAlg.asyncGzipTo h
     where
         multiplex k fhs r = liftIO $
                 B.hPutStr (fhs V.! hashRead k r) (fqEncode enc r)

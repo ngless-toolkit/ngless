@@ -55,7 +55,7 @@ import NGLess.NGLEnvironment
 import NGLess.NGError
 import Dependencies.Embedded
 import Utils.LockFile
-import Utils.Utils
+import Utils.Utils (withOutputFile)
 
 
 data InstallMode = User | Root deriving (Eq, Show)
@@ -255,18 +255,6 @@ createMegahitBin = do
                 Tar.Directory -> return ()
                 _ -> throwSystemError ("Unexpected entry in megahit tarball: " ++ show e)
             unpackMegahit destdir next
-
-
-
-copyDir ::  FilePath -> FilePath -> IO ()
-copyDir src dst = do
-  createDirectoryIfMissing False dst
-  xs <- filter (`notElem` [".", ".."]) <$> getDirectoryContents src
-  forM_ xs $ \n -> do
-    exists <- doesDirectoryExist (src </> n)
-    if exists
-        then copyDir  (src </> n) (dst </> n)
-        else copyFile (src </> n) (dst </> n)
 
 
 binPath :: InstallMode -> NGLessIO FilePath

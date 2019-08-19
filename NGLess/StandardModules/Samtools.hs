@@ -17,6 +17,8 @@ import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
 import qualified Data.Text as T
 import qualified Control.Concurrent.Async as A
+import           Data.List (uncons, tails)
+import           Data.Maybe (mapMaybe)
 
 
 import System.FilePath
@@ -25,7 +27,7 @@ import System.Exit
 import System.IO
 
 import Control.Monad.IO.Class (liftIO)
-import Data.Default
+import Data.Default (def)
 import Data.Semigroup ((<>))
 
 import FileManagement
@@ -36,9 +38,12 @@ import Modules
 import Output
 import NGLess
 
-import Utils.Conduit
-import Utils.Utils
+import Utils.Conduit (byteLineVSinkHandle)
+import Utils.Utils (passthrough)
 
+
+headtails :: [a] -> [(a,[a])]
+headtails = mapMaybe uncons . tails
 
 -- This function is necessary because we cannot call readProcessWithErrorCode directly (see comment below)
 callSamtools :: FileOrStream -> [String] -> Handle -> NGLessIO ExitCode

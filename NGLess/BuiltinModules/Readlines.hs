@@ -1,4 +1,4 @@
-{- Copyright 2016-2017 NGLess Authors
+{- Copyright 2016-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -13,23 +13,23 @@ import qualified Data.Text as T
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.List as CL
-import qualified Data.Conduit.Binary as CB
-import Data.Conduit ((.|))
-import Data.Default
+import           Data.Conduit ((.|))
+import           Data.Default (def)
 
 import Language
 
 import Modules
 import NGLess
+import Utils.Conduit (ByteLine(..), linesC)
 
 executeReadlines :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeReadlines (NGOString fname) _ = do
     content <-
         C.runConduit $ (CC.sourceFile (T.unpack fname) `C.catchC` (\(e :: IOError) ->
                                             throwDataError ("Could not read file '"++T.unpack fname++"': " ++ show e)))
-            .| CB.lines
+            .| linesC
             .| CL.consume
-    return $! NGOList [NGOString (T.pack . B8.unpack $ ell) | ell <- content]
+    return $! NGOList [NGOString (T.pack . B8.unpack $ ell) | ByteLine ell <- content]
 executeReadlines arg _ = throwShouldNotOccur ("executeReadlines called with argument: " ++ show arg)
 
 readlines_Function = Function

@@ -7,14 +7,12 @@ module Data.Fasta
     , faseqLength
     , faConduit
     , faWriteC
-    , faWriteConduit
     ) where
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
-import qualified Data.Conduit.Combinators as C
 import           Data.Word
 import           Control.Monad.Except
 import           Control.DeepSeq
@@ -32,6 +30,7 @@ instance NFData FastaSeq where
 
 faseqLength :: FastaSeq -> Int
 faseqLength = B.length . seqdata
+{-# INLINE faseqLength #-}
 
 greaterThanSign :: Word8
 greaterThanSign = 62
@@ -63,6 +62,3 @@ faWriteC = C.awaitForever $ \(FastaSeq h s) -> do
     C.yield "\n"
     C.yield s
     C.yield "\n"
-
-faWriteConduit :: (Monad m) => [FastaSeq] -> C.ConduitT () B.ByteString m ()
-faWriteConduit fas = C.yieldMany fas .| faWriteC

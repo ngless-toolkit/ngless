@@ -1,7 +1,7 @@
 {- Copyright 2013-2018 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE RecordWildCards, CPP #-}
+{-# LANGUAGE RecordWildCards #-}
 module Configuration
     ( NGLessConfiguration(..)
     , ColorSetting(..)

@@ -6,26 +6,16 @@ module Utils.Conduit
     ( ByteLine(..)
     , byteLineSinkHandle
     , byteLineVSinkHandle
-    , asyncMapC
-    , asyncMapEitherC
-    , linesUnBoundedC
     , linesC
     , linesVC
-    , awaitJust
-    , asyncGzipTo
-    , asyncGzipToFile
-    , asyncGzipFrom
-    , asyncGzipFromFile
     , zipSink2
     , zipSource2
     ) where
 
 import qualified Data.ByteString as B
 
-import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import           Data.Conduit ((.|))
 import qualified Data.Vector         as V
 import qualified Data.Vector.Mutable as VM
 
@@ -33,9 +23,6 @@ import           Control.Monad (when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Error.Class (MonadError(..))
 import           System.IO
-
-import           Data.Conduit.Algorithms.Utils (awaitJust)
-import           Data.Conduit.Algorithms.Async
 
 import NGLess.NGError
 
@@ -115,14 +102,6 @@ linesVC nlines = do
                         splitWrite done vec (vix + 1) 0 [] (B.tail rest)
 {-# INLINE linesVC #-}
 
-linesUnBoundedC :: (Monad m) => C.ConduitT B.ByteString ByteLine m ()
-linesUnBoundedC =
-    CB.lines
-        .| CL.map lineWindowsTerminated
-        .| CL.map ByteLine
-{-# INLINE linesUnBoundedC #-}
-
-
 
 byteLineSinkHandle :: (MonadIO m) => Handle -> C.ConduitT ByteLine C.Void m ()
 byteLineSinkHandle h = CL.mapM_ (\(ByteLine val) -> liftIO (B.hPut h val >> B.hPut h nl))
@@ -130,15 +109,18 @@ byteLineSinkHandle h = CL.mapM_ (\(ByteLine val) -> liftIO (B.hPut h val >> B.hP
         nl = B.singleton 10
 {-# INLINE byteLineSinkHandle #-}
 
+
 byteLineVSinkHandle :: (MonadIO m) => Handle -> C.ConduitT (V.Vector ByteLine) C.Void m ()
 byteLineVSinkHandle h = CL.mapM_ $ liftIO . V.mapM_ (\(ByteLine val) -> B.hPut h val >> B.hPut h nl)
     where
         nl = B.singleton 10
 {-# INLINE byteLineVSinkHandle #-}
 
+
 zipSource2 :: Monad m => C.ConduitT () a m () -> C.ConduitT () b m () -> C.ConduitT () (a,b) m ()
 zipSource2 a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
 {-# INLINE zipSource2 #-}
+
 
 zipSink2 :: (Monad m) => C.ConduitT i C.Void m a -> C.ConduitT i C.Void m b -> C.ConduitT i C.Void m (a,b)
 zipSink2 a b = C.getZipSink((,) <$> C.ZipSink a <*> C.ZipSink b)

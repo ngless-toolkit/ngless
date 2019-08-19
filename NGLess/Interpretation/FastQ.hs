@@ -25,6 +25,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Control.Concurrent.Async as A
 import           Data.Conduit ((.|))
+import           Data.Conduit.Algorithms.Utils (awaitJust)
+import qualified Data.Conduit.Algorithms.Async as CAlg
 import           Data.Conduit.Algorithms.Async (withPossiblyCompressedFile)
 import           Control.Monad.Trans.Resource (runResourceT)
 import Control.Exception (try)
@@ -37,7 +39,7 @@ import Data.FastQ
 import Configuration
 import Language
 import Output
-import Utils.Conduit
+import Utils.Conduit (ByteLine(..), linesC)
 import NGLess
 import NGLess.NGLEnvironment
 
@@ -87,8 +89,8 @@ checkNoContent fp = runResourceT $ withPossiblyCompressedFile fp $ \src ->
         .| CL.fold (\_ _ -> False) True
 
 
--- | Drop every tenth FastQ group
-drop10 = loop (0 :: Int)
+-- | Drop 90% of FastQ entries (keep only the first of every 10)
+drop90 = loop (0 :: Int)
     where
         loop 40 = loop 0
         loop !n = awaitJust $ \line -> do
@@ -102,10 +104,10 @@ performSubsample f h = do
         C.runConduit $
             src
             .| CB.lines
-            .| drop10
+            .| drop90
             .| C.take 100000
             .| C.unlinesAscii
-            .| asyncGzipTo h
+            .| CAlg.asyncGzipTo h
     hClose h
 
 optionalSubsample :: FilePath -> NGLessIO FilePath

@@ -10,8 +10,8 @@ module BuiltinModules.Checks
     ) where
 
 import qualified Data.Text as T
+import           Data.Default (def)
 import Control.Monad.Except
-import Data.Default
 import System.Directory
 import System.FilePath (takeDirectory)
 
