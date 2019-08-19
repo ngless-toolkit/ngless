@@ -648,29 +648,32 @@ write
 Writes an object to disk.
 
 
-ReadSet
-~~~~~~~
-
 Argument:
-#########
+~~~~~~~~~
 
 Any
 
 Return:
-#######
+~~~~~~~
 
 Void
 
 Arguments by value:
-###################
+~~~~~~~~~~~~~~~~~~~
 
-+---------+-------------+------------+----------------+
-| Name    | Type        | Required   | Default Value  |
-+=========+=============+============+================+
-| ofile   | String      | yes        | -              |
-+---------+-------------+------------+----------------+
-| format  | String      | no         | -              |
-+---------+-------------+------------+----------------+
++---------------+-------------+------------+----------------+
+| Name          | Type        | Required   | Default Value  |
++===============+=============+============+================+
+| ofile         | String      | yes        | -              |
++---------------+-------------+------------+----------------+
+| format        | String      | no         | -              |
++---------------+-------------+------------+----------------+
+| format\_flags | [Symbol]    | no         | []             |
++---------------+-------------+------------+----------------+
+| comment       | String      | no         | -              |
++---------------+-------------+------------+----------------+
+| auto_comments | String      | no         | -              |
++---------------+-------------+------------+----------------+
 
 The argument ``ofile`` is where to write the content.
 
@@ -680,6 +683,25 @@ The output format is typically determined from the ``ofile`` extension, but the
 - CountsTable: ``{tsv}`` (default) or ``{csv}``: use TAB or COMMA as a delimiter
 - MappedReadSet: ``{sam}`` (default) or ``{bam}``
 - ReadSet: FastQ format, optionally compressed (depending on the extension).
+
+By default, ReadSets are written a set of one to three FastQ files (2 files for
+the paired-end reads, and one file for the single-end ones, with empty files
+omitted). ``format\_flags`` (since NGLess 0.7) currently supports only
+``{interleaved}`` to output an interleaved FastQ file instead.
+
+Compression is inferred from the ``ofile`` argument:
+
+- ``.gz``: gzip compression
+- ``.bz2``: bzip2 compression
+- ``.xz``: xz compression
+- ``.zstd``: ZStandard compression (since NGLess 1.1)
+
+Comments can be added with the ``comment`` argument (a free form string), or a
+list of ``auto\_comments``:
+
+- ``{date}``: date the script was run,
+- ``{script}``: script that generated the output,
+- ``{hash}``: machine readable hash of the computation leading to this output.
 
 print
 -----
