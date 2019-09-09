@@ -200,6 +200,27 @@ Converts from a ``MappedReadSet`` to a ``ReadSet``::
     reads = as_reads(samfile('input.sam'))
 
 
+discard_singles
+---------------
+
+.. since :: NGLess 1.1
+
+Throws away unpaired reads from a ``ReadSet``::
+
+    reads = discard_singles(reads)
+
+
+Argument
+~~~~~~~~
+
+ReadSet
+
+Returns
+~~~~~~~
+
+ReadSet
+
+
 unique
 ------
 

@@ -41,6 +41,10 @@ executeReads :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeReads (NGOMappedReadSet name istream _) _ = NGOReadSet name <$> uncurry samToFastQ (asSamStream istream)
 executeReads arg _ = throwShouldNotOccur ("executeReads called with argument: " ++ show arg)
 
+executeDiscardSingles :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeDiscardSingles (NGOReadSet meta (ReadSet paired _)) [] = return (NGOReadSet meta (ReadSet paired []))
+executeDiscardSingles arg _ = throwShouldNotOccur ("executeDiscardSingles called with argument: " ++ show arg)
+
 data FQResult = NoResult
                 | Single !B.ByteString
                 | Paired !B.ByteString !B.ByteString
@@ -128,10 +132,24 @@ as_reads_Function = Function
     , funcChecks = [FunctionCheckReturnAssigned]
     }
 
+discard_singles_Function = Function
+    { funcName = FuncName "discard_singles"
+    , funcArgType = Just NGLReadSet
+    , funcArgChecks = []
+    , funcRetType = NGLReadSet
+    , funcKwArgs = []
+    , funcAllowsAutoComprehension= True
+    , funcChecks = [FunctionCheckMinNGLessVersion (1,1)
+                   ,FunctionCheckReturnAssigned]
+    }
+
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ = return def
     { modInfo = ModInfo "builtin.as_reads" "0.0"
-    , modFunctions = [as_reads_Function]
-    , runFunction = const executeReads
+    , modFunctions = [as_reads_Function, discard_singles_Function]
+    , runFunction = \case
+                        "as_reads" -> executeReads
+                        "discard_singles" -> executeDiscardSingles
+                        _ -> error "NOT POSSIBLE"
     }
 
