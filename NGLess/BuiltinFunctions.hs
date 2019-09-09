@@ -124,7 +124,7 @@ mapArgs =
     ,ArgInformation "mode_all" False NGLBool []
     ,ArgInformation "mapper" False NGLString []
     ,ArgInformation "block_size_megabases" False NGLInteger []
-    ,ArgInformation "__extra_bwa" False (NGList NGLString) []
+    ,ArgInformation "__extra_args" False (NGList NGLString) [ArgCheckMinVersion (1,1)]
     ,ArgInformation "__oname" False NGLString []
     ]
 

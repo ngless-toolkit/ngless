@@ -265,7 +265,7 @@ executeMap :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeMap fqs args = do
     ref <- lookupReference args
     oAll <- lookupBoolOrScriptErrorDef (return False) "map() call" "mode_all" args
-    extraArgs <- map T.unpack <$> lookupStringListOrScriptErrorDef (return []) "extra bwa arguments" "__extra_bwa_args" args
+    extraArgs <- map T.unpack <$> lookupStringListOrScriptErrorDef (return []) "extra mapper arguments" "__extra_args" args
     mapperName <- lookupStringOrScriptErrorDef (return "bwa") "map() call" "mapper" args
     blockSize <- lookupIntegerOrScriptErrorDef (return 0) "map() call" "block_size_megabases" args
     mapper <- getMapper mapperName

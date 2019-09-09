@@ -8,6 +8,7 @@ Version 1.0.1+
 	* Update to LTS-14.1 (fixes #116)
 	* Add ``sense`` argument to `count()`
 	* Add line numbers to FastQ parsing errors
+	* Fix __extra_args argument in map()
 
 Version 1.0.1 2019-07-05 by luispedro
 	* Fix bug with external modules and multiple fastQ inputs

@@ -304,6 +304,8 @@ Arguments by value:
 +------------------------+-------------+------------+----------------+
 | mode_all               | Bool        | no         | -              |
 +------------------------+-------------+------------+----------------+
+| __extra_args           | [String]    | no         | []             |
++------------------------+-------------+------------+----------------+
 
 The user must provide either a path to a FASTA file in the ``fafile`` argument
 or the name of a builtin reference using the ``reference`` argument. The
@@ -324,6 +326,8 @@ corresponding section in the `mapping documentation <mapping.html>`__)
 
 The option ``mode_all=True`` can be passed to include all alignments of both
 single and paired-end reads in the output SAM/BAM.
+
+Strings passed as ``__extra_args`` will be passed verbatim to the mapper.
 
 mapstats
 --------
