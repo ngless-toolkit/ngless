@@ -9,24 +9,19 @@ module StandardModules.Mappers.Minimap2
     , callMapper
     ) where
 
-import           System.Process (proc, readProcessWithExitCode)
-import           System.Exit (ExitCode(..))
 import           System.Directory (doesFileExist)
 import           System.Path (splitExt)
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.Vector as V
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy.Char8 as BL8
 
-import qualified Data.Conduit.Process as CP
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit as C
-import qualified UnliftIO as U
 import           Data.Conduit ((.|))
 import           Data.Conduit.Algorithms (mergeC)
-import           GHC.Conc (getNumCapabilities, setNumCapabilities)
+import           GHC.Conc (getNumCapabilities)
 import           Control.Monad.Trans.Class (lift)
 
 import Data.FastQ
@@ -38,6 +33,7 @@ import Dependencies.Versions (minimap2Version)
 import NGLess.NGLEnvironment
 import Utils.Vector (sortParallel)
 import Utils.Conduit (linesC, ByteLine(..))
+import Utils.Process (runProcess)
 import FileManagement (makeNGLTempFile, minimap2Bin)
 
 indexName :: FilePath -> FilePath
@@ -51,13 +47,11 @@ createIndex :: FilePath -> NGLessIO ()
 createIndex fafile = do
     outputListLno' InfoOutput ["Start minimap2 index creation for ", fafile]
     minimap2Path <- minimap2Bin
-    (exitCode, out, err) <- liftIO $
-        readProcessWithExitCode minimap2Path [fafile, "-d", indexName fafile] []
-    outputListLno' DebugOutput ["minimap2-index stderr: ", err]
-    outputListLno' DebugOutput ["minimap2-index stdout: ", out]
-    case exitCode of
-        ExitSuccess -> return ()
-        ExitFailure _err -> throwSystemError err
+    runProcess
+        minimap2Path
+        [fafile, "-d", indexName fafile]
+        (return ())
+        (Left ())
 
 callMapper :: FilePath -> ReadSet -> [String] -> C.ConduitT B.ByteString C.Void NGLessIO a -> NGLessIO a
 callMapper refIndex rs extraArgs outC = do
@@ -68,32 +62,13 @@ callMapper refIndex rs extraArgs outC = do
     let minimap2threads
             | strictThreads && numCapabilities > 1 = numCapabilities - 1
             | otherwise = numCapabilities
-        with1Thread act
-            | strictThreads = U.bracket_
-                                (liftIO $ setNumCapabilities 1)
-                                (liftIO $ setNumCapabilities numCapabilities)
-                                act
-            | otherwise = act
         cmdargs =  concat [["-t", show minimap2threads, "-a"], extraArgs, [refIndex, "-"]]
-    outputListLno' TraceOutput ["Calling: ", minimap2Path, unwords cmdargs]
-    let cp = proc minimap2Path cmdargs
     usam <- makeNGLTempFile "fastq" "minimap2." "sam" $ \hout -> do
-        (exitCode, _, err) <- with1Thread $
-                CP.sourceProcessWithStreams cp
-                    (interleaveFQs rs) -- stdin
-                    (CB.sinkHandle hout) -- stdout
-                    CL.consume -- stderr
-        let err' = BL8.unpack $ BL8.fromChunks err
-        outputListLno' DebugOutput ["minimap2 info: ", err']
-        case exitCode of
-            ExitSuccess ->
-                outputListLno' InfoOutput ["Finished mapping to ", refIndex]
-            ExitFailure code ->
-                throwSystemError $ concat ["Failed mapping\n",
-                                "Executable used::\t", minimap2Path,"\n",
-                                "Command line was::\n\t", unwords cmdargs, "\n",
-                                "minimap2 error code was ", show code, ".\n",
-                                "minimap2 stderr: ", err']
+        runProcess
+            minimap2Path
+            cmdargs
+            (interleaveFQs rs) -- stdin
+            (Right $ CB.sinkHandle hout) -- stdout
     C.runConduit $ sortSam usam
                         .| CL.map (`B.snoc` 10)
                         .| outC

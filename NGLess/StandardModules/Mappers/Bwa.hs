@@ -15,9 +15,7 @@ import           System.Path (splitExt)
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as B
 
-import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import           Control.Monad (void)
 import           Control.Monad.Extra (allM)
 import           Control.Concurrent (getNumCapabilities)
 
@@ -75,11 +73,11 @@ createIndex fafile = do
     blocksize <- liftIO $ customBlockSize fafile
     prefix <- indexPrefix fafile
     bwaPath <- bwaBin
-    void $ runProcess
+    runProcess
             bwaPath
             (["index"] ++ blocksize ++ ["-p", prefix, fafile])
             (return ())
-            CL.consume
+            (Left ())
 
 callMapper :: FilePath -> ReadSet -> [String] -> C.ConduitT B.ByteString C.Void NGLessIO a -> NGLessIO a
 callMapper refIndex rs extraArgs outC = do
@@ -98,4 +96,4 @@ callMapper refIndex rs extraArgs outC = do
             bwaPath
             cmdargs
             (interleaveFQs rs) -- stdin
-            outC -- stdout
+            (Right outC) -- stdout
