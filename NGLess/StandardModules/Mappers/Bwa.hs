@@ -9,21 +9,17 @@ module StandardModules.Mappers.Bwa
     , callMapper
     ) where
 
-import           System.Process (proc, readProcessWithExitCode)
-import           System.Exit (ExitCode(..))
 import           System.Directory (doesFileExist)
 import           System.Posix (getFileStatus, fileSize, FileOffset)
 import           System.Path (splitExt)
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy.Char8 as BL8
 
-import qualified Data.Conduit.Process as CP
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import qualified UnliftIO as U
+import           Control.Monad (void)
 import           Control.Monad.Extra (allM)
-import           Control.Concurrent (getNumCapabilities, setNumCapabilities)
+import           Control.Concurrent (getNumCapabilities)
 
 import Output
 import NGLess
@@ -32,6 +28,7 @@ import Configuration
 import NGLess.NGLEnvironment
 import Dependencies.Versions (bwaVersion)
 import FileManagement (bwaBin)
+import Utils.Process (runProcess)
 
 -- | Appends bwa version to the index such that different versions
 -- of bwa use different indices
@@ -78,13 +75,11 @@ createIndex fafile = do
     blocksize <- liftIO $ customBlockSize fafile
     prefix <- indexPrefix fafile
     bwaPath <- bwaBin
-    (exitCode, out, err) <- liftIO $
-        readProcessWithExitCode bwaPath (["index"] ++ blocksize ++ ["-p", prefix, fafile]) []
-    outputListLno' DebugOutput ["BWA-index stderr: ", err]
-    outputListLno' DebugOutput ["BWA-index stdout: ", out]
-    case exitCode of
-        ExitSuccess -> return ()
-        ExitFailure _err -> throwSystemError err
+    void $ runProcess
+            bwaPath
+            (["index"] ++ blocksize ++ ["-p", prefix, fafile])
+            (return ())
+            CL.consume
 
 callMapper :: FilePath -> ReadSet -> [String] -> C.ConduitT B.ByteString C.Void NGLessIO a -> NGLessIO a
 callMapper refIndex rs extraArgs outC = do
@@ -99,30 +94,8 @@ callMapper refIndex rs extraArgs outC = do
                                                     -- -K 100000000 is a hidden option to set the chunk size
                                                     -- this makes the output independent of the number of threads
         cmdargs =  concat [["mem", "-t", show bwathreads, "-K", "100000000"], extraArgs, [refIndex', "-p", "-"]]
-        with1Thread act
-            | strictThreads = U.bracket_
-                                (liftIO $ setNumCapabilities 1)
-                                (liftIO $ setNumCapabilities numCapabilities)
-                                act
-            | otherwise = act
-
-    outputListLno' TraceOutput ["Calling: ", unwords (bwaPath:cmdargs)]
-    let cp = proc bwaPath cmdargs
-    (exitCode, out, err) <- with1Thread $
-            CP.sourceProcessWithStreams cp
-                (interleaveFQs rs) -- stdin
-                outC -- stdout
-                CL.consume -- stderr
-    let err' = BL8.unpack $ BL8.fromChunks err
-    outputListLno' DebugOutput ["BWA info: ", err']
-    case exitCode of
-        ExitSuccess -> do
-            outputListLno' InfoOutput ["Finished mapping to ", refIndex]
-            return out
-        ExitFailure code ->
-            throwSystemError $ concat ["Failed mapping\n",
-                            "Executable used::\t", bwaPath,"\n",
-                            "Command line was::\n\t", unwords cmdargs, "\n",
-                            "Bwa error code was ", show code, ".\n",
-                            "Bwa stderr: ", err']
-
+    runProcess
+            bwaPath
+            cmdargs
+            (interleaveFQs rs) -- stdin
+            outC -- stdout
