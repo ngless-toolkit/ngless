@@ -144,16 +144,61 @@ groupFiles context [] =
     throwDataError ("Attempted to group sample '" ++ T.unpack context ++ "' but sample is empty (no read files).")
 groupFiles _ rs = return $! ReadSet (concatMap pairedSamples rs) (concatMap singleSamples rs)
 
+data SingleOrPaired = SingleEnd !ShortRead | PairedEnd !ShortRead !ShortRead
+
+uninterleave :: Maybe FastQEncoding -> FilePath -> NGLessIO ReadSet
+uninterleave enc fname = do
+    enc' <- fromMaybe (encodingFor fname) (return <$> enc)
+    outputListLno' TraceOutput ["Un-interleaving file ", fname]
+    (fp1,h1) <- openNGLTempFile fname "" "pair.1.fq"
+    (fp2,h2) <- openNGLTempFile fname "" "pair.2.fq"
+    (fp3,h3) <- openNGLTempFile fname "" "singles.fq"
+    subsampleActive <- nConfSubsample <$> nglConfiguration
+    let writeC = C.awaitForever $ \case
+                        PairedEnd s1 s2 -> liftIO $ B.hPut h1 (fqEncode enc' s1) >> B.hPut h2 (fqEncode enc' s2)
+                        SingleEnd s -> liftIO $ B.hPut h3 (fqEncode enc' s)
+        doSubsampleC !n
+            | n >= 25000 = return ()
+            | otherwise = awaitJust $ \x -> do
+                            when (n `mod` 10 == 0) $
+                                C.yield x
+                            doSubsampleC (n + 1)
+        subsampleC w
+            | subsampleActive  = doSubsampleC (0 :: Int) .| w
+            | otherwise = w
+        uninterleaveC = awaitJust uninterleaveC'
+        uninterleaveC' prev = C.await >>= \case
+            Nothing -> C.yield $! SingleEnd prev
+            Just next
+                | srHeader prev == srHeader next -> do
+                        C.yield (PairedEnd prev next)
+                        uninterleaveC
+                | otherwise -> do
+                        C.yield $! SingleEnd prev
+                        uninterleaveC' next
+    withPossiblyCompressedFile fname $ \src ->
+        C.runConduit $
+            src
+            .| linesC
+            .| fqDecodeC enc'
+            .| C.passthroughSink fqStatsC (\stats -> outputFQStatistics fname stats enc')
+            .| uninterleaveC
+            .| subsampleC writeC
+    forM_ [h1,h2,h3] (liftIO . hClose)
+    return $! ReadSet [(FastQFilePath enc' fp1, FastQFilePath enc' fp2)] [FastQFilePath enc' fp3]
 
 executeFastq :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeFastq expr args = do
     enc <- getEncArgument "fastq" args
     qcNeeded <- lookupBoolOrScriptErrorDef (return True) "fastq hidden QC argument" "__perform_qc" args
+    interleaved <- lookupBoolOrScriptErrorDef (return False) "fastq interleaved" "interleaved" args
     case expr of
-        (NGOString fname) -> do
-            fname' <- optionalSubsample (T.unpack fname)
-            fq <- asFQFilePathMayQC qcNeeded enc fname'
-            return $ NGOReadSet fname (ReadSet [] [fq])
+        (NGOString fname)
+            | interleaved -> NGOReadSet fname <$> uninterleave enc (T.unpack fname)
+            | otherwise -> do
+                fname' <- optionalSubsample (T.unpack fname)
+                fq <- asFQFilePathMayQC qcNeeded enc fname'
+                return $ NGOReadSet fname (ReadSet [] [fq])
         (NGOList fps) -> NGOList <$> sequence [NGOReadSet fname . ReadSet [] . (:[]) <$> asFQFilePathMayQC True enc (T.unpack fname) | NGOString fname <- fps]
         v -> throwScriptError ("fastq function: unexpected first argument: " ++ show v)
 
@@ -219,6 +264,7 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
             else return $! ReadSet [pair] [single]
 executePaired expr _ = throwScriptError ("Function paired expects a string, got: " ++ show expr)
 
+getEncArgument :: String -> KwArgsValues -> NGLessIO (Maybe FastQEncoding)
 getEncArgument fname args =
     lookupSymbolOrScriptErrorDef (return "auto") fname "encoding" args
         >>= \case

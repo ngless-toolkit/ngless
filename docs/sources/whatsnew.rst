@@ -28,6 +28,8 @@ User-visible improvements
   only on the strand to which they are annotated, now it is also possible to
   consider them present only on the opposite strand (which is necessary for
   some strand-specific protocols as they produce the opposite strand).
+- Added ``interleaved`` argument to `fastq
+  <https://ngless.embl.de/Functions.html#fastq>`__
 
 Version 1.0.1
 -------------

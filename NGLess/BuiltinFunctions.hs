@@ -93,6 +93,7 @@ selectArgs =
 
 fastqArgs =
     [ArgInformation "encoding" False NGLSymbol [ArgCheckSymbol ["auto", "33", "64", "sanger", "solexa"]]
+    ,ArgInformation "interleaved" False NGLBool [ArgCheckMinVersion (1,1)]
     ,ArgInformation "__perform_qc" False NGLBool []
     ]
 

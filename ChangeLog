@@ -10,6 +10,7 @@ Version 1.0.1+
 	* Add line numbers to FastQ parsing errors
 	* Fix __extra_args argument in map()
 	* Add `discard_singles` function
+	* Add `interleaved` option to fastq()
 
 Version 1.0.1 2019-07-05 by luispedro
 	* Fix bug with external modules and multiple fastQ inputs

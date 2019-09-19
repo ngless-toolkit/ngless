@@ -32,6 +32,8 @@ Arguments by value:
 |               | ({auto}, {33}, {64}, |            |                |
 |               | {sanger}, {solexa})  |            |                |
 +---------------+----------------------+------------+----------------+
+| interleaved   | Bool                 |  no        | False          |
++---------------+----------------------+------------+----------------+
 
 Possible values for ``encoding`` are:
 
@@ -40,6 +42,10 @@ Possible values for ``encoding`` are:
 - ``{solexa}`` or ``{64}`` assumes that the file is encoded with a 64 offset.
   This is used for older Illumina/Solexa machines.
 - ``{auto}``: use auto detection. This is the default.
+
+If ``interleaved`` is ``True``, then the input is assumed to be interleaved
+(i.e., paired-end reads are represented by each mate being adjacent in the
+file with the same ID).
 
 When loading a data set, quality control is carried out and statistics can be
 visualised in a graphical user interface (GUI). Statistics calculated are:
@@ -54,6 +60,7 @@ If not specified, the encoding is guessed from the file.
 
 Gzip and bzip2 compressed files are transparently supported (determined by file
 extension, ``.gz`` and ``.bz2`` for gzip and bzip2 respectively).
+
 
 
 paired
