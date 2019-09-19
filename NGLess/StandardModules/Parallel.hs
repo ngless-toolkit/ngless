@@ -359,8 +359,8 @@ maxNrOpenFiles = 512 :: Int
 
 data SparseCountData = SparseCountData
                             { spdHeader :: !B.ByteString
-                            , spdIndex :: {-# UNPACK #-} !Int
-                            , spdPayload :: !B.ByteString
+                            , _spdIndex :: {-# UNPACK #-} !Int
+                            , _spdPayload :: !B.ByteString
                             }
     deriving (Eq)
 
