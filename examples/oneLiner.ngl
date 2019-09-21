@@ -1,8 +1,0 @@
-ngless "0.0"
-write(
-    count(
-        map(fastq('samples/sample.fq'),
-            reference='sacCer3'),
-        features=['gene', 'cds', 'exon'], gff_file='samples/genes.gff', min=10),
-    ofile="samples/CountsResult.txt", format={tsv})
-

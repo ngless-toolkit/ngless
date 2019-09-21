@@ -1,7 +1,0 @@
-ngless "0.0"
-input = fastq('samples/sample.fq')
-preprocess(input) using |read|:
-    if len(read) < 20:
-        discard
-mapped = map(input,reference='sacCer3')
-write(mapped, ofile='samples/resultSampleSam.sam',format={sam})
