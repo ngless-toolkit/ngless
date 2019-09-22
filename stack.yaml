@@ -9,7 +9,8 @@ compiler-check: newer-minor
 
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
-extra-deps: []
+extra-deps:
+ - conduit-algorithms-0.0.11.0
 
 allow-newer: true
 

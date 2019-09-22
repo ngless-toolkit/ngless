@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, MultiWayIf #-}
@@ -13,7 +13,7 @@ module Interpretation.FastQ
     ) where
 
 import System.IO
-import Control.Monad
+import           Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
 import qualified Data.Vector.Storable as VS
@@ -28,6 +28,7 @@ import           Data.Conduit ((.|))
 import           Data.Conduit.Algorithms.Utils (awaitJust)
 import qualified Data.Conduit.Algorithms.Async as CAlg
 import           Data.Conduit.Algorithms.Async (withPossiblyCompressedFile)
+import qualified Data.Conduit.Algorithms.Utils as CAlg
 import           Control.Monad.Trans.Resource (runResourceT)
 import Control.Exception (try)
 import Control.Monad.Except
@@ -144,20 +145,15 @@ groupFiles context [] =
     throwDataError ("Attempted to group sample '" ++ T.unpack context ++ "' but sample is empty (no read files).")
 groupFiles _ rs = return $! ReadSet (concatMap pairedSamples rs) (concatMap singleSamples rs)
 
-data SingleOrPaired = SingleEnd !ShortRead | PairedEnd !ShortRead !ShortRead
-
 uninterleave :: Maybe FastQEncoding -> FilePath -> NGLessIO ReadSet
 uninterleave enc fname = do
     enc' <- fromMaybe (encodingFor fname) (return <$> enc)
     outputListLno' TraceOutput ["Un-interleaving file ", fname]
-    (fp1,h1) <- openNGLTempFile fname "" "pair.1.fq"
-    (fp2,h2) <- openNGLTempFile fname "" "pair.2.fq"
-    (fp3,h3) <- openNGLTempFile fname "" "singles.fq"
+    (fp1,h1) <- openNGLTempFile fname "" "pair.1.fq.zst"
+    (fp2,h2) <- openNGLTempFile fname "" "pair.2.fq.zst"
+    (fp3,h3) <- openNGLTempFile fname "" "singles.fq.zst"
     subsampleActive <- nConfSubsample <$> nglConfiguration
-    let writeC = C.awaitForever $ \case
-                        PairedEnd s1 s2 -> liftIO $ B.hPut h1 (fqEncode enc' s1) >> B.hPut h2 (fqEncode enc' s2)
-                        SingleEnd s -> liftIO $ B.hPut h3 (fqEncode enc' s)
-        doSubsampleC !n
+    let doSubsampleC !n
             | n >= 25000 = return ()
             | otherwise = awaitJust $ \x -> do
                             when (n `mod` 10 == 0) $
@@ -168,22 +164,26 @@ uninterleave enc fname = do
             | otherwise = w
         uninterleaveC = awaitJust uninterleaveC'
         uninterleaveC' prev = C.await >>= \case
-            Nothing -> C.yield $! SingleEnd prev
+            Nothing -> C.yield $! (2, fqEncode enc' prev)
             Just next
                 | srHeader prev == srHeader next -> do
-                        C.yield (PairedEnd prev next)
+                        C.yield (0, fqEncode enc' prev)
+                        C.yield (1, fqEncode enc' next)
                         uninterleaveC
                 | otherwise -> do
-                        C.yield $! SingleEnd prev
+                        C.yield $! (2, fqEncode enc' prev)
                         uninterleaveC' next
-    withPossiblyCompressedFile fname $ \src ->
+    void $ withPossiblyCompressedFile fname $ \src ->
         C.runConduit $
             src
             .| linesC
             .| fqDecodeC enc'
             .| C.passthroughSink fqStatsC (\stats -> outputFQStatistics fname stats enc')
             .| uninterleaveC
-            .| subsampleC writeC
+            .| subsampleC (CAlg.dispatchC
+                        [CAlg.asyncZstdTo 3 h1
+                        ,CAlg.asyncZstdTo 3 h2
+                        ,CAlg.asyncZstdTo 3 h3])
     forM_ [h1,h2,h3] (liftIO . hClose)
     return $! ReadSet [(FastQFilePath enc' fp1, FastQFilePath enc' fp2)] [FastQFilePath enc' fp3]
 
