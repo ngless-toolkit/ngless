@@ -1,4 +1,4 @@
-ngless "0.11"
+ngless "1.1"
 input = samfile('input.sam')
 selected = select(input) using |mr|:
     mr = mr.filter(max_trim=1)

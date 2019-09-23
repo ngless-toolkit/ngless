@@ -1,4 +1,4 @@
-ngless '0.0'
+ngless '1.1'
 input = paired('sample.1.fq', 'sample.2.fq', singles='sample.singles.fq')
 
 mapped1 = map(input, fafile='<data>/ref1.fna')

@@ -1,4 +1,4 @@
-ngless '0.0'
+ngless '1.1'
 import "samtools" version "0.0"
 to_sort = samfile('input.bam')
 unsorted = select(to_sort, keep_if=[{mapped}])

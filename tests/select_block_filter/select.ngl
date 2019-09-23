@@ -1,4 +1,4 @@
-ngless '0.9'
+ngless '1.1'
 mapped = samfile('input.sam')
 remapped = select(mapped) using |mread|:
     mread = mread

@@ -1,4 +1,4 @@
-ngless '0.0'
+ngless '1.1'
 local import "whentrue" version "0.0"
 
 whentrue("foo", argument_name=true)

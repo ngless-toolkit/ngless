@@ -1,4 +1,4 @@
-ngless '1.0'
+ngless '1.1'
 input = paired('sample.fq', 'sample2.fq', singles='singles.fq')
 trim = 3
 input = preprocess(input) using |read|:

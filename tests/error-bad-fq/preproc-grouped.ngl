@@ -1,4 +1,4 @@
-ngless '0.0'
+ngless '1.1'
 split1 = fastq('split1.fq')
 split2 = fastq('split2.fq')
 split = group([split1, split2], name='sample')

@@ -1,4 +1,4 @@
-ngless '0.0'
+ngless '1.1'
 input = fastq('sample.fq')
 mapped = map(input, fafile='nope')
 write(mapped, ofile='output.sam')

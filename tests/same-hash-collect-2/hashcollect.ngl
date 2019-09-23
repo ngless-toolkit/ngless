@@ -1,4 +1,4 @@
-ngless "1.0"
+ngless "1.1"
 import "parallel" version "1.0"
 
 samples = ['basic']

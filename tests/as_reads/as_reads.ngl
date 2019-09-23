@@ -1,4 +1,4 @@
-ngless '0.8'
+ngless '1.1'
 input = fastq('sample.fq')
 mapped = map(input,reference='sacCer3')
 reads = as_reads(mapped)

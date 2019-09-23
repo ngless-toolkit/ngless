@@ -1,4 +1,4 @@
-ngless "0.10"
+ngless "1.1"
 
 mapped = samfile('input.sam')
 mappedBlock = select(mapped) using |mr|:

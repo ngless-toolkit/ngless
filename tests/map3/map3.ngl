@@ -1,4 +1,4 @@
-ngless '0.0'
+ngless '1.1'
 input = paired('sample.1.fq', 'sample.2.fq', singles='sample.singles.fq', encoding={auto})
 mapped = map(input, fafile='ref.fna')
 write(mapped, ofile='output.sam')

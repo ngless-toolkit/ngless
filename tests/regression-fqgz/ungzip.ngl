@@ -1,4 +1,4 @@
-ngless "0.0"
+ngless "1.1"
 
 input = fastq('input.fq.gz')
 write(input, ofile='output.fq')

@@ -1,4 +1,4 @@
-ngless '0.8'
+ngless '1.1'
 import "minimap2" version "1.0"
 
 input = paired('sample.1.fq', 'sample.2.fq', singles='sample.singles.fq')

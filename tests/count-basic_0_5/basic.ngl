@@ -1,4 +1,4 @@
-ngless '1.1'
+ngless '0.5'
 mapped = samfile('basic.sam')
 
 counted = count(mapped, features=['seqname'], multiple={all1})

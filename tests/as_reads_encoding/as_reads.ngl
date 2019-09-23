@@ -1,4 +1,4 @@
-ngless "0.8"
+ngless "1.1"
 input = as_reads(samfile('sanger.encoded.sam'))
 input = preprocess(input, keep_singles=True) using |read|:
     read = substrim(read, min_quality=25)

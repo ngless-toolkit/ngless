@@ -1,4 +1,4 @@
-ngless '0.0'
+ngless '1.1'
 local import "test" version "0.0"
 
 testing_searchpath_path("<location>/input.fq", ref="<location>/input2.fq", ref2="<fullpath>/input2.fq", string="sentence")

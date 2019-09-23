@@ -1,5 +1,4 @@
-ngless '0.8'
-
+ngless '1.1'
 
 mapped = samfile('input.bam')
 mapped_plus = select(mapped, keep_if=[{mapped}])

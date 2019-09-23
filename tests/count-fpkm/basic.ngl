@@ -1,4 +1,4 @@
-ngless '0.0'
+ngless '1.1'
 
 counted = count(samfile('seq1_2.sam.bz2'), features=['seqname'], multiple={all1}, normalization={fpkm})
 write(counted, ofile='output.all1.fpkm.txt')
