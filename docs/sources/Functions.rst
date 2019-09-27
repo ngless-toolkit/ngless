@@ -417,7 +417,7 @@ considered and each read is processed independently.
 count
 -----
 
-Given a file with aligned sequencing reads (ReadSet), ``count()`` will produce
+Given a file with aligned sequencing reads (MappedReadSet), ``count()`` will produce
 a counts table depending on the arguments passed. For example::
 
     counts = count(mapped, min=2, mode={union}, multiple={dist1})
