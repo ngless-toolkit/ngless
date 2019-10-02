@@ -151,6 +151,16 @@ Paired-end reads are assumed to be split into two files, with matching names
 with `.1`/`.2` appended. `_1`/`_2` as is used by the European Nucleotide
 Archive (ENA) is also accepted.
 
+If paired-end reads have been pre-filtered, an unpaired/single file is often available.
+`load_mocat_sample` recognizes the suffix `single`. In the following example,
+all three files are read as one group:
+
+    sample
+    ├── sample.pair.1.fq.gz
+    ├── sample.pair.2.fq.gz
+    └── sample.single.fq.gz
+
+
 `coord_file_to_gtf :: string -> string` this function takes a MOCAT-style
 `.coord`, converts it internally to a GTF file and returns it.
 
