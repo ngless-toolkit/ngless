@@ -5,8 +5,7 @@ module ReferenceDatabases
     ( Reference(..)
     , ReferenceFilePaths(..)
     , builtinReferences
-    , isDefaultReference
-    , getReference
+    , isBuiltinReference
     , createReferencePack
     , ensureDataPresent
     , installData
@@ -24,19 +23,19 @@ import System.IO.Error
 import Data.Foldable
 import Data.Maybe
 
-import Control.Monad
+import Control.Monad (liftM2)
 import Control.Applicative ((<|>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource(release)
 
 import qualified StandardModules.Mappers.Bwa as Bwa
 import FileManagement (createTempDir, InstallMode(..))
-import NGLess.NGLEnvironment
+import NGLess.NGLEnvironment (NGLVersion(..), NGLEnvironment(..), nglConfiguration, nglEnvironment)
 import Configuration
 import Utils.Network (downloadExpandTar, downloadOrCopyFile)
 import Utils.Utils
 import Modules
-import Version
+import Version (versionStr)
 import Output
 import NGLess
 
@@ -73,15 +72,11 @@ builtinReferences = [Reference rn (Just alias) (T.concat [rn, "-v", ver, "-", T.
                 ]]
 
 
-getAlias :: (a -> Bool) -> Maybe a -> Bool
-getAlias f (Just n) = f n
-getAlias _ Nothing = False
+findReference :: [Reference] -> T.Text -> Maybe Reference
+findReference allrefs rn = find (\ref -> (refName ref == rn) || maybe False (== rn) (refAlias ref)) allrefs
 
-getReference :: [Reference] -> T.Text -> Maybe Reference
-getReference allrefs rn = find (\ref -> (== rn) (refName ref) || getAlias (== rn) (refAlias ref)) allrefs
-
-isDefaultReference :: T.Text -> Bool
-isDefaultReference rn = isJust $ getReference builtinReferences rn
+isBuiltinReference :: T.Text -> Bool
+isBuiltinReference rn = isJust $ findReference builtinReferences rn
 
 moduleDirectReference :: T.Text -> NGLessIO (Maybe ReferenceFilePaths)
 moduleDirectReference rname = do
@@ -170,13 +165,13 @@ installData (Just mode) refname = do
     let unpackRef (ExternalPackagedReference r) = Just r
         unpackRef _ = Nothing
         refs = mapMaybe unpackRef $ concatMap modReferences mods
-    ref  <- case getReference (refs ++ builtinReferences) refname of
+    ref  <- case findReference (refs ++ builtinReferences) refname of
         Just ref -> return ref
         Nothing -> throwScriptError ("Could not find reference '" ++ T.unpack refname ++ "'. It is not builtin nor in one of the loaded modules.")
     url <- case refUrl ref of
         Just u -> return u
         Nothing
-            | isDefaultReference (refName ref) -> do
+            | isBuiltinReference (refName ref) -> do
                     version@(NGLVersion majV minV) <- (ngleVersion <$> nglEnvironment)
                     let versionDirectory = if version < NGLVersion 0 9
                                                 then ""

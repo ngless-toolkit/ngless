@@ -140,6 +140,7 @@ instance Default Module where
         }
 
 
+-- TODO: This really belongs in nglEnvironment!
 loadedModulesRef :: IORef [Module]
 {-# NOINLINE loadedModulesRef #-}
 loadedModulesRef = unsafePerformIO (newIORef [])
