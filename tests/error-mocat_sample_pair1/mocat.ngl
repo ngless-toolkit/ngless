@@ -1,0 +1,12 @@
+ngless "1.0"
+import "mocat" version "0.0"
+
+input = load_mocat_sample('sample')
+
+trim = 3
+input = preprocess(input) using |read|:
+   read = read[trim:]
+   if len(read) < 10:
+       discard
+
+write(input, ofile='output.fq')

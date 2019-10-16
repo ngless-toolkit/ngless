@@ -11,6 +11,7 @@ Version 1.0.1+
 	* Fix __extra_args argument in map()
 	* Add `discard_singles` function
 	* Add `interleaved` option to fastq()
+	* `load_mocat_sample` now fails if `pair.2` exists but `pair.1` doesn't
 
 Version 1.0.1 2019-07-05 by luispedro
 	* Fix bug with external modules and multiple fastQ inputs

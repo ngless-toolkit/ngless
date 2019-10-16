@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 {- Copyright 2016-2019 NGLess Authors
  - License: MIT
  -}
@@ -48,21 +49,24 @@ pairedEnds = do
 
 buildSingle m1
     | "pair.1" `isInfixOf` m1 = replace "pair.1" "single" m1
+    | "pair.2" `isInfixOf` m1 = replace "pair.2" "single" m1
     | otherwise = "MARKER_FOR_FILE_WHICH_DOES_NOT_EXIST"
 
 mocatSamplePaired :: [FilePath] -> T.Text -> Bool -> NGLessIO [Expression]
 mocatSamplePaired fqfiles encoding doQC = do
     let passthru = [(Variable "__perform_qc", ConstBool doQC), (Variable "encoding", ConstSymbol encoding)]
         match1 :: FilePath -> Maybe (FilePath, FilePath)
-        match1 fp = listToMaybe . flip mapMaybe pairedEnds $ \(p1,p2) -> do
-                        guard (endswith p1 fp)
-                        return (fp, dropEnd (length p1) fp ++ p2)
-        matched1 = mapMaybe match1 fqfiles
+        match1 fp = listToMaybe . flip mapMaybe pairedEnds $ \(p1,p2) -> if
+                        | (endswith p1 fp) -> Just (fp, dropEnd (length p1) fp ++ p2)
+                        | (endswith p2 fp) -> Just (dropEnd (length p2) fp ++ p1, fp)
+                        | otherwise -> Nothing
+        -- match1 returns repeated entries if both pair.1 and pair.2 exist, uniq removes duplicate records
+        matched1 = uniq $ mapMaybe match1 fqfiles
         encodeStr = ConstStr . T.pack
     (exps,used) <- fmap unzip $ forM matched1 $ \(m1,m2) -> do
         let singles = buildSingle m1
-        unless (m2 `elem` fqfiles) $
-            throwDataError ("Cannot find match for file: " ++ m1)
+        unless (m1 `elem` fqfiles) $ throwDataError ("Cannot find match for file: " ++ m2)
+        unless (m2 `elem` fqfiles) $ throwDataError ("Cannot find match for file: " ++ m1)
         let singlesArgs
                 | singles `elem` fqfiles = (Variable "singles", encodeStr singles):passthru
                 | otherwise = passthru
