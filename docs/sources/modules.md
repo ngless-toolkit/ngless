@@ -201,8 +201,8 @@ of the output type.
             name: "ofile"
             extension: "sam"
 
-``rtype`` must be one of ``"void"``, ``"counts"``, ``"readset"``, or
-``"mappedreadset"``.
+``rtype`` must be one of ``"void"``, ``"counts"`` or ``"mappedreadset"``.
+Returning ``readset`` isn't currently supported.
 
 If you plan to make use of [search path expansion](searchpath.html), in order
 for NGLess to expand the argument prior to passing it to the external module
