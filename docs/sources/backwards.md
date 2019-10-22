@@ -3,18 +3,21 @@
 As NGLess uses a version declaration string at the top of script means that
 NGLess can change its behaviour depending on the version used in the script.
 
+This page documents the fixes that are currently implemented.
+
 ## NGLess 1.1
 
 - The way that CIGAR sequence lengths are computed has changed to match
   samtools. This implies that the computation of `min_match_size` and
   `min_identity_pc` have slightly changed.
 - Starting in NGLess 1.1, `countfile` reorders its input if necessary.
-- `count` now handles multiple lines of comments at the top of its
+- The `count` function now accepts multiple lines of comments at the top of its
   `functional_map` arguments
 
 ## NGLess 0.8
 
-- select changes how a corner case is handled.
+- The `select` handles a strange corner case differently (it was arguably wrong
+  before, but affects very few reads).
 
 ## NGLess 0.6
 

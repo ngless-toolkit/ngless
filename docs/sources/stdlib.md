@@ -15,8 +15,8 @@ have and ngless will figure everything out.
 
 For example
 
-    ngless "0.6"
-    import "parallel" version "0.6"
+    ngless "1.0"
+    import "parallel" version "1.0"
 
     samples = ['Sample1', 'Sample2', 'Sample3']
     current = lock1(samples)
@@ -57,8 +57,8 @@ does ngless collect all the results into a single table.
 
 #### Full "parallel" example
 
-    ngless "0.8"
-    import "parallel" version "0.6"
+    ngless "1.0"
+    import "parallel" version "1.0"
 
     sample = lock1(readlines('input.txt'))
     input = fastq(sample)
@@ -100,8 +100,8 @@ interfere in a way that you get erroneous results**.
 This module exposes two samtools functionalities: sorting (`samtools_sort`) and
 selecting reads in regions of interest (`samtools_view`).
 
-    ngless '0.8'
-    import "samtools" version "0.0"
+    ngless '1.0'
+    import "samtools" version "1.0"
     input = samfile('input.bam')
     sam_regions = samtools_view(input, bed_file="interesting_regions.bed")
     write(sam_regions, ofile='interesting.sam')
@@ -109,8 +109,8 @@ selecting reads in regions of interest (`samtools_view`).
 `samtools_view :: mappedreadset -> mappedreadset` returns a subset of the
 mapped reads that overlap with the regions specified in the BED file.
 
-    ngless '0.8'
-    import "samtools" version "0.0"
+    ngless '1.0'
+    import "samtools" version "1.0"
     to_sort = samfile('input.bam')
     sorted = samtools_sort(to_sort)
     name_sorted = samtools_sort(to_sort, by={name})
