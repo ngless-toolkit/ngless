@@ -31,9 +31,9 @@ This is a toy dataset. It is based on `real data
 <https://www.ebi.ac.uk/ena/data/view/PRJNA339914>`__, but the samples were
 trimmed so that they contains only 250k paired-end reads.
 
-The dataset is organized in classical MOCAT style. Ngless does not require this
-structure, but this tutorial also demonstrates how to upgrade from your
-existing MOCAT-based projects.::
+The dataset is organized in classical MOCAT style, with one sample per
+directory. NGLess does not require this structure, but this tutorial also
+demonstrates how to upgrade from your existing MOCAT-based projects.::
 
     $ find
     ./igc.demo.short
@@ -58,12 +58,11 @@ can immediately run it with::
 
 The rest of this tutorial is an explanation of the steps in this script.
 
-
 2. Preliminary imports
 
 To run ngless, we need write a script. We start with a few imports::
 
-    ngless "0.7"
+    ngless "1.0"
     import "parallel" version "0.6"
     import "mocat" version "0.0"
     import "motus" version "0.1"
@@ -88,9 +87,12 @@ are reading the ``tara.demo.short`` file, which contains the three samples
 
 ``lock1()`` is a slightly more complex function. It takes a list and *locks one
 of the elements* and returns it. It always chooses an element which has not
-been locked before, so you each time you run _ngless_, you will get a different
-sample.
+been locked before, so you each time you run ``NGLess``, you will get a
+different sample.
 
+.. note::
+   When you are using ``lock1()`` you will need to run ``NGLess`` multiple
+   times. But you can run multiple instances in parallel.
 
 3. Preprocessing
 
@@ -200,7 +202,7 @@ Full script
 
 Here is the full script::
 
-    ngless "0.7"
+    ngless "1.0"
     import "parallel" version "0.6"
     import "mocat" version "0.0"
     import "motus" version "0.1"

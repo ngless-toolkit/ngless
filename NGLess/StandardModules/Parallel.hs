@@ -241,7 +241,16 @@ executeCollect (NGOCounts istream) kwargs = do
         then do
             newfp <- pasteCounts comment False allentries (map partialfile allentries)
             moveOrCopyCompress True newfp (T.unpack ofile ++ (if isSubsample then ".subsample" else ""))
-        else outputListLno' TraceOutput ["Cannot collect (not all files present yet), wrote partial file to ", partialfile current]
+        else do
+            outputListLno' TraceOutput ["Cannot collect (not all files present yet), wrote partial file to ", partialfile current]
+            Just lno <- ngleLno <$> nglEnvironment
+            registerHook FinishOkHook $
+                outputListLno InfoOutput Nothing
+                        ["The collect() call at line ", show lno, " could not be executed as there are partial results missing.\n"
+                        ,"When you use the parallel module and the collect() function,\n"
+                        ,"you typically need to run ngless *multiple times* (once per sample)!\n"
+                        ,"\n\n"
+                        ,"For more information, see https://ngless.embl.de/stdlib.html#parallel-module"]
     return NGOVoid
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)
 

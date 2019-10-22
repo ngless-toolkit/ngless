@@ -30,6 +30,10 @@ User-visible improvements
   some strand-specific protocols as they produce the opposite strand).
 - Added ``interleaved`` argument to `fastq
   <https://ngless.embl.de/Functions.html#fastq>`__
+- ``load_mocat_sample`` now checks for mismatched paired samples (`#120
+  <https://github.com/ngless-toolkit/ngless/issues/120>`__) - Better messages
+  when collect call could not finish (following discussion on the `mailing list
+  <https://groups.google.com/forum/#!topic/ngless/jIEcC7LVJgI>`__)
 
 Version 1.0.1
 -------------
@@ -42,6 +46,9 @@ Bugfixes
 - Fix bug with external modules and multiple fastQ inputs.
 - Fix bug with resaving input files where the original file was sometimes
   moved (thus removing it).
+- When ``bwa`` or ``samtools`` calls fail, show the user the stdout/stderr from
+  these processes (see `#121
+  <https://github.com/ngless-toolkit/ngless/issues/121>`__).
 
 Version 1.0
 -----------

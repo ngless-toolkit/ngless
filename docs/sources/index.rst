@@ -181,9 +181,9 @@ Authors
    ng-meta-profiler
    whatsnew
    backwards
+   tutorial-gut-metagenomics
    tutorial-ocean-metagenomics
    tutorial-assembly-gp
-   tutorial-gut-metagenomics
    command-line-options
    command-line-wrappers
    one-liners

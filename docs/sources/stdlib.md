@@ -2,12 +2,17 @@
 
 ## Parallel module
 
-This module allows you to run several parallel computations. It provides two
-functions: `lock1` and `collect`.
+This module allows you to run several parallel computations.
+
+**Important**: when you use this module, you will often need to _run the NGLess
+command multiple times_ (one for each sample). These can be run in parallel
+(and even on different compute nodes on an HPC cluster).
+
+The module provides two functions: `lock1` and `collect`.
 
 `lock1 :: [string] -> string` takes a list of strings and returns a single
 element. It uses the filesystem to obtain a lock file so that if multiple
-processes are running at once, each one will return a different element. Ngless
+processes are running at once, each one will return a different element. NGLess
 also marks results as *finished* once you have run a script to completion.
 
 The intended usage is that you simply run as many processes as inputs that you
@@ -21,8 +26,9 @@ For example
     samples = ['Sample1', 'Sample2', 'Sample3']
     current = lock1(samples)
 
-Now, current will be one of `'Sample1'`, `'Sample2'`, or `'Sample3'`. You can
-use this to find your input data:
+Now, when you run this script, `current` will be assigned to one of
+`'Sample1'`, `'Sample2'`, or `'Sample3'`. You can use this to find your input
+data:
 
     input = paired("data/" + current + ".1.fq.gz", "data/" + current + ".2.fq.gz")
 
@@ -53,7 +59,6 @@ counts together into a single table, for convenience:
 
 Now, only when all the samples in the `allneeded` argument have been processed,
 does ngless collect all the results into a single table.
-
 
 #### Full "parallel" example
 
