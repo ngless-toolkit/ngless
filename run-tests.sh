@@ -37,7 +37,7 @@ for testdir in tests/*; do
         ngless_exit=$?
         if [[ $testdir == tests/error-* ]] ; then
             if test $ngless_exit -eq "0"; then
-                echo "Expected error message in test"
+                echo "NGLess exited with exit code 0, even though an error was expected in test"
                 cur_ok=no
             fi
         else

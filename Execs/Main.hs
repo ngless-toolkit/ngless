@@ -42,10 +42,10 @@ import System.FilePath
 import System.Directory
 import Control.Monad.Extra (whenJust)
 import System.IO (stdout, stderr, stdin, hPutStrLn, mkTextEncoding, hGetEncoding, Handle, hSetEncoding)
-import Control.Exception (catch, IOException, try)
+import Control.Exception (catch, try, throwIO, fromException, displayException)
 import Control.Concurrent (setNumCapabilities)
 import System.Console.ANSI (setSGRCode, SGR(..), ConsoleLayer(..), Color(..), ColorIntensity(..))
-import System.Exit (exitSuccess, exitFailure)
+import System.Exit (exitSuccess, exitFailure, ExitCode(..))
 
 import Control.Monad.Trans.Resource
 
@@ -126,20 +126,18 @@ runNGLessIO context (NGLessIO act) = try (runResourceT act) >>= \case
             hPutStrLn stderr ("Exiting after fatal error while " ++ context)
             case etype of
                 ShouldNotOccur ->
-                        hPutStrLn stderr $
-                                        "Should Not Occur Error! This probably indicates a bug in ngless.\n" ++
-                                        "\tPlease get in touch with the authors with a description of how this happened.\n" ++
-                                        "\tIf possible run your script with the --trace flag and post the script and the resulting trace at \n"++
-                                        "\t\thttps://github.com/ngless-toolkit/ngless/issues\n" ++
-                                        "\tor email us at coelho@embl.de."
+                    hPutStrLn stderr $
+                        "Should Not Occur Error! This probably indicates a bug in ngless.\n" ++
+                        "\tPlease get in touch with the authors with a description of how this happened.\n" ++
+                        "\tIf possible run your script with the --trace flag and post the script and the resulting trace at\n"++
+                        "\t\thttps://github.com/ngless-toolkit/ngless/issues.\n"
                 ScriptError ->
-                        hPutStrLn stderr "Script Error"
+                    hPutStrLn stderr "Script Error (there is likely an error in your script)"
                 DataError ->
-                        hPutStrLn stderr "Data Error (the input data did not conform to ngless' expectations)"
+                    hPutStrLn stderr "Data Error (the input data did not conform to NGLess' expectations)"
                 SystemError ->
-                        hPutStrLn stderr "System Error"
-                _ ->
-                        return ()
+                    hPutStrLn stderr "System Error (NGLess was not able to access some necessary resource)"
+                _ -> return ()
             hPutStrLn stderr (redColor ++ emsg)
             hPutStrLn stderr $ setSGRCode [Reset]
             exitFailure
@@ -393,8 +391,11 @@ makeEncodingSafe h = do
 
 main = do
     mapM_ makeEncodingSafe [stdout, stdin, stderr]
-    catch main' $ \e -> do
-            putStrLn ("Exiting after internal error. If you can reproduce this issue, please run your script "++
-                    "with the --trace flag and report a bug at https://github.com/ngless-toolkit/ngless/issues")
-            print (e :: IOException)
-            exitFailure
+    catch main' $ \e -> case fromException e of
+        Just ec -> throwIO (ec :: ExitCode) -- rethrow
+        Nothing ->
+            fatalError ("An unhandled erorr occurred (this should not happen)!\n\n" ++
+                        "\tIf you can reproduce this issue, please run your script\n" ++
+                        "\twith the --trace flag and report a bug (including the script and the trace) at\n" ++
+                        "\t\thttps://github.com/ngless-toolkit/ngless/issues\n\n" ++
+                        "The error message was: `" ++ displayException e ++ "`")
