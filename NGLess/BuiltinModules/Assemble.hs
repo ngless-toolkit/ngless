@@ -7,9 +7,7 @@ module BuiltinModules.Assemble
     ) where
 
 import qualified Data.Text as T
-import           System.Process (proc)
 import           System.FilePath ((</>))
-import           System.Exit
 import           Control.Monad.Except (liftIO)
 import           Data.Default (def)
 import           GHC.Conc (getNumCapabilities)
@@ -23,7 +21,7 @@ import NGLess
 import Data.FastQ
 import Data.FastQ.Utils
 import NGLess.NGLEnvironment
-import Utils.Utils (readProcessErrorWithExitCode)
+import Utils.Process (runProcess)
 
 
 executeAssemble :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -55,14 +53,8 @@ executeAssemble "assemble" expr kwargs = do
                         ,"--tmp-dir", mhtmpdir
                         ] ++ ["--keep-tmp-files" | keepTempFiles] ++ extraArgs
     outputListLno' DebugOutput ["Calling megahit: ", megahitPath, " ", unwords args]
-    (errmsg, exitCode) <- liftIO $ readProcessErrorWithExitCode
-                                    (proc megahitPath args)
-    if null errmsg
-        then outputListLno' DebugOutput ["No output from megahit."]
-        else outputListLno' InfoOutput ["Message from metahit: ", errmsg]
-    case exitCode of
-       ExitSuccess -> return $! NGOFilename (odir </> "final.contigs.fa")
-       ExitFailure err -> throwSystemError ("Failure on calling megahit, error code: "++show err)
+    runProcess megahitPath args (return ()) (Left ())
+    return $! NGOFilename (odir </> "final.contigs.fa")
 executeAssemble _ _ _ = throwScriptError "unexpected code path taken [megahit:assemble]"
 
 assembleFunction = Function

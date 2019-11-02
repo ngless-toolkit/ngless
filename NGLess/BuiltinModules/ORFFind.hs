@@ -7,9 +7,7 @@ module BuiltinModules.ORFFind
     ) where
 
 import qualified Data.Text as T
-import           System.Process (proc)
 import           System.IO (hClose)
-import           System.Exit
 import           Control.Monad.Except (liftIO)
 import           Data.Default (def)
 
@@ -19,7 +17,8 @@ import Output
 import NGLess
 import FileOrStream
 import FileManagement (prodigalBin, openNGLTempFile)
-import Utils.Utils (readProcessErrorWithExitCode, fmapMaybeM)
+import Utils.Process (runProcess)
+import Utils.Utils (fmapMaybeM)
 
 executeORFFind :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeORFFind "orf_find" expr kwargs = do
@@ -50,16 +49,9 @@ executeORFFind "orf_find" expr kwargs = do
                 ++ ["-c" | not includeFragments]
 
     outputListLno' DebugOutput ["Calling prodigal: ", prodigalPath, " ", unwords args]
-    (errmsg, exitCode) <- liftIO $ readProcessErrorWithExitCode
-                                    (proc prodigalPath args)
-    -- prodigal is quite noisy:
-    outputListLno' DebugOutput ["Messages from prodigal:"]
-    outputListLno' DebugOutput [errmsg]
-    outputListLno' DebugOutput ["END OF prodigal output"]
-    case exitCode of
-       -- ExitSuccess -> return $! NGOSequenceSet (File dnaout)
-       ExitSuccess -> return $! NGOFilename dnaout
-       ExitFailure err -> throwSystemError ("Failure on calling prodigal, error code: "++show err)
+    runProcess prodigalPath args (return ()) (Left ())
+    -- return $! NGOSequenceSet (File dnaout)
+    return $! NGOFilename dnaout
 executeORFFind _ _ _ = throwScriptError "unexpected code path taken [prodigal:orf_find]"
 
 orfFindFunction = Function

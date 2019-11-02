@@ -32,12 +32,16 @@ failHooks = unsafePerformIO (newIORef [])
 registerHook :: Hook -> NGLessIO () -> NGLessIO ()
 registerHook hook act = liftIO $ modifyIORef nglHooks ((hook,act):)
 
+{- Run if the script fails. Note that these hooks are in the IO Monad, not
+ - NGLessIO! -}
 registerFailHook :: IO () -> NGLessIO ()
 registerFailHook act = liftIO $ modifyIORef failHooks (act:)
 
+-- Run all fail hooks
 triggerFailHook :: IO ()
 triggerFailHook = readIORef failHooks >>= sequence_
 
+-- Trigger the actions registered with the given hook
 triggerHook :: Hook -> NGLessIO ()
 triggerHook hook = do
     registered <- liftIO $ readIORef nglHooks

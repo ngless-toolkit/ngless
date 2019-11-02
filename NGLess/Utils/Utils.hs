@@ -11,7 +11,6 @@ module Utils.Utils
     , fmapMaybeM
     , findM
     , uniq
-    , readProcessErrorWithExitCode
     , allSame
     , passthrough
     , moveOrCopy
@@ -19,11 +18,6 @@ module Utils.Utils
     , dropEnd
     , withOutputFile
     ) where
-
-import Control.Monad
-import Control.Concurrent
-import System.IO
-import System.Process
 
 import System.Directory
 import System.IO.Error
@@ -46,6 +40,7 @@ import           System.IO.SafeWrite (withOutputFile)
 -- | lookup with a default if the key is not present in the association list
 lookupWithDefault :: Eq b => a -> b -> [(b,a)] -> a
 lookupWithDefault def key values = fromMaybe def $ lookup key values
+{-# INLINE lookupWithDefault #-}
 
 -- | equivalent to the Unix command 'uniq'
 uniq :: Eq a => [a] -> [a]
@@ -54,21 +49,7 @@ uniq = map head . group
 allSame :: Eq a => [a] -> Bool
 allSame [] = True
 allSame (e:es) = all (==e) es
-
--- | This gets stderr and the exit code
-readProcessErrorWithExitCode cp = do
-    (_, _, Just herr, jHandle) <-
-        createProcess cp { std_err = CreatePipe }
-    err <- hGetContents herr
-    -- In a separate thread, consume all the error input
-    -- the same pattern is used in the implementation of
-    -- readProcessWithErrorCode (which cannot be used here as we want to
-    -- use `hout` for stdout)
-    void . forkIO $ do
-        void (evaluate (length err))
-        hClose herr
-    exitCode <- waitForProcess jHandle
-    return (err, exitCode)
+{-# INLINE allSame #-}
 
 maybeM :: (Monad m) => m (Maybe a) -> (a -> m (Maybe b)) -> m (Maybe b)
 maybeM ma f = ma >>= \case
@@ -104,9 +85,11 @@ findM (x:xs) f = f x >>= \case
 
 secondM :: Monad m => (a -> m b) -> (c,a) -> m (c,b)
 secondM f (a,c) = (a,) <$> f c
+{-# INLINE secondM #-}
 
 dropEnd :: Int -> [a] -> [a]
 dropEnd v a = take (length a - v) a -- take of a negative is the empty sequence, which is correct in this case
+{-# INLINE dropEnd #-}
 
 #ifdef WINDOWS
 -- Windows-compatible reimplementation of safeio's withOutputFile
