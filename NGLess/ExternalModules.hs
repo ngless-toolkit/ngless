@@ -43,7 +43,7 @@ import Configuration
 import FileOrStream
 import Utils.Suggestion
 import Utils.Utils
-import Utils.Network (downloadExpandTar)
+import Utils.Network (downloadExpandTar, isUrl)
 import Language
 import Modules
 import Output
@@ -218,6 +218,7 @@ addPathToRef mpath er@ExternalReference{..} = er
     where
         ma p
             | isAbsolute p = p
+            | isUrl p = p
             | otherwise = mpath </> p
 addPathToRef _ er = er
 
@@ -393,6 +394,7 @@ asInternalModule em@ExternalModule{..} = do
     validateModule em
     return def
         { modInfo = emInfo
+        , modPath = modulePath
         , modCitations = emCitations
         , modReferences = references
         , modFunctions = map asFunction emFunctions

@@ -34,6 +34,8 @@ User-visible improvements
   <https://github.com/ngless-toolkit/ngless/issues/120>`__) - Better messages
   when collect call could not finish (following discussion on the `mailing list
   <https://groups.google.com/forum/#!topic/ngless/jIEcC7LVJgI>`__)
+- Modules can now specify their resources as a URL that NGLess downloads on a
+  "as needed" basis.
 
 Version 1.0.1
 -------------

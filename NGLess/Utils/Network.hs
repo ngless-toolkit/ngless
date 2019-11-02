@@ -5,6 +5,7 @@ module Utils.Network
     ( downloadFile
     , downloadOrCopyFile
     , downloadExpandTar
+    , isUrl
     ) where
 
 import           Control.Monad.IO.Class (liftIO, MonadIO(..))
@@ -29,9 +30,13 @@ import Output
 import NGLess
 import Utils.ProgressBar
 
+isUrl :: FilePath -> Bool
+isUrl p = any (`isPrefixOf` p) ["http://", "https://", "ftp://"]
+{-# INLINE isUrl #-}
+
 downloadOrCopyFile :: FilePath -> FilePath -> NGLessIO ()
 downloadOrCopyFile src dest
-    | any (`isPrefixOf` src) ["http://", "https://", "ftp://"] = downloadFile src dest
+    | isUrl src = downloadFile src dest
     | otherwise = liftIO $ copyFile src dest
 
 

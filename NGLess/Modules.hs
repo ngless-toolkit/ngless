@@ -117,6 +117,7 @@ instance FromJSON ExternalReference where
 -- | This represents a module (i.e., something which is imported by ngless)
 data Module = Module
     { modInfo :: !ModInfo -- ^ name & version
+    , modPath :: FilePath
     , modCitations :: [T.Text]
     , modConstants :: [(T.Text, NGLessObject)] -- ^ constants defined in this module
     , modReferences :: [ExternalReference]
@@ -126,11 +127,12 @@ data Module = Module
     }
 
 instance Show Module where
-    show (Module info _ cs fs _ _ _) = "Module["++show info++"; constants="++show cs++"; functions="++show fs++"]"
+    show (Module info p _ cs fs _ _ _) = "Module["++show info++" ("++p++"); constants="++show cs++"; functions="++show fs++"]"
 
 instance Default Module where
     def = Module
         { modInfo = ModInfo "builtin.default" "0.0"
+        , modPath = "<internal>"
         , modCitations = []
         , modConstants = []
         , modReferences = []

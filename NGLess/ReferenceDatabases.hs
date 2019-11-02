@@ -1,4 +1,4 @@
-{- Copyright 2013-2016 NGLess Authors
+{- Copyright 2013-2019 NGLess Authors
  - License: MIT
 -}
 module ReferenceDatabases
@@ -15,7 +15,7 @@ import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
-import           Control.Monad.Extra (whenJust)
+import           Control.Monad.Extra (whenJust, unlessM)
 
 import System.FilePath
 import System.Directory
@@ -32,11 +32,12 @@ import qualified StandardModules.Mappers.Bwa as Bwa
 import FileManagement (createTempDir, InstallMode(..))
 import NGLess.NGLEnvironment (NGLVersion(..), NGLEnvironment(..), nglConfiguration, nglEnvironment)
 import Configuration
-import Utils.Network (downloadExpandTar, downloadOrCopyFile)
+import Utils.Network (downloadExpandTar, downloadOrCopyFile, downloadFile, isUrl)
+import Utils.LockFile (withLockFile, LockParameters(..), WhenExistsStrategy(..))
 import Utils.Utils
 import Modules
 import Version (versionStr)
-import Output
+import Output (outputListLno', OutputType(..))
 import NGLess
 
 data ReferenceFilePaths = ReferenceFilePaths
@@ -46,6 +47,7 @@ data ReferenceFilePaths = ReferenceFilePaths
     } deriving (Eq, Show)
 
 
+dataDirectory :: InstallMode -> NGLessIO FilePath
 dataDirectory Root = nConfGlobalDataDirectory <$> nglConfiguration
 dataDirectory User = nConfUserDataDirectory   <$> nglConfiguration
 
@@ -75,17 +77,34 @@ builtinReferences = [Reference rn (Just alias) (T.concat [rn, "-v", ver, "-", T.
 findReference :: [Reference] -> T.Text -> Maybe Reference
 findReference allrefs rn = find (\ref -> (refName ref == rn) || maybe False (== rn) (refAlias ref)) allrefs
 
+-- Is this a builtin reference (i.e., can be used without importing a module)?
 isBuiltinReference :: T.Text -> Bool
 isBuiltinReference rn = isJust $ findReference builtinReferences rn
 
 moduleDirectReference :: T.Text -> NGLessIO (Maybe ReferenceFilePaths)
 moduleDirectReference rname = do
     mods <- loadedModules
-    let refs = concatMap modReferences mods
-    findM refs $ \case
-        ExternalReference eref fafile gtffile mapfile
-            | eref == rname -> return . Just $! ReferenceFilePaths (Just fafile) gtffile mapfile
-        _ -> return Nothing
+    findM mods $ \m ->
+        findM (modReferences m) $ \case
+            ExternalReference eref fafile gtffile mapfile
+                | eref == rname -> do
+                    fafile' <- if isUrl fafile
+                        then do
+                            let local = modPath m </> "cached" </> T.unpack rname
+                            unlessM (liftIO $ doesFileExist local) $
+                                withLockFile LockParameters
+                                         { lockFname = local ++ ".download.lock"
+                                         , maxAge = 300
+                                         , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
+                                         , mtimeUpdate = True
+                                        } $ do
+                                    -- recheck with lock
+                                    unlessM (liftIO $ doesFileExist local) $
+                                        downloadFile fafile local
+                            return local
+                        else return fafile
+                    return . Just $! ReferenceFilePaths (Just fafile') gtffile mapfile
+            _ -> return Nothing
 
 referencePath = "Sequence/BWAIndex/reference.fa.gz"
 gffPath = "Annotation/annotation.gtf.gz"
@@ -100,7 +119,8 @@ buildGFFPath = (</> gffPath)
 buildFunctionalMapPath :: FilePath -> FilePath
 buildFunctionalMapPath = (</> functionalMapPath)
 
-
+-- Create an NGLess-style reference pack, including a FASTA file, and possibly
+-- one of two annotation files (GFF or TSV)
 createReferencePack :: FilePath -> FilePath -> Maybe FilePath -> Maybe FilePath -> NGLessIO ()
 createReferencePack oname reference mgtf mfunc = do
     (rk,tmpdir) <- createTempDir "ngless_ref_creator_"
