@@ -251,7 +251,7 @@ readSamGroupsC' :: forall m . (MonadError NGError m, MonadIO m) =>
 readSamGroupsC' mapthreads respectPairs = do
         CC.dropWhileE (isSamHeaderString . unwrapByteLine)
         CC.filter (not . V.null)
-            .| asyncMapEitherC mapthreads (fmap groupByName . V.mapM (readSamLine . unwrapByteLine))
+            .| asyncMapEitherC mapthreads (fmap groupByName . V.mapM (readSamLineCheck . unwrapByteLine))
             -- the groups may not be aligned on the group boundary, thus we need to fix them
             .| fixSamGroups
     where
@@ -259,6 +259,9 @@ readSamGroupsC' mapthreads respectPairs = do
         samQNameMate s
             | respectPairs = (samQName s, True)
             | otherwise = (samQName s, isFirstInPair s)
+        readSamLineCheck sm
+            | isSamHeaderString sm = throwDataError "SAM header appears after SAM data (malformed file?)"
+            | otherwise = readSamLine sm
         groupByName :: V.Vector SamLine -> V.Vector [SamLine]
         groupByName vs = V.unfoldr groupByName' (0, error "null value", [])
             where
