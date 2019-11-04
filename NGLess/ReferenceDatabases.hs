@@ -91,6 +91,7 @@ moduleDirectReference rname = do
                     fafile' <- if isUrl fafile
                         then do
                             let local = modPath m </> "cached" </> T.unpack rname
+                            liftIO $ createDirectoryIfMissing True (modPath m </> "cached")
                             unlessM (liftIO $ doesFileExist local) $
                                 withLockFile LockParameters
                                          { lockFname = local ++ ".download.lock"
