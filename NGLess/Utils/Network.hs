@@ -15,7 +15,8 @@ import qualified Data.Conduit.List as CL
 import           Data.Conduit ((.|))
 import qualified Data.Conduit.Tar as CTar
 
-import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Char8 as B8
+import qualified Data.ByteString as B
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Simple as HTTPSimple
 import           Data.Conduit.Algorithms.Utils (awaitJust)
@@ -28,6 +29,7 @@ import System.FilePath
 
 import Output
 import NGLess
+import Version (versionStr)
 import Utils.ProgressBar
 
 isUrl :: FilePath -> Bool
@@ -44,15 +46,17 @@ downloadFile :: String -> FilePath -> NGLessIO ()
 downloadFile url destPath = do
     outputListLno' TraceOutput ["Downloading ", url]
     req <- HTTP.parseRequest url
-    let req' = req { HTTP.decompress = const False }
-    r <- liftIO $ HTTPSimple.withResponse req' $ \res ->
+    let req' = req { HTTP.decompress = const False,
+                    HTTP.requestHeaders = [("User-Agent", B8.pack $ "NGLess/"++versionStr)]
+                    }
+    liftIO $ HTTPSimple.withResponse req' $ \res ->
         case HTTPSimple.getResponseStatusCode res of
             200 -> do
                 C.runConduitRes $
                     HTTP.responseBody res
                         .| case lookup "Content-Length" (HTTP.responseHeaders res) of
                             Nothing -> CL.map id
-                            Just csize -> printProgress ("Downloading "++url) (read (B.unpack csize))
+                            Just csize -> printProgress ("Downloading "++url) (read (B8.unpack csize))
                         .| CB.sinkFileCautious destPath
                 return $ Right ()
             err -> return . throwSystemError $ "Could not connect to "++url++" (got error code: "++show err++")"
