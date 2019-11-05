@@ -49,7 +49,7 @@ downloadFile url destPath = do
     let req' = req { HTTP.decompress = const False,
                     HTTP.requestHeaders = [("User-Agent", B8.pack $ "NGLess/"++versionStr)]
                     }
-    liftIO $ HTTPSimple.withResponse req' $ \res ->
+    r <- liftIO $ HTTPSimple.withResponse req' $ \res ->
         case HTTPSimple.getResponseStatusCode res of
             200 -> do
                 C.runConduitRes $
