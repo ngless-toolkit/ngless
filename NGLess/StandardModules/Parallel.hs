@@ -185,7 +185,7 @@ getLock' basedir (f:fs) = do
     finished <- liftIO $ doesFileExist (basedir </> finishedName f)
     if finished
         then getLock' basedir fs
-        else acquireLock' LockParameters
+        else acquireLock LockParameters
                             { lockFname = lockname
                             , maxAge = fromInteger (60*60)
                                 -- one hour. Given that lock files are touched

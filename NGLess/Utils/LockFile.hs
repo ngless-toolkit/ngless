@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, CPP #-}
-{- Copyright 2015-2018 NGLess Authors
+{- Copyright 2015-2019 NGLess Authors
  - License: MIT
  -}
 
@@ -7,7 +7,6 @@ module Utils.LockFile
     ( withLockFile
     , LockParameters(..)
     , WhenExistsStrategy(..)
-    , acquireLock'
     , acquireLock
     , fileAge
     , removeFileIfExists
@@ -83,7 +82,7 @@ touchFile fname = writeFile fname "lock file"
 -- ngless do not clash with each other
 withLockFile :: LockParameters -> NGLessIO a -> NGLessIO a
 withLockFile params act =
-    acquireLock' params >>= \case
+    acquireLock params >>= \case
         Just rk -> do
             v <- act
             release rk
@@ -98,14 +97,10 @@ sleep = threadDelay . toMicroSeconds
         toMicroSeconds = (1000000 *) . fromInteger . round
 
 
--- | Atomically create a lock file with a given name
--- If file already exists, returns 'Nothing'
-acquireLock :: FilePath -> NGLessIO (Maybe ReleaseKey)
-acquireLock fname = acquireLock' LockParameters { lockFname = fname, whenExistsStrategy = IfLockedNothing, maxAge = 0, mtimeUpdate = True }
-
 -- | Atomically create a lock file
-acquireLock' :: LockParameters -> NGLessIO (Maybe ReleaseKey)
-acquireLock' params@LockParameters{..} = liftIO (openLockFile lockFname) >>= \case
+-- If file already exists, returns 'Nothing'
+acquireLock :: LockParameters -> NGLessIO (Maybe ReleaseKey)
+acquireLock params@LockParameters{..} = liftIO (openLockFile lockFname) >>= \case
     Just h -> do
         -- rkC is for the case where an exception is raised between this line and the release call below
         rkC <- register (hClose h)
@@ -129,11 +124,11 @@ acquireLock' params@LockParameters{..} = liftIO (openLockFile lockFname) >>= \ca
     Nothing -> liftIO (fileAge lockFname) >>= \case
         Nothing -> do
             outputListLno' InfoOutput ["Lock file ", lockFname, " existed but has been removed. Retrying."]
-            acquireLock' params
+            acquireLock params
         Just age | age > maxAge -> do
             outputListLno' InfoOutput ["Lock file ", lockFname, " exists but is too old. Assuming it is stale and removing it."]
             liftIO $ removeFileIfExists lockFname
-            acquireLock' params
+            acquireLock params
         _ -> case whenExistsStrategy of
             IfLockedNothing -> return Nothing
             IfLockedThrow err -> throwError err
@@ -142,7 +137,7 @@ acquireLock' params@LockParameters{..} = liftIO (openLockFile lockFname) >>= \ca
                     outputListLno' InfoOutput ["Lock file ", lockFname, " exists and seems current, sleeping for ", show timeBetweenRetries, "."]
                     liftIO $ sleep timeBetweenRetries
                     let lessOneTry = IfLockedRetry (nrLockRetries - 1) timeBetweenRetries
-                    acquireLock' (params { whenExistsStrategy = lessOneTry })
+                    acquireLock (params { whenExistsStrategy = lessOneTry })
                 | otherwise -> throwSystemError ("Could not obtain lock " ++ lockFname ++ " even after waiting for its release.")
 
 -- This code is adapted from
