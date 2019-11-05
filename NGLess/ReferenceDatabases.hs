@@ -90,7 +90,7 @@ moduleDirectReference rname = do
                 | eref == rname -> do
                     fafile' <- if isUrl fafile
                         then do
-                            let local = modPath m </> "cached" </> T.unpack rname
+                            let local = modPath m </> "cached" </> T.unpack rname <.> "fna.gz"
                             liftIO $ createDirectoryIfMissing True (modPath m </> "cached")
                             unlessM (liftIO $ doesFileExist local) $
                                 withLockFile LockParameters
