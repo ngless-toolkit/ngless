@@ -11,6 +11,8 @@ import           System.FilePath ((</>))
 import           Control.Monad.Except (liftIO)
 import           Data.Default (def)
 import           GHC.Conc (getNumCapabilities)
+import           Control.Monad.Trans.Resource (release)
+
 
 import Language
 import Configuration
@@ -45,7 +47,7 @@ executeAssemble "assemble" expr kwargs = do
     nthreads <- liftIO getNumCapabilities
     extraArgs <- map T.unpack <$> lookupStringListOrScriptErrorDef (return []) "extra megahit arguments" "__extra_megahit_args" kwargs
     (_, tdir) <- createTempDir "ngless-megahit-assembly"
-    (_, mhtmpdir) <- createTempDir "ngless-megahit-tmpdir"
+    (mt, mhtmpdir) <- createTempDir "ngless-megahit-tmpdir"
     let odir = tdir </> "megahit-output"
         args = files ++
                         ["-o", odir
@@ -54,6 +56,7 @@ executeAssemble "assemble" expr kwargs = do
                         ] ++ ["--keep-tmp-files" | keepTempFiles] ++ extraArgs
     outputListLno' DebugOutput ["Calling megahit: ", megahitPath, " ", unwords args]
     runProcess megahitPath args (return ()) (Left ())
+    release mt
     return $! NGOFilename (odir </> "final.contigs.fa")
 executeAssemble _ _ _ = throwScriptError "unexpected code path taken [megahit:assemble]"
 
