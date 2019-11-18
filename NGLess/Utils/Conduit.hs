@@ -30,8 +30,11 @@ import NGLess.NGError
 newtype ByteLine = ByteLine { unwrapByteLine :: B.ByteString }
                 deriving (Show)
 
+-- A limit was introduced to avoid running out of memory on corrupt files, but
+-- it needs to be large enough to accommodate nanopore reads, see:
+-- https://groups.google.com/forum/#!topic/ngless/-ovfYW8hfAs
 maxLineSize :: Int
-maxLineSize = 65536
+maxLineSize = 1024 * 1024 * 1024
 
 concatrevline :: B.ByteString -> [B.ByteString] -> ByteLine
 concatrevline line [] = ByteLine $ lineWindowsTerminated line
