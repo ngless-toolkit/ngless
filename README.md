@@ -3,11 +3,11 @@
 ![NGLess logo](NGLess-logo-128x64.png) Ngless is a domain-specific language for
 NGS (next-generation sequencing data) processing.
 
-[![Build Status](https://travis-ci.org/ngless-toolkit/ngless.svg?branch=master)](https://travis-ci.org/ngless-toolkit/ngless)
+[![Build Status](https://travis-ci.com/ngless-toolkit/ngless.svg?branch=master)](https://travis-ci.com/ngless-toolkit/ngless)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/hyperium/hyper/master/LICENSE)
 [![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/installer/conda.svg)](https://anaconda.org/bioconda/ngless)
 [![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/downloads.svg)](https://anaconda.org/bioconda/ngless)
-[![Citation for NGLess](https://img.shields.io/badge/CITATION%20DOI-10.1186%2Fs40168-019-0684-8-brightgreen.svg)](https://doi.org/10.1186/s40168-019-0684-8)
+[![Citation for NGLess](https://img.shields.io/badge/CITATION-DOI%3A10.1186%252Fs40168--019--0684--8-brightgreen.svg)](https://doi.org/10.1186/s40168-019-0684-8)
 [![Join the chat at https://gitter.im/luispedro/ngless](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/luispedro/ngless?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 
