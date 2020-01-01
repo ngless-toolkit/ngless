@@ -1,4 +1,4 @@
-{- Copyright 2016-2019 NGLess Authors
+{- Copyright 2016-2020 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -232,7 +232,6 @@ substrimReassign = pureTransform $ \case
 --
 -- write(input, ofile="output/"+variable+".sam")
 addFileChecks :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
-                    -- this is easier to do on the reversed script
 addFileChecks sc = reverse <$> (checkIFiles (reverse sc) >>= checkOFiles)
     -- convert to genericCheckUpfloat
     where
@@ -310,7 +309,7 @@ addFileChecks' checkFname tag ((lno,e):rest) = do
 --
 -- write(input, ofile="output/"+variable+".sam")
 addIndexChecks :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
-addIndexChecks = genericCheckUpfloat addIndexChecks'
+addIndexChecks = return . genericCheckUpfloat addIndexChecks'
 addIndexChecks' :: (Int, Expression) -> Maybe ([Variable],Expression)
 addIndexChecks' (lno, e) =
         case execWriter (recursiveAnalyse extractIndexOne e) of
@@ -330,33 +329,69 @@ addIndexChecks' (lno, e) =
                             ,(Variable "index1", ix1)]
                             Nothing
 
+-- Many checks can be generalize so that certain expressions generate a
+-- corresponding __check() function call. For example, bounds checks, transform
+--
+--      print(list[2])
+--
+-- into
+--
+--      __check_index_access(list, index1=2)
+--      print(list[2])
+--
+--
+-- More interesting, these can be "bubbled up" so that __check_index_access
+-- moves up (floats up):
+--
+--      list = [1,2,3]
+--      <code>
+--      print(list[2])
+--
+-- transforms into
+--
+--      list = [1,2,3]
+--      __check_index_access(list, index1=2)
+--      <code>
+--      print(list[2])
+--
+-- 'genericCheckUpfloat' generalizes this pattern
+
 genericCheckUpfloat :: ((Int, Expression) -> Maybe ([Variable],Expression))
                         -> [(Int, Expression)]
-                        -> NGLessIO [(Int, Expression)]
-genericCheckUpfloat f exprs = reverse <$> genericCheckUpfloat' f (reverse exprs)
+                        -> [(Int, Expression)]
+                                -- this is easier to do on the reversed script
+genericCheckUpfloat f exprs = reverse $ genericCheckUpfloat' f (reverse exprs)
 genericCheckUpfloat' :: ((Int, Expression) -> Maybe ([Variable],Expression))
                         -> [(Int, Expression)]
-                        -> NGLessIO [(Int, Expression)]
-genericCheckUpfloat' _ [] = return []
+                        -> [(Int, Expression)]
+genericCheckUpfloat' _ [] = []
 genericCheckUpfloat' f (c@(lno, expr):rest) = case expr of
-    Sequence es -> do
-        let es' = [(lno,e) | e <- es]
-        genericCheckUpfloat' f (reverse es' ++ rest)
-    Condition eC eT eF -> do
-        eT' <- genericCheckUpfloat f [(lno, eT)]
-        eF' <- genericCheckUpfloat f [(lno, eF)]
-        let rest' = case f (lno,eC) of
+                    -- expand sequences
+    Sequence es -> genericCheckUpfloat' f (reverse [(lno,e) | e <- es] ++ rest)
+    -- Conditions are tricky. At some point, NGLess would erroneuously float
+    -- checks above the Condition, so that
+    --
+    -- list = [1]
+    --
+    -- if len(list) > 1:
+    --    print(list[1])
+    --
+    -- would trigger an error. Now, checks only float up within the block
+    Condition eC eT eF -> let
+        eT' = genericCheckUpfloat f [(lno, eT)]
+        eF' = genericCheckUpfloat f [(lno, eF)]
+        rest' = case f (lno,eC) of
                 Nothing -> rest
                 Just (vars, ne) -> floatDown vars (lno, ne) rest
-            u tagged = asSequence (snd <$> tagged)
-        return ((lno, Condition eC (u eT') (u eF')):rest')
+        untag tagged = asSequence (snd <$> tagged)
+        in
+            ((lno, Condition eC (untag eT') (untag eF')):rest')
 
-    _ -> do
-        let rest' = case recursiveCall f c of
+    _ -> let
+        rest' = case recursiveCall f c of
                 Nothing -> rest
                 Just (vars, ne) -> floatDown vars (lno,ne) rest
-        rest'' <- genericCheckUpfloat' f rest'
-        return (c:rest'')
+        in (c:genericCheckUpfloat' f rest')
 
 recursiveCall :: ((Int, Expression) -> Maybe a) -> (Int, Expression) -> Maybe a
 recursiveCall f (lno, e) = evalCont $ callCC $ \exit -> do
@@ -373,7 +408,7 @@ floatDown vars e (c:rest)
 
 -- | Implements addition of temp$nn variables to simplify expressions
 --
--- This allows the rest of the code to be simpler
+-- This allows the rest of the code to be simpler. Namely, there are no complex expressions.
 addTemporaries = addTemporaries' 0
     where
         addTemporaries' :: Int -> [(Int,Expression)] -> NGLessIO [(Int,Expression)]
@@ -525,7 +560,7 @@ addUseNewer exprs = do
 
 
 addCountsCheck :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
-addCountsCheck = genericCheckUpfloat countCheck
+addCountsCheck = return . genericCheckUpfloat countCheck
     where
         countCheck (lno, FunctionCall (FuncName "count") _ kwargs Nothing) = Just (extractVars kwargs, buildCheck lno kwargs)
         countCheck _ = Nothing
