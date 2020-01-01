@@ -1,4 +1,4 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2020 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, CPP #-}
@@ -262,7 +262,7 @@ interpretTop (Condition c ifTrue ifFalse) = do
         then ifTrue
         else ifFalse)
 interpretTop (Sequence es) = forM_ es interpretTop
-interpretTop _ = throwShouldNotOccur "Top level statement is NOP"
+interpretTop e = throwShouldNotOccur ("Unexpected top level statement: "++show e)
 
 interpretTopValue :: Expression -> InterpretationEnvIO NGLessObject
 interpretTopValue (FunctionCall f e args b) = interpretFunction f e args b
