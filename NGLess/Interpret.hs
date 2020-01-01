@@ -713,6 +713,7 @@ interpretPreProcessExpr expr = interpretExpr expr
 _evalUnary :: UOp -> NGLessObject -> Either NGError NGLessObject
 _evalUnary UOpMinus (NGOInteger n) = return $ NGOInteger (-n)
 _evalUnary UOpLen (NGOShortRead r) = return $ NGOInteger . toInteger $ srLength r
+_evalUnary UOpLen (NGOList elems) = return $ NGOInteger . toInteger $ length elems
 _evalUnary UOpNot (NGOBool v) = return $ NGOBool (not v)
 _evalUnary op v = nglTypeError ("invalid unary operation ("++show op++") on value " ++ show v)
 

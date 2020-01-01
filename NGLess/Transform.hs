@@ -73,6 +73,11 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , addCountsCheck
                 ]
 
+
+asSequence :: [Expression] -> Expression
+asSequence [e] = e
+asSequence es = Sequence es
+
 pureRecursiveTransform :: (Expression -> Expression) -> Expression -> Expression
 pureRecursiveTransform f e = runIdentity (recursiveTransform (return . f) e)
 
@@ -108,6 +113,8 @@ isVarUsed1 v expr = evalCont $ callCC $ \exit -> do
                 return False
     where
         isVarUsed1' :: (Bool -> Cont Bool ()) -> Expression -> Cont Bool ()
+        isVarUsed1' exit (Assignment v' _)
+            | v == v' = exit True
         isVarUsed1' exit (Lookup _ v')
             | v == v' = exit True
         isVarUsed1' _ _ = return ()
@@ -303,25 +310,19 @@ addFileChecks' checkFname tag ((lno,e):rest) = do
 --
 -- write(input, ofile="output/"+variable+".sam")
 addIndexChecks :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
-addIndexChecks sc = reverse <$> addIndexChecks' (reverse sc) -- TODO: convert to genericCheckUpfloat
-addIndexChecks' :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
-addIndexChecks' [] = return []
-addIndexChecks' ((lno,e):rest) = do
-        vars <- runNGLess . execWriterT . flip recursiveAnalyse e $ \case
-            (IndexExpression (Lookup _ v) (IndexOne ix1@ConstInt{})) -> tell [(v, ix1)]
-            _ -> return ()
-        rest' <- addIndexChecks' (maybeAddChecks vars rest)
-        return ((lno,e):rest')
+addIndexChecks = genericCheckUpfloat addIndexChecks'
+addIndexChecks' :: (Int, Expression) -> Maybe ([Variable],Expression)
+addIndexChecks' (lno, e) =
+        case execWriter (recursiveAnalyse extractIndexOne e) of
+            [] -> Nothing
+            vars -> Just (map fst vars, asSequence $ map (uncurry indexCheckExpr) vars)
 
      where
-        maybeAddChecks :: [(Variable,Expression)] -> [(Int, Expression)] -> [(Int, Expression)]
-        maybeAddChecks [(v,ix)] [] = [(0, indexCheckExpr v ix)]
-        maybeAddChecks vars@[(v,ix)] ((lno',e'):rest') = case e' of
-            Assignment v' _
-                | v' == v -> ((lno', indexCheckExpr v ix):(lno', e'):rest')
-            _ -> (lno',e') : maybeAddChecks vars rest'
-        maybeAddChecks _ rest' = rest'
+        extractIndexOne :: Expression -> Writer [(Variable, Expression)] ()
+        extractIndexOne (IndexExpression (Lookup _ v) (IndexOne ix1@ConstInt{})) = tell [(v, ix1)]
+        extractIndexOne _ = return ()
 
+        indexCheckExpr :: Variable -> Expression -> Expression
         indexCheckExpr arr ix1 = FunctionCall
                             (FuncName "__check_index_access")
                             (Lookup Nothing arr)
@@ -329,18 +330,33 @@ addIndexChecks' ((lno,e):rest) = do
                             ,(Variable "index1", ix1)]
                             Nothing
 
-
 genericCheckUpfloat :: ((Int, Expression) -> Maybe ([Variable],Expression))
                         -> [(Int, Expression)]
                         -> NGLessIO [(Int, Expression)]
 genericCheckUpfloat f exprs = reverse <$> genericCheckUpfloat' f (reverse exprs)
+genericCheckUpfloat' :: ((Int, Expression) -> Maybe ([Variable],Expression))
+                        -> [(Int, Expression)]
+                        -> NGLessIO [(Int, Expression)]
 genericCheckUpfloat' _ [] = return []
-genericCheckUpfloat' f (c:rest) = do
-    let rest' = case recursiveCall f c of
-                    Nothing -> rest
-                    Just (vars, ne) -> floatDown vars (fst c,ne) rest
-    rest'' <- genericCheckUpfloat' f rest'
-    return (c:rest'')
+genericCheckUpfloat' f (c@(lno, expr):rest) = case expr of
+    Sequence es -> do
+        let es' = [(lno,e) | e <- es]
+        genericCheckUpfloat' f (reverse es' ++ rest)
+    Condition eC eT eF -> do
+        eT' <- genericCheckUpfloat f [(lno, eT)]
+        eF' <- genericCheckUpfloat f [(lno, eF)]
+        let rest' = case f (lno,eC) of
+                Nothing -> rest
+                Just (vars, ne) -> floatDown vars (lno, ne) rest
+            u tagged = asSequence (snd <$> tagged)
+        return ((lno, Condition eC (u eT') (u eF')):rest')
+
+    _ -> do
+        let rest' = case recursiveCall f c of
+                Nothing -> rest
+                Just (vars, ne) -> floatDown vars (lno,ne) rest
+        rest'' <- genericCheckUpfloat' f rest'
+        return (c:rest'')
 
 recursiveCall :: ((Int, Expression) -> Maybe a) -> (Int, Expression) -> Maybe a
 recursiveCall f (lno, e) = evalCont $ callCC $ \exit -> do
@@ -369,12 +385,14 @@ addTemporaries = addTemporaries' 0
                 let lno_e' = (lno,) <$> es
                 return $ lno_e' ++ rest'
 
-        {- This is incomplete:
-         - The transformation should also process the expressions inside blocks
-         -}
         addTemporaries1 :: [Module] -> Int -> Expression -> (Int, [Expression])
         addTemporaries1 _ next e@(FunctionCall _ _ _ (Just _)) = (next, [e])
         addTemporaries1 _ next e@(Assignment _ (FunctionCall _ _ _ (Just _))) = (next, [e])
+        addTemporaries1 mods next (Condition ifC ifT ifF) = let
+                (next1, ifC') = addTemporaries1 mods next ifC
+                (next2, ifT') = addTemporaries1 mods next1 ifT
+                (next3, ifF') = addTemporaries1 mods next2 ifF
+            in (next3, init ifC' ++ [Condition (last ifC') (asSequence ifT') (asSequence ifF')])
         addTemporaries1 mods next expr = let (e', next', pre) = runRWS (recursiveTransform functionCallTemp expr) () next in
                                                     (next', combineExpr pre e')
             where
@@ -399,12 +417,15 @@ addTemporaries = addTemporaries' 0
 
                 functionCallTemp :: Expression -> RWS () [Expression] Int Expression
                 functionCallTemp e@(FunctionCall f _ _ _) = do
-                    n <- get
-                    let v = Variable (T.pack $ "temp$"++show n)
-                    put (n + 1)
-                    tell [Assignment v e]
                     let t = funcRetType <$> findFunction mods f
-                    return (Lookup t v)
+                    if t == Just NGLVoid
+                        then return e
+                        else do
+                            n <- get
+                            let v = Variable (T.pack $ "temp$"++show n)
+                            put (n + 1)
+                            tell [Assignment v e]
+                            return (Lookup t v)
                 functionCallTemp e = return e
 
 {-| Calculation of hashes for output method calls

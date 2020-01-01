@@ -36,6 +36,7 @@ User-visible improvements
   <https://groups.google.com/forum/#!topic/ngless/jIEcC7LVJgI>`__)
 - Modules can now specify their resources as a URL that NGLess downloads on a
   "as needed" basis.
+- `len <https://ngless.embl.de/Functions.html#len>`__ now works on lists
 
 Version 1.0.1
 -------------

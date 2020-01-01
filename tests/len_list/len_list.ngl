@@ -1,0 +1,21 @@
+ngless "1.0"
+
+list = ["one", "two", "three"]
+
+if len(list) > 2:
+    val = list[2]
+else:
+    val = list[1]
+print(val)
+print("\n")
+
+if len(list) > 2:
+    print(list[2])
+    print("\n")
+    print("1\n")
+    print("2\n")
+    print("3\n")
+
+if len(list) > 5:
+    print(list[4])
+    print("\n")
