@@ -2,25 +2,21 @@
 What's New (History)
 ====================
 
-Post Version 1.0.1
-------------------
+Version 1.1.0
+-------------
 
 User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-- ZSTD compression is available for output and intermediate files use it for
-  reduced temporary space usage (and possibly faster processing).
-- The `countfile <https://ngless.embl.de/Functions.html#countfile>`__ now
-  reorders its input if it is not ordered. This is necessary for correct usage.
+
+- Added `discard_singles() function <Functions.html#discard_singles>`__.
 - Added ``include_fragments`` option to `orf_find()
   <Functions.html#orf_find>`__.
+- The `countfile <https://ngless.embl.de/Functions.html#countfile>`__ now
+  reorders its input if it is not ordered. This is necessary for correct usage.
 - More flexible loading of ``functional_map`` arguments in `count
   <https://ngless.embl.de/Functions.html#count>`__ to accept multiple comment
   lines at the top of the file as produced by `eggnog-mapper
   <http://eggnog-mapper.embl.de/>`__.
-- Faster check for column headers in ``functional_map`` argument to `count()
-  <https://ngless.embl.de/Functions.html#count>`__ function: now it is
-  performed *as soon as possible* (including at the top of the script if the
-  arguments are literal strings), thus NGLess can fail faster.
 - Added ``sense`` argument to the `count
   <https://ngless.embl.de/Functions.html#count>`__ function, generalizing the
   previous ``strand`` argument (which is deprecated). Whereas before it was
@@ -37,6 +33,22 @@ User-visible improvements
 - Modules can now specify their resources as a URL that NGLess downloads on a
   "as needed" basis.
 - `len <https://ngless.embl.de/Functions.html#len>`__ now works on lists
+
+Internal improvements
+~~~~~~~~~~~~~~~~~~~~~
+
+- ZSTD compression is available for output and intermediate files use it for
+  reduced temporary space usage (and possibly faster processing).
+- Faster check for column headers in ``functional_map`` argument to `count()
+  <https://ngless.embl.de/Functions.html#count>`__ function: now it is
+  performed *as soon as possible* (including at the top of the script if the
+  arguments are literal strings), thus NGLess can fail faster.
+- ZSTD compression is available for output and intermediate files use it for
+  reduced temporary space usage (and possibly faster processing).
+- Faster check for column headers in ``functional_map`` argument to `count()
+  <https://ngless.embl.de/Functions.html#count>`__ function: now it is
+  performed *as soon as possible* (including at the top of the script if the
+  arguments are literal strings), thus NGLess can fail faster.
 
 Version 1.0.1
 -------------
