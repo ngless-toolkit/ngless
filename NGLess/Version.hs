@@ -1,4 +1,4 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2020 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, CPP #-}
@@ -19,7 +19,7 @@ versionStr :: String
 versionStr = showVersion version
 
 dateStr :: String
-dateStr = "unreleased (post 1.0.1)"
+dateStr = "January 25 2020"
 
 gitHashStr :: String
 gitHashStr = $(gitHash)
