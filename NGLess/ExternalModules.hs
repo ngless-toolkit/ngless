@@ -286,6 +286,7 @@ executeCommand basedir cmds funcname input args = do
 
 adjustCompression :: Maybe CommandExtra -> FilePath -> NGLessIO FilePath
 adjustCompression (Just (FileInfo (FileType _ gz bz2 _))) f =
+    -- This could be a call to ensureCompressionIsOneOf
     case inferCompression f of
         NoCompression -> return f
         GzipCompression

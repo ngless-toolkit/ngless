@@ -1,4 +1,4 @@
-{- Copyright 2017-2018 NGLess Authors
+{- Copyright 2017-2020 NGLess Authors
  - License: MIT
  -}
 
@@ -16,7 +16,7 @@ import           Control.Monad.Trans.Resource (release)
 
 import Language
 import Configuration
-import FileManagement (createTempDir, megahitBin)
+import FileManagement (ensureCompressionIsOneOf, Compression(..), createTempDir, megahitBin)
 import Modules
 import Output
 import NGLess
@@ -26,20 +26,23 @@ import NGLess.NGLEnvironment
 import Utils.Process (runProcess)
 
 
+maybeRecompress :: FastQFilePath -> NGLessIO FilePath
+maybeRecompress (FastQFilePath _ fp) = ensureCompressionIsOneOf [NoCompression, GzipCompression] fp
+
 executeAssemble :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeAssemble "assemble" expr kwargs = do
     files <- case expr of
             NGOReadSet _ (ReadSet [] singles) -> do
-                FastQFilePath _ f <- concatenateFQs singles
+                f <- maybeRecompress =<< concatenateFQs singles
                 return ["-r", f]
             NGOReadSet _ (ReadSet pairs []) -> do
-                FastQFilePath _ f1 <- concatenateFQs (fst <$> pairs)
-                FastQFilePath _ f2 <- concatenateFQs (snd <$> pairs)
+                f1 <- maybeRecompress =<< concatenateFQs (fst <$> pairs)
+                f2 <- maybeRecompress =<< concatenateFQs (snd <$> pairs)
                 return ["-1", f1, "-2", f2]
             NGOReadSet _ (ReadSet pairs singles) -> do
-                FastQFilePath _ f1 <- concatenateFQs (fst <$> pairs)
-                FastQFilePath _ f2 <- concatenateFQs (snd <$> pairs)
-                FastQFilePath _ f3 <- concatenateFQs singles
+                f1 <- maybeRecompress =<< concatenateFQs (fst <$> pairs)
+                f2 <- maybeRecompress =<< concatenateFQs (snd <$> pairs)
+                f3 <- maybeRecompress =<< concatenateFQs singles
                 return ["-1", f1, "-2", f2, "-r", f3]
             _ -> throwScriptError ("megahit:assemble first argument should have been readset, got '"++show expr++"'")
     megahitPath <- megahitBin

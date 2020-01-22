@@ -1,4 +1,4 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2020 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, CPP #-}
@@ -17,8 +17,11 @@ module FileManagement
     , bwaBin
     , minimap2Bin
     , expandPath
+
     , inferCompression
+    , ensureCompressionIsOneOf
     , Compression(..)
+
 #ifdef IS_BUILDING_TEST
     , expandPath'
 #endif
@@ -31,7 +34,11 @@ import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import qualified Text.RE.TDFA.String as RE
 import           Data.List (isPrefixOf)
-import           System.FilePath (dropExtensions, takeBaseName, takeDirectory, (</>), (<.>))
+import qualified System.FilePath as FP
+import qualified Data.Conduit.Algorithms.Async as CAlg
+import qualified Conduit as C
+import           Conduit ((.|))
+import           System.FilePath (takeBaseName, takeDirectory, (</>), (<.>), (-<.>))
 import           Control.Monad (unless, forM_, when)
 import           System.Posix.Files (setFileMode)
 import           System.Posix.Internals (c_getpid)
@@ -75,6 +82,28 @@ inferCompression fp
     | endswith ".zst" fp = ZStdCompression
     | endswith ".zstd" fp = ZStdCompression
     | otherwise = NoCompression
+
+
+{- Ensure that the file is compressed using an acceptable compression format
+ -}
+ensureCompressionIsOneOf :: [Compression] -- ^ Acceptable formats
+                                -> FilePath -- ^ input file
+                                -> NGLessIO FilePath
+ensureCompressionIsOneOf [] fp = return fp
+ensureCompressionIsOneOf cs fp
+        | inferCompression fp `elem` cs = return fp
+        | otherwise = makeNGLTempFile fp "adjust_compression_" ext' $ \h ->
+            CAlg.withPossiblyCompressedFile fp $ \src ->
+                C.runConduit $
+                    src .| (if GzipCompression `elem` cs
+                        then CAlg.asyncGzipTo
+                        else C.sinkHandle) h
+    where
+        ext' = case FP.takeExtensions fp of
+                "" -> ""
+                (_:rest)
+                    | GzipCompression `elem` cs -> rest -<.> "gz"
+                    | otherwise -> rest
 
 
 -- | Shorten filename if longer than 240 characters
@@ -151,8 +180,9 @@ removeIfTemporary fp = do
 
 
 -- | This is a version of 'takeBaseName' which drops all extension
--- ('takeBaseName' only takes out the first extension
-takeBaseNameNoExtensions = dropExtensions . takeBaseName
+-- ('takeBaseName' only takes out the first extension)
+takeBaseNameNoExtensions = FP.dropExtensions . FP.takeBaseName
+{-# INLINE takeBaseNameNoExtensions #-}
 
 -- | create a temporary directory as a sub-directory of the user-specified
 -- temporary directory.
