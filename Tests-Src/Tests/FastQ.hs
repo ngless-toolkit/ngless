@@ -1,3 +1,6 @@
+{- Copyright 2013-2020 NGLess Authors
+ - License: MIT
+ -}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
 module Tests.FastQ
     ( tgroup_FastQ
@@ -54,6 +57,12 @@ reads3 =
 simpleStats f = testNGLessIO $ do
     enc <- encodingFor f
     qualityPercentiles <$> statsFromFastQ f enc
+
+case_compatibleHeader = do
+    assertBool "remove /[12]" $ compatibleHeader "@SRR4052021.40730 4073/1" "@SRR4052021.40730 4073/2"
+    assertBool "equal headers" $ compatibleHeader "@SRR4052021.40730 4073" "@SRR4052021.40730 4073"
+    assertBool "not equal " $ not $ compatibleHeader "@SRR4052021.40730 4073" "@SRR4052021.40730 4074"
+    assertBool "suffix is not /[12]" $ not $ compatibleHeader "@SRR4052021.40730 4073 xa" "@SRR4052021.40730 4073 xb"
 
 -- negative tests quality on value 60 char ';'. Value will be 60 - 64 which is -4
 case_calc_statistics_negative = do

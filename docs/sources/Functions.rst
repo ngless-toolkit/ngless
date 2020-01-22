@@ -43,9 +43,11 @@ Possible values for ``encoding`` are:
   This is used for older Illumina/Solexa machines.
 - ``{auto}``: use auto detection. This is the default.
 
-If ``interleaved`` is ``True``, then the input is assumed to be interleaved
-(i.e., paired-end reads are represented by each mate being adjacent in the
-file with the same ID).
+If ``interleaved`` is ``True``, then the input is assumed to be interleaved.
+This means that paired-end reads are represented by each mate being adjacent in
+the file with the same identifier (if the identifiers end with ``/1`` and
+``/2``, but are otherwise identical, this is still considered a match). Thus,
+an interleaved file can contain both paired-end and single-end reads.
 
 When loading a data set, quality control is carried out and statistics can be
 visualised in a graphical user interface (GUI). Statistics calculated are:

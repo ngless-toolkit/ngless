@@ -1,7 +1,7 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2020 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE FlexibleContexts, MultiWayIf #-}
+{-# LANGUAGE FlexibleContexts, MultiWayIf, CPP #-}
 
 module Interpretation.FastQ
     ( executeFastq
@@ -10,6 +10,9 @@ module Interpretation.FastQ
     , executeShortReadsMethod
 
     , encodingFor
+#ifdef IS_BUILDING_TEST
+    , compatibleHeader
+#endif
     ) where
 
 import System.IO
@@ -145,6 +148,15 @@ groupFiles context [] =
     throwDataError ("Attempted to group sample '" ++ T.unpack context ++ "' but sample is empty (no read files).")
 groupFiles _ rs = return $! ReadSet (concatMap pairedSamples rs) (concatMap singleSamples rs)
 
+compatibleHeader :: B.ByteString -> B.ByteString -> Bool
+compatibleHeader h1 h2
+    | h1 == h2 = True
+    | B.length h1 /= B.length h2 = False
+    | otherwise = fromMaybe False $ do
+        h1' <- B8.stripSuffix "/1" h1
+        h2' <- B8.stripSuffix "/2" h2
+        return (h1' == h2')
+
 uninterleave :: Maybe FastQEncoding -> FilePath -> NGLessIO ReadSet
 uninterleave enc fname = do
     enc' <- fromMaybe (encodingFor fname) (return <$> enc)
@@ -166,7 +178,7 @@ uninterleave enc fname = do
         uninterleaveC' prev = C.await >>= \case
             Nothing -> C.yield $! (2, fqEncode enc' prev)
             Just next
-                | srHeader prev == srHeader next -> do
+                | compatibleHeader (srHeader prev) (srHeader next) -> do
                         C.yield (0, fqEncode enc' prev)
                         C.yield (1, fqEncode enc' next)
                         uninterleaveC
