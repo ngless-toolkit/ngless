@@ -8,7 +8,7 @@ NGS (next-generation sequencing data) processing.
 [![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/installer/conda.svg)](https://anaconda.org/bioconda/ngless)
 [![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/downloads.svg)](https://anaconda.org/bioconda/ngless)
 [![Citation for NGLess](https://img.shields.io/badge/CITATION-DOI%3A10.1186%252Fs40168--019--0684--8-brightgreen.svg)](https://doi.org/10.1186/s40168-019-0684-8)
-[![Join the chat at https://gitter.im/luispedro/ngless](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/luispedro/ngless?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Join the chat at https://gitter.im/ngless-toolkit](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/ngless-toolkit)
 
 
 For questions and discussions, please use the [ngless mailing
