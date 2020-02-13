@@ -97,7 +97,7 @@ build-and-test-ubuntu-wsl-profiling:
 
     variables:
         LC_ALL: "C.UTF-8"
-        STACKOPTS: "--system-ghc --work-dir .stack-work-profile --ghc-options '-fPIC -fprof-auto -rtsopts' --flag NGLess:embed --executable-profiling --library-profiling"
+        STACKOPTS: "--system-ghc --work-dir .stack-work-profile --ghc-options '-fPIC -g -fprof-auto -rtsopts' --flag NGLess:embed --executable-profiling --library-profiling"
     retry: 1
 
     script:
@@ -109,6 +109,8 @@ build-and-test-ubuntu-wsl-profiling:
     allow_failure: true
     # Don't run this step automatically, make it a manually triggered build
     when: manual
+    # The profiling build takes considerably longer, so relax the project's 2 hour limit
+    timeout: 4 hours
 
     artifacts:
         when: on_success
