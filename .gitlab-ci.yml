@@ -9,6 +9,7 @@ cache:
         - .stack
         - .stack-work
         - .stack-work-test
+        - .stack-work-profile
     # CI_JOB_NAME creates one cache per build target (e.g. build-and-test-ubuntu)
     key: "$CI_JOB_NAME"
 
@@ -96,7 +97,7 @@ build-and-test-ubuntu-wsl-profiling:
 
     variables:
         LC_ALL: "C.UTF-8"
-        STACKOPTS: "--system-ghc --ghc-options '-fPIC -fprof-auto -rtsopts' --flag NGLess:embed --executable-profiling --library-profiling"
+        STACKOPTS: "--system-ghc --work-dir .stack-work-profile --ghc-options '-fPIC -fprof-auto -rtsopts' --flag NGLess:embed --executable-profiling --library-profiling"
     retry: 1
 
     script:
