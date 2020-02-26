@@ -91,7 +91,7 @@ Installing/compiling from source is also possible. Clone
 The simplest way to get an environment will all the dependencies is to use conda:
 
     conda create -n ngless
-    source activate ngless
+    conda activate ngless
     conda config --add channels conda-forge
     conda install stack cairo bzip2 gmp zlib perl wget xz pkg-config make
 
