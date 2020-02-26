@@ -114,6 +114,7 @@ the directory where you wish to install, default is `/usr/local`):
 - [Frequently Asked Questions (FAQ)](https://ngless.embl.de/faq.html)
 - [ngless mailing list](https://groups.google.com/forum/#!forum/ngless)
 - [What's new log](https://ngless.embl.de/whatsnew.html)
+- [NGless V1.1.0 Release Documentation](https://ngless.embl.de/whatsnew.html#version-1-1-0)
 
 ## Authors
 
