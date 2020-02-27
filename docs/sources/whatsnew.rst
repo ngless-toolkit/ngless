@@ -8,9 +8,9 @@ Version 1.1.0
 User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Added `discard_singles() function <Functions.html#discard_singles>`__.
+- Added `discard_singles() function <Functions.html#discard-singles>`__.
 - Added ``include_fragments`` option to `orf_find()
-  <Functions.html#orf_find>`__.
+  <Functions.html#orf-find>`__.
 - The `countfile <https://ngless.embl.de/Functions.html#countfile>`__ now
   reorders its input if it is not ordered. This is necessary for correct usage.
 - More flexible loading of ``functional_map`` arguments in `count
