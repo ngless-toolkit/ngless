@@ -108,6 +108,26 @@ the directory where you wish to install, default is `/usr/local`):
 
     make install prefix=<PREFIX>
 
+## Running Sample Test Scripts on Local Machine
+For Developers who have successfully comiled and installed NGless, running the test scripts in /tests folder would be the next line of action to have the output of sample(small) test cases.
+
+    cd tests
+Once in the test directory, select any of the following many test folders(scripts) to run using NGless.
+For example, here we would run the "**regression-fqgz**" and the eventually the .ngl file to get a sample output view that can be used for visualizing the software.
+
+    cd regression-fqgz
+    ngless ungzip.ngl
+After running this script open the newly generated folder "**ungzip.ngl.output_ngless**" and view the template in the **index.html** file.
+
+For developers who have done this much more data-sets for testing purposes can be referenced and used by reading these documentation links:
+**[Human Gut Metagenomics Functional & Taxonomic Profiling](https://ngless.embl.de/tutorial-gut-metagenomics.html#)**
+**[ Ocean Metagenomics Functional Profiling](https://ngless.embl.de/tutorial-ocean-metagenomics.html)**
+**[Ocean Metagenomics Assembly and Gene Prediction](https://ngless.embl.de/tutorial-assembly-gp.html)**
+
+The download might cause network congestion in some machines, however with a compute trade-off the packages can be downloaded easily.
+Get more details of the resources **[here](https://ngless.embl.de/resources/Modules/)**.
+
+
 ## More information
 
 - [Full documentation](https://ngless.embl.de/)
