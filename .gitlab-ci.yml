@@ -119,6 +119,36 @@ build-and-test-ubuntu-wsl-profiling:
         - Modules/packages/
         expire_in: 1 month
 
+build-and-longtests-ubuntu-wsl:
+    image: registry.gitlab.com/ngless/ngless/ubuntu-ghc-stack:wsl
+    stage: build
+    tags:
+    - longjob
+
+    before_script:
+    - apt update
+    - apt upgrade -y
+    - stack upgrade
+    - mkdir bin
+
+    variables:
+        LC_ALL: "C.UTF-8"
+        STACKOPTS: "--system-ghc --ghc-options '-fPIC' --flag NGLess:embed"
+    retry: 1
+
+    script:
+    - make modules
+    - make check
+    - make install prefix=${PWD}
+    - PATH=${PWD}/bin:$PATH ./run-tests.sh long-
+
+    # Allow this to fail without failing the entire commit
+    #allow_failure: true
+    # Don't run this step automatically, make it a manually triggered build
+    when: manual
+    # The profiling build takes considerably longer, so relax the project's 2 hour limit
+    timeout: 24 hours
+
 build-and-test-ubuntu-non-static:
     image: registry.gitlab.com/ngless/ngless/ubuntu-ghc-stack:old
     stage: build

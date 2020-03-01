@@ -11,12 +11,19 @@ if ! ngless --check-install ; then
     exit 1
 fi
 
+TEST_PREFIX="$1"
+
 echo ">>> Running tests with: $(ngless --version-debug) <<<"
 
 ok="yes"
 failed_tests=""
 for testdir in tests/*; do
     if test -d "$testdir"; then
+        # Run only tests with specified PREFIX
+        # Useful to run only 'long-' tests or 'regression'
+        if [[ "x$TEST_PREFIX" != "x" ]] && [[ "$testdir" != tests/${TEST_PREFIX}-* ]]; then
+            continue
+        fi
         cur_ok=yes
         if test -f "${testdir}/TRAVIS_SKIP" -a "x$TRAVIS" = xtrue; then
             echo "Skipping $testdir on Travis"
