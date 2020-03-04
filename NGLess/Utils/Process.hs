@@ -38,7 +38,7 @@ runProcess binPath args stdin stdout = do
         stdout' = case stdout of
             Left _ -> fmap Left CL.consume
             Right sink -> fmap Right sink
-    outputListLno' DebugOutput ["Will run process ", binPath, unwords args]
+    outputListLno' DebugOutput ["Will run process ", binPath, " ", unwords args]
     (exitCode, out, err) <- with1Thread $
         CPT.withProcessWait (
                         -- No need to keep these open
