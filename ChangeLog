@@ -1,5 +1,6 @@
 Version 1.1.0+
-	* Edit-me
+	* Enable specifying *all* module resources by URL with download on first
+	use
 
 Version 1.1.0 2020-01-25 by luispedro
 	* Reintroduce zstd compression (after fixes upstream)

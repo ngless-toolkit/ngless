@@ -1,4 +1,4 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2020 NGLess Authors
  - License: MIT
 -}
 module ReferenceDatabases
@@ -81,6 +81,29 @@ findReference allrefs rn = find (\ref -> (refName ref == rn) || maybe False (== 
 isBuiltinReference :: T.Text -> Bool
 isBuiltinReference rn = isJust $ findReference builtinReferences rn
 
+-- Download if it's a URL
+downloadIfUrl :: FilePath -- ^ base directory
+                -> FilePath -- ^ local filename
+                -> Maybe FilePath
+                -> NGLessIO (Maybe FilePath)
+downloadIfUrl _ _ Nothing = return Nothing
+downloadIfUrl basedir fname (Just path)
+    | isUrl path = do
+        let local = basedir </> "cached" </> fname
+        liftIO $ createDirectoryIfMissing True (basedir </> "cached")
+        unlessM (liftIO $ doesFileExist local) $
+            withLockFile LockParameters
+                     { lockFname = local ++ ".download.lock"
+                     , maxAge = 300
+                     , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
+                     , mtimeUpdate = True
+                    } $ do
+                -- recheck with lock
+                unlessM (liftIO $ doesFileExist local) $
+                    downloadFile path local
+        return (Just local)
+    | otherwise = return (Just path)
+
 moduleDirectReference :: T.Text -> NGLessIO (Maybe ReferenceFilePaths)
 moduleDirectReference rname = do
     mods <- loadedModules
@@ -88,23 +111,10 @@ moduleDirectReference rname = do
         findM (modReferences m) $ \case
             ExternalReference eref fafile gtffile mapfile
                 | eref == rname -> do
-                    fafile' <- if isUrl fafile
-                        then do
-                            let local = modPath m </> "cached" </> T.unpack rname <.> "fna.gz"
-                            liftIO $ createDirectoryIfMissing True (modPath m </> "cached")
-                            unlessM (liftIO $ doesFileExist local) $
-                                withLockFile LockParameters
-                                         { lockFname = local ++ ".download.lock"
-                                         , maxAge = 300
-                                         , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
-                                         , mtimeUpdate = True
-                                        } $ do
-                                    -- recheck with lock
-                                    unlessM (liftIO $ doesFileExist local) $
-                                        downloadFile fafile local
-                            return local
-                        else return fafile
-                    return . Just $! ReferenceFilePaths (Just fafile') gtffile mapfile
+                    fafile'  <- downloadIfUrl (modPath m) (T.unpack rname <.> "fna.gz") (Just fafile)
+                    gtffile' <- downloadIfUrl (modPath m) (T.unpack rname <.> "gff.gz") gtffile
+                    mapfile' <- downloadIfUrl (modPath m) (T.unpack rname <.> "tsv.gz") mapfile
+                    return . Just $! ReferenceFilePaths fafile' gtffile' mapfile'
             _ -> return Nothing
 
 referencePath = "Sequence/BWAIndex/reference.fa.gz"
