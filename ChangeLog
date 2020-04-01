@@ -1,7 +1,7 @@
 Version 1.1.0+
 	* Edit-me
 
-Version 1.1.0 2019-01-25 by luispedro
+Version 1.1.0 2020-01-25 by luispedro
 	* Reintroduce zstd compression (after fixes upstream)
 	* Fix CIGAR interpretation (#109) occurring when I is present
 	* Call bwa mem so that it behaves in a deterministic way (independently of
