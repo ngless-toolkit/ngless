@@ -204,4 +204,5 @@ Authors
    advanced
    Language
    Mapping
+   contacts
    software
