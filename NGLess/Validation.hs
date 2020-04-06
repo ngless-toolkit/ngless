@@ -15,8 +15,7 @@ import           Control.Monad.Extra (whenJust)
 import           Control.Monad.Writer.Strict
 import           Control.Monad.RWS
 import           Control.Monad (foldM_)
-import           Data.String.Utils (endswith)
-import           Data.List (find)
+import           Data.List (find, isSuffixOf)
 import           Data.Maybe
 import           Data.Char (isUpper)
 import           Data.Foldable (asum)
@@ -26,6 +25,7 @@ import Modules
 import NGLess.NGError
 import BuiltinFunctions
 import Utils.Suggestion
+
 
 findMethod :: MethodName -> Maybe MethodInfo
 findMethod m = find ((==m) . methodName) builtinMethods
@@ -197,9 +197,9 @@ validateWriteOName _ = checkRecursiveScript $ validateWriteOName'
                 _ -> Nothing
         validateWriteOName' _ = Nothing
         checkType NGLReadSet oname
-            | endswith ".fa" oname = Just "Cannot save data in FASTA format."
-            | endswith ".fq" oname = Nothing
-            | endswith ".fq.gz" oname = Nothing
+            | isSuffixOf ".fa" oname = Just "Cannot save data in FASTA format."
+            | isSuffixOf ".fq" oname = Nothing
+            | isSuffixOf ".fq.gz" oname = Nothing
             | otherwise = Just . T.concat $ ["Cannot determine output format from filename '", T.pack oname, "'"]
         checkType _ _ = Nothing
 

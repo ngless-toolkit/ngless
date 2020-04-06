@@ -42,7 +42,7 @@ import           System.FilePath (takeBaseName, takeDirectory, (</>), (<.>), (-<
 import           Control.Monad (unless, forM_, when)
 import           System.Posix.Files (setFileMode)
 import           System.Posix.Internals (c_getpid)
-import           Data.String.Utils (endswith)
+import           Data.List (isSuffixOf)
 
 import System.Directory
 import System.IO
@@ -76,11 +76,11 @@ data Compression = NoCompression
 
 inferCompression :: FilePath -> Compression
 inferCompression fp
-    | endswith ".gz" fp = GzipCompression
-    | endswith ".bz2" fp = BZ2Compression
-    | endswith ".xz"  fp = XZCompression
-    | endswith ".zst" fp = ZStdCompression
-    | endswith ".zstd" fp = ZStdCompression
+    | isSuffixOf ".gz" fp = GzipCompression
+    | isSuffixOf ".bz2" fp = BZ2Compression
+    | isSuffixOf ".xz"  fp = XZCompression
+    | isSuffixOf ".zst" fp = ZStdCompression
+    | isSuffixOf ".zstd" fp = ZStdCompression
     | otherwise = NoCompression
 
 

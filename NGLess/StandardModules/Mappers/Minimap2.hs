@@ -1,4 +1,4 @@
-{- Copyright 2018-2019 NGLess Authors
+{- Copyright 2018-2020 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE RankNTypes #-}
@@ -10,7 +10,7 @@ module StandardModules.Mappers.Minimap2
     ) where
 
 import           System.Directory (doesFileExist)
-import           System.Path (splitExt)
+import           System.FilePath (splitExtension)
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.Vector as V
 import qualified Data.ByteString as B
@@ -38,7 +38,7 @@ import FileManagement (makeNGLTempFile, minimap2Bin)
 
 indexName :: FilePath -> FilePath
 indexName fp = base ++ "-minimap2-" ++ minimap2Version ++ ext ++ ".mm2.idx"
-    where (base, ext) = splitExt fp
+    where (base, ext) = splitExtension fp
 
 hasValidIndex :: FilePath -> NGLessIO Bool
 hasValidIndex = liftIO . doesFileExist . indexName

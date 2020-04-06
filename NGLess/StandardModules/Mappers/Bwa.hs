@@ -1,4 +1,4 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2020 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE RankNTypes #-}
@@ -11,7 +11,7 @@ module StandardModules.Mappers.Bwa
 
 import           System.Directory (doesFileExist)
 import           System.Posix (getFileStatus, fileSize, FileOffset)
-import           System.Path (splitExt)
+import           System.FilePath (splitExtension)
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as B
 
@@ -32,7 +32,7 @@ import Utils.Process (runProcess)
 -- of bwa use different indices
 indexPrefix :: FilePath -> NGLessIO FilePath
 indexPrefix base = do
-    let (basename, ext) = splitExt base
+    let (basename, ext) = splitExtension base
     return $ basename ++ "-bwa-" ++ bwaVersion ++ ext
 
 -- | Checks whether all necessary files are present for a BWA index

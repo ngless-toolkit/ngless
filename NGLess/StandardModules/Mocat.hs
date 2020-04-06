@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiWayIf #-}
-{- Copyright 2016-2019 NGLess Authors
+{- Copyright 2016-2020 NGLess Authors
  - License: MIT
  -}
 
@@ -20,12 +20,12 @@ import           Control.Monad.Extra (unlessM)
 import           System.Directory (doesDirectoryExist)
 import System.FilePath
 import System.FilePath.Glob
-import Data.List.Utils
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad
 import Data.Maybe
 import Data.Default
-import Data.List (sort, isInfixOf)
+import Data.List (sort, nub, isInfixOf, isSuffixOf)
+
 
 import Output
 import NGLess
@@ -48,8 +48,8 @@ pairedEnds = do
     return (s1 ++ "." ++ end, s2 ++ "." ++ end)
 
 buildSingle m1
-    | "pair.1" `isInfixOf` m1 = replace "pair.1" "single" m1
-    | "pair.2" `isInfixOf` m1 = replace "pair.2" "single" m1
+    | "pair.1" `isInfixOf` m1 = T.unpack $ T.replace "pair.1" "single" (T.pack m1)
+    | "pair.2" `isInfixOf` m1 = T.unpack $ T.replace "pair.2" "single" (T.pack m1)
     | otherwise = "MARKER_FOR_FILE_WHICH_DOES_NOT_EXIST"
 
 mocatSamplePaired :: [FilePath] -> T.Text -> Bool -> NGLessIO [Expression]
@@ -57,11 +57,11 @@ mocatSamplePaired fqfiles encoding doQC = do
     let passthru = [(Variable "__perform_qc", ConstBool doQC), (Variable "encoding", ConstSymbol encoding)]
         match1 :: FilePath -> Maybe (FilePath, FilePath)
         match1 fp = listToMaybe . flip mapMaybe pairedEnds $ \(p1,p2) -> if
-                        | (endswith p1 fp) -> Just (fp, dropEnd (length p1) fp ++ p2)
-                        | (endswith p2 fp) -> Just (dropEnd (length p2) fp ++ p1, fp)
+                        | (isSuffixOf p1 fp) -> Just (fp, dropEnd (length p1) fp ++ p2)
+                        | (isSuffixOf p2 fp) -> Just (dropEnd (length p2) fp ++ p1, fp)
                         | otherwise -> Nothing
-        -- match1 returns repeated entries if both pair.1 and pair.2 exist, uniq removes duplicate records
-        matched1 = uniq $ mapMaybe match1 fqfiles
+        -- match1 returns repeated entries if both pair.1 and pair.2 exist, `nub` removes duplicate records
+        matched1 = nub $ mapMaybe match1 fqfiles
         encodeStr = ConstStr . T.pack
     (exps,used) <- fmap unzip $ forM matched1 $ \(m1,m2) -> do
         let singles = buildSingle m1
