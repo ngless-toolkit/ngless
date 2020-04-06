@@ -103,7 +103,7 @@ import Interpretation.Count (executeCount, executeCountCheck)
 import Interpretation.CountFile (executeCountFile)
 import Interpretation.FastQ
 import Interpretation.Write
-import Interpretation.Select (executeSelect, executeMappedReadMethod, splitSamlines3, fixCigar)
+import Interpretation.Select (executeSelect, executeMappedReadMethod, reinjectSequences)
 import Interpretation.Unique
 import Interpretation.Substrim
 import Utils.Utils
@@ -589,25 +589,6 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Vari
                             _ -> nglTypeError ("Expected variable "++show var++" to contain a mapped read.")
 
                         else return []
-        reinjectSequences :: [SamLine] -> [SamLine] -> NGLess [SamLine]
-        reinjectSequences original filtered = case (splitSamlines3 original, splitSamlines3 filtered) of
-            ((o1, o2, os), (f1, f2, fs)) -> do
-                r1 <- reinjectSequences' o1 f1
-                r2 <- reinjectSequences' o2 f2
-                ss <- reinjectSequences' os fs
-                return (r1 ++ r2 ++ ss)
-        reinjectSequences' :: [SamLine] -> [SamLine] -> NGLess [SamLine]
-        reinjectSequences' original f@(s@SamLine{}:rs)
-            | not (any hasSequence f) = let
-                        fixed = flip map (filter hasSequence original) $ \s' -> do
-                            cigar <- fixCigar (samCigar s) (samLength s')
-                            return (s { samSeq = samSeq s', samQual = samQual s', samCigar = cigar }:rs)
-                        asum' [] = return f
-                        asum' (x:xs) = case x of
-                            Right{} -> x
-                            Left{} -> asum' xs
-                    in asum' fixed
-        reinjectSequences' _ f = return f
 executeSelectWBlock expr _ _ = unreachable ("Select with block, unexpected argument: " ++ show expr)
 
 

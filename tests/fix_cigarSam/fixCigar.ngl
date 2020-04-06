@@ -7,3 +7,4 @@ mappedBlock = select(mapped) using |mr|:
         discard
 
 mappedCall = select(mapped, keep_if=[{mapped}])
+write(mappedCall, ofile='output.sam')

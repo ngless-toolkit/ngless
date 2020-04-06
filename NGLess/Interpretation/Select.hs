@@ -1,4 +1,4 @@
-{- Copyright 2015-2019 NGLess Authors
+{- Copyright 2015-2020 NGLess Authors
  - License: MIT
  -}
 
@@ -7,8 +7,8 @@
 module Interpretation.Select
     ( executeSelect
     , executeMappedReadMethod
-    , splitSamlines3
     , fixCigar
+    , reinjectSequences
     ) where
 
 import qualified Data.ByteString as B
@@ -25,7 +25,7 @@ import qualified Data.Text.Encoding as TE
 import           Data.Bits (Bits(..))
 import           Control.Monad.Except (throwError)
 import           Data.Either.Combinators (fromRight)
-import           Data.List (foldl', find)
+import           Data.List (foldl')
 import           Data.Either.Extra (eitherToMaybe)
 import           Data.Tuple.Extra (fst3)
 import           Data.Ratio (Ratio, (%))
@@ -34,7 +34,7 @@ import Data.Maybe
 
 import Data.Sam
 import FileManagement
-import FileOrStream
+import FileOrStream (asSamStream, FileOrStream(..))
 import Language
 import Output
 
@@ -81,24 +81,52 @@ _parseConditions args = do
 --  2) we want to keep the full sequence, so we want to use soft trimming (if
 --  at all possible)
 matchConditions :: Bool -> MatchCondition -> [(SamLine,B.ByteString)] -> NGLess [(SamLine, B.ByteString)]
-matchConditions doReinject conds sg = reinjectSequences doReinject (matchConditions' conds sg)
+matchConditions doReinject conds sg =
+    let sg' = matchConditions' conds sg
+        in if doReinject
+            then reinjectSequencesIfNeeded sg sg'
+            else pure sg'
+
+toStrictBS :: BB.Builder -> B.ByteString
+toStrictBS = BL.toStrict . BB.toLazyByteString
+
+
+reinjectSequencesIfNeeded :: [(SamLine,B.ByteString)] -> [(SamLine,B.ByteString)] -> NGLess [(SamLine,B.ByteString)]
+reinjectSequencesIfNeeded _ filtered@((SamHeader{},_):_) = return filtered
+reinjectSequencesIfNeeded orig filtered =
+        if needsReinject (fmap fst filtered)
+            then do
+                filtered' <- reinjectSequences (fmap fst orig) (fmap fst filtered)
+                return $ fmap (\s -> (s, toStrictBS $ encodeSamLine s)) filtered'
+            else return filtered
     where
-        reinjectSequences True f@((s@SamLine{}, _):rs)
-            | not (any (hasSequence . fst) f) && any (hasSequence . fst) sg
-                = do
-                    s' <- addSequence s
-                    return ((s', toStrictBS $ encodeSamLine s'):rs)
-        reinjectSequences _ f = return f
+        needsReinject :: [SamLine] -> Bool
+        needsReinject fs = let (fs1, fs2, fs0) = splitSamlines3 fs
+                            in needsReinject' fs1 || needsReinject' fs2 || needsReinject' fs0
+        needsReinject' :: [SamLine] -> Bool
+        needsReinject' [] = False
+        needsReinject' xs = not (any hasSequence xs)
 
-        toStrictBS :: BB.Builder -> B.ByteString
-        toStrictBS = BL.toStrict . BB.toLazyByteString
-
-        addSequence s = case find hasSequence (fst <$> sg) of
-                            Just s'@SamLine{} -> do
-                                        cigar' <- fixCigar (samCigar s) (B.length $ samSeq s')
-                                        return s { samSeq = samSeq s', samQual = samQual s', samCigar = cigar' }
-                            _ -> return s
-
+-- See note above on "Sequence reinjection" about why this function is necessary
+reinjectSequences :: [SamLine] -> [SamLine] -> NGLess [SamLine]
+reinjectSequences original filtered = case (splitSamlines3 original, splitSamlines3 filtered) of
+    ((o1, o2, os), (f1, f2, fs)) -> do
+        r1 <- reinjectSequences' o1 f1
+        r2 <- reinjectSequences' o2 f2
+        ss <- reinjectSequences' os fs
+        return (r1 ++ r2 ++ ss)
+reinjectSequences' :: [SamLine] -> [SamLine] -> NGLess [SamLine]
+reinjectSequences' original f@(s@SamLine{}:rs)
+    | not (any hasSequence f) = let
+                fixed = flip map (filter hasSequence original) $ \s' -> do
+                    cigar <- fixCigar (samCigar s) (samLength s')
+                    return (s { samSeq = samSeq s', samQual = samQual s', samCigar = cigar }:rs)
+                asum' [] = return f
+                asum' (x:xs) = case x of
+                    Right{} -> x
+                    Left{} -> asum' xs
+            in asum' fixed
+reinjectSequences' _ f = return f
 -- See note above on "Sequence reinjection" about why this function is necessary
 fixCigar :: B.ByteString -> Int -> NGLess B.ByteString
 fixCigar prev n = do
