@@ -1,5 +1,5 @@
-Version 1.1.0+
-	* Fix CIGAR reinjection bug
+Version 1.1.1 2020-04-07 by luispedro
+	* Fix sequence reinjection bug
 
 Version 1.1.0 2020-01-25 by luispedro
 	* Reintroduce zstd compression (after fixes upstream)

@@ -2,6 +2,12 @@
 What's New (History)
 ====================
 
+Version 1.1.1
+-------------
+
+This is a bugfix release and results should not change. In particular, a
+sequence reinjection bug was fixed.
+
 Version 1.1.0
 -------------
 
