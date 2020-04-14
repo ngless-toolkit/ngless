@@ -6,8 +6,17 @@ What's New (History)
 Version 1.2.0 (Unreleased)
 --------------------------
 
+Internal improvements
+~~~~~~~~~~~~~~~~~~~~~
+
 - Modules can now specify their annotation as a URL that NGLess downloads on a
   "as needed" basis: in version 1.1, only FASTA files were supported.
+
+Version 1.1.1
+-------------
+
+This is a bugfix release and results should not change. In particular, a
+sequence reinjection bug was fixed.
 
 Version 1.1.0
 -------------
