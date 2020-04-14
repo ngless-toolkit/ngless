@@ -20,16 +20,16 @@ Adapt the mount flags (``-v``) as needed.
 
 ## Linux (binary)
 
-You can get a [statically linked version of
-NGless 0.6.1](https://ngless.embl.de/releases/ngless-0.6.1-Linux64) or a [nighly build
-of the latest development
+You can get a [statically linked version of NGless
+1.1.1](https://github.com/ngless-toolkit/ngless/releases/download/v1.1.1/NGLess-1.1.1-static-Linux64)
+or a [nighly build of the latest development
 code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
 This should work across a wide range of Linux versions (please
 [report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
 
-    curl -O https://ngless.embl.de/releases/ngless-0.6.0-Linux64
-    chmod +x ngless-0.6.0-Linux64
-    ./ngless-0.6.0-Linux64
+    curl -L -O https://github.com/ngless-toolkit/ngless/releases/download/v1.1.1/NGLess-1.1.1-static-Linux64
+    chmod +x NGLess-1.1.1-static-Linux64
+    ./NGLess-1.1.1-static-Linux64
 
 This download bundles bwa, samtools and megahit (also statically linked).
 
