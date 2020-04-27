@@ -18,7 +18,6 @@ import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import qualified Data.Strict.Tuple as TU
 import           Data.Conduit ((.|))
 import           Data.List (elemIndex)
 import Control.Monad.IO.Class (liftIO)
@@ -74,11 +73,16 @@ defCountOpts =
     }
 
 
+extractIds :: [AnnotationInfo] -> [Int]
+extractIds [] = []
+extractIds (AnnotationInfo1 _ ix:xs) = ix:extractIds xs
+extractIds (AnnotationInfoCons _ ix ais:xs) = ix:extractIds (ais:xs)
+
 very_short_gff = "test_samples/very_short.gtf"
 case_load_very_short = do
     [GFFAnnotator immap headers szmap] <- testNGLessIO
                 $ loadAnnotator (AnnotateGFF very_short_gff) defCountOpts  { optFeatures = ["gene"] }
-    let usedIDs = map TU.snd $ concat $ concatMap IM.elems $ M.elems immap
+    let usedIDs = extractIds $ concatMap IM.elems $ M.elems immap
     length (listNub usedIDs) @?= length headers
     minimum usedIDs @?= 0
     maximum usedIDs @?= length headers - 1
@@ -101,7 +105,7 @@ case_load_gff_order = do
     fp <- testNGLessIO $ asTempFile short3 "gtf"
     [GFFAnnotator immap headers _] <- testNGLessIO
                 $ loadAnnotator (AnnotateGFF fp) defCountOpts  { optFeatures = ["gene"] }
-    let [h] = map TU.snd . concat . IM.elems  . fromJust $ M.lookup "V" immap
+    let [h] = extractIds . IM.elems  . fromJust $ M.lookup "V" immap
     (headers !! h) @?= "WBGene00008825"
 
 short1 :: B.ByteString

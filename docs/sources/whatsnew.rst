@@ -11,6 +11,8 @@ Internal improvements
 
 - Modules can now specify their annotation as a URL that NGLess downloads on a
   "as needed" basis: in version 1.1, only FASTA files were supported.
+- Memory consumption of `count() function <Functions.html#count>`__ has been
+  improved when using GFF files.
 
 Version 1.1.1
 -------------
