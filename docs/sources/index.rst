@@ -192,6 +192,7 @@ Authors
    methods
    stdlib
    modules
+   count
    constants
    Organisms
    motus
