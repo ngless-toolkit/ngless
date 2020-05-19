@@ -1,4 +1,4 @@
-{- Copyright 2015-2019 NGLess Authors
+{- Copyright 2015-2020 NGLess Authors
  - License: MIT
  -}
 
@@ -28,14 +28,12 @@ module Modules
  - The data type 'Module' encapsulates all information about a module.
  -}
 import qualified Data.Text as T
-import qualified Language.Haskell.TH as TH
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef
 import Data.Aeson
 import Data.Default
 
-import Utils.FindModules (listKnownModules)
 import Language
 import NGLess
 
@@ -154,5 +152,16 @@ loadedModules :: NGLessIO [Module]
 loadedModules = liftIO $ readIORef loadedModulesRef
 
 knownModules :: [T.Text]
-knownModules = T.pack <$> $(TH.runIO ((TH.ListE . fmap (TH.LitE . TH.stringL)) <$> listKnownModules))
+knownModules =
+    ["example-cmd"
+
+    ,"igc"
+    ,"om-rgc"
+    ,"DogGutCatalog"
+    ,"MouseGutCatalog"
+    ,"PigGutCatalog"
+
+    ,"specI"
+    ,"motus"
+    ]
 
