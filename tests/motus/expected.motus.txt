@@ -1,3 +1,0 @@
-	input.1.fq.gz
-Cluster1105	18.0
-Cluster1485	3.2

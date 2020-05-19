@@ -2,6 +2,7 @@ Version 1.1.0+
 	* Enable specifying *all* module resources by URL with download on first
 	use
 	* Fix CIGAR reinjection bug
+	* Remove old motus/specI moduels
 
 Version 1.1.0 2020-01-25 by luispedro
 	* Reintroduce zstd compression (after fixes upstream)

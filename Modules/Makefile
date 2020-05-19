@@ -1,25 +1,9 @@
-MODULES: motus specI targzs
+MODULES: targzs
 
-MOTUS_VERSION = 1.0
-SPECI_VERSION = 1.0
-
-motus:
-	cd motus.ngm/$(MOTUS_VERSION) && $(MAKE)
-
-specI:
-	cd specI.ngm/$(SPECI_VERSION) && $(MAKE)
-
-targzs: packages/example-cmd-0.0.tar.gz packages/motus-$(MOTUS_VERSION).tar.gz packages/specI-$(SPECI_VERSION).tar.gz
+targzs: packages/example-cmd-0.0.tar.gz
 
 packages/example-cmd-0.0.tar.gz:
 	mkdir -p packages
 	cd .. && tar cfz Modules/packages/example-cmd-0.0.tar.gz Modules/example-cmd.ngm/0.0
 
-packages/motus-$(MOTUS_VERSION).tar.gz:
-	cd .. && tar cfz Modules/packages/motus-$(MOTUS_VERSION).tar.gz Modules/motus.ngm/$(MOTUS_VERSION)
-
-packages/specI-$(SPECI_VERSION).tar.gz:
-	mkdir -p packages
-	cd .. && tar cfz Modules/packages/specI-$(SPECI_VERSION).tar.gz Modules/specI.ngm/$(SPECI_VERSION)
-
-.PHONY: MODULES packages motus
+.PHONY: MODULES packages
