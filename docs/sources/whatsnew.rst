@@ -274,7 +274,7 @@ Bug fixes
 
 - Fix writing multiple compressed Fastq outputs.
 
-- Fix corner case in `select <Functions.html#select>__`. Previously, it was
+- Fix corner case in `select <Functions.html#select>`__. Previously, it was
   possible that some sequences were wrongly removed from the output.
 
 Internal improvements
