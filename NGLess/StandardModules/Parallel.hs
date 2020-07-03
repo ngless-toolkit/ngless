@@ -1,4 +1,4 @@
-{- Copyright 2016-2019 NGLess Authors
+{- Copyright 2016-2020 NGLess Authors
  - License: MIT
  -}
 
@@ -72,6 +72,7 @@ import Transform
 import FileOrStream
 import Configuration
 import FileManagement
+import NGLess.NGError
 import NGLess.NGLEnvironment
 
 import Interpretation.Write (moveOrCopyCompress)
@@ -163,7 +164,10 @@ getLock basedir fs = do
         notlocked = flip filter notfinished $ \fname -> lockName fname `notElem` existing
         notfailed = flip filter notlocked $ \fname -> failedName fname `notElem` existing
 
-    outputListLno' TraceOutput ["Looking for a lock in ", basedir, ". Total number of elements is ", show (length fs), " (not locked: ", show (length notlocked), "; not finished: ", show (length notfinished), ")."]
+    outputListLno' TraceOutput [
+                    "Looking for a lock in ", basedir, ". ",
+                    "Total number of elements is ", show (length fs),
+                    " (not locked: ", show (length notlocked), "; not finished: ", show (length notfinished), ")."]
     -- first try all the elements that are not locked and have not failed
     -- if that fails, try the unlocked but failed
     -- Finally, try the locked elements in the hope that some may be stale
@@ -176,8 +180,11 @@ getLock basedir fs = do
                 getLock' basedir notfinished >>= \case
                     Just v -> return v
                     Nothing -> do
-                        outputListLno' InfoOutput ["Could get a lock for any file."]
-                        throwGenericError "Could not obtain any lock"
+                        let msg = if null (notfailed ++ notfailed)
+                                then "All jobs are finished"
+                                else "Jobs appear to be running"
+                        outputListLno' WarningOutput ["Could get a lock for any file: ", msg]
+                        throwError $ NGError NoErrorExit msg
 
 getLock' _ [] = return Nothing
 getLock' basedir (f:fs) = do

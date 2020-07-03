@@ -6,6 +6,13 @@ What's New (History)
 Version 1.2.0 (Unreleased)
 --------------------------
 
+User-visible improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Better messages in `parallel
+  <https://ngless.embl.de/stdlib.html?highlight=lock1#parallel-module>`__
+  module when there are no free locks.
+
 Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~
 
