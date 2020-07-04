@@ -34,6 +34,7 @@ import Language
 import FileManagement
 import Utils.Conduit
 import Utils.Utils (dropEnd)
+import Interpretation.FastQ (executeGroup, executePaired, executeFastq)
 
 exts :: [FilePath]
 exts = do
@@ -52,9 +53,9 @@ buildSingle m1
     | "pair.2" `isInfixOf` m1 = T.unpack $ T.replace "pair.2" "single" (T.pack m1)
     | otherwise = "MARKER_FOR_FILE_WHICH_DOES_NOT_EXIST"
 
-mocatSamplePaired :: [FilePath] -> T.Text -> Bool -> NGLessIO [Expression]
+mocatSamplePaired :: [FilePath] -> T.Text -> Bool -> NGLessIO [NGLessObject]
 mocatSamplePaired fqfiles encoding doQC = do
-    let passthru = [(Variable "__perform_qc", ConstBool doQC), (Variable "encoding", ConstSymbol encoding)]
+    let passthru = [("__perform_qc", NGOBool doQC), ("encoding", NGOSymbol encoding)]
         match1 :: FilePath -> Maybe (FilePath, FilePath)
         match1 fp = listToMaybe . flip mapMaybe pairedEnds $ \(p1,p2) -> if
                         | (isSuffixOf p1 fp) -> Just (fp, dropEnd (length p1) fp ++ p2)
@@ -62,28 +63,32 @@ mocatSamplePaired fqfiles encoding doQC = do
                         | otherwise -> Nothing
         -- match1 returns repeated entries if both pair.1 and pair.2 exist, `nub` removes duplicate records
         matched1 = nub $ mapMaybe match1 fqfiles
-        encodeStr = ConstStr . T.pack
+        encodeStr = NGOString . T.pack
     (exps,used) <- fmap unzip $ forM matched1 $ \(m1,m2) -> do
         let singles = buildSingle m1
         unless (m1 `elem` fqfiles) $ throwDataError ("Cannot find match for file: " ++ m2)
         unless (m2 `elem` fqfiles) $ throwDataError ("Cannot find match for file: " ++ m1)
         let singlesArgs
-                | singles `elem` fqfiles = (Variable "singles", encodeStr singles):passthru
+                | singles `elem` fqfiles = ("singles", encodeStr singles):passthru
                 | otherwise = passthru
-        outputListLno' InfoOutput ["load_mocat_sample found paired-end sample '", m1, "' - '", m2, if singles `elem` fqfiles then "' with singles file '" ++ singles ++ "'" else "'"]
-        let expr = FunctionCall (FuncName "paired") (encodeStr m1) ((Variable "second", encodeStr m2):singlesArgs) Nothing
-            used = [m1, m2, singles]
+        outputListLno' InfoOutput [
+                        "load_mocat_sample found paired-end sample '",
+                        m1, "' - '", m2,
+                        if singles `elem` fqfiles
+                            then "' with singles file '" ++ singles ++ "'"
+                            else "'"]
+        expr <- executePaired (encodeStr m1) (("second", encodeStr m2):singlesArgs)
+        let used = [m1, m2, singles]
         return (expr, used)
     let singletonFiles = [f | f <- fqfiles, f `notElem` concat used]
-        singletons = [FunctionCall (FuncName "fastq") (encodeStr f) passthru Nothing
-                                | f <- singletonFiles]
-    forM_ singletonFiles $ \f ->
+    singletons <- forM singletonFiles $ \f -> do
         outputListLno' InfoOutput ["load_mocat_sample found single-end sample '", f, "'"]
+        executeFastq (encodeStr f) passthru
     return $ singletons ++ exps
 
 
 executeLoad :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-executeLoad (NGOString samplename) kwargs = NGOExpression <$> do
+executeLoad (NGOString samplename) kwargs = do
     qcNeeded <- lookupBoolOrScriptErrorDef (return True) "hidden QC argument" "__perform_qc" kwargs
     encoding <- lookupSymbolOrScriptErrorDef (return "auto") "encoding passthru argument" "encoding" kwargs
     outputListLno' TraceOutput ["Executing load_mocat_sample transform"]
@@ -93,7 +98,7 @@ executeLoad (NGOString samplename) kwargs = NGOExpression <$> do
     fqfiles <- fmap (sort . concat) $ forM exts $ \pat ->
         liftIO $ namesMatching (basedir </> ("*." ++ pat))
     args <- mocatSamplePaired fqfiles encoding qcNeeded
-    return (FunctionCall (FuncName "group") (ListExpression args) [(Variable "name", ConstStr samplename)] Nothing)
+    executeGroup (NGOList args) [("name", NGOString samplename)]
 executeLoad _ _ = throwShouldNotOccur "load_mocat_sample got the wrong arguments."
 
 executeParseCoord :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject

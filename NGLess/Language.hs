@@ -106,7 +106,6 @@ data NGLessObject =
         | NGOCounts FileOrStream
         | NGOVoid
         | NGOList [NGLessObject]
-        | NGOExpression Expression
     deriving (Eq, Show)
 
 
@@ -114,19 +113,19 @@ data NGLessObject =
 
 data Expression =
         Lookup (Maybe NGLType) Variable -- ^ This looks up the variable name
-        | ConstStr T.Text -- ^ constant string
-        | ConstInt Integer -- ^ integer
-        | ConstDouble Double -- ^ integer
-        | ConstBool Bool -- ^ true/false
-        | ConstSymbol T.Text -- ^ a symbol
-        | BuiltinConstant Variable -- ^ built-in constant
+        | ConstStr !T.Text -- ^ constant string
+        | ConstInt !Integer -- ^ integer
+        | ConstDouble !Double -- ^ integer
+        | ConstBool !Bool -- ^ true/false
+        | ConstSymbol !T.Text -- ^ a symbol
+        | BuiltinConstant !Variable -- ^ built-in constant
         | ListExpression [Expression] -- ^ a list
         | Continue -- ^ continue
         | Discard -- ^ discard
         | UnaryOp UOp Expression  -- ^ op ( expr )
         | BinaryOp BOp Expression Expression -- ^ expr bop expr
         | Condition Expression Expression Expression -- ^ if condition: true-expr else: false-expr
-        | IndexExpression Expression Index -- ^ expr [ index ]
+        | IndexExpression Expression !Index -- ^ expr [ index ]
         | Assignment Variable Expression -- ^ var = expr
         | FunctionCall FuncName Expression [(Variable, Expression)] (Maybe Block)
         | MethodCall MethodName Expression (Maybe Expression) [(Variable, Expression)] -- ^ expr.method(expre)

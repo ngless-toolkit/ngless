@@ -1,4 +1,4 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2020 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -185,7 +185,6 @@ typeOfObject NGOCounts{} = Just NGLCounts
 typeOfObject NGOVoid = Just NGLVoid
 typeOfObject (NGOList []) = Nothing
 typeOfObject (NGOList (v:_)) = NGList <$> typeOfObject v
-typeOfObject (NGOExpression _) = error "unexpected typeOfObject(NGOExpression)"
 
 
 checkuop UOpLen e = checkindexable e *> return (Just NGLInteger)

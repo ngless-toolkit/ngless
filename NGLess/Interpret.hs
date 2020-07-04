@@ -240,7 +240,6 @@ gcTemps = do
                             NGOCounts s -> origin s
                             NGOVoid -> []
                             NGOList lst -> concatMap extractFiles lst
-                            NGOExpression _ -> error "gcTemps: NGOExpression in extractFiles"
         extractFilesRS (ReadSet ps p3) = concatMap (extractFilesRS' . fst) ps
                                                 ++ concatMap (extractFilesRS' . snd) ps
                                                 ++ concatMap extractFilesRS' p3
@@ -341,9 +340,7 @@ interpretFunction' (FuncName "select")    expr args (Just b) = executeSelectWBlo
 interpretFunction' fname@(FuncName fname') expr args Nothing = do
     traceExpr ("executing module function: '"++T.unpack fname'++"'") expr
     execF <- findFunction fname
-    runNGLessIO (execF expr args) >>= \case
-        NGOExpression expr' -> interpretTopValue expr'
-        val -> return val
+    runNGLessIO (execF expr args)
 interpretFunction' f _ _ _ = throwShouldNotOccur . concat $ ["Interpretation of ", show f, " is not implemented"]
 
 executeSamfile expr@(NGOString fname) args = do
