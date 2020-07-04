@@ -84,6 +84,7 @@ import qualified BuiltinModules.Argv as ModArgv
 import qualified BuiltinModules.Assemble as ModAssemble
 import qualified BuiltinModules.Checks as Checks
 import qualified BuiltinModules.AsReads as ModAsReads
+import qualified BuiltinModules.LoadDirectory as ModLoadDirectory
 import qualified BuiltinModules.Readlines as Readlines
 import qualified BuiltinModules.Remove as Remove
 import qualified BuiltinModules.QCStats as ModQCStats
@@ -149,6 +150,7 @@ loadModules av mods  = do
     mA <- ModAsReads.loadModule ("" :: T.Text)
     mArgv <- ModArgv.loadModule ("" :: T.Text)
     mAssemble <- ModAssemble.loadModule ("" :: T.Text)
+    mLoadDirectory <- ModLoadDirectory.loadModule ("" :: T.Text)
     mReadlines <- Readlines.loadModule ("" :: T.Text)
     mChecks <- Checks.loadModule ("" :: T.Text)
     mRemove <- Remove.loadModule ("" :: T.Text)
@@ -156,6 +158,7 @@ loadModules av mods  = do
     mOrfFind <- ModORFFind.loadModule ("0.6" :: T.Text)
     imported <- loadStdlibModules mods
     let loaded = [mOrfFind | av >= NGLVersion 0 6]
+                    ++ [mLoadDirectory | av >= NGLVersion 1 2]
                     ++ [mReadlines, mArgv, mAssemble, mA, mChecks, mRemove, mStats] ++ imported
     forM_ loaded registerModule
     return loaded
@@ -212,7 +215,8 @@ loadScript (CmdArgs.ScriptFilePath fname) =
 
 
 parseVersion :: Maybe T.Text -> NGLess NGLVersion
-parseVersion Nothing = return $ NGLVersion 1 0
+parseVersion Nothing = return $ NGLVersion 1 2
+parseVersion (Just "1.2") = return $ NGLVersion 1 2
 parseVersion (Just "1.1") = return $ NGLVersion 1 1
 parseVersion (Just "1.0") = return $ NGLVersion 1 0
 parseVersion (Just "0.0") = return $ NGLVersion 0 0
@@ -228,7 +232,7 @@ parseVersion (Just v) = case T.splitOn "." v of
                                 throwScriptError $ concat ["The NGLess version string at the top of the file should only\ncontain a major and a minor version, separated by a dot.\n\n"
                                                         ,"You probably meant to write:\n\n"
                                                         ,"ngless \"" , T.unpack majV, ".", T.unpack minV, "\"\n"]
-                            [_, _] -> throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 1.0 and 0.0/0.5-12 are available in this release)."]
+                            [_, _] -> throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 1.[0-2] and 0.0/0.5-12 are available in this release)."]
                             _ -> throwScriptError $ concat ["Version ", T.unpack v, " could not be understood. The version string should look like \"1.0\" or similar"]
 
 modeExec :: CmdArgs.NGLessMode -> IO ()

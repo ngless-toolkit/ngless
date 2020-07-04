@@ -133,46 +133,23 @@ the visible behaviour, only make the computation faster).
 
 ## Mocat module
 
-    import "mocat" version "0.6"
+    import "mocat" version "1.0"
 
 This is a [MOCAT](http://vm-lux.embl.de/~kultima/MOCAT) compatibility layer to
 make it easier to adapt projects from MOCAT to ngless.
 
 ### Functions
 
-`load_mocat_sample :: string -> readset` this function takes a directory name
-and returns a set of reads by scanning the directory for (compressed) FastQ
-files. This is slightly more flexible than MOCAT2 in terms of the patterns in
-matches. In particular, the following extensions are accepted:
-
-- `fq`
-- `fq.gz`
-- `fq.bz2`
-- `fastq`
-- `fastq.gz`
-- `fastq.bz2`
-
-Paired-end reads are assumed to be split into two files, with matching names
-with `.1`/`.2` appended. `_1`/`_2` as is used by the European Nucleotide
-Archive (ENA) is also accepted.
-
-If paired-end reads have been pre-filtered, an unpaired/single file is often available.
-`load_mocat_sample` recognizes the suffix `single`. In the following example,
-all three files are read as one group:
-
-    sample
-    ├── sample.pair.1.fq.gz
-    ├── sample.pair.2.fq.gz
-    └── sample.single.fq.gz
-
+`load_mocat_sample :: string -> readset` this is now available as
+`load_fastq_directory`.
 
 `coord_file_to_gtf :: string -> string` this function takes a MOCAT-style
 `.coord`, converts it internally to a GTF file and returns it.
 
 Example usage:
 
-    ngless "0.6"
-    import "mocat" version "0.6"
+    ngless "1.1"
+    import "mocat" version "1.1"
 
     sample = load_mocat_sample('Sample1')
     mapped = map(sampled, fafile='data/catalog.padded.fna')

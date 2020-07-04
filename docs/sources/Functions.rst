@@ -104,6 +104,59 @@ The ``encoding`` argument has the same meaning as for the ``fastq()`` function:
   This is used for older Illumina/Solexa machines.
 - ``{auto}``: use auto detection. This is the default.
 
+load_fastq_directory
+--------------------
+
+.. since :: NGLess 1.2
+    Previously, this function was available in the ``mocat`` module as
+    ``load_mocat_sample``. Now, it is a builtin function. Even though the
+    concept originated with MOCAT, this function is now more flexible than the
+    original MOCAT implementation.
+
+This function takes a directory name and returns a set of reads by scanning the
+directory for (compressed) FastQ files. This is slightly more flexible than
+MOCAT2 in terms of the patterns in matches. In particular, the following
+extensions are accepted:
+
+- ``fq``
+- ``fq.gz``
+- ``fq.bz2``
+- ``fastq``
+- ``fastq.gz``
+- ``fastq.bz2``
+
+Paired-end reads are assumed to be split into two files, with matching names
+with ``.1``/``.2`` appended. ``_1``/``_2`` as is used by the European Nucleotide
+Archive (ENA) is also accepted.
+
+If paired-end reads have been pre-filtered, an unpaired/single file is often available.
+``load_fastq_directory`` recognizes the suffix ``single``. In the following example,
+all three files are read as one group::
+
+    sample
+    ├── sample.pair.1.fq.gz
+    ├── sample.pair.2.fq.gz
+    └── sample.single.fq.gz
+
+
+Arguments by value:
+~~~~~~~~~~~~~~~~~~~
++------------+--------------+------------+----------------+
+| Name       | Type         | Required   | Default Value  |
++============+==============+============+================+
+| name       | String       |  no        | ""             |
++------------+--------------+------------+----------------+
+
+Argument
+~~~~~~~~
+
+String (directory path)
+
+Returns
+~~~~~~~
+
+ReadSet
+
 group
 -----
 

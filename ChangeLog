@@ -1,4 +1,6 @@
 Version 1.1.0+
+	* Add load_fastq_directory to builtin functions
+	* Better messages when using `lock1`
 	* Enable specifying *all* module resources by URL with download on first
 	use
 	* Fix CIGAR reinjection bug

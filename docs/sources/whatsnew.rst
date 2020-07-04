@@ -9,6 +9,11 @@ Version 1.2.0 (Unreleased)
 User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Added function `load_fastq_directory <Functions.html#load_fastq_directory>`__
+  to the builtin namespace. This was previously available under the ``mocat``
+  module, but it had become much more flexible than the original MOCAT version,
+  so it was no longer a descriptive name.
+
 - Better messages in `parallel
   <https://ngless.embl.de/stdlib.html?highlight=lock1#parallel-module>`__
   module when there are no free locks.
