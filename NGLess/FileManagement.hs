@@ -65,6 +65,15 @@ import Utils.LockFile
 import Utils.Utils (withOutputFile)
 
 
+{- Note on temporary files
+ -
+ - A big part of this module is handling temporary files. By generating
+ - temporary files with the functions in this module, one guarantees that user
+ - settings (wrt where to store files, whether to keep them, &c) are respected.
+ - It also enables garbage collection.
+ -
+ -}
+
 data InstallMode = User | Root deriving (Eq, Show)
 
 data Compression = NoCompression
@@ -85,6 +94,7 @@ inferCompression fp
 
 
 {- Ensure that the file is compressed using an acceptable compression format
+ - (potentially by recompressing).
  -}
 ensureCompressionIsOneOf :: [Compression] -- ^ Acceptable formats
                                 -> FilePath -- ^ input file
