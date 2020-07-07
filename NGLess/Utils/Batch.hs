@@ -1,4 +1,4 @@
-{- Copyright 2015-2017 NGLess Authors
+{- Copyright 2015-2020 NGLess Authors
  - License: MIT
  -}
 module Utils.Batch
@@ -7,16 +7,10 @@ module Utils.Batch
 
 import Text.Read (readMaybe)
 import System.Environment (lookupEnv)
-
-
-firstJust :: [IO (Maybe a)] -> IO (Maybe a)
-firstJust [] = return Nothing
-firstJust (x:xs) = x >>= \case
-    Nothing -> firstJust xs
-    val -> return val
+import Control.Monad.Extra (firstJustM)
 
 getNcpus :: IO (Maybe Int)
-getNcpus = firstJust . map getIntFromEnv $
+getNcpus = firstJustM getIntFromEnv
                  [ "OMP_NUM_THREADS"
                  , "NSLOTS"
                  , "LSB_DJOB_NUMPROC"
