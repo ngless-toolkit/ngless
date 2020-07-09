@@ -107,7 +107,7 @@ The ``encoding`` argument has the same meaning as for the ``fastq()`` function:
 load_fastq_directory
 --------------------
 
-.. since :: NGLess 1.2
+.. versionadded:: NGLess 1.2
     Previously, this function was available in the ``mocat`` module as
     ``load_mocat_sample``. Now, it is a builtin function. Even though the
     concept originated with MOCAT, this function is now more flexible than the
@@ -236,8 +236,10 @@ CountsTable
 Argument
 ~~~~~~~~
 
-``{fastq}``: FastQ statistics
-``{mapping}``: Mapping statistics
+Defines what type of statistics to return. Currently, two options are available
+
+- ``{fastq}``: FastQ statistics
+- ``{mapping}``: Mapping statistics
 
 
 countfile
@@ -247,7 +249,8 @@ Loads a TSV file::
 
     c = countfile('table.tsv')
 
-This function takes no keyword arguments. If the filename ends with ".gz", it is assumed to be a gzipped file.
+This function takes no keyword arguments. If the filename ends with ".gz", it
+is assumed to be a gzipped file.
 
 Returns
 ~~~~~~~
@@ -265,7 +268,7 @@ Converts from a ``MappedReadSet`` to a ``ReadSet``::
 discard_singles
 ---------------
 
-.. since :: NGLess 1.1
+.. versionadded:: NGLess 1.1
 
 Throws away unpaired reads from a ``ReadSet``::
 
