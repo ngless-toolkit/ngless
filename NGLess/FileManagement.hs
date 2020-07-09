@@ -225,9 +225,6 @@ setupHtmlViewer dst = do
     exists <- doesFileExist (dst </> "index.html")
     unless exists $ do
         createDirectoryIfMissing False dst
-        createDirectoryIfMissing False (dst </> "htmllibs")
-        createDirectoryIfMissing False (dst </> "fonts")
-        createDirectoryIfMissing False (dst </> "forms")
         forM_ $(embedDir "Html") $ \(fp,bs) ->
             B.writeFile (dst </> fp) bs
 

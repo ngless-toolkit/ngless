@@ -73,43 +73,7 @@ NGLESS_EXT_BINS_VERSIONED = $(BWA_DIR)/$(BWA_TARGET_VERSIONED) \
 							$(MINIMAP2_DIR)/$(MINIMAP2_TARGET_VERSIONED)
 
 HTML = Html
-HTML_LIBS_DIR = $(HTML)/htmllibs
-HTML_FONTS_DIR = $(HTML)/fonts
 
-# Required html Librarys
-HTMLFILES := jquery-latest.min.js
-HTMLFILES += angular.min.js
-HTMLFILES += bootstrap.min.css
-HTMLFILES += bootstrap-theme.min.css
-HTMLFILES += bootstrap.min.js
-HTMLFILES += d3.min.js
-HTMLFILES += nv.d3.js
-HTMLFILES += nv.d3.css
-HTMLFILES += angular-sanitize.js
-HTMLFILES += bootstrap-glyphicons.css
-HTMLFILES += angular-animate.min.js
-
-# Required fonts
-FONTFILES := glyphicons-halflings-regular.woff
-FONTFILES += glyphicons-halflings-regular.ttf
-
-#URLS
-jquery-latest.min.js = https://code.jquery.com/jquery-latest.min.js
-d3.min.js = https://cdnjs.cloudflare.com/ajax/libs/d3/3.1.6/d3.min.js
-nv.d3.js = https://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.js
-nv.d3.css = https://cdnjs.cloudflare.com/ajax/libs/nvd3/1.1.14-beta/nv.d3.css
-angular-sanitize.js = https://code.angularjs.org/1.3.0-beta.1/angular-sanitize.js
-bootstrap.min.js = https://netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js
-bootstrap.min.css = https://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css
-angular.min.js = https://ajax.googleapis.com/ajax/libs/angularjs/1.3.0-beta.1/angular.min.js
-bootstrap-glyphicons.css += https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css
-bootstrap-theme.min.css = https://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-theme.min.css
-glyphicons-halflings-regular.woff = https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.woff
-glyphicons-halflings-regular.ttf = https://netdna.bootstrapcdn.com/bootstrap/3.0.0/fonts/glyphicons-halflings-regular.ttf
-angular-animate.min.js = https://ajax.googleapis.com/ajax/libs/angularjs/1.2.16/angular-animate.min.js
-
-reqhtmllibs = $(addprefix $(HTML_LIBS_DIR)/, $(HTMLFILES))
-reqfonts = $(addprefix $(HTML_FONTS_DIR)/, $(FONTFILES))
 
 all: ngless
 
@@ -154,14 +118,13 @@ install: ngless external-deps $(NGLESS_EXT_BINS_VERSIONED) $(MEGAHIT_BINS)
 	mkdir -p $(deps)/bin/ngless-${VERSION}-megahit
 	cp -prf $(MEGAHIT_BINS) $(deps)/bin/ngless-${VERSION}-megahit
 
-external-deps: $(NGLESS_EXT_BINS_VERSIONED) $(reqhtmllibs) $(reqfonts)
+external-deps: $(NGLESS_EXT_BINS_VERSIONED)
 
 clean:
 	rm -f $(NGLESS_EMBEDDED_BINARIES)
 	stack clean $(STACKOPTS)
 
 distclean: clean
-	rm -rf $(HTML_FONTS_DIR) $(HTML_LIBS_DIR)
 	rm -rf $(BWA_DIR)
 	rm -rf $(SAM_DIR)
 	rm -rf $(PRODIGAL_DIR)
@@ -325,29 +288,6 @@ NGLess/Dependencies/minimap2_data.c: $(MINIMAP2_DIR)/$(MINIMAP2_TARGET)-static
 	xxd -i $(<F) $@
 	rm -f $(<F)
 
-# We cannot depend on $(HTML_LIBS_DIR) as $(WGET) sets the mtime in the past
-# and it would cause the download to happen at every make run
-$(HTML_LIBS_DIR)/%.js:
-	mkdir -p $(HTML_LIBS_DIR)
-	echo $(notdir $@)
-	$(WGET) -O $@ $($(notdir $@))
-
-
-$(HTML_LIBS_DIR)/%.css:
-	mkdir -p $(HTML_LIBS_DIR)
-	echo $(notdir $@)
-	$(WGET) -O $@ $($(notdir $@))
-
-
-$(HTML_FONTS_DIR)/%.woff:
-	mkdir -p $(HTML_FONTS_DIR)
-	echo $(notdir $@)
-	$(WGET) -O $@ $($(notdir $@))
-
-$(HTML_FONTS_DIR)/%.ttf:
-	mkdir -p $(HTML_FONTS_DIR)
-	echo $(notdir $@)
-	$(WGET) -O $@ $($(notdir $@))
 
 ngless-${VERSION}.tar.gz: ngless
 	mkdir -p $(distdir)/share $(distdir)/bin

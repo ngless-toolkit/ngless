@@ -18,6 +18,7 @@ User-visible improvements
   <https://ngless.embl.de/stdlib.html?highlight=lock1#parallel-module>`__
   module when there are no free locks.
 
+
 Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -25,6 +26,10 @@ Internal improvements
   "as needed" basis: in version 1.1, only FASTA files were supported.
 - Memory consumption of `count() function <Functions.html#count>`__ has been
   improved when using GFF files.
+- This one is *hopefully **not** user-visible*: Previously, NGLess would ship
+  the Javascript libraries it uses for the HTML viewer and copy them into all
+  its outputs. Starting in v1.2.0, the HTML viewer links to the live versions
+  online.
 
 Version 1.1.1
 -------------
