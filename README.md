@@ -100,6 +100,7 @@ The following sequence of commands should download and build the software
 
     git clone https://github.com/ngless-toolkit/ngless
     cd ngless
+    stack setup
     make
 
 To install, you can use the following command (replace `<PREFIX>` with

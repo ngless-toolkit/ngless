@@ -1,4 +1,4 @@
-Version 1.1.0+
+Version 1.2.0 2020-07-12 by luispedro
 	* Add load_fastq_directory to builtin functions
 	* Better messages when using `lock1`
 	* Enable specifying *all* module resources by URL with download on first

@@ -3,8 +3,10 @@ What's New (History)
 ====================
 
 
-Version 1.2.0 (Unreleased)
---------------------------
+Version 1.2.0
+-------------
+
+Released *12 July 2020*.
 
 User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -13,7 +15,6 @@ User-visible improvements
   to the builtin namespace. This was previously available under the ``mocat``
   module, but it had become much more flexible than the original MOCAT version,
   so it was no longer a descriptive name.
-
 - Better messages in `parallel
   <https://ngless.embl.de/stdlib.html?highlight=lock1#parallel-module>`__
   module when there are no free locks.
@@ -25,7 +26,7 @@ Internal improvements
 - Modules can now specify their annotation as a URL that NGLess downloads on a
   "as needed" basis: in version 1.1, only FASTA files were supported.
 - Memory consumption of `count() function <Functions.html#count>`__ has been
-  improved when using GFF files.
+  improved when using GFF files (*ca.* ⅓ less memory used).
 - This one is *hopefully **not** user-visible*: Previously, NGLess would ship
   the Javascript libraries it uses for the HTML viewer and copy them into all
   its outputs. Starting in v1.2.0, the HTML viewer links to the live versions
