@@ -18,6 +18,7 @@ import Control.Monad.RWS
 import Control.Arrow (first, second)
 import Control.Monad.Identity (Identity(..), runIdentity)
 import Control.Monad.State.Lazy
+import Control.Monad.Extra (whenJust)
 import Data.Maybe
 import qualified Data.Hash.MD5 as MD5
 import qualified Data.Map.Strict as M
@@ -25,31 +26,37 @@ import           Data.List (sortOn, foldl')
 
 import Language
 import Modules
-import Output
+import Output (outputListLno', OutputType(..))
 import NGLess
 import Utils.Utils (uniq, secondM)
 import NGLess.NGLEnvironment
 import BuiltinFunctions
 
 
-{-| Before interpretation, scripts are transformed to allow for several
-  - optimizations.
-
-  - As a first step, the script is normalized, introducing temporary variables
-  - so that function calls do not contain nested expressions.  For example:
-  -
-  -     write(mapstats(samfile('input.sam')), ofile='stats.txt')
-  -
-  - is re-written to the equivalent of:
-  -
-  -     temp$0 = samfile('input.sam')
-  -     temp$1 = mapstats(temp$0)
-  -     write(temp$1, ofile='stats.txt')
-  -
-  - Note that "temp$xx" are not valid ngless variable names. Thus, these
-  - temporary variables can only be introduced internally and will never clash
-  - with any user variables.
--}
+{-| NOTE
+ -
+ - Before interpretation, scripts are transformed to allow for several
+ - optimizations.
+ -
+ - INITIAL NORMALIZATION
+ -
+ - As a first step, the script is normalized, introducing temporary variables
+ - so that function calls do not contain nested expressions.  For example:
+ -
+ -     write(mapstats(samfile('input.sam')), ofile='stats.txt')
+ -
+ - is re-written to the equivalent of:
+ -
+ -     temp$0 = samfile('input.sam')
+ -     temp$1 = mapstats(temp$0)
+ -     write(temp$1, ofile='stats.txt')
+ -
+ - Note that "temp$xx" are not valid ngless variable names. Thus, these
+ - temporary variables can only be introduced internally and will never clash
+ - with any user variables. All subsequent transformations can assume that the
+ - scripts have been normalized.
+ -
+ -}
 transform :: [Module] -> Script -> NGLessIO Script
 transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
     where
@@ -61,6 +68,7 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 [ reassignPreprocess
                 , addTemporaries
                 , addOutputHash -- Hashing should be based on what the user input (pre-transforms)
+                , checkSimple
                 ]
         builtinTransforms =
                 [ writeToMove
@@ -72,6 +80,58 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , addUseNewer
                 , addCountsCheck
                 ]
+
+{-| The condition is "one single function call per top level expression"
+ -}
+checkSimple :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+checkSimple expr = forM_ expr (checkSimple1 . snd) *> return expr
+    where
+        checkSimple0 = \case
+            Condition{} -> throwShouldNotOccur "Non-simple expression (Condition)"
+            Assignment{} -> throwShouldNotOccur "Non-simple expression (Assignment)"
+            FunctionCall{} -> throwShouldNotOccur "Non-simple expression (FunctionCall)"
+            MethodCall{} -> throwShouldNotOccur "Non-simple expression (MethodCall)"
+
+            ListExpression s -> mapM_ checkSimple0 s
+            UnaryOp _ a -> checkSimple0 a
+            BinaryOp _ a b -> checkSimple0 a *> checkSimple0 b
+            IndexExpression e ix -> checkSimple0 e *> checkSimpleIndex ix
+            Sequence s -> mapM_ checkSimple0 s
+
+            Lookup{} -> return ()
+            ConstStr{} -> return ()
+            ConstInt{} -> return ()
+            ConstDouble{} -> return ()
+            ConstBool{} -> return ()
+            ConstSymbol{} -> return ()
+            BuiltinConstant{} -> return ()
+            Continue -> return ()
+            Discard -> return ()
+            Optimized{} -> return ()
+
+        checkSimpleIndex (IndexOne e) = checkSimple0 e
+        checkSimpleIndex (IndexTwo a b) =  whenJust a checkSimple0 *> whenJust b checkSimple0
+
+        checkSimple1 = \case
+            Condition ifC ifT ifF ->
+                checkSimple0 ifC *>
+                checkSimple1 ifT *>
+                checkSimple1 ifF
+            Assignment _ e  -> checkSimple1 e
+            FunctionCall _ _ _ Just{} -> return () -- NOT IMPLEMENTED, BUT SHOULD BE!
+            FunctionCall _ e kwargs Nothing ->
+                checkSimple0 e *>
+                forM_ kwargs (checkSimple0 . snd)
+                -- whenJust block (checkSimple1 . blockBody)
+            MethodCall _ e arg kwargs ->
+                checkSimple0 e *>
+                whenJust arg checkSimple0 *>
+                forM_ kwargs (checkSimple0 . snd)
+            Sequence s -> mapM_ checkSimple1 s
+            ListExpression s -> mapM_ checkSimple0 s
+            UnaryOp _ a -> checkSimple0 a
+            BinaryOp _ a b -> checkSimple0 a *> checkSimple0 b
+            e -> checkSimple0 e
 
 
 asSequence :: [Expression] -> Expression
@@ -86,6 +146,7 @@ pureRecursiveTransform f e = runIdentity (recursiveTransform (return . f) e)
 pureTransform :: (Expression -> Expression) -> [(Int,Expression)] -> NGLessIO [(Int, Expression)]
 pureTransform f = return . map (second (pureRecursiveTransform f))
 
+-- | Add an argument to a function call iff the expression includes that function call
 addArgument :: T.Text -- ^ function name
             -> (Variable, Expression) -- ^ new argument
             -> Expression -- ^ expression to transform
