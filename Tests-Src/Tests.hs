@@ -257,13 +257,6 @@ case_recursiveAnalyze = execState (recursiveAnalyse countFcalls expr) 0 @?= (1 :
                         Nothing)
 
 
-case_test_setup_html_view = do
-    setupHtmlViewer "testing_tmp_dir_html"
-    ex <- doesFileExist "testing_tmp_dir_html/index.html"
-    assertBool "index.html should be present after setupHtmlViewer" ex
-    removeDirectoryRecursive "testing_tmp_dir_html/"
-
-
 case_expand_path = do
     expandPath' "/nothing1/file.txt" [] @?=  ["/nothing1/file.txt"]
     expandPath' "/nothing2/file.txt" [undefined] @?=  ["/nothing2/file.txt"]
