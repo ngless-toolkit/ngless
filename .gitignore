@@ -1,6 +1,7 @@
-/.cabal-sandbox/
 /.stack-work/
-/.stack-work-test/
+/.stack-work-check/
+/.stack-work-fastcheck/
+/.stack-work-fast/
 /cabal.sandbox.config
 /dist/
 /docker/

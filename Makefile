@@ -87,15 +87,15 @@ static: $(NGLESS_EMBEDDED_TARGET) external-deps
 	stack build $(STACKOPTS) --ghc-options='-fPIC' --force-dirty --flag NGLess:embed
 
 fast: $(NGLESS_VERSIONS_TARGET)
-	stack build --fast $(STACKOPTS)
-
-dist: ngless-${VERSION}.tar.gz
+	stack build --fast --work-dir .stack-work-fast $(STACKOPTS)
 
 check: $(NGLESS_VERSIONS_TARGET)
-	stack test --work-dir .stack-work-test $(STACKOPTS)
+	stack test --work-dir .stack-work-check $(STACKOPTS)
 
 fastcheck: $(NGLESS_VERSIONS_TARGET)
-	stack test --fast --work-dir .stack-work-test $(STACKOPTS)
+	stack test --fast --work-dir .stack-work-fastcheck $(STACKOPTS)
+
+dist: ngless-${VERSION}.tar.gz
 
 # Synonym
 tests: check
