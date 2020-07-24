@@ -409,7 +409,7 @@ writeAndContinue q = CL.iterM (liftIO . atomically . TQ.writeTBMQueue q)
 
 executePreprocess :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executePreprocess (NGOList e) args _block = NGOList <$> mapM (\x -> executePreprocess x args _block) e
-executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block [Variable var] block) = do
+executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block (Variable var) block) = do
         -- This is a bit complex, but preprocess was slow at first and we try
         -- to take full advantage of parallelism.
         --
@@ -535,7 +535,7 @@ executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
 executePrint err  _ = throwScriptError ("Cannot print " ++ show err)
 
 executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
-executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block [Variable var] body) = do
+executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block (Variable var) body) = do
         paired <- lookupBoolOrScriptErrorDef (return True) "select" "paired" args
         outputHeader <- lookupBoolOrScriptErrorDef (return True) "select" "__output_header" args
         let (samfp, istream) = asSamStream isam

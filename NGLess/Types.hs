@@ -91,7 +91,7 @@ inferM e = void (nglTypeOf e)
 
 inferBlock :: FuncName -> Maybe Block -> TypeMSt ()
 inferBlock _ Nothing = return ()
-inferBlock (FuncName f) (Just (Block vars es)) = case f of
+inferBlock (FuncName f) (Just (Block (Variable v) es)) = case f of
         "preprocess" -> inferBlock' NGLRead
         "select" -> inferBlock' NGLMappedRead
         _ -> do
@@ -99,8 +99,7 @@ inferBlock (FuncName f) (Just (Block vars es)) = case f of
             void cannotContinue
     where
         inferBlock' btype = do
-            forM_ vars $ \(Variable v) ->
-                envInsert v btype
+            envInsert v btype
             inferM es
 
 envLookup :: Maybe NGLType -> T.Text -> TypeMSt (Maybe NGLType)

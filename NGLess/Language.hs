@@ -1,4 +1,4 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2020 NGLess Authors
  - License: MIT
  -}
 
@@ -63,7 +63,7 @@ data Index = IndexOne Expression
 --  f(a) using |inputvariables|:
 --      expression
 data Block = Block
-                { blockVariable :: [Variable] -- ^ input arguments
+                { blockVariable :: Variable -- ^ input argument
                 , blockBody :: Expression -- ^ block body, will likely be Sequence
                 }
     deriving (Eq, Ord, Show)

@@ -110,9 +110,8 @@ validateVariables mods (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e 
                     tell [T.concat ["Could not find variable `", T.pack . show $v, "`. ", suggestionMessage v used]]
         checkVarUsage (FunctionCall _ _ _ (Just block)) = do
             vs <- get
-            let unVariable (Variable v) = v
-                vs' = unVariable <$> blockVariable block
-            put (vs' ++ vs)
+            let Variable v' = blockVariable block
+            put (v':vs)
         checkVarUsage (Assignment (Variable v) _) = do
             vs <- get
             put (v:vs)
@@ -350,7 +349,7 @@ validateBlockAssignments _ (Script _ es) = forM_ es validateBlockAssignments1
 validateBlockAssignments1 :: (Int, Expression) -> Writer [T.Text] ()
 validateBlockAssignments1 (lno, e) = case e of
     Assignment _ e' -> validateBlockAssignments1 (lno, e')
-    FunctionCall (FuncName fname)  _ _ (Just block) -> let [var] = blockVariable block
+    FunctionCall (FuncName fname)  _ _ (Just block) -> let var = blockVariable block
                                         in recursiveAnalyse (checkAssignmentOnlyTo fname lno var) (blockBody block)
     _ -> return ()
 checkAssignmentOnlyTo fname lno v@(Variable n) e = case e of

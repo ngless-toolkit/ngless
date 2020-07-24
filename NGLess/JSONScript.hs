@@ -1,4 +1,4 @@
-{- Copyright 2017 NGLess Authors
+{- Copyright 2017-2020 NGLess Authors
  - License: MIT
  -}
 
@@ -67,7 +67,7 @@ encodeOpt (LenThresholdDiscard (Variable n) bop t) = object [jsonType "len-thres
 encodeOpt (SubstrimReassign (Variable n) mq) = object [jsonType "substrim-reassign", "name" .= toJSON n, "minqual" .= toJSON mq]
 
 encodeBlock Nothing = Null
-encodeBlock (Just (Block vars e)) = object [jsonType "block", "variables" .= [toJSON n | Variable n <- vars], "body" .= toJSONEx e]
+encodeBlock (Just (Block (Variable n) e)) = object [jsonType "block", "variables" .= [toJSON n], "body" .= toJSONEx e]
 
 encodeBOp :: BOp -> T.Text
 encodeBOp BOpAdd = "add"

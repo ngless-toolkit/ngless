@@ -22,7 +22,7 @@ import Control.Monad.Extra (whenJust)
 import Data.Maybe
 import qualified Data.Hash.MD5 as MD5
 import qualified Data.Map.Strict as M
-import           Data.List (sortOn, foldl')
+import           Data.List (sortOn)
 
 import Language
 import Modules
@@ -558,9 +558,7 @@ addOutputHash expr_lst = do
             where
                 injectBlockVars :: Maybe Block -> M.Map Variable T.Text -> M.Map Variable T.Text
                 injectBlockVars Nothing m = m
-                injectBlockVars (Just (Block vars _)) m = foldl' injectBlockVars' m vars
-                    where
-                        injectBlockVars' hm v@(Variable n) = M.insert v n hm
+                injectBlockVars (Just (Block v@(Variable n) _)) m = M.insert v n m
                 hashOf :: Expression -> State (M.Map Variable T.Text) T.Text
                 hashOf e@(FunctionCall _ _ _ block) = withState (injectBlockVars block) $ hashOf' e
                 hashOf e  = hashOf' e

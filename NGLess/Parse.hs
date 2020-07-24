@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2020 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE CPP #-}
@@ -161,7 +161,7 @@ funccall = try paired <|> FunctionCall <$>
                 <*> (kwargs <* operator ')')
                 <*> funcblock
 
-funcblock = optionMaybe (Block <$> (reserved "using" *> operator '|' *> variableList <* operator '|' <* operator ':') <*> block)
+funcblock = optionMaybe (Block <$> (reserved "using" *> operator '|' *> variable <* operator '|' <* operator ':') <*> block)
 
 paired = FunctionCall
             <$> (match_word "paired" *> pure (FuncName "paired"))
@@ -217,7 +217,6 @@ block = do
                             if level /= level'
                                 then fail "indentation changed"
                                 else expression <* many eol)
-variableList = sepBy1 variable (operator ',') <?> "variable list"
 variable = Variable <$> word <?> "variable"
 
 ngless_header = Header <$> (many eol *> ngless_version <* many eol) <*> many (import_mod <* many eol)
