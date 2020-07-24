@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2020 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -51,6 +51,7 @@ validate mods expr = case errors of
             ,validateNGLessVersionUses
             ,validatePureFunctions
             ,validateWriteOName
+            ,validateBlockAssignments
             ]
 
 {- Each checking function has the type
@@ -341,3 +342,19 @@ validateNGLessVersionUses mods sc = case nglVersion <$> nglHeader sc of
             guard $ not (T.null rest)
             (minV, _) <- rightToMaybe $ T.decimal (T.tail rest)
             return (majV, minV)
+
+
+-- Check that only block variables are assigned inside a block
+validateBlockAssignments :: [Module] -> Script -> Writer [T.Text] ()
+validateBlockAssignments _ (Script _ es) = forM_ es validateBlockAssignments1
+validateBlockAssignments1 :: (Int, Expression) -> Writer [T.Text] ()
+validateBlockAssignments1 (lno, e) = case e of
+    Assignment _ e' -> validateBlockAssignments1 (lno, e')
+    FunctionCall (FuncName fname)  _ _ (Just block) -> let [var] = blockVariable block
+                                        in recursiveAnalyse (checkAssignmentOnlyTo fname lno var) (blockBody block)
+    _ -> return ()
+checkAssignmentOnlyTo fname lno v@(Variable n) e = case e of
+    Assignment v' _
+        | v /= v' -> tell1lno lno ["Inside blocks, only the block variable (in this case `", n, "`) can be assigned to",
+                                    " (when analysing function `", fname, "`)."]
+    _ -> return ()
