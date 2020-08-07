@@ -35,7 +35,7 @@ jobs:
 
             with:
               name: ngless_install
-          - name: Print the final result
+          - name: print download
             shell: bash
             run: |
               echo Download done!
