@@ -1,0 +1,41 @@
+name: Ngless CI
+
+on: [push]
+
+jobs:
+    job_1:
+      name: Install Ngless
+      runs-on: macOS-latest
+
+      steps:
+      - uses: actions/checkout@v1
+      - name: before_install
+        run: |
+            brew install gcc@8
+            brew install md5sha1sum
+      - name: install
+        run: |
+            stack setup
+            make 
+            make install CXX=g++-8 prefix=ngless_path/ngless
+      - name: Upload
+        uses: actions/upload-artifact@v2
+        with:
+          name: ngless_install
+          path: ngless_path/ngless
+
+
+    job_2:
+      name: Download
+      needs: job_1
+      runs-on: macOS-latest
+      steps:
+          - name: download
+            uses: actions/download-artifact@v2
+
+            with:
+              name: ngless_install
+          - name: Print the final result
+            shell: bash
+            run: |
+              echo Download done!
