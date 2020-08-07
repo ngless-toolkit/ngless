@@ -1,0 +1,25 @@
+name: NGLess MacOSX Build
+
+on: [push]
+
+jobs:
+    job_1:
+      name: Build and install NGLess
+      runs-on: macOS-latest
+
+      steps:
+      - uses: actions/checkout@v1
+      - name: before_install
+        run: |
+            brew install gcc@8
+            brew install md5sha1sum
+      - name: install
+        run: |
+            stack setup
+            make 
+            make install CXX=g++-8 prefix=ngless_path/ngless
+      - name: upload
+        uses: actions/upload-artifact@v2
+        with:
+          name: ngless_install
+          path: ngless_path/ngless
