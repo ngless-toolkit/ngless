@@ -1,5 +1,6 @@
 Version 1.2.0+
 	* Add early check that block assignments are always to block variables
+	* Use ZStd compression for temporary files from preprocess()
 
 Version 1.2.0 2020-07-12 by luispedro
 	* Add load_fastq_directory to builtin functions

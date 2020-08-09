@@ -70,7 +70,7 @@ import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
 import qualified Data.Conduit.Algorithms.Utils as CAlg
 import qualified Data.Conduit.Algorithms.Async as CAlg
-import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile, asyncZstdTo)
+import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import qualified Control.Concurrent.Async as A
 import qualified Control.Concurrent.STM.TBMQueue as TQ
 import qualified Data.Conduit.TQueue as CA
@@ -453,13 +453,13 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block (Variabl
                 write nt h q =
                         writeAndContinue q
                             .| CAlg.asyncMapC nt (B.concat . map (fqEncode outenc) . V.toList)
-                            .| CAlg.asyncGzipTo h
+                            .| CAlg.asyncZstdTo 3 h
 
             let processpairs :: (V.Vector ShortRead, V.Vector ShortRead) -> NGLess (V.Vector ShortRead, V.Vector ShortRead, V.Vector ShortRead)
                 processpairs = liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles) . uncurry V.zip
-            (fp1', out1) <- openNGLTempFile "" "preprocessed.1." "fq.gz"
-            (fp2', out2) <- openNGLTempFile "" "preprocessed.2." "fq.gz"
-            (fp3', out3) <- openNGLTempFile "" "preprocessed.singles." "fq.gz"
+            (fp1', out1) <- openNGLTempFile "" "preprocessed.1." "fq.zst"
+            (fp2', out2) <- openNGLTempFile "" "preprocessed.2." "fq.zst"
+            (fp3', out3) <- openNGLTempFile "" "preprocessed.singles." "fq.zst"
 
             C.runConduit $
                 zipSource2 (asSource (fst <$> pairs)) (asSource (snd <$> pairs))
@@ -560,7 +560,7 @@ executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block (Vari
                                 .| CL.map concatBytelines
                             readSamGroupsC' mapthreads paired
                                 .| CAlg.asyncMapEitherC mapthreads (fmap concatLines . V.mapM (runInterpretationRO env . selectBlock doReinject))
-                        .|  asyncZstdTo 3 ohandle
+                        .|  CAlg.asyncZstdTo 3 ohandle
         return input { nglSamFile = File oname }
     where
         concatBytelines :: V.Vector ByteLine -> B.ByteString
