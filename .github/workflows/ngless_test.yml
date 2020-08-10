@@ -18,7 +18,7 @@ jobs:
             stack setup
             make 
             make install CXX=g++-8 prefix=ngless_path/ngless
-      - name: Upload
+      - name: upload
         uses: actions/upload-artifact@v2
         with:
           name: ngless_install
