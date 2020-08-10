@@ -1,10 +1,10 @@
-name: Ngless CI
+name: NGLess CI
 
 on: [push]
 
 jobs:
     job_1:
-      name: Install Ngless
+      name: Install NGLess
       runs-on: macOS-latest
 
       steps:
@@ -23,19 +23,3 @@ jobs:
         with:
           name: ngless_install
           path: ngless_path/ngless
-
-
-    job_2:
-      name: Download
-      needs: job_1
-      runs-on: macOS-latest
-      steps:
-          - name: download
-            uses: actions/download-artifact@v2
-
-            with:
-              name: ngless_install
-          - name: print download
-            shell: bash
-            run: |
-              echo Download done!
