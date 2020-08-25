@@ -121,9 +121,30 @@ Whenever a symbol is used in the argument to a function, this means that that
 function takes only one of a small number of possible symbols for that
 argument. This improves error checking and readibility.
 
-## Does the select function work on inserts (considering both mates) or per-read (treating the data as single-ended)?
+## Does the `select` function work on inserts (considering both mates) or per-read (treating the data as single-ended)?
 
 By default, `select` considers the insert as a whole, but you can have it
 consider each read as single-end by using setting the `paired` argument to
 `False`.
+
+## Should I use a TSV file or a GFF for the `count` function?
+
+_Short answer_: If you have a choice, use TSV; if you must, use GFF.
+
+_Long answer_: The TSV format is much more limited, annotating each reference
+sequence with a set of annotation terms. This is appropriate for gene
+catalogues. With the GFF format, you can annotate areas of the reference with
+different annotations. This is appropriate for (1) mapping metagenomes against
+reference genomes (where, due to strain variability, different areas of the
+genome may be differentially present in your samples) and (2) mapping
+(meta)transcriptomes against reference genomes.
+
+The GFF format is, thus, more powerful than the TSV format (this is meant in
+the strict sense: everything that you can do with the TSV file can also be done
+with a GFF by setting the coordinates to cover the whole sequence). However,
+this implies a significantly higher computational cost (both in terms of time
+and memory usage), which is why you should not use the functionality unless you
+need it.
+
+
 
