@@ -24,6 +24,7 @@ module Interpretation.Count
     ) where
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BS
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as BL
@@ -151,13 +152,13 @@ type GffIMMap = IM.IntervalIntMap AnnotationInfo
 type GffIMMapAcc = IM.IntervalIntMapAccumulator (PrimState IO) AnnotationInfo
 
 -- GFFAnnotationMap maps from `References` (e.g., chromosomes) to positions to (strand/feature-id)
-type GFFAnnotationMap = M.Map B.ByteString GffIMMap
+type GFFAnnotationMap = M.Map BS.ShortByteString GffIMMap
 
-type GFFAnnotationMapAcc = M.Map B.ByteString GffIMMapAcc
+type GFFAnnotationMapAcc = M.Map BS.ShortByteString GffIMMapAcc
 type AnnotationRule = GffIMMap -> GffStrand -> IM.Interval -> [AnnotationInfo]
 
 -- This implements MOCAT-style "gene name" -> "feature" annotation
-type GeneMapAnnotation = M.Map B8.ByteString [Int]
+type GeneMapAnnotation = M.Map B.ByteString [Int]
 
 data MMMethod = MMCountAll | MM1OverN | MMDist1 | MMUniqueOnly
     deriving (Eq)
@@ -190,7 +191,7 @@ data AnnotationMode = AnnotateSeqName | AnnotateGFF FilePath | AnnotateFunctiona
 
 data Annotator =
                 SeqNameAnnotator (Maybe RSV.RefSeqInfoVector) -- ^ Just annotate by sequence names
-                | GFFAnnotator GFFAnnotationMap [B.ByteString] !(VU.Vector Double) -- ^ map reference regions to features + feature sizes
+                | GFFAnnotator GFFAnnotationMap (V.Vector BS.ShortByteString) !(VU.Vector Double) -- ^ map reference regions to features + feature sizes
                 | GeneMapAnnotator B.ByteString GeneMapAnnotation RSV.RefSeqInfoVector -- ^ map reference (gene names) to indices, indexing into the vector of refseqinfo
 instance NFData Annotator where
     rnf (SeqNameAnnotator m) = rnf m
@@ -233,7 +234,7 @@ annEnumerate (GeneMapAnnotator tag _ ix) = let
                                 | B.null tag = id
                                 | otherwise = \(name, v) -> (B.concat [tag, ":", name], v)
                         in addTag <$> ("-1",0):enumerateRSVector ix
-annEnumerate (GFFAnnotator _ headers _)   = zip ("-1":headers) [0..]
+annEnumerate (GFFAnnotator _ headers _)   = zip ("-1":(map BS.fromShort $ V.toList headers)) [0..]
 enumerateRSVector rfv = [(RSV.retrieveName rfv i, i + 1) | i <- [0.. RSV.length rfv - 1]]
 
 -- Number of elements
@@ -733,7 +734,7 @@ loadFunctionalMap fname columns = do
             cis <- mapM (lookUpColumns' $ M.fromList (zip (tail headers) [0..])) columns
             return $ unzip $ sort $ zip cis columns
 
-        lookUpColumns' :: M.Map B8.ByteString Int -> B8.ByteString -> NGLess Int
+        lookUpColumns' :: M.Map B.ByteString Int -> B.ByteString -> NGLess Int
         lookUpColumns' colmap col = note notfounderror $ M.lookup col colmap
             where
                 notfounderror = NGError DataError errormsg
@@ -763,7 +764,7 @@ loadFunctionalMap fname columns = do
         selectIds line_nr _ _ = throwDataError ("Loading functional map file '" ++ fname ++ "' [line " ++ show (line_nr + 1)++ "]: wrong number of columns") -- humans count lines in 1-based systems
 
 
-revnamemap :: M.Map B.ByteString Int -> VU.Vector Int
+revnamemap :: Ord a => M.Map a Int -> VU.Vector Int
 revnamemap namemap = VU.create $ do
                 r <- VUM.new (M.size namemap)
                 forM_ (zip (M.elems namemap) [0..]) $ uncurry (VUM.write r)
@@ -773,9 +774,9 @@ data GffLoadingState = GffLoadingState
                         !Int --  ^ next available ID
                         !GFFAnnotationMapAcc
                         --  ^ gmap: current annotation map
-                        !(M.Map B.ByteString Int)
+                        !(M.Map BS.ShortByteString Int)
                         --  ^ namemap: str -> int name to ID
-                        !(M.Map B.ByteString Double)
+                        !(M.Map BS.ShortByteString Double)
                         --  ^ szmap: str -> double name to feature size
 
 loadGFF :: FilePath -> CountOpts -> NGLessIO [Annotator]
@@ -823,8 +824,8 @@ loadGFF gffFp opts = do
         finishGffAnnotator (GffLoadingState _ amap namemap szmap) = do
                 amap' :!: headers <- reindex amap namemap
                 let szmap' = VU.create $ do
-                            f <- VUM.new (length headers)
-                            forM_ (zip headers [0..]) $ \(h,i) -> do
+                            f <- VUM.new (V.length headers)
+                            forM_ (zip (V.toList headers) [0..]) $ \(h,i) -> do
                                 let v = fromMaybe 0.0 (M.lookup h szmap)
                                 VUM.write f i v
                             return f
@@ -842,9 +843,9 @@ loadGFF gffFp opts = do
             where
                 subfeatureMap :: GffLoadingState -> B.ByteString -> NGLessIO GffLoadingState
                 subfeatureMap (GffLoadingState !next !gmap !namemap !szmap) val = let
-                            header
-                                | singleFeature = val
-                                | otherwise = B.concat $ [f, ":"] ++(case sf of { Nothing -> []; Just s -> [s,":"]}) ++[val]
+                            header = BS.toShort $ if singleFeature
+                                                    then val
+                                                    else B.concat $ [f, ":"] ++(case sf of { Nothing -> []; Just s -> [s,":"]}) ++[val]
                             (!namemap', active, !next') = case M.lookup header namemap of
                                 Just v -> (namemap, v, next)
                                 Nothing -> (M.insert header next namemap, next, next+1)
@@ -865,7 +866,7 @@ loadGFF gffFp opts = do
                             inserts1 :: Maybe Double -> Maybe Double
                             inserts1 cursize = Just $! convert (gffSize gline) + fromMaybe 0.0 cursize
                         in do
-                            gmap' <- M.alterF insertg' (gffSeqId gline) gmap
+                            gmap' <- M.alterF insertg' (BS.toShort $ gffSeqId gline) gmap
                             return $! GffLoadingState next' gmap' namemap' szmap'
 
                 lookupSubFeature :: Maybe B.ByteString -> [B.ByteString]
@@ -876,10 +877,10 @@ loadGFF gffFp opts = do
 
         -- First integer IDs are assigned "first come, first served"
         -- `reindex` makes them alphabetical
-        reindex :: GFFAnnotationMapAcc -> M.Map B.ByteString Int -> NGLessIO (Pair GFFAnnotationMap [B.ByteString])
+        reindex :: GFFAnnotationMapAcc -> M.Map BS.ShortByteString Int -> NGLessIO (Pair GFFAnnotationMap (V.Vector BS.ShortByteString))
         reindex amap namemap = do
             outputListLno' TraceOutput ["Re-index GFF"]
-            let headers = M.keys namemap -- these are sorted
+            let headers = V.fromList $ M.keys namemap -- these are sorted
                 ix2ix :: VU.Vector Int
                 ix2ix = revnamemap namemap
                 reindexAI :: AnnotationInfo -> AnnotationInfo
@@ -898,7 +899,7 @@ loadGFF gffFp opts = do
 --    - the intersection rules
 --    - the strandness rules
 annotateSamLineGFF :: CountOpts -> GFFAnnotationMap -> SamLine -> [Int]
-annotateSamLineGFF opts amap samline = case M.lookup rname amap of
+annotateSamLineGFF opts amap samline = case M.lookup (BS.toShort rname) amap of
         Nothing -> []
         Just im ->  selectIx $ (optIntersectMode opts) im lineStrand (IM.Interval sStart sEnd)
     where
