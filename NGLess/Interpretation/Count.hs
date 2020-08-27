@@ -770,14 +770,12 @@ revnamemap namemap = VU.create $ do
                 forM_ (zip (M.elems namemap) [0..]) $ uncurry (VUM.write r)
                 return r
 
+data IntDoublePair = IntDoublePair {-# UNPACK #-} !Int {-# UNPACK #-} !Double
 data GffLoadingState = GffLoadingState
-                        !Int --  ^ next available ID
                         !GFFAnnotationMapAcc
                         --  ^ gmap: current annotation map
-                        !(M.Map BS.ShortByteString Int)
-                        --  ^ namemap: str -> int name to ID
-                        !(M.Map BS.ShortByteString Double)
-                        --  ^ szmap: str -> double name to feature size
+                        !(M.Map BS.ShortByteString IntDoublePair)
+                        --  ^ metamap: str -> int name to ID/feature-size
 
 loadGFF :: FilePath -> CountOpts -> NGLessIO [Annotator]
 loadGFF gffFp opts = do
@@ -798,7 +796,7 @@ loadGFF gffFp opts = do
                     .| linesC
                     .| readAnnotationOrDie
                     .| sequenceSinks
-                        [CL.foldM (insertg f sf) (GffLoadingState 0 M.empty M.empty M.empty)
+                        [CL.foldM (insertg f sf) (GffLoadingState M.empty M.empty)
                                     |  f <- optFeatures    opts
                                     , sf <- case optSubFeatures opts of
                                                 Nothing -> [Nothing]
@@ -820,17 +818,6 @@ loadGFF gffFp opts = do
                     Right g -> C.yield g
                     Left err -> throwError err
 
-        finishGffAnnotator ::  GffLoadingState -> NGLessIO Annotator
-        finishGffAnnotator (GffLoadingState _ amap namemap szmap) = do
-                amap' :!: headers <- reindex amap namemap
-                let szmap' = VU.create $ do
-                            f <- VUM.new (V.length headers)
-                            forM_ (zip (V.toList headers) [0..]) $ \(h,i) -> do
-                                let v = fromMaybe 0.0 (M.lookup h szmap)
-                                VUM.write f i v
-                            return f
-                return $! GFFAnnotator amap' headers szmap'
-
         -- update GffLoadingState
         insertg :: B.ByteString -- ^ feature
                         -> Maybe B.ByteString -- ^ subfeature
@@ -839,19 +826,23 @@ loadGFF gffFp opts = do
                         -> NGLessIO GffLoadingState
         insertg f sf cur gline
                 | gffType gline /= f = return cur
-                | otherwise = foldM subfeatureMap cur $ lookupSubFeature sf
+                | otherwise = liftIO $ foldM subfeatureMap cur $ lookupSubFeature sf
             where
-                subfeatureMap :: GffLoadingState -> B.ByteString -> NGLessIO GffLoadingState
-                subfeatureMap (GffLoadingState !next !gmap !namemap !szmap) val = let
+                subfeatureMap :: GffLoadingState -> B.ByteString -> IO GffLoadingState
+                subfeatureMap (GffLoadingState !gmap !metamap) val = let
                             header = BS.toShort $ if singleFeature
                                                     then val
                                                     else B.concat $ [f, ":"] ++(case sf of { Nothing -> []; Just s -> [s,":"]}) ++[val]
-                            (!namemap', active, !next') = case M.lookup header namemap of
-                                Just v -> (namemap, v, next)
-                                Nothing -> (M.insert header next namemap, next, next+1)
+                            featureSize :: Double
+                            featureSize = convert $ gffSize gline
+                            (!metamap', active) = let
+                                    combine _key _nv (IntDoublePair p oldSize) = (IntDoublePair p $ oldSize + featureSize)
+                                    (oldVal, m) = M.insertLookupWithKey combine header (IntDoublePair (M.size metamap) featureSize) metamap
+                                in (m, case oldVal of
+                                    Just (IntDoublePair i _) -> i
+                                    Nothing -> M.size m - 1)
 
-
-                            insertg' :: Maybe GffIMMapAcc -> NGLessIO (Maybe GffIMMapAcc)
+                            insertg' :: Maybe GffIMMapAcc -> IO (Maybe GffIMMapAcc)
                             insertg' immap = do
                                 immap' <- case immap of
                                             Just v -> return v
@@ -860,14 +851,9 @@ loadGFF gffFp opts = do
                                             (AnnotationInfo (gffStrand gline) active)
                                             immap'
                                 return $! Just immap'
-
-
-                            szmap' = M.alter inserts1 header szmap
-                            inserts1 :: Maybe Double -> Maybe Double
-                            inserts1 cursize = Just $! convert (gffSize gline) + fromMaybe 0.0 cursize
                         in do
                             gmap' <- M.alterF insertg' (BS.toShort $ gffSeqId gline) gmap
-                            return $! GffLoadingState next' gmap' namemap' szmap'
+                            return $! GffLoadingState gmap' metamap'
 
                 lookupSubFeature :: Maybe B.ByteString -> [B.ByteString]
                 lookupSubFeature Nothing = filterSubFeatures "ID" (gffAttrs gline) <|> filterSubFeatures "gene_id" (gffAttrs gline)
@@ -875,14 +861,23 @@ loadGFF gffFp opts = do
 
                 filterSubFeatures s sf' = map snd $ (filter ((s ==) . fst)) sf'
 
+        finishGffAnnotator ::  GffLoadingState -> NGLessIO Annotator
+        finishGffAnnotator (GffLoadingState amap metamap) = do
+                amap' :!: headers <- reindexGffAnn amap metamap
+                let szmap' = VU.fromList $ map (\(IntDoublePair _ v) -> v) $ M.elems metamap
+                return $! GFFAnnotator amap' headers szmap'
+
         -- First integer IDs are assigned "first come, first served"
-        -- `reindex` makes them alphabetical
-        reindex :: GFFAnnotationMapAcc -> M.Map BS.ShortByteString Int -> NGLessIO (Pair GFFAnnotationMap (V.Vector BS.ShortByteString))
-        reindex amap namemap = do
+        -- `reindexGffAnn` makes them alphabetical
+        reindexGffAnn :: GFFAnnotationMapAcc -> M.Map BS.ShortByteString IntDoublePair -> NGLessIO (Pair GFFAnnotationMap (V.Vector BS.ShortByteString))
+        reindexGffAnn amap metamap = do
             outputListLno' TraceOutput ["Re-index GFF"]
-            let headers = V.fromList $ M.keys namemap -- these are sorted
+            let headers = V.fromList $ M.keys metamap -- these are sorted
                 ix2ix :: VU.Vector Int
-                ix2ix = revnamemap namemap
+                ix2ix = VU.create $ do
+                                r <- VUM.new (M.size metamap)
+                                forM_ (zip (M.elems metamap) [0..]) $ \((IntDoublePair i _),p) -> VUM.write r i p
+                                return r
                 reindexAI :: AnnotationInfo -> AnnotationInfo
                 reindexAI (AnnotationInfo s v) = AnnotationInfo s (ix2ix VU.! v)
             amap' <- forM amap $ \im -> do
