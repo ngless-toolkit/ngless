@@ -616,7 +616,7 @@ normalizeCounts NMNormed counts sizes = do
             n' = VUM.length sizes
         unless (n == n') $
             throwShouldNotOccur ("Counts vector is of size " ++ show n ++ ", but sizes is of size " ++ show n')
-        forM_ [0 .. n - 1] $ \i -> liftIO $ do
+        liftIO $ forM_ [0 .. n - 1] $ \i -> do
             s <- VUM.read sizes i
             when (s > 0) $
                 VUM.unsafeModify counts (/ s) i
