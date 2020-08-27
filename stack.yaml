@@ -1,15 +1,13 @@
 # For more information, see: https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md
 
-# Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-
-# NOTE: When bumping stack's lts version, remember to rebuild and upload the
-# docker images (build-scripts/docker_bases/) used by GitLab
 resolver: lts-14.20
 compiler-check: newer-minor
 
-
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
-extra-deps: []
+extra-deps:
+  - git: "https://github.com/ngless-toolkit/interval-to-int"
+    commit: "c7ad5a51aea53e3546708bdd3ee51252877fb2b3"
+
 
 allow-newer: true
 

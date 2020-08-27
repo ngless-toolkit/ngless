@@ -7,7 +7,7 @@ import Test.Framework.TH
 import Test.HUnit
 import Test.Framework.Providers.HUnit
 
-import qualified Data.IntervalMap.Strict as IM
+import qualified Data.IntervalIntMap as IM
 import qualified Data.Set as S
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
@@ -74,9 +74,7 @@ defCountOpts =
 
 
 extractIds :: [AnnotationInfo] -> [Int]
-extractIds [] = []
-extractIds (AnnotationInfo1 _ ix:xs) = ix:extractIds xs
-extractIds (AnnotationInfoCons _ ix ais:xs) = ix:extractIds (ais:xs)
+extractIds = map (\(AnnotationInfo _ ix) -> ix)
 
 very_short_gff = "test_samples/very_short.gtf"
 case_load_very_short = do

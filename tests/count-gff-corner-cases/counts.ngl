@@ -1,0 +1,12 @@
+ngless "1.2"
+
+mapped = samfile('input1.sam')
+
+
+write(count(mapped,
+              gff_file='short.gff',
+              features=['eggnog'],
+              subfeatures=['GOs'],
+              multiple={all1},
+              normalization={raw}),
+        ofile='output.counts.txt')

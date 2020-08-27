@@ -16,9 +16,7 @@ import Test.Framework.Providers.HUnit
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
 
-import System.Directory (removeDirectoryRecursive
-                        ,doesFileExist
-                        )
+import System.Directory (removeDirectoryRecursive)
 import qualified Data.Vector.Storable as VS
 import qualified Data.ByteString.Char8 as B
 

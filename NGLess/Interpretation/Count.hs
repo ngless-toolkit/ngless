@@ -1,7 +1,7 @@
 {- Copyright 2015-2020 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE FlexibleContexts, CPP #-}
+{-# LANGUAGE FlexibleContexts, CPP, TypeApplications #-}
 {-# OPTIONS_GHC -fno-full-laziness #-}
 module Interpretation.Count
     ( executeCount
@@ -35,7 +35,7 @@ import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Unboxed.Mutable as VUM
 import qualified Data.Vector.Algorithms.Intro as VA
 
-import qualified Data.IntervalMap.Strict as IM
+import qualified Data.IntervalIntMap as IM
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
@@ -47,13 +47,16 @@ import qualified Data.Conduit.Algorithms.Utils as CAlg
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import           Data.Conduit ((.|))
 import           Data.Strict.Tuple (Pair(..))
-import           Control.Monad (when, unless, forM, forM_)
+import           Control.Monad (when, unless, forM, forM_, foldM)
+import           Foreign.Storable (Storable(..))
+import           Foreign.Ptr (castPtr)
+import           Control.Monad.Primitive (PrimMonad(..))
 
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class   (liftIO)
 import Control.Monad.Except     (throwError)
-import Data.List                (foldl1', foldl', sort, sortOn)
+import Data.List                (foldl', sort, sortOn)
 import GHC.Conc                 (getNumCapabilities)
 import Control.DeepSeq          (NFData(..), ($!!))
 import Control.Error            (note)
@@ -115,47 +118,43 @@ toShortest = B8.pack . show
  -   3. MOCAT-style "gene name" -> "feature"
  -}
 
-
--- AnnotationInfo is a C-style embedded list
---
--- The type `AnnotationInfo` is equivalent to `NonEmpty (GffStrand, Int)`, while
--- `Maybe AnnotationInfo` is equivalent to `[(GffString, Int)]` (with `Nothing`
--- representing `[]`).
---
--- The reason to not use those more natural types (which was done until NGLess
--- 1.2) is that some GFF files can get pretty big and it ends up being worth it
--- to save those extra Bytes. Additionally, AnnotationInfo is strict, so
--- `AnnotationInfo` is actually equivalent to a strict version of `NonEmpty
--- (Pair GffStrand Int)`, which avoids any space leaks due to laziness.
---
-data AnnotationInfo = AnnotationInfo1 !GffStrand
-                            {-# UNPACK #-} !Int
-                        | AnnotationInfoCons !GffStrand
-                            {-# UNPACK #-} !Int
-                            !AnnotationInfo
+data AnnotationInfo = AnnotationInfo !GffStrand !Int
+    deriving (Eq)
 
 instance NFData AnnotationInfo where
-    rnf (AnnotationInfo1 !_ !_) = ()
-    rnf (AnnotationInfoCons !_ !_ ais) = rnf ais
-
-aiConcat :: [AnnotationInfo] -> Maybe AnnotationInfo
-aiConcat xs = aiFromList . concat . map aiToList $ xs
-    where
-        aiToList :: AnnotationInfo -> [(GffStrand, Int)]
-        aiToList (AnnotationInfo1 s ix) = [(s,ix)]
-        aiToList (AnnotationInfoCons s ix ais) = (s,ix):aiToList ais
-
-        aiFromList :: [(GffStrand, Int)] -> Maybe AnnotationInfo
-        aiFromList [] = Nothing
-        aiFromList [(s,ix)] = Just $ AnnotationInfo1 s ix
-        aiFromList ((s,ix):ais) = AnnotationInfoCons s ix <$> (aiFromList ais)
+    rnf (AnnotationInfo !_ !_) = ()
 
 
-type GffIMMap = IM.IntervalMap Int AnnotationInfo
+instance Storable AnnotationInfo where
+    sizeOf _ = 2 * sizeOf (undefined :: Int)
+    alignment _ = alignment (undefined :: Int)
+    poke ptr (AnnotationInfo s ix) =
+        let
+            ptr' = castPtr ptr
+        in do
+            pokeElemOff @Int ptr' 0 (fromEnum s)
+            pokeElemOff @Int ptr' 1 (fromEnum ix)
+
+    peek ptr =
+        let
+            ptr' = castPtr ptr
+        in do
+            s <- peekElemOff @Int ptr' 0
+            ix <- peekElemOff @Int ptr' 1
+            return $! AnnotationInfo
+                    (toEnum s)
+                    (toEnum ix)
+
+
+
+type GffIMMap = IM.IntervalIntMap AnnotationInfo
+type GffIMMapAcc = IM.IntervalIntMapAccumulator (PrimState IO) AnnotationInfo
 
 -- GFFAnnotationMap maps from `References` (e.g., chromosomes) to positions to (strand/feature-id)
 type GFFAnnotationMap = M.Map B.ByteString GffIMMap
-type AnnotationRule = GffIMMap -> GffStrand -> (Int, Int) -> Maybe AnnotationInfo
+
+type GFFAnnotationMapAcc = M.Map B.ByteString GffIMMapAcc
+type AnnotationRule = GffIMMap -> GffStrand -> IM.Interval -> [AnnotationInfo]
 
 -- This implements MOCAT-style "gene name" -> "feature" annotation
 type GeneMapAnnotation = M.Map B8.ByteString [Int]
@@ -772,7 +771,7 @@ revnamemap namemap = VU.create $ do
 
 data GffLoadingState = GffLoadingState
                         !Int --  ^ next available ID
-                        !GFFAnnotationMap
+                        !GFFAnnotationMapAcc
                         --  ^ gmap: current annotation map
                         !(M.Map B.ByteString Int)
                         --  ^ namemap: str -> int name to ID
@@ -798,14 +797,14 @@ loadGFF gffFp opts = do
                     .| linesC
                     .| readAnnotationOrDie
                     .| sequenceSinks
-                        [CL.fold (insertg f sf) (GffLoadingState 0 M.empty M.empty M.empty)
+                        [CL.foldM (insertg f sf) (GffLoadingState 0 M.empty M.empty M.empty)
                                     |  f <- optFeatures    opts
                                     , sf <- case optSubFeatures opts of
                                                 Nothing -> [Nothing]
                                                 Just fs -> Just <$> fs]
 
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "' complete."]
-        return $!! map finishGffAnnotator partials
+        mapM finishGffAnnotator partials
     where
         singleFeature
             | length (optFeatures opts) > 1 = False
@@ -819,28 +818,30 @@ loadGFF gffFp opts = do
                 case readGffLine line of
                     Right g -> C.yield g
                     Left err -> throwError err
-        finishGffAnnotator ::  GffLoadingState -> Annotator
-        finishGffAnnotator (GffLoadingState _ amap namemap szmap) = GFFAnnotator amap' headers szmap'
-            where
-                (amap' :!: headers) = reindex amap namemap
-                szmap' = VU.create $ do
+
+        finishGffAnnotator ::  GffLoadingState -> NGLessIO Annotator
+        finishGffAnnotator (GffLoadingState _ amap namemap szmap) = do
+                amap' :!: headers <- reindex amap namemap
+                let szmap' = VU.create $ do
                             f <- VUM.new (length headers)
                             forM_ (zip headers [0..]) $ \(h,i) -> do
                                 let v = fromMaybe 0.0 (M.lookup h szmap)
                                 VUM.write f i v
                             return f
+                return $! GFFAnnotator amap' headers szmap'
 
         -- update GffLoadingState
         insertg :: B.ByteString -- ^ feature
                         -> Maybe B.ByteString -- ^ subfeature
                         -> GffLoadingState
                         -> GffLine
-                        -> GffLoadingState
+                        -> NGLessIO GffLoadingState
         insertg f sf cur gline
-                | gffType gline /= f = cur
-                | otherwise = foldr subfeatureMap cur $ lookupSubFeature sf
+                | gffType gline /= f = return cur
+                | otherwise = foldM subfeatureMap cur $ lookupSubFeature sf
             where
-                subfeatureMap val (GffLoadingState !next !gmap !namemap !szmap) = let
+                subfeatureMap :: GffLoadingState -> B.ByteString -> NGLessIO GffLoadingState
+                subfeatureMap (GffLoadingState !next !gmap !namemap !szmap) val = let
                             header
                                 | singleFeature = val
                                 | otherwise = B.concat $ [f, ":"] ++(case sf of { Nothing -> []; Just s -> [s,":"]}) ++[val]
@@ -848,23 +849,24 @@ loadGFF gffFp opts = do
                                 Just v -> (namemap, v, next)
                                 Nothing -> (M.insert header next namemap, next, next+1)
 
-                            gmap' :: GFFAnnotationMap
-                            gmap' = M.alter insertg' (gffSeqId gline) gmap
-                            insertg' immap = Just $ IM.alter
-                                                        (\case
-                                                            Nothing -> Just $ AnnotationInfo1 (gffStrand gline) active
-                                                            Just ais -> Just $ AnnotationInfoCons (gffStrand gline) active ais
-                                                        )
-                                                        asInterval
-                                                        (fromMaybe IM.empty immap)
 
-                            asInterval :: IM.Interval Int
-                            asInterval = IM.ClosedInterval (gffStart gline) (gffEnd gline)
+                            insertg' :: Maybe GffIMMapAcc -> NGLessIO (Maybe GffIMMapAcc)
+                            insertg' immap = do
+                                immap' <- case immap of
+                                            Just v -> return v
+                                            Nothing -> IM.new
+                                IM.insert (IM.Interval (gffStart gline) (gffEnd gline + 1)) -- [closed, open) intervals
+                                            (AnnotationInfo (gffStrand gline) active)
+                                            immap'
+                                return $! Just immap'
+
 
                             szmap' = M.alter inserts1 header szmap
                             inserts1 :: Maybe Double -> Maybe Double
                             inserts1 cursize = Just $! convert (gffSize gline) + fromMaybe 0.0 cursize
-                        in GffLoadingState next' gmap' namemap' szmap'
+                        in do
+                            gmap' <- M.alterF insertg' (gffSeqId gline) gmap
+                            return $! GffLoadingState next' gmap' namemap' szmap'
 
                 lookupSubFeature :: Maybe B.ByteString -> [B.ByteString]
                 lookupSubFeature Nothing = filterSubFeatures "ID" (gffAttrs gline) <|> filterSubFeatures "gene_id" (gffAttrs gline)
@@ -874,16 +876,18 @@ loadGFF gffFp opts = do
 
         -- First integer IDs are assigned "first come, first served"
         -- `reindex` makes them alphabetical
-        reindex :: GFFAnnotationMap -> M.Map B.ByteString Int -> Pair GFFAnnotationMap [B.ByteString]
-        reindex amap namemap = (M.map (IM.map reindexAI) amap :!: headers)
-            where
-                headers = M.keys namemap -- these are sorted
-                reindexAI :: AnnotationInfo -> AnnotationInfo
-                reindexAI (AnnotationInfo1 s v) = AnnotationInfo1 s (ix2ix VU.! v)
-                reindexAI (AnnotationInfoCons s v ais) = AnnotationInfoCons s (ix2ix VU.! v) (reindexAI ais)
+        reindex :: GFFAnnotationMapAcc -> M.Map B.ByteString Int -> NGLessIO (Pair GFFAnnotationMap [B.ByteString])
+        reindex amap namemap = do
+            outputListLno' TraceOutput ["Re-index GFF"]
+            let headers = M.keys namemap -- these are sorted
                 ix2ix :: VU.Vector Int
                 ix2ix = revnamemap namemap
-
+                reindexAI :: AnnotationInfo -> AnnotationInfo
+                reindexAI (AnnotationInfo s v) = AnnotationInfo s (ix2ix VU.! v)
+            amap' <- forM amap $ \im -> do
+                im' <- IM.unsafeFreeze im
+                return $ IM.map reindexAI im'
+            return $! amap' :!: headers
         gffSize :: GffLine -> Int
         gffSize g = (gffEnd g - gffStart g) + 1 -- gff format is inclusive at both ends!
 
@@ -896,14 +900,12 @@ loadGFF gffFp opts = do
 annotateSamLineGFF :: CountOpts -> GFFAnnotationMap -> SamLine -> [Int]
 annotateSamLineGFF opts amap samline = case M.lookup rname amap of
         Nothing -> []
-        Just im ->  selectIx $ (optIntersectMode opts) im lineStrand (sStart, sEnd)
+        Just im ->  selectIx $ (optIntersectMode opts) im lineStrand (IM.Interval sStart sEnd)
     where
-        selectIx Nothing = []
-        selectIx (Just (AnnotationInfo1 _ ix)) = [ix]
-        selectIx (Just (AnnotationInfoCons _ ix ais)) = ix:selectIx (Just ais)
+        selectIx = map (\(AnnotationInfo _ ix) -> ix)
         rname = samRName samline
         sStart = samPos samline
-        sEnd   = sStart + samLength samline - 1
+        sEnd   = sStart + samLength samline
         -- GffUnStranded matches everything (see 'filterStrand')
         lineStrand :: GffStrand
         lineStrand = case optStrandMode opts of
@@ -915,35 +917,55 @@ annotateSamLineGFF opts amap samline = case M.lookup rname amap of
                                 | isPositive samline -> GffNegStrand
                                 | otherwise -> GffPosStrand
 
-filterStrand :: GffStrand -> IM.IntervalMap Int AnnotationInfo -> IM.IntervalMap Int AnnotationInfo
-filterStrand GffUnStranded = id
-filterStrand strand = IM.mapMaybe matchStrand
-    where
-        match1 s = s == GffUnStranded || s == strand
-        matchStrand ai@(AnnotationInfo1 s _)
-            | match1 s = Just ai
-            | otherwise = Nothing
-        matchStrand (AnnotationInfoCons s ix ais)
-            | match1 s =
-                Just $! case matchStrand ais of
-                    Nothing -> AnnotationInfo1 s ix
-                    Just ais' -> AnnotationInfoCons s ix ais'
-            | otherwise = matchStrand ais
+matchStrand GffUnStranded _ = True
+matchStrand s (AnnotationInfo s' _) = s == s'
 
 union :: AnnotationRule
-union im strand (sS, sE) =  aiConcat . IM.elems . filterStrand strand . IM.intersecting im $ IM.ClosedInterval sS sE
+union im strand i =  filter (matchStrand strand) . IM.overlaps i $ im
 
 intersection_strict :: AnnotationRule
-intersection_strict im strand (sS, sE) = intersection' $ map (filterStrand strand . IM.containing im) [sS..sE]
+intersection_strict im strand i = let
+        candidates = IM.overlapsWithKeys i  im
+        strandFiltered = filter (matchStrand strand . snd) candidates
+        intersecting = filter (contained i . fst) strandFiltered
+        contained (IM.Interval s0 e0) (IM.Interval s1 e1) = s0 >= s1 && e0 <= e1
+    in noDupAIs (fmap snd intersecting)
+
+noDupAIs :: [AnnotationInfo] -> [AnnotationInfo]
+noDupAIs = noDupAIs' []
+    where
+        noDupAIs' _ [] = []
+        noDupAIs' prev (x@(AnnotationInfo _ ix):xs)
+            | ix `elem` prev = noDupAIs' prev xs
+            | otherwise = x:noDupAIs' (ix:prev) xs
 
 intersection_non_empty :: AnnotationRule
-intersection_non_empty im strand (sS, sE) = intersection' . filter (not . null) .  map (filterStrand strand . IM.containing subim) $ [sS..sE]
-    where
-        subim = IM.intersecting im (IM.ClosedInterval sS sE)
+intersection_non_empty im strand i@(IM.Interval sS sE)
+    | sE <= sS = []
+    | otherwise = let
+        candidates = IM.overlapsWithKeys i  im
+        strandFiltered = filter (matchStrand strand . snd) candidates
+        subim = IM.fromList strandFiltered
+        hits = filter (not . null) . map (flip IM.lookup subim) $ [sS..(sE-1)]
+    in noDupAIs . intersection $ hits
 
-intersection' :: [GffIMMap] -> Maybe AnnotationInfo
-intersection' [] = Nothing
-intersection' im = aiConcat . IM.elems $ foldl1' IM.intersection im
+
+-- This is a pretty terrible implementation, but the expectation is that its
+-- arguments will be very small lists (1-5 elements)
+intersection :: Eq a => [[a]] -> [a]
+intersection [] = []
+intersection [x] = x
+intersection (x:xs) = intersection' x xs
+    where
+        -- early bail-out (which is why this is not strictly an instance of foldl1)
+        intersection' [] _ = []
+        intersection' y [] = y
+        intersection' y (z:zs) = intersection' (common y z) zs
+        common :: Eq a => [a] -> [a] -> [a]
+        common [] _ = []
+        common (y:ys) zs
+            | y `elem` zs = y:common ys zs
+            | otherwise = common ys zs
 
 
 lookupFilePath context name args = case lookup name args of
