@@ -6,7 +6,7 @@ compiler-check: newer-minor
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
   - git: "https://github.com/ngless-toolkit/interval-to-int"
-    commit: "c7ad5a51aea53e3546708bdd3ee51252877fb2b3"
+    commit: "78289f6b48d41f7cc48169520ec9b77b050a0029"
 
 
 allow-newer: true
