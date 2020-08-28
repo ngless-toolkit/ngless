@@ -824,15 +824,26 @@ loadGFF gffFp opts = do
                         -> GffLoadingState
                         -> GffLine
                         -> NGLessIO GffLoadingState
-        insertg f sf cur gline
+        insertg f sf cur@(GffLoadingState gmap metamap0) gline
                 | gffType gline /= f = return cur
-                | otherwise = liftIO $ foldM subfeatureMap cur $ lookupSubFeature sf
+                | otherwise = liftIO $ do
+                    let seqid = BS.toShort $ gffSeqId gline
+                    -- We can do it all with a single call to M.alterF, but the
+                    -- expectation is that most of the lookups will return
+                    -- something and we can avoid allocations
+                    (gmap', immap) <- case M.lookup seqid gmap of
+                        Just im -> return (gmap, im)
+                        Nothing -> do
+                            im <- IM.new
+                            return $! (M.insert seqid im gmap, im)
+                    metamap' <- foldM (subfeatureInsert immap) metamap0 $ lookupSubFeature sf
+                    return $! GffLoadingState gmap' metamap'
             where
-                subfeatureMap :: GffLoadingState -> B.ByteString -> IO GffLoadingState
-                subfeatureMap (GffLoadingState !gmap !metamap) val = let
+                subfeatureInsert :: GffIMMapAcc -> M.Map BS.ShortByteString IntDoublePair -> B.ByteString -> IO (M.Map BS.ShortByteString IntDoublePair)
+                subfeatureInsert !immap !metamap sfVal = let
                             header = BS.toShort $ if singleFeature
-                                                    then val
-                                                    else B.concat $ [f, ":"] ++(case sf of { Nothing -> []; Just s -> [s,":"]}) ++[val]
+                                                    then sfVal
+                                                    else B.concat $ [f, ":"] ++(case sf of { Nothing -> []; Just s -> [s,":"]}) ++ [sfVal]
                             featureSize :: Double
                             featureSize = convert $ gffSize gline
                             (!metamap', active) = let
@@ -841,19 +852,11 @@ loadGFF gffFp opts = do
                                 in (m, case oldVal of
                                     Just (IntDoublePair i _) -> i
                                     Nothing -> M.size m - 1)
-
-                            insertg' :: Maybe GffIMMapAcc -> IO (Maybe GffIMMapAcc)
-                            insertg' immap = do
-                                immap' <- case immap of
-                                            Just v -> return v
-                                            Nothing -> IM.new
-                                IM.insert (IM.Interval (gffStart gline) (gffEnd gline + 1)) -- [closed, open) intervals
-                                            (AnnotationInfo (gffStrand gline) active)
-                                            immap'
-                                return $! Just immap'
                         in do
-                            gmap' <- M.alterF insertg' (BS.toShort $ gffSeqId gline) gmap
-                            return $! GffLoadingState gmap' metamap'
+                            IM.insert (IM.Interval (gffStart gline) (gffEnd gline + 1)) -- [closed, open) intervals
+                                        (AnnotationInfo (gffStrand gline) active)
+                                        immap
+                            return metamap'
 
                 lookupSubFeature :: Maybe B.ByteString -> [B.ByteString]
                 lookupSubFeature Nothing = filterSubFeatures "ID" (gffAttrs gline) <|> filterSubFeatures "gene_id" (gffAttrs gline)
