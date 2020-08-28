@@ -11,6 +11,7 @@ import qualified Data.IntervalIntMap as IM
 import qualified Data.Set as S
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Map as M
 
@@ -19,7 +20,6 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
-import           Data.List (elemIndex)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe
 
@@ -81,12 +81,12 @@ case_load_very_short = do
     [GFFAnnotator immap headers szmap] <- testNGLessIO
                 $ loadAnnotator (AnnotateGFF very_short_gff) defCountOpts  { optFeatures = ["gene"] }
     let usedIDs = extractIds $ concatMap IM.elems $ M.elems immap
-    length (listNub usedIDs) @?= length headers
+    length (listNub usedIDs) @?= V.length headers
     minimum usedIDs @?= 0
-    maximum usedIDs @?= length headers - 1
-    VU.length szmap @?= length headers
+    maximum usedIDs @?= V.length headers - 1
+    VU.length szmap @?= V.length headers
     let mix = do
-            ix <- elemIndex "WBGene00010199" headers
+            ix <- V.elemIndex "WBGene00010199" headers
             return $! szmap VU.! ix
     mix @?= Just (721-119+1)
 
@@ -104,7 +104,7 @@ case_load_gff_order = do
     [GFFAnnotator immap headers _] <- testNGLessIO
                 $ loadAnnotator (AnnotateGFF fp) defCountOpts  { optFeatures = ["gene"] }
     let [h] = extractIds . IM.elems  . fromJust $ M.lookup "V" immap
-    (headers !! h) @?= "WBGene00008825"
+    (headers V.! h) @?= "WBGene00008825"
 
 short1 :: B.ByteString
 short1 = [here|
