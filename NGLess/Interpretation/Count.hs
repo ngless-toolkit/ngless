@@ -56,10 +56,9 @@ import           Control.Monad.Primitive (PrimMonad(..))
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class   (liftIO)
-import Control.Monad.Except     (throwError)
 import Data.List                (foldl', sort, sortOn)
 import GHC.Conc                 (getNumCapabilities)
-import Control.DeepSeq          (NFData(..), ($!!))
+import Control.DeepSeq          (NFData(..))
 import Control.Error            (note)
 import Control.Applicative      ((<|>))
 import Data.Maybe
@@ -791,12 +790,14 @@ loadGFF gffFp opts = do
                 "The old format created problems when mixed with collect() and other\n" ++
                 "functions.")
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "'..."]
+        numCapabilities <- liftIO getNumCapabilities
+        let mapthreads = max 1 (numCapabilities - 1)
         partials <- C.runConduit $
                 conduitPossiblyCompressedFile gffFp
-                    .| linesC
-                    .| readAnnotationOrDie
+                    .| linesVC 8192
+                    .| CAlg.asyncMapEitherC mapthreads (V.mapM (readGffLine . unwrapByteLine) . V.filter (not . isComment))
                     .| sequenceSinks
-                        [CL.foldM (insertg f sf) (GffLoadingState M.empty M.empty)
+                        [CL.foldM (insertgV f sf) (GffLoadingState M.empty M.empty)
                                     |  f <- optFeatures    opts
                                     , sf <- case optSubFeatures opts of
                                                 Nothing -> [Nothing]
@@ -811,22 +812,20 @@ loadGFF gffFp opts = do
                 Nothing -> True
                 Just [_] -> True
                 _ -> False
-        readAnnotationOrDie :: C.ConduitT ByteLine GffLine NGLessIO ()
-        readAnnotationOrDie = C.awaitForever $ \(ByteLine line) ->
-            unless (B8.head line == '#') $
-                case readGffLine line of
-                    Right g -> C.yield g
-                    Left err -> throwError err
+
+        isComment (ByteLine line)
+            | B.null line = True
+            | otherwise = B8.head line == '#'
+
+        insertgV f sf p vs = liftIO $ V.foldM (insertg f sf) p (V.filter ((==f) . gffType) vs)
 
         -- update GffLoadingState
-        insertg :: B.ByteString -- ^ feature
+        insertgV :: B.ByteString -- ^ feature
                         -> Maybe B.ByteString -- ^ subfeature
                         -> GffLoadingState
-                        -> GffLine
+                        -> (V.Vector GffLine)
                         -> NGLessIO GffLoadingState
-        insertg f sf cur@(GffLoadingState gmap metamap0) gline
-                | gffType gline /= f = return cur
-                | otherwise = liftIO $ do
+        insertg f sf (GffLoadingState gmap metamap0) gline = do
                     let seqid = BS.toShort $ gffSeqId gline
                     -- We can do it all with a single call to M.alterF, but the
                     -- expectation is that most of the lookups will return
@@ -836,11 +835,12 @@ loadGFF gffFp opts = do
                         Nothing -> do
                             im <- IM.new
                             return $! (M.insert seqid im gmap, im)
-                    metamap' <- foldM (subfeatureInsert immap) metamap0 $ lookupSubFeature sf
+                    let i = IM.Interval (gffStart gline) (gffEnd gline + 1) -- [closed, open) intervals
+                    metamap' <- foldM (subfeatureInsert immap i) metamap0 $ lookupSubFeature sf
                     return $! GffLoadingState gmap' metamap'
             where
-                subfeatureInsert :: GffIMMapAcc -> M.Map BS.ShortByteString IntDoublePair -> B.ByteString -> IO (M.Map BS.ShortByteString IntDoublePair)
-                subfeatureInsert !immap !metamap sfVal = let
+                subfeatureInsert :: GffIMMapAcc -> IM.Interval -> M.Map BS.ShortByteString IntDoublePair -> B.ByteString -> IO (M.Map BS.ShortByteString IntDoublePair)
+                subfeatureInsert !immap !i !metamap sfVal = let
                             header = BS.toShort $ if singleFeature
                                                     then sfVal
                                                     else B.concat $ [f, ":"] ++(case sf of { Nothing -> []; Just s -> [s,":"]}) ++ [sfVal]
@@ -850,12 +850,10 @@ loadGFF gffFp opts = do
                                     combine _key _nv (IntDoublePair p oldSize) = (IntDoublePair p $ oldSize + featureSize)
                                     (oldVal, m) = M.insertLookupWithKey combine header (IntDoublePair (M.size metamap) featureSize) metamap
                                 in (m, case oldVal of
-                                    Just (IntDoublePair i _) -> i
+                                    Just (IntDoublePair ix _) -> ix
                                     Nothing -> M.size m - 1)
                         in do
-                            IM.insert (IM.Interval (gffStart gline) (gffEnd gline + 1)) -- [closed, open) intervals
-                                        (AnnotationInfo (gffStrand gline) active)
-                                        immap
+                            IM.insert i (AnnotationInfo (gffStrand gline) active) immap
                             return metamap'
 
                 lookupSubFeature :: Maybe B.ByteString -> [B.ByteString]
