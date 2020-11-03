@@ -408,7 +408,7 @@ lazily: i.e., the first time you use them, NGLess will download and cache them.
 NGLess will also index any database used the first time it is used.
 
 The option ``block_size_megabases`` turns on low memory mode (see the
-corresponding section in the `mapping documentation <mapping.html>`__)
+corresponding section in the `mapping documentation <Mapping.html>`__)
 
 The option ``mode_all=True`` can be passed to include all alignments of both
 single and paired-end reads in the output SAM/BAM.

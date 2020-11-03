@@ -2,8 +2,8 @@
 Configuration
 =============
 
-.. note:: ngless' results do not change because of configuration or command
-    line options. **The ngless script always has complete information on what
+.. note:: NGLess' results do not change because of configuration or command
+    line options. **The NGLess script always has complete information on what
     is computed**. What configuration options change are details of *how* the
     results are computed such as where to store intermediate files and how many
     CPU cores to use.
@@ -60,7 +60,7 @@ if writing to a file or pipe), ``yes`` (synonym of ``force``).
 ``print-header``: whether to print ngless banner (version info...).
 
 ``user-directory``: user writable directory to cache downloads (default is
-system dependent, on Linux, typically ``$HOME/.local/share/ngless/``.
+system dependent, on Linux, typically it is ``$HOME/.local/share/ngless/``).
 
 ``user-data-directory``: user writable directory to cache data (default is a
 ``data`` directory inside the ``user-directory`` [see above]).
