@@ -43,7 +43,13 @@ builtinFunctions =
     ,Function (FuncName "__check_count") (Just NGLMappedReadSet) [] NGLCounts countCheckArgs False []
     ,Function (FuncName "countfile") (Just NGLString) [ArgCheckFileReadable] NGLCounts [] False [FunctionCheckReturnAssigned]
     ,Function (FuncName "write") (Just NGLAny) [] NGLVoid writeArgs False []
+
     ,Function (FuncName "print") (Just NGLAny) [] NGLVoid [] False []
+
+    ,Function (FuncName "read_int") (Just NGLString) [] NGLInteger [ArgInformation "on_empty_return" False NGLInteger []] False []
+    ,Function (FuncName "read_double") (Just NGLString) [] NGLDouble [ArgInformation "on_empty_return" False NGLDouble []] False []
+
+    ,Function (FuncName "__assert") (Just NGLBool) [] NGLVoid [] False []
 
     ,Function (FuncName "__merge_samfiles") (Just (NGList NGLString)) [] NGLMappedReadSet [] False []
     ]

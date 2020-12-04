@@ -80,6 +80,7 @@ import           Control.DeepSeq (NFData(..))
 import qualified Data.Vector as V
 import           Safe (atMay)
 import           Control.Error (note)
+import           Text.Read (readEither)
 
 import System.IO
 import System.Directory
@@ -335,8 +336,11 @@ interpretFunction' (FuncName "count")     expr args Nothing = runNGLessIO (execu
 interpretFunction' (FuncName "__check_count") expr args Nothing = runNGLessIO (executeCountCheck expr args)
 interpretFunction' (FuncName "countfile") expr args Nothing = runNGLessIO (executeCountFile expr args)
 interpretFunction' (FuncName "print")     expr args Nothing = executePrint expr args
+interpretFunction' (FuncName "read_int")  expr args Nothing = executeReadInt expr args
+interpretFunction' (FuncName "read_double")  expr args Nothing = executeReadDouble expr args
 interpretFunction' (FuncName "paired")   mate1 args Nothing = runNGLessIO (executePaired mate1 args)
 interpretFunction' (FuncName "select")    expr args (Just b) = executeSelectWBlock expr args b
+interpretFunction' (FuncName "__assert")  expr [] args       = executeAssert expr args
 interpretFunction' fname@(FuncName fname') expr args Nothing = do
     traceExpr ("executing module function: '"++T.unpack fname'++"'") expr
     execF <- findFunction fname
@@ -536,6 +540,24 @@ executePrint :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO 
 executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
 executePrint err  _ = throwScriptError ("Cannot print " ++ show err)
 
+executeReadInt :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
+executeReadInt (NGOString "") kwargs = NGOInteger <$> lookupIntegerOrScriptError "read_int" "on_empty_return" kwargs
+executeReadInt (NGOString s) _ = case readEither (T.unpack s) of
+    Right val -> return $! NGOInteger val
+    Left err -> throwDataError ("Could not parse integer from '"++T.unpack s++"'. Error: "++err)
+executeReadInt s _ = throwScriptError ("Cannot parse this object as integer: "++ show s)
+
+executeReadDouble :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
+executeReadDouble (NGOString "") kwargs = NGODouble <$> lookupDoubleOrScriptError "read_int" "on_empty_return" kwargs
+executeReadDouble (NGOString s) _ = case readEither (T.unpack s) of
+    Right val -> return $! NGODouble val
+    Left err -> throwDataError ("Could not parse double from '"++T.unpack s++"'. Error: "++err)
+executeReadDouble s _ = throwScriptError ("Cannot parse this object as double: "++ show s)
+
+executeAssert (NGOBool True) _ = return $! NGOVoid
+executeAssert (NGOBool False) _ = throwScriptError "Assert failed"
+executeAssert _ _ = throwShouldNotOccur "Assert did not receive a boolean!"
+
 executeSelectWBlock :: NGLessObject -> [(T.Text, NGLessObject)] -> Block -> InterpretationEnvIO NGLessObject
 executeSelectWBlock input@NGOMappedReadSet{ nglSamFile = isam} args (Block (Variable var) body) = do
         paired <- lookupBoolOrScriptErrorDef (return True) "select" "paired" args
@@ -727,6 +749,8 @@ evalBinary BOpPathAppend a b = case (a,b) of
     (NGOString pa, NGOString pb) -> return . NGOString $! T.pack (T.unpack pa </> T.unpack pb)
     _ -> nglTypeError ("Operator </>: invalid arguments" :: String)
 
+evalBinary BOpEQ (NGOString a) (NGOString b) = return . NGOBool $! a == b
+evalBinary BOpNEQ (NGOString a) (NGOString b) = return . NGOBool $! a /= b
 evalBinary op a b = do
         a' <- asDouble a
         b' <- asDouble b

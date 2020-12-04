@@ -1,0 +1,16 @@
+ngless "1.2"
+
+val = 1
+__assert(val.to_string() == "1")
+
+vald = 1.5
+__assert(vald.to_string() == "1.5")
+
+s = "2"
+__assert(read_int(s) == 2)
+__assert(read_int("", on_empty_return=3) == 3)
+
+s = "2.2"
+__assert(read_double(s) == 2.2)
+__assert(read_double("", on_empty_return=3.8) == 3.8)
+

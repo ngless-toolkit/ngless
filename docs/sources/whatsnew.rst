@@ -6,10 +6,16 @@ What's New (History)
 Unreleased development version
 ------------------------------
 
+User-visible improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Adds conversion from string to numbers (int or double) and back
+
 Bugfixes
 ~~~~~~~~
 - Fix cases where sample names contain ``/`` and ``collect()`` (`issue 141
   <https://github.com/ngless-toolkit/ngless/issues/141>`__)
+ 
 
 
 Version 1.2.0

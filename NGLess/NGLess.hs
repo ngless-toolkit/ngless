@@ -1,3 +1,6 @@
+{- Copyright 2013-2020 NGLess Authors
+ - License: MIT
+ -}
 {-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 module NGLess
     ( NGLessIO
@@ -23,6 +26,8 @@ module NGLess
     , lookupStringListOrScriptErrorDef
     , lookupIntegerOrScriptError
     , lookupIntegerOrScriptErrorDef
+    , lookupDoubleOrScriptError
+    , lookupDoubleOrScriptErrorDef
     , lookupSymbolOrScriptError
     , lookupSymbolOrScriptErrorDef
     , lookupSymbolListOrScriptError
@@ -92,6 +97,13 @@ lookupIntegerOrScriptErrorDef defval context name args = case lookup name args o
     Nothing -> defval
     Just (NGOInteger v) -> return v
     Just other -> throwScriptError ("Expected an integer in argument " ++ T.unpack name ++ " in context '" ++ context ++ "' instead observed: " ++ show other)
+
+lookupDoubleOrScriptError :: (MonadError NGError m) => String-> T.Text -> KwArgsValues -> m Double
+lookupDoubleOrScriptError = requiredLookup lookupDoubleOrScriptErrorDef
+lookupDoubleOrScriptErrorDef defval context name args = case lookup name args of
+    Nothing -> defval
+    Just (NGODouble v) -> return v
+    Just other -> throwScriptError ("Expected a double in argument " ++ T.unpack name ++ " in context '" ++ context ++ "' instead observed: " ++ show other)
 
 lookupSymbolOrScriptError :: (MonadError NGError m) => String-> T.Text -> KwArgsValues -> m T.Text
 lookupSymbolOrScriptError = requiredLookup lookupSymbolOrScriptErrorDef

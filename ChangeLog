@@ -3,6 +3,7 @@ Version 1.2.0+
 	* Use ZStd compression for temporary files from preprocess()
 	* Correctly handle subpaths in samples for collect (fixes #141)
 	* Add to_string() to int and double types (partially fixes #78 & fixes #81)
+	* Add read_int() and read_double() functions (fixes #78)
 
 Version 1.2.0 2020-07-12 by luispedro
 	* Add load_fastq_directory to builtin functions

@@ -90,7 +90,8 @@ checkSimple expr = forM_ expr (checkSimple1 . snd) *> return expr
             Condition{} -> throwShouldNotOccur "Non-simple expression (Condition)"
             Assignment{} -> throwShouldNotOccur "Non-simple expression (Assignment)"
             FunctionCall{} -> throwShouldNotOccur "Non-simple expression (FunctionCall)"
-            MethodCall{} -> throwShouldNotOccur "Non-simple expression (MethodCall)"
+            -- Rewriting for MethodCall is not implemented!
+            MethodCall{} -> return () -- throwShouldNotOccur "Non-simple expression (MethodCall)"
 
             ListExpression s -> mapM_ checkSimple0 s
             UnaryOp _ a -> checkSimple0 a
@@ -522,6 +523,12 @@ addTemporaries = addTemporaries' 0
                             put (n + 1)
                             tell [Assignment v e]
                             return (Lookup t v)
+                functionCallTemp e@BinaryOp{} = do
+                            n <- get
+                            let v = Variable (T.pack $ "temp$"++show n)
+                            put (n + 1)
+                            tell [Assignment v e]
+                            return (Lookup Nothing v)
                 functionCallTemp e = return e
 
 {-| Calculation of hashes for output method calls

@@ -204,10 +204,17 @@ checkbop BOpGT  a b = checknum a *> checknum b *> return (Just NGLBool)
 checkbop BOpGTE a b = checknum a *> checknum b *> return (Just NGLBool)
 checkbop BOpLT  a b = checknum a *> checknum b *> return (Just NGLBool)
 checkbop BOpLTE a b = checknum a *> checknum b *> return (Just NGLBool)
-checkbop BOpEQ  a b = checknum a *> checknum b *> return (Just NGLBool)
-checkbop BOpNEQ a b = checknum a *> checknum b *> return (Just NGLBool)
-
 checkbop BOpPathAppend a b = softCheck NGLString a *> softCheck NGLString b *> return (Just NGLString)
+checkbop BOpNEQ  a b = checkbop BOpEQ a b
+checkbop BOpEQ  a b = do
+    t <- liftM3 (\a b c -> a <|> b <|> c)
+        (softCheckPair NGLInteger a b)
+        (softCheckPair NGLDouble a b)
+        (softCheckPair NGLString a b)
+    when (isNothing t) $
+        errorInLineC ["Comparison operators (== or !=) must be applied to a pair of strings or numbers"]
+    return (Just NGLBool)
+
 
 softCheck :: NGLType -> Expression -> TypeMSt (Maybe NGLType)
 softCheck expected expr = do
