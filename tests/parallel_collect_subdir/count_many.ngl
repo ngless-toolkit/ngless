@@ -1,0 +1,9 @@
+ngless "1.1"
+import "parallel" version "0.6"
+
+samples = readlines("samplefile")
+sample = lock1(samples)
+input = samfile(sample + ".sam.gz")
+
+counts = count(input, features=["exon", "gene", "start_codon", "stop_codon"], subfeatures=["gene_id"], multiple={1overN}, gff_file="short.gtf")
+collect(counts, ofile="output.RNA.txt", current=sample, allneeded=samples)
