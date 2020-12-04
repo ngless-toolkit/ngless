@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2020 NGLess Authors
  - License: MIT
  -}
 module BuiltinFunctions
@@ -159,6 +159,12 @@ builtinMethods =
     ,MethodInfo (MethodName "avg_quality") NGLRead Nothing NGLDouble [] True []
     ,MethodInfo (MethodName "fraction_at_least") NGLRead (Just NGLInteger) NGLDouble [] True []
     ,MethodInfo (MethodName "n_to_zero_quality") NGLRead Nothing NGLRead [] True [FunctionCheckMinNGLessVersion (0,8)]
+
+    -- NGLDouble
+    ,MethodInfo (MethodName "to_string") NGLDouble Nothing NGLString [] True []
+
+    -- NGLInteger
+    ,MethodInfo (MethodName "to_string") NGLInteger Nothing NGLString [] True []
     ]
 
 filterArgs =

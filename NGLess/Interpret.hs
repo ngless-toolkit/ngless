@@ -516,6 +516,8 @@ executePreprocess v _ _ = unreachable ("executePreprocess: Cannot handle this in
 executeMethod :: MethodName -> NGLessObject -> Maybe NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationROEnv NGLessObject
 executeMethod method (NGOMappedRead samline) arg kwargs = runNGLess (executeMappedReadMethod method samline arg kwargs)
 executeMethod method (NGOShortRead sr) arg kwargs = runNGLess (executeShortReadsMethod method sr arg kwargs)
+executeMethod (MethodName "to_string") (NGODouble val) _ _  = return . NGOString . T.pack . show $ val
+executeMethod (MethodName "to_string") (NGOInteger val) _ _ = return . NGOString . T.pack . show $ val
 executeMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 
