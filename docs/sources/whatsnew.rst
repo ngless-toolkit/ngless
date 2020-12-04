@@ -3,6 +3,15 @@ What's New (History)
 ====================
 
 
+Unreleased development version
+------------------------------
+
+Bugfixes
+~~~~~~~~
+- Fix cases where sample names contain ``/`` and ``collect()`` (`issue 141
+  <https://github.com/ngless-toolkit/ngless/issues/141>`__)
+
+
 Version 1.2.0
 -------------
 

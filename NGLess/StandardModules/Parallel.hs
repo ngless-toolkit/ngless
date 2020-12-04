@@ -118,8 +118,9 @@ setupHashDirectory basename hash = do
 unsafeCharMap = [('/', '_'),
                  ('\\', '_')]
 
-sanitizeLock :: T.Text -> T.Text
-sanitizeLock = T.map (\x -> fromMaybe x (lookup x unsafeCharMap))
+-- | Remove '/' and '\' from filenames
+sanitizePath :: T.Text -> T.Text
+sanitizePath = T.map (\x -> fromMaybe x (lookup x unsafeCharMap))
 
 executeLock1 (NGOList entries) kwargs  = do
     entries' <- mapM (stringOrTypeError "lock1") entries
@@ -128,7 +129,7 @@ executeLock1 (NGOList entries) kwargs  = do
     -- Keep a map of 'sane -> original' names used for locks to backtrace
     -- what file was locked and return the unsanitized name
     -- See also https://github.com/ngless-toolkit/ngless/issues/68
-    let saneentries = sanitizeLock <$> entries'
+    let saneentries = sanitizePath <$> entries'
         lockmap = zip saneentries entries'
     (e,rk) <- getLock lockdir saneentries
     outputListLno' InfoOutput ["lock1: Obtained lock file: '", lockdir </> T.unpack e ++ ".lock", "'"]
@@ -158,6 +159,12 @@ lockName = (++ ".lock") . T.unpack
 finishedName = (++ ".finished") . T.unpack
 failedName = (++ ".failed") . T.unpack
 
+-- | Create a lock file
+getLock :: FilePath
+                -- ^  directory where to create locks
+                -> [T.Text]
+                -- ^ keys to attempt to ock
+                -> NGLessIO (T.Text, ReleaseKey)
 getLock basedir fs = do
     existing <- liftIO $ getDirectoryContents basedir
     let notfinished = flip filter fs $ \fname -> finishedName fname `notElem` existing
@@ -220,7 +227,8 @@ executeCollect (NGOCounts istream) kwargs = do
         .| CL.map unwrapByteLine
         .| C.unlinesAscii
         .| CAlg.asyncGzipTo gzout
-    let partialfile entry = hashdir </> "partial." ++ T.unpack entry <.> "tsv.gz"
+    let partialfile entry = hashdir </> "partial." ++ T.unpack (sanitizePath entry) <.> "tsv.gz"
+    outputListLno' TraceOutput ["Collect will write partial file to ", partialfile current]
     liftIO $ do
         hClose gzout
         syncFile gzfp
@@ -246,7 +254,9 @@ executeCollect (NGOCounts istream) kwargs = do
 
     if canCollect
         then do
+            outputListLno' TraceOutput ["Can collect"]
             newfp <- pasteCounts comment False allentries (map partialfile allentries)
+            outputListLno' TraceOutput ["Pasted. Will move result to ", T.unpack ofile]
             moveOrCopyCompress True newfp (T.unpack ofile ++ (if isSubsample then ".subsample" else ""))
         else do
             outputListLno' TraceOutput ["Cannot collect (not all files present yet), wrote partial file to ", partialfile current]
