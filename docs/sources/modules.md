@@ -231,6 +231,17 @@ provide a list:
         - "Paper 1"
         - "Paper 2"
 
+## Minimal NGLess Version
+
+External modules can specify a minimal NGLess version that they need to run.
+This is optional, but if it is used, you need to additionally supply a reason
+for the requirement (using the aptly-named `reason` field):
+
+    min-ngless-version:
+        min-version: "1.3"
+        reason: "The min-ngless-version field is only supported since NGLess 1.3"
+
+
 ## Internal Modules
 
 This is very advanced as it requires writing Haskell code which can then

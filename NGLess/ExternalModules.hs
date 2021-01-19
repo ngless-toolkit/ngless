@@ -1,4 +1,4 @@
-{- Copyright 2015-2019 NGLess Authors
+{- Copyright 2015-2021 NGLess Authors
  - License: MIT
  -}
 
@@ -178,9 +178,27 @@ instance Aeson.FromJSON Command where
             <*> o .:? "additional" .!= []
             <*> o .:? "return" .!=  CommandReturn NGLVoid "" ""
 
+data ModuleNGLessMinVersion = ModuleNGLessMinVersion
+                        { nglessMinVersion :: NGLVersion
+                        , nglessMinVersionReason :: T.Text
+                        }
+    deriving (Eq, Show)
+
+instance Aeson.FromJSON ModuleNGLessMinVersion where
+    parseJSON = Aeson.withObject "min-ngless-version" $ \o -> do
+            vtText <- o .: "min-version"
+            reason <- o .: "reason"
+            vt <- (Aeson.withText "minimal NGLess version" $ \vt ->
+                        case parseVersion (Just vt) of
+                            Left err -> fail (show err)
+                            Right val -> return val) vtText
+            return $ ModuleNGLessMinVersion vt reason
+
+
 data ExternalModule = ExternalModule
     { emInfo :: ModInfo -- ^ module information
     , modulePath :: FilePath -- ^ directory where module files are located
+    , modNGLessMinVersion :: Maybe ModuleNGLessMinVersion -- ^ minimal NGLess version for this module
     , initCmd :: Maybe FilePath
     , initArgs :: [String]
     , emFunctions :: [Command]
@@ -197,6 +215,7 @@ instance Aeson.FromJSON ExternalModule where
                 init_cmd <- initO' .: "init_cmd"
                 init_args <- initO' .:? "init_args" .!= []
                 return (init_cmd, init_args)
+        modNGLessMinVersion <- o .:? "min-ngless-version"
         references <- o .:? "references" .!= []
         emFunctions <- o .:? "functions" .!= []
         singleCitation <- o .:? "citation"
@@ -406,6 +425,14 @@ asInternalModule em@ExternalModule{..} = do
 validateModule :: ExternalModule -> NGLessIO ()
 validateModule  em@ExternalModule{..} = do
     checkSyntax em
+    whenJust modNGLessMinVersion $ \(ModuleNGLessMinVersion minV reason) -> do
+        curV <- ngleVersion <$> nglEnvironment
+        when (minV > curV) $
+            throwScriptError $ concat
+                [ "Current NGLess version is too old for loading module '"
+                , show emInfo, ".\n"
+                , "Version ", show minV, " is required.\n"
+                , "Reason: ", T.unpack reason]
     whenJust initCmd $ \initCmd' -> do
         outputListLno' DebugOutput ("Running initialization for module ":show emInfo:" ":initCmd':" ":initArgs)
         env <- nglessEnv modulePath
@@ -533,7 +560,10 @@ checkCompatible modname version mi = do
 loadModule :: ModInfo -> NGLessIO Module
 loadModule mi
         | isGlobalImport mi && name `notElem` knownModules =
-            throwScriptError ("Module '" ++ T.unpack name ++ "' is not known.\n\t" ++ T.unpack (suggestionMessage name knownModules) ++ "\n\tTo import local modules, use \"local import\"")
+            throwScriptError (
+                    "Module '" ++ T.unpack name ++ "' is not known.\n\t"
+                    ++ T.unpack (suggestionMessage name knownModules)
+                    ++ "\n\tTo import local modules, use \"local import\"")
         | otherwise = asInternalModule =<< findLoad name version
     where
         isGlobalImport LocalModInfo{} = False

@@ -1,4 +1,5 @@
 Version 1.2.0+
+	* Add min-ngless-version field for modules
 	* Add early check that block assignments are always to block variables
 	* Use ZStd compression for temporary files from preprocess()
 	* Correctly handle subpaths in samples for collect (fixes #141)
