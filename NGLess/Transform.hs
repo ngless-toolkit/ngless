@@ -1,4 +1,4 @@
-{- Copyright 2016-2020 NGLess Authors
+{- Copyright 2016-2021 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -523,12 +523,17 @@ addTemporaries = addTemporaries' 0
                             put (n + 1)
                             tell [Assignment v e]
                             return (Lookup t v)
+                {- The code below seemed like a good idea, but breaks the early
+                 - error checking (as it relies on a very simplistic way of
+                 - "bubbling up" the error checking code:
+                 -
                 functionCallTemp e@BinaryOp{} = do
                             n <- get
                             let v = Variable (T.pack $ "temp$"++show n)
                             put (n + 1)
                             tell [Assignment v e]
                             return (Lookup Nothing v)
+                -}
                 functionCallTemp e = return e
 
 {-| Calculation of hashes for output method calls
