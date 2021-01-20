@@ -613,6 +613,8 @@ argument to True.
   feature
 - ``{scaled}`` is the result of the ``{normed}`` mode scaled up so that the
   total number of counts is identical to the ``{raw}`` (within rounding error)
+- ``{fpkm}`` is *fragments per 1000 bp per million fragments*, so it is normalized
+  by both the size of the feature and the number of fragments.
 
 Unmapped inserts are included in the output if ``{include_minus1}`` is true
 (default: ``False``).
