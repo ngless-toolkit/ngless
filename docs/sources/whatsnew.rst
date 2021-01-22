@@ -10,12 +10,13 @@ User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Adds conversion from string to numbers (int or double) and back
+- Better error message if the user attempts to use the non-existent ``<\>``
+  operator (suggest ``</>``)
 
 Bugfixes
 ~~~~~~~~
 - Fix cases where sample names contain ``/`` and ``collect()`` (`issue 141
   <https://github.com/ngless-toolkit/ngless/issues/141>`__)
- 
 
 
 Version 1.2.0

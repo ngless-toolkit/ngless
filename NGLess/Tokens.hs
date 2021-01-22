@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, CPP #-}
@@ -126,7 +126,10 @@ constants =
 
 variableStr = (:) <$> (char '_' <|> letter) <*> many (char '_' <|> alphaNum)
 operator = TOperator <$> oneOf "=,+-*():[]<>.|"
-boperator = choice [
+boperator =
+        -- Check for a not-so-unreasonable user mistake
+        (try_string "<\\>" *> fail "<\\> found. Did you mean </>?")
+        <|> choice [
                 (try_string long *> pure (TBop short))
                     | (long,short) <-
                     [ ("!=", BOpNEQ)

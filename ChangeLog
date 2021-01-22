@@ -1,4 +1,6 @@
 Version 1.2.0+
+	* Better error message if the user attempts to use the non-existent <\>
+	operator (suggest </>)
 	* Add min-ngless-version field for modules
 	* Add early check that block assignments are always to block variables
 	* Use ZStd compression for temporary files from preprocess()
