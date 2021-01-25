@@ -2,9 +2,10 @@
 What's New (History)
 ====================
 
+Version 1.3.0
+-------------
 
-Unreleased development version
-------------------------------
+Released *28 January 2021*
 
 User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -12,6 +13,12 @@ User-visible improvements
 - Adds conversion from string to numbers (int or double) and back
 - Better error message if the user attempts to use the non-existent ``<\>``
   operator (suggest ``</>``)
+- Validate ``count()`` headers on ``--validate-only``
+
+Internal improvements
+~~~~~~~~~~~~~~~~~~~~~
+
+- Use zstd compression for more temporary files
 
 Bugfixes
 ~~~~~~~~

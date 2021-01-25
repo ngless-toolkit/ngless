@@ -1,4 +1,4 @@
-Version 1.2.0+
+Version 1.3.0 2021-01-28 by luispedro
 	* Validate count() headers on --validate-only
 	* Better error message if the user attempts to use the non-existent <\>
 	operator (suggest </>)
