@@ -1,4 +1,4 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, CPP #-}
@@ -84,7 +84,6 @@ import           Text.Read (readEither)
 
 import System.IO
 import System.Directory
-import System.FilePath ((</>))
 import Data.List (find)
 import GHC.Conc                 (getNumCapabilities)
 
@@ -730,38 +729,4 @@ _evalIndex (NGOShortRead sr) [Nothing, Just (NGOInteger e)] =
 _evalIndex (NGOShortRead sr) [Just (NGOInteger s), Just (NGOInteger e)] =
     return . NGOShortRead $ srSlice (fromInteger s) (fromInteger $ e - s) sr
 _evalIndex _ _ = nglTypeError ("_evalIndex: invalid operation" :: String)
-
-
-asDouble :: NGLessObject -> NGLess Double
-asDouble (NGODouble d) = return d
-asDouble (NGOInteger i) = return $ fromIntegral i
-asDouble other = throwScriptError ("Expected numeric value, got: " ++ show other)
-
-
--- Binary Evaluation
-evalBinary :: BOp ->  NGLessObject -> NGLessObject -> Either NGError NGLessObject
-evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a + b)
-evalBinary BOpAdd (NGOString a) (NGOString b) = Right $ NGOString (T.concat [a, b])
-evalBinary BOpAdd a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
-evalBinary BOpMul (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a * b)
-evalBinary BOpMul a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
-evalBinary BOpPathAppend a b = case (a,b) of
-    (NGOString pa, NGOString pb) -> return . NGOString $! T.pack (T.unpack pa </> T.unpack pb)
-    _ -> nglTypeError ("Operator </>: invalid arguments" :: String)
-
-evalBinary BOpEQ (NGOString a) (NGOString b) = return . NGOBool $! a == b
-evalBinary BOpNEQ (NGOString a) (NGOString b) = return . NGOBool $! a /= b
-evalBinary op a b = do
-        a' <- asDouble a
-        b' <- asDouble b
-        return . NGOBool $ cmp op a' b'
-    where
-        cmp BOpLT = (<)
-        cmp BOpGT = (>)
-        cmp BOpLTE = (<=)
-        cmp BOpGTE = (>=)
-        cmp BOpEQ = (==)
-        cmp BOpNEQ = (/=)
-        cmp _ = error "should never occur"
-
 

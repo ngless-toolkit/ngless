@@ -1,4 +1,4 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
 
@@ -22,15 +22,19 @@ module Language
     , recursiveTransform
     , usedVariables
     , staticValue
+    , evalBinary
     ) where
 
 {- This module defines the internal representation the language -}
 import qualified Data.Text as T
+import           Data.Either.Extra (eitherToMaybe)
 import           Control.Monad.Extra (whenJust)
 import           Control.Monad.Writer
+import           System.FilePath ((</>))
 
 import Data.FastQ
 import Data.Sam
+import NGLess.NGError
 import FileOrStream
 
 newtype Variable = Variable T.Text
@@ -167,19 +171,51 @@ instance Show Expression where
 showArgs [] = ""
 showArgs ((Variable v, e):args) = "; "++T.unpack v++"="++show e++showArgs args
 
+{-- Extract static (ie, constant) values from expressions, if possible -}
 staticValue :: Expression -> Maybe NGLessObject
 staticValue (ConstStr s) = Just $ NGOString s
 staticValue (ConstInt v) = Just $ NGOInteger v
 staticValue (ConstBool b) = Just $ NGOBool b
 staticValue (ConstSymbol s) = Just $ NGOSymbol s
-staticValue (BinaryOp BOpAdd e1 e2) = do
+staticValue (BinaryOp bop e1 e2) = do
     v1 <- staticValue e1
     v2 <- staticValue e2
-    case (v1,v2) of
-        (NGOString s1, NGOString s2) -> return $ NGOString (T.concat [s1, s2])
-        (NGOInteger i1, NGOInteger i2) -> return $ NGOInteger (i1 + i2)
-        _ -> Nothing
+    eitherToMaybe $ evalBinary bop v1 v2
+staticValue (ListExpression e) = NGOList <$> mapM staticValue e
 staticValue _ = Nothing
+
+asDouble :: NGLessObject -> NGLess Double
+asDouble (NGODouble d) = return d
+asDouble (NGOInteger i) = return $ fromIntegral i
+asDouble other = throwScriptError ("Expected numeric value, got: " ++ show other)
+
+-- Binary Evaluation
+evalBinary :: BOp ->  NGLessObject -> NGLessObject -> Either NGError NGLessObject
+evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a + b)
+evalBinary BOpAdd (NGOString a) (NGOString b) = Right $ NGOString (T.concat [a, b])
+evalBinary BOpAdd a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
+evalBinary BOpMul (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a * b)
+evalBinary BOpMul a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
+evalBinary BOpPathAppend a b = case (a,b) of
+    (NGOString pa, NGOString pb) -> return . NGOString $! T.pack (T.unpack pa </> T.unpack pb)
+    _ -> throwShouldNotOccur ("Operator </>: invalid arguments" :: String)
+
+evalBinary BOpEQ (NGOString a) (NGOString b) = return . NGOBool $! a == b
+evalBinary BOpNEQ (NGOString a) (NGOString b) = return . NGOBool $! a /= b
+evalBinary op a b = do
+        a' <- asDouble a
+        b' <- asDouble b
+        return . NGOBool $ cmp op a' b'
+    where
+        cmp BOpLT = (<)
+        cmp BOpGT = (>)
+        cmp BOpLTE = (<=)
+        cmp BOpGTE = (>=)
+        cmp BOpEQ = (==)
+        cmp BOpNEQ = (/=)
+        cmp _ = error "should never occur"
+
+
 
 -- 'recursiveAnalyse f e' will call the function 'f' for all the subexpression inside 'e'
 recursiveAnalyse :: (Monad m) => (Expression -> m ()) -> Expression -> m ()

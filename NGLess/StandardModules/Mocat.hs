@@ -15,7 +15,6 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
-import Control.Monad.IO.Class (liftIO)
 import Control.Monad
 import Data.Default
 

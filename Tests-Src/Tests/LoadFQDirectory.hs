@@ -8,7 +8,6 @@ import Test.HUnit
 import Test.Framework.Providers.HUnit
 
 import Control.Monad (forM_)
-import Control.Monad.IO.Class (liftIO)
 
 import BuiltinModules.LoadDirectory (matchUp)
 import Tests.Utils

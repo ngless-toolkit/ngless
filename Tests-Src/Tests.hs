@@ -1,4 +1,4 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
@@ -43,17 +43,18 @@ import Utils.Here
 import qualified Data.GFF as GFF
 
 import Tests.Utils
+import Tests.Count (tgroup_Count)
 import Tests.FastQ (tgroup_FastQ)
-import Tests.Validation (tgroup_Validation)
+import Tests.IntGroups (tgroup_IntGroups)
+import Tests.Language (tgroup_Language)
+import Tests.LoadFQDirectory (tgroup_LoadFQDirectory)
+import Tests.NGLessAPI (tgroup_NGLessAPI)
+import Tests.Parse (tgroup_Parse)
 import Tests.Select (tgroup_Select)
 import Tests.Types (tgroup_Types)
-import Tests.Count (tgroup_Count)
-import Tests.Parse (tgroup_Parse)
+import Tests.Validation (tgroup_Validation)
 import Tests.Vector (tgroup_Vector)
-import Tests.IntGroups (tgroup_IntGroups)
-import Tests.LoadFQDirectory (tgroup_LoadFQDirectory)
 import Tests.Write (tgroup_Write)
-import Tests.NGLessAPI (tgroup_NGLessAPI)
 
 test_FastQ      = [tgroup_FastQ]
 test_Validation = [tgroup_Validation]
@@ -64,6 +65,7 @@ test_NGLessAPI  = [tgroup_NGLessAPI]
 test_Vector     = [tgroup_Vector]
 test_IntGroups  = [tgroup_IntGroups]
 test_Select     = [tgroup_Select]
+test_Language   = [tgroup_Language]
 test_LoadFqDir  = [tgroup_LoadFQDirectory]
 test_Write      = [tgroup_Write]
 

@@ -1,4 +1,5 @@
 Version 1.2.0+
+	* Validate count() headers on --validate-only
 	* Better error message if the user attempts to use the non-existent <\>
 	operator (suggest </>)
 	* Add min-ngless-version field for modules

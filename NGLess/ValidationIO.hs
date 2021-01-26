@@ -1,4 +1,4 @@
-{- Copyright 2013-2017 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
 
@@ -24,6 +24,7 @@ import FileManagement
 import Utils.Suggestion
 import ReferenceDatabases
 import BuiltinModules.Checks
+import Interpretation.Count (executeCountCheck)
 
 
 -- validation functions live in this Monad, where error messages can be written
@@ -32,7 +33,7 @@ liftNGLessIO = lift . lift
 tell1 = tell . (:[])
 
 findFunctionIO :: FuncName -> ValidateIO Function
-findFunctionIO fname = flip findFunction fname <$> ask >>= \case
+findFunctionIO fname = asks (flip findFunction fname) >>= \case
     Just finfo -> return finfo
     Nothing -> throwShouldNotOccur ("Cannot find information for function: " ++ show fname)
 
@@ -48,6 +49,7 @@ validateIO mods sc = do
             [validateReadInputs
             ,validateOFile
             ,checkReferencesExist
+            ,validateCount
             ]
 
 
@@ -144,4 +146,14 @@ checkOFileV ofile = do
     let ofile' = T.unpack ofile
     whenM (liftIO $ doesFileExist ofile') $
         liftNGLessIO $ outputListLno' WarningOutput ["Writing to file '", ofile', "' will overwrite existing file."]
+
+{- Attempt to run executeCountCheck in the validation stage
+ -}
+validateCount (Script _ es) = checkRecursive validateCount' es
+    where
+        validateCount' (FunctionCall (FuncName "count") _ kwargs Nothing) =
+            whenJust (constantKWArgs kwargs) (void . liftNGLessIO . executeCountCheck NGOVoid)
+        validateCount' _ = return ()
+        constantKWArgs :: [(Variable, Expression)] -> Maybe KwArgsValues
+        constantKWArgs = mapM $ \(Variable v, e) -> (v,) <$> staticValue e
 
