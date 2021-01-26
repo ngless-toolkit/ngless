@@ -1,4 +1,4 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE CPP #-}
@@ -20,6 +20,7 @@ import Text.ParserCombinators.Parsec.Prim hiding (Parser)
 import Text.Parsec.Combinator
 import Text.Parsec.Pos
 import Text.Parsec.Error
+import Data.Functor (($>))
 
 import NGLess.NGError
 import Language
@@ -72,15 +73,15 @@ _cleanupindents = _cleanupindents' []
     where
         _cleanupindents' _ [] = []
         _cleanupindents' cs (t@(_,TOperator o):ts)
-                | isOpen o = (t:(_cleanupindents' (closeOf o:cs) ts))
+                | isOpen o = t : _cleanupindents' (closeOf o:cs) ts
         _cleanupindents' (c:cs) (t@(_,TOperator c'):ts)
-                | c' == c = (t:(_cleanupindents' cs ts))
+                | c' == c = t : _cleanupindents' cs ts
         _cleanupindents' cs@(_:_) ((_,TNewLine):ts) = _cleanupindents' cs ts
         _cleanupindents' cs@(_:_) ((_,TIndent _):ts) = _cleanupindents' cs ts
         _cleanupindents' [] ((_,TNewLine):(_,TIndent _):t0@(_,TNewLine):ts) = _cleanupindents' [] (t0:ts)
-        _cleanupindents' [] (t0@(_,TNewLine):t1@(_,TIndent _):ts) = (t0:t1:_cleanupindents' [] ts)
+        _cleanupindents' [] (t0@(_,TNewLine):t1@(_,TIndent _):ts) = t0 : t1 : _cleanupindents' [] ts
         _cleanupindents' [] ((_,TIndent _):ts) = _cleanupindents' [] ts
-        _cleanupindents' cs (t:ts) = (t:_cleanupindents' cs ts)
+        _cleanupindents' cs (t:ts) = t : _cleanupindents' cs ts
 
         isOpen '(' = True
         isOpen '[' = True
@@ -98,12 +99,12 @@ lno_expression = (,) <$> linenr <*> expression
     where linenr = sourceLine `fmap` getPosition
 
 expression :: Parser Expression
-expression = expression' <* (many eol)
+expression = expression' <* many eol
     where
         expression' =
                     conditional
-                    <|> (reserved "discard" *> pure Discard)
-                    <|> (reserved "continue" *> pure Continue)
+                    <|> (reserved "discard" $> Discard)
+                    <|> (reserved "continue" $> Continue)
                     <|> assignment
                     <|> innerexpression
 
@@ -164,7 +165,7 @@ funccall = try paired <|> FunctionCall <$>
 funcblock = optionMaybe (Block <$> (reserved "using" *> operator '|' *> variable <* operator '|' <* operator ':') <*> block)
 
 paired = FunctionCall
-            <$> (match_word "paired" *> pure (FuncName "paired"))
+            <$> (match_word "paired" $> (FuncName "paired"))
             <*> (operator '(' *> innerexpression <* operator ',')
             <*> pairedKwArgs
             <*> pure Nothing
@@ -203,8 +204,8 @@ _listexpr = try listexpr
         listexpr = (operator '[') *> (ListExpression <$> (innerexpression `sepEndBy` (operator ','))) <* (operator ']')
 
 conditional = Condition <$> (reserved "if" *> innerexpression <* operator ':') <*> block <*> mayelse
-mayelse = elseblock <|> (pure $ Sequence [])
-elseblock = (reserved "else" *> operator ':' *> block)
+mayelse = elseblock <|> pure (Sequence [])
+elseblock = reserved "else" *> operator ':' *> block
 block = do
         eol
         level <- indentation

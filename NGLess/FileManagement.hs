@@ -1,4 +1,4 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, CPP #-}
@@ -33,7 +33,6 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import qualified Text.RE.TDFA.String as RE
-import           Data.List (isPrefixOf)
 import qualified System.FilePath as FP
 import qualified Data.Conduit.Algorithms.Async as CAlg
 import qualified Conduit as C
@@ -42,7 +41,7 @@ import           System.FilePath (takeBaseName, takeDirectory, (</>), (<.>), (-<
 import           Control.Monad (unless, forM_, when)
 import           System.Posix.Files (setFileMode)
 import           System.Posix.Internals (c_getpid)
-import           Data.List (isSuffixOf)
+import           Data.List (isSuffixOf, isPrefixOf)
 
 import System.Directory
 import System.IO
@@ -149,7 +148,7 @@ openNGLTempFile' base prefix ext = do
                 (openTempFileWithDefaultPermissions tdir (prefix ++ takeBaseNameNoExtensions filename ++ "." ++ ext))
                 cleanupAction
     outputListLno' DebugOutput ["Created & opened temporary file ", fp]
-    updateNglEnvironment $ \e -> e { ngleTemporaryFilesCreated = fp:(ngleTemporaryFilesCreated e) }
+    updateNglEnvironment $ \e -> e { ngleTemporaryFilesCreated = fp : ngleTemporaryFilesCreated e }
     return (key,(fp,h))
 
 -- | Open a temporary file

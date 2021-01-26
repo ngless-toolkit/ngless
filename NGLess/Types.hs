@@ -1,4 +1,4 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -23,6 +23,7 @@ import Control.Monad.Writer
 import Control.Applicative
 import           Data.String (fromString)
 import           Data.List (find, foldl')
+import           Data.Functor (($>))
 
 import Modules
 import Language
@@ -119,7 +120,7 @@ envLookup' v = liftM2 (<|>)
 
 constantLookup :: T.Text -> TypeMSt (Maybe NGLType)
 constantLookup v = do
-    moduleBuiltins <- concatMap modConstants <$> ask
+    moduleBuiltins <- asks (concatMap modConstants)
     case filter ((==v) . fst) moduleBuiltins of
         [] -> return Nothing
         [(_,r)] -> return $ typeOfObject r
@@ -200,14 +201,14 @@ checkbop BOpAdd a b = do
     return t
 checkbop BOpMul a b = checknum a *> checknum b
 
-checkbop BOpGT  a b = checknum a *> checknum b *> return (Just NGLBool)
-checkbop BOpGTE a b = checknum a *> checknum b *> return (Just NGLBool)
-checkbop BOpLT  a b = checknum a *> checknum b *> return (Just NGLBool)
-checkbop BOpLTE a b = checknum a *> checknum b *> return (Just NGLBool)
-checkbop BOpPathAppend a b = softCheck NGLString a *> softCheck NGLString b *> return (Just NGLString)
+checkbop BOpGT  a b = checknum a *> checknum b $> Just NGLBool
+checkbop BOpGTE a b = checknum a *> checknum b $> Just NGLBool
+checkbop BOpLT  a b = checknum a *> checknum b $> Just NGLBool
+checkbop BOpLTE a b = checknum a *> checknum b $> Just NGLBool
+checkbop BOpPathAppend a b = softCheck NGLString a *> softCheck NGLString b $> Just NGLString
 checkbop BOpNEQ  a b = checkbop BOpEQ a b
 checkbop BOpEQ  a b = do
-    t <- liftM3 (\a b c -> a <|> b <|> c)
+    t <- liftM3 (\x y z -> x <|> y <|> z)
         (softCheckPair NGLInteger a b)
         (softCheckPair NGLDouble a b)
         (softCheckPair NGLString a b)
@@ -279,7 +280,7 @@ checkindexable expr = do
             return $ Just NGLVoid
 
 allFunctions = (builtinFunctions ++) <$> moduleFunctions
-moduleFunctions = concatMap modFunctions <$> ask
+moduleFunctions = asks (concatMap modFunctions)
 
 funcInfo fn = do
     fs <- allFunctions
@@ -319,8 +320,8 @@ checkFuncUnnamed f arg = do
         case metype of
             Just etype -> case targ of
                 Just (NGList t)
-                    | allowAutoComp -> checkfunctype etype t *> return (Just (NGList rtype))
-                Just t -> checkfunctype etype t *> return (Just rtype)
+                    | allowAutoComp -> checkfunctype etype t $> Just (NGList rtype)
+                Just t -> checkfunctype etype t $> Just rtype
                 Nothing -> do
                     errorInLineC ["While checking types for function ", show f, ".\n\tCould not infer type of argument (saw :", show arg, ")"]
                     cannotContinue

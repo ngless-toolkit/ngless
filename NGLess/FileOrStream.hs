@@ -1,4 +1,4 @@
-{- Copyright 2016-2018 NGLess Authors
+{- Copyright 2016-2021 NGLess Authors
  - License: MIT
  -}
 
@@ -38,7 +38,7 @@ data FileOrStream = File FilePath
 
 instance Show FileOrStream where
     show (File fp) = "File " ++ fp
-    show (Stream _ _ _) = "<STREAM>"
+    show Stream{} = "<STREAM>"
 
 instance Eq FileOrStream where
     (File fp) == (File fp') = fp == fp'

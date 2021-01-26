@@ -1,5 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{- Copyright 2015-2019 NGLess Authors
+{- Copyright 2015-2021 NGLess Authors
  - License: MIT
  -}
 module CmdArgs
@@ -174,7 +173,7 @@ createRefArgs = flag' CreateReferencePackMode (long "create-reference-pack" <> i
                         <*> optional (strOption $ long "functional-map-url" <> internal)
         -- += details ["Example:", "ngless --create-reference-pack ref.tar.gz -g http://...genome.fa.gz -a http://...gtf.fa.gz"]
 
-downloadFileArgs = (flag' DownloadFileMode (long "download-file"))
+downloadFileArgs = flag' DownloadFileMode (long "download-file")
                         <*> strOption (long "download-url")
                         <*> strOption (long "local-file")
 

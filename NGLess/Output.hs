@@ -1,4 +1,4 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, RecordWildCards, CPP, FlexibleContexts #-}
@@ -449,7 +449,7 @@ drawBaseQs oname bpos = D.renderSVG oname (D.mkSizeSpec2D (Just (1200.0 :: Doubl
                 littleLine :: (D.Path D.V2 Double, Diagram -> Diagram) -> Diagram
                 littleLine (shape, st) = st (D.strokeP $ D.fromVertices [ D.p2 (0, 0), D.p2 (0.2, 0) ]) <> (D.strokeP shape # D.moveTo (D.p2 (0.1, 0)))
         text' :: String -> Diagram
-        text' s = (D.text s # D.fc D.black # D.lw D.none # D.fontSizeL 0.03)
+        text' s = D.text s # D.fc D.black # D.lw D.none # D.fontSizeL 0.03
 
 
         [meanValues, medianValues, uqValues, lqValues] = map rescale [_mean, _median, _upperQuartile, _lowerQuartile]

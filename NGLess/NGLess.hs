@@ -1,7 +1,7 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
 module NGLess
     ( NGLessIO
     , NGLess
@@ -129,7 +129,7 @@ decodeSymbolOrError context allowed used = case lookup used allowed of
                                             ++context++".\n"
                                             ++T.unpack (suggestionMessage used (fst <$> allowed))
                                             ++"\nValid values are:"
-                                            ++concat [("\n\t - "++T.unpack val) | (val,_) <- allowed])
+                                            ++concat ["\n\t - "++T.unpack val | (val,_) <- allowed])
 
 
 requiredLookup :: (MonadError NGError m) => (m a -> String-> T.Text -> KwArgsValues -> m a) -> String-> T.Text -> KwArgsValues -> m a

@@ -166,11 +166,11 @@ setlno !n = runNGLessIO $ updateNglEnvironment (\e -> e { ngleLno = Just n } )
 lookupVariable :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
 lookupVariable !k = liftM2 (<|>)
     (lookupConstant k)
-    (variableMapLookup k . ieVariableEnv <$> ask)
+    (asks (variableMapLookup k . ieVariableEnv))
 
 lookupConstant :: T.Text -> InterpretationROEnv (Maybe NGLessObject)
 lookupConstant !k = do
-    constants <- concatMap modConstants . ieModules <$> ask
+    constants <- asks (concatMap modConstants . ieModules)
     case filter ((==k) . fst) constants of
         [] -> return Nothing
         [(_,v)] -> return (Just v)
@@ -313,8 +313,7 @@ interpretFunction :: FuncName -> Expression -> [(Variable, Expression)] -> Maybe
 interpretFunction (FuncName "preprocess") expr args (Just block) = do
     expr' <- runInROEnvIO $ interpretExpr expr
     args' <- interpretArguments args
-    res' <- executePreprocess expr' args' block
-    return res'
+    executePreprocess expr' args' block
 interpretFunction (FuncName "preprocess") expr _ _ = throwShouldNotOccur ("preprocess expected a variable holding a NGOReadSet, but received: " ++ show expr)
 interpretFunction f expr args block = do
     expr' <- interpretTopValue expr
@@ -459,7 +458,7 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block (Variabl
                             .| CAlg.asyncZstdTo 3 h
 
             let processpairs :: (V.Vector ShortRead, V.Vector ShortRead) -> NGLess (V.Vector ShortRead, V.Vector ShortRead, V.Vector ShortRead)
-                processpairs = liftM splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles) . uncurry V.zip
+                processpairs = fmap splitPreprocessPair . vMapMaybeLifted (runInterpretationRO env . intercalate keepSingles) . uncurry V.zip
             (fp1', out1) <- openNGLTempFile "" "preprocessed.1." "fq.zst"
             (fp2', out2) <- openNGLTempFile "" "preprocessed.2." "fq.zst"
             (fp3', out3) <- openNGLTempFile "" "preprocessed.singles." "fq.zst"
@@ -553,7 +552,7 @@ executeReadDouble (NGOString s) _ = case readEither (T.unpack s) of
     Left err -> throwDataError ("Could not parse double from '"++T.unpack s++"'. Error: "++err)
 executeReadDouble s _ = throwScriptError ("Cannot parse this object as double: "++ show s)
 
-executeAssert (NGOBool True) _ = return $! NGOVoid
+executeAssert (NGOBool True) _ = return NGOVoid
 executeAssert (NGOBool False) _ = throwScriptError "Assert failed"
 executeAssert _ _ = throwShouldNotOccur "Assert did not receive a boolean!"
 
@@ -721,7 +720,7 @@ _evalUnary op v = nglTypeError ("invalid unary operation ("++show op++") on valu
 _evalIndex :: NGLessObject -> [Maybe NGLessObject] -> Either NGError NGLessObject
 _evalIndex (NGOList elems) [Just (NGOInteger ix)] = note (NGError ScriptError errmsg) $ atMay elems (fromInteger ix)
     where errmsg = "Accessing element "++show ix ++ " in list of size "++show (length elems) ++ "."
-_evalIndex sr index@[Just (NGOInteger a)] = _evalIndex sr $ (Just $ NGOInteger (a + 1)) : index
+_evalIndex sr index@[Just (NGOInteger a)] = _evalIndex sr $ Just (NGOInteger (a + 1)) : index
 _evalIndex (NGOShortRead sr) [Just (NGOInteger s), Nothing] = let s' = fromInteger s in
     return . NGOShortRead $ srSlice s' (srLength sr - s') sr
 _evalIndex (NGOShortRead sr) [Nothing, Just (NGOInteger e)] =

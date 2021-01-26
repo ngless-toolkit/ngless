@@ -823,7 +823,7 @@ loadGFF gffFp opts = do
         insertgV :: B.ByteString -- ^ feature
                         -> Maybe B.ByteString -- ^ subfeature
                         -> GffLoadingState
-                        -> (V.Vector GffLine)
+                        -> V.Vector GffLine
                         -> NGLessIO GffLoadingState
         insertg f sf (GffLoadingState gmap metamap0) gline = do
                     let seqid = BS.toShort $ gffSeqId gline
@@ -834,7 +834,7 @@ loadGFF gffFp opts = do
                         Just im -> return (gmap, im)
                         Nothing -> do
                             im <- IM.new
-                            return $! (M.insert seqid im gmap, im)
+                            return (M.insert seqid im gmap, im)
                     let i = IM.Interval (gffStart gline) (gffEnd gline + 1) -- [closed, open) intervals
                     metamap' <- foldM (subfeatureInsert immap i) metamap0 $ lookupSubFeature sf
                     return $! GffLoadingState gmap' metamap'
@@ -860,7 +860,7 @@ loadGFF gffFp opts = do
                 lookupSubFeature Nothing = filterSubFeatures "ID" (gffAttrs gline) <|> filterSubFeatures "gene_id" (gffAttrs gline)
                 lookupSubFeature (Just s) = filterSubFeatures s (gffAttrs gline)
 
-                filterSubFeatures s sf' = map snd $ (filter ((s ==) . fst)) sf'
+                filterSubFeatures s sf' = map snd $ filter ((s ==) . fst) sf'
 
         finishGffAnnotator ::  GffLoadingState -> NGLessIO Annotator
         finishGffAnnotator (GffLoadingState amap metamap) = do
@@ -877,7 +877,7 @@ loadGFF gffFp opts = do
                 ix2ix :: VU.Vector Int
                 ix2ix = VU.create $ do
                                 r <- VUM.new (M.size metamap)
-                                forM_ (zip (M.elems metamap) [0..]) $ \((IntDoublePair i _),p) -> VUM.write r i p
+                                forM_ (zip (M.elems metamap) [0..]) $ \(IntDoublePair i _, p) -> VUM.write r i p
                                 return r
                 reindexAI :: AnnotationInfo -> AnnotationInfo
                 reindexAI (AnnotationInfo s v) = AnnotationInfo s (ix2ix VU.! v)

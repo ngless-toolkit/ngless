@@ -1,4 +1,4 @@
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE RecordWildCards #-}
@@ -49,7 +49,7 @@ data NGLessConfiguration = NGLessConfiguration
 getDefaultUserNglessDirectory :: IO FilePath
 getDefaultUserNglessDirectory = liftM2 fromMaybe
     ((</> ".local/share/ngless") <$> getHomeDirectory)
-    (liftM (</> "ngless")  <$> lookupEnv "XDG_DATA_HOME")
+    (fmap (</> "ngless") <$> lookupEnv "XDG_DATA_HOME")
 
 
 -- | This sets the default configuration based on the environment

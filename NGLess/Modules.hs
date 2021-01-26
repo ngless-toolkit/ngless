@@ -1,8 +1,16 @@
-{- Copyright 2015-2020 NGLess Authors
+{- Copyright 2015-2021 NGLess Authors
  - License: MIT
  -}
 
-{-# LANGUAGE TemplateHaskell #-}
+{-|
+ - # Modules
+ -
+ - Modules add additional functions, constants, or references to ngless
+ -
+ - See https://ngless.embl.de/modules.html for user information.
+ -
+ - The data type 'Module' encapsulates all information about a module.
+ -}
 
 module Modules
     ( ArgInformation(..)
@@ -18,15 +26,6 @@ module Modules
     , knownModules
     ) where
 
-{-|
- - # Modules
- -
- - Modules add additional functions, constants, or references to ngless
- -
- - See https://ngless.embl.de/modules.html for user information.
- -
- - The data type 'Module' encapsulates all information about a module.
- -}
 import qualified Data.Text as T
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad.IO.Class (liftIO)

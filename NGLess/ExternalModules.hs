@@ -130,7 +130,7 @@ instance Aeson.FromJSON CommandArgument where
         aexpand <- o .:? "expand_searchpath" .!= False
         cargPayload <-
             if
-                | atype `elem` ["option", "flag"] -> liftM FlagInfo <$> ((Just . (:[]) <$> o .: "when-true") <|> o .:? "when-true")
+                | atype `elem` ["option", "flag"] -> fmap FlagInfo <$> ((Just . (:[]) <$> o .: "when-true") <|> o .:? "when-true")
                 | atype `elem` ["readset", "counts", "mappedreadset"] -> (Just . FileInfo <$> Aeson.parseJSON (Aeson.Object o)) <|> return Nothing
                 | atype == "str" -> return $ Just (ExpandSearchPath aexpand)
                 | otherwise -> return Nothing

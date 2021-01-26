@@ -1,4 +1,4 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
 -}
 module ReferenceDatabases
@@ -203,7 +203,7 @@ installData (Just mode) refname = do
         Just u -> return u
         Nothing
             | isBuiltinReference (refName ref) -> do
-                    version@(NGLVersion majV minV) <- (ngleVersion <$> nglEnvironment)
+                    version@(NGLVersion majV minV) <- ngleVersion <$> nglEnvironment
                     let versionDirectory = if version < NGLVersion 0 9
                                                 then ""
                                                 else show majV ++ "." ++ show minV

@@ -16,6 +16,7 @@ import qualified Data.Text as T
 import Control.Monad (void)
 import Text.Parsec.Text ()
 import Text.Parsec.Combinator
+import Data.Functor (($>))
 import Text.Parsec
 
 import NGLess.NGError
@@ -62,8 +63,8 @@ ngltoken = comment
 
 eol = semicolon <|> real_eol
     where
-        real_eol = ((char '\r' *> char '\n') <|> char '\n') *> pure TNewLine
-        semicolon = char ';' *> skipMany (char ' ') *> pure TNewLine
+        real_eol = ((char '\r' *> char '\n') <|> char '\n') $> TNewLine
+        semicolon = char ';' *> skipMany (char ' ') $> TNewLine
 
 try_string s = try (string s)
 
@@ -88,8 +89,8 @@ comment = singlelinecomment <|> multilinecomment
 singlelinecomment = commentstart *> skiptoeol
     where commentstart = (void $ char '#') <|> (void . try $ string "//")
 skiptoeol = eol  <|> (anyChar *> skiptoeol)
-multilinecomment = (try_string "/*") *> skipmultilinecomment
-skipmultilinecomment = (try_string "*/" *> pure (TIndent 0))
+multilinecomment = try_string "/*" *> skipmultilinecomment
+skipmultilinecomment = (try_string "*/" $> TIndent 0)
             <|> (anyChar *> skipmultilinecomment)
             <|> (eof *> fail "Unexpected End Of File inside a comment")
 
@@ -130,7 +131,7 @@ boperator =
         -- Check for a not-so-unreasonable user mistake
         (try_string "<\\>" *> fail "<\\> found. Did you mean </>?")
         <|> choice [
-                (try_string long *> pure (TBop short))
+                (try_string long $> TBop short)
                     | (long,short) <-
                     [ ("!=", BOpNEQ)
                     , ("==", BOpEQ)
@@ -154,5 +155,5 @@ double = TExpr . ConstDouble . read <$> try double'
 
 integer = TExpr . ConstInt <$> (try hex <|> dec)
     where
-        hex = (read . ("0x"++)) <$> (string "0x" *> many1 hexDigit)
+        hex = read . ("0x"++) <$> (string "0x" *> many1 hexDigit)
         dec = read <$> many1 digit

@@ -318,7 +318,7 @@ addFileChecks' checkFname tag ((lno,e):rest) = do
         maybeAddChecks _ [] = []
         maybeAddChecks vars@[(v,complete)] ((lno',e'):rest') = case e' of
             Assignment v' _
-                | v' == v -> ((lno', checkFileExpression complete):(lno', e'):rest')
+                | v' == v -> (lno', checkFileExpression complete) : (lno', e') : rest'
             _ -> (lno',e') : maybeAddChecks vars rest'
         maybeAddChecks _ rest' = rest'
 
@@ -465,8 +465,8 @@ recursiveCall f (lno, e) = evalCont $ callCC $ \exit -> do
 floatDown :: [Variable] -> (Int, Expression) -> [(Int, Expression)] -> [(Int, Expression)]
 floatDown _ e [] = [e]
 floatDown vars e (c:rest)
-    | any (`isVarUsed1` (snd c)) vars = (e:c:rest)
-    | otherwise = (c:floatDown vars e rest)
+    | any (`isVarUsed1` snd c) vars = e : c : rest
+    | otherwise = c : floatDown vars e rest
 
 -- | Implements addition of temp$nn variables to simplify expressions
 --
