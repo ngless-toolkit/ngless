@@ -18,6 +18,10 @@ User-visible improvements
 Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~
 
+- Switched internal interval structure to `interval-int
+  <https://github.com/ngless-toolkit/interval-to-int/>`__. For users using
+  GFF-style annotation in ``count()``, this should result in a significant
+  improvement (less memory, faster performance)
 - Use zstd compression for more temporary files
 
 Bugfixes
