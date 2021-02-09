@@ -19,7 +19,7 @@ versionStr :: String
 versionStr = showVersion version
 
 dateStr :: String
-dateStr = "28 January 2021 (version 1.3.0)"
+dateStr = "Unreleased"
 
 gitHashStr :: String
 gitHashStr = $(gitHash)
