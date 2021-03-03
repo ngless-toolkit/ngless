@@ -25,7 +25,7 @@ If you are using NGLess, please cite:
 
 ## Example
 
-    ngless "1.0"
+    ngless "1.3"
     input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
     input = preprocess(input) using |read|:
         read = read[5:]
@@ -134,11 +134,11 @@ Get more details of the resources **[here](https://ngless.embl.de/resources/Modu
 - [Frequently Asked Questions (FAQ)](https://ngless.embl.de/faq.html)
 - [ngless mailing list](https://groups.google.com/forum/#!forum/ngless)
 - [What's new log](https://ngless.embl.de/whatsnew.html)
-- [NGless V1.1.0 Release Documentation](https://ngless.embl.de/whatsnew.html#version-1-1-0)
+- [NGless V1.3.0 Release Documentation](https://ngless.embl.de/whatsnew.html#version-1-3-0)
 
 ## Authors
 
-- [Luis Pedro Coelho](http://luispedro.org) (email: [coelho@embl.de](mailto:coelho@embl.de)) (on twitter: [@luispedrocoelho](https://twitter.com/luispedrocoelho))
+- [Luis Pedro Coelho](http://luispedro.org) (email: [luispedro@big-data-biology.org](mailto:luispedro@big-data-biology.org)) (on twitter: [@luispedrocoelho](https://twitter.com/luispedrocoelho))
 - Paulo Monteiro
 -  Renato Alves
 - [Ana Teresa Freitas](http://web.tecnico.ulisboa.pt/ana.freitas/)
