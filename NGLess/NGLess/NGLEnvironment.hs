@@ -41,7 +41,8 @@ data NGLEnvironment = NGLEnvironment
                     } deriving (Show, Eq)
 
 parseVersion :: Maybe T.Text -> NGLess NGLVersion
-parseVersion Nothing = return $ NGLVersion 1 2
+parseVersion Nothing = return $ NGLVersion 1 4
+parseVersion (Just "1.4") = return $ NGLVersion 1 4
 parseVersion (Just "1.3") = return $ NGLVersion 1 3
 parseVersion (Just "1.2") = return $ NGLVersion 1 2
 parseVersion (Just "1.1") = return $ NGLVersion 1 1
