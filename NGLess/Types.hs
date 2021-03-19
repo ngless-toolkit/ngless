@@ -32,7 +32,6 @@ import BuiltinFunctions
 import Utils.Suggestion
 import Utils.Utils
 
-
 type TypeMap = Map.Map T.Text NGLType
 type TypeMSt = StateT (Int, TypeMap)        -- ^ Current line & current type map (type map is inferred top-to-bottom)
                 (ExceptT NGError            -- ^ to enable early exit for certain types of error
@@ -187,7 +186,7 @@ typeOfObject (NGOList []) = Nothing
 typeOfObject (NGOList (v:_)) = NGList <$> typeOfObject v
 
 
-checkuop UOpLen e = checkindexable e *> return (Just NGLInteger)
+checkuop UOpLen e = checkindexable e $> Just NGLInteger
 checkuop UOpMinus e = checknum e
 checkuop UOpNot e = checkBool e
 
