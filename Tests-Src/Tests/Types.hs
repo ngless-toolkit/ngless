@@ -11,22 +11,27 @@ import qualified Data.Text as T
 import Tests.Utils
 import Types
 import Language
+import BuiltinFunctions (builtinModule)
+import NGLess.NGLEnvironment (NGLVersion(..))
 
 tgroup_Types = $(testGroupGenerator)
 
+
+mods = [builtinModule (NGLVersion 1 3)]
+
 isOkTypes :: Script -> IO ()
-isOkTypes script = case checktypes [] script of
+isOkTypes script = case checktypes mods script of
     (Right _) -> return ()
     (Left err) -> assertFailure ("Type error on good code (error was '"++show err++"'")
 
-isOkTypesText scriptText = case parsetest scriptText >>= checktypes [] of
+isOkTypesText scriptText = case parsetest scriptText >>= checktypes mods of
     (Right _) -> return ()
     (Left err) -> assertFailure ("Type error on good code (error was '"++show err++"') for script: '"++T.unpack scriptText++"'")
 
-isErrorText scriptText = isError $ parsetest scriptText>>= checktypes []
+isErrorText scriptText = isError $ parsetest scriptText>>= checktypes mods
 
 
-case_bad_type_fastq = isError $ checktypes [] (Script Nothing [(0,FunctionCall (FuncName "fastq") (ConstInt 3) [] Nothing)])
+case_bad_type_fastq = isError $ checktypes mods (Script Nothing [(0,FunctionCall (FuncName "fastq") (ConstInt 3) [] Nothing)])
 case_good_type_fastq = isOkTypes (Script Nothing [(0,FunctionCall (FuncName "fastq") (ConstStr "fastq.fq") [] Nothing)])
 
 case_type_complete = isOkTypesText
@@ -49,7 +54,7 @@ case_indent_empty_line = isOkTypesText
     \        discard\n"
 
 
-case_invalid_func_fastq = isError $ checktypes [] $
+case_invalid_func_fastq = isError $ checktypes mods $
     Script Nothing [(0,FunctionCall (FuncName "fastq") (ConstStr "fastq.fq") [(Variable "fname", ConstInt 10)] Nothing)]
 
 -- unique

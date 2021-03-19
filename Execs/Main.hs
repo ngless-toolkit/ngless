@@ -80,6 +80,7 @@ import Utils.Batch (getNcpus)
 import Utils.Suggestion
 import CWL (writeCWL)
 
+import           BuiltinFunctions (builtinModule)
 import qualified BuiltinModules.Argv as ModArgv
 import qualified BuiltinModules.Assemble as ModAssemble
 import qualified BuiltinModules.Checks as Checks
@@ -144,7 +145,7 @@ runNGLessIO context (NGLessIO act) = try (runResourceT act) >>= \case
             exitFailure
         Right v -> return v
 
--- | Load both automatically imported modules are user-requested one
+-- | Load both automatically imported modules and user-requested ones
 loadModules :: NGLVersion -> [ModInfo] -> NGLessIO [Module]
 loadModules av mods  = do
     mA <- ModAsReads.loadModule ("" :: T.Text)
@@ -157,7 +158,8 @@ loadModules av mods  = do
     mStats <- ModQCStats.loadModule ("" :: T.Text)
     mOrfFind <- ModORFFind.loadModule ("0.6" :: T.Text)
     imported <- loadStdlibModules mods
-    let loaded = [mOrfFind | av >= NGLVersion 0 6]
+    let loaded = [builtinModule av]
+                    ++ [mOrfFind | av >= NGLVersion 0 6]
                     ++ [mLoadDirectory | av >= NGLVersion 1 2]
                     ++ [mReadlines, mArgv, mAssemble, mA, mChecks, mRemove, mStats] ++ imported
     forM_ loaded registerModule

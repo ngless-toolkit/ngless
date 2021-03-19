@@ -747,7 +747,10 @@ Any
 Return:
 ~~~~~~~
 
-Void
+.. versionadded:: NGLess 1.4
+    Prior to version 1.4, ``write()`` returned nothing
+
+String: the file name used
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~

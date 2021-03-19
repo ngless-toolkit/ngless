@@ -30,7 +30,7 @@ import Output (outputListLno', OutputType(..))
 import NGLess
 import Utils.Utils (uniq, secondM)
 import NGLess.NGLEnvironment
-import BuiltinFunctions
+import BuiltinFunctions (findFunction)
 
 
 {-| NOTE

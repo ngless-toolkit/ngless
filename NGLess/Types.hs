@@ -279,11 +279,9 @@ checkindexable expr = do
             errorInLineC ["List expected. Type ", show e , " provided."]
             return $ Just NGLVoid
 
-allFunctions = (builtinFunctions ++) <$> moduleFunctions
-moduleFunctions = asks (concatMap modFunctions)
 
 funcInfo fn = do
-    fs <- allFunctions
+    fs <- asks (concatMap modFunctions)
     let matched = filter ((==fn) . funcName) fs
     case matched of
         [fi] -> return fi

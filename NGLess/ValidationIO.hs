@@ -19,7 +19,7 @@ import NGLess
 import Output
 import Modules
 import Language
-import BuiltinFunctions
+import BuiltinFunctions (findFunction)
 import FileManagement
 import Utils.Suggestion
 import ReferenceDatabases

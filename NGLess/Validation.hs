@@ -23,7 +23,7 @@ import           Data.Foldable (asum)
 import Language
 import Modules
 import NGLess.NGError
-import BuiltinFunctions
+import BuiltinFunctions (MethodInfo(..), builtinMethods, findFunction)
 import Utils.Suggestion
 
 

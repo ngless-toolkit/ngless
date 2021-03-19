@@ -14,15 +14,19 @@ import Tests.Utils
 import Validation
 import ValidationIO
 import Utils.Here
+import BuiltinFunctions (builtinModule)
+import NGLess.NGLEnvironment (NGLVersion(..))
 
 tgroup_Validation = $(testGroupGenerator)
 
 -- Pure Validation
 
-isValidateOk ftext = case parsetest ftext >>= validate [] of
+mods = [builtinModule (NGLVersion 1 3)]
+
+isValidateOk ftext = case parsetest ftext >>= validate mods of
     Right _ -> return ()
     Left err -> assertFailure ("Validation should have passed for script "++T.unpack ftext++"; instead picked up error: '"++show err++"'")
-isValidateError ftext = isErrorMsg ("Validation should have picked error for script '"++T.unpack ftext++"'") (parsetest ftext >>= validate [])
+isValidateError ftext = isErrorMsg ("Validation should have picked error for script '"++T.unpack ftext++"'") (parsetest ftext >>= validate mods)
 
 case_bad_function_attr_count = isValidateError
     "ngless '0.0'\n\
@@ -49,13 +53,13 @@ write(
 -- Validate IO
 
 validateIO_Ok script = do
-    err <- testNGLessIO $ validateIO [] (fromRight . parsetest $ script)
+    err <- testNGLessIO $ validateIO mods (fromRight . parsetest $ script)
     case err of
         Nothing -> assertBool "" True
         Just errmsg -> assertFailure (concat ["Expected no errors in validation, got ", show errmsg, ".\nScript was::\n\n", show script])
 
 validateIO_error script = do
-    err <- testNGLessIO $ validateIO [] (fromRight . parsetest $ script)
+    err <- testNGLessIO $ validateIO mods (fromRight . parsetest $ script)
     case err of
         Nothing -> assertFailure (concat ["ValidateIO should have detected an error on the script ", show script])
         Just _ -> return ()

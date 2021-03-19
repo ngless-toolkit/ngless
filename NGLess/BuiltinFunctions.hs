@@ -1,15 +1,19 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2021 NGLess Authors
  - License: MIT
  -}
 module BuiltinFunctions
     ( MethodName(..)
     , MethodInfo(..)
-    , builtinFunctions
+    , builtinModule
     , builtinMethods
     , findFunction
     ) where
 
 import Data.List (find)
+import Data.Default (def)
+import qualified Data.Text as T
+
+import NGLess.NGLEnvironment (NGLVersion(..))
 import Modules
 import Language
 
@@ -24,9 +28,17 @@ data MethodInfo = MethodInfo
     } deriving (Eq, Show)
 
 findFunction :: [Module] -> FuncName -> Maybe Function
-findFunction mods fn = find ((==fn) . funcName) $ builtinFunctions ++ concat (modFunctions <$> mods)
+-- findFunction mods fn = trace (show mods) $ trace (show fn) $ find ((==fn) . funcName) $ concat (modFunctions <$> mods)
+findFunction mods fn = find ((==fn) . funcName) $ concat (modFunctions <$> mods)
 
-builtinFunctions =
+builtinModule :: NGLVersion -> Module
+builtinModule ver@(NGLVersion majV minV) = def
+    { modInfo = ModInfo "__builtin__" (T.pack $ show majV ++ "." ++ show minV)
+    , modPath = ""
+    , modFunctions = builtinFunctions ver
+    }
+
+builtinFunctions ver =
     [Function (FuncName "fastq") (Just NGLString) [ArgCheckFileReadable] NGLReadSet fastqArgs False []
     ,Function (FuncName "paired") (Just NGLString) [ArgCheckFileReadable] NGLReadSet pairedArgs False []
     ,Function (FuncName "group") (Just (NGList NGLReadSet)) [] NGLReadSet groupArgs False []
@@ -42,7 +54,7 @@ builtinFunctions =
     ,Function (FuncName "count") (Just NGLMappedReadSet) [] NGLCounts countArgs False [FunctionCheckReturnAssigned]
     ,Function (FuncName "__check_count") (Just NGLMappedReadSet) [] NGLCounts countCheckArgs False []
     ,Function (FuncName "countfile") (Just NGLString) [ArgCheckFileReadable] NGLCounts [] False [FunctionCheckReturnAssigned]
-    ,Function (FuncName "write") (Just NGLAny) [] NGLVoid writeArgs False []
+    ,Function (FuncName "write") (Just NGLAny) [] (if ver >= NGLVersion 1 4 then NGLString else NGLVoid) writeArgs False []
 
     ,Function (FuncName "print") (Just NGLAny) [] NGLVoid [] False []
 
@@ -151,6 +163,7 @@ smoothtrimArgs =
     ,ArgInformation "window" True NGLInteger []
     ]
 
+builtinMethods :: [MethodInfo]
 builtinMethods =
     [
      -- NGLMappedReadSet

@@ -8,7 +8,7 @@
 #     
 #     write(counts, ofile='output.hash.txt', auto_comments=[{script}, {hash}])
 #     
-# Output hash: 4f7469b9f55d910b486512edf0c1dcf1
+# Output hash: 8dc0b1723c21d5e03004419a06a93813
 	seq1_2.sam.bz2
 -1	1
 seq1	99990
