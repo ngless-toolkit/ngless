@@ -3,8 +3,8 @@ module Tests.NGLessAPI
     ( tgroup_NGLessAPI
     ) where
 
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
+import Test.Tasty.TH
+import Test.Tasty.HUnit
 
 import Language
 import NGLess

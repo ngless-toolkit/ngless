@@ -9,10 +9,9 @@
 
 module Main where
 
-import Test.Framework
-import Test.Framework.TH
-import Test.HUnit
-import Test.Framework.Providers.HUnit
+import Test.Tasty
+import Test.Tasty.TH
+import Test.Tasty.HUnit
 import Text.Parsec (parse)
 import Text.Parsec.Combinator (eof)
 

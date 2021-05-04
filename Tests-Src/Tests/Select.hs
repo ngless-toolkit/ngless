@@ -3,9 +3,8 @@ module Tests.Select
     ( tgroup_Select
     ) where
 
-import Test.Framework.TH
-import Test.HUnit
-import Test.Framework.Providers.HUnit
+import Test.Tasty.TH
+import Test.Tasty.HUnit
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as BB
 

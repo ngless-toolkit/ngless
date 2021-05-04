@@ -3,10 +3,9 @@ module Tests.IntGroups
     ( tgroup_IntGroups
     ) where
 
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2
-import Test.HUnit
+import Test.Tasty.TH
+import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
 import qualified Data.Vector.Unboxed as VU
 
 import qualified Utils.IntGroups as IG

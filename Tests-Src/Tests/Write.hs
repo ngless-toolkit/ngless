@@ -1,14 +1,13 @@
-{- Copyright 2015 NGLess Authors
+{- Copyright 2015-2021 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE TemplateHaskell, OverloadedStrings, TupleSections #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Tests.Write
     ( tgroup_Write
     ) where
 
-import Test.Framework.TH
-import Test.HUnit
-import Test.Framework.Providers.HUnit
+import Test.Tasty.TH
+import Test.Tasty.HUnit
 
 import Interpretation.Write
 

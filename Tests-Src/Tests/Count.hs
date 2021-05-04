@@ -3,9 +3,8 @@ module Tests.Count
     ( tgroup_Count
     ) where
 
-import Test.Framework.TH
-import Test.HUnit
-import Test.Framework.Providers.HUnit
+import Test.Tasty.TH
+import Test.Tasty.HUnit
 
 import qualified Data.IntervalIntMap as IM
 import qualified Data.Set as S

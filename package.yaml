@@ -142,11 +142,11 @@ tests:
     cpp-options: -DIS_BUILDING_TEST
     dependencies:
     - HUnit >=1.3
-    - test-framework >=0.8
-    - test-framework-hunit
-    - test-framework-quickcheck2
-    - test-framework-th
     - QuickCheck >=2.8
+    - tasty
+    - tasty-hunit
+    - tasty-quickcheck
+    - tasty-th
     when:
     - condition: ! '!(flag(embed))'
       then:

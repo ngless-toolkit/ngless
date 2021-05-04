@@ -3,11 +3,9 @@ module Tests.Vector
     ( tgroup_Vector
     ) where
 
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2
-import Test.HUnit
-import Test.QuickCheck
+import Test.Tasty.TH
+import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
 import qualified Data.Vector as V
 import System.IO.Unsafe (unsafePerformIO)
 

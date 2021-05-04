@@ -3,9 +3,8 @@ module Tests.LoadFQDirectory
     ( tgroup_LoadFQDirectory
     ) where
 
-import Test.Framework.TH
-import Test.HUnit
-import Test.Framework.Providers.HUnit
+import Test.Tasty.TH
+import Test.Tasty.HUnit
 
 import Control.Monad (forM_)
 

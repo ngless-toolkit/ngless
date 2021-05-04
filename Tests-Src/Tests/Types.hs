@@ -3,9 +3,8 @@ module Tests.Types
     ( tgroup_Types
     ) where
 
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
-import Test.HUnit
+import Test.Tasty.TH
+import Test.Tasty.HUnit
 import qualified Data.Text as T
 
 import Tests.Utils

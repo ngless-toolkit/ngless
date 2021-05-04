@@ -3,9 +3,8 @@ module Tests.Language
     ( tgroup_Language
     ) where
 
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
-import Test.HUnit
+import Test.Tasty.TH
+import Test.Tasty.HUnit
 
 import Language
 

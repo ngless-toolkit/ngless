@@ -6,12 +6,11 @@ module Tests.FastQ
     ( tgroup_FastQ
     ) where
 
-import Test.Framework.TH
-import Test.HUnit
+import Test.Tasty.TH
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
-import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2
+import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector.Storable as VS

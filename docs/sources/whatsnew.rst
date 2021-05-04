@@ -2,6 +2,15 @@
 What's New (History)
 ====================
 
+Unreleased
+----------
+
+Internal improvements
+~~~~~~~~~~~~~~~~~~~~~
+
+- Switched to the tasty testing framework
+
+
 Version 1.3.0
 -------------
 

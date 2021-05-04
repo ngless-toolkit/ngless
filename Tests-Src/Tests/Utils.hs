@@ -8,7 +8,7 @@ module Tests.Utils
     , asTempFile
     , testNGLessIO
     ) where
-import Test.HUnit
+import Test.Tasty.HUnit
 import qualified Data.Text as T
 import qualified Data.ByteString as B
 import Control.Monad.IO.Class (liftIO)

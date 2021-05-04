@@ -3,9 +3,8 @@ module Tests.Parse
     ( tgroup_Parse
     ) where
 
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
-import Test.HUnit
+import Test.Tasty.TH
+import Test.Tasty.HUnit
 
 import Text.Parsec (SourcePos, parse)
 import Text.ParserCombinators.Parsec.Prim (GenParser)

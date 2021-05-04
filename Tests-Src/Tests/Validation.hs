@@ -3,9 +3,8 @@ module Tests.Validation
     ( tgroup_Validation
     ) where
 
-import Test.Framework.TH
-import Test.Framework.Providers.HUnit
-import Test.HUnit
+import Test.Tasty.TH
+import Test.Tasty.HUnit
 import Control.Monad
 import Data.Either.Combinators (isRight)
 import qualified Data.Text as T
