@@ -1,0 +1,24 @@
+name: "Test NGLess"
+
+on: [push, pull_request]
+
+jobs:
+  test_conduit_algorithms:
+    name: Build and test NGLess
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: haskell/actions/setup@v1
+        with:
+          enable-stack: true
+          stack-version: 'latest'
+          stack-no-global: true
+      - run: |
+          ./.travis/add_O0_option.sh
+          stack --no-terminal setup
+          make fast
+          make modules
+          stack test --fast ${STACKOPTS}
+          mkdir prefix-test
+          make install prefix=${PWD}/prefix-test
+          PATH=${PWD}/prefix-test/bin:$PATH ./run-tests.sh
