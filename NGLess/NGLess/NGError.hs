@@ -50,7 +50,8 @@ type NGLess = Either NGError
 
 newtype NGLessIO a = NGLessIO { unwrapNGLessIO :: ResourceT IO a }
                         deriving (Functor, Applicative, Monad, MonadIO,
-                        MonadResource, MonadThrow, MonadCatch, MonadMask)
+                        MonadResource, MonadThrow, MonadCatch, MonadMask,
+                        MonadUnliftIO)
 
 
 instance MonadError NGError NGLessIO where
@@ -61,11 +62,6 @@ instance PrimMonad NGLessIO where
     type PrimState NGLessIO = PrimState IO
     primitive act = NGLessIO (primitive act)
     {-# INLINE primitive #-}
-
-instance MonadUnliftIO NGLessIO where
-    askUnliftIO = NGLessIO $ do
-        u <- askUnliftIO
-        return $ UnliftIO (\(NGLessIO act) -> unliftIO u act)
 
 instance MonadFail NGLessIO where
     fail err = throwShouldNotOccur err
