@@ -118,6 +118,8 @@ parseColor = optional $ option (eitherReader readColor) (long "color" <> help co
         readColor _ = Left "Could not parse color option (valid options are 'auto', 'force', and 'no')"
         colorHelp = "Color settings, one of 'auto' (color if writing to a terminal, this is the default), 'force' (always color), 'no' (no color)."
 
+-- The input can be either inline (using -e ... or --script "...") or given as
+-- a filepath
 parseInput :: Parser NGLessInput
 parseInput = InlineScript <$> strOption
                         (long "script"
@@ -125,6 +127,7 @@ parseInput = InlineScript <$> strOption
                         <> help "inline script to execute")
             <|> ScriptFilePath <$> strArgument (metavar "INPUT" <> help "Filename of script to interpret")
 
+-- A integer literal or the string "auto"
 parseNThreads = option (eitherReader readNThreads) (long "jobs" <> short 'j' <> long "threads" <> value (NThreads 1) <> help "Nr of threads to use")
     where
         readNThreads "auto" = Right NThreadsAuto
@@ -132,6 +135,13 @@ parseNThreads = option (eitherReader readNThreads) (long "jobs" <> short 'j' <> 
                             Just n -> Right (NThreads n)
                             Nothing -> Left ("Failed to parse "++val++" as a threads option")
 
+-- An option with 3 states
+--    ""            -> Nothing
+--    "--option"    -> Just True
+--    "--no-option" -> Just False
+--
+-- This builds on the `switch` function because it distinguishes between not
+-- passing in the option.
 triSwitch :: String -> String -> Parser (Maybe Bool)
 triSwitch name helpmsg = optional (flag' True  (long         name <> help helpmsg)
                                <|> flag' False (long ("no-"++name) <> help ("opposite of --"++name)))
