@@ -1,0 +1,44 @@
+---
+name: NGLess Linux (Ubuntu) Build
+
+on: [push]
+
+jobs:
+  ngless:
+    name: Build, install and upload NGLess
+    runs-on: ubuntu-latest
+    env:
+      # Force building/installing a static binary
+      STACKOPTS: "--ghc-options '-fPIC' --flag NGLess:embed"
+    steps:
+      - uses: actions/checkout@v2
+      - uses: haskell/actions/setup@v1
+        with:
+          enable-stack: true
+          stack-version: "latest"
+
+      - name: Install GCC8/G++-8
+        run: |
+          sudo apt update
+          sudo apt install -y g++-8
+
+      - name: Setup stack
+        run: stack setup
+
+      - name: Build Static NGLess and dependencies
+        run: make static CXX=g++-8
+
+      - name: Build NGLess modules
+        run: make modules
+
+      - name: Run tests
+        run: make check
+
+      - name: Install NGLess
+        run: make install CXX=g++-8 prefix=ngless_path/ngless
+
+      - name: Upload
+        uses: actions/upload-artifact@v2
+        with:
+          name: ngless_install
+          path: ngless_path/ngless
