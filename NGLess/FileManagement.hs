@@ -252,7 +252,7 @@ minimap2Bin = findOrCreateBin "NGLESS_MINIMAP2_BIN" minimap2Fname minimap2Data
     where
         minimap2Fname = "ngless-" ++ versionStr ++ "-minimap2" ++ binaryExtension
 
-
+-- | path to megahit
 megahitBin :: NGLessIO FilePath
 megahitBin = liftIO (lookupEnv "NGLESS_MEGAHIT_BIN") >>= \case
     Just bin -> checkExecutable "NGLESS_MEGAHIT_BIN" bin
@@ -303,24 +303,30 @@ binPath Root = do
 #endif
 binPath User = ((</> "bin") . nConfUserDirectory) <$> nglConfiguration
 
+-- | Attempts to find the absolute path for the requested binary (checks permissions)
 findBin :: FilePath -> NGLessIO (Maybe FilePath)
 findBin fname = do
         rootPath <- (</> fname) <$> binPath Root
-        rootex <- liftIO $ canExecute rootPath
+        rootex <- canExecute rootPath
         if rootex then
             return (Just rootPath)
         else do
             userpath <- (</> fname) <$> binPath User
-            userex <- liftIO $ canExecute userpath
+            userex <- canExecute userpath
             return $ if userex
                 then Just userpath
                 else Nothing
     where
+        canExecute :: FilePath -> NGLessIO Bool
         canExecute bin = do
-            exists <- doesFileExist bin
+            exists <- liftIO $ doesFileExist bin
             if exists
-                then executable <$> getPermissions bin
-                else return False
+                then executable <$> (liftIO $ getPermissions bin)
+                else do
+                    outputListLno' WarningOutput [
+                                "Found file `", bin,
+                                "`, but it is not executable by NGLess (may indicate a permission error)."]
+                    return False
 
 writeBin :: FilePath -> IO B.ByteString -> NGLessIO FilePath
 writeBin fname bindata = do
