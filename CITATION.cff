@@ -1,0 +1,27 @@
+cff-version: 1.1.0
+message: If you use this software, please cite it as below.
+title: 'NG-meta-profiler: fast processing of metagenomes using NGLess, a domain-specific
+  language'
+authors:
+- family-names: Coelho
+  given-names: Luis Pedro
+  orcid: http://orcid.org/0000-0002-9280-7885
+- family-names: Alves
+  given-names: Renato
+  orcid: null
+- family-names: Monteiro
+  given-names: Paulo
+  orcid: null
+- family-names: Huerta-Cepas
+  given-names: Jaime
+  orcid: null
+- family-names: Freitas
+  given-names: Ana Teresa
+  orcid: null
+- family-names: Bork
+  given-names: Peer
+  orcid: null
+doi: 10.1186/s40168-019-0684-8
+date-released: 2019-12-1
+version: 1.3.0
+
