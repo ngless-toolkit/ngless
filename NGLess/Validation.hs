@@ -14,7 +14,6 @@ import           Data.Either.Combinators (rightToMaybe)
 import           Control.Monad.Extra (whenJust)
 import           Control.Monad.Writer.Strict
 import           Control.Monad.RWS
-import           Control.Monad (foldM_)
 import           Data.List (find, isSuffixOf)
 import           Data.Maybe
 import           Data.Char (isUpper)

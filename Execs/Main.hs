@@ -34,7 +34,6 @@ module Main
 -}
 
 import Data.Maybe
-import Data.Monoid ((<>))
 import Control.Monad
 import Control.Monad.IO.Class (liftIO, MonadIO(..))
 import Options.Applicative

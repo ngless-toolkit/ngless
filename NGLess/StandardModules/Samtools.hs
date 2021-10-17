@@ -28,7 +28,6 @@ import System.IO
 
 import Control.Monad.IO.Class (liftIO)
 import Data.Default (def)
-import Data.Semigroup ((<>))
 
 import FileManagement
 import FileOrStream

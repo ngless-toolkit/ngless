@@ -46,7 +46,6 @@ import           Control.Monad.Trans.Class
 import           System.AtomicWrite.Writer.Text (atomicWriteFile)
 
 
-import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource
 import Control.Monad.State.Lazy
 import System.IO

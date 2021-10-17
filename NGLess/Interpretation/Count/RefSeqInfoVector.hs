@@ -22,7 +22,6 @@ module Interpretation.Count.RefSeqInfoVector
     ) where
 
 import           Prelude hiding (length, lookup)
-import           Data.Monoid ((<>))
 import           Foreign.C.Types
 import           Control.DeepSeq (NFData(..))
 import           Control.Monad (forM_)

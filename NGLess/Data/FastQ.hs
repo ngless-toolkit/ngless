@@ -37,8 +37,6 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
 import           Control.DeepSeq (NFData(..))
 import           Data.Conduit ((.|))
-import           Data.Monoid ((<>))
-import           Control.Monad (forM_)
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import Control.Monad.Except
 import Control.Monad.Trans.Resource

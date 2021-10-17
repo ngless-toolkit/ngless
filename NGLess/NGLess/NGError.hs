@@ -17,9 +17,7 @@ import           Control.DeepSeq
 import           Control.Monad.Except
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Primitive
-import           Control.Monad.Fail (MonadFail(..))
 import           Control.Monad.Catch
-import           Control.Monad.IO.Unlift
 import           Control.Exception
 
 -- This file should be a leaf in the import graph (i.e., not import any other NGLess modules)

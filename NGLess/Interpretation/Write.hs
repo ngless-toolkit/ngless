@@ -29,10 +29,8 @@ import           System.Directory (copyFile)
 import           Data.Maybe
 import           Data.String.Utils (replace, endswith)
 import           Control.Monad.IO.Unlift (MonadUnliftIO)
-import           Control.Monad (zipWithM_)
 import           Control.Monad.Except
 import           Control.Monad.Catch (MonadMask)
-import           Control.Monad.IO.Class (liftIO)
 import           System.IO (Handle, stdout)
 import           Data.List (isInfixOf)
 

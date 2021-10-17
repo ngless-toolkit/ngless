@@ -16,8 +16,6 @@ module Interpretation.FastQ
     ) where
 
 import System.IO
-import           Control.Monad (void)
-import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text as T
 import qualified Data.Vector.Storable as VS
 import qualified Data.Conduit.Combinators as C
