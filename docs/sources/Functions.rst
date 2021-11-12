@@ -689,6 +689,8 @@ to average base qualities. For example::
 
     read = smoothtrim(read, min_quality=15, window=4)
 
+If an even number is given as the window size, the left pad is 1 unit smaller 
+than the right. 
 Quality values of bases at the edges of each read are repeated to allow
 averaging with quality centered on each base. For instance a read::
 
