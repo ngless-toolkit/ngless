@@ -685,15 +685,16 @@ smoothtrim
 ----------
 
 This trims with the same algorithm as substrim but uses a sliding window
-to average base qualities. For example::
+to average base qualities. Quality scores are returned to their original
+value after trimming.
+For example::
 
-    read = smoothtrim(read, min_quality=15, window=4)
+    read = smoothtrim(read, min_quality=15, window=3)
 
-If an even number is given as the window size, the left pad is 1 unit smaller 
-than the right. 
 Quality values of bases at the edges of each read are repeated to allow
 averaging with quality centered on each base. For instance a read::
 
+                                      left pad |--|        |--| right pad
     Sequence   A  T  C  G    with a window     A  A  T  C  G  G
     Quality   28 25 14 12  of size 3 becomes  28 28 25 14 12 12
 
@@ -703,12 +704,27 @@ and is smoothed::
     Qual      28 28 25 14 12 12         --->        27 22 17 13
     Windows    |-----|            (28 + 28 + 25) / 3 = 27     ^
      ...          |-----|         (28 + 25 + 14) / 3 = 22     |
-                     |-----|      (25 + 14 + 12) / 3 = 17     !
+                     |-----|      (25 + 14 + 12) / 3 = 17     |
                         |-----|   (14 + 12 + 12) / 3 = 13 ----+
 
 at which point ``substrim`` is applied for trimming.
 
-Quality scores are returned to their original value after trimming.
+If an even number is given as the window size (e.g. ``window=4``),
+the left pad is 1 unit smaller than the right and scores are rounded
+to the nearest integer::
+
+                                      left pad |--|        |-----| right pad
+    Sequence   A  T  C  G    with a window     A  A  T  C  G  G  G
+    Quality   28 25 14 12  of size 4 becomes  28 28 25 14 12 12 12
+
+and is smoothed::
+
+    Seq        A  A  T  C  G  G  G   smoothed quality   A  T  C  G
+    Qual      28 28 25 14 12 12 12         --->        24 20 16 12
+    Windows    |--------|          (28 + 28 + 25 + 14) / 4 = 24  ^
+     ...          |--------|       (28 + 25 + 14 + 12) / 4 = 20  |
+                     |--------|    (25 + 14 + 12 + 12) / 4 = 16  |
+                        |--------| (14 + 12 + 12 + 12) / 4 = 12 -+                                              
 
 Argument:
 ~~~~~~~~~
