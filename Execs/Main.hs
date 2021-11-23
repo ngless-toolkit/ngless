@@ -39,7 +39,7 @@ import Control.Monad.IO.Class (liftIO, MonadIO(..))
 import Options.Applicative
 import System.FilePath
 import System.Directory
-import Control.Monad.Extra (whenJust)
+import Control.Monad.Extra (whenJust, whenM)
 import System.IO (stdout, stderr, stdin, hPutStrLn, mkTextEncoding, hGetEncoding, Handle, hSetEncoding)
 import Control.Exception (catch, try, throwIO, fromException, displayException)
 import Control.Concurrent (setNumCapabilities)
@@ -236,7 +236,7 @@ modeExec opts@CmdArgs.DefaultMode{} = do
         Right t -> return t
         Left err ->  fatalError err
     let maybe_add_print = (if CmdArgs.print_last opts then wrapPrint else return)
-    (shouldOutput,odir) <- runNGLessIO "loading and running script" $ do
+    runNGLessIO "loading and running script" $ do
         updateNglEnvironment (\e -> e { ngleScriptText = ngltext })
         outputConfiguration
         sc' <- runNGLess $ parsengless fname reqversion ngltext >>= maybe_add_print
@@ -254,8 +254,6 @@ modeExec opts@CmdArgs.DefaultMode{} = do
         when (uses_STDOUT `any` [e | (_,e) <- nglBody sc]) $ do
             outputListLno' DebugOutput ["Setting quiet mode as STDOUT is used"]
             setQuiet
-        shouldOutput <- nConfCreateReportDirectory <$> nglConfiguration
-        shouldPrintHeader <- nConfPrintHeader <$> nglConfiguration
         outputListLno' DebugOutput ["Validating script..."]
         errs <- validateIO modules sc
         when (isJust errs) $ do
@@ -270,7 +268,7 @@ modeExec opts@CmdArgs.DefaultMode{} = do
         transformed <- transform modules sc
         when (CmdArgs.debug_mode opts == "transform") $
             liftIO (print transformed)
-        when shouldPrintHeader $
+        whenM (nConfPrintHeader <$> nglConfiguration) $ do
             printHeader (collectCitations modules transformed)
         whenJust (CmdArgs.exportJSON opts) $ \jsoname -> liftIO $ do
             writeScriptJSON jsoname sc transformed
@@ -281,14 +279,13 @@ modeExec opts@CmdArgs.DefaultMode{} = do
         outputListLno' InfoOutput ["Script OK. Starting interpretation..."]
         interpret modules (nglBody transformed)
         triggerHook FinishOkHook
-        odir <- nConfReportDirectory <$> nglConfiguration
-        return (shouldOutput, odir)
-    when shouldOutput $ do
-        createDirectoryIfMissing False odir
-        setupHtmlViewer odir
-        T.writeFile (odir </> "script.ngl") ngltext
-        writeOutputJSImages odir fname ngltext
-        writeOutputTSV False (Just $ odir </> "fq.tsv") (Just $ odir </> "mappings.tsv")
+        whenM (nConfCreateReportDirectory <$> nglConfiguration) $ do
+            odir <- nConfReportDirectory <$> nglConfiguration
+            liftIO $ createDirectoryIfMissing False odir
+            liftIO $ setupHtmlViewer odir
+            liftIO $ T.writeFile (odir </> "script.ngl") ngltext
+            writeOutputJSImages odir fname ngltext
+            writeOutputTSV False (Just $ odir </> "fq.tsv") (Just $ odir </> "mappings.tsv")
     exitSuccess
 
 

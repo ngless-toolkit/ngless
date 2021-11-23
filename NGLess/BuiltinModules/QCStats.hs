@@ -26,8 +26,8 @@ executeStats (NGOSymbol statsType) [] = do
         (fp, h) <- openNGLTempFile "" "qcstats" "tsv"
         liftIO $ hClose h
         case statsType of
-            "mapping" -> liftIO $ writeOutputTSV True Nothing (Just fp)
-            "fastq" -> liftIO $ writeOutputTSV True (Just fp) Nothing
+            "mapping" -> writeOutputTSV True Nothing (Just fp)
+            "fastq" -> writeOutputTSV True (Just fp) Nothing
             _ -> throwScriptError ("Unknown stats type: " ++ T.unpack statsType)
         return $ NGOCounts (File fp)
 executeStats arg _ = throwShouldNotOccur ("executeStats called with argument: " ++ show arg)

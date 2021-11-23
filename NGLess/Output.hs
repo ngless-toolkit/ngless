@@ -139,17 +139,23 @@ data MappingInfo = MappingInfo
 
 $(deriveToJSON defaultOptions{fieldLabelModifier = drop 3} ''MappingInfo)
 
-savedOutput :: IORef [OutputLine]
+data SavedOutput = SavedOutput
+        { outOutput :: [OutputLine]
+        , fqOutput :: [FQInfo]
+        , mapOutput :: [MappingInfo]
+        }
+
+savedOutput :: IORef SavedOutput
 {-# NOINLINE savedOutput #-}
-savedOutput = unsafePerformIO (newIORef [])
+savedOutput = unsafePerformIO (newIORef (SavedOutput [] [] []))
 
-savedFQOutput :: IORef [FQInfo]
-{-# NOINLINE savedFQOutput #-}
-savedFQOutput = unsafePerformIO (newIORef [])
+addOutputLine :: OutputLine -> SavedOutput -> SavedOutput
+addOutputLine !oline so@(SavedOutput ells _ _) = so { outOutput = oline:ells }
 
-savedMapOutput :: IORef [MappingInfo]
-{-# NOINLINE savedMapOutput #-}
-savedMapOutput = unsafePerformIO (newIORef [])
+addFQOutput !fq so@(SavedOutput _ fqs _) = so { fqOutput = fq:fqs }
+addMapOutput !mp so@(SavedOutput _ _ maps) = so { mapOutput = mp:maps }
+
+outputReverse (SavedOutput a b c) = SavedOutput (reverse a) (reverse b) (reverse c)
 
 -- | See `outputListLno'`, which is often the right function to use
 outputListLno :: OutputType      -- ^ Level at which to output
@@ -193,7 +199,7 @@ output !ot !lno !msg = do
     c <- colorFor ot
     liftIO $ do
         t <- getZonedTime
-        modifyIORef savedOutput (OutputLine lno ot t msg:)
+        modifyIORef savedOutput (addOutputLine $ OutputLine lno ot t msg)
         when sp $ do
             let st = if doColor
                         then ANSI.setSGRCode [ANSI.SetColor ANSI.Foreground ANSI.Dull c]
@@ -242,7 +248,7 @@ outputFQStatistics fname stats enc = do
     p "Number of base pairs: "      (show $ length (FQ.qualCounts stats))
     p "Encoding is: "               (show enc)
     p "Number of sequences: "   (show $ FQ.nSeq stats)
-    liftIO $ modifyIORef savedFQOutput (binfo:)
+    liftIO $ modifyIORef savedOutput (addFQOutput binfo)
 
 outputMappedSetStatistics :: MappingInfo -> NGLessIO ()
 outputMappedSetStatistics mi@(MappingInfo _ _ ref total aligned unique) = do
@@ -253,7 +259,7 @@ outputMappedSetStatistics mi@(MappingInfo _ _ ref total aligned unique) = do
         out ["Total reads aligned: ", showNumAndPercentage aligned]
         out ["Total reads Unique map: ", showNumAndPercentage unique]
         out ["Total reads Non-Unique map: ", showNumAndPercentage (aligned - unique)]
-        liftIO $ modifyIORef savedMapOutput (mi { mi_lno = fromMaybe 0 lno }:)
+        liftIO $ modifyIORef savedOutput (addMapOutput $ mi { mi_lno = fromMaybe 0 lno })
     where
         showNumAndPercentage :: Int -> String
         showNumAndPercentage v = concat [show v, " [", showFFloat (Just 2) ((fromIntegral (100*v) / fromIntegral total') :: Double) "", "%]"]
@@ -287,11 +293,9 @@ wrapScript script tags stats = first annotate <$> script
             | i `elem` stats = Just (HasStatsInfo i)
             | otherwise =  Nothing
 
-writeOutputJSImages :: FilePath -> FilePath -> T.Text -> IO ()
-writeOutputJSImages odir scriptName script = do
-    fullOutput <- reverse <$> readIORef savedOutput
-    fqStats <- reverse <$> readIORef savedFQOutput
-    mapStats <- reverse <$> readIORef savedMapOutput
+writeOutputJSImages :: FilePath -> FilePath -> T.Text -> NGLessIO ()
+writeOutputJSImages odir scriptName script = liftIO $ do
+    SavedOutput fullOutput fqStats mapStats <- outputReverse <$> readIORef savedOutput
     fqfiles <- forM (zip [(0::Int)..] fqStats) $ \(ix, q) -> do
         let oname = "output"++show ix++".svg"
             bpos = perBaseQ q
@@ -318,10 +322,9 @@ writeOutputJSImages odir scriptName script = do
 writeOutputTSV :: Bool -- ^ whether to transpose matrix
                 -> Maybe FilePath -- ^ FastQ statistics
                 -> Maybe FilePath -- ^ Mapping statistics
-                -> IO ()
-writeOutputTSV transpose fqStatsFp mapStatsFp = do
-        fqStats <- reverse <$> readIORef savedFQOutput
-        mapStats <- reverse <$> readIORef savedMapOutput
+                -> NGLessIO ()
+writeOutputTSV transpose fqStatsFp mapStatsFp = liftIO $ do
+        SavedOutput _ fqStats mapStats <- outputReverse <$> readIORef savedOutput
         whenJust fqStatsFp $ \fp ->
             withOutputFile fp $ \hout ->
                 BL.hPut hout  . formatTSV $ encodeFQStats <$> fqStats
