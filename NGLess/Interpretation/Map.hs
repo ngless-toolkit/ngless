@@ -29,14 +29,14 @@ import           Control.Monad.Extra (unlessM)
 import           Data.List (sort)
 
 
-import System.IO
-import System.IO.Error
-import System.FilePath.Glob (namesMatching)
-import System.Directory
-import System.FilePath
-import System.PosixCompat.Files (createSymbolicLink)
-import System.IO.SafeWrite (withOutputFile)
-import Data.Maybe (fromMaybe)
+import           System.IO (hClose, hPutStr, hPutStrLn)
+import           System.IO.Error (catchIOError, isAlreadyExistsError)
+import           System.FilePath.Glob (namesMatching)
+import qualified System.Directory as SD
+import           System.FilePath ((</>), (<.>))
+import qualified System.FilePath as FilePath
+import           System.PosixCompat.Files (createSymbolicLink)
+import           Data.Maybe (fromMaybe)
 
 import Language
 import FileManagement
@@ -88,8 +88,8 @@ getMapper request = do
 
 
 isSubPath path base = let
-                        path' = splitPath path
-                        base' = splitPath base
+                        path' = FilePath.splitPath path
+                        base' = FilePath.splitPath base
                         isSubPath' _ [] = True
                         isSubPath' [] _ = False
                         isSubPath' (p:ps) (b:bs) = p == b && isSubPath' ps bs
@@ -104,9 +104,9 @@ getIndexOutput createLink fafile = do
                 let dropSlash "" = ""
                     dropSlash ('/':r) = dropSlash r
                     dropSlash p = p
-                afafile <- makeAbsolute fafile
+                afafile <- SD.makeAbsolute fafile
                 let fafile' = d </> dropSlash afafile
-                createDirectoryIfMissing True (takeDirectory fafile')
+                SD.createDirectoryIfMissing True (FilePath.takeDirectory fafile')
                 when createLink $
                     createSymbolicLink afafile fafile'
                         `catchIOError` (\e -> unless (isAlreadyExistsError e) (ioError e))
@@ -144,9 +144,9 @@ ensureIndexExists blockSize mapper fafile = do
 
 ensureSplitsExist blockSize fafile = do
     fafile' <- getIndexOutput False fafile
-    let ofafile = takeDirectory fafile' </> takeBaseName fafile <.> "splits_" ++ show blockSize ++ "m"
+    let ofafile = FilePath.takeDirectory fafile' </> FilePath.takeBaseName fafile <.> "splits_" ++ show blockSize ++ "m"
         receipt = ofafile <.> "done"
-    done <- liftIO $ doesFileExist receipt
+    done <- liftIO $ SD.doesFileExist receipt
     if done
         then do
             outputListLno' TraceOutput ["Splits for FASTA file '", fafile, "' found"]
