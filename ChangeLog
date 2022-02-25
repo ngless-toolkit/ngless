@@ -1,4 +1,5 @@
 Unreleased
+	* Remove embedded file infrastructure
 	* write() returns the filename used
 	* Switch to tasty test framework
 

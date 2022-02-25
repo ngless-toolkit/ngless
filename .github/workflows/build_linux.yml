@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Force building/installing a static binary
-      STACKOPTS: "--ghc-options '-fPIC' --flag NGLess:embed"
+      STACKOPTS: "--ghc-options '-fPIC'"
     steps:
       - uses: actions/checkout@v2
       - uses: haskell/actions/setup@v1
@@ -25,7 +25,7 @@ jobs:
       - name: Setup stack
         run: stack setup
 
-      - name: Build Static NGLess and dependencies
+      - name: Build Static NGLess
         run: make static CXX=g++-8
 
       - name: Build NGLess modules

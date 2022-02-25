@@ -12,11 +12,10 @@ jobs:
       - name: before_install
         run: |
             brew install gcc@8
-            brew install md5sha1sum
       - name: install
         run: |
             stack setup
-            make 
+            make
             make install CXX=g++-8 prefix=ngless_path/ngless
       - name: upload
         uses: actions/upload-artifact@v2
