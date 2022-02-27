@@ -44,11 +44,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.ByteString.Lazy as BL
 
-import qualified Diagrams.Backend.SVG as D
-import qualified Diagrams.TwoD.Size as D
-import qualified Diagrams.Prelude as D
-import           Diagrams.Prelude ((#), (^&), (|||))
-
 import           System.Environment (lookupEnv)
 
 
@@ -299,7 +294,6 @@ writeOutputJSImages odir scriptName script = liftIO $ do
     fqfiles <- forM (zip [(0::Int)..] fqStats) $ \(ix, q) -> do
         let oname = "output"++show ix++".svg"
             bpos = perBaseQ q
-        drawBaseQs (odir </> oname) bpos
         return oname
     t <- getZonedTime
     let script' = zip [1..] (T.lines script)
@@ -384,92 +378,4 @@ outputConfiguration = do
     forM_ (nConfSearchPath cfg) $ \p ->
         outputListLno' DebugOutput ["\t\t", p]
 
-
-type Diagram = D.QDiagram D.SVG D.V2 Double D.Any
--- Draw a chart of the base qualities
---
--- The code is very empirical in magic numbers
-drawBaseQs :: FilePath -> [BPosInfo] -> IO ()
-drawBaseQs oname bpos = D.renderSVG oname (D.mkSizeSpec2D (Just (1200.0 :: Double)) (Just 800.0)) $
-        D.padX 1.2 $ D.padY 1.1 $ D.centerXY $
-        chart ||| D.strutX 0.04 ||| legend
-    where
-        datalines = [
-            ("Mean" ,  style1, meanValues),
-            ("Median", style2, medianValues),
-            ("Upper Quartile", style3, uqValues),
-            ("Lower Quartile", style4, lqValues)
-            ]
-
-        lenBP = length bpos
-        chart = mconcat [plot st d | (_, st, d) <- datalines]
-                    <> horizticks <> vertticks
-                    <> text' "Basepair position" # D.moveTo (0.5 ^& (-0.07))
-                    <> text' "Quality score" # D.rotate (90 D.@@ D.deg) # D.moveTo ((-0.1) ^& (0.5))
-
-        plot :: (D.Path D.V2 Double, Diagram -> Diagram) -> [(Double, Double)] -> Diagram
-        plot (shape, style) ps = let
-                        ps' = D.p2 <$> ps
-                     in style (D.strokeP $ D.fromVertices ps') `D.atop` D.strokeP (mconcat [ shape D.# D.moveTo p | p <- ps' ])
-        horizticks :: Diagram
-        horizticks =
-            let
-                ticks = (takeWhile (< lenBP) [0, 25..]) ++ [lenBP]
-                pairs = [(fromIntegral tk * tickspace, show tk) | tk <- ticks]
-                tickspace :: Double
-                tickspace = 1.0 / fromIntegral lenBP
-
-                textBits = mconcat     [ text' t # D.moveTo ((x)^&(-0.04)) | (x,t) <- pairs ]
-                tickBits =    mconcat  [ D.fromVertices [ (x) ^& 0, (x) ^& 0.1     ] | (x,_) <- pairs ]
-                            <> mconcat [ D.fromVertices [ (x) ^& h, (x) ^& (h-0.1) ] | (x,_) <- pairs ]
-                            <> mconcat [ D.fromVertices [ (x) ^& 0, (x) ^& h       ] # dashedLine | (x,_) <- pairs ]
-            in textBits <> tickBits
-
-        h = 1.0
-        w = 1.0
-
-        dashedLine = D.lc D.gray . D.dashing [ 0.3, 0.3] 0
-        vertticks :: Diagram
-        vertticks =
-            let
-                pairs = [(0.0,  "0"),
-                         (0.25, "10"),
-                         (0.50, "20"),
-                         (0.75, "30"),
-                         (1.00, "40")]
-                textBits = mconcat [ text' t # D.alignR # D.moveTo   ((-0.04) ^&  y) | (y,t) <- pairs ]
-                tickBits = mconcat     [ D.fromVertices [ 0 ^& y,     0.1 ^& y ] | (y,_) <- pairs ]
-                            <> mconcat [ D.fromVertices [ w ^& y, (w-0.1) ^& y ] | (y,_) <- pairs ]
-                            <> mconcat [ D.fromVertices [ 0 ^& y,       w ^& y ] # dashedLine | (y,_) <- pairs ]
-            in textBits <> tickBits
-
-
-        legend = D.translateY 0.8 $
-                    D.vcat' D.with {D._sep=0.1} $
-                        [littleLine s ||| D.strutX 0.2 ||| text' label # D.alignL
-                            | (label, s, _) <- datalines]
-            where
-                littleLine :: (D.Path D.V2 Double, Diagram -> Diagram) -> Diagram
-                littleLine (shape, st) = st (D.strokeP $ D.fromVertices [ D.p2 (0, 0), D.p2 (0.2, 0) ]) <> (D.strokeP shape # D.moveTo (D.p2 (0.1, 0)))
-        text' :: String -> Diagram
-        text' s = D.text s # D.fc D.black # D.lw D.none # D.fontSizeL 0.03
-
-
-        [meanValues, medianValues, uqValues, lqValues] = map rescale [_mean, _median, _upperQuartile, _lowerQuartile]
-
-        rescale :: (BPosInfo -> Int) -> [(Double, Double)]
-        rescale sel = [(rescale1 1 (toInteger lenBP) x, rescale1 0 40 y) | (x,y) <- zip [1..] values]
-            where
-                values = map (toInteger . sel) bpos
-                rescale1 :: Integer -> Integer -> Integer -> Double
-                rescale1 m0 m1 x = let
-                                   m0' = fromInteger m0
-                                   s = fromInteger (m1 - m0)
-                                   x' = fromInteger x
-                               in (x'-m0')/s
-
-        style1 = (D.circle   0.01, D.lc D.red)
-        style2 = (D.square   0.01, D.lc D.green)
-        style3 = (D.pentagon 0.01, D.lc D.blue)
-        style4 = (D.star (D.StarSkip 2) (D.pentagon 0.01), D.lc D.brown)
 

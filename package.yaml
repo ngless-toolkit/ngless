@@ -77,9 +77,6 @@ dependencies:
   - vector-algorithms
   - yaml
   - zlib
-  - diagrams-lib
-  - diagrams-svg
-  - diagrams-core
 
 ghc-options:
   - -Wall

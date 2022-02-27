@@ -1,19 +1,12 @@
 # For more information, see: https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md
 
-resolver: lts-17.10
+resolver: lts-18.26
 compiler-check: newer-minor
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
   - git: "https://github.com/ngless-toolkit/interval-to-int"
     commit: "78289f6b48d41f7cc48169520ec9b77b050a0029"
-  - diagrams-core-1.4.2@sha256:47de45658e8a805b7cb7f535e7b093daf7e861604fa3c70e25bd4ef481bf1571,2997
-  - diagrams-lib-1.4.3@sha256:04f77778d4b550d3c8e54440800685f88467bef91075e82e009a8a6f45c51033,8232
-  - diagrams-svg-1.4.3@sha256:36708b0b4cf35507ccf689f1a25f6f81b8f41c2c4c2900793de820f66d4e241c,3181
-  - active-0.2.0.14@sha256:e618aba4a7881eb85dc1585e0a01230af6b4fbab6693931e4a5d0d3a5b184406,1823
-  - dual-tree-0.2.2.1@sha256:9ff31e461d873ae74ba51d93b454c0c4094726d7cb78a0c454394c965e83539d,2830
-  - monoid-extras-0.5.1@sha256:438dbfd7b4dce47d8f0ca577f56caf94bd1e21391afa545cad09fe7cf2e5793d,2333
-  - svg-builder-0.1.1@sha256:22de54d326a6b6912e461e1302edb9108b02aac0b6a6368fcdc3c4a224d487fd,1440
 allow-newer: true
 
 # Override default flag values for local packages and extra-deps
