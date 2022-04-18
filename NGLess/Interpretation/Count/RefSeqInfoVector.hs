@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
-{- Copyright 2013-2018 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 
@@ -34,7 +34,7 @@ import           System.IO.Unsafe (unsafeDupablePerformIO)
 import qualified Language.C.Inline.Context as C
 import qualified Language.C.Inline.Unsafe as CU
 import qualified Language.C.Inline.Cpp as C
-import qualified Language.C.Inline.Cpp.Exceptions as C
+import qualified Language.C.Inline.Cpp.Exception as C
 
 
 foreign import ccall "&rsiv_free" c_rsiv_free :: FunPtr (Ptr () -> IO ())

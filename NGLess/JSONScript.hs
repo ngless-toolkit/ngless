@@ -1,4 +1,4 @@
-{- Copyright 2017-2020 NGLess Authors
+{- Copyright 2017-2022 NGLess Authors
  - License: MIT
  -}
 
@@ -10,6 +10,7 @@ import           System.IO.SafeWrite (withOutputFile)
 import           Data.Aeson
 import           Data.Aeson.Types (Pair)
 import           Control.Arrow (second)
+import           Data.String (fromString)
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
 
@@ -27,7 +28,7 @@ jsonType :: String -> Pair
 jsonType = ("type" .=)
 
 sP :: T.Text -> T.Text -> Pair
-sP a b = a .= b
+sP a b = fromString (T.unpack a) .= b
 
 
 encodeMod (ModInfo n v) = object [jsonType "module", "name" .= n, "version" .= v]
@@ -61,7 +62,7 @@ toJSONEx (Optimized oe) = object [jsonType "optimized", "value" .= encodeOpt oe]
 toJSONIndex (IndexOne e) = object [jsonType "index1", "arg" .= toJSONEx e]
 toJSONIndex (IndexTwo e0 e1) = object [jsonType "index2", "left" .= maybe Null toJSONEx e0, "right" .= maybe Null toJSONEx e1]
 
-toJSONKwArgs kwargs = object [n .= toJSONEx e | (Variable n, e) <- kwargs]
+toJSONKwArgs kwargs = object [fromString (T.unpack n) .= toJSONEx e | (Variable n, e) <- kwargs]
 
 encodeOpt (LenThresholdDiscard (Variable n) bop t) = object [jsonType "len-threshold", "name" .= toJSON n, "op" .= encodeBOp bop, "thresh" .= toJSON t]
 encodeOpt (SubstrimReassign (Variable n) mq) = object [jsonType "substrim-reassign", "name" .= toJSON n, "minqual" .= toJSON mq]
