@@ -1,4 +1,4 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 
@@ -33,6 +33,7 @@ import           Control.Monad.Except
 import           Control.Monad.Catch (MonadMask)
 import           System.IO (Handle, stdout)
 import           Data.List (isInfixOf)
+import           Control.Concurrent.Async (concurrently_)
 
 import Data.FastQ
 import Language
@@ -119,9 +120,12 @@ parseWriteOptions args = do
 
 
 moveOrCopyCompress :: Bool -> FilePath -> FilePath -> NGLessIO ()
-moveOrCopyCompress _ ifile "/dev/stdout" = C.runConduit $ conduitPossiblyCompressedFile ifile .| C.stdout
-moveOrCopyCompress moveAllowed ifile ofile
-        | ifile == ofile = return () -- trivial case. Can happen.
+moveOrCopyCompress moveAllowed ifile ofile = liftIO =<< moveOrCopyCompress' moveAllowed ifile ofile
+
+moveOrCopyCompress' :: Bool -> FilePath -> FilePath -> NGLessIO (IO ())
+moveOrCopyCompress' _ ifile "/dev/stdout" = return (C.runConduitRes $ conduitPossiblyCompressedFile ifile .| C.stdout)
+moveOrCopyCompress' moveAllowed ifile ofile
+        | ifile == ofile = return (return ()) -- trivial case. Can happen.
 #ifdef WINDOWS
         | ocompression == BZ2Compression = throwNotImplementedError "Compression of bzip2 files is not supported on Windows"
         | icompression == BZ2Compression = throwNotImplementedError "Decompression of bzip2 files is not supported on Windows"
@@ -129,17 +133,17 @@ moveOrCopyCompress moveAllowed ifile ofile
         | icompression == ocompression = moveIfAllowed
         | otherwise = convertCompression
     where
-        moveIfAllowed :: NGLessIO ()
+        moveIfAllowed :: NGLessIO (IO ())
         moveIfAllowed = do
                 createdFiles <- ngleTemporaryFilesCreated <$> nglEnvironment
                 if moveAllowed && ifile `elem` createdFiles
-                    then liftIO (moveOrCopy ifile ofile)
-                    else liftIO (copyFile ifile ofile)
+                    then return (moveOrCopy ifile ofile)
+                    else return (copyFile ifile ofile)
 
         icompression = inferCompression ifile
         ocompression = inferCompression ofile
 
-        convertCompression = liftIO $
+        convertCompression = return $
             withOutputFile' ofile $ \hout ->
                 C.runConduitRes (conduitPossiblyCompressedFile ifile .| ostream ofile hout)
 
@@ -169,15 +173,15 @@ executeWrite (NGOList el) args = do
 executeWrite (NGOReadSet _ rs) args = do
     opts <- parseWriteOptions args
     let ofile = woOFile opts
-        moveOrCopyCompressFQs :: [FastQFilePath] -> FilePath -> NGLessIO ()
-        moveOrCopyCompressFQs [] _ = return ()
-        moveOrCopyCompressFQs [FastQFilePath _ f] ofname = moveOrCopyCompress (woCanMove opts) f ofname
+        moveOrCopyCompressFQs :: [FastQFilePath] -> FilePath -> NGLessIO (IO ())
+        moveOrCopyCompressFQs [] _ = return (return ())
+        moveOrCopyCompressFQs [FastQFilePath _ f] ofname = moveOrCopyCompress' (woCanMove opts) f ofname
         moveOrCopyCompressFQs multiple ofname = do
             let inputs = fqpathFilePath <$> multiple
             fp' <- makeNGLTempFile (head inputs) "concat" "tmp" $ \h ->
                 C.runConduit
                     (mapM_ conduitPossiblyCompressedFile inputs .| C.sinkHandle h)
-            moveOrCopyCompress True fp' ofname
+            moveOrCopyCompress' True fp' ofname
     if woFormatFlags opts == Just "interleaved"
         then
             withOutputFile' ofile $ \hout ->
@@ -185,19 +189,21 @@ executeWrite (NGOReadSet _ rs) args = do
                     interleaveFQs rs .| ostream ofile hout
         else case rs of
             ReadSet [] singles ->
-                moveOrCopyCompressFQs singles ofile
+                liftIO =<< moveOrCopyCompressFQs singles ofile
             ReadSet pairs [] -> do
                 fname1 <- _formatFQOname ofile "pair.1"
                 fname2 <- _formatFQOname ofile "pair.2"
-                moveOrCopyCompressFQs (fst <$> pairs) fname1
-                moveOrCopyCompressFQs (snd <$> pairs) fname2
+                cp1 <- moveOrCopyCompressFQs (fst <$> pairs) fname1
+                cp2 <- moveOrCopyCompressFQs (snd <$> pairs) fname2
+                liftIO $ cp1 `concurrently_` cp2
             ReadSet pairs singletons -> do
                 fname1 <- _formatFQOname ofile "pair.1"
                 fname2 <- _formatFQOname ofile "pair.2"
                 fname3 <- _formatFQOname ofile "singles"
-                moveOrCopyCompressFQs (fst <$> pairs) fname1
-                moveOrCopyCompressFQs (snd <$> pairs) fname2
-                moveOrCopyCompressFQs singletons fname3
+                cp1 <- moveOrCopyCompressFQs (fst <$> pairs) fname1
+                cp2 <- moveOrCopyCompressFQs (snd <$> pairs) fname2
+                cp3 <- moveOrCopyCompressFQs singletons fname3
+                liftIO $ cp1 `concurrently_` cp2 `concurrently_` cp3
     return NGOVoid
 executeWrite el@(NGOMappedReadSet _ iout  _) args = do
     opts <- parseWriteOptions args

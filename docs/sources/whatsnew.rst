@@ -9,6 +9,7 @@ Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~
 
 - Switched to the tasty testing framework
+- ``write()`` function uses multiple threads when writing multiple FastQ files (for paired-end data)
 
 
 Version 1.3.0
