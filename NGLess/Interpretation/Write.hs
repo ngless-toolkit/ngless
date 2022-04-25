@@ -168,7 +168,7 @@ executeWrite (NGOList el) args = do
     let args' = filter (\(a,_) -> (a /= "ofile")) args
         fps = map ((\fname -> replace "{index}" fname templateFP) . show) [1..length el]
     zipWithM_ (\e fp -> executeWrite e (("ofile", NGOFilename fp):args')) el fps
-    return NGOVoid
+    return (NGOFilename templateFP)
 
 executeWrite (NGOReadSet _ rs) args = do
     opts <- parseWriteOptions args
@@ -204,7 +204,8 @@ executeWrite (NGOReadSet _ rs) args = do
                 cp2 <- moveOrCopyCompressFQs (snd <$> pairs) fname2
                 cp3 <- moveOrCopyCompressFQs singletons fname3
                 liftIO $ cp1 `concurrently_` cp2 `concurrently_` cp3
-    return NGOVoid
+    return (NGOFilename ofile)
+
 executeWrite el@(NGOMappedReadSet _ iout  _) args = do
     opts <- parseWriteOptions args
     fp <- asFile iout
@@ -229,7 +230,7 @@ executeWrite el@(NGOMappedReadSet _ iout  _) args = do
             | otherwise -> convertSamToBam fp
         s -> throwScriptError ("write does not accept format {" ++ T.unpack s ++ "} with input type " ++ show el)
     moveOrCopyCompress (woCanMove opts) orig (woOFile opts)
-    return NGOVoid
+    return (NGOFilename $ woOFile opts)
 
 executeWrite (NGOCounts iout) args = do
     opts <- parseWriteOptions args
@@ -253,7 +254,7 @@ executeWrite (NGOCounts iout) args = do
                         .| byteLineSinkHandle ohand
             moveOrCopyCompress True comma (woOFile opts)
         f -> throwScriptError ("Invalid format in write: {"++T.unpack f++"}.\n\tWhen writing counts, only accepted values are {tsv} (TAB separated values; default) or {csv} (COMMA separated values).")
-    return NGOVoid
+    return (NGOFilename $ woOFile opts)
   where
     tabToComma :: ByteLine -> ByteLine
     tabToComma (ByteLine line) = ByteLine $ B8.map (\case { '\t' -> ','; c -> c }) line
@@ -261,7 +262,7 @@ executeWrite (NGOCounts iout) args = do
 executeWrite (NGOFilename fp) args = do
     opts <- parseWriteOptions args
     moveOrCopyCompress (woCanMove opts) fp (woOFile opts)
-    return NGOVoid
+    return (NGOFilename $ woOFile opts)
 
 executeWrite v _ = throwShouldNotOccur ("Error: executeWrite of " ++ show v ++ " not implemented yet.")
 
