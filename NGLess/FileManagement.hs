@@ -1,4 +1,4 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, CPP #-}
@@ -11,6 +11,7 @@ module FileManagement
     , removeIfTemporary
     , setupHtmlViewer
     , takeBaseNameNoExtensions
+
     , samtoolsBin
     , prodigalBin
     , megahitBin
@@ -28,22 +29,18 @@ module FileManagement
     ) where
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import qualified Codec.Archive.Tar as Tar
-import qualified Codec.Archive.Tar.Entry as Tar
-import qualified Codec.Compression.GZip as GZip
 import qualified Text.RE.TDFA.String as RE
 import qualified System.FilePath as FP
 import qualified Data.Conduit.Algorithms.Async as CAlg
 import qualified Conduit as C
 import           Conduit ((.|))
-import           System.FilePath (takeBaseName, takeDirectory, (</>), (<.>), (-<.>))
-import           Control.Monad (unless, forM_, when)
-import           System.Posix.Files (setFileMode)
+import           System.FilePath (takeDirectory, (</>), (<.>), (-<.>))
+import           Control.Monad (unless, forM_)
+import           Control.Applicative ((<|>))
 import           System.Posix.Internals (c_getpid)
 import           Data.List (isSuffixOf, isPrefixOf)
 
-import System.Directory
+import qualified System.Directory as SD
 import System.IO
 import System.IO.Error
 import Control.Exception
@@ -59,9 +56,8 @@ import Data.FileEmbed (embedDir)
 import Output
 import NGLess.NGLEnvironment
 import NGLess.NGError
-import Dependencies.Embedded
 import Utils.LockFile
-import Utils.Utils (withOutputFile)
+import Utils.Utils (findM)
 
 
 {- Note on temporary files
@@ -137,7 +133,7 @@ openNGLTempFile' :: FilePath -- ^ basename
                         -> NGLessIO (ReleaseKey, (FilePath, Handle))
 openNGLTempFile' base prefix ext = do
     tdir <- nConfTemporaryDirectory <$> nglConfiguration
-    liftIO $ createDirectoryIfMissing True tdir
+    liftIO $ SD.createDirectoryIfMissing True tdir
     keepTempFiles <- nConfKeepTemporaryFiles <$> nglConfiguration
     let cleanupAction = if not keepTempFiles
                 then deleteTempFile
@@ -201,18 +197,18 @@ takeBaseNameNoExtensions = FP.dropExtensions . FP.takeBaseName
 createTempDir :: String -> NGLessIO (ReleaseKey,FilePath)
 createTempDir template = do
         tbase <- nConfTemporaryDirectory <$> nglConfiguration
-        liftIO $ createDirectoryIfMissing True tbase
+        liftIO $ SD.createDirectoryIfMissing True tbase
         keepTempFiles <- nConfKeepTemporaryFiles <$> nglConfiguration
         allocate
             (c_getpid >>= createFirst tbase (takeBaseNameNoExtensions template))
             (if not keepTempFiles
-                then removeDirectoryRecursive
+                then SD.removeDirectoryRecursive
                 else const (return ()))
     where
         createFirst :: (Num a, Show a) => FilePath -> String -> a -> IO FilePath
         createFirst dirbase t n = do
             let dirpath = dirbase </> t <.> "tmp" ++ show n
-            try (createDirectory dirpath) >>= \case
+            try (SD.createDirectory dirpath) >>= \case
                 Right () -> return dirpath
                 Left e
                     | isAlreadyExistsError e -> createFirst dirbase t (n + 1)
@@ -221,76 +217,32 @@ createTempDir template = do
 -- This is in IO because it is run after NGLessIO has finished.
 setupHtmlViewer :: FilePath -> IO ()
 setupHtmlViewer dst = do
-    exists <- doesFileExist (dst </> "index.html")
+    exists <- SD.doesFileExist (dst </> "index.html")
     unless exists $ do
-        createDirectoryIfMissing False dst
+        SD.createDirectoryIfMissing False dst
         forM_ $(embedDir "Html") $ \(fp,bs) ->
             B.writeFile (dst </> fp) bs
 
 
 -- | path to bwa
 bwaBin :: NGLessIO FilePath
-bwaBin = findOrCreateBin "NGLESS_BWA_BIN" bwaFname bwaData
-    where
-        bwaFname = "ngless-" ++ versionStr ++ "-bwa" ++ binaryExtension
+bwaBin = findNGLessBin "NGLESS_BWA_BIN" "bwa"
 
 -- | path to samtools
 samtoolsBin :: NGLessIO FilePath
-samtoolsBin = findOrCreateBin "NGLESS_SAMTOOLS_BIN" samtoolsFname samtoolsData
-    where
-        samtoolsFname = "ngless-" ++ versionStr ++ "-samtools" ++ binaryExtension
+samtoolsBin = findNGLessBin "NGLESS_SAMTOOLS_BIN" "samtools"
         --
 -- | path to prodigal
 prodigalBin :: NGLessIO FilePath
-prodigalBin = findOrCreateBin "NGLESS_PRODIGAL_BIN" prodigalFname prodigalData
-    where
-        prodigalFname = "ngless-" ++ versionStr ++ "-prodigal" ++ binaryExtension
+prodigalBin = findNGLessBin "NGLESS_PRODIGAL_BIN" "prodigal"
 
 -- | path to minimap2
 minimap2Bin :: NGLessIO FilePath
-minimap2Bin = findOrCreateBin "NGLESS_MINIMAP2_BIN" minimap2Fname minimap2Data
-    where
-        minimap2Fname = "ngless-" ++ versionStr ++ "-minimap2" ++ binaryExtension
+minimap2Bin = findNGLessBin "NGLESS_MINIMAP2_BIN" "minimap2"
 
 -- | path to megahit
 megahitBin :: NGLessIO FilePath
-megahitBin = liftIO (lookupEnv "NGLESS_MEGAHIT_BIN") >>= \case
-    Just bin -> checkExecutable "NGLESS_MEGAHIT_BIN" bin
-    Nothing -> do
-        path <- findBin ("ngless-"++versionStr ++ "-megahit/megahit")
-        maybe createMegahitBin return path
-
-createMegahitBin :: NGLessIO FilePath
-createMegahitBin = do
-    megahitData' <- liftIO megahitData
-    destdir <- (</> ("ngless-" ++ versionStr ++ "-megahit")) <$> binPath User
-    when (B.null megahitData') $
-        throwSystemError "Cannot find megahit on the system and this is a build without embedded dependencies."
-    liftIO $ createDirectoryIfMissing True destdir
-    withLockFile LockParameters
-                { lockFname = destdir ++ "lock.megahit-expand"
-                , maxAge = 300
-                , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
-                , mtimeUpdate = True
-               } $ do
-        outputListLno' TraceOutput ["Expanding megahit binaries into ", destdir]
-        unpackMegahit destdir $ Tar.read . GZip.decompress $ BL.fromChunks [megahitData']
-    return $ destdir </> "megahit"
-    where
-        unpackMegahit :: FilePath -> Tar.Entries Tar.FormatError -> NGLessIO ()
-        unpackMegahit _ Tar.Done = return ()
-        unpackMegahit _ (Tar.Fail err) = throwSystemError ("Error expanding megahit archive: " ++ show err)
-        unpackMegahit destdir (Tar.Next e next) = do
-            case Tar.entryContent e of
-                Tar.NormalFile content _ -> do
-                    let dest = destdir </> takeBaseName (Tar.entryPath e)
-                    liftIO $ do
-                        BL.writeFile dest content
-                        --setModificationTime dest (posixSecondsToUTCTime (fromIntegral $ Tar.entryTime e))
-                        setFileMode dest (Tar.entryPermissions e)
-                Tar.Directory -> return ()
-                _ -> throwSystemError ("Unexpected entry in megahit tarball: " ++ show e)
-            unpackMegahit destdir next
+megahitBin = findNGLessBin "NGLESS_MEGAHIT_BIN" "megahit"
 
 
 binPath :: InstallMode -> NGLessIO FilePath
@@ -304,25 +256,31 @@ binPath Root = do
 binPath User = ((</> "bin") . nConfUserDirectory) <$> nglConfiguration
 
 -- | Attempts to find the absolute path for the requested binary (checks permissions)
-findBin :: FilePath -> NGLessIO (Maybe FilePath)
+findBin :: FilePath -> NGLessIO FilePath
 findBin fname = do
-        rootPath <- (</> fname) <$> binPath Root
-        rootex <- canExecute rootPath
-        if rootex then
-            return (Just rootPath)
-        else do
-            userpath <- (</> fname) <$> binPath User
-            userex <- canExecute userpath
-            return $ if userex
-                then Just userpath
-                else Nothing
+        nglPath <- findM [Root, User] $ \p -> do
+            findM [versionTaggedFname, fname] $ \fn -> do
+                path <- (</> fn) <$> binPath p
+                ex <- canExecute path
+                if ex
+                    then return (Just path)
+                    else return Nothing
+        case nglPath of
+            Just p -> return p
+            Nothing -> do
+                inPath <- liftIO $ SD.findExecutable versionTaggedFname
+                inPath' <- liftIO $ SD.findExecutable fname
+                case inPath <|> inPath' of
+                    Just p -> return p
+                    Nothing -> throwSystemError $ "Missing executable '"++fname++"'"
     where
+        versionTaggedFname = "ngless-" ++ versionStr ++ "-" ++ fname ++ binaryExtension
         canExecute :: FilePath -> NGLessIO Bool
         canExecute bin = do
-            exists <- liftIO $ doesFileExist bin
+            exists <- liftIO $ SD.doesFileExist bin
             if exists
                 then do
-                    isExecutable <- executable <$> (liftIO $ getPermissions bin)
+                    isExecutable <- SD.executable <$> (liftIO $ SD.getPermissions bin)
                     unless isExecutable $
                         outputListLno' WarningOutput [
                             "Found file `", bin,
@@ -330,38 +288,18 @@ findBin fname = do
                     return isExecutable
                 else return False
 
-writeBin :: FilePath -> IO B.ByteString -> NGLessIO FilePath
-writeBin fname bindata = do
-    userBinPath <- binPath User
-    bindata' <- liftIO bindata
-    when (B.null bindata') $
-        throwSystemError ("Cannot find " ++ fname ++ " on the system and this is a build without embedded dependencies.")
-    liftIO $ createDirectoryIfMissing True userBinPath
-    let fname' = userBinPath </> fname
-    withLockFile LockParameters
-                    { lockFname = fname' ++ ".expand.lock"
-                    , maxAge = 300
-                    , whenExistsStrategy = IfLockedRetry { nrLockRetries = 60, timeBetweenRetries = 60 }
-                    , mtimeUpdate = True
-                    } $ liftIO $ do
-        withOutputFile fname' (flip B.hPut bindata')
-        p <- getPermissions fname'
-        setPermissions fname' (setOwnerExecutable True p)
-        return fname'
 
-findOrCreateBin :: String -> FilePath -> IO B.ByteString -> NGLessIO FilePath
-findOrCreateBin envvar fname bindata = liftIO (lookupEnv envvar) >>= \case
+findNGLessBin :: String -> FilePath -> NGLessIO FilePath
+findNGLessBin envvar fname = liftIO (lookupEnv envvar) >>= \case
     Just bin -> checkExecutable envvar bin
-    Nothing -> do
-        path <- findBin fname
-        maybe (writeBin fname bindata) return path
+    Nothing -> findBin fname
 
 checkExecutable :: String -> FilePath -> NGLessIO FilePath
 checkExecutable name bin = do
-    exists <- liftIO $ doesFileExist bin
+    exists <- liftIO $ SD.doesFileExist bin
     unless exists
         (throwSystemError $ concat [name, " binary not found!\n","Expected it at ", bin])
-    is_executable <- executable <$> liftIO (getPermissions bin)
+    is_executable <- SD.executable <$> liftIO (SD.getPermissions bin)
     unless is_executable
         (throwSystemError $ concat [name, " binary found at ", bin, ".\nHowever, it is not an executable file!"])
     return bin
@@ -374,7 +312,7 @@ expandPath fbase = do
         let candidates = expandPath' fbase searchpath
         findMaybeM candidates $ \p -> do
             outputListLno' TraceOutput ["Looking for file (", fbase, ") in ", p]
-            exists <- liftIO (doesFileExist p)
+            exists <- liftIO (SD.doesFileExist p)
             return $! if exists
                             then Just p
                             else Nothing

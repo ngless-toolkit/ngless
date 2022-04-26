@@ -7,7 +7,6 @@ github:         ngless-toolkit/ngless
 license:        MIT
 license-file:   COPYING
 c-sources:
-  - NGLess/Dependencies/embedded.c
   - NGLess/Data/FastQ.c
 default-extensions:
   - BangPatterns
@@ -106,6 +105,15 @@ when:
      - safeio >=0.0.2
      - unix
 
+
+library:
+  source-dirs: NGLess/
+  when:
+    - condition: 'flag(static)'
+      ld-options:
+        - -static
+        - -pthread
+
 executables:
   ngless:
     main: Main.hs
@@ -114,25 +122,11 @@ executables:
     dependencies:
         - NGLess
     when:
-    - condition: ! '!(flag(embed))'
-      then:
-        cc-options: -DNO_EMBED_SAMTOOLS_BWA
-        cpp-options: -DNO_EMBED_SAMTOOLS_BWA
-      else:
+      - condition: 'flag(static)'
         ld-options:
-        - -static
-        - -pthread
-library:
-    source-dirs: NGLess/
-    when:
-    - condition: ! '!(flag(embed))'
-      then:
-        cc-options: -DNO_EMBED_SAMTOOLS_BWA
-        cpp-options: -DNO_EMBED_SAMTOOLS_BWA
-      else:
-        ld-options:
-        - -static
-        - -pthread
+          - -static
+          - -pthread
+
 tests:
   nglesstest:
     main: Tests.hs
@@ -147,28 +141,18 @@ tests:
     - tasty-hunit
     - tasty-quickcheck
     - tasty-th
-    when:
-    - condition: ! '!(flag(embed))'
-      then:
-        cc-options: -DNO_EMBED_SAMTOOLS_BWA
-        cpp-options: -DNO_EMBED_SAMTOOLS_BWA
-      else:
-        ld-options:
-        - -static
-        - -pthread
+
 benchmarks:
   nglessbench:
     main: Bench.hs
     source-dirs: Execs/
     other-modules: []
-    cc-options: -DNO_EMBED_SAMTOOLS_BWA
-    cpp-options: -DNO_EMBED_SAMTOOLS_BWA
     dependencies:
     - NGLess
     - HUnit >=1.3
     - criterion
 flags:
-  embed:
-    description: Embed bwa/samtools
+  static:
+    description: Static build
     manual: false
     default: false
