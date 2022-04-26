@@ -321,12 +321,14 @@ findBin fname = do
         canExecute bin = do
             exists <- liftIO $ doesFileExist bin
             if exists
-                then executable <$> (liftIO $ getPermissions bin)
-                else do
-                    outputListLno' WarningOutput [
-                                "Found file `", bin,
-                                "`, but it is not executable by NGLess (may indicate a permission error)."]
-                    return False
+                then do
+                    isExecutable <- executable <$> (liftIO $ getPermissions bin)
+                    unless isExecutable $
+                        outputListLno' WarningOutput [
+                            "Found file `", bin,
+                            "`, but it is not executable by NGLess (may indicate a permission error)."]
+                    return isExecutable
+                else return False
 
 writeBin :: FilePath -> IO B.ByteString -> NGLessIO FilePath
 writeBin fname bindata = do
