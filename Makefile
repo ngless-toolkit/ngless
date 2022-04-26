@@ -43,7 +43,7 @@ MEGAHIT_VERSION = 1.1.4
 MEGAHIT_DIR = megahit-$(MEGAHIT_VERSION)
 # we can't target Makefile here cause we patch it after unpacking
 MEGAHIT_DIR_TARGET = $(MEGAHIT_DIR)/LICENSE
-MEGAHIT_URL = https://github.com/voutcn/megahit/archive/v$(MEGAHIT_VERSION).tar.gz
+MEGAHIT_URL = https://github.com/voutcn/megahit/archive/refs/tags/v$(MEGAHIT_VERSION).tar.gz
 MEGAHIT_TAR = v$(MEGAHIT_VERSION).tar.gz
 MEGAHIT_SHA1 = 2707cb46f7dde579065b65374a8053ba68d54dff
 MEGAHIT_TARGET = megahit
