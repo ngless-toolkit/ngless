@@ -19,3 +19,4 @@ jobs:
         # If you chose API tokens for write access OR if you have a private cache
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix build -f release.nix NGLess.components.exes.ngless --out-link ngless-dyn
+    - run: nix build -f release.nix projectCross.musl64.hsPkgs.NGLess.components.exes.ngless --out-link ngless-static
