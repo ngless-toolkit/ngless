@@ -27,7 +27,7 @@ concatenateFQs (FastQFilePath enc fp:rest) = do
                 | enc /= enc' =
                                 conduitPossiblyCompressedFile f
                                     .| linesC
-                                    .| fqDecodeC enc'
+                                    .| fqDecodeC f enc'
                                     .| fqEncodeC enc
                                     .| asyncGzipTo hout
                 | ".gz" `isSuffixOf` f = CB.sourceFile f .| CB.sinkHandle hout

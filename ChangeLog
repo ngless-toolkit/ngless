@@ -4,6 +4,7 @@ Unreleased
 	* Update to LTS-19
 	* write() uses multiple threads to write multiple FQ files
 	* Use binaries from path (not self installed)
+	* Better error message when parsing misformed FastQ files
 
 Version 1.3.0 2021-01-28 by luispedro
 	* Validate count() headers on --validate-only

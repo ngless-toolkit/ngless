@@ -230,7 +230,7 @@ make_unique_test n = let enc = SolexaEncoding in do
         C.runConduit $
             conduitPossiblyCompressedFile newfp
                 .| linesC
-                .| fqDecodeC enc
+                .| fqDecodeC "testing" enc
                 .| countC
     let n' = min n 4
     nuniq @?=  (n' * 54)

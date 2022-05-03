@@ -57,7 +57,7 @@ performUnique fname enc mc = do
         C.runConduitRes $
             conduitPossiblyCompressedFile fname
                 .| linesC
-                .| fqDecodeC enc
+                .| fqDecodeC fname enc
                 .| CL.mapM_ (multiplex k fhs)
         V.mapM_ (liftIO . hClose) fhs
         outputListLno' DebugOutput ["Wrote N Files to: ", dest]
@@ -85,7 +85,7 @@ readUniqueFile :: Int -> FastQEncoding -> FilePath -> C.ConduitT () ShortRead NG
 readUniqueFile k enc fname =
     CC.sourceFile fname
         .| linesC
-        .| fqDecodeC enc
+        .| fqDecodeC fname enc
         .| filterUniqueUpTo k
 
 

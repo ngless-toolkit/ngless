@@ -176,20 +176,20 @@ fqEncode enc (ShortRead a b c) = B.concat [a, "\n", b, "\n+\n", bsAdd c offset, 
 -- | Decode a FastQ file as a Conduit
 --
 -- Throws DataError if the stream is not in valid FastQ format
-fqDecodeC :: (MonadError NGError m) => FastQEncoding -> C.ConduitT ByteLine ShortRead m ()
-fqDecodeC enc = C.awaitForever $ \(ByteLine rid) ->
+fqDecodeC :: (MonadError NGError m) => FilePath -> FastQEncoding -> C.ConduitT ByteLine ShortRead m ()
+fqDecodeC fp enc = C.awaitForever $ \(ByteLine rid) ->
         lineOrError4 $ \rseq ->
             lineOrError4 $ \_ ->
                 lineOrError4 $ \rqs->
                     if B.length rseq == B.length rqs
                         then C.yield $! ShortRead rid rseq (vSub rqs offset)
-                        else throwDataError "Length of quality line is not the same as sequence"
+                        else throwDataError ("Parsing file '" ++ fp ++ "': Length of quality line is not the same as sequence")
     where
         offset :: Int8
         offset = encodingOffset enc
         lineOrError4 f = C.await >>=
                             maybe
-                                (throwDataError "Number of lines in FastQ file is not multiple of 4! EOF found")
+                                (throwDataError ("Parsing file '" ++ fp ++ "': Number of lines in FastQ file is not multiple of 4! EOF found"))
                                 (f . unwrapByteLine)
 
 
@@ -217,7 +217,7 @@ statsFromFastQ :: (MonadIO m, MonadError NGError m, MonadThrow m, MonadUnliftIO 
 statsFromFastQ fp enc = C.runConduitRes $
         conduitPossiblyCompressedFile fp
             .| linesC
-            .| fqDecodeC enc
+            .| fqDecodeC fp enc
             .| fqStatsC
 
 fqStatsC :: forall m. (MonadIO m) => C.ConduitT ShortRead C.Void m FQStatistics

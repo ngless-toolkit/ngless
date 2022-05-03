@@ -43,7 +43,7 @@ fqDecode :: FastQEncoding -> BL.ByteString -> NGLess [ShortRead]
 fqDecode enc s = C.runConduit $
     CL.sourceList (BL.toChunks s)
         .| linesC
-        .| fqDecodeC enc
+        .| fqDecodeC "test" enc
         .| CL.consume
 
 encodeRecover enc = fqDecode enc . BL.fromChunks $ map (fqEncode enc) reads3

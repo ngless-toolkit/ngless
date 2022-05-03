@@ -187,7 +187,7 @@ uninterleave enc fname = do
         C.runConduit $
             src
             .| linesC
-            .| fqDecodeC enc'
+            .| fqDecodeC fname enc'
             .| C.passthroughSink fqStatsC (\stats -> outputFQStatistics fname stats enc')
             .| uninterleaveC
             .| subsampleC (CAlg.dispatchC
