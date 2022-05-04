@@ -10,18 +10,21 @@ else
     SAMTOOLS="$(which samtools)"
 fi
 
-if ! diff <($SAMTOOLS view -h output.unsorted.bam) texpected.unsorted.sam ; then
-    exit 1
+failed=0
+if ! diff <($SAMTOOLS view -h output.unsorted.bam | grep -v '^@PG') texpected.unsorted.sam ; then
+    failed=1
 fi
 
-if ! diff <($SAMTOOLS view -h output.pos_sorted.bam) texpected.pos_sorted.sam ; then
-    exit 1
+if ! diff <($SAMTOOLS view -h output.pos_sorted.bam | grep -v '^@PG') texpected.pos_sorted.sam ; then
+    failed=1
 fi
 
-if ! diff <($SAMTOOLS view -h output.pos_sorted2.bam) texpected.pos_sorted.sam ; then
-    exit 1
+if ! diff <($SAMTOOLS view -h output.pos_sorted2.bam | grep -v '^@PG') texpected.pos_sorted.sam ; then
+    failed=1
 fi
 
-if ! diff <($SAMTOOLS view -h output.name_sorted.bam) texpected.name_sorted.sam ; then
-    exit 1
+if ! diff <($SAMTOOLS view -h output.name_sorted.bam | grep -v '^@PG') texpected.name_sorted.sam ; then
+    failed=1
 fi
+
+exit $failed

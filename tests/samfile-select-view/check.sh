@@ -10,6 +10,6 @@ else
     SAMTOOLS="$(which samtools)"
 fi
 
-if ! diff <($SAMTOOLS view -h output.bam) <(zcat texpected.sam.gz) ; then
+if ! diff <($SAMTOOLS view -h output.bam | grep -v '^@PG') <(zcat texpected.sam.gz | grep -v '^@PG') ; then
     exit 1
 fi

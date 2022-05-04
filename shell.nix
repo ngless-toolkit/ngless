@@ -11,6 +11,7 @@ in pkgs.mkShell {
     pkgs.prodigal
     pkgs.samtools
     pkgs.megahit
+    pkgs.python3 # required for megahit (dependency should be upstreamed)
     pkgs.minimap2
     pkgs.bwa
 
