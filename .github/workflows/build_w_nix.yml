@@ -20,3 +20,9 @@ jobs:
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix build -f release.nix NGLess.components.exes.ngless --out-link ngless-dyn
     - run: nix build -f release.nix projectCross.musl64.hsPkgs.NGLess.components.exes.ngless --out-link ngless-static
+
+    - run: nix build -f release.nix NGLess.components.tests.nglesstest --out-link ngless-test-dyn
+    - run: ./ngless-test-dyn/bin/nglesstest
+
+    - run: nix build -f release.nix projectCross.musl64.hsPkgs.NGLess.components.exes.ngless --out-link ngless-static
+
