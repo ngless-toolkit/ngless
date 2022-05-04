@@ -1,4 +1,4 @@
-name: "Test with nix"
+name: "Build & test (nix)"
 on:
   pull_request:
   push:
@@ -25,4 +25,10 @@ jobs:
     - run: ./ngless-test-dyn/bin/nglesstest
 
     - run: nix build -f release.nix projectCross.musl64.hsPkgs.NGLess.components.exes.ngless --out-link ngless-static
+
+    - name: Upload
+      uses: actions/upload-artifact@v2
+      with:
+        name: ngless_static
+        path: ngless-static/bin/ngless
 
