@@ -40,7 +40,7 @@ qcStatsFunction = Function
     , funcKwArgs = []
     , funcAllowsAutoComprehension = False
     , funcChecks = [FunctionCheckReturnAssigned
-                   ,FunctionCheckNGLVersionIncompatibleChange (0, 8)]
+                   ,FunctionCheckNGLVersionIncompatibleChange (0, 8) ""]
     }
 
 loadModule :: T.Text -> NGLessIO Module

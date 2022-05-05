@@ -1,4 +1,4 @@
-ngless "1.1"
+ngless "1.4"
 
 input = fastq('sample.fq.gz')
 contigs = assemble(input)

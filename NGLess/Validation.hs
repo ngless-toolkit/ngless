@@ -1,4 +1,4 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -298,20 +298,21 @@ validateNGLessVersionUses mods sc = case nglVersion <$> nglHeader sc of
                     | versionLE minV version = return ()
                     | otherwise = tell1lno lno (prefix ++ [" requires ngless version ", showV minV, " (version '", version, "' is active)."])
                 checkVersionChanged _ Nothing = return ()
-                checkVersionChanged prefix (Just minV)
+                checkVersionChanged prefix (Just (minV, r))
                     | versionLE minV version = return ()
-                    | otherwise = tell1lno lno (prefix ++ [" changed behaviour in an incompatible fashion in version ", showV minV, " (version '", version, "' is active).\n",
-                                                           "See https://ngless.embl.de/whatsnew.html for details on changes."])
+                    | otherwise = tell1lno lno (prefix ++
+                            [" changed behaviour in an incompatible fashion in version ", showV minV, " (version '", version, "' is active).\n", r,
+                            "\n\nSee https://ngless.embl.de/whatsnew.html for details on changes."])
         minVersionFunction :: Function -> Maybe (Int, Int)
         minVersionFunction finfo =
             asum $ flip map (funcChecks finfo) $ \case
                             FunctionCheckMinNGLessVersion minV -> Just minV
                             _ -> Nothing
 
-        minVersionFunctionChanged :: Function -> Maybe (Int, Int)
+        minVersionFunctionChanged :: Function -> Maybe ((Int, Int), T.Text)
         minVersionFunctionChanged finfo =
             asum $ flip map (funcChecks finfo) $ \case
-                            FunctionCheckNGLVersionIncompatibleChange minV -> Just minV
+                            FunctionCheckNGLVersionIncompatibleChange minV r -> Just (minV, r)
                             _ -> Nothing
 
         minVersionMethod :: MethodInfo -> Maybe (Int, Int)

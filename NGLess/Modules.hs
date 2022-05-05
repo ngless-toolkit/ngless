@@ -1,4 +1,4 @@
-{- Copyright 2015-2021 NGLess Authors
+{- Copyright 2015-2022 NGLess Authors
  - License: MIT
  -}
 
@@ -59,7 +59,8 @@ data ArgCheck =
 data FunctionCheck =
             FunctionCheckMinNGLessVersion (Int, Int) -- ^ first version where this function can be used
             | FunctionCheckReturnAssigned -- ^ Function is pure
-            | FunctionCheckNGLVersionIncompatibleChange (Int, Int) -- ^ version when behaviour changed
+            | FunctionCheckNGLVersionIncompatibleChange (Int, Int)-- ^ version when behaviour changed
+                            T.Text -- ^ reason for change
             deriving (Eq, Show)
 
 -- | Basic information about argument to a function

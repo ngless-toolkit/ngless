@@ -1,4 +1,4 @@
-{- Copyright 2017-2020 NGLess Authors
+{- Copyright 2017-2022 NGLess Authors
  - License: MIT
  -}
 
@@ -70,7 +70,9 @@ assembleFunction = Function
     , funcRetType = NGLString
     , funcKwArgs = [ArgInformation "__extra_megahit_args" False (NGList NGLString) []]
     , funcAllowsAutoComprehension = False
-    , funcChecks = [FunctionCheckReturnAssigned]
+    , funcChecks =
+        [FunctionCheckNGLVersionIncompatibleChange (1, 4) "Megahit version was updated which significantly changes results"
+        ,FunctionCheckReturnAssigned]
     }
 
 loadModule :: T.Text -> NGLessIO Module

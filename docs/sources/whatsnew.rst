@@ -10,6 +10,8 @@ Internal improvements
 
 - Switched to the tasty testing framework
 - ``write()`` function uses multiple threads when writing multiple FastQ files (for paired-end data)
+- ``assemble()`` is now using a more up to date version of megahit, which means
+  that the older versions cannot be run.
 
 
 Version 1.3.0
