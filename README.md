@@ -47,7 +47,7 @@ information.
 ### Bioconda
 
 The recommended way to install NGLess is through
-[bioconda](http://bioconda.github.io):
+[bioconda](https://bioconda.github.io):
 
     conda install -c bioconda ngless 
 
@@ -87,7 +87,7 @@ Installing/compiling from source is also possible. Clone
 
 #### Dependencies
 
-The simplest way to get an environment will all the dependencies is to use conda:
+The simplest way to get an environment with all the dependencies is to use conda:
 
     conda create -n ngless
     conda activate ngless
@@ -109,15 +109,23 @@ the directory where you wish to install, default is `/usr/local`):
     make install prefix=<PREFIX>
 
 ## Running Sample Test Scripts on Local Machine
-For Developers who have successfully comiled and installed NGless, running the test scripts in /tests folder would be the next line of action to have the output of sample(small) test cases.
+
+For developers who have successfully compiled and installed NGless, running the
+test scripts in the `tests` folder would be the next line of action to have the
+output of sample test cases.
 
     cd tests
-Once in the test directory, select any of the following many test folders(scripts) to run using NGless.
-For example, here we would run the "**regression-fqgz**" and the eventually the .ngl file to get a sample output view that can be used for visualizing the software.
+
+Once in the `test` directory, select any of the test folders to run NGless.
+
+For example, here we would run the `regression-fqgz` test:
 
     cd regression-fqgz
     ngless ungzip.ngl
-After running this script open the newly generated folder "**ungzip.ngl.output_ngless**" and view the template in the **index.html** file.
+
+After running this script open the newly generated folder
+"**ungzip.ngl.output_ngless**" and view the template in the **index.html**
+file.
 
 For developers who have done this much more data-sets for testing purposes can be referenced and used by reading these documentation links:
 **[Human Gut Metagenomics Functional & Taxonomic Profiling](https://ngless.embl.de/tutorial-gut-metagenomics.html#)**
@@ -138,9 +146,9 @@ Get more details of the resources **[here](https://ngless.embl.de/resources/Modu
 
 ## Authors
 
-- [Luis Pedro Coelho](http://luispedro.org) (email: [luispedro@big-data-biology.org](mailto:luispedro@big-data-biology.org)) (on twitter: [@luispedrocoelho](https://twitter.com/luispedrocoelho))
+- [Luis Pedro Coelho](https://luispedro.org) (email: [luispedro@big-data-biology.org](mailto:luispedro@big-data-biology.org)) (on twitter: [@luispedrocoelho](https://twitter.com/luispedrocoelho))
 - Paulo Monteiro
 -  Renato Alves
-- [Ana Teresa Freitas](http://web.tecnico.ulisboa.pt/ana.freitas/)
+- [Ana Teresa Freitas](https://web.tecnico.ulisboa.pt/ana.freitas/)
 -  Peer Bork
 
