@@ -1,4 +1,4 @@
-Unreleased
+Version 1.4.0
 	* write() returns the filename used
 	* Switch to tasty test framework
 	* Update to LTS-19
