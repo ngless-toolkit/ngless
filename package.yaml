@@ -9,6 +9,7 @@ github:         ngless-toolkit/ngless
 license:        MIT
 license-file:   COPYING
 c-sources:
+  - NGLess/Dependencies/embedded.c
   - NGLess/Data/FastQ.c
 default-extensions:
   - BangPatterns
@@ -128,6 +129,10 @@ executables:
         ld-options:
           - -static
           - -pthread
+    when:
+    - condition: 'flag(embed)'
+      cc-options: -DBUILD_W_EMBED
+      cpp-options: -DBUILD_W_EMBED
 
 tests:
   nglesstest:
@@ -156,5 +161,9 @@ benchmarks:
 flags:
   static:
     description: Static build
+    manual: false
+    default: false
+  embed:
+    description: Embed dependencies
     manual: false
     default: false

@@ -29,14 +29,18 @@ module FileManagement
     ) where
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Archive.Tar.Entry as Tar
+import qualified Codec.Compression.GZip as GZip
 import qualified Text.RE.TDFA.String as RE
 import qualified System.FilePath as FP
 import qualified Data.Conduit.Algorithms.Async as CAlg
 import qualified Conduit as C
 import           Conduit ((.|))
 import           System.FilePath (takeDirectory, (</>), (<.>), (-<.>))
-import           Control.Monad (unless, forM_)
-import           Control.Applicative ((<|>))
+import           Control.Monad (unless, forM_, when)
+import           System.Posix.Files (setFileMode)
 import           System.Posix.Internals (c_getpid)
 import           Data.List (isSuffixOf, isPrefixOf)
 
@@ -55,9 +59,10 @@ import Version (versionStr)
 import Data.FileEmbed (embedDir)
 import Output
 import NGLess.NGLEnvironment
+import qualified Dependencies.Embedded as Deps
 import NGLess.NGError
 import Utils.LockFile
-import Utils.Utils (findM)
+import Utils.Utils (findM, withOutputFile)
 
 
 {- Note on temporary files
@@ -226,23 +231,37 @@ setupHtmlViewer dst = do
 
 -- | path to bwa
 bwaBin :: NGLessIO FilePath
-bwaBin = findNGLessBin "NGLESS_BWA_BIN" "bwa"
+bwaBin = findNGLessBin "NGLESS_BWA_BIN" "bwa" Deps.bwaData
 
 -- | path to samtools
 samtoolsBin :: NGLessIO FilePath
-samtoolsBin = findNGLessBin "NGLESS_SAMTOOLS_BIN" "samtools"
+samtoolsBin = findNGLessBin "NGLESS_SAMTOOLS_BIN" "samtools" Deps.samtoolsData
         --
 -- | path to prodigal
 prodigalBin :: NGLessIO FilePath
-prodigalBin = findNGLessBin "NGLESS_PRODIGAL_BIN" "prodigal"
+prodigalBin = findNGLessBin "NGLESS_PRODIGAL_BIN" "prodigal" Deps.prodigalData
 
 -- | path to minimap2
 minimap2Bin :: NGLessIO FilePath
-minimap2Bin = findNGLessBin "NGLESS_MINIMAP2_BIN" "minimap2"
+minimap2Bin = findNGLessBin "NGLESS_MINIMAP2_BIN" "minimap2" Deps.minimap2Data
 
 -- | path to megahit
 megahitBin :: NGLessIO FilePath
-megahitBin = findNGLessBin "NGLESS_MEGAHIT_BIN" "megahit"
+megahitBin = liftIO (lookupEnv "NGLESS_MEGAHIT_BIN") >>= \case
+    Just bin -> checkExecutable "megahit" bin
+    Nothing -> do
+        findBin ("ngless-"++versionStr ++ "-megahit/megahit") >>= \case
+            Just bin -> return bin
+            Nothing -> do
+                megahitData' <- liftIO Deps.megahitData
+                if B.null megahitData'
+                    then findBin "megahit" >>= \case
+                        Just bin -> do
+                            outputListLno' WarningOutput
+                                ["Could not find NGLess-specific megahit installation, using ", bin]
+                            return bin
+                        Nothing -> throwSystemError "Cannot find megahit on the system and this is a build without embedded dependencies."
+                    else createMegahitBin megahitData'
 
 
 binPath :: InstallMode -> NGLessIO FilePath
@@ -256,25 +275,18 @@ binPath Root = do
 binPath User = ((</> "bin") . nConfUserDirectory) <$> nglConfiguration
 
 -- | Attempts to find the absolute path for the requested binary (checks permissions)
-findBin :: FilePath -> NGLessIO FilePath
+findBin :: FilePath -> NGLessIO (Maybe FilePath)
 findBin fname = do
         nglPath <- findM [Root, User] $ \p -> do
-            findM [versionTaggedFname, fname] $ \fn -> do
-                path <- (</> fn) <$> binPath p
-                ex <- canExecute path
-                if ex
-                    then return (Just path)
-                    else return Nothing
+            path <- (</> fname) <$> binPath p
+            ex <- canExecute path
+            if ex
+                then return (Just path)
+                else return Nothing
         case nglPath of
-            Just p -> return p
-            Nothing -> do
-                inPath <- liftIO $ SD.findExecutable versionTaggedFname
-                inPath' <- liftIO $ SD.findExecutable fname
-                case inPath <|> inPath' of
-                    Just p -> return p
-                    Nothing -> throwSystemError $ "Missing executable '"++fname++"'"
+            Just p -> return (Just p)
+            Nothing -> liftIO $ SD.findExecutable fname
     where
-        versionTaggedFname = "ngless-" ++ versionStr ++ "-" ++ fname ++ binaryExtension
         canExecute :: FilePath -> NGLessIO Bool
         canExecute bin = do
             exists <- liftIO $ SD.doesFileExist bin
@@ -289,10 +301,74 @@ findBin fname = do
                 else return False
 
 
-findNGLessBin :: String -> FilePath -> NGLessIO FilePath
-findNGLessBin envvar fname = liftIO (lookupEnv envvar) >>= \case
+findNGLessBin :: String -> FilePath -> IO B.ByteString -> NGLessIO FilePath
+findNGLessBin envvar fname bindata = liftIO (lookupEnv envvar) >>= \case
     Just bin -> checkExecutable envvar bin
-    Nothing -> findBin fname
+    Nothing -> do
+        let versionTaggedFname =
+                "ngless-" ++ versionStr ++ "-" ++ fname ++ binaryExtension
+        findBin versionTaggedFname >>= \case
+            Just bin -> return bin
+            Nothing -> do
+                bindata' <- liftIO bindata
+                if B.null bindata'
+                    then findBin fname >>= \case
+                        Just bin -> do
+                            outputListLno' WarningOutput
+                                ["Could not find an NGLess specific executable for ", fname, ", using ", bin]
+                            return bin
+                        Nothing -> throwSystemError ("Cannot find " ++ fname ++ " on the system and this is a build without embedded dependencies.")
+                    else writeBin versionTaggedFname bindata
+
+writeBin :: FilePath -> IO B.ByteString -> NGLessIO FilePath
+writeBin fname bindata = do
+    userBinPath <- binPath User
+    bindata' <- liftIO bindata
+    when (B.null bindata') $
+        throwSystemError ("Cannot find " ++ fname ++ " on the system and this is a build without embedded dependencies.")
+    liftIO $ SD.createDirectoryIfMissing True userBinPath
+    let fname' = userBinPath </> fname
+    withLockFile LockParameters
+                    { lockFname = fname' ++ ".expand.lock"
+                    , maxAge = 300
+                    , whenExistsStrategy = IfLockedRetry { nrLockRetries = 60, timeBetweenRetries = 60 }
+                    , mtimeUpdate = True
+                    } $ liftIO $ do
+        withOutputFile fname' (flip B.hPut bindata')
+        p <- SD.getPermissions fname'
+        SD.setPermissions fname' (SD.setOwnerExecutable True p)
+        return fname'
+
+createMegahitBin :: B.ByteString-> NGLessIO FilePath
+createMegahitBin megahitData = do
+    destdir <- (</> ("ngless-" ++ versionStr ++ "-megahit")) <$> binPath User
+    liftIO $ SD.createDirectoryIfMissing True destdir
+    withLockFile LockParameters
+                { lockFname = destdir ++ "lock.megahit-expand"
+                , maxAge = 300
+                , whenExistsStrategy = IfLockedRetry { nrLockRetries = 37*60, timeBetweenRetries = 60 }
+                , mtimeUpdate = True
+               } $ do
+        outputListLno' TraceOutput ["Expanding megahit binaries into ", destdir]
+        unpackMegahit destdir $ Tar.read . GZip.decompress $ BL.fromChunks [megahitData]
+    return $ destdir </> "megahit"
+    where
+        unpackMegahit :: FilePath -> Tar.Entries Tar.FormatError -> NGLessIO ()
+        unpackMegahit _ Tar.Done = return ()
+        unpackMegahit _ (Tar.Fail err) = throwSystemError ("Error expanding megahit archive: " ++ show err)
+        unpackMegahit destdir (Tar.Next e next) = do
+            case Tar.entryContent e of
+                Tar.NormalFile content _ -> do
+                    let dest = destdir </> FP.takeBaseName (Tar.entryPath e)
+                    liftIO $ do
+                        BL.writeFile dest content
+                        --setModificationTime dest (posixSecondsToUTCTime (fromIntegral $ Tar.entryTime e))
+                        setFileMode dest (Tar.entryPermissions e)
+                Tar.Directory -> return ()
+                _ -> throwSystemError ("Unexpected entry in megahit tarball: " ++ show e)
+            unpackMegahit destdir next
+
+
 
 checkExecutable :: String -> FilePath -> NGLessIO FilePath
 checkExecutable name bin = do
