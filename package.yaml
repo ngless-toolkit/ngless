@@ -1,6 +1,8 @@
 name:           NGLess
 version:        '1.4.0'
 category:       Domain Specific Language
+description:    'NGLess implements a domain-specific language for processing next generation data, particularly metagenomics.'
+synopsis:       'NGLess implements ngless, a DSL for processing sequencing data'
 author:         Luis Pedro Coelho and others (see AUTHORS)
 maintainer:     luis@luispedro.org
 github:         ngless-toolkit/ngless
@@ -21,7 +23,7 @@ dependencies:
   - ansi-terminal
   - async
   - atomic-write >=0.2
-  - base
+  - base >= 4.12 && < 4.16
   - bytestring
   - bytestring-lexing
   - optparse-applicative
