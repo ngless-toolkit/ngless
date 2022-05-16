@@ -11,7 +11,7 @@ import           Control.Monad (forM_)
 
 import Data.List (isSuffixOf)
 
-import NGLess.NGError
+import NGLess.NGError (NGLessIO, throwShouldNotOccur)
 
 import FileManagement (makeNGLTempFile)
 import Utils.Conduit (linesC)
@@ -25,11 +25,11 @@ concatenateFQs (FastQFilePath enc fp:rest) = do
     fres <- makeNGLTempFile fp "concatenate" "fq.gz" $ \hout -> do
         let catTo f enc'
                 | enc /= enc' =
-                                conduitPossiblyCompressedFile f
-                                    .| linesC
-                                    .| fqDecodeC f enc'
-                                    .| fqEncodeC enc
-                                    .| asyncGzipTo hout
+                    conduitPossiblyCompressedFile f
+                        .| linesC
+                        .| fqDecodeC f enc'
+                        .| fqEncodeC enc
+                        .| asyncGzipTo hout
                 | ".gz" `isSuffixOf` f = CB.sourceFile f .| CB.sinkHandle hout
                 | otherwise = conduitPossiblyCompressedFile f .| asyncGzipTo hout
         C.runConduitRes $ catTo fp enc
