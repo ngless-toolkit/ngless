@@ -36,5 +36,6 @@ NGLess/Dependencies/minimap2_data.c
 NGLess/Dependencies/Versions.hs
 NGLess.cabal
 stack.yaml.lock
-ngless-dyn n
-ngless-static n
+ngless-dyn
+ngless-static
+ngless-bench
