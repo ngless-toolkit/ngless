@@ -35,7 +35,7 @@ all_tests: check
 	PATH=$(stack path --bin-path):${PATH} ./run-tests.sh
 
 bench:
-	stack bench $(STACKOPTS)
+	stack bench --work-dir .stack-work-bench $(STACKOPTS)
 
 profile:
 	stack build $(STACKOPTS) --executable-profiling --library-profiling --ghc-options="-fprof-auto -rtsopts"
