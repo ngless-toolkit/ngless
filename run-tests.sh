@@ -21,7 +21,7 @@ for testdir in tests/*; do
     if test -d "$testdir"; then
         # Run only tests with specified PREFIX
         # Useful to run only 'long-' tests or 'regression'
-        if [[ "x$TEST_PREFIX" != "x" ]] && [[ "$testdir" != tests/${TEST_PREFIX}-* ]]; then
+        if [[ "x$TEST_PREFIX" != "x" ]] && [[ "$testdir" != tests/${TEST_PREFIX}* ]]; then
             continue
         fi
         cur_ok=yes
