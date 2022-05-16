@@ -337,7 +337,7 @@ addFileChecks' checkFname tag ((lno,e):rest) = do
                 forM_ (funcKwArgs finfo) $ \ainfo ->
                     when (tag `elem` argChecks ainfo) $
                         extractExpressions (lookup (Variable $ argName ainfo) args)
-            Nothing -> throwShouldNotOccur ("Transform.getFileExpressions: Unknown function: " ++ show f ++ ". This should have been caught before")
+            Nothing -> throwShouldNotOccur ("Transform.getFileExpressions: Unknown function: '" ++ show f ++ "'. This should have been caught before")
         getFileExpressions _ _ = return ()
 
         extractExpressions :: (MonadWriter [(Variable, Expression)] m) =>  Maybe Expression -> m ()

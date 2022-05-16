@@ -16,6 +16,8 @@ import           Control.DeepSeq (NFData)
 
 import Control.Monad.Trans.Resource (runResourceT)
 
+import Modules (setModulesForTestingPurposesOnlyDoNotUseOtherwise)
+import BuiltinFunctions (builtinModule)
 import NGLess (NGLessIO, testNGLessIO)
 
 
@@ -39,7 +41,7 @@ import Data.Sam (readSamLine, readSamGroupsC', samStatsC)
 import Data.FastQ (FastQEncoding(..), ShortRead(..), fqDecodeVector)
 import Utils.Conduit (linesC, ByteLine(..), linesVC)
 import Transform (transform)
-import NGLess.NGLEnvironment (setupTestEnvironment)
+import NGLess.NGLEnvironment (NGLVersion(..), setupTestEnvironment)
 
 nfNGLessIO :: (NFData a) => NGLessIO a -> Benchmarkable
 nfNGLessIO = nfIO . testNGLessIO
@@ -53,8 +55,10 @@ nfNGLessScriptWithTransform :: T.Text -> Benchmarkable
 nfNGLessScriptWithTransform code = case parsengless "bench" False code of
     Left err -> error (show err)
     Right sc -> nfNGLessIO $ do
-        sc' <- transform [] sc
-        interpret [] (nglBody sc')
+        let mods = [builtinModule (NGLVersion 1 4)]
+        setModulesForTestingPurposesOnlyDoNotUseOtherwise mods
+        sc' <- transform mods sc
+        interpret mods (nglBody sc')
 
 
 nfRIO = nfIO . runResourceT

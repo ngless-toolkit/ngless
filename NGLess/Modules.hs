@@ -24,6 +24,7 @@ module Modules
     , registerModule
     , loadedModules
     , knownModules
+    , setModulesForTestingPurposesOnlyDoNotUseOtherwise
     ) where
 
 import qualified Data.Text as T
@@ -150,6 +151,9 @@ registerModule m = liftIO $ modifyIORef' loadedModulesRef (m:)
 
 loadedModules :: NGLessIO [Module]
 loadedModules = liftIO $ readIORef loadedModulesRef
+
+setModulesForTestingPurposesOnlyDoNotUseOtherwise :: [Module] -> NGLessIO ()
+setModulesForTestingPurposesOnlyDoNotUseOtherwise mods = liftIO $ writeIORef loadedModulesRef mods
 
 knownModules :: [T.Text]
 knownModules =
