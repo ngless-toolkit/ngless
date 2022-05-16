@@ -123,17 +123,12 @@ For example, here we would run the `regression-fqgz` test:
     cd regression-fqgz
     ngless ungzip.ngl
 
-After running this script open the newly generated folder
-"**ungzip.ngl.output_ngless**" and view the template in the **index.html**
-file.
+After running this script open the newly generated folder `ungzip.ngl.output_ngless` and view the template in the **index.html** file.
 
-For developers who have done this much more data-sets for testing purposes can be referenced and used by reading these documentation links:
+For developers who have done this much more datasets for testing purposes can be referenced and used by reading these documentation links:
 **[Human Gut Metagenomics Functional & Taxonomic Profiling](https://ngless.embl.de/tutorial-gut-metagenomics.html#)**
-**[ Ocean Metagenomics Functional Profiling](https://ngless.embl.de/tutorial-ocean-metagenomics.html)**
+**[Ocean Metagenomics Functional Profiling](https://ngless.embl.de/tutorial-ocean-metagenomics.html)**
 **[Ocean Metagenomics Assembly and Gene Prediction](https://ngless.embl.de/tutorial-assembly-gp.html)**
-
-The download might cause network congestion in some machines, however with a compute trade-off the packages can be downloaded easily.
-Get more details of the resources **[here](https://ngless.embl.de/resources/Modules/)**.
 
 
 ## More information
@@ -142,7 +137,7 @@ Get more details of the resources **[here](https://ngless.embl.de/resources/Modu
 - [Frequently Asked Questions (FAQ)](https://ngless.embl.de/faq.html)
 - [ngless mailing list](https://groups.google.com/forum/#!forum/ngless)
 - [What's new log](https://ngless.embl.de/whatsnew.html)
-- [NGless V1.3.0 Release Documentation](https://ngless.embl.de/whatsnew.html#version-1-3-0)
+- [NGless 1.4.0 Release Documentation](https://ngless.embl.de/whatsnew.html#version-1-4-0)
 
 ## Authors
 
