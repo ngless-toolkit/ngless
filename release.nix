@@ -15,11 +15,17 @@ let
     # These arguments passed to nixpkgs, include some patches and also
     # the haskell.nix functionality itself as an overlay.
     haskellNix.nixpkgsArgs;
+
+    ignoredPaths = ["tests" "docs" "run-tests.sh"];
 in pkgs.haskell-nix.stackProject {
   # 'cleanGit' cleans a source directory based on the files known by git
-  src = pkgs.haskell-nix.haskellLib.cleanGit {
-    name = "NGLess";
-    src = ./.;
+  src = pkgs.lib.cleanSourceWith {
+    src = pkgs.haskell-nix.haskellLib.cleanGit {
+      name = "NGLess";
+      src = ./.;
+    };
+    # ignore paths that change frequently, but do not contribute to the result
+    filter = path: type: let baseName = baseNameOf (toString path); in !(pkgs.lib.elem baseName ignoredPaths);
   };
 }
 
