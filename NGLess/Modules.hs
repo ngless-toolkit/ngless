@@ -32,7 +32,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef
 import Data.Aeson
-import Data.Default
+import Data.Default (Default, def)
 
 import Language
 import NGLess
@@ -158,6 +158,8 @@ setModulesForTestingPurposesOnlyDoNotUseOtherwise mods = liftIO $ writeIORef loa
 knownModules :: [T.Text]
 knownModules =
     ["example-cmd"
+
+    ,"gmgc"
 
     ,"igc"
     ,"om-rgc"

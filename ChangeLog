@@ -8,6 +8,7 @@ Version 1.4.0
 	* Overhall building infrastructure to use haskell.nix and build
 	dependencies with nix
 	* Update megahit version
+	* Added GMGC to builtin Modules
 
 Version 1.3.0 2021-01-28 by luispedro
 	* Validate count() headers on --validate-only
