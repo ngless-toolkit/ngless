@@ -90,7 +90,7 @@ callMapper refIndex rs extraArgs outC = do
             | otherwise = numCapabilities
                                                     -- -K 100000000 is a hidden option to set the chunk size
                                                     -- this makes the output independent of the number of threads
-        cmdargs =  concat [["mem", "-t", show bwathreads, "-K", "100000000"], extraArgs, [refIndex', "-p", "-"]]
+        cmdargs =  concat [["mem", "-t", show bwathreads, "-K", "100000000", "-p"], extraArgs, [refIndex', "-"]]
     runProcess
             bwaPath
             cmdargs
