@@ -24,6 +24,7 @@ import NGLess
 import Data.FastQ
 import Configuration
 import NGLess.NGLEnvironment
+import Dependencies.Versions (bwaVersion)
 import FileManagement (bwaBin)
 import Utils.Process (runProcess)
 
@@ -32,7 +33,7 @@ import Utils.Process (runProcess)
 indexPrefix :: FilePath -> NGLessIO FilePath
 indexPrefix base = do
     let (basename, ext) = splitExtension base
-    return $ basename ++ "-bwa-" ++ ext
+    return $ basename ++ "-bwa-" ++ bwaVersion ++ ext
 
 -- | Checks whether all necessary files are present for a BWA index
 -- Does not change any file on disk.
