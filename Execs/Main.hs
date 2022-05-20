@@ -322,6 +322,7 @@ modeExec (CmdArgs.PrintPathMode exec) = runNGLessIO "finding internal path" $ do
       "prodigal" -> prodigalBin
       "megahit" -> megahitBin
       "bwa" -> bwaBin
+      "minimap2" -> minimap2Bin
       _ -> throwSystemError ("Unknown binary " ++ exec ++ ".")
     liftIO $ putStrLn path
 

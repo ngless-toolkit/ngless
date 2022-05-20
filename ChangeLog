@@ -9,6 +9,7 @@ Version 1.4.0
 	dependencies with nix
 	* Update megahit version
 	* Added GMGC to builtin Modules
+	* Make `--print-path minimap2` work correctly
 
 Version 1.3.0 2021-01-28 by luispedro
 	* Validate count() headers on --validate-only
