@@ -1,0 +1,10 @@
+diff --git a/package.yaml b/package.yaml
+index 7a05f8d..6aed1f7 100644
+--- a/package.yaml
++++ b/package.yaml
+@@ -166,4 +166,4 @@ flags:
+   embed:
+     description: Embed dependencies
+     manual: false
+-    default: false
++    default: true

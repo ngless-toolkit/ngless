@@ -38,3 +38,4 @@ stack.yaml.lock
 ngless-dyn
 ngless-static
 ngless-bench
+ngless-static-embed
