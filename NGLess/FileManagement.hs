@@ -40,7 +40,7 @@ import qualified Conduit as C
 import           Conduit ((.|))
 import           System.FilePath (takeDirectory, (</>), (<.>), (-<.>))
 import           Control.Monad (unless, forM_, when)
-import           System.Posix.Files (setFileMode)
+import           System.Posix.Files (setFileMode, createSymbolicLink)
 import           System.Posix.Internals (c_getpid)
 import           Data.List (isSuffixOf, isPrefixOf)
 
@@ -357,14 +357,16 @@ createMegahitBin megahitData = do
         unpackMegahit _ Tar.Done = return ()
         unpackMegahit _ (Tar.Fail err) = throwSystemError ("Error expanding megahit archive: " ++ show err)
         unpackMegahit destdir (Tar.Next e next) = do
+            let dest = destdir </> FP.takeBaseName (Tar.entryPath e)
             case Tar.entryContent e of
                 Tar.NormalFile content _ -> do
-                    let dest = destdir </> FP.takeBaseName (Tar.entryPath e)
                     liftIO $ do
                         BL.writeFile dest content
                         --setModificationTime dest (posixSecondsToUTCTime (fromIntegral $ Tar.entryTime e))
                         setFileMode dest (Tar.entryPermissions e)
                 Tar.Directory -> return ()
+                Tar.SymbolicLink lt -> do
+                    liftIO $ createSymbolicLink (Tar.fromLinkTarget lt) dest
                 _ -> throwSystemError ("Unexpected entry in megahit tarball: " ++ show e)
             unpackMegahit destdir next
 
