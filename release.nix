@@ -16,7 +16,7 @@ let
     # the haskell.nix functionality itself as an overlay.
     haskellNix.nixpkgsArgs;
 
-    ignoredPaths = ["tests" "docs" "run-tests.sh"];
+    ignoredPaths = ["tests" "docs" "run-tests.sh" ".github"];
 in pkgs.haskell-nix.stackProject {
   # 'cleanGit' cleans a source directory based on the files known by git
   src = pkgs.lib.cleanSourceWith {
