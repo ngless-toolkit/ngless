@@ -1,4 +1,4 @@
-{- Copyright 2016-2021 NGLess Authors
+{- Copyright 2016-2022 NGLess Authors
  - License: MIT
  -}
 module NGLess.NGLEnvironment

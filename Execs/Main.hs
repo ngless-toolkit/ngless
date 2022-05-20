@@ -317,6 +317,8 @@ modeExec (CmdArgs.DownloadDemoMode demo) = do
             exitFailure
 
 modeExec (CmdArgs.PrintPathMode exec) = runNGLessIO "finding internal path" $ do
+    updateNglEnvironment (\env -> let oldConf = ngleConfiguration env
+                                    in env { ngleConfiguration = oldConf { nConfOutputTo = NGLOutStderr } })
     path <- case exec of
       "samtools" -> samtoolsBin
       "prodigal" -> prodigalBin

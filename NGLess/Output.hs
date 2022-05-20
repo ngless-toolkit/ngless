@@ -1,4 +1,4 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE TemplateHaskell, RecordWildCards, CPP, FlexibleContexts #-}
@@ -19,7 +19,7 @@ module Output
     ) where
 
 import           Text.Printf (printf)
-import           System.IO (hIsTerminalDevice, stdout)
+import           System.IO (hPutStrLn, hIsTerminalDevice, stdout, stderr)
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.IO.SafeWrite (withOutputFile)
 import           Data.Maybe (maybeToList, fromMaybe, isJust)
@@ -186,7 +186,11 @@ shouldPrint True  ot Normal = ot >= InfoOutput
 
 output :: OutputType -> Int -> String -> NGLessIO ()
 output !ot !lno !msg = do
-    isTerm <- liftIO $ hIsTerminalDevice stdout
+    outputTo <- nConfOutputTo <$> nglConfiguration
+    let outputHandle = case outputTo of
+            NGLOutStdout -> stdout
+            NGLOutStderr -> stderr
+    isTerm <- liftIO $ hIsTerminalDevice outputHandle
     hasNOCOLOR <- isJust <$> liftIO (lookupEnv "NO_COLOR")
     verb <- nConfVerbosity <$> nglConfiguration
     traceSet <- nConfTrace <$> nglConfiguration
@@ -214,7 +218,7 @@ output !ot !lno !msg = do
                 lineStr = if lno > 0
                                 then printf " Line %s" (show lno)
                                 else "" :: String
-            putStrLn $ printf "%s[%s]%s: %s%s" st tstr lineStr msg rst
+            hPutStrLn outputHandle $ printf "%s[%s]%s: %s%s" st tstr lineStr msg rst
 
 colorFor :: OutputType -> NGLessIO ANSI.Color
 colorFor = return . colorFor'

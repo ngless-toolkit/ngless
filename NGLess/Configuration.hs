@@ -1,9 +1,10 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE RecordWildCards #-}
 module Configuration
     ( NGLessConfiguration(..)
+    , NGLessOutputDestination(..)
     , ColorSetting(..)
     , guessConfiguration
     , initConfiguration
@@ -23,6 +24,8 @@ import CmdArgs
 defaultBaseURL :: FilePath
 defaultBaseURL = "https://ngless.embl.de/resources/"
 
+data NGLessOutputDestination = NGLOutStdout | NGLOutStderr deriving (Eq, Show)
+
 -- | ngless configuration options
 data NGLessConfiguration = NGLessConfiguration
     { nConfDownloadBaseURL :: FilePath
@@ -40,6 +43,7 @@ data NGLessConfiguration = NGLessConfiguration
     , nConfSubsample :: Bool
     , nConfArgv :: [T.Text]
     , nConfVerbosity :: Verbosity
+    , nConfOutputTo :: NGLessOutputDestination
     , nConfSearchPath :: [FilePath]
     , nConfIndexStorePath :: Maybe FilePath
     } deriving (Eq, Show)
@@ -74,6 +78,7 @@ guessConfiguration = do
         , nConfSubsample = False
         , nConfArgv = []
         , nConfVerbosity = Normal
+        , nConfOutputTo = NGLOutStdout
         , nConfSearchPath = []
         , nConfIndexStorePath = Nothing
         }
@@ -117,6 +122,7 @@ readConfigFiles NGLessConfiguration{..} cfiles = do
         , nConfSubsample = nConfSubsample
         , nConfArgv = nConfArgv
         , nConfVerbosity = nConfVerbosity
+        , nConfOutputTo = NGLOutStdout
         , nConfSearchPath = nConfSearchPath'
         , nConfIndexStorePath = nConfIndexStorePath' <|> nConfIndexStorePath
         }
