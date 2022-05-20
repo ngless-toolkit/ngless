@@ -2,14 +2,22 @@
 What's New (History)
 ====================
 
-Unreleased
-----------
+Version 1.4.0
+-------------
+
+Improvements
+~~~~~~~~~~~~
+
+- ``write()`` now returns the filename used
+- ``write()`` can use multiple threads
+- Better error messages
+- Add a module for `GMGC — Global Microbial Gene Catalogue <https://www.nature.com/articles/s41586-021-04233-4>`__
 
 Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~
 
+- Better building infrastructure
 - Switched to the tasty testing framework
-- ``write()`` function uses multiple threads when writing multiple FastQ files (for paired-end data)
 - ``assemble()`` is now using a more up to date version of megahit, which means
   that the older versions cannot be run.
 
