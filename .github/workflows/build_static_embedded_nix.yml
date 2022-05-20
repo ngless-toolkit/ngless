@@ -1,4 +1,4 @@
-name: "Build & test (nix)"
+name: "Build & test static embeds (nix)"
 on:
   pull_request:
   push:
@@ -19,8 +19,21 @@ jobs:
         # If you chose API tokens for write access OR if you have a private cache
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-    - run: nix build -f release.nix NGLess.components.exes.ngless --out-link ngless-dyn
-    - run: nix build -f release.nix NGLess.components.tests.nglesstest --out-link ngless-test-dyn
-    - run: ./ngless-test-dyn/bin/nglesstest
-    - run: nix-shell --pure --command ./run-tests.sh
+    - run: nix build -f build-static-embedded-depencies.nix projectCross.musl64.hsPkgs.NGLess.components.exes.ngless --out-link ngless-static-embed
+    - run: nix-shell shell-static.nix --pure --command ./run-tests.sh
+
+    - run: nix build -f release.nix projectCross.musl64.hsPkgs.NGLess.components.exes.ngless --out-link ngless-static
+
+    - name: "Upload with embeds"
+      uses: actions/upload-artifact@v2
+      with:
+        name: ngless_static-embed
+        path: ngless-static-embed/bin/ngless
+
+
+    - name: "Upload without embeds"
+      uses: actions/upload-artifact@v2
+      with:
+        name: ngless_static
+        path: ngless-static/bin/ngless
 
