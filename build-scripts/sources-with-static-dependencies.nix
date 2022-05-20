@@ -37,7 +37,7 @@ in pkgs.stdenv.mkDerivation {
     src = pkgs.lib.cleanSourceWith {
       src = pkgs.haskell-nix.haskellLib.cleanGit {
         name = "NGLess";
-        src = ./.;
+        src = ../.;
       };
       # ignore paths that change frequently, but do not contribute to the result
       filter = path: type: let baseName = baseNameOf (toString path); in !(pkgs.lib.elem baseName ignoredPaths);
