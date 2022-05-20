@@ -1,5 +1,5 @@
 let
- release = import ./build-static-embedded-depencies.nix;
+ release = import ./ngless-static-embed-dependencies.nix;
  pkgs = release.pkgs;
 
 in pkgs.mkShell {
