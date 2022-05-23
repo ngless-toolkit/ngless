@@ -4,6 +4,7 @@
 {-# LANGUAGE CPP #-}
 module Version
     ( versionStr
+    , versionStrLong
     , dateStr
     , embeddedStr
     ) where
@@ -15,8 +16,11 @@ import Paths_NGLess (version)
 versionStr :: String
 versionStr = showVersion version
 
+versionStrLong :: String
+versionStrLong = "1.4.0-beta1"
+
 dateStr :: String
-dateStr = "Unreleased"
+dateStr = "May 23 2022"
 
 embeddedStr :: String
 #ifdef NO_EMBED_SAMTOOLS_BWA

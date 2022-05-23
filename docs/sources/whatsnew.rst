@@ -5,6 +5,8 @@ What's New (History)
 Version 1.4.0
 -------------
 
+Released *23 May 2022* (Beta release)
+
 Improvements
 ~~~~~~~~~~~~
 

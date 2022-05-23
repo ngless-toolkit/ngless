@@ -343,7 +343,7 @@ modeExec (CmdArgs.CheckInstallMode verbose) = runNGLessIO "Checking install" $ d
 main' = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
         foottext = concat [
-                            "ngless v", Version.versionStr, "(C) NGLess Authors 2013-2022\n",
+                            "ngless v", Version.versionStrLong, "(C) NGLess Authors 2013-2022\n",
                             "For more information:\n",
                             "\thttps://ngless.embl.de/\n",
                             "For comments/discussion:\n",
@@ -352,12 +352,12 @@ main' = do
                             "https://doi.org/10.1186/s40168-019-0684-8.\n"
                             ]
         versioner =
-            (infoOption ("ngless v" ++ Version.versionStr ++ " (release date: " ++ Version.dateStr ++ ")")
+            (infoOption ("ngless v" ++ Version.versionStrLong ++ " (release date: " ++ Version.dateStr ++ ")")
                 (long "version" <> short 'V' <> help "print version and exit"))
             <*>
             (infoOption Version.versionStr (long "version-short" <> help "print just version string (useful for scripting)"))
             <*>
-            (infoOption ("ngless v" ++ Version.versionStr ++ " (release date: " ++ Version.dateStr ++ "; embedded binaries: " ++ Version.embeddedStr ++ ")")
+            (infoOption ("ngless v" ++ Version.versionStr ++ " (full version: " ++ Version.versionStrLong ++ "; release date: " ++ Version.dateStr ++ "; embedded binaries: " ++ Version.embeddedStr ++ ")")
                 (long "version-debug" <> help "print detailed version information"))
             <*>
             (infoOption Version.dateStr (long "date-short" <> help "print just release date string (useful for scripting)"))
