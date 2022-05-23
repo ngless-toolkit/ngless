@@ -56,7 +56,7 @@ The recommended way to install NGLess is through
 Alternatively, a docker container with NGLess is available at
 [docker hub](https://hub.docker.com/r/nglesstoolkit/ngless):
 
-    docker run -v $PWD:/workdir -w /workdir -it nglesstoolkit/ngless:1.0.0 ngless --version
+    docker run -v $PWD:/workdir -w /workdir -it nglesstoolkit/ngless:latest ngless --version
 
 Adapt the mount flags (``-v``) as needed.
 
@@ -64,8 +64,8 @@ Adapt the mount flags (``-v``) as needed.
 
 You can get a [statically linked version of NGless
 1.1.1](https://github.com/ngless-toolkit/ngless/releases/download/v1.1.1/NGLess-1.1.1-static-Linux64)
-or a [nighly build of the latest development
-code](https://gitlab.com/ngless/ngless/builds/artifacts/master/raw/bin/ngless?job=build-and-test-ubuntu).
+or a [build of the latest development
+code](https://github.com/ngless-toolkit/ngless/actions/workflows/build_static_embedded_nix.yml)
 This should work across a wide range of Linux versions (please
 [report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
 
@@ -73,12 +73,7 @@ This should work across a wide range of Linux versions (please
     chmod +x NGLess-1.1.1-static-Linux64
     ./NGLess-1.1.1-static-Linux64
 
-This download bundles bwa, samtools and megahit (also statically linked).
-
-If you want to try one of ngless' builtin modules (motus, specI, ...) you can
-download [the full nighly build zip
-file](https://gitlab.com/ngless/ngless/builds/artifacts/master/download?job=build-and-test-ubuntu)
-which includes them.
+This downloaded file bundles bwa, samtools and megahit (also statically linked).
 
 ### From Source
 
