@@ -1,4 +1,4 @@
-{- Copyright 2016-2020 NGLess Authors
+{- Copyright 2016-2022 NGLess Authors
  - License: MIT
  -}
 
@@ -49,10 +49,8 @@ import           System.AtomicWrite.Writer.Text (atomicWriteFile)
 import Control.Monad.Trans.Resource
 import Control.Monad.State.Lazy
 import System.IO
-import Data.IORef
 import Data.Default
 import Data.Maybe (fromMaybe)
-import System.IO.Unsafe (unsafePerformIO)
 import System.Directory (createDirectoryIfMissing, doesFileExist, getDirectoryContents)
 
 import qualified Data.Hash.MD5 as MD5
@@ -80,10 +78,6 @@ import Utils.Utils (fmapMaybeM, allSame, moveOrCopy)
 import Utils.Conduit
 import Utils.LockFile
 
-prefixRef :: IORef String
-{-# NOINLINE prefixRef #-}
-prefixRef = unsafePerformIO (newIORef "")
-
 syncFile :: FilePath -> IO ()
 #ifndef WINDOWS
 syncFile fname = do
@@ -100,9 +94,8 @@ syncFile _ = return ()
 #endif
 
 
-setupHashDirectory :: FilePath -> T.Text -> NGLessIO FilePath
-setupHashDirectory basename hash = do
-    prefix <- liftIO $ readIORef prefixRef
+setupHashDirectory :: String -> FilePath -> T.Text -> NGLessIO FilePath
+setupHashDirectory prefix basename hash = do
     isSubsample <- nConfSubsample <$> nglConfiguration
     let actiondir = basename </> prefix ++ take 8 (T.unpack hash) ++ (if isSubsample then "-subsample" else "")
         scriptfile = actiondir </> "script.ngl"
@@ -124,7 +117,11 @@ sanitizePath = T.map (\x -> fromMaybe x (lookup x unsafeCharMap))
 executeLock1 (NGOList entries) kwargs  = do
     entries' <- mapM (stringOrTypeError "lock1") entries
     hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
-    lockdir <- setupHashDirectory "ngless-locks" hash
+    tag <- lookupStringOrScriptErrorDef (return "") "collect arguments (hidden tag)" "__parallel_tag" kwargs
+    let prefix
+            | T.null tag = ""
+            | otherwise = T.unpack tag ++ "-"
+    lockdir <- setupHashDirectory prefix "ngless-locks" hash
     -- Keep a map of 'sane -> original' names used for locks to backtrace
     -- what file was locked and return the unsanitized name
     -- See also https://github.com/ngless-toolkit/ngless/issues/68
@@ -132,7 +129,7 @@ executeLock1 (NGOList entries) kwargs  = do
         lockmap = zip saneentries entries'
     (e,rk) <- getLock lockdir saneentries
     outputListLno' InfoOutput ["lock1: Obtained lock file: '", lockdir </> T.unpack e ++ ".lock", "'"]
-    reportbase <- setupHashDirectory "ngless-stats" hash
+    reportbase <- setupHashDirectory prefix "ngless-stats" hash
     let reportdir = reportbase </> T.unpack e
     outputListLno' InfoOutput ["Writing stats to '", reportdir, "'"]
     let setReportDir c = c { nConfReportDirectory = reportdir }
@@ -218,7 +215,11 @@ executeCollect (NGOCounts istream) kwargs = do
     allentries <- lookupStringListOrScriptError "collect arguments" "allneeded" kwargs
     ofile <- lookupStringOrScriptError "collect arguments" "ofile" kwargs
     hash <- lookupStringOrScriptError "collect arguments" "__hash" kwargs
-    hashdir <- setupHashDirectory "ngless-partials" hash
+    tag <- lookupStringOrScriptErrorDef (return "") "collect arguments (hidden tag)" "__parallel_tag" kwargs
+    let prefix
+            | T.null tag = ""
+            | otherwise = T.unpack tag ++ "-"
+    hashdir <- setupHashDirectory prefix "ngless-partials" hash
     (gzfp,gzout) <- openNGLTempFile "compress" "partial." "tsv.gz"
     C.runConduit $
         (snd . asStream $ istream)
@@ -271,10 +272,7 @@ executeCollect (NGOCounts istream) kwargs = do
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)
 
 executeSetTag :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
-executeSetTag (NGOString prefix) [] = do
-    liftIO $ writeIORef prefixRef $ T.unpack prefix ++ "-"
-    return NGOVoid
-executeSetTag arg _ = throwScriptError ("set_parallel_tag got unexpected argument: " ++ show arg)
+executeSetTag _ _ = throwShouldNotOccur "set_parallel_tag should have been transformed away!"
 
 
 -- | split a list into a given number of (roughly) equally sized chunks
@@ -541,7 +539,7 @@ collectFunction = Function
 
 setTagFunction = Function
     { funcName = FuncName "set_parallel_tag"
-    , funcArgType = Just NGLCounts
+    , funcArgType = Just NGLString
     , funcArgChecks = []
     , funcRetType = NGLString
     , funcKwArgs = []
@@ -564,6 +562,9 @@ pasteHiddenFunction = Function
     , funcChecks = []
     }
 
+parallelTransform :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+parallelTransform script = addLockHash (processSetParallelTag script)
+
 addLockHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 addLockHash script = pureTransform addLockHash' script
     where
@@ -574,6 +575,22 @@ addLockHash script = pureTransform addLockHash' script
                 h = T.pack . MD5.md5s . MD5.Str . show $ map snd script
         addLockHash' e = e
 
+
+processSetParallelTag :: [(Int, Expression)] -> [(Int, Expression)]
+processSetParallelTag = processSetParallelTag' False
+    where
+        processSetParallelTag' :: Bool -> [(Int, Expression)] -> [(Int, Expression)]
+        processSetParallelTag' _ [] = []
+        processSetParallelTag' hasTag ((lno, e):rest) = let
+                (e',ch) = case e of
+                    FunctionCall (FuncName "set_parallel_tag") expr [] Nothing
+                            -> (Assignment (Variable "$parallel$tag") expr, True)
+                    FunctionCall fn@(FuncName fname) expr kwargs block
+                        | ch && fname `elem` ["lock1", "collect"] ->
+                            (FunctionCall fn expr ((Variable "__parallel_tag", Lookup (Just NGLString) (Variable "$parallel$tag")):kwargs) block, True)
+                    _ -> (e, False)
+                rest' = processSetParallelTag' (hasTag || ch) rest
+            in (lno, e'):rest'
 
 
 loadModule :: T.Text -> NGLessIO Module
@@ -589,7 +606,7 @@ loadModule v
             , setTagFunction
             , pasteHiddenFunction
             ]
-        , modTransform = addLockHash
+        , modTransform = parallelTransform
         , runFunction = \case
             "lock1" -> executeLock1
             "collect" -> executeCollect
