@@ -45,7 +45,6 @@ dependencies:
   - filemanip >=0.3.6
   - filepath >=1.3
   - file-embed >=0.0.8
-  - gitrev
   - hashable
   - hashtables
   - hostname

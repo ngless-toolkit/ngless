@@ -357,7 +357,7 @@ main' = do
             <*>
             (infoOption Version.versionStr (long "version-short" <> help "print just version string (useful for scripting)"))
             <*>
-            (infoOption ("ngless v" ++ Version.versionStr ++ " (release date: " ++ Version.dateStr ++ "; git revision: " ++ Version.gitHashStr ++ "; compilation date: " ++ Version.compilationDateStr ++ "; embedded binaries: " ++ Version.embeddedStr ++ ")")
+            (infoOption ("ngless v" ++ Version.versionStr ++ " (release date: " ++ Version.dateStr ++ "; embedded binaries: " ++ Version.embeddedStr ++ ")")
                 (long "version-debug" <> help "print detailed version information"))
             <*>
             (infoOption Version.dateStr (long "date-short" <> help "print just release date string (useful for scripting)"))

@@ -1,16 +1,13 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
-{-# LANGUAGE TemplateHaskell, CPP #-}
+{-# LANGUAGE CPP #-}
 module Version
     ( versionStr
-    , compilationDateStr
     , dateStr
     , embeddedStr
-    , gitHashStr
     ) where
 
-import Development.GitRev (gitHash)
 import Data.Version (showVersion)
 
 import Paths_NGLess (version)
@@ -21,9 +18,6 @@ versionStr = showVersion version
 dateStr :: String
 dateStr = "Unreleased"
 
-gitHashStr :: String
-gitHashStr = $(gitHash)
-
 embeddedStr :: String
 #ifdef NO_EMBED_SAMTOOLS_BWA
 embeddedStr = "No"
@@ -31,5 +25,3 @@ embeddedStr = "No"
 embeddedStr = "Yes"
 #endif
 
-compilationDateStr :: String
-compilationDateStr = __DATE__
