@@ -586,8 +586,8 @@ processSetParallelTag = processSetParallelTag' False
                     FunctionCall (FuncName "set_parallel_tag") expr [] Nothing
                             -> (Assignment (Variable "$parallel$tag") expr, True)
                     FunctionCall fn@(FuncName fname) expr kwargs block
-                        | ch && fname `elem` ["lock1", "collect"] ->
-                            (FunctionCall fn expr ((Variable "__parallel_tag", Lookup (Just NGLString) (Variable "$parallel$tag")):kwargs) block, True)
+                        | hasTag && fname `elem` ["lock1", "collect"]
+                            -> (FunctionCall fn expr ((Variable "__parallel_tag", Lookup (Just NGLString) (Variable "$parallel$tag")):kwargs) block, True)
                     _ -> (e, False)
                 rest' = processSetParallelTag' (hasTag || ch) rest
             in (lno, e'):rest'
