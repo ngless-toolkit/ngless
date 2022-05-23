@@ -1,4 +1,4 @@
-{- Copyright 2016-2021 NGLess Authors
+{- Copyright 2016-2022 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -305,7 +305,7 @@ addFileChecks sc = reverse <$> (checkIFiles (reverse sc) >>= checkOFiles)
 addFileChecks' :: T.Text -> ArgCheck -> [(Int,Expression)] -> NGLessIO [(Int, Expression)]
 addFileChecks' _ _ [] = return []
 addFileChecks' checkFname tag ((lno,e):rest) = do
-        mods <- loadedModules
+        mods <- ngleLoadedModules <$> nglEnvironment
         vars <- runNGLess $ execWriterT (recursiveAnalyse (getFileExpressions mods) e)
         rest' <- addFileChecks' checkFname tag (addCheck vars (maybeAddChecks vars rest))
         return ((lno,e):rest')
@@ -476,7 +476,7 @@ addTemporaries = addTemporaries' 0
         addTemporaries' :: Int -> [(Int,Expression)] -> NGLessIO [(Int,Expression)]
         addTemporaries' _ [] = return []
         addTemporaries' next ((lno,e):rest) = do
-                mods <- loadedModules
+                mods <- ngleLoadedModules <$> nglEnvironment
                 let (next', es) = addTemporaries1 mods next e
                 rest' <- addTemporaries' next' rest
                 let lno_e' = (lno,) <$> es
@@ -550,7 +550,7 @@ addTemporaries = addTemporaries' 0
 addOutputHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 addOutputHash expr_lst = do
         nv <- ngleVersion <$> nglEnvironment
-        modules <- loadedModules
+        modules <- ngleLoadedModules <$> nglEnvironment
         let modInfos = map modInfo modules
             state0 = M.insert (Variable "ARGV") (T.pack "ARGV") M.empty
             versionString = show nv ++ show (sortOn modName modInfos)

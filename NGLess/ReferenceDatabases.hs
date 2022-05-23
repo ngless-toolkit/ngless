@@ -106,7 +106,7 @@ downloadIfUrl basedir fname (Just path)
 
 moduleDirectReference :: T.Text -> NGLessIO (Maybe ReferenceFilePaths)
 moduleDirectReference rname = do
-    mods <- loadedModules
+    mods <- ngleLoadedModules <$> nglEnvironment
     findM mods $ \m ->
         findM (modReferences m) $ \case
             ExternalReference eref fafile gtffile mapfile
@@ -192,7 +192,7 @@ installData Nothing refname = do
         else installData (Just User) refname
 installData (Just mode) refname = do
     basedir <- dataDirectory mode
-    mods <- loadedModules
+    mods <- ngleLoadedModules <$> nglEnvironment
     let unpackRef (ExternalPackagedReference r) = Just r
         unpackRef _ = Nothing
         refs = mapMaybe unpackRef $ concatMap modReferences mods

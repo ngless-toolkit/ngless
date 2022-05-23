@@ -35,7 +35,7 @@ import           System.FilePath ((</>))
 import Data.FastQ
 import Data.Sam
 import NGLess.NGError
-import FileOrStream
+import FileOrStream.Types (FileOrStream(..))
 
 newtype Variable = Variable T.Text
     deriving (Eq, Ord, Show)

@@ -10,6 +10,9 @@ module NGLess.NGLEnvironment
     , updateNglEnvironment
     , updateNglEnvironment'
     , setQuiet
+    , registerModule
+
+    , setModulesForTestingPurposesOnlyDoNotUseOtherwise
     , setupTestEnvironment
     ) where
 
@@ -19,6 +22,7 @@ import Control.Monad.IO.Class (liftIO)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
 
+import Modules (Module(..))
 import NGLess.NGError
 import Configuration
 import CmdArgs (Verbosity(..))
@@ -38,7 +42,8 @@ data NGLEnvironment = NGLEnvironment
                     , ngleMappersActive :: [T.Text] -- ^ which mappers can be used
                     , ngleTemporaryFilesCreated :: [FilePath] -- ^ list of temporary files created
                     , ngleConfiguration :: NGLessConfiguration
-                    } deriving (Show, Eq)
+                    , ngleLoadedModules :: [Module]
+                    }
 
 parseVersion :: Maybe T.Text -> NGLess NGLVersion
 parseVersion Nothing = return $ NGLVersion 1 4
@@ -64,7 +69,7 @@ parseVersion (Just v) = case T.splitOn "." v of
                             _ -> throwScriptError $ concat ["Version ", T.unpack v, " could not be understood. The version string should look like \"1.0\" or similar"]
 ngle :: IORef NGLEnvironment
 {-# NOINLINE ngle #-}
-ngle = unsafePerformIO (newIORef $ NGLEnvironment (NGLVersion 0 0) Nothing "" ["bwa"] [] (error "Configuration not set"))
+ngle = unsafePerformIO (newIORef $ NGLEnvironment (NGLVersion 0 0) Nothing "" ["bwa"] [] (error "Configuration not set") [])
 
 nglEnvironment :: NGLessIO NGLEnvironment
 nglEnvironment = liftIO $ readIORef ngle
@@ -77,6 +82,13 @@ updateNglEnvironment = liftIO . updateNglEnvironment'
 
 nglConfiguration :: NGLessIO NGLessConfiguration
 nglConfiguration = ngleConfiguration <$> nglEnvironment
+
+registerModule :: Module -> NGLessIO ()
+registerModule m = updateNglEnvironment $ \env ->
+    env { ngleLoadedModules = m:ngleLoadedModules env }
+
+setModulesForTestingPurposesOnlyDoNotUseOtherwise :: [Module] -> NGLessIO ()
+setModulesForTestingPurposesOnlyDoNotUseOtherwise mods = updateNglEnvironment $ \env -> env { ngleLoadedModules = mods }
 
 -- | sets verbosity to Quiet
 setQuiet :: NGLessIO ()

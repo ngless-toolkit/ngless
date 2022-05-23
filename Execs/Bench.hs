@@ -16,7 +16,6 @@ import           Control.DeepSeq (NFData)
 
 import Control.Monad.Trans.Resource (runResourceT)
 
-import Modules (setModulesForTestingPurposesOnlyDoNotUseOtherwise)
 import BuiltinFunctions (builtinModule)
 import NGLess (NGLessIO, testNGLessIO)
 
@@ -41,7 +40,7 @@ import Data.Sam (readSamLine, readSamGroupsC', samStatsC)
 import Data.FastQ (FastQEncoding(..), ShortRead(..), fqDecodeVector)
 import Utils.Conduit (linesC, ByteLine(..), linesVC)
 import Transform (transform)
-import NGLess.NGLEnvironment (NGLVersion(..), setupTestEnvironment)
+import NGLess.NGLEnvironment (NGLVersion(..), setupTestEnvironment, setModulesForTestingPurposesOnlyDoNotUseOtherwise)
 
 nfNGLessIO :: (NFData a) => NGLessIO a -> Benchmarkable
 nfNGLessIO = nfIO . testNGLessIO

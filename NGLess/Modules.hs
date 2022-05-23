@@ -21,16 +21,10 @@ module Modules
     , ExternalReference(..)
     , Module(..)
     , ModInfo(..) -- re-export
-    , registerModule
-    , loadedModules
     , knownModules
-    , setModulesForTestingPurposesOnlyDoNotUseOtherwise
     ) where
 
 import qualified Data.Text as T
-import System.IO.Unsafe (unsafePerformIO)
-import Control.Monad.IO.Class (liftIO)
-import Data.IORef
 import Data.Aeson
 import Data.Default (Default, def)
 
@@ -141,19 +135,6 @@ instance Default Module where
         }
 
 
--- TODO: This really belongs in nglEnvironment!
-loadedModulesRef :: IORef [Module]
-{-# NOINLINE loadedModulesRef #-}
-loadedModulesRef = unsafePerformIO (newIORef [])
-
-registerModule :: Module -> NGLessIO ()
-registerModule m = liftIO $ modifyIORef' loadedModulesRef (m:)
-
-loadedModules :: NGLessIO [Module]
-loadedModules = liftIO $ readIORef loadedModulesRef
-
-setModulesForTestingPurposesOnlyDoNotUseOtherwise :: [Module] -> NGLessIO ()
-setModulesForTestingPurposesOnlyDoNotUseOtherwise mods = liftIO $ writeIORef loadedModulesRef mods
 
 knownModules :: [T.Text]
 knownModules =
