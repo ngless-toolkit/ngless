@@ -5,6 +5,14 @@ NGLess can change its behaviour depending on the version used in the script.
 
 This page documents the fixes that are currently implemented.
 
+## NGLess 1.4
+
+- The old `motus` module (which supports only motus version 1, which is [a
+  reference from 2013](https://www.nature.com/articles/nmeth.2693)) is not
+  supported any more. Upgrade to the new [external motus
+  module](https://github.com/ngless-toolkit/ngless-contrib/tree/master/motus.ngm)
+  if possible.
+
 ## NGLess 1.1
 
 - The way that CIGAR sequence lengths are computed has changed to match

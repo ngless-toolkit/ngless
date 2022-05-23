@@ -12,6 +12,7 @@ Improvements
 - ``write()`` can use multiple threads
 - Better error messages
 - Add a module for `GMGC — Global Microbial Gene Catalogue <https://www.nature.com/articles/s41586-021-04233-4>`__
+- Old ``motus`` (version 1) module deprecated
 
 Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~
