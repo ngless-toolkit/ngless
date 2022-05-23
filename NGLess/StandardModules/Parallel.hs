@@ -430,7 +430,9 @@ mergeCounts ss = do
         start <- forM ss $ \s -> do
             (s', v) <- lift $ s $$+ (CL.mapM (splitAtTab . unwrapByteLine) .| CC.head)
             case v of
-                Nothing -> throwShouldNotOccur "Trying to merge a headerless file"
+                Nothing -> do
+                    lift $ outputListLno' WarningOutput ["Merging empty file"]
+                    return (s', placeholder 1)
                 Just (_,hs) -> do
                     let p = placeholder (B8.count '\t' hs)
                     return (s', p)
