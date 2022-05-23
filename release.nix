@@ -1,7 +1,10 @@
 let
-  # Read in the Niv sources
   sources = {
-    haskellNix = builtins.fetchTarball "https://github.com/input-output-hk/haskell.nix/archive/c6a5afba7e259e9908f9dc56ce711173cda4549b.tar.gz";
+    haskellNix = builtins.fetchTarball {
+      name = "haskell-nix-snap";
+      url = "https://github.com/input-output-hk/haskell.nix/archive/c6a5afba7e259e9908f9dc56ce711173cda4549b.tar.gz";
+      sha256 = "0g58zvyqd47c1y2w84qbf1x29yp4pfdz2gqligvgn1jlx972i53n";
+    };
   };
 
   haskellNix = import sources.haskellNix { };
