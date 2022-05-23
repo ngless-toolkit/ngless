@@ -74,7 +74,6 @@ import FileManagement
 import StandardModules.NGLStdlib
 import Citations (collectCitations)
 import Utils.Network
-import Hooks (triggerHook, triggerFailHook, Hook(..))
 import Utils.Batch (getNcpus)
 import Utils.Suggestion
 import CWL (writeCWL)

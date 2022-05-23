@@ -60,7 +60,6 @@ import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Binary as CB
 import           Data.Conduit ((.|), (.|), ($$+))
 
-import Hooks
 import Output
 import NGLess
 import Modules

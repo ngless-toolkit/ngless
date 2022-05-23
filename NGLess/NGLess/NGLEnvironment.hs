@@ -12,12 +12,19 @@ module NGLess.NGLEnvironment
     , setQuiet
     , registerModule
 
+    , Hook(..)
+    , registerHook
+    , registerFailHook
+    , triggerFailHook
+    , triggerHook
+
     , setModulesForTestingPurposesOnlyDoNotUseOtherwise
     , setupTestEnvironment
     ) where
 
 import qualified Data.Text as T
 
+import Control.Monad (forM_, when)
 import Control.Monad.IO.Class (liftIO)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
@@ -35,6 +42,9 @@ instance Ord NGLVersion where
         | majV0 == majV1 = compare minV0 minV1
         | otherwise = compare majV0 majV1
 
+data Hook = FinishOkHook
+    deriving (Eq, Show, Ord, Bounded, Enum)
+
 data NGLEnvironment = NGLEnvironment
                     { ngleVersion :: !NGLVersion
                     , ngleLno :: !(Maybe Int)
@@ -43,6 +53,7 @@ data NGLEnvironment = NGLEnvironment
                     , ngleTemporaryFilesCreated :: [FilePath] -- ^ list of temporary files created
                     , ngleConfiguration :: NGLessConfiguration
                     , ngleLoadedModules :: [Module]
+                    , ngleActiveHooks :: [(Hook, NGLessIO ())]
                     }
 
 parseVersion :: Maybe T.Text -> NGLess NGLVersion
@@ -69,7 +80,13 @@ parseVersion (Just v) = case T.splitOn "." v of
                             _ -> throwScriptError $ concat ["Version ", T.unpack v, " could not be understood. The version string should look like \"1.0\" or similar"]
 ngle :: IORef NGLEnvironment
 {-# NOINLINE ngle #-}
-ngle = unsafePerformIO (newIORef $ NGLEnvironment (NGLVersion 0 0) Nothing "" ["bwa"] [] (error "Configuration not set") [])
+ngle = unsafePerformIO (newIORef $ NGLEnvironment (NGLVersion 0 0) Nothing "" ["bwa"] [] (error "Configuration not set") [] [])
+
+
+failHooks :: IORef [IO ()]
+{-# NOINLINE failHooks #-}
+failHooks = unsafePerformIO (newIORef [])
+
 
 nglEnvironment :: NGLessIO NGLEnvironment
 nglEnvironment = liftIO $ readIORef ngle
@@ -89,6 +106,27 @@ registerModule m = updateNglEnvironment $ \env ->
 
 setModulesForTestingPurposesOnlyDoNotUseOtherwise :: [Module] -> NGLessIO ()
 setModulesForTestingPurposesOnlyDoNotUseOtherwise mods = updateNglEnvironment $ \env -> env { ngleLoadedModules = mods }
+
+registerHook :: Hook -> NGLessIO () -> NGLessIO ()
+registerHook hook act = updateNglEnvironment $ \env ->
+    env { ngleActiveHooks = (hook, act):ngleActiveHooks env }
+
+{- Run if the script fails. Note that these hooks are in the IO Monad, not
+ - NGLessIO! -}
+registerFailHook :: IO () -> NGLessIO ()
+registerFailHook act = liftIO $ modifyIORef failHooks (act:)
+
+-- Run all fail hooks
+triggerFailHook :: IO ()
+triggerFailHook = readIORef failHooks >>= sequence_
+
+-- Trigger the actions registered with the given hook
+triggerHook :: Hook -> NGLessIO ()
+triggerHook hook = do
+    registered <- ngleActiveHooks <$> nglEnvironment
+    forM_ registered $ \(h,act) ->
+        when (h == hook) act
+
 
 -- | sets verbosity to Quiet
 setQuiet :: NGLessIO ()
