@@ -57,6 +57,7 @@ symbolOrTypeError context val = throwScriptError ("Expected a symbol (received "
 -- | If argument is a NGOString, then unwraps it; else it raises a type error
 stringOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m T.Text
 stringOrTypeError _ (NGOString s) = return s
+stringOrTypeError _ (NGOFilename s) = return (T.pack s)
 stringOrTypeError context val = throwScriptError ("Expected a string (received " ++ show val ++ ") in context '" ++ context ++ "'")
 
 -- | If argument is an NGOInteger, then unwraps it; else it raises a type error

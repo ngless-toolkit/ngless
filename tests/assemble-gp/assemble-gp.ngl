@@ -7,3 +7,5 @@ write(orf_find(contigs,
                 is_metagenome=True,
                 prots_out='output.orfs.faa'),
     ofile='output.orfs.fna')
+
+write(map(input, fafile=contigs), ofile='output.mapped.sam')
