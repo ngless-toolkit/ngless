@@ -129,10 +129,9 @@ executables:
         ld-options:
           - -static
           - -pthread
-    when:
-    - condition: 'flag(embed)'
-      cc-options: -DBUILD_W_EMBED
-      cpp-options: -DBUILD_W_EMBED
+      - condition: 'flag(embed)'
+        cc-options: -DBUILD_W_EMBED
+        cpp-options: -DBUILD_W_EMBED
 
 tests:
   nglesstest:
