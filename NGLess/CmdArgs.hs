@@ -76,7 +76,7 @@ data NGLessMode =
               , indexPath :: Maybe FilePath
               , extraArgs :: [String]
               }
-        | InstallGenMode
+        | InstallReferenceMode
               { refname :: T.Text
               }
         | CreateReferencePackMode
@@ -170,7 +170,7 @@ mainArgs = DefaultMode
               <*> optional (strOption $ long "index-path" <> help "Index path (directory where indices are stored)") -- indexPath :: Maybe FilePath
               <*> many (strArgument (metavar "ARGV")) -- extraArgs :: [String]
 
-installArgs = (flag' InstallGenMode (long "install-reference-data"))
+installArgs = (flag' InstallReferenceMode (long "install-reference-data"))
                 <*> (T.pack <$> strArgument (help "Name of reference to install" <> metavar "REF"))
         -- += details  [ "Example:" , "(sudo) ngless --install-reference-data sacCer3" ]
 

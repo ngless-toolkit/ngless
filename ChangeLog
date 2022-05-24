@@ -3,6 +3,7 @@ Unreleased
 	* Update --create-reference-pack mode to newer format (previous version worked, but
 	users still had to recreate indices after downloading, negating some of
 	the benefits
+	* Update --install-reference-data mode to download latest version (#107)
 
 Version 1.4.0 2022-05-23 (beta) by luispedro
 	* write() returns the filename used

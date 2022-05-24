@@ -288,9 +288,11 @@ modeExec opts@CmdArgs.DefaultMode{} = do
     exitSuccess
 
 
--- if user uses the flag -i he will install a Reference Genome to all users
-modeExec (CmdArgs.InstallGenMode ref)
-    | isBuiltinReference ref = void . runNGLessIO "installing data" $ installData Nothing ref
+modeExec (CmdArgs.InstallReferenceMode ref)
+    | isBuiltinReference ref = void . runNGLessIO "installing data" $ do
+        activeVersion <- runNGLess $ parseVersion Nothing
+        updateNglEnvironment (\e -> e {ngleVersion = activeVersion })
+        installData Nothing ref
     | otherwise =
         error (concat ["Reference ", T.unpack ref, " is not a known reference."])
 
