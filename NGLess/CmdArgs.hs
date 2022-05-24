@@ -1,4 +1,4 @@
-{- Copyright 2015-2021 NGLess Authors
+{- Copyright 2015-2022 NGLess Authors
  - License: MIT
  -}
 module CmdArgs
@@ -51,6 +51,7 @@ data NGLessArgs = NGLessArgs
         , verbosity :: Verbosity
         , quiet :: Bool
         , color :: Maybe ColorSetting
+        , trace_flag :: Maybe Bool
         } deriving (Eq, Show)
 data NGLessMode =
         DefaultMode
@@ -58,7 +59,6 @@ data NGLessMode =
               , debug_mode :: String
               , validateOnly :: Bool
               , print_last :: Bool
-              , trace_flag :: Maybe Bool
               , nThreads :: NThreadsOpts
               , strictThreads :: Maybe Bool
               , createReportDirectory :: Maybe Bool
@@ -150,7 +150,6 @@ mainArgs = DefaultMode
               <*> strOption (long "debug" <> value "") -- debug_mode :: String
               <*> switch (long "validate-only" <> short 'n' <> help "Only validate input, do not run script") -- validateOnly :: Bool
               <*> switch (long "print-last" <> short 'p' <> help "print value of last line in script") -- print_last :: Bool
-              <*> triSwitch "trace" "Set highest verbosity mode" -- trace_flag :: Maybe Bool
               <*> parseNThreads
               <*> triSwitch "strict-threads" "strictly respect the --threads option (by default, NGLess will, occasionally, use more threads than specified)" -- scrict-threads :: Bool
               <*> triSwitch "create-report" "create the report directory" -- createReportDirectory :: Bool
@@ -207,3 +206,4 @@ nglessArgs = NGLessArgs
                 <*> parseVerbosity
                 <*> switch (long "quiet" <> short 'q')
                 <*> parseColor
+                <*> triSwitch "trace" "Set highest verbosity mode" -- trace_flag :: Maybe Bool

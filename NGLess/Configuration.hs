@@ -141,17 +141,18 @@ initConfiguration opts = do
     where
 
         updateConfigurationOpts NGLessArgs{..} config =
-                updateConfigurationOptsMode mode $
-                    config
-                        { nConfColor = fromMaybe (nConfColor config) color
-                        , nConfVerbosity = if quiet then Quiet else verbosity
-                        }
-
-        updateConfigurationOptsMode DefaultMode{..} config =
             let nConfTrace' = fromMaybe
                             (nConfTrace config)
                             trace_flag
-                strictThreads' = fromMaybe
+            in  updateConfigurationOptsMode mode $
+                    config
+                        { nConfColor = fromMaybe (nConfColor config) color
+                        , nConfVerbosity = if quiet then Quiet else verbosity
+                        , nConfTrace = nConfTrace'
+                        }
+
+        updateConfigurationOptsMode DefaultMode{..} config =
+            let strictThreads' = fromMaybe
                             (nConfStrictThreads config)
                             strictThreads
                 ktemp = fromMaybe
@@ -176,8 +177,7 @@ initConfiguration opts = do
                                     createReportDirectory
                 indexPath' = indexPath <|> nConfIndexStorePath config
             in config
-                    { nConfTrace = nConfTrace'
-                    , nConfStrictThreads = strictThreads'
+                    { nConfStrictThreads = strictThreads'
                     , nConfKeepTemporaryFiles = ktemp
                     , nConfCreateReportDirectory = createReportDirectory'
                     , nConfReportDirectory = html_odir

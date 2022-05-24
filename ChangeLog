@@ -1,3 +1,6 @@
+Unreleased
+	* Add --trace argument to all modes
+
 Version 1.4.0 2022-05-23 (beta) by luispedro
 	* write() returns the filename used
 	* Switch to tasty test framework
