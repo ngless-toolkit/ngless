@@ -2,6 +2,16 @@
 What's New (History)
 ====================
 
+Unreleased
+----------
+
+
+Bugfixes
+~~~~~~~~
+
+- Update `--create-reference-pack` mode to newer format (where indices are
+  versioned)
+
 Version 1.4.0
 -------------
 

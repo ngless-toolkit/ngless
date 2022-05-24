@@ -1,4 +1,4 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
 -}
 module ReferenceDatabases
@@ -17,7 +17,7 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Monad.Extra (whenJust, unlessM)
 
-import System.FilePath
+import System.FilePath ((</>), (<.>), dropExtension)
 import System.Directory
 import System.IO.Error
 import Data.Foldable
@@ -32,13 +32,14 @@ import qualified StandardModules.Mappers.Bwa as Bwa
 import FileManagement (createTempDir, InstallMode(..))
 import NGLess.NGLEnvironment (NGLVersion(..), NGLEnvironment(..), nglConfiguration, nglEnvironment)
 import Configuration
-import Utils.Network (downloadExpandTar, downloadOrCopyFile, downloadFile, isUrl)
-import Utils.LockFile (withLockFile, LockParameters(..), WhenExistsStrategy(..))
-import Utils.Utils
 import Modules
 import Version (versionStr)
 import Output (outputListLno', OutputType(..))
 import NGLess
+import Dependencies.Versions (bwaVersion)
+import Utils.Network (downloadExpandTar, downloadOrCopyFile, downloadFile, isUrl)
+import Utils.LockFile (withLockFile, LockParameters(..), WhenExistsStrategy(..))
+import Utils.Utils (findM, withOutputFile)
 
 data ReferenceFilePaths = ReferenceFilePaths
     { rfpFaFile :: Maybe FilePath
@@ -145,16 +146,16 @@ createReferencePack oname reference mgtf mfunc = do
     whenJust mfunc $ \func ->
         downloadOrCopyFile func (buildFunctionalMapPath tmpdir)
     Bwa.createIndex (buildFaFilePath tmpdir)
-    let referencefiles = [referencePath ++ ext |
-                                    ext <- [""
-                                        ,".amb"
+    let indexFiles = [(dropExtension referencePath ++ "-bwa-" ++ bwaVersion ++ ".gz" ++ ext) |
+                                    ext <-
+                                        [".amb"
                                         ,".ann"
                                         ,".bwt"
                                         ,".pac"
                                         ,".sa"]]
-        filelist = referencefiles ++ [gffPath | isJust mgtf] ++ [functionalMapPath | isJust mfunc]
-    liftIO $
-        BL.writeFile oname . GZip.compress . Tar.write =<< Tar.pack tmpdir filelist
+        filelist = [referencePath] ++ indexFiles ++ [gffPath | isJust mgtf] ++ [functionalMapPath | isJust mfunc]
+    liftIO $ withOutputFile oname $ \h ->
+        BL.hPut h . GZip.compress . Tar.write =<< Tar.pack tmpdir filelist
     outputListLno' ResultOutput ["Created reference package in file ", oname]
     release rk
 
