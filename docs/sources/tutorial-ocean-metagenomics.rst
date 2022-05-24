@@ -34,9 +34,9 @@ expand the data to a directory called ``ocean-short``.
 This is a toy dataset. It is based on real data, but the samples were trimmed
 so that they contains only 250k paired-end reads.
 
-The dataset is organized in classical MOCAT style. Ngless does not require this
-structure, but this tutorial also demonstrates how to upgrade from your
-existing MOCAT-based projects.::
+The dataset is organized in so that each directory contains a sample with
+multiple fastq files). NGLess does not require this structure, but it is
+convenient::
 
     $ find
     ./SAMEA2621229.sampled
@@ -63,10 +63,9 @@ The rest of this tutorial is an explanation of the steps in this script.
 
 To run ngless, we need write a script. We start with a few imports::
 
-    ngless "0.7"
-    import "parallel" version "0.6"
-    import "mocat" version "0.0"
-    import "omrgc" version "0.0"
+    ngless "1.4"
+    import "parallel" version "1.0"
+    import "omrgc" version "1.0"
 
 These will all be used in the tutorial.
 
@@ -94,7 +93,7 @@ sample.
 
 First, we load the data (the FastQ files)::
 
-    input = load_mocat_sample(sample)
+    input = load_fastq_directory(sample)
 
 And, now, we preprocess the data::
 
@@ -153,15 +152,14 @@ Full script
 
 Here is the full script::
 
-    ngless "0.8"
+    ngless "1.4"
     import "parallel" version "0.0"
-    import "mocat" version "0.0"
-    import "omrgc" version "0.0"
+    import "omrgc" version "1.0"
 
 
     samples = readlines('tara.demo.short')
     sample = lock1(samples)
-    input = load_mocat_sample(sample)
+    input = load_fastq_directory(sample)
 
     input = preprocess(input, keep_singles=False) using |read|:
         read = substrim(read, min_quality=25)

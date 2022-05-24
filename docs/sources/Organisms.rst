@@ -81,33 +81,4 @@ When attempting to install an organism if is returned **True** it means that
 the organism is already installed, and there is no reason to install again.
 Otherwise, a progress bar is displayed to provide information on the download.
 
-Data Set Structure
--------------------
-
-This section provides the technical details necessary if you wish to build your
-own reference for others to use automatically. For most users, it will likely
-be easier to directly specify the references in the ngless script.
-
-The archives provided by NGLess contain BWA index files, the genome reference
-file and a gene annotation file.
-
-::
-
- Name.tar.gz
-  |
-  |--- Sequence
-  |     |
-  |     |-- BWAIndex
-  |             |-- genome.fa.gz
-  |             |-- genome.fa.gz.amb
-  |             |-- genome.fa.gz.ann
-  |             |-- genome.fa.gz.bwt
-  |             |-- genome.fa.gz.pac
-  |             |-- genome.fa.gz.sa
-  |
-  |--- Annotation
-        |-- annot.gtf.gz
-
-The basename of Description.tar.gz (Description) will have the description name
-of the respective organism (i.e, Mus_musculus.tar.gz).
 

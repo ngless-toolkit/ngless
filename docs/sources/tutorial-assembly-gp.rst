@@ -26,21 +26,17 @@ of that tutorial before starting this one.
 
 To run ngless, we need write a script. We start with a few imports::
 
-    ngless "0.6"
+    ngless "1.4"
 
-
-.. _`profiling tutorial`: tutorial-ocean-metagenomics.html
 
 3. Preprocessing
 
-This is as in the `profiling tutorial`_, except that we will be working with a
-single sample. You could also use the parallel module to make it easier to work
-on all samples::
+First, we want to trim the reads based on quality::
 
     sample = 'SAMEA2621155.sampled'
     input = load_mocat_sample(sample)
 
-    preprocess(input, keep_singles=False) using |read|:
+    input = preprocess(input, keep_singles=False) using |read|:
         read = substrim(read, min_quality=25)
         if len(read) < 45:
             discard
@@ -62,13 +58,12 @@ Full script
 
 ::
 
-    ngless "0.6"
-
+    ngless "1.4"
 
     sample = 'SAMEA2621155.sampled'
     input = load_mocat_sample(sample)
 
-    preprocess(input, keep_singles=False) using |read|:
+    input = preprocess(input, keep_singles=False) using |read|:
         read = substrim(read, min_quality=25)
         if len(read) < 45:
             discard

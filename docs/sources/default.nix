@@ -29,7 +29,6 @@ let
         meta = {
           homepage = "https://github.com/guzzle/guzzle_sphinx_theme";
           description = "Sphinx theme";
-          license = pkgs.licenses.mit;
           maintainers = with pkgs.maintainers; [ fridh ];
         };
       };

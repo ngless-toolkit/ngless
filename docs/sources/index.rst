@@ -31,7 +31,7 @@ NGLess
 
 NGLess is best illustrated by an example::
 
-    ngless "1.0"
+    ngless "1.4"
     input = paired('ctrl1.fq', 'ctrl2.fq', singles='ctrl-singles.fq')
     input = preprocess(input) using |read|:
         read = read[5:]
