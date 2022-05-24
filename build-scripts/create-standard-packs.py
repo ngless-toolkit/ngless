@@ -1,3 +1,12 @@
+try:
+    from jug.utils import jug_execute
+except ImportError:
+    from sys import exit, stderr
+    stderr.write("Error!\n\nJug is needed to run this script\n"
+            "See https://jug.readthedocs.io/\n"
+            "It should be run as `jug execute create-standard-packs.py`\n")
+
+    exit(2)
 datasets = [
     (75, 'bos_taurus', "Bos_taurus.UMD3.1", "bosTau4", "v1.0"),
     (75, 'caenorhabditis_elegans', "Caenorhabditis_elegans.WBcel235", "ce10", "v1.0"),
@@ -33,12 +42,16 @@ for (ensembl_version, base_name, build, outputname, our_version) in datasets:
     if base_name in ["homo_sapiens", "mus_musculus"]:
         level = "primary_assembly"
 
-    a = "http://ftp.ensembl.org/pub/release-{ensembl_version}/gtf/{base_name}/{build}.{ensembl_version}.gtf.gz".format(**locals())
+    a = f"http://ftp.ensembl.org/pub/release-{ensembl_version}/gtf/{base_name}/{build}.{ensembl_version}.gtf.gz"
 
     if ensembl_version <= 75:
-        g = "http://ftp.ensembl.org/pub/release-{ensembl_version}/fasta/{base_name}/dna/{build}.{ensembl_version}.dna.{level}.fa.gz".format(**locals())
+        g = f"http://ftp.ensembl.org/pub/release-{ensembl_version}/fasta/{base_name}/dna/{build}.{ensembl_version}.dna.{level}.fa.gz"
     else:
-        g = "http://ftp.ensembl.org/pub/release-{ensembl_version}/fasta/{base_name}/dna/{build}.dna.{level}.fa.gz".format(**locals())
+        g = f"http://ftp.ensembl.org/pub/release-{ensembl_version}/fasta/{base_name}/dna/{build}.dna.{level}.fa.gz"
 
-    outname = "{outputname}-{our_version}".format(**locals())
-    print("ngless --create-reference-pack --output-name {outname}.tar.gz --genome-url {g} --gtf-url {a}".format(outname=outname, g=g, a=a))
+    jug_execute([
+        "ngless", "--create-reference-pack",
+        "--output-name", f"{outputname}-{our_version}.tar.gz",
+        "--genome-url", g,
+        "--gtf-url", a])
+
