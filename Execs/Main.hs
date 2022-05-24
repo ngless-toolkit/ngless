@@ -313,6 +313,7 @@ modeExec (CmdArgs.DownloadDemoMode demo) = do
                                     T.unpack (suggestionMessage (T.pack demo) (T.pack <$> known))++
                                     "Available demos are:\n")
             forM_ known $ hPutStrLn stderr . ("\t- " ++)
+            hPutStrLn stderr $ setSGRCode [Reset]
             exitFailure
 
 modeExec (CmdArgs.PrintPathMode exec) = runNGLessIO "finding internal path" $ do
