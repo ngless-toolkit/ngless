@@ -2,16 +2,6 @@
 What's New (History)
 ====================
 
-Unreleased
-----------
-
-
-Bugfixes
-~~~~~~~~
-
-- Update `--create-reference-pack` mode to newer format (where indices are
-  versioned)
-
 Version 1.4.0
 -------------
 
@@ -25,6 +15,15 @@ Improvements
 - Better error messages
 - Add a module for `GMGC — Global Microbial Gene Catalogue <https://www.nature.com/articles/s41586-021-04233-4>`__
 - Old ``motus`` (version 1) module deprecated
+
+Bugfixes
+~~~~~~~~
+
+- Update `--install-reference-data` mode to newer URLs, see `#107 <https://github.com/ngless-toolkit/ngless/issues/107>`__
+- Update `--create-reference-pack` mode to newer format (where indices are
+  versioned), see `#108 <https://github.com/ngless-toolkit/ngless/issues/108>`__
+- Do not fail when merging empty files (`#113 <https://github.com/ngless-toolkit/ngless/issues/113>`__)
+
 
 Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~

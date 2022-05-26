@@ -4,6 +4,8 @@ Unreleased
 	users still had to recreate indices after downloading, negating some of
 	the benefits
 	* Update --install-reference-data mode to download latest version (#107)
+	* Update --create-reference-pack mode to download latest version (#108)
+	* Do not fail when merging empty files (#113)
 
 Version 1.4.0 2022-05-23 (beta) by luispedro
 	* write() returns the filename used

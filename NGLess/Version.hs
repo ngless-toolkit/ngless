@@ -17,10 +17,10 @@ versionStr :: String
 versionStr = showVersion version
 
 versionStrLong :: String
-versionStrLong = "1.4.0-beta1"
+versionStrLong = "1.4.0-beta2"
 
 dateStr :: String
-dateStr = "May 23 2022"
+dateStr = "May 26 2022"
 
 embeddedStr :: String
 #ifdef NO_EMBED_SAMTOOLS_BWA
