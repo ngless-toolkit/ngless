@@ -5,14 +5,14 @@ What's New (History)
 Version 1.4.0
 -------------
 
-Released *23 May 2022* (Beta release)
+Released *30 May 2022*
 
-Improvements
-~~~~~~~~~~~~
+User-visible Improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - ``write()`` now returns the filename used
 - ``write()`` can use multiple threads
-- Better error messages
+- Better error messages in multiple situations
 - Add a module for `GMGC — Global Microbial Gene Catalogue <https://www.nature.com/articles/s41586-021-04233-4>`__
 - Old ``motus`` (version 1) module deprecated
 
