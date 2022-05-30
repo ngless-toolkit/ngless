@@ -190,6 +190,7 @@ Authors
    preprocess
    Functions
    methods
+   LoadFastQDirectory
    stdlib
    modules
    count
