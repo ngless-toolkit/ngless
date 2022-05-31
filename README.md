@@ -25,7 +25,7 @@ If you are using NGLess, please cite:
 
 ## Example
 
-    ngless "1.3"
+    ngless "1.4"
     input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
     input = preprocess(input) using |read|:
         read = read[5:]
@@ -56,21 +56,21 @@ The recommended way to install NGLess is through
 Alternatively, a docker container with NGLess is available at
 [docker hub](https://hub.docker.com/r/nglesstoolkit/ngless):
 
-    docker run -v $PWD:/workdir -w /workdir -it nglesstoolkit/ngless:latest ngless --version
+    docker run -v $PWD:/workdir -w /workdir -it nglesstoolkit/ngless:1.4.0 ngless --version
 
 Adapt the mount flags (``-v``) as needed.
 
 ### Linux
 
 You can download a [statically linked version of NGless
-1.4.0-beta](https://github.com/ngless-toolkit/ngless/releases/download/v1.4.0-beta1/ngless-v1.4.0-beta1-static)
+1.4.0](https://github.com/ngless-toolkit/ngless/releases/download/v1.4.0/NGLess-v1.4.0-Linux-static-full)
 
 This should work across a wide range of Linux versions (please
 [report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
 
-    curl -L -O https://github.com/ngless-toolkit/ngless/releases/download/v1.4.0-beta1/ngless-v1.4.0-beta1-static
-    chmod +x ngless-v1.4.0-beta1-static
-    ./ngless-v1.4.0-beta1-static
+    curl -L -O https://github.com/ngless-toolkit/ngless/releases/download/v1.4.0/NGLess-v1.4.0-Linux-static-full
+    chmod +x NGLess-v1.4.0-Linux-static-full
+    ./NGLess-v1.4.0-Linux-static-full
 
 This downloaded file bundles bwa, samtools and megahit (also statically linked).
 
@@ -100,7 +100,7 @@ The following sequence of commands should download and build the software
 To install, you can use the following command (replace `<PREFIX>` with
 the directory where you wish to install, default is `/usr/local`):
 
-    make install prefix=<PREFIX>
+    make make
 
 ## Running Sample Test Scripts on Local Machine
 
