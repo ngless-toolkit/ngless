@@ -49,7 +49,7 @@ faConduit' = C.await >>= \case
     getdata !n header toks = C.await >>= \case
                                 Nothing -> C.yield $ FastaSeq header (B.concat $ reverse toks)
                                 Just (ByteLine next)
-                                    | B.null next -> throwDataError ("Unexpected empty string at line " ++ show (n+1) ++ " (expected header line).")
+                                    | B.null next -> getdata (n+1) header toks
                                     | B.head next == greaterThanSign -> do
                                             C.yield $ FastaSeq header (B.concat $ reverse toks)
                                             getdata (n+1) (B.drop 1 next) []

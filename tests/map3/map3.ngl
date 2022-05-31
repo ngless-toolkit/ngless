@@ -2,3 +2,6 @@ ngless '1.1'
 input = paired('sample.1.fq', 'sample.2.fq', singles='sample.singles.fq', encoding={auto})
 mapped = map(input, fafile='ref.fna')
 write(mapped, ofile='output.sam')
+
+mapped = map(input, fafile='ref.fna', block_size_megabases=1)
+write(mapped, ofile='output.split.sam')

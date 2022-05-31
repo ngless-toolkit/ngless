@@ -1,4 +1,4 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -142,6 +142,7 @@ ensureIndexExists blockSize mapper fafile = do
     forM_ blocks (ensureIndexExists 0 mapper)
     return blocks
 
+ensureSplitsExist :: Int -> FilePath -> NGLessIO [FilePath]
 ensureSplitsExist blockSize fafile = do
     fafile' <- getIndexOutput False fafile
     let ofafile = FilePath.takeDirectory fafile' </> FilePath.takeBaseName fafile <.> "splits_" ++ show blockSize ++ "m"
@@ -314,13 +315,13 @@ mergeSamFiles [] = lift $ throwShouldNotOccur "empty input to mergeSamFiles"
 mergeSamFiles inputs = do
     lift $ outputListLno' TraceOutput ["Merging SAM files: ", show inputs]
     forM_ inputs $ \f ->
-        CB.sourceFile f
+        CAlg.conduitPossiblyCompressedFile f
             .| linesC
             .| readSamHeaders
     -- This is sub-optimal as we reparse the file.
     -- There are also obvious opportunities to make this code take advantage of parallelism
     C.sequenceSources
-            [CB.sourceFile f
+            [CAlg.conduitPossiblyCompressedFile f
                 .| linesVC 4096
                 .| readSamGroupsC' 1 True
                 .| CC.concat -- TODO: Remove this and adapt `mergeSAMGroups` to work directly on vectors
