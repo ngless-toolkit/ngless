@@ -18,9 +18,9 @@ let
 
         src = pkgs.fetchgit {
             url = "https://github.com/guzzle/guzzle_sphinx_theme";
-            rev = "eefd45b79383b1b4aab1607444e41366fd1348a6";
+            rev = "d351448ac36933ce27ac3ef0fa813d286dc3f760";
 
-            sha256 = "00d69wa7vvcnzvki88ri7m78rikqbw7bkpxgs3z41ljav99qh2yi";
+            sha256 = "1mvbhpb3274chj9hbi7wvbmdri84l405im3h9k1gashwhxy5cvs9";
           };
         buildInputs = with python.pkgs; [ sphinx ];
 

@@ -33,7 +33,7 @@ source_parsers = {
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = (['guzzle_sphinx_theme'] if has_guzzle else [])
+extensions = []
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -97,23 +97,44 @@ pygments_style = 'sphinx'
 #keep_warnings = False
 
 
-# -- Options for HTML output ----------------------------------------------
-
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 if has_guzzle:
-    html_theme = "guzzle_sphinx_theme"
     html_theme_path = guzzle_sphinx_theme.html_theme_path()
+    html_theme = "guzzle_sphinx_theme"
+    extensions.append("guzzle_sphinx_theme")
+    html_sidebars = {
+        '**': [
+             'logo-text.html',
+             'globaltoc.html',
+             'searchbox.html']
+    }
+
+    html_theme_options = {
+
+        # Set the name of the project to appear in the left sidebar.
+        "project_nav_name": "NGLess",
+
+        # Specify a base_url used to generate sitemap.xml links. If not
+        # specified, then no sitemap will be built.
+        "base_url": "https://ngless.embl.de/",
+
+        # Visible levels of the global TOC; -1 means unlimited
+        "globaltoc_depth": 2,
+
+        # If False, expand all TOC entries
+        "globaltoc_collapse": False,
+
+        # If True, show hidden TOC entries
+        "globaltoc_includehidden": True,
+    }
 else:
     html_theme = "default"
     html_sidebars = {
         '*': ['searchbox.html', 'sidebar.html'],
     }
 
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-html_theme_options = {}
+    html_theme_options = {}
 
 
 # The name for this set of Sphinx documents.  If None, it defaults to
@@ -239,26 +260,3 @@ man_pages = [
 # If true, show URL addresses after external links.
 #man_show_urls = False
 
-
-# -- Options for Texinfo output -------------------------------------------
-
-# Grouping the document tree into Texinfo files. List of tuples
-# (source start file, target name, title, author,
-#  dir menu entry, description, category)
-texinfo_documents = [
-  ('index', 'NGLess', u'NGLess Documentation',
-   u'NGLess Authors', 'NGLess', 'One line description of project.',
-   'Miscellaneous'),
-]
-
-# Documents to append as an appendix to all manuals.
-#texinfo_appendices = []
-
-# If false, no module index is generated.
-#texinfo_domain_indices = True
-
-# How to display URL addresses: 'footnote', 'no', or 'inline'.
-#texinfo_show_urls = 'footnote'
-
-# If true, do not generate a @detailmenu in the "Top" node's menu.
-#texinfo_no_detailmenu = False

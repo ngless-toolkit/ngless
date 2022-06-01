@@ -174,7 +174,6 @@ Authors
 
 .. toctree::
    :hidden:
-   :maxdepth: 2
 
    introduction
    install
