@@ -24,7 +24,6 @@ import qualified Data.Conduit as C
 import qualified Data.Conduit.Algorithms.Async as CAlg
 import           Data.Conduit ((.|))
 import           Data.Conduit.Algorithms.Utils (awaitJust)
-import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import           Control.Monad.Extra (unlessM)
 import           Data.List (sort)
 
@@ -190,12 +189,12 @@ splitFASTA megaBPS ifile ofileBase =
                 , maxAge = 36 * 3000
                 , whenExistsStrategy = IfLockedRetry { nrLockRetries = 120, timeBetweenRetries = 60 }
                 , mtimeUpdate = True
-                } $ C.runConduit $
-            conduitPossiblyCompressedFile ifile
-                .| faConduit
-                .| splitWriter
+                } $
+            CAlg.withPossiblyCompressedFile ifile $ \ic ->
+                C.runConduit (ic .| faConduit .| splitWriter)
     where
         maxBPS = 1000 * 1000 * megaBPS
+        splitWriter :: C.ConduitT FastaSeq C.Void NGLessIO [FilePath]
         splitWriter = splitWriter' [] (0 :: Int)
         splitWriter' fs n = do
             let f = ofileBase ++ "." ++ show n ++ ".fna"
