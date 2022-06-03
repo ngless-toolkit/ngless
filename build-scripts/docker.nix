@@ -1,10 +1,12 @@
+{ version ? "latest" }:
 let
- release = import ../release.nix;
- pkgs = release.pkgs;
+  release = import ../release.nix;
+  pkgs = release.pkgs;
 
 in pkgs.dockerTools.buildImage {
 
-  name = "ngless-docker";
+  name = "nglesstoolkit/ngless";
+  tag = version;
 
   contents = [
     release.NGLess.components.exes.ngless
