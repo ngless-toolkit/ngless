@@ -2,6 +2,16 @@
 What's New (History)
 ====================
 
+Version 1.4.1
+-------------
+
+Released *3 June 2022*
+
+Bugfixes
+~~~~~~~~
+
+- Fix bug with *low memory mode*
+
 Version 1.4.0
 -------------
 
