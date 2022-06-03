@@ -1,8 +1,8 @@
 let
-  nixpkgsPinned = builtins.fetchGit {
+  nixpkgsPinned = builtins.fetchTarball {
     name = "nixpksg-pinned";
-    url = "https://github.com/nixos/nixpkgs/";
-    rev = "1bb17332abf7a782ed7fa3101fd7ba54dd239694";
+    url = "https://github.com/nixos/nixpkgs/archive/1bb17332abf7a782ed7fa3101fd7ba54dd239694.tar.gz";
+    sha256 = "17y5xb109vnkvqqf8nlx6b7as3f9p4v7z6xjfq9mg3vyyhym33fl";
   };
 
   sources = {
