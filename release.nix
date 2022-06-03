@@ -1,3 +1,4 @@
+{ checkMaterialization ? false }:
 let
   sources = {
     haskellNix = builtins.fetchTarball {
@@ -30,5 +31,8 @@ in pkgs.haskell-nix.stackProject {
     # ignore paths that change frequently, but do not contribute to the result
     filter = path: type: let baseName = baseNameOf (toString path); in !(pkgs.lib.elem baseName ignoredPaths);
   };
+  stack-sha256 = "15csmssghh848bpqkp1lvn6ss5cgf639gp9y108m7mksppp0wc0q";
+  materialized = ./build-scripts/release.materialized;
+  inherit checkMaterialization;
 }
 

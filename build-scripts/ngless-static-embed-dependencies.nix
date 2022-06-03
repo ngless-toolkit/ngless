@@ -1,3 +1,4 @@
+{ checkMaterialization ? false }:
 let
   sources = {
     haskellNix = builtins.fetchTarball {
@@ -23,5 +24,8 @@ let
 in pkgs.haskell-nix.stackProject {
   name = "NGLess";
   src = (import ./sources-with-static-dependencies.nix) ;
+  stack-sha256 = "0llm949rj6grlff2cbfj3n8zvymbnca1m8mqrs3gylmgpylad2i8";
+  materialized = ./sources-with-static-dependencies.materialized;
+  inherit checkMaterialization;
 }
 
