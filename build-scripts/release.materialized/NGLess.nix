@@ -11,7 +11,7 @@
     flags = { embed = false; static = false; };
     package = {
       specVersion = "1.12";
-      identifier = { name = "NGLess"; version = "1.4.1"; };
+      identifier = { name = "NGLess"; version = "1.5.0"; };
       license = "MIT";
       copyright = "";
       maintainer = "luis@luispedro.org";
@@ -53,9 +53,6 @@
           (hsPkgs."convertible" or (errorHandler.buildDepError "convertible"))
           (hsPkgs."data-default" or (errorHandler.buildDepError "data-default"))
           (hsPkgs."deepseq" or (errorHandler.buildDepError "deepseq"))
-          (hsPkgs."diagrams-core" or (errorHandler.buildDepError "diagrams-core"))
-          (hsPkgs."diagrams-lib" or (errorHandler.buildDepError "diagrams-lib"))
-          (hsPkgs."diagrams-svg" or (errorHandler.buildDepError "diagrams-svg"))
           (hsPkgs."directory" or (errorHandler.buildDepError "directory"))
           (hsPkgs."edit-distance" or (errorHandler.buildDepError "edit-distance"))
           (hsPkgs."either" or (errorHandler.buildDepError "either"))
@@ -134,9 +131,6 @@
             (hsPkgs."convertible" or (errorHandler.buildDepError "convertible"))
             (hsPkgs."data-default" or (errorHandler.buildDepError "data-default"))
             (hsPkgs."deepseq" or (errorHandler.buildDepError "deepseq"))
-            (hsPkgs."diagrams-core" or (errorHandler.buildDepError "diagrams-core"))
-            (hsPkgs."diagrams-lib" or (errorHandler.buildDepError "diagrams-lib"))
-            (hsPkgs."diagrams-svg" or (errorHandler.buildDepError "diagrams-svg"))
             (hsPkgs."directory" or (errorHandler.buildDepError "directory"))
             (hsPkgs."edit-distance" or (errorHandler.buildDepError "edit-distance"))
             (hsPkgs."either" or (errorHandler.buildDepError "either"))
@@ -219,9 +213,6 @@
             (hsPkgs."convertible" or (errorHandler.buildDepError "convertible"))
             (hsPkgs."data-default" or (errorHandler.buildDepError "data-default"))
             (hsPkgs."deepseq" or (errorHandler.buildDepError "deepseq"))
-            (hsPkgs."diagrams-core" or (errorHandler.buildDepError "diagrams-core"))
-            (hsPkgs."diagrams-lib" or (errorHandler.buildDepError "diagrams-lib"))
-            (hsPkgs."diagrams-svg" or (errorHandler.buildDepError "diagrams-svg"))
             (hsPkgs."directory" or (errorHandler.buildDepError "directory"))
             (hsPkgs."edit-distance" or (errorHandler.buildDepError "edit-distance"))
             (hsPkgs."either" or (errorHandler.buildDepError "either"))
@@ -308,9 +299,6 @@
             (hsPkgs."criterion" or (errorHandler.buildDepError "criterion"))
             (hsPkgs."data-default" or (errorHandler.buildDepError "data-default"))
             (hsPkgs."deepseq" or (errorHandler.buildDepError "deepseq"))
-            (hsPkgs."diagrams-core" or (errorHandler.buildDepError "diagrams-core"))
-            (hsPkgs."diagrams-lib" or (errorHandler.buildDepError "diagrams-lib"))
-            (hsPkgs."diagrams-svg" or (errorHandler.buildDepError "diagrams-svg"))
             (hsPkgs."directory" or (errorHandler.buildDepError "directory"))
             (hsPkgs."edit-distance" or (errorHandler.buildDepError "edit-distance"))
             (hsPkgs."either" or (errorHandler.buildDepError "either"))

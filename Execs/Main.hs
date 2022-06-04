@@ -283,7 +283,7 @@ modeExec opts@CmdArgs.DefaultMode{} = do
             liftIO $ createDirectoryIfMissing False odir
             liftIO $ setupHtmlViewer odir
             liftIO $ T.writeFile (odir </> "script.ngl") ngltext
-            writeOutputJSImages odir fname ngltext
+            writeOutputJS odir fname ngltext
             writeOutputTSV False (Just $ odir </> "fq.tsv") (Just $ odir </> "mappings.tsv")
     exitSuccess
 

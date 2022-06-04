@@ -31,7 +31,7 @@ in pkgs.haskell-nix.stackProject {
     # ignore paths that change frequently, but do not contribute to the result
     filter = path: type: let baseName = baseNameOf (toString path); in !(pkgs.lib.elem baseName ignoredPaths);
   };
-  stack-sha256 = "15csmssghh848bpqkp1lvn6ss5cgf639gp9y108m7mksppp0wc0q";
+  stack-sha256 = "06l7xh0yza5p7bhyahq0ija1spcbmwr99cv33r4si8cm4y0xi217";
   materialized = ./build-scripts/release.materialized;
   inherit checkMaterialization;
 }

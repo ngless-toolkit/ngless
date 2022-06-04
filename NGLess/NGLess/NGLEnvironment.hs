@@ -57,7 +57,8 @@ data NGLEnvironment = NGLEnvironment
                     }
 
 parseVersion :: Maybe T.Text -> NGLess NGLVersion
-parseVersion Nothing = return $ NGLVersion 1 4
+parseVersion Nothing = return $ NGLVersion 1 5
+parseVersion (Just "1.5") = return $ NGLVersion 1 5
 parseVersion (Just "1.4") = return $ NGLVersion 1 4
 parseVersion (Just "1.3") = return $ NGLVersion 1 3
 parseVersion (Just "1.2") = return $ NGLVersion 1 2
@@ -76,7 +77,7 @@ parseVersion (Just v) = case T.splitOn "." v of
                                 throwScriptError $ concat ["The NGLess version string at the top of the file should only\ncontain a major and a minor version, separated by a dot.\n\n"
                                                         ,"You probably meant to write:\n\n"
                                                         ,"ngless \"" , T.unpack majV, ".", T.unpack minV, "\"\n"]
-                            [_, _] -> throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 1.[0-2] and 0.0/0.5-12 are available in this release)."]
+                            [_, _] -> throwScriptError $ concat ["Version ", T.unpack v, " is not supported (only versions 1.[0-5] and 0.0/0.5-12 are available in this release)."]
                             _ -> throwScriptError $ concat ["Version ", T.unpack v, " could not be understood. The version string should look like \"1.0\" or similar"]
 ngle :: IORef NGLEnvironment
 {-# NOINLINE ngle #-}
