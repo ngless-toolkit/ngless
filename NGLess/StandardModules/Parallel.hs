@@ -75,7 +75,8 @@ import Interpretation.Write (moveOrCopyCompress)
 
 import Utils.Utils (fmapMaybeM, allSame, moveOrCopy)
 import Utils.Conduit
-import Utils.LockFile
+import qualified Utils.LockFile as LockFile
+import           Utils.LockFile (LockParameters(..))
 
 syncFile :: FilePath -> IO ()
 #ifndef WINDOWS
@@ -113,10 +114,11 @@ unsafeCharMap = [('/', '_'),
 sanitizePath :: T.Text -> T.Text
 sanitizePath = T.map (\x -> fromMaybe x (lookup x unsafeCharMap))
 
-executeLock1 (NGOList entries) kwargs  = do
-    entries' <- mapM (stringOrTypeError "lock1") entries
-    hash <- lookupStringOrScriptError "lock1" "__hash" kwargs
-    tag <- lookupStringOrScriptErrorDef (return "") "collect arguments (hidden tag)" "__parallel_tag" kwargs
+executeLock1OrForAll funcname (NGOList entries) kwargs  = do
+    entries' <- mapM (stringOrTypeError funcname) entries
+    hash <- lookupStringOrScriptError funcname "__hash" kwargs
+    tag <- lookupStringOrScriptErrorDef (return "") "collect arguments (hidden tag)"
+                (if funcname == "lock1" then "__parallel_tag" else "tag") kwargs
     let prefix
             | T.null tag = ""
             | otherwise = T.unpack tag ++ "-"
@@ -127,7 +129,7 @@ executeLock1 (NGOList entries) kwargs  = do
     let saneentries = sanitizePath <$> entries'
         lockmap = zip saneentries entries'
     (e,rk) <- getLock lockdir saneentries
-    outputListLno' InfoOutput ["lock1: Obtained lock file: '", lockdir </> T.unpack e ++ ".lock", "'"]
+    outputListLno' InfoOutput [funcname, ": Obtained lock file: '", lockdir </> T.unpack e ++ ".lock", "'"]
     reportbase <- setupHashDirectory prefix "ngless-stats" hash
     let reportdir = reportbase </> T.unpack e
     outputListLno' InfoOutput ["Writing stats to '", reportdir, "'"]
@@ -147,7 +149,7 @@ executeLock1 (NGOList entries) kwargs  = do
             hPutStrLn h "Execution failed" -- TODO output log here
     return $! NGOString $ fromMaybe e $ lookup e lockmap
 
-executeLock1 arg _ = throwScriptError ("Wrong argument for lock1 (expected a list of strings, got `" ++ show arg ++ "`")
+executeLock1OrForAll func arg _ = throwScriptError ("Wrong argument for " ++ func ++ " (expected a list of strings, got `" ++ show arg ++ "`")
 
 
 lockName = (++ ".lock") . T.unpack
@@ -194,14 +196,14 @@ getLock' basedir (f:fs) = do
     finished <- liftIO $ doesFileExist (basedir </> finishedName f)
     if finished
         then getLock' basedir fs
-        else acquireLock LockParameters
+        else LockFile.acquireLock LockFile.LockParameters
                             { lockFname = lockname
                             , maxAge = fromInteger (60*60)
                                 -- one hour. Given that lock files are touched
                                 -- every ten minutes if things are good (see
                                 -- thread below), this is an indication that
                                 -- the process has crashed
-                            , whenExistsStrategy = IfLockedNothing
+                            , whenExistsStrategy = LockFile.IfLockedNothing
                             , mtimeUpdate = True } >>= \case
             Nothing -> getLock' basedir fs
             Just rk -> do
@@ -519,14 +521,14 @@ lock1 = Function
     , funcChecks = []
     }
 
-collectFunction = Function
+collectFunction isV11 = Function
     { funcName = FuncName "collect"
     , funcArgType = Just NGLCounts
     , funcArgChecks = []
     , funcRetType = NGLVoid
     , funcKwArgs =
-        [ArgInformation "current" True NGLString []
-        ,ArgInformation "allneeded" True (NGList NGLString) []
+        [ArgInformation "current" (not isV11) NGLString []
+        ,ArgInformation "allneeded" (not isV11) (NGList NGLString) []
         ,ArgInformation "ofile" True NGLString [ArgCheckFileWritable]
         ,ArgInformation "__can_move" False NGLBool []
         ,ArgInformation "comment" False NGLString []
@@ -561,22 +563,78 @@ pasteHiddenFunction = Function
     , funcChecks = []
     }
 
-parallelTransform :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
-parallelTransform script = addLockHash (processSetParallelTag script)
+
+
+runForAllFunction = Function
+    { funcName = FuncName "run_for_all"
+    , funcArgType = Just (NGList NGLString)
+    , funcArgChecks = []
+    , funcRetType = NGLString
+    , funcKwArgs =
+        [ ArgInformation "tag" False NGLString []
+        ]
+    , funcAllowsAutoComprehension = False
+    , funcChecks = []
+    }
+
+
+
+parallelTransform :: Bool -> [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+parallelTransform includeForAll = processRunForAll includeForAll >=> processSetParallelTag >=> addLockHash
 
 addLockHash :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
 addLockHash script = pureTransform addLockHash' script
     where
         addLockHash' :: Expression -> Expression
-        addLockHash' (FunctionCall (FuncName "lock1") expr kwargs block) =
-            FunctionCall (FuncName "lock1") expr ((Variable "__hash", ConstStr h):kwargs) block
-            where
-                h = T.pack . MD5.md5s . MD5.Str . show $ map snd script
+        addLockHash' (FunctionCall fn@(FuncName fname) expr kwargs block)
+            | fname `elem` ["lock1", "run_for_all"] =
+                FunctionCall fn expr ((Variable "__hash", ConstStr h):kwargs) block
+                where
+                    h = T.pack . MD5.md5s . MD5.Str . show $ map snd script
         addLockHash' e = e
 
+processRunForAll :: Bool -> [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+processRunForAll False = checkNoRunForAll
+processRunForAll True = processRunForAll' Nothing
 
-processSetParallelTag :: [(Int, Expression)] -> [(Int, Expression)]
-processSetParallelTag = processSetParallelTag' False
+processRunForAll' _ [] = return []
+processRunForAll' Nothing ((lno,expr):rest) = case expr of
+    Assignment v (FunctionCall (FuncName "run_for_all") slist kwargs _) -> do
+        let save_match = Assignment (Variable "$parallel$iterator") (Lookup (Just NGLString) v)
+            save_list  = Assignment (Variable "$parallel$list") slist
+            set_tag = do
+                tag <- lookup (Variable "tag") kwargs
+                return (lno,
+                        FunctionCall (FuncName "set_parallel_tag") tag [] Nothing)
+        rest' <- processRunForAll' (Just (lno, slist)) rest
+        let res = ((lno,expr):(lno,save_match):(lno,save_list):rest')
+        case set_tag of
+            Nothing -> return res
+            Just t -> return (t:res)
+    _ -> do
+        ((lno,expr):) <$> processRunForAll' Nothing rest
+processRunForAll' (Just prev) ((lno,e):rest) = case e of
+    Assignment _ (FunctionCall (FuncName "run_for_all") _ _ _) ->
+        throwScriptError ("The function 'run_for_all' can only be called once (seen on lines "++show prev++" and "++show lno++")")
+    FunctionCall fn@(FuncName "collect") expr kwargs block -> do
+        let kwargs' =  (Variable "allneeded", Lookup (Just NGLString) (Variable "$parallel$list"))
+                      :(Variable "current", Lookup (Just NGLString) (Variable "$parallel$iterator"))
+                      :kwargs
+            e' = FunctionCall fn expr kwargs' block
+        rest' <- processRunForAll' (Just prev) rest
+        return ((lno,e'):rest')
+    _ -> do
+        rest' <- processRunForAll' (Just prev) rest
+        return ((lno,e):rest')
+
+checkNoRunForAll = mapM checkNoRunForAll1
+    where
+        checkNoRunForAll1 (_,Assignment _ (FunctionCall (FuncName "run_for_all") _ _ _)) =
+            throwScriptError "Function 'run_for_all' is only available in parallel module version 1.1+. Please upgrade your import"
+        checkNoRunForAll1 e = return e
+
+processSetParallelTag :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
+processSetParallelTag = return . processSetParallelTag' False
     where
         processSetParallelTag' :: Bool -> [(Int, Expression)] -> [(Int, Expression)]
         processSetParallelTag' _ [] = []
@@ -594,23 +652,25 @@ processSetParallelTag = processSetParallelTag' False
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule v
-    | v `notElem` ["1.0", "0.6"] = throwScriptError ("The behaviour of the parallel module changed.\n"++
-                                    "Only versions 1.0 & 0.6 is now supported (currently attempting to import version '"++T.unpack v++"')")
-    | otherwise =
+    | v `notElem` ["1.1", "1.0", "0.6"] = throwScriptError ("The behaviour of the parallel module changed.\n"++
+                                    "Only versions 1.1/1.0/0.6 are now supported (currently attempting to import version '"++T.unpack v++"')")
+    | otherwise = do
+        let includeForAll = v == "1.1"
         return def
-        { modInfo = ModInfo "stdlib.parallel" "1.0"
-        , modFunctions =
-            [ lock1
-            , collectFunction
-            , setTagFunction
-            , pasteHiddenFunction
-            ]
-        , modTransform = parallelTransform
-        , runFunction = \case
-            "lock1" -> executeLock1
-            "collect" -> executeCollect
-            "set_parallel_tag" -> executeSetTag
-            "__paste" -> executePaste
-            _ -> error "Bad function name"
-        }
+            { modInfo = ModInfo "stdlib.parallel" v
+            , modFunctions =
+                [ lock1
+                , collectFunction includeForAll
+                , setTagFunction
+                , pasteHiddenFunction
+                ] ++ (if includeForAll then [runForAllFunction] else [])
+            , modTransform = parallelTransform includeForAll
+            , runFunction = \case
+                "lock1" -> executeLock1OrForAll "lock1"
+                "collect" -> executeCollect
+                "set_parallel_tag" -> executeSetTag
+                "run_for_all" -> executeLock1OrForAll "run_for_all"
+                "__paste" -> executePaste
+                _ -> error "Bad function name"
+            }
 

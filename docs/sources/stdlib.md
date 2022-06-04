@@ -8,23 +8,26 @@ This module allows you to run several parallel computations.
 command multiple times_ (one for each sample). These can be run in parallel
 (and even on different compute nodes on an HPC cluster).
 
-The module provides two functions: `lock1` and `collect`.
+### `run_for_all` interface (module versions 1.1 and above, for NGLess 1.5 and above)
 
-`lock1 :: [string] -> string` takes a list of strings and returns a single
-element. It uses the filesystem to obtain a lock file so that if multiple
-processes are running at once, each one will return a different element. NGLess
-also marks results as *finished* once you have run a script to completion.
+We will use two functions: `run_for_all` and `collect`.
+
+`run_for_all :: [string] -> string` takes a list of strings and returns a
+single element. It uses the filesystem to obtain a lock file so that if
+multiple processes are running at once, each one will return a different
+element. NGLess also marks results as *finished* once you have run a script to
+completion.
 
 The intended usage is that you simply run as many processes as inputs that you
 have and ngless will figure everything out.
 
 For example
 
-    ngless "1.0"
-    import "parallel" version "1.0"
+    ngless "1.5"
+    import "parallel" version "1.1"
 
     samples = ['Sample1', 'Sample2', 'Sample3']
-    current = lock1(samples)
+    current = run_for_all(samples)
 
 Now, when you run this script, `current` will be assigned to one of
 `'Sample1'`, `'Sample2'`, or `'Sample3'`. You can use this to find your input
@@ -32,12 +35,11 @@ data:
 
     input = paired("data/" + current + ".1.fq.gz", "data/" + current + ".2.fq.gz")
 
-Often, it's a good idea to combine `lock1` with `readlines` (a function which
+Often, it's a good idea to combine `run_for_all` with `readlines` (a function which
 returns the contents of all the non-empty lines in a file as a list of
 strings):
 
-    samples = readlines('samples.txt')
-    current = lock1(samples)
+    current = run_for_all(readlines('samples.txt'))
     input = paired("data/" + current + ".1.fq.gz", "data/" + current + ".2.fq.gz")
 
 You now use `input` as in any other ngless script:
@@ -53,12 +55,44 @@ counts together into a single table, for convenience:
 
     collect(
         counts,
+        ofile='outputs/counts.txt.gz')
+
+Now, only when all the samples have been processed, does NGLess collect all the
+results into a single table.
+
+
+### `lock1` interface (all versions, including older versions)
+
+Instead of `run_for_all`, you can use `lock1` which is more flexible, but also
+potentially more complex.
+
+`lock1 :: [string] -> string` takes a list of strings and returns a single
+element. It has the exact same locking mechanism as `run_for_all` and using it
+is very similar:
+
+    ngless "1.4"
+    import "parallel" version "1.0"
+
+    samples = ['Sample1', 'Sample2', 'Sample3']
+    current = lock1(samples)
+
+
+The main difference is that with `lock1`, if you also use the `collect`
+function, you need to explicitly pass the arguments `current` and `allneeded`
+to `collect`:
+
+    collect(
+        counts,
         current=current,
         allneeded=samples,
         ofile='outputs/counts.txt.gz')
 
 Now, only when all the samples in the `allneeded` argument have been processed,
-does ngless collect all the results into a single table.
+does NGLess collect all the results into a single table.
+
+The advantage of `lock1` over `run_for_all` is that you can have _multiple_
+`lock1()` calls in the same script (only one `run_for_all` is accepted and
+applies to the whole script).
 
 #### Full "parallel" example
 
