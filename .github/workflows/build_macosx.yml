@@ -1,6 +1,10 @@
 name: NGLess MacOSX Build
 
-on: [push]
+on:
+  push:
+    tags:
+    - 'v*'
+    - 'trigger*'
 
 jobs:
     job_1:
@@ -16,7 +20,7 @@ jobs:
       - name: install
         run: |
             stack setup
-            make 
+            make
             make install CXX=g++-8 prefix=ngless_path/ngless
       - name: upload
         uses: actions/upload-artifact@v2
