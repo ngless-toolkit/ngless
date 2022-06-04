@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE CPP #-}
-{- Copyright 2016-2020 NGLess Authors
+{- Copyright 2016-2022 NGLess Authors
  - License: MIT
  -}
 
@@ -33,7 +33,7 @@ import Interpretation.FastQ (executeGroup, executePaired, executeFastq)
 exts :: [FilePath]
 exts = do
     fq <- ["fq", "fastq"]
-    comp <- ["", ".gz", ".bz2"]
+    comp <- ["", ".gz", ".bz2", ".xz"]
     return $! fq ++ comp
 
 pairedEnds :: [(String, String)]

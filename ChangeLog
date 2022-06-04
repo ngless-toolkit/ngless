@@ -1,3 +1,6 @@
+Unreleased
+	* Support .xz compressed files in load_fastq_directory
+
 Version 1.4.1 2022-06-03 by luispedro
 	* Fix bug with split mapping
 	* Fix packaging for hackage
