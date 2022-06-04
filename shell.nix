@@ -19,5 +19,12 @@ in pkgs.mkShell {
     pkgs.which
     pkgs.zstd
   ];
+  shellHook = ''
+    export NGLESS_SAMTOOLS_BIN=${pkgs.samtools}/bin/samtools
+    export NGLESS_BWA_BIN=${pkgs.bwa}/bin/bwa
+    export NGLESS_PRODIGAL_BIN=${pkgs.prodigal}/bin/prodigal
+    export NGLESS_MEGAHIT_BIN=${pkgs.megahit}/bin/megahit
+    export NGLESS_MINIMAP2_BIN=${pkgs.minimap2}/bin/minimap2
+  '';
 
 }
