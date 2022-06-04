@@ -40,7 +40,7 @@ auto-detection (see below).
 ``strict-threads``: by default, NGLess will, in certain conditions, use more
 CPUs than specified by the ``jobs`` argument (in bursts of activity). This
 happens, for example, when it calls an external short-read-mapper (such as `bwa
-<http://bio-bwa.sourceforge.net/bwa.shtml>`__). By default, it will pass the
+<https://bio-bwa.sourceforge.net/bwa.shtml>`__). By default, it will pass the
 threads argument through to ``bwa``. However, it will still be processing
 ``bwa``'s output using its own threads. This will results in small bursts of
 activity where the CPU usage is above ``jobs``. If you specify

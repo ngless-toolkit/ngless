@@ -8,7 +8,7 @@ Example
 -------
 
 This example will use data from a real experiment stored at EMBL-EBI. The data
-can be accessed at http://www.ebi.ac.uk/ena/data/view/SRP023199 and represent
+can be accessed at https://www.ebi.ac.uk/ena/data/view/SRP023199 and represent
 **HeLa cells**. The idea is to preprocess the data set, map it against the
 human genome and count the reads that overlap with known genes.
 

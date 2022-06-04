@@ -15,7 +15,7 @@ metagenomes.
 .. note::
     This tutorial uses the full Ocean Microbial Reference Gene Catalog
     presented in `Structure and function of the global ocean microbiome
-    <http://science.sciencemag.org/content/348/6237/1261359.long>`__ Sunagawa,
+    <https://science.sciencemag.org/content/348/6237/1261359.long>`__ Sunagawa,
     Coelho, Chaffron, et al., Science, 2015
 
     This catalog contains ca. 40 million genes and requires **56GiB** of RAM

@@ -52,7 +52,7 @@ Add new model organisms can similarly be done with simple YAML file.
 More advanced extensions can be done in Haskell, but this is considered a
 solution for advanced users.
 
-## Couldn't you just use Docker/[Bioboxes](http://bioboxes.org/)?
+## Couldn't you just use Docker/[Bioboxes](https://bioboxes.org/)?
 
 Short answer: Bioboxes gets us part of the way there, but not all of it;
 however, if we think of these technologies as complements, we might get more
@@ -74,7 +74,8 @@ experience than is possible with a generic tool. In particular, when the user
 makes a mistake (and all users will make mistakes), we can diagnose it faster
 and provide a better error message than is possible to do with Bioboxes.
 
-## What is the relationship of ngless to the [Common Workflow Language](http://common-workflow-language.github.io/)?
+## What is the relationship of ngless to the [Common Workflow
+Language](https://common-workflow-language.github.io/)?
 
 Like for the question above, we consider ngless to be related to but not
 overlapping with the CWL (Common Workflow Language).

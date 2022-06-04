@@ -13,7 +13,7 @@ Filtering reads based on quality is performed with the ``preprocess`` function,
 which takes a block of code. This block of code will be executed for each read.
 For example::
 
-    ngless "0.8"
+    ngless "1.4"
 
     input = fastq('input.fq.gz')
 
@@ -45,7 +45,7 @@ Within the preprocess block, you can modify the read in several ways:
   method).
 
 You can combine these in different ways. For example, the behaviour of the
-`fastx quality trimmer <http://hannonlab.cshl.edu/fastx_toolkit/>`__ can be
+`fastx quality trimmer <https://hannonlab.cshl.edu/fastx_toolkit/>`__ can be
 recreated as::
 
     preprocess(input) using |r|:

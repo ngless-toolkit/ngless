@@ -9,7 +9,7 @@ Python package management tools:
 All of the wrappers can install NGLess if passed the `--auto-install` flag.
 
 All of these wrappers also have [Common Workflow
-Language](http://www.commonwl.org/) so that they can be used in larger
+Language](https://www.commonwl.org/) so that they can be used in larger
 pipelines.
 
 ## ngless-install.py

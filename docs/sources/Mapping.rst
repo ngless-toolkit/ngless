@@ -4,7 +4,7 @@ Mapping
 Mapping is one of the major functions of NGLess. Here we describe, in more
 detail, some of its functionality.
 
-Mapping is implemented using `bwa <http://bio-bwa.sourceforge.net/>`__. As of
+Mapping is implemented using `bwa <https://bio-bwa.sourceforge.net/>`__. As of
 version 1.4, NGLess uses *bwa 0.7.17* by default.
 
 By default, bwa is called with default parameters. If the ``mode_all`` argument

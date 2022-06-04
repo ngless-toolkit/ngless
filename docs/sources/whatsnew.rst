@@ -121,7 +121,7 @@ User-visible improvements
 - More flexible loading of ``functional_map`` arguments in `count
   <https://ngless.embl.de/Functions.html#count>`__ to accept multiple comment
   lines at the top of the file as produced by `eggnog-mapper
-  <http://eggnog-mapper.embl.de/>`__.
+  <https://eggnog-mapper.embl.de/>`__.
 - Added ``sense`` argument to the `count
   <https://ngless.embl.de/Functions.html#count>`__ function, generalizing the
   previous ``strand`` argument (which is deprecated). Whereas before it was

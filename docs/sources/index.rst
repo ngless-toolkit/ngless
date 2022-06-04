@@ -55,7 +55,7 @@ Basic functionality
 
 -  preprocessing and quality control of FastQ files
 -  mapping to a reference genome (implemented through
-   `bwa <http://bio-bwa.sourceforge.net/>`__ by default)
+   `bwa <https://bio-bwa.sourceforge.net/>`__ by default)
 -  assembly of contigs
 -  annotation and summarization of the alignments using reference gene
    annotations
@@ -164,11 +164,11 @@ from another programme (not just ``cat``).
 Authors
 -------
 
--  `Luis Pedro Coelho <http://luispedro.org>`__ (email: coelho@embl.de)
+-  `Luis Pedro Coelho <https://luispedro.org>`__ (email: coelho@embl.de)
    (on twitter: `@luispedrocoelho <https://twitter.com/luispedrocoelho>`__)
 -  Paulo Monteiro
 -  Renato Alves
--  `Ana Teresa Freitas <http://web.tecnico.ulisboa.pt/ana.freitas/>`__
+-  `Ana Teresa Freitas <https://web.tecnico.ulisboa.pt/ana.freitas/>`__
 -  Peer Bork
 
 

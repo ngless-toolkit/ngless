@@ -54,7 +54,7 @@ The following table represents organisms provided by default:
 +-----------+-----------------------------+-------------------+---------+
 
 These archives are all created using versions 75, 85 and 90 of `Ensembl
-<http://www.ensembl.org/>`__.
+<https://www.ensembl.org/>`__.
 
 Automatic installation
 ----------------------

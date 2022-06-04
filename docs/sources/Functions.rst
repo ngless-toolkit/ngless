@@ -536,7 +536,7 @@ expansion <searchpath.html>`__.
 The ``functional_map`` should be a tab-separated file where the first column is
 the sequence name and the other columns are the annotations. This is often used
 for gene catalogues and can be produced by `eggnog-mapper
-<http://eggnog-mapper.embl.de/>`__.
+<https://eggnog-mapper.embl.de/>`__.
 
 ``features``: which features to count. If a GFF file is used, this refers to
 the "features" field.
