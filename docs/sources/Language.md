@@ -34,7 +34,7 @@ Integers are specified as decimals ``[0-9]+`` or as hexadecimals
 The first line (ignoring comments and empty lines) of an NGLess file MUST be a
 version declaration:
 
-    ngless "0.9"
+    ngless "1.4"
 
 
 ## Module Import Statements

@@ -26,7 +26,7 @@ first step will allow you to perform quality control.
 
 ::
 
-	ngless "0.0"
+	ngless "1.4"
 
 	/* load the data set */
 	input = fastq('SRR867735.fastq.gz')

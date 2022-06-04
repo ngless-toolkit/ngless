@@ -17,7 +17,7 @@ The rules are simple: the script must use `ARGV` for its inputs and outputs.
 For example, this is a conforming script:
 
 
-    ngless "0.8"
+    ngless "1.4"
 
     mapped = samfile(ARGV[1])
 
