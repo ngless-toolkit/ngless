@@ -14,7 +14,7 @@ import Data.Version (showVersion)
 import Paths_NGLess (version)
 
 versionStr :: String
-versionStr = showVersion version
+versionStr = "1.4.1"
 
 versionStrLong :: String
 versionStrLong = "1.4.1"
