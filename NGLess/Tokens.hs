@@ -1,4 +1,4 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, CPP #-}
@@ -125,7 +125,16 @@ constants =
         ,"STDOUT"
         ]
 
-variableStr = (:) <$> (char '_' <|> letter) <*> many (char '_' <|> alphaNum)
+variableStrSimple = (:) <$> (char '_' <|> letter) <*> many (char '_' <|> alphaNum)
+-- variableStr is `variableStrSimple` or `variableStrSimple`::`variableStrSimple`
+variableStr = do
+    s <- variableStrSimple
+    let long = try $ do
+            _ <- string "::"
+            s' <- variableStrSimple
+            return $ concat [s, "::", s']
+    long <|> return s
+
 operator = TOperator <$> oneOf "=,+-*():[]<>.|"
 boperator =
         -- Check for a not-so-unreasonable user mistake
