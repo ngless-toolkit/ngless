@@ -1,4 +1,4 @@
-{- Copyright 2015-2021 NGLess Authors
+{- Copyright 2015-2022 NGLess Authors
  - License: MIT
  -}
 
@@ -147,6 +147,7 @@ instance Aeson.FromJSON ReadNGLType where
             "counts" -> return NGLCounts
             "readset" -> return NGLReadSet
             "mappedreadset" -> return NGLMappedReadSet
+            "sequenceset" -> return NGLSequenceSet
             other -> fail ("Cannot parse unknown type '"++T.unpack other++"'")
 
 data CommandReturn = CommandReturn
@@ -303,6 +304,7 @@ executeCommand basedir cmds funcname input args = do
         Just (newfp, _) -> case commandReturnType $ ret cmd of
             NGLCounts -> return $ NGOCounts (File newfp)
             NGLMappedReadSet -> return $ NGOMappedReadSet (groupName input) (File newfp) Nothing
+            NGLSequenceSet -> return $ NGOSequenceSet newfp
             ret -> throwShouldNotOccur ("Not implemented (ExternalModules.hs:executeCommand commandReturnType = "++show ret++")")
 
 adjustCompression :: Maybe CommandExtra -> FilePath -> NGLessIO FilePath
