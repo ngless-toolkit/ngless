@@ -16,6 +16,7 @@ module NGLess
     , boolOrTypeError
     , symbolOrTypeError
     , stringOrTypeError
+    , filepathOrTypeError
     , integerOrTypeError
     , decodeSymbolOrError
     , lookupBoolOrScriptError
@@ -59,6 +60,14 @@ stringOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m T.Tex
 stringOrTypeError _ (NGOString s) = return s
 stringOrTypeError _ (NGOFilename s) = return (T.pack s)
 stringOrTypeError context val = throwScriptError ("Expected a string (received " ++ show val ++ ") in context '" ++ context ++ "'")
+
+-- | If argument represents a file, then return it; otherwise, raise an error
+filepathOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m FilePath
+filepathOrTypeError _ (NGOString s) = return (T.unpack s)
+filepathOrTypeError _ (NGOFilename s) = return s
+filepathOrTypeError _ (NGOSequenceSet fp) = return fp
+filepathOrTypeError context val = throwScriptError ("Expected a filepath (received " ++ show val ++ ") in context '" ++ context ++ "'")
+
 
 -- | If argument is an NGOInteger, then unwraps it; else it raises a type error
 integerOrTypeError :: (MonadError NGError m) => String -> NGLessObject -> m Integer

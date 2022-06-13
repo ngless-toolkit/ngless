@@ -1,4 +1,4 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -15,12 +15,11 @@ import qualified Data.Text as T
 import qualified Data.Map as Map
 import           Control.Arrow
 import Data.Maybe
-import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Trans.Except
-import Control.Monad.Reader
+import Control.Monad.Reader (ReaderT(..), asks)
 import Control.Monad.Writer
-import Control.Applicative
+import           Control.Applicative ((<|>))
 import           Data.String (fromString)
 import           Data.List (find, foldl')
 import           Data.Functor (($>))
@@ -327,10 +326,15 @@ checkFuncUnnamed f arg = do
         checkfunctype NGLAny NGLVoid = errorInLineC
                                     ["Function '", show f, "' can take any type, but the input is of illegal type Void."]
         checkfunctype NGLAny _ = return ()
+        checkfunctype NGLString NGLSequenceSet = return ()
         checkfunctype t t'
-                | t /= t' = errorInLineC
+                | t' `trivialConvertable` t = return ()
+                | otherwise = errorInLineC
                                     ["Bad type in function call (function '", show f,"' expects ", show t, " got ", show t', ")."]
-                | otherwise = return ()
+
+trivialConvertable :: NGLType -> NGLType -> Bool
+trivialConvertable NGLSequenceSet NGLString = True
+trivialConvertable t t' = t == t'
 
 checkFuncKwArgs :: FuncName -> [(Variable, Expression)] -> TypeMSt ()
 checkFuncKwArgs f args = do
@@ -350,10 +354,10 @@ check1arg ferr arginfo (Variable v, e) = do
             ++ map ((\aname -> "\t"++aname++"\n") . T.unpack . argName) arginfo
         (_, Nothing) -> return () -- Could not infer type of argument. Maybe an error, but maybe not
         (Just ainfo', Just t') ->
-            when (argType ainfo' /= t') $
+            unless (t' `trivialConvertable` argType ainfo') $
                 errorInLineC
-                    ["Bad argument type in ", ferr ,", variable " , show v, ". ",
-                    "Expected ", show . argType $ ainfo', " got ", show t', "."]
+                    ["Bad argument type in ", ferr ,", argument " , show v, " ",
+                    "(expected ", show . argType $ ainfo', " got ", show t', ")."]
 
 
 requireType :: NGLType -> Expression -> TypeMSt NGLType

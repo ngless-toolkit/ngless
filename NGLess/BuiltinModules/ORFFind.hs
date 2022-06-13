@@ -1,4 +1,4 @@
-{- Copyright 2017-2019 NGLess Authors
+{- Copyright 2017-2022 NGLess Authors
  - License: MIT
  -}
 
@@ -23,7 +23,7 @@ import Utils.Utils (fmapMaybeM)
 executeORFFind :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeORFFind "orf_find" expr kwargs = do
     input <- case expr of
-            NGOSequenceSet f -> return f
+            NGOSequenceSet f -> return $ File f
             NGOFilename f -> return $ File f
             NGOString f -> return $ File (T.unpack f)
             _ -> throwScriptError ("orf_find first argument should have been sequenceset, got '"++show expr++"'")

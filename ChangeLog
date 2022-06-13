@@ -1,4 +1,6 @@
 Unreleased
+	* Make 'assemble' return NGLSequenceSet type and add sequenceset to
+	external modules
 	* Allow `::` in names (for module::function notation)
 	* Add `run_for_all` in parallel module
 	* Support .xz compressed files in load_fastq_directory

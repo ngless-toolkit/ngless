@@ -264,6 +264,11 @@ executeWrite (NGOFilename fp) args = do
     moveOrCopyCompress (woCanMove opts) fp (woOFile opts)
     return (NGOFilename $ woOFile opts)
 
+executeWrite (NGOSequenceSet fp) args = do
+    opts <- parseWriteOptions args
+    moveOrCopyCompress (woCanMove opts) fp (woOFile opts)
+    return $ NGOSequenceSet (woOFile opts)
+
 executeWrite v _ = throwShouldNotOccur ("Error: executeWrite of " ++ show v ++ " not implemented yet.")
 
 

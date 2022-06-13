@@ -60,14 +60,14 @@ executeAssemble "assemble" expr kwargs = do
     outputListLno' DebugOutput ["Calling megahit: ", megahitPath, " ", unwords args]
     runProcess megahitPath args (return ()) (Left ())
     release mt
-    return $! NGOFilename (odir </> "final.contigs.fa")
+    return $! NGOSequenceSet (odir </> "final.contigs.fa")
 executeAssemble _ _ _ = throwScriptError "unexpected code path taken [megahit:assemble]"
 
 assembleFunction = Function
     { funcName = FuncName "assemble"
     , funcArgType = Just NGLReadSet
     , funcArgChecks = []
-    , funcRetType = NGLString
+    , funcRetType = NGLSequenceSet
     , funcKwArgs = [ArgInformation "__extra_megahit_args" False (NGList NGLString) []]
     , funcAllowsAutoComprehension = False
     , funcChecks =

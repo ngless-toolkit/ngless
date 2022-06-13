@@ -100,7 +100,7 @@ data NGLessObject =
         | NGOFilename !FilePath
         | NGOShortRead !ShortRead
         | NGOReadSet T.Text ReadSet
-        | NGOSequenceSet FileOrStream
+        | NGOSequenceSet !FilePath
         | NGOMappedReadSet
                     { nglgroupName :: T.Text
                     , nglSamFile :: FileOrStream

@@ -169,7 +169,7 @@ lookupReference args = do
         (Nothing, Nothing) -> throwScriptError "Either reference or fafile must be passed"
         (Just _, Just _) -> throwScriptError "Reference and fafile cannot be used simmultaneously"
         (Just r, Nothing) -> PackagedReference <$> stringOrTypeError "reference in map argument" r
-        (Nothing, Just fa) -> (FaFile . T.unpack) <$> stringOrTypeError "fafile in map argument" fa
+        (Nothing, Just fa) -> FaFile <$> filepathOrTypeError "fafile in map argument" fa
 
 
 mapToReference :: Mapper -> FilePath -> ReadSet -> [String] -> NGLessIO (FilePath, (Int, Int, Int))

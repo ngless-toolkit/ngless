@@ -11,6 +11,7 @@ module BuiltinModules.Checks
 
 import qualified Data.Text as T
 import           Data.Default (def)
+import Control.Monad.Extra (whenJust)
 import Control.Monad.Except
 import System.Directory
 import System.FilePath (takeDirectory)
@@ -37,17 +38,19 @@ checkOFile ofile = do
 
 executeChecks :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeChecks "__check_ofile" expr args = do
-    oname <- stringOrTypeError "o file check" expr
+    oname <- stringOrTypeError "output file check" expr
     lno <- lookupIntegerOrScriptError "o file lno" "original_lno" args
     liftIO (checkOFile oname) >>= \case
         Nothing -> return NGOVoid
         Just err -> throwSystemError $! concat [T.unpack err, " (used in line ", show lno, ")."]
 executeChecks "__check_ifile" expr args = do
-    oname <- stringOrTypeError "input file check" expr
-    lno <- lookupIntegerOrScriptError "inputo file lno" "original_lno" args
-    liftIO (checkFileReadable $ T.unpack oname) >>= \case
-        Nothing -> return NGOVoid
-        Just err -> throwSystemError $! concat [T.unpack err, " (used in line ", show lno, ")."]
+    fname <- filepathOrTypeError "checking input file" expr
+    lno <- lookupIntegerOrScriptError "input file lno" "original_lno" args
+    merr <- liftIO (checkFileReadable fname)
+    whenJust merr $ \err ->
+        throwSystemError $! concat [T.unpack err, " (used in line ", show lno, ")."]
+    return NGOVoid
+
 executeChecks "__check_index_access" (NGOList vs) args = do
     lno <- lookupIntegerOrScriptError "index access check" "original_lno" args
     index1 <- lookupIntegerOrScriptError "index access check" "index1" args

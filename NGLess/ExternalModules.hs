@@ -58,6 +58,7 @@ data FileTypeBase =
     | SamFile
     | BamFile
     | SamOrBamFile
+    | FastaFile
     | TSVFile
     deriving (Eq,Show)
 
@@ -120,6 +121,7 @@ instance Aeson.FromJSON CommandArgument where
             "readset" -> return (NGLReadSet, Nothing)
             "counts" -> return (NGLCounts, Nothing)
             "mappedreadset" -> return (NGLMappedReadSet, Nothing)
+            "sequenceset" -> return (NGLSequenceSet, Nothing)
             _ -> fail ("unknown argument type "++atype)
         argChecks <- if atype == "option"
                 then do
@@ -337,6 +339,7 @@ asFilePaths (NGOMappedReadSet _ input _) payload = (:[]) <$> do
             SamFile -> asSamFile filepath payload
             BamFile -> asBamFile filepath
             SamOrBamFile -> adjustCompression payload filepath
+            FastaFile -> adjustCompression payload filepath
             _ -> throwScriptError "Unexpected combination of arguments"
         Just other -> throwShouldNotOccur ("encodeArgument: unexpected payload: "++show other)
 asFilePaths invalid _ = throwShouldNotOccur ("AsFile path got "++show invalid)
@@ -483,6 +486,7 @@ checkSyntax ExternalModule{..} = forM_ emFunctions $ \f -> do
                 ,(NGLMappedReadSet, SamFile)
                 ,(NGLMappedReadSet, BamFile)
                 ,(NGLMappedReadSet, SamOrBamFile)
+                ,(NGLSequenceSet, FastaFile)
                 ,(NGLCounts, TSVFile)
                 ]
 

@@ -234,7 +234,7 @@ gcTemps = do
                             NGOFilename f -> [f]
                             NGOShortRead _ -> []
                             NGOReadSet _ rs -> extractFilesRS rs
-                            NGOSequenceSet s -> origin s
+                            NGOSequenceSet f -> [f]
                             NGOMappedReadSet _ s _ -> origin s
                             NGOMappedRead _ -> []
                             NGOCounts s -> origin s
