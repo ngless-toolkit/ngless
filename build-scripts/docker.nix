@@ -1,6 +1,6 @@
 { version ? "latest" }:
 let
-  release = import ../release.nix;
+  release = (import ../release.nix) {};
   pkgs = release.pkgs;
 
 in pkgs.dockerTools.buildImage {
