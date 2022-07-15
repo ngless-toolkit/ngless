@@ -57,6 +57,7 @@ builtinFunctions ver =
     ,Function (FuncName "write") (Just NGLAny) [] (if ver >= NGLVersion 1 4 then NGLString else NGLVoid) writeArgs False []
 
     ,Function (FuncName "print") (Just NGLAny) [] NGLVoid [] False []
+    ,Function (FuncName "println") (Just NGLAny) [] NGLVoid [] False []
 
     ,Function (FuncName "read_int") (Just NGLString) [] NGLInteger [ArgInformation "on_empty_return" False NGLInteger []] False []
     ,Function (FuncName "read_double") (Just NGLString) [] NGLDouble [ArgInformation "on_empty_return" False NGLDouble []] False []

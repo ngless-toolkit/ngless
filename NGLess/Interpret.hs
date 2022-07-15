@@ -334,6 +334,7 @@ interpretFunction' (FuncName "count")     expr args Nothing = runNGLessIO (execu
 interpretFunction' (FuncName "__check_count") expr args Nothing = runNGLessIO (executeCountCheck expr args)
 interpretFunction' (FuncName "countfile") expr args Nothing = runNGLessIO (executeCountFile expr args)
 interpretFunction' (FuncName "print")     expr args Nothing = executePrint expr args
+interpretFunction' (FuncName "println")   expr args Nothing = executePrint expr args >> executePrint (NGOString "\n") args
 interpretFunction' (FuncName "read_int")  expr args Nothing = executeReadInt expr args
 interpretFunction' (FuncName "read_double")  expr args Nothing = executeReadDouble expr args
 interpretFunction' (FuncName "paired")   mate1 args Nothing = runNGLessIO (executePaired mate1 args)

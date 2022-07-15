@@ -16,6 +16,8 @@ User-visible Improvements
 
 will print ``my-sample``.
 
+- Added ``println`` function which works like ``print`` but prints a newline after the output.
+
 Version 1.4.1
 -------------
 

@@ -2,7 +2,7 @@ ngless "1.2"
 
 input = load_fastq_directory('sample')
 
-print(input.name())
+println(input.name())
 
 trim = 3
 input = preprocess(input) using |read|:
