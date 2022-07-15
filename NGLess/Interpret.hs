@@ -1,4 +1,4 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, CPP #-}
@@ -520,6 +520,7 @@ executeMethod method (NGOMappedRead samline) arg kwargs = runNGLess (executeMapp
 executeMethod method (NGOShortRead sr) arg kwargs = runNGLess (executeShortReadsMethod method sr arg kwargs)
 executeMethod (MethodName "to_string") (NGODouble val) _ _  = return . NGOString . T.pack . show $ val
 executeMethod (MethodName "to_string") (NGOInteger val) _ _ = return . NGOString . T.pack . show $ val
+executeMethod (MethodName "name") (NGOReadSet n _) _ _ = return $ NGOString n
 executeMethod m self arg kwargs = throwShouldNotOccur ("Method " ++ show m ++ " with self="++show self ++ " arg="++ show arg ++ " kwargs="++show kwargs ++ " is not implemented")
 
 

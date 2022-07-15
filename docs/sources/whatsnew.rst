@@ -2,6 +2,20 @@
 What's New (History)
 ====================
 
+Unreleased (Github version)
+---------------------------
+
+User-visible Improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Added ``name()`` method to ``ReadSet`` objects, so you can do::
+
+
+    input = load_fastq_directory("my-sample")
+    print(input.name())
+
+will print ``my-sample``.
+
 Version 1.4.1
 -------------
 
