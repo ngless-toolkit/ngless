@@ -190,6 +190,7 @@ Authors
    Functions
    methods
    LoadFastQDirectory
+   yaml-list
    stdlib
    modules
    count

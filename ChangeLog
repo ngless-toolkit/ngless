@@ -1,4 +1,5 @@
 Unreleased
+	* Add ability to specify samples using YAML format
 	* Make 'assemble' return NGLSequenceSet type and add sequenceset to
 	external modules
 	* Allow `::` in names (for module::function notation)

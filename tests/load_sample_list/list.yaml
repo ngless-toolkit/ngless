@@ -1,0 +1,5 @@
+samples:
+  sample:
+    - paired:
+        - sample/funny_one.gz
+        - sample/funny_two.gz
