@@ -1,4 +1,4 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 
@@ -86,6 +86,7 @@ data NGLType =
         | NGLSequenceSet
         | NGLCounts
         | NGLVoid
+        | NGLUnion [NGLType]
         | NGLAny
         | NGList !NGLType
     deriving (Eq, Ord, Show)

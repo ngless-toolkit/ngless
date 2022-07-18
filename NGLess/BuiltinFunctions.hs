@@ -38,6 +38,8 @@ builtinModule ver@(NGLVersion majV minV) = def
     , modFunctions = builtinFunctions ver
     }
 
+printType = NGLUnion [NGLString, NGLInteger, NGLDouble]
+
 builtinFunctions ver =
     [Function (FuncName "fastq") (Just NGLString) [ArgCheckFileReadable] NGLReadSet fastqArgs False []
     ,Function (FuncName "paired") (Just NGLString) [ArgCheckFileReadable] NGLReadSet pairedArgs False []
@@ -56,8 +58,8 @@ builtinFunctions ver =
     ,Function (FuncName "countfile") (Just NGLString) [ArgCheckFileReadable] NGLCounts [] False [FunctionCheckReturnAssigned]
     ,Function (FuncName "write") (Just NGLAny) [] (if ver >= NGLVersion 1 4 then NGLString else NGLVoid) writeArgs False []
 
-    ,Function (FuncName "print") (Just NGLAny) [] NGLVoid [] False []
-    ,Function (FuncName "println") (Just NGLAny) [] NGLVoid [] False []
+    ,Function (FuncName "print") (Just printType) [] NGLVoid [] False []
+    ,Function (FuncName "println") (Just printType) [] NGLVoid [] False []
 
     ,Function (FuncName "read_int") (Just NGLString) [] NGLInteger [ArgInformation "on_empty_return" False NGLInteger []] False []
     ,Function (FuncName "read_double") (Just NGLString) [] NGLDouble [ArgInformation "on_empty_return" False NGLDouble []] False []

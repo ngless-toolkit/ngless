@@ -1,4 +1,4 @@
-ngless "1.1"
+ngless "1.5"
 
 input = readlines('input.txt')
 print(input[0])
@@ -7,3 +7,6 @@ print(input[2])
 print("\n")
 print(input[3])
 print("\n")
+println(2)
+println(3)
+println(3.14)

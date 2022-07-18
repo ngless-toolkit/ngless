@@ -327,10 +327,14 @@ checkFuncUnnamed f arg = do
                                     ["Function '", show f, "' can take any type, but the input is of illegal type Void."]
         checkfunctype NGLAny _ = return ()
         checkfunctype NGLString NGLSequenceSet = return ()
+        checkfunctype (NGLUnion ts) t
+            | any (`trivialConvertable` t) ts = return ()
+            | otherwise = errorInLineC
+                ["Function '", show f, "' can take any of ", show ts, " but the input is of illegal type ", show t, "."]
         checkfunctype t t'
-                | t' `trivialConvertable` t = return ()
-                | otherwise = errorInLineC
-                                    ["Bad type in function call (function '", show f,"' expects ", show t, " got ", show t', ")."]
+            | t' `trivialConvertable` t = return ()
+            | otherwise = errorInLineC
+                                ["Bad type in function call (function '", show f,"' expects ", show t, " got ", show t', ")."]
 
 trivialConvertable :: NGLType -> NGLType -> Bool
 trivialConvertable NGLSequenceSet NGLString = True

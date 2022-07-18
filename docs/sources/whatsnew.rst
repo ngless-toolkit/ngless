@@ -9,15 +9,12 @@ User-visible Improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Add ``load_sample_list`` function to load samples in YAML format (see `YAML Samples <yaml-list.html>`_)
-
 - Added ``name()`` method to ``ReadSet`` objects, so you can do::
-
 
     input = load_fastq_directory("my-sample")
     print(input.name())
-
-will print ``my-sample``.
-
+which will print ``my-sample``.
+- Make ``print()`` accept ints and doubles as well as strings
 - Added ``println`` function which works like ``print`` but prints a newline after the output.
 
 Version 1.4.1

@@ -538,6 +538,8 @@ interpretPBlock1 block var r = do
 
 executePrint :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
 executePrint (NGOString s) [] = liftIO (T.putStr s) >> return NGOVoid
+executePrint (NGOInteger i) [] = liftIO (putStr $ show i) >> return NGOVoid
+executePrint (NGODouble d) [] = liftIO (putStr $ show d) >> return NGOVoid
 executePrint err  _ = throwScriptError ("Cannot print " ++ show err)
 
 executeReadInt :: NGLessObject -> [(T.Text, NGLessObject)] -> InterpretationEnvIO NGLessObject
