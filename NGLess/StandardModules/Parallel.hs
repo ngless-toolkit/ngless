@@ -115,7 +115,14 @@ sanitizePath :: T.Text -> T.Text
 sanitizePath = T.map (\x -> fromMaybe x (lookup x unsafeCharMap))
 
 executeLock1OrForAll funcname (NGOList entries) kwargs  = do
-    entries' <- mapM (stringOrTypeError funcname) entries
+    let readSetOrTypeError (NGOReadSet name _) = return name
+        readSetOrTypeError _ = throwShouldNotOccur "Expected a readset"
+    entries' <- case entries of
+        [] -> throwDataError "Cannot run on empty list"
+        (NGOString _:_) -> mapM (stringOrTypeError funcname) entries
+        (NGOReadSet _ _:_) -> mapM (readSetOrTypeError) entries
+        _ -> throwScriptError ("Unsupported type for function " ++ funcname)
+
     hash <- lookupStringOrScriptError funcname "__hash" kwargs
     tag <- lookupStringOrScriptErrorDef (return "") "collect arguments (hidden tag)"
                 (if funcname == "lock1" then "__parallel_tag" else "tag") kwargs
@@ -127,7 +134,6 @@ executeLock1OrForAll funcname (NGOList entries) kwargs  = do
     -- what file was locked and return the unsanitized name
     -- See also https://github.com/ngless-toolkit/ngless/issues/68
     let saneentries = sanitizePath <$> entries'
-        lockmap = zip saneentries entries'
     (e,rk) <- getLock lockdir saneentries
     outputListLno' InfoOutput [funcname, ": Obtained lock file: '", lockdir </> T.unpack e ++ ".lock", "'"]
     reportbase <- setupHashDirectory prefix "ngless-stats" hash
@@ -147,7 +153,11 @@ executeLock1OrForAll funcname (NGOList entries) kwargs  = do
         let logfile = lockdir </> T.unpack e ++ ".failed"
         withFile logfile WriteMode $ \h ->
             hPutStrLn h "Execution failed" -- TODO output log here
-    return $! NGOString $ fromMaybe e $ lookup e lockmap
+    case entries of
+        (NGOString _:_) -> return . NGOString $! fromMaybe e $ lookup e (zip saneentries entries')
+        _ -> case lookup e (zip saneentries entries) of
+                Just r -> return r
+                Nothing -> throwShouldNotOccur "Could not find entry in map (should not happen)"
 
 executeLock1OrForAll func arg _ = throwScriptError ("Wrong argument for " ++ func ++ " (expected a list of strings, got `" ++ show arg ++ "`")
 
@@ -513,7 +523,7 @@ executePaste _ _ = throwScriptError "Bad call to test function __paste"
 
 lock1 = Function
     { funcName = FuncName "lock1"
-    , funcArgType = Just (NGList NGLString)
+    , funcArgType = Just (NGLUnion [NGList NGLString, NGList NGLReadSet])
     , funcArgChecks = []
     , funcRetType = NGLString
     , funcKwArgs = []
@@ -567,7 +577,7 @@ pasteHiddenFunction = Function
 
 runForAllFunction = Function
     { funcName = FuncName "run_for_all"
-    , funcArgType = Just (NGList NGLString)
+    , funcArgType = Just (NGLUnion [NGList NGLString, NGList NGLReadSet])
     , funcArgChecks = []
     , funcRetType = NGLString
     , funcKwArgs =

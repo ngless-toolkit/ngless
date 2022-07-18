@@ -13,9 +13,11 @@ User-visible Improvements
 
     input = load_fastq_directory("my-sample")
     print(input.name())
+
 which will print ``my-sample``.
 - Make ``print()`` accept ints and doubles as well as strings
 - Added ``println`` function which works like ``print`` but prints a newline after the output.
+- Added ``run_for_all`` function to ``parallel`` module, simplifying its `API <stdlib.html>`__.
 
 Version 1.4.1
 -------------
