@@ -19,6 +19,17 @@ which will print ``my-sample``.
 - Added ``println`` function which works like ``print`` but prints a newline after the output.
 - Added ``run_for_all`` function to ``parallel`` module, simplifying its `API <stdlib.html>`__.
 
+Version 1.4.2
+-------------
+
+Released *21 July 2022*
+
+Bugfixes
+~~~~~~~~
+
+- Fix bug with parsing GFF files (it was assumed that _scores_ were always positive)
+
+
 Version 1.4.1
 -------------
 

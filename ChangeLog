@@ -9,6 +9,9 @@ Unreleased
 	* Add ``println()`` function
 	* Make ``print()`` accept ints and doubles as well as strings
 
+Version 1.4.2 2022-07-21 by luispedro
+	* Fix bug with parsing GFF files
+
 Version 1.4.1 2022-06-03 by luispedro
 	* Fix bug with split mapping
 	* Fix packaging for hackage
