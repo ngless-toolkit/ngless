@@ -49,6 +49,7 @@ import Tests.Language (tgroup_Language)
 import Tests.LoadFQDirectory (tgroup_LoadFQDirectory)
 import Tests.NGLessAPI (tgroup_NGLessAPI)
 import Tests.Parse (tgroup_Parse)
+import Tests.Samples (tgroup_Samples)
 import Tests.Select (tgroup_Select)
 import Tests.Types (tgroup_Types)
 import Tests.Validation (tgroup_Validation)
@@ -63,6 +64,7 @@ test_Types      = [tgroup_Types]
 test_NGLessAPI  = [tgroup_NGLessAPI]
 test_Vector     = [tgroup_Vector]
 test_IntGroups  = [tgroup_IntGroups]
+test_Samples    = [tgroup_Samples]
 test_Select     = [tgroup_Select]
 test_Language   = [tgroup_Language]
 test_LoadFqDir  = [tgroup_LoadFQDirectory]

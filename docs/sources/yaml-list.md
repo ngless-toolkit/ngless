@@ -53,3 +53,14 @@ It can also be used with the [parallel module](stdlib.html) module's `run_for_al
         if len(read) < 45:
             discard
     ...
+
+## Loading a single sample from an YAML file
+
+The function `load_sample_from_yaml` (which takes a YAML file and a mandatory
+`sample` argument) will return a single sample (identified by the `sample`
+argument).
+
+    ngless "1.5"
+    input = load_sample_from_yaml('list.yaml', sample='sample-id')
+    ...
+

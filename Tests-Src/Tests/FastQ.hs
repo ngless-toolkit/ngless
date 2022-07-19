@@ -21,7 +21,7 @@ import qualified Data.Conduit.List as CL
 
 import Interpretation.FastQ
 import Interpretation.Substrim
-import Tests.Utils
+import Tests.Utils (asTempFile)
 import Data.FastQ
 import Utils.Here
 import Utils.Conduit

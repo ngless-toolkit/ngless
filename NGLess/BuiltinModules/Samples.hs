@@ -1,13 +1,19 @@
+{-# LANGUAGE CPP #-}
 {- Copyright 2022 NGLess Authors
  - License: MIT
  -}
 
 module BuiltinModules.Samples
     ( loadModule
+#ifdef IS_BUILDING_TEST
+    , executeLoadSample
+    , executeLoadSampleList
+#endif
     ) where
 
 import qualified Data.ByteString as B
 import qualified Data.Text as T
+import           Data.List (find)
 import           Data.Default (def)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
@@ -104,23 +110,46 @@ executeLoadSampleList (NGOString fname) _ = do
         Left err -> throwSystemError ("Could not sample information file "++ (T.unpack fname) ++ ". Error was `" ++ show err ++ "`")
 executeLoadSampleList arg _ = throwShouldNotOccur ("load_sample_list called with argument: " ++ show arg)
 
+executeLoadSample :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
+executeLoadSample fname kwargs = do
+    sample <- lookupStringOrScriptError "load_sample_from_yaml arguments" "sample" kwargs
+    samples <- executeLoadSampleList fname []
+    case samples of
+        NGOList l -> case find (\(NGOReadSet n _) -> n == sample) l of
+            Just s -> return s
+            _ -> throwDataError ("load_sample_from_yaml: sample " ++ show sample ++ " not found in file " ++ show fname)
+        _ -> throwShouldNotOccur "load_sample_from_yaml: sample list is not a list"
 
-load_sample_list_Function = Function
-    { funcName = FuncName "load_sample_list"
-    , funcArgType = Just NGLString
-    , funcArgChecks = []
-    , funcRetType = NGList NGLReadSet
-    , funcKwArgs = []
-    , funcAllowsAutoComprehension = True
-    , funcChecks = [FunctionCheckMinNGLessVersion (1,5)
-                   ,FunctionCheckReturnAssigned]
-    }
+
+yamlFunctions =
+    [ Function
+        { funcName = FuncName "load_sample_list"
+        , funcArgType = Just NGLString
+        , funcArgChecks = []
+        , funcRetType = NGList NGLReadSet
+        , funcKwArgs = []
+        , funcAllowsAutoComprehension = True
+        , funcChecks = [FunctionCheckMinNGLessVersion (1,5)
+                       ,FunctionCheckReturnAssigned]
+        }
+    , Function
+        { funcName = FuncName "load_sample_from_yaml"
+        , funcArgType = Just NGLString
+        , funcArgChecks = []
+        , funcRetType = NGList NGLReadSet
+        , funcKwArgs = [ArgInformation "sample" True (NGList NGLString) []]
+        , funcAllowsAutoComprehension = True
+        , funcChecks = [FunctionCheckMinNGLessVersion (1,5)
+                       ,FunctionCheckReturnAssigned]
+        }
+    ]
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ = return def
     { modInfo = ModInfo "builtin.samples" "1.5"
-    , modFunctions = [load_sample_list_Function]
+    , modFunctions = yamlFunctions
     , runFunction = \case
                         "load_sample_list" -> executeLoadSampleList
+                        "load_sample_from_yaml" -> executeLoadSample
                         _ -> error "NOT POSSIBLE"
     }
