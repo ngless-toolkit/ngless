@@ -14,13 +14,13 @@ import Data.Version (showVersion)
 import Paths_NGLess (version)
 
 versionStr :: String
-versionStr = "1.4.1"
+versionStr = "1.4.2"
 
 versionStrLong :: String
-versionStrLong = "1.4.1"
+versionStrLong = "1.4.2"
 
 dateStr :: String
-dateStr = "June 3 2022"
+dateStr = "July 21 2022"
 
 embeddedStr :: String
 #ifdef NO_EMBED_SAMTOOLS_BWA

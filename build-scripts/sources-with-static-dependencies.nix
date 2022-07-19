@@ -35,7 +35,7 @@ let
 
 in pkgs.stdenv.mkDerivation {
     name = "ngless-source-with-dependencies";
-    version = "1.4.1";
+    version = "1.4.2";
     nativeBuildInputs = with pkgsStatic ; [ megahit-static samtools bwa prodigal minimap2 ];
     buildInputs = with pkgs; [ xxd stdenv ];
     src = pkgs.lib.cleanSourceWith {

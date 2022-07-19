@@ -1,5 +1,5 @@
 name:           NGLess
-version:        '1.4.1.1'
+version:        '1.4.2.0'
 category:       Domain Specific Language
 description:    'NGLess implements a domain-specific language for processing next generation data, particularly metagenomics.'
 synopsis:       'NGLess implements ngless, a DSL for processing sequencing data'
