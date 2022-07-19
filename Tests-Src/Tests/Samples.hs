@@ -13,6 +13,7 @@ import qualified Data.ByteString as B
 import qualified Data.Text as T
 import           Control.Monad.IO.Class (liftIO)
 
+import Data.FastQ
 import BuiltinModules.Samples
 import Language
 import Utils.Here
@@ -31,6 +32,20 @@ samples:
         - sample/sample2a.2.fq.gz
 |]
 
+yamlWithBasedir :: B.ByteString
+yamlWithBasedir = [here|
+basedir: /share/metagenomes
+samples:
+  sample1:
+    - paired:
+        - sample/sample1a.1.fq.gz
+        - sample/sample1a.2.fq.gz
+  sample2:
+    - paired:
+        - /share/data/sample/sample2a.1.fq.gz
+        - /share/data/sample/sample2a.2.fq.gz
+|]
+
 tgroup_Samples = $(testGroupGenerator)
 
 getSampleName (NGOReadSet name _) = name
@@ -46,4 +61,20 @@ case_load_samples = testNGLessIO $ do
     liftIO $ n @?= "sample1"
 
 
-
+case_basedir :: Assertion
+case_basedir = do
+    NGOList samples <- testNGLessIO $ do
+        simpleYamlF <- asTempFile yamlWithBasedir "yaml"
+        executeLoadSampleList (NGOString $ T.pack simpleYamlF) []
+    let getSamplePaths (NGOReadSet _ (ReadSet [
+                                        (FastQFilePath _ p1
+                                        ,FastQFilePath _ p2)]
+                                        [])) = (p1, p2)
+        getSamplePaths _ = error "should not occur"
+    length samples @?= 2
+    getSamplePaths (head samples) @?= (
+                    "/share/metagenomes/sample/sample1a.1.fq.gz",
+                    "/share/metagenomes/sample/sample1a.2.fq.gz")
+    getSamplePaths (last samples) @?= (
+                    "/share/data/sample/sample2a.1.fq.gz",
+                    "/share/data/sample/sample2a.2.fq.gz")
