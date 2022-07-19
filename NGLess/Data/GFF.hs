@@ -1,4 +1,4 @@
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT -}
 {-# LANGUAGE CPP #-}
 
@@ -81,31 +81,32 @@ readGffLine :: B.ByteString -> Either NGError GffLine
 readGffLine line = case B8.split '\t' line of
         [tk0,tk1,tk2,tk3,tk4,tk5,tk6,tk7,tk8] ->
             GffLine
-                tk0
-                tk1
-                tk2
-                <$> intOrError tk3
-                <*> intOrError tk4
-                <*> score tk5
+                tk0 -- seq id
+                tk1 -- source
+                tk2 -- type
+                <$> intOrError "reading start" tk3 -- start
+                <*> intOrError "reading end" tk4 -- end
+                <*> score tk5 -- score
                 <*> strandOrError tk6
                 <*> phase tk7
                 <*> pure (_parseGffAttributes tk8)
         _ -> throwDataError ("unexpected line in GFF: " ++ show line)
     where
-        parseOrError :: (a -> Maybe b) -> a -> NGLess b
-        parseOrError p s = case p s of
+        parseOrError :: String -> (B.ByteString -> Maybe b) -> B.ByteString -> NGLess b
+        parseOrError context p s = case p s of
                     Just v -> return v
-                    Nothing -> throwDataError $ "Could not parse GFF line: "++ show line
-        intOrError :: B.ByteString -> NGLess Int
-        intOrError = parseOrError (liftM fst . I.readDecimal)
-        floatOrError = parseOrError (liftM fst . F.readDecimal)
+                    Nothing -> throwDataError $ "Could not parse GFF line (" ++ context  ++ ", while parsing '" ++ B8.unpack s ++  "'): "++ show line
+        intOrError :: String -> B.ByteString -> NGLess Int
+        intOrError c = parseOrError c (liftM fst . I.readDecimal)
+        floatOrError c = parseOrError c (liftM fst . (F.readSigned F.readDecimal))
+
         score :: B.ByteString -> NGLess (Maybe Float)
         score "." = return Nothing
-        score v = Just <$> floatOrError v
+        score v = Just <$> floatOrError "reading score" v
 
         phase :: B.ByteString -> NGLess Int
         phase "." = return (-1)
-        phase r = intOrError r
+        phase r = intOrError "reading phase" r
         strandOrError :: B.ByteString -> NGLess GffStrand
         strandOrError s = case B8.uncons s of
             Just (s',_) -> parseStrand s'

@@ -792,10 +792,23 @@ loadGFF gffFp opts = do
         outputListLno' TraceOutput ["Loading GFF file '", gffFp, "'..."]
         numCapabilities <- liftIO getNumCapabilities
         let mapthreads = max 1 (numCapabilities - 1)
+            annotateErrorReader :: (Int, V.Vector ByteLine) -> NGLess (V.Vector GffLine)
+            annotateErrorReader (ch_ix, ells) =
+                case V.mapM (readGffLine. unwrapByteLine) . V.filter (not . isComment) $ ells of
+                    r@Right{} -> r
+                    _ -> do
+                        forM_ (zip [0..] $ V.toList ells) $ \(i, ell) ->
+                            if isComment ell
+                                then return ()
+                                else case readGffLine (unwrapByteLine ell) of
+                                        Right{} -> return ()
+                                        Left (NGError errtype errmsg) -> Left (NGError errtype (errmsg ++ " (Line " ++ show (8192 * ch_ix + i + 1) ++ ")"))
+                        throwShouldNotOccur "annotateErrorReader: this should never happen"
         partials <- C.runConduit $
                 conduitPossiblyCompressedFile gffFp
                     .| linesVC 8192
-                    .| CAlg.asyncMapEitherC mapthreads (V.mapM (readGffLine . unwrapByteLine) . V.filter (not . isComment))
+                    .| CAlg.enumerateC
+                    .| CAlg.asyncMapEitherC mapthreads annotateErrorReader
                     .| sequenceSinks
                         [CL.foldM (insertgV f sf) (GffLoadingState M.empty M.empty)
                                     |  f <- optFeatures    opts
