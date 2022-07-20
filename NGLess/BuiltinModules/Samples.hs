@@ -77,8 +77,9 @@ parseSamplePath name = Aeson.withObject "path" $ \ob -> do
             case V.toList v of
                 [Aeson.String fq1, Aeson.String fq2] -> return $ Left (T.unpack fq1, T.unpack fq2)
                 _ -> fail ("Invalid paired sample '" ++ T.unpack name ++ "'")
-        [("single", elems)] -> flip (Aeson.withArray "single") elems $ \v ->
-            case V.toList v of
+        [("single", elems)] -> case elems of
+            Aeson.String fq1 -> return . Right $ T.unpack fq1
+            Aeson.Array arr -> case V.toList arr of
                 [Aeson.String fq1] -> return . Right $ T.unpack fq1
                 _ -> fail ("Invalid sample '" ++ T.unpack name ++ "'")
         _ -> fail ("Invalid sample '" ++ T.unpack name ++ "'")
