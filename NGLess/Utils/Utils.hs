@@ -23,7 +23,7 @@ import System.Directory
 import System.IO.Error
 import Control.Exception
 import GHC.IO.Exception (IOErrorType(..))
-
+import Safe (lookupJustDef)
 import Data.List (group)
 import Data.Maybe (fromMaybe, catMaybes)
 #ifdef WINDOWS
@@ -39,7 +39,7 @@ import           System.IO.SafeWrite (withOutputFile)
 
 -- | lookup with a default if the key is not present in the association list
 lookupWithDefault :: Eq b => a -> b -> [(b,a)] -> a
-lookupWithDefault def key values = fromMaybe def $ lookup key values
+lookupWithDefault = lookupJustDef
 {-# INLINE lookupWithDefault #-}
 
 -- | equivalent to the Unix command 'uniq'
