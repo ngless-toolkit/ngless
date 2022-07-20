@@ -1,15 +1,10 @@
 let
-  nixpkgsPinned = builtins.fetchTarball {
-    name = "nixpksg-pinned";
-    url = "https://github.com/nixos/nixpkgs/archive/1bb17332abf7a782ed7fa3101fd7ba54dd239694.tar.gz";
-    sha256 = "17y5xb109vnkvqqf8nlx6b7as3f9p4v7z6xjfq9mg3vyyhym33fl";
-  };
 
   sources = {
     haskellNix = builtins.fetchTarball {
         name = "haskell-nix-snap";
-        url = "https://github.com/input-output-hk/haskell.nix/archive/c6a5afba7e259e9908f9dc56ce711173cda4549b.tar.gz";
-        sha256 = "0g58zvyqd47c1y2w84qbf1x29yp4pfdz2gqligvgn1jlx972i53n";
+        url = "https://github.com/input-output-hk/haskell.nix/archive/fbd32c9c441fbd35a85049978bffb4b2eff2f04b.tar.gz";
+        sha256 = "0ihjyf7k47z71zznrs1453vi7kl2p82da18wngjmnr7rjap1vjyi";
     };
   };
 
@@ -17,7 +12,7 @@ let
 
   # Import nixpkgs and pass the haskell.nix provided nixpkgsArgs
   pkgs = import
-    nixpkgsPinned
+    haskellNix.sources.nixpkgs-unstable
     haskellNix.nixpkgsArgs;
 
   ignoredPaths = ["tests" "docs" "run-tests.sh"];
