@@ -126,7 +126,7 @@ yamlFunctions =
     [ Function
         { funcName = FuncName "load_sample_list"
         , funcArgType = Just NGLString
-        , funcArgChecks = []
+        , funcArgChecks = [ArgCheckFileReadable]
         , funcRetType = NGList NGLReadSet
         , funcKwArgs = []
         , funcAllowsAutoComprehension = True
@@ -136,7 +136,7 @@ yamlFunctions =
     , Function
         { funcName = FuncName "load_sample_from_yaml"
         , funcArgType = Just NGLString
-        , funcArgChecks = []
+        , funcArgChecks = [ArgCheckFileReadable]
         , funcRetType = NGList NGLReadSet
         , funcKwArgs = [ArgInformation "sample" True (NGList NGLString) []]
         , funcAllowsAutoComprehension = True
