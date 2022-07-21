@@ -55,21 +55,21 @@ The recommended way to install NGLess is through
 Alternatively, a docker container with NGLess is available at
 [docker hub](https://hub.docker.com/r/nglesstoolkit/ngless):
 
-    docker run -v $PWD:/workdir -w /workdir -it nglesstoolkit/ngless:1.4.1 ngless --version
+    docker run -v $PWD:/workdir -w /workdir -it nglesstoolkit/ngless:1.4.2 ngless --version
 
 Adapt the mount flags (``-v``) as needed.
 
 ### Linux
 
 You can download a [statically linked version of NGless
-1.4.1](https://github.com/ngless-toolkit/ngless/releases/download/v1.4.1/NGLess-v1.4.1-Linux-static-full)
+1.4.2](https://github.com/ngless-toolkit/ngless/releases/download/v1.4.2/NGLess-v1.4.2-Linux-static-full)
 
 This should work across a wide range of Linux versions (please
 [report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
 
-    curl -L -O https://github.com/ngless-toolkit/ngless/releases/download/v1.4.1/NGLess-v1.4.1-Linux-static-full
-    chmod +x NGLess-v1.4.1-Linux-static-full
-    ./NGLess-v1.4.1-Linux-static-full
+    curl -L -O https://github.com/ngless-toolkit/ngless/releases/download/v1.4.2/NGLess-v1.4.2-Linux-static-full
+    chmod +x NGLess-v1.4.2-Linux-static-full
+    ./NGLess-v1.4.2-Linux-static-full
 
 This downloaded file bundles bwa, samtools and megahit (also statically linked).
 
