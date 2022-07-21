@@ -575,18 +575,30 @@ pasteHiddenFunction = Function
 
 
 
-runForAllFunction = Function
-    { funcName = FuncName "run_for_all"
-    , funcArgType = Just (NGLUnion [NGList NGLString, NGList NGLReadSet])
-    , funcArgChecks = []
-    , funcRetType = NGLString
-    , funcKwArgs =
-        [ ArgInformation "tag" False NGLString []
-        ]
-    , funcAllowsAutoComprehension = False
-    , funcChecks = []
-    }
-
+runForAllFunctions =
+    [ Function
+        { funcName = FuncName "run_for_all"
+        , funcArgType = Just (NGList NGLString)
+        , funcArgChecks = []
+        , funcRetType = NGLString
+        , funcKwArgs =
+            [ ArgInformation "tag" False NGLString []
+            ]
+        , funcAllowsAutoComprehension = False
+        , funcChecks = []
+        }
+    , Function
+        { funcName = FuncName "run_for_all_samples"
+        , funcArgType = Just (NGList NGLReadSet)
+        , funcArgChecks = []
+        , funcRetType = NGLReadSet
+        , funcKwArgs =
+            [ ArgInformation "tag" False NGLString []
+            ]
+        , funcAllowsAutoComprehension = False
+        , funcChecks = []
+        }
+    ]
 
 
 parallelTransform :: Bool -> [(Int, Expression)] -> NGLessIO [(Int, Expression)]
@@ -597,7 +609,7 @@ addLockHash script = pureTransform addLockHash' script
     where
         addLockHash' :: Expression -> Expression
         addLockHash' (FunctionCall fn@(FuncName fname) expr kwargs block)
-            | fname `elem` ["lock1", "run_for_all"] =
+            | fname `elem` ["lock1", "run_for_all", "run_for_all_samples"] =
                 FunctionCall fn expr ((Variable "__hash", ConstStr h):kwargs) block
                 where
                     h = T.pack . MD5.md5s . MD5.Str . show $ map snd script
@@ -609,23 +621,25 @@ processRunForAll True = processRunForAll' Nothing
 
 processRunForAll' _ [] = return []
 processRunForAll' Nothing ((lno,expr):rest) = case expr of
-    Assignment v (FunctionCall (FuncName "run_for_all") slist kwargs _) -> do
-        let save_match = Assignment (Variable "$parallel$iterator") (Lookup (Just NGLString) v)
-            save_list  = Assignment (Variable "$parallel$list") slist
-            set_tag = do
-                tag <- lookup (Variable "tag") kwargs
-                return (lno,
-                        FunctionCall (FuncName "set_parallel_tag") tag [] Nothing)
-        rest' <- processRunForAll' (Just (lno, slist)) rest
-        let res = ((lno,expr):(lno,save_match):(lno,save_list):rest')
-        case set_tag of
-            Nothing -> return res
-            Just t -> return (t:res)
+    Assignment v (FunctionCall (FuncName fname) slist kwargs _)
+        | fname `elem` ["run_for_all", "run_for_all_samples"] -> do
+            let save_match = Assignment (Variable "$parallel$iterator") (Lookup (Just NGLString) v)
+                save_list  = Assignment (Variable "$parallel$list") slist
+                set_tag = do
+                    tag <- lookup (Variable "tag") kwargs
+                    return (lno,
+                            FunctionCall (FuncName "set_parallel_tag") tag [] Nothing)
+            rest' <- processRunForAll' (Just (lno, slist)) rest
+            let res = ((lno,expr):(lno,save_match):(lno,save_list):rest')
+            case set_tag of
+                Nothing -> return res
+                Just t -> return (t:res)
     _ -> do
         ((lno,expr):) <$> processRunForAll' Nothing rest
 processRunForAll' (Just prev) ((lno,e):rest) = case e of
-    Assignment _ (FunctionCall (FuncName "run_for_all") _ _ _) ->
-        throwScriptError ("The function 'run_for_all' can only be called once (seen on lines "++show prev++" and "++show lno++")")
+    Assignment _ (FunctionCall (FuncName fname) _ _ _)
+        | fname `elem` ["run_for_all", "run_for_all_samples"] -> do
+            throwScriptError ("The functions 'run_for_all'/'run_for_all_samples' can only be called once (seen on lines "++show prev++" and "++show lno++")")
     FunctionCall fn@(FuncName "collect") expr kwargs block -> do
         let kwargs' =  (Variable "allneeded", Lookup (Just NGLString) (Variable "$parallel$list"))
                       :(Variable "current", Lookup (Just NGLString) (Variable "$parallel$iterator"))
@@ -639,8 +653,9 @@ processRunForAll' (Just prev) ((lno,e):rest) = case e of
 
 checkNoRunForAll = mapM checkNoRunForAll1
     where
-        checkNoRunForAll1 (_,Assignment _ (FunctionCall (FuncName "run_for_all") _ _ _)) =
-            throwScriptError "Function 'run_for_all' is only available in parallel module version 1.1+. Please upgrade your import"
+        checkNoRunForAll1 (_,Assignment _ (FunctionCall (FuncName fname) _ _ _))
+            | fname `elem` ["run_for_all", "run_for_all_samples"] =
+                throwScriptError ("Function '"++T.unpack fname++"' is only available in parallel module version 1.1+. Please upgrade your import")
         checkNoRunForAll1 e = return e
 
 processSetParallelTag :: [(Int, Expression)] -> NGLessIO [(Int, Expression)]
@@ -673,13 +688,14 @@ loadModule v
                 , collectFunction includeForAll
                 , setTagFunction
                 , pasteHiddenFunction
-                ] ++ (if includeForAll then [runForAllFunction] else [])
+                ] ++ (if includeForAll then runForAllFunctions else [])
             , modTransform = parallelTransform includeForAll
             , runFunction = \case
                 "lock1" -> executeLock1OrForAll "lock1"
                 "collect" -> executeCollect
                 "set_parallel_tag" -> executeSetTag
                 "run_for_all" -> executeLock1OrForAll "run_for_all"
+                "run_for_all_samples" -> executeLock1OrForAll "run_for_all_samples"
                 "__paste" -> executePaste
                 _ -> error "Bad function name"
             }

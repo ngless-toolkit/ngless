@@ -42,17 +42,23 @@ You can load a sample list with the `load_sample_list` function:
     ...
 
 
-It can also be used with the [parallel module](stdlib.html) module's `run_for_all` function
+It can also be used with the [parallel module](stdlib.html) module's
+`run_for_all_samples` function. For example:
 
     ngless "1.5"
     import "parallel" version "1.1"
-    input = run_for_all(load_sample_list('list.yaml'))
+    input = run_for_all_samples(load_sample_list('list.yaml'))
 
     input = preprocess(input) using |read|:
         read = substrim(read, min_quality=25)
         if len(read) < 45:
             discard
+    
+    write(input, ofile='outputs' </> input.name() + '.fq.xz')
     ...
+
+Note how we used the `.name()` method in the readset object to get the name of
+the selected sample.
 
 ## Loading a single sample from an YAML file
 
