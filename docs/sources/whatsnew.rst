@@ -8,6 +8,7 @@ Unreleased (Github version)
 User-visible Improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Add ``compress_level`` argument to ``write`` function to specify the compression level
 - Add ``load_sample_list`` function to load samples in YAML format (see `YAML Samples <yaml-list.html>`_)
 - Added ``name()`` method to ``ReadSet`` objects, so you can do::
 

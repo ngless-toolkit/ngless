@@ -7,6 +7,7 @@
 module Interpretation.Write
     ( executeWrite
     , moveOrCopyCompress
+    , WriteOptions(..)
 #ifdef IS_BUILDING_TEST
     , _formatFQOname
 #endif
@@ -14,10 +15,11 @@ module Interpretation.Write
 
 
 
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.Text as T
 import qualified Data.Vector as V
-import qualified Data.Conduit as C
+import qualified Conduit as C
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Combinators as CC
@@ -26,6 +28,7 @@ import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
 import qualified Data.Conduit.Algorithms.Async as CAsync
 import           Data.Conduit ((.|))
 import           System.Directory (copyFile)
+import           Data.Default (Default(..))
 import           Data.Maybe
 import           Data.String.Utils (replace, endswith)
 import           Control.Monad.IO.Unlift (MonadUnliftIO)
@@ -66,15 +69,29 @@ data WriteOptions = WriteOptions
                 , woComment :: Maybe T.Text
                 , woAutoComment :: [AutoComment]
                 , woHash :: T.Text
+                , woCompressLevel :: Maybe Int
                 } deriving (Eq)
 
+instance Default WriteOptions where
+    def = WriteOptions
+            { woOFile= ""
+            , woFormat = Nothing
+            , woFormatFlags = Nothing
+            , woCanMove = False
+            , woVerbose = False
+            , woComment = Nothing
+            , woAutoComment = []
+            , woHash = ""
+            , woCompressLevel = Nothing
+            }
 
-ostream fp = case inferCompression fp of
+ostream :: (MonadUnliftIO m, C.MonadResource m) => FilePath -> Maybe Int -> Handle -> C.ConduitT B.ByteString C.Void m ()
+ostream fp comp = case inferCompression fp of
     NoCompression -> CB.sinkHandle
-    GzipCompression -> CAsync.asyncGzipTo
+    GzipCompression -> maybe CAsync.asyncGzipTo CAsync.asyncGzipTo' comp
     BZ2Compression -> CAsync.asyncBzip2To
-    XZCompression -> CAsync.asyncXzTo
-    ZStdCompression -> CAsync.asyncZstdTo 3 -- compression level
+    XZCompression -> maybe CAsync.asyncXzTo CAsync.asyncXzTo' comp
+    ZStdCompression -> CAsync.asyncZstdTo (fromMaybe 3 comp)
 
 withOutputFile' :: (MonadUnliftIO m, MonadMask m) => FilePath -> (Handle -> m a) -> m a
 withOutputFile' "/dev/stdout" = \inner -> inner stdout
@@ -107,6 +124,10 @@ parseWriteOptions args = do
                         Nothing -> return Nothing
                         Just (NGOSymbol flag) -> return $ Just flag
                         Just other -> throwScriptError $ "format_flags argument to write(): illegal argument ("++show other++")"
+    compressLevel <- case lookup "compress_level" args of
+                        Nothing -> return Nothing
+                        Just (NGOInteger level) -> return . Just $ fromEnum level
+                        Just other -> throwScriptError $ "compress_level argument to write(): illegal argument ("++show other++")"
     return $! WriteOptions
                 { woOFile = ofile
                 , woFormat = format
@@ -116,16 +137,17 @@ parseWriteOptions args = do
                 , woComment = comment
                 , woAutoComment = autoComments
                 , woHash = hash
+                , woCompressLevel = compressLevel
                 }
 
 
-moveOrCopyCompress :: Bool -> FilePath -> FilePath -> NGLessIO ()
-moveOrCopyCompress moveAllowed ifile ofile = liftIO =<< moveOrCopyCompress' moveAllowed ifile ofile
+moveOrCopyCompress :: WriteOptions -> FilePath -> NGLessIO ()
+moveOrCopyCompress opts ifile = liftIO =<< moveOrCopyCompress' opts ifile
 
-moveOrCopyCompress' :: Bool -> FilePath -> FilePath -> NGLessIO (IO ())
-moveOrCopyCompress' _ ifile "/dev/stdout" = return (C.runConduitRes $ conduitPossiblyCompressedFile ifile .| C.stdout)
-moveOrCopyCompress' moveAllowed ifile ofile
-        | ifile == ofile = return (return ()) -- trivial case. Can happen.
+moveOrCopyCompress' :: WriteOptions -> FilePath -> NGLessIO (IO ())
+moveOrCopyCompress' opts ifile
+        | ofile == "/dev/stdout" = return (C.runConduitRes $ conduitPossiblyCompressedFile ifile .| C.stdout)
+        | ofile == ifile = return (return ()) -- trivial case. Can happen.
 #ifdef WINDOWS
         | ocompression == BZ2Compression = throwNotImplementedError "Compression of bzip2 files is not supported on Windows"
         | icompression == BZ2Compression = throwNotImplementedError "Decompression of bzip2 files is not supported on Windows"
@@ -133,10 +155,11 @@ moveOrCopyCompress' moveAllowed ifile ofile
         | icompression == ocompression = moveIfAllowed
         | otherwise = convertCompression
     where
+        ofile = woOFile opts
         moveIfAllowed :: NGLessIO (IO ())
         moveIfAllowed = do
                 createdFiles <- ngleTemporaryFilesCreated <$> nglEnvironment
-                if moveAllowed && ifile `elem` createdFiles
+                if woCanMove opts && ifile `elem` createdFiles
                     then return (moveOrCopy ifile ofile)
                     else return (copyFile ifile ofile)
 
@@ -145,7 +168,7 @@ moveOrCopyCompress' moveAllowed ifile ofile
 
         convertCompression = return $
             withOutputFile' ofile $ \hout ->
-                C.runConduitRes (conduitPossiblyCompressedFile ifile .| ostream ofile hout)
+                C.runConduitRes (conduitPossiblyCompressedFile ifile .| ostream ofile (woCompressLevel opts) hout)
 
 
 removeEnd :: String -> String -> String
@@ -175,18 +198,18 @@ executeWrite (NGOReadSet _ rs) args = do
     let ofile = woOFile opts
         moveOrCopyCompressFQs :: [FastQFilePath] -> FilePath -> NGLessIO (IO ())
         moveOrCopyCompressFQs [] _ = return (return ())
-        moveOrCopyCompressFQs [FastQFilePath _ f] ofname = moveOrCopyCompress' (woCanMove opts) f ofname
+        moveOrCopyCompressFQs [FastQFilePath _ f] ofname = moveOrCopyCompress' (opts {woOFile = ofname}) f
         moveOrCopyCompressFQs multiple ofname = do
             let inputs = fqpathFilePath <$> multiple
             fp' <- makeNGLTempFile (head inputs) "concat" "tmp" $ \h ->
                 C.runConduit
                     (mapM_ conduitPossiblyCompressedFile inputs .| C.sinkHandle h)
-            moveOrCopyCompress' True fp' ofname
+            moveOrCopyCompress' (opts {woCanMove = True, woOFile = ofname}) fp'
     if woFormatFlags opts == Just "interleaved"
         then
             withOutputFile' ofile $ \hout ->
                 C.runConduitRes $
-                    interleaveFQs rs .| ostream ofile hout
+                    interleaveFQs rs .| ostream ofile (woCompressLevel opts) hout
         else case rs of
             ReadSet [] singles ->
                 liftIO =<< moveOrCopyCompressFQs singles ofile
@@ -229,7 +252,7 @@ executeWrite el@(NGOMappedReadSet _ iout  _) args = do
             | endswith ".bam" fp -> return fp -- We already have a BAM, so just copy it
             | otherwise -> convertSamToBam fp
         s -> throwScriptError ("write does not accept format {" ++ T.unpack s ++ "} with input type " ++ show el)
-    moveOrCopyCompress (woCanMove opts) orig (woOFile opts)
+    moveOrCopyCompress opts orig
     return (NGOFilename $ woOFile opts)
 
 executeWrite (NGOCounts iout) args = do
@@ -240,7 +263,7 @@ executeWrite (NGOCounts iout) args = do
         "tsv" -> do
             fp <- asFile iout
             case comment of
-                [] -> moveOrCopyCompress (woCanMove opts) fp (woOFile opts)
+                [] -> moveOrCopyCompress opts fp
                 _ -> C.runConduit $
                         (commentC "# " comment >> CB.sourceFile fp)
                         .| CB.sinkFileCautious (woOFile opts)
@@ -252,7 +275,7 @@ executeWrite (NGOCounts iout) args = do
                         .| CL.map (V.map tabToComma)
                         .| CC.concat
                         .| byteLineSinkHandle ohand
-            moveOrCopyCompress True comma (woOFile opts)
+            moveOrCopyCompress (opts { woCanMove = True}) comma
         f -> throwScriptError ("Invalid format in write: {"++T.unpack f++"}.\n\tWhen writing counts, only accepted values are {tsv} (TAB separated values; default) or {csv} (COMMA separated values).")
     return (NGOFilename $ woOFile opts)
   where
@@ -261,12 +284,12 @@ executeWrite (NGOCounts iout) args = do
 
 executeWrite (NGOFilename fp) args = do
     opts <- parseWriteOptions args
-    moveOrCopyCompress (woCanMove opts) fp (woOFile opts)
+    moveOrCopyCompress opts fp
     return (NGOFilename $ woOFile opts)
 
 executeWrite (NGOSequenceSet fp) args = do
     opts <- parseWriteOptions args
-    moveOrCopyCompress (woCanMove opts) fp (woOFile opts)
+    moveOrCopyCompress opts fp
     return $ NGOSequenceSet (woOFile opts)
 
 executeWrite v _ = throwShouldNotOccur ("Error: executeWrite of " ++ show v ++ " not implemented yet.")

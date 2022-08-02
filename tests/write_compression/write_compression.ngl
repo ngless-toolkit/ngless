@@ -1,10 +1,11 @@
-ngless '1.1'
+ngless '1.5'
 
 input = paired('sample.1.fq', 'sample.2.fq', singles='sample.singles.fq')
 mapped = map(input, fafile='ref.fna')
 
 write(mapped, ofile='output.sam')
 write(mapped, ofile='output.sam.gz')
+write(mapped, ofile='output.c0.sam.gz', compress_level=0)
 write(mapped, ofile='output.sam.bz2')
 write(mapped, ofile='output.sam.zstd')
 write(mapped, ofile='output.bam')

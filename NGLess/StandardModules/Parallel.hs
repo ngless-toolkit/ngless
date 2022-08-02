@@ -71,7 +71,7 @@ import FileManagement
 import NGLess.NGError
 import NGLess.NGLEnvironment
 
-import Interpretation.Write (moveOrCopyCompress)
+import Interpretation.Write (moveOrCopyCompress, WriteOptions(..))
 
 import Utils.Utils (fmapMaybeM, allSame, moveOrCopy)
 import Utils.Conduit
@@ -268,7 +268,11 @@ executeCollect (NGOCounts istream) kwargs = do
             outputListLno' TraceOutput ["Can collect"]
             newfp <- pasteCounts comment False allentries (map partialfile allentries)
             outputListLno' TraceOutput ["Pasted. Will move result to ", T.unpack ofile]
-            moveOrCopyCompress True newfp (T.unpack ofile ++ (if isSubsample then ".subsample" else ""))
+            moveOrCopyCompress (def
+                                    { woCompressLevel = Nothing
+                                    , woCanMove = True
+                                    , woOFile = T.unpack ofile ++ (if isSubsample then ".subsample" else "")
+                                    }) newfp
         else do
             outputListLno' TraceOutput ["Cannot collect (not all files present yet), wrote partial file to ", partialfile current]
             Just lno <- ngleLno <$> nglEnvironment

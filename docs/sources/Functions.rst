@@ -773,19 +773,21 @@ String: the file name used
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 
-+---------------+-------------+------------+----------------+
-| Name          | Type        | Required   | Default Value  |
-+===============+=============+============+================+
-| ofile         | String      | yes        | -              |
-+---------------+-------------+------------+----------------+
-| format        | String      | no         | -              |
-+---------------+-------------+------------+----------------+
-| format\_flags | [Symbol]    | no         | []             |
-+---------------+-------------+------------+----------------+
-| comment       | String      | no         | -              |
-+---------------+-------------+------------+----------------+
-| auto_comments | String      | no         | -              |
-+---------------+-------------+------------+----------------+
++-----------------+-------------+------------+----------------+
+| Name            | Type        | Required   | Default Value  |
++=================+=============+============+================+
+| ofile           | String      | yes        | -              |
++-----------------+-------------+------------+----------------+
+| format          | String      | no         | -              |
++-----------------+-------------+------------+----------------+
+| format\_flags   | [Symbol]    | no         | []             |
++-----------------+-------------+------------+----------------+
+| comment         | String      | no         | -              |
++-----------------+-------------+------------+----------------+
+| auto_comments   | String      | no         | -              |
++-----------------+-------------+------------+----------------+
+| compress_level  | Integer     | no         | -              |
++-----------------+-------------+------------+----------------+
 
 The argument ``ofile`` is where to write the content.
 
@@ -807,6 +809,11 @@ Compression is inferred from the ``ofile`` argument:
 - ``.bz2``: bzip2 compression
 - ``.xz``: xz compression
 - ``.zstd``: ZStandard compression (since NGLess 1.1)
+
+If given, the argument ``compress_level`` can be control the compression level.
+Its exact meaning depends on the algorithm used, but it generally a small
+number (1 to 9) with smaller numbers corresponding to less compression (but
+potentially faster).
 
 Comments can be added with the ``comment`` argument (a free form string), or a
 list of ``auto\_comments``:

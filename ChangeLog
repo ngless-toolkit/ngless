@@ -1,4 +1,5 @@
 Unreleased
+	* Add `compress_level` option to `write()` function
 	* Add ability to specify samples using YAML format
 	* Make 'assemble' return NGLSequenceSet type and add sequenceset to
 	external modules

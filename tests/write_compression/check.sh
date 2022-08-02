@@ -8,6 +8,8 @@ echo "Comparing SAM"
 diff -q <(grep -v '^@PG' output.sam) texpected.sam
 echo "Comparing SAM.gz"
 diff -q <(zcat output.sam.gz | grep -v '^@PG') texpected.sam
+echo "Comparing SAM.gz (compress level=0)"
+diff -q <(zcat output.c0.sam.gz | grep -v '^@PG') texpected.sam
 echo "Comparing SAM.bz2"
 diff -q <(bzcat output.sam.bz2 | grep -v '^@PG') texpected.sam
 echo "Comparing SAM.zstd"

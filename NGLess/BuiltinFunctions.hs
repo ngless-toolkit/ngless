@@ -81,6 +81,7 @@ writeArgs =
     ,ArgInformation "verbose" False NGLBool []
     ,ArgInformation "comment" False NGLString []
     ,ArgInformation "auto_comments" False (NGList NGLSymbol) [ArgCheckSymbol ["date", "script", "hash"]]
+    ,ArgInformation "compress_level" False NGLInteger [ArgCheckMinVersion (1,5)]
     ]
 
 countArgs =
