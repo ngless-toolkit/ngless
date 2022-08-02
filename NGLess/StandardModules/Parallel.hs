@@ -222,8 +222,20 @@ getLock' basedir (f:fs) = do
 executeCollect :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
 executeCollect (NGOCounts istream) kwargs = do
     isSubsample <- nConfSubsample <$> nglConfiguration
-    current <- lookupStringOrScriptError "collect arguments" "current" kwargs
-    allentries <- lookupStringListOrScriptError "collect arguments" "allneeded" kwargs
+    current <- case lookup "current" kwargs of
+        Nothing -> throwScriptError "current not specified in collect call"
+        Just (NGOString c) -> return c
+        Just (NGOReadSet n _) -> return n
+        Just _ -> throwScriptError "current argument (in collect()) must be a string or a readset"
+
+    allentries <- case lookup "allneeded" kwargs of
+        Nothing -> throwScriptError "collect() called without 'allneeded' argument"
+        Just (NGOList ells) -> forM ells $ \case
+            NGOString s -> return s
+            NGOReadSet n _ -> return n
+            _ -> throwScriptError "collect() called with 'allneeded' argument, but not all elements are strings or readsets"
+        Just _ -> throwScriptError "collect() called with 'allneeded' argument that is not a list"
+
     ofile <- lookupStringOrScriptError "collect arguments" "ofile" kwargs
     hash <- lookupStringOrScriptError "collect arguments" "__hash" kwargs
     tag <- lookupStringOrScriptErrorDef (return "") "collect arguments (hidden tag)" "__parallel_tag" kwargs
