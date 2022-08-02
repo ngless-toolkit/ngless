@@ -82,6 +82,7 @@ parseSamplePath name = Aeson.withObject "path" $ \ob -> do
             Aeson.Array arr -> case V.toList arr of
                 [Aeson.String fq1] -> return . Right $ T.unpack fq1
                 _ -> fail ("Invalid sample '" ++ T.unpack name ++ "'")
+            _ -> fail ("Invalid sample '" ++ T.unpack name ++ "' (parsing 'single' entry)")
         _ -> fail ("Invalid sample '" ++ T.unpack name ++ "'")
 
 normalize :: SampleFile -> [NGLessObject]

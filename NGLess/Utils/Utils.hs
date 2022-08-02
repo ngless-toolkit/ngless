@@ -25,7 +25,7 @@ import Control.Exception
 import GHC.IO.Exception (IOErrorType(..))
 import Safe (lookupJustDef)
 import Data.List (group)
-import Data.Maybe (fromMaybe, catMaybes)
+import Data.Maybe (catMaybes)
 #ifdef WINDOWS
 import           System.AtomicWrite.Internal (tempFileFor, closeAndRename)
 #else
