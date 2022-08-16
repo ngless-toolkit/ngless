@@ -1,11 +1,10 @@
 # For more information, see: https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md
 
-resolver: lts-19.4
+resolver: lts-19.19
 compiler-check: newer-minor
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
-  - conduit-algorithms-0.0.13.0
   - git: "https://github.com/ngless-toolkit/interval-to-int"
     commit: "78289f6b48d41f7cc48169520ec9b77b050a0029"
 

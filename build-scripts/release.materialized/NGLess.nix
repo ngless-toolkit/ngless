@@ -30,6 +30,10 @@
         "README.md"
         "ChangeLog"
         "NGLess/Interpretation/Count/RefSeqInfoVector.h"
+        "test_samples/sample.sam.gz"
+        "test_samples/data_set_repeated.fq"
+        "test_samples/very_short.gtf"
+        "Makefile"
         ];
       extraTmpFiles = [];
       extraDocFiles = [];

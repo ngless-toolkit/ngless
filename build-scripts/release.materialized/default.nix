@@ -6,7 +6,7 @@
         int-interval-map = ./.stack-to-nix.cache.0;
         };
       };
-  resolver = "lts-19.4";
+  resolver = "lts-19.19";
   modules = [
     ({ lib, ... }:
       { packages = {}; })
