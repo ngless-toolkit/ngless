@@ -27,7 +27,7 @@ let
         nativeBuildInputs = oldAttr.nativeBuildInputs ++ [ pkgs.zlib.dev pkgs.glibc.static ];
   }) ).override { zlib = pkgs.zlib.static; };
 
-  samtools-static = (pkgs.samtools.overrideAttrs (oldAttr: {
+  samtools-static = (pkgsStatic.samtools.overrideAttrs (oldAttr: {
         doCheck = false;
   }) );
 
