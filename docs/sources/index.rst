@@ -164,7 +164,7 @@ from another programme (not just ``cat``).
 Authors
 -------
 
--  `Luis Pedro Coelho <https://luispedro.org>`__ (email: coelho@embl.de)
+-  `Luis Pedro Coelho <https://luispedro.org>`__ (email: luispedro@big-data-biology.org)
    (on twitter: `@luispedrocoelho <https://twitter.com/luispedrocoelho>`__)
 -  Paulo Monteiro
 -  Renato Alves

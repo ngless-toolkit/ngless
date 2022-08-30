@@ -1,4 +1,4 @@
-{- Copyright 2015-2019 NGLess Authors
+{- Copyright 2015-2022 NGLess Authors
  - License: MIT
  -}
 
@@ -101,9 +101,7 @@ convertSamToBam samfile = do
 -- The output is a newly created temporary file
 convertBamToSam :: FilePath -> NGLessIO FilePath
 convertBamToSam bamfile = do
-    (newfp, hout) <- openNGLTempFile bamfile "converted_" "sam"
-    outputListLno' DebugOutput ["BAM->SAM Conversion start ('", bamfile, "' -> '", newfp, "')"]
-    C.runConduit $
-        samBamConduit bamfile .| C.sinkHandle hout
-    liftIO $ hClose hout
-    return newfp
+    makeNGLTempFile bamfile "converted_" "sam" $ \hout -> do
+        outputListLno' DebugOutput ["BAM->SAM Conversion start ('", bamfile, "' -> <temp>)"]
+        C.runConduit $
+            samBamConduit bamfile .| C.sinkHandle hout
