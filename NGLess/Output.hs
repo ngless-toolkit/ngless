@@ -15,11 +15,12 @@ module Output
     , outputMappedSetStatistics
     , writeOutputJS
     , writeOutputTSV
+    , writeOutputTo
     , outputConfiguration
     ) where
 
 import           Text.Printf (printf)
-import           System.IO (hPutStrLn, hIsTerminalDevice, stdout, stderr)
+import           System.IO (hPutStrLn, hIsTerminalDevice, stdout, stderr, Handle)
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.IO.SafeWrite (withOutputFile)
 import           Data.Maybe (maybeToList, fromMaybe, isJust)
@@ -291,6 +292,17 @@ wrapScript script tags stats = first annotate <$> script
             | i `elem` (scriptLno <$> tags) = Just (HasQCInfo i)
             | i `elem` stats = Just (HasStatsInfo i)
             | otherwise =  Nothing
+
+writeOutputTo :: Handle -> IO ()
+writeOutputTo h = do
+    SavedOutput fullOutput _ _ <- outputReverse <$> readIORef savedOutput
+    forM_ fullOutput $ \(OutputLine lno ot t' msg) -> do
+        let tformat = "%a %d-%m-%Y %T"
+            tstr = formatTime defaultTimeLocale tformat t'
+            lineStr = if lno > 0
+                            then printf " Line %s" (show lno)
+                            else "" :: String
+        hPutStrLn h $ printf "[%s]%s (%s): %s" tstr lineStr (show ot) msg
 
 writeOutputJS :: FilePath -> FilePath -> T.Text -> NGLessIO ()
 writeOutputJS odir scriptName script = liftIO $ do

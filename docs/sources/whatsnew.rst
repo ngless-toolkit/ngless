@@ -19,6 +19,7 @@ which will print ``my-sample``.
 - Make ``print()`` accept ints and doubles as well as strings
 - Added ``println`` function which works like ``print`` but prints a newline after the output.
 - Added ``run_for_all`` function to ``parallel`` module, simplifying its `API <stdlib.html>`__.
+- When using the ``parallel`` module and a job fails, writes the log to the corresponding ``.failed`` file
 
 Version 1.4.2
 -------------

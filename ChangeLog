@@ -9,6 +9,7 @@ Unreleased
 	* Add `names()` method to readset
 	* Add ``println()`` function
 	* Make ``print()`` accept ints and doubles as well as strings
+	* Write log to .failed files when using the parallel module
 
 Version 1.4.2 2022-07-21 by luispedro
 	* Fix bug with parsing GFF files

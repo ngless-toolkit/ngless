@@ -151,8 +151,9 @@ executeLock1OrForAll funcname (NGOList entries) kwargs  = do
         release rk
     registerFailHook $ do
         let logfile = lockdir </> T.unpack e ++ ".failed"
-        withFile logfile WriteMode $ \h ->
-            hPutStrLn h "Execution failed" -- TODO output log here
+        withFile logfile WriteMode $ \h -> do
+            hPutStrLn h "Execution failed. Execution log:"
+            writeOutputTo h
     case entries of
         (NGOString _:_) -> return . NGOString $! fromMaybe e $ lookup e (zip saneentries entries')
         _ -> case lookup e (zip saneentries entries) of
