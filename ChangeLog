@@ -1,4 +1,4 @@
-Unreleased
+Version 1.5.0
 	* Add `compress_level` option to `write()` function
 	* Add ability to specify samples using YAML format
 	* Make 'assemble' return NGLSequenceSet type and add sequenceset to
@@ -10,6 +10,7 @@ Unreleased
 	* Add ``println()`` function
 	* Make ``print()`` accept ints and doubles as well as strings
 	* Write log to .failed files when using the parallel module
+	* Fix bug where failhooks were not triggered for uncaught exceptions
 
 Version 1.4.2 2022-07-21 by luispedro
 	* Fix bug with parsing GFF files

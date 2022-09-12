@@ -383,7 +383,8 @@ main = do
     mapM_ makeEncodingSafe [stdout, stdin, stderr]
     catch main' $ \e -> case fromException e of
         Just ec -> throwIO (ec :: ExitCode) -- rethrow
-        Nothing ->
+        Nothing -> do
+            triggerFailHook
             fatalError ("An unhandled error occurred (this should not happen)!\n\n" ++
                         "\tIf you can reproduce this issue, please run your script\n" ++
                         "\twith the --trace flag and report a bug (including the script and the trace) at\n" ++
