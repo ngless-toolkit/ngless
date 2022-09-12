@@ -8,19 +8,27 @@ in pkgs.dockerTools.buildImage {
   name = "nglesstoolkit/ngless";
   tag = version;
 
-  contents = [
-    release.NGLess.components.exes.ngless
-    pkgs.prodigal
-    pkgs.samtools
-    pkgs.megahit
-    pkgs.python3 # required for megahit (dependency should be upstreamed)
-    pkgs.minimap2
-    pkgs.bwa
+  copyToRoot = pkgs.buildEnv {
+    name = "image-root";
+    pathsToLink = [ "/bin" "/usr/bin" ];
+    paths = [
+      release.NGLess.components.exes.ngless
+      pkgs.prodigal
+      pkgs.samtools
+      pkgs.megahit
+      pkgs.python3 # required for megahit (dependency should be upstreamed)
+      pkgs.minimap2
+      pkgs.bwa
 
-    pkgs.xz
-    pkgs.which
-    pkgs.zstd
-  ];
+      pkgs.xz
+      pkgs.which
+      pkgs.zstd
+      pkgs.coreutils
+    ];
+  };
+  runAsRoot = ''
+    ${pkgs.coreutils}/bin/ln -s /bin/env /usr/bin/env
+  '';
 
   config = {
       Env = [
