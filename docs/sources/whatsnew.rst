@@ -5,21 +5,38 @@ What's New (History)
 Unreleased (Github version)
 ---------------------------
 
+The two big changes are:
+
+1. the ability to use `Yaml <yaml-list.html`__ files to specify samples,
+2. the introduction of ``run_for_all`` (and ``run_for_all_samples``) functions to simplify the usage of the ``parallel`` module (see `standard library docs <stdlib.html>`__.
+
+Several of the other changes were then to support these two features.
+Additionally, some minor fixes and improvements were made.
+
 User-visible Improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Add ``compress_level`` argument to ``write`` function to specify the compression level
-- Add ``load_sample_list`` function to load samples in YAML format (see `YAML Samples <yaml-list.html>`_)
+- Add ``load_sample_list`` function to load samples in YAML format (see `YAML Samples <yaml-list.html>`_).
+- Add ``compress_level`` argument to ``write`` function to specify the compression level.
 - Added ``name()`` method to ``ReadSet`` objects, so you can do::
 
     input = load_fastq_directory("my-sample")
     print(input.name())
 
 which will print ``my-sample``.
-- Make ``print()`` accept ints and doubles as well as strings
 - Added ``println`` function which works like ``print`` but prints a newline after the output.
+- Make ``print()`` accept ints and doubles as well as strings.
 - Added ``run_for_all`` function to ``parallel`` module, simplifying its `API <stdlib.html>`__.
-- When using the ``parallel`` module and a job fails, writes the log to the corresponding ``.failed`` file
+- When using the ``parallel`` module and a job fails, writes the log to the corresponding ``.failed`` file.
+- External modules can now use the ``sequenceset`` type to represent a FASTA file.
+- The ``load_fastq_directory`` function now supports ``.xz`` compressed files.
+
+Bugfixes
+~~~~~~~~
+
+- The ``parallel`` module should generate a ``.failed`` file for each failed job, but this was not happening in every case.
+- Fixed parsing of GFF files to support negative values (reported by Josh Sekela on the `mailing-list <https://groups.google.com/g/ngless/c/kf6y2MWBfec/m/2DicyAH3DwAJ>`__).
+
 
 Version 1.4.2
 -------------
