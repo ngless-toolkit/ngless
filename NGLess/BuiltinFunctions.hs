@@ -127,8 +127,8 @@ samfileArgs =
                     ]
     ]
 pairedArgs =
-    [ArgInformation "second" True NGLString []
-    ,ArgInformation "singles" False NGLString []
+    [ArgInformation "second" True NGLString [ArgCheckFileReadable]
+    ,ArgInformation "singles" False NGLString [ArgCheckFileReadable]
     ,ArgInformation "encoding" False NGLSymbol [ArgCheckSymbol ["auto", "33", "64", "sanger", "solexa"]]
     ,ArgInformation "__perform_qc" False NGLBool []
     ]
