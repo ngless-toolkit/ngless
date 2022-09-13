@@ -32,7 +32,7 @@ in pkgs.haskell-nix.stackProject {
     filter = path: type: let baseName = baseNameOf (toString path); in !(pkgs.lib.elem baseName ignoredPaths);
   };
   materialized = ./build-scripts/release.materialized;
-  stack-sha256 = "0lpv5h8zzvmdamw0sxxnqaj919b3wl4b3zmc3d1z38ckpgpxi16b";
+  stack-sha256 = "0b6mwmf9jcqj294fdyrqjiq1wcdnzjl7z00bzwzskklh5bknp8s3";
   inherit checkMaterialization;
 }
 

@@ -44,6 +44,7 @@ import           Control.DeepSeq
 import           Data.Traversable
 import           Control.Monad.Trans.Class
 import           System.AtomicWrite.Writer.Text (atomicWriteFile)
+import           System.Random.Shuffle (shuffleM)
 
 
 import Control.Monad.Trans.Resource
@@ -171,54 +172,73 @@ failedName = (++ ".failed") . T.unpack
 getLock :: FilePath
                 -- ^  directory where to create locks
                 -> [T.Text]
-                -- ^ keys to attempt to ock
+                -- ^ keys to attempt to lock
                 -> NGLessIO (T.Text, ReleaseKey)
 getLock basedir fs = do
     existing <- liftIO $ getDirectoryContents basedir
     let notfinished = flip filter fs $ \fname -> finishedName fname `notElem` existing
         notlocked = flip filter notfinished $ \fname -> lockName fname `notElem` existing
         notfailed = flip filter notlocked $ \fname -> failedName fname `notElem` existing
+        failed = flip filter notfinished $ \fname -> failedName fname `elem` existing
+        locked = flip filter notfinished $ \fname -> lockName fname `elem` existing
+    when (null notfinished) $ do
+        outputListLno' InfoOutput ["All jobs are finished"]
+        throwError $ NGError NoErrorExit "All jobs are finished"
 
+    outputListLno' TraceOutput ["Looking for a lock in '", basedir, "'"]
     outputListLno' TraceOutput [
-                    "Looking for a lock in ", basedir, ". ",
-                    "Total number of elements is ", show (length fs),
-                    " (not locked: ", show (length notlocked), "; not finished: ", show (length notfinished), ")."]
-    -- first try all the elements that are not locked and have not failed
-    -- if that fails, try the unlocked but failed
-    -- Finally, try the locked elements in the hope that some may be stale
+                    "Total number of tasks to run is ", show (length fs),
+                    " (total not finished (including locked & failed): ", show (length notfinished),
+                    " ; locked: ", show (length locked),
+                    " ; failed: ", show (length failed),
+                    ")."]
+    -- first try all the tasks that are not locked and have not failed
+    -- if that fails, try the locked tasks in the hope that some may be stale
+    -- Finally, try the unlocked but failed (in random order)
     getLock' basedir notfailed >>= \case
         Just v -> return v
-        Nothing -> getLock' basedir (filter (`notElem` notfailed) notlocked) >>= \case
-            Just v -> return v
-            Nothing -> do
-                outputListLno' TraceOutput ["All elements locked. checking for stale locks"]
-                getLock' basedir notfinished >>= \case
-                    Just v -> return v
-                    Nothing -> do
-                        let msg = if null (notfailed ++ notfailed)
-                                then "All jobs are finished"
-                                else "Jobs appear to be running"
-                        outputListLno' WarningOutput ["Could get a lock for any file: ", msg]
-                        throwError $ NGError NoErrorExit msg
+        Nothing -> do
+            outputListLno' InfoOutput ["All tasks locked or failed. Checking for stale locks..."]
+            getLock' basedir locked >>= \case
+                Just v -> return v
+                Nothing -> do
+                    when (null failed) $ do
+                        outputListLno' InfoOutput ["All jobs appear to be finished or running"]
+                        throwError $ NGError NoErrorExit "All jobs are finished or running"
+                    -- randomizing the order maximizes the possibilities to get a lock
+                    failed' <- liftIO $ shuffleM failed
+                    outputListLno' InfoOutput ["All tasks locked or failed and there are no stale locks."]
+                    outputListLno' InfoOutput ["Will retry some failed tasks, but it is possible that this will fail again."]
+                    outputListLno' InfoOutput ["Failed logs are in directory '", basedir, "'"]
+                    getLock' basedir failed' >>= \case
+                        Just v -> return v
+                        Nothing -> do
+                            let msg
+                                 | null (notfailed ++ notfailed) = "All jobs are finished"
+                                 | null failed = "Jobs appear to be running"
+                                 | otherwise = "Jobs are either locked or failed. Check directory '" ++ basedir ++ "' for more information"
+                            outputListLno' WarningOutput ["Could get a lock for any file: ", msg]
+                            throwError $ NGError NoErrorExit msg
 
 getLock' _ [] = return Nothing
-getLock' basedir (f:fs) = do
-    let lockname = basedir </> lockName f
-    finished <- liftIO $ doesFileExist (basedir </> finishedName f)
-    if finished
-        then getLock' basedir fs
-        else LockFile.acquireLock LockFile.LockParameters
-                            { lockFname = lockname
-                            , maxAge = fromInteger (60*60)
-                                -- one hour. Given that lock files are touched
-                                -- every ten minutes if things are good (see
-                                -- thread below), this is an indication that
-                                -- the process has crashed
-                            , whenExistsStrategy = LockFile.IfLockedNothing
-                            , mtimeUpdate = True } >>= \case
-            Nothing -> getLock' basedir fs
-            Just rk -> do
-                return $ Just (f,rk)
+getLock' basedir (f:fs) =
+    LockFile.acquireLock LockFile.LockParameters
+                        { lockFname = basedir </> lockName f
+                        , maxAge = fromInteger (60*60)
+                            -- one hour. Given that lock files are touched
+                            -- every ten minutes if things are good (see
+                            -- thread below), this is an indication that
+                            -- the process has crashed
+                        , whenExistsStrategy = LockFile.IfLockedNothing
+                        , mtimeUpdate = True } >>= \case
+        Nothing -> getLock' basedir fs
+        Just rk -> do
+            isFinished <- liftIO $ doesFileExist (basedir </> finishedName f)
+            if isFinished
+                then do
+                    release rk
+                    getLock' basedir fs
+                else return $ Just (f, rk)
 
 executeCollect :: NGLessObject -> [(T.Text, NGLessObject)] -> NGLessIO NGLessObject
 executeCollect (NGOCounts istream) kwargs = do

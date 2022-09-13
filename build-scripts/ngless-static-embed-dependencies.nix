@@ -24,7 +24,7 @@ let
 in pkgs.haskell-nix.stackProject {
   name = "NGLess";
   src = (import ./sources-with-static-dependencies.nix) ;
-  stack-sha256 = "13ms75px2iyfydc91nyr521cw8fadhwic1xn1vn9kqnksf2zaglz";
+  stack-sha256 = "0m0kkykh6zicmzcgs1fyxnjaxpsf8ylvvdq4cawjmpd3csnxqvgg";
   materialized = ./sources-with-static-dependencies.materialized;
   inherit checkMaterialization;
 }

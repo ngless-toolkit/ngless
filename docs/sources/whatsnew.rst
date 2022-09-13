@@ -30,6 +30,7 @@ which will print ``my-sample``.
 - When using the ``parallel`` module and a job fails, writes the log to the corresponding ``.failed`` file.
 - External modules can now use the ``sequenceset`` type to represent a FASTA file.
 - The ``load_fastq_directory`` function now supports ``.xz`` compressed files.
+- The ``parallel`` module now checks for stale locks **before** re-trying failed tasks. The former model could lead to a situation where a particular sample failed deterministically and then blocked progress even when some locks were stale.
 
 Bugfixes
 ~~~~~~~~

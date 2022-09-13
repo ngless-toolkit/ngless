@@ -11,6 +11,8 @@ Version 1.5.0
 	* Make ``print()`` accept ints and doubles as well as strings
 	* Write log to .failed files when using the parallel module
 	* Fix bug where failhooks were not triggered for uncaught exceptions
+	* Change order of testing for locks in the parallel module for a more
+	robust protocol
 
 Version 1.4.2 2022-07-21 by luispedro
 	* Fix bug with parsing GFF files
