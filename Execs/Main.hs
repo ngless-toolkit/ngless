@@ -45,6 +45,8 @@ import Control.Exception (catch, try, throwIO, fromException, displayException)
 import Control.Concurrent (setNumCapabilities)
 import System.Console.ANSI (setSGRCode, SGR(..), ConsoleLayer(..), Color(..), ColorIntensity(..))
 import System.Exit (exitSuccess, exitFailure, ExitCode(..))
+import qualified UnliftIO.Exception
+import qualified Control.Monad.Except
 
 import Control.Monad.Trans.Resource
 
@@ -279,15 +281,25 @@ modeExec opts@CmdArgs.DefaultMode{} = do
             writeCWL sc fname cwlname
             exitSuccess
         outputListLno' InfoOutput ["Script OK. Starting interpretation..."]
-        interpret modules (nglBody transformed)
-        triggerHook FinishOkHook
-        whenM (nConfCreateReportDirectory <$> nglConfiguration) $ do
-            odir <- nConfReportDirectory <$> nglConfiguration
-            liftIO $ createDirectoryIfMissing False odir
-            liftIO $ setupHtmlViewer odir
-            liftIO $ T.writeFile (odir </> "script.ngl") ngltext
-            writeOutputJS odir fname ngltext
-            writeOutputTSV False (Just $ odir </> "fq.tsv") (Just $ odir </> "mappings.tsv")
+        UnliftIO.Exception.try (interpret modules (nglBody transformed)) >>= \case
+            Left e -> case fromException e of
+                Just ec -> liftIO $ throwIO (ec :: ExitCode) -- rethrow
+                Nothing -> case fromException e of
+                    Just e@NGError{} -> Control.Monad.Except.throwError e
+                    Nothing -> do
+                        outputListLno' ErrorOutput [show e]
+                        liftIO $ do
+                            triggerFailHook
+                            fatalError (show e)
+            Right () -> do
+                triggerHook FinishOkHook
+                whenM (nConfCreateReportDirectory <$> nglConfiguration) $ do
+                    odir <- nConfReportDirectory <$> nglConfiguration
+                    liftIO $ createDirectoryIfMissing False odir
+                    liftIO $ setupHtmlViewer odir
+                    liftIO $ T.writeFile (odir </> "script.ngl") ngltext
+                    writeOutputJS odir fname ngltext
+                    writeOutputTSV False (Just $ odir </> "fq.tsv") (Just $ odir </> "mappings.tsv")
     exitSuccess
 
 
