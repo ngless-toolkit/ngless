@@ -24,7 +24,7 @@ If you are using NGLess, please cite:
 
 ## Example
 
-    ngless "1.4"
+    ngless "1.5"
     input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
     input = preprocess(input) using |read|:
         read = read[5:]
@@ -55,21 +55,21 @@ The recommended way to install NGLess is through
 Alternatively, a docker container with NGLess is available at
 [docker hub](https://hub.docker.com/r/nglesstoolkit/ngless):
 
-    docker run -v $PWD:/workdir -w /workdir -it nglesstoolkit/ngless:1.4.2 ngless --version
+    docker run -v $PWD:/workdir -w /workdir -it nglesstoolkit/ngless:1.5.0 ngless --version
 
 Adapt the mount flags (``-v``) as needed.
 
 ### Linux
 
 You can download a [statically linked version of NGless
-1.4.2](https://github.com/ngless-toolkit/ngless/releases/download/v1.4.2/NGLess-v1.4.2-Linux-static-full)
+1.5.0](https://github.com/ngless-toolkit/ngless/releases/download/v1.5.0/NGLess-v1.5.0-Linux-static-full)
 
 This should work across a wide range of Linux versions (please
 [report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
 
-    curl -L -O https://github.com/ngless-toolkit/ngless/releases/download/v1.4.2/NGLess-v1.4.2-Linux-static-full
-    chmod +x NGLess-v1.4.2-Linux-static-full
-    ./NGLess-v1.4.2-Linux-static-full
+    curl -L -O https://github.com/ngless-toolkit/ngless/releases/download/v1.5.0/NGLess-v1.5.0-Linux-static-full
+    chmod +x NGLess-v1.5.0-Linux-static-full
+    ./NGLess-v1.5.0-Linux-static-full
 
 This downloaded file bundles bwa, samtools and megahit (also statically linked).
 
@@ -130,7 +130,7 @@ For developers who have done this much more datasets for testing purposes can be
 - [Frequently Asked Questions (FAQ)](https://ngless.embl.de/faq.html)
 - [ngless mailing list](https://groups.google.com/forum/#!forum/ngless)
 - [What's new log](https://ngless.embl.de/whatsnew.html)
-- [NGless 1.4.0 Release Documentation](https://ngless.embl.de/whatsnew.html#version-1-4-0)
+- [NGless 1.5.0 Release Documentation](https://ngless.embl.de/whatsnew.html#version-1-5-0)
 
 ## Authors
 

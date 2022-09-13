@@ -20,7 +20,7 @@ versionStrLong :: String
 versionStrLong = "1.5.0"
 
 dateStr :: String
-dateStr = "Unreleased"
+dateStr = "14 September 2022"
 
 embeddedStr :: String
 #ifdef NO_EMBED_SAMTOOLS_BWA

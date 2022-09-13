@@ -2,13 +2,15 @@
 What's New (History)
 ====================
 
-Unreleased (Github version)
----------------------------
+Version 1.5.0
+-------------
+
+*Released on September 14 2022*
 
 The two big changes are:
 
 1. the ability to use `Yaml <yaml-list.html`__ files to specify samples,
-2. the introduction of ``run_for_all`` (and ``run_for_all_samples``) functions to simplify the usage of the ``parallel`` module (see `standard library docs <stdlib.html>`__.
+2. the introduction of ``run_for_all`` (and ``run_for_all_samples``) functions to simplify the usage of the ``parallel`` module (see `standard library docs <stdlib.html>`__).
 
 Several of the other changes were then to support these two features.
 Additionally, some minor fixes and improvements were made.
