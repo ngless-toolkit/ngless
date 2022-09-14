@@ -1,4 +1,3 @@
-{-# LANGUAGE PackageImports #-}
 {- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
@@ -33,8 +32,8 @@ module Main
  -
 -}
 
-import Data.Maybe
-import Control.Monad
+import Data.Maybe (isJust, fromMaybe)
+import Control.Monad (forM_, unless, when, void)
 import Control.Monad.IO.Class (liftIO, MonadIO(..))
 import Options.Applicative
 import System.FilePath
@@ -55,14 +54,14 @@ import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as B
 
-import Interpret
+import Interpret (interpret)
 import JSONScript (writeScriptJSON)
-import Validation
-import ValidationIO
+import Validation (validate, uses_STDOUT)
+import ValidationIO (validateIO)
 import Transform
 import Language
 import Types
-import Parse
+import Parse (parsengless)
 import Configuration
 import qualified Version
 import ReferenceDatabases
@@ -70,10 +69,10 @@ import Output
 import NGLess
 import NGLess.NGError
 import NGLess.NGLEnvironment
-import Modules
+import Modules (Module)
 import qualified CmdArgs
 import FileManagement
-import StandardModules.NGLStdlib
+import StandardModules.NGLStdlib (loadStdlibModules)
 import Citations (collectCitations)
 import Utils.Network
 import Utils.Batch (getNcpus)
@@ -260,8 +259,8 @@ modeExec opts@CmdArgs.DefaultMode{} = do
             setQuiet
         outputListLno' DebugOutput ["Validating script..."]
         errs <- validateIO modules sc
-        when (isJust errs) $ do
-            let errormessage = T.intercalate "\n\n" (fromJust errs)
+        whenJust errs $ \errs' -> do
+            let errormessage = T.intercalate "\n\n" errs'
             liftIO $ fatalError (T.unpack errormessage)
         when (CmdArgs.validateOnly opts) $ do
             outputListLno' InfoOutput ["Script OK."]
@@ -285,7 +284,7 @@ modeExec opts@CmdArgs.DefaultMode{} = do
             Left e -> case fromException e of
                 Just ec -> liftIO $ throwIO (ec :: ExitCode) -- rethrow
                 Nothing -> case fromException e of
-                    Just e@NGError{} -> Control.Monad.Except.throwError e
+                    Just nge@NGError{} -> Control.Monad.Except.throwError nge
                     Nothing -> do
                         outputListLno' ErrorOutput [show e]
                         liftIO $ do
