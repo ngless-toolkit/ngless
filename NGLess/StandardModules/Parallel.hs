@@ -17,6 +17,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as VM
+import qualified Data.Set as S
 import           Data.Time (getZonedTime)
 import           Data.Time.Format (formatTime, defaultTimeLocale)
 import           Data.List.Extra (snoc, chunksOf)
@@ -175,12 +176,12 @@ getLock :: FilePath
                 -- ^ keys to attempt to lock
                 -> NGLessIO (T.Text, ReleaseKey)
 getLock basedir fs = do
-    existing <- liftIO $ getDirectoryContents basedir
-    let notfinished = flip filter fs $ \fname -> finishedName fname `notElem` existing
-        notlocked = flip filter notfinished $ \fname -> lockName fname `notElem` existing
-        notfailed = flip filter notlocked $ \fname -> failedName fname `notElem` existing
-        failed = flip filter notfinished $ \fname -> failedName fname `elem` existing
-        locked = flip filter notfinished $ \fname -> lockName fname `elem` existing
+    existing <- liftIO $ S.fromList <$> getDirectoryContents basedir
+    let notfinished = flip filter fs $ \fname -> finishedName fname `S.notMember` existing
+        notlocked = flip filter notfinished $ \fname -> lockName fname `S.notMember` existing
+        notfailed = flip filter notlocked $ \fname -> failedName fname `S.notMember` existing
+        failed = flip filter notfinished $ \fname -> failedName fname `S.member` existing
+        locked = flip filter notfinished $ \fname -> lockName fname `S.member` existing
     when (null notfinished) $ do
         outputListLno' InfoOutput ["All jobs are finished"]
         throwError $ NGError NoErrorExit "All jobs are finished"
