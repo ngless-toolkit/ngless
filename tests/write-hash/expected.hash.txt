@@ -7,6 +7,7 @@
 #                     normalization={fpkm})
 #     
 #     write(counts, ofile='output.hash.txt', auto_comments=[{script}, {hash}])
+#     write(counts, ofile='output.compress.txt.gz', auto_comments=[{script}, {hash}])
 #     
 # Output hash: 8dc0b1723c21d5e03004419a06a93813
 	seq1_2.sam.bz2

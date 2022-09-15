@@ -261,12 +261,24 @@ executeWrite (NGOCounts iout) args = do
     comment <- buildComment (woComment opts) (woAutoComment opts) (woHash opts)
     case fromMaybe "tsv" (woFormat opts) of
         "tsv" -> do
-            fp <- asFile iout
             case comment of
-                [] -> moveOrCopyCompress opts fp
-                _ -> C.runConduit $
-                        (commentC "# " comment >> CB.sourceFile fp)
-                        .| CB.sinkFileCautious (woOFile opts)
+                [] -> do
+                    fp <- asFile iout
+                    moveOrCopyCompress opts fp
+                _ -> do
+                    let unlinesVC :: V.Vector ByteLine -> B.ByteString
+                        unlinesVC vs =
+                            B.intercalate (B.singleton 10)
+                                $ map unwrapByteLine
+                                $ V.toList vs
+                        istream = case iout of
+                            File fp -> C.sourceFile fp
+                            Stream _ _ iss ->
+                                iss .| CL.map unlinesVC
+                    withOutputFile' (woOFile opts) $ \hout ->
+                        C.runConduit $
+                            (commentC "# " comment >> istream)
+                                .| ostream (woOFile opts) (woCompressLevel opts) hout
         "csv" -> do
             let (fp,istream) = asStream iout
             comma <- makeNGLTempFile fp "wcomma" "csv" $ \ohand ->

@@ -1,3 +1,7 @@
+Unreleased
+	* Fix bug when outputing comments to compressed files
+	* Better performance for large uses of the parallel module
+
 Version 1.5.0 2022-09-14 by luispedro
 	* Add `compress_level` option to `write()` function
 	* Add ability to specify samples using YAML format

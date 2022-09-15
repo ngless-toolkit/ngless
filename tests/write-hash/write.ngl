@@ -6,4 +6,5 @@ counts = count(samfile('seq1_2.sam.bz2'),
                 normalization={fpkm})
 
 write(counts, ofile='output.hash.txt', auto_comments=[{script}, {hash}])
+write(counts, ofile='output.compress.txt.gz', auto_comments=[{script}, {hash}])
 
