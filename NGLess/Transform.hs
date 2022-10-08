@@ -76,6 +76,7 @@ transform mods sc = Script (nglHeader sc) <$> applyM transforms (nglBody sc)
                 , ifLenDiscardSpecial
                 , substrimReassign
                 , addFileChecks
+                , addRSChecks
                 , addIndexChecks
                 , addUseNewer
                 , addCountsCheck
@@ -353,6 +354,20 @@ addFileChecks' checkFname tag ((lno,e):rest) = do
         validVariables (BinaryOp _ re le) = validVariables re ++ validVariables le
         validVariables (ConstStr _) = []
         validVariables _ = [Variable "this", Variable "wont", Variable "work"] -- this causes the caller to bailout
+
+
+addRSChecks :: [(Int,Expression)] -> NGLessIO [(Int, Expression)]
+addRSChecks = return . genericCheckUpfloat addRSChecks'
+
+addRSChecks' :: (Int, Expression) -> Maybe ([Variable],Expression)
+addRSChecks' (lno, e) = case e of
+    Assignment _ (FunctionCall (FuncName "preprocess") lk@(Lookup _ v) _ _)
+        -> Just ([v],
+                FunctionCall (FuncName "__check_readset")
+                            lk
+                            [(Variable "original_lno", ConstInt (toInteger lno))]
+                            Nothing)
+    _ -> Nothing
 
 -- | 'addIndexChecks' implements the following transformation
 --

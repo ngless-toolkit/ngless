@@ -1,0 +1,14 @@
+ngless "1.5"
+
+samples = load_sample_list('list.yaml')
+
+input = samples[0]
+
+println(input.name())
+
+trim = 3
+input = preprocess(input) using |read|:
+   read = read[trim:]
+   if len(read) < 10:
+       discard
+write(input, ofile='output.fq')

@@ -1,8 +1,7 @@
-{- Copyright 2016-2019 NGLess Authors
+{- Copyright 2016-2022 NGLess Authors
  - License: MIT
  -}
 
-{-# LANGUAGE TupleSections, OverloadedStrings #-}
 
 module BuiltinModules.Checks
     ( checkOFile
@@ -20,7 +19,9 @@ import System.FilePath (takeDirectory)
 import Language
 
 import Modules
+import Output
 import NGLess
+import Data.FastQ (FastQFilePath(..))
 import           Utils.Suggestion (checkFileReadable)
 
 checkOFile :: T.Text -> IO (Maybe T.Text)
@@ -62,6 +63,18 @@ executeChecks "__check_index_access" (NGOList vs) args = do
                         else "")
                     ])
     return NGOVoid
+
+executeChecks "__check_readset" (NGOReadSet name (ReadSet pairs singles)) args = do
+    lno <- lookupIntegerOrScriptError "readset check" "original_lno" args
+    let catPairs [] = []
+        catPairs ((a,b):xs) = a:b:catPairs xs
+    forM_ (catPairs pairs ++ singles) $ \(FastQFilePath _ r) -> do
+        outputListLno TraceOutput (Just $ fromEnum lno) ["Checking file ", r, "."]
+        merr <- liftIO (checkFileReadable r)
+        whenJust merr $ \err ->
+            throwSystemError $! concat ["Cannot read file '", r, "' for sample '", T.unpack name, "'. ",
+                                T.unpack err, " (used in line ", show lno, ")."]
+    return NGOVoid
 executeChecks _ _ _ = throwShouldNotOccur "checks called in an unexpected fashion."
 
 indexCheck = Function
@@ -95,11 +108,20 @@ iFileCheck = Function
     , funcAllowsAutoComprehension = False
     , funcChecks = []
     }
+iRSCheck = Function
+    { funcName = FuncName "__check_readset"
+    , funcArgType = Just NGLReadSet
+    , funcArgChecks = []
+    , funcRetType = NGLVoid
+    , funcKwArgs = [ArgInformation "original_lno" True NGLInteger []]
+    , funcAllowsAutoComprehension = False
+    , funcChecks = []
+    }
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule _ = return def
     { modInfo = ModInfo "builtin.checks" "0.0"
-    , modFunctions = [oFileCheck, iFileCheck, indexCheck]
+    , modFunctions = [oFileCheck, iFileCheck, indexCheck, iRSCheck]
     , runFunction = executeChecks
     }
 
