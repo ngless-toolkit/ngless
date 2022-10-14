@@ -1,4 +1,4 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2022 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE RankNTypes #-}
@@ -22,6 +22,7 @@ import           Control.Concurrent (getNumCapabilities)
 import Output
 import NGLess
 import Data.FastQ
+import Data.FastQ.Utils
 import Configuration
 import NGLess.NGLEnvironment
 import Dependencies.Versions (bwaVersion)

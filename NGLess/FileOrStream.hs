@@ -19,8 +19,8 @@ import System.FilePath
 
 import FileOrStream.Types (FileOrStream(..))
 import NGLess.NGError
-import Utils.Conduit
-import Utils.Samtools
+import Utils.Conduit (ByteLine, byteLineSinkHandle, linesVC)
+import Utils.Samtools (samBamConduit)
 import FileManagement
 
 asFile :: FileOrStream -> NGLessIO FilePath

@@ -37,6 +37,7 @@ import           Data.List (isInfixOf)
 import           Control.Concurrent.Async (concurrently_)
 
 import Data.FastQ
+import Data.FastQ.Utils
 import Language
 import Configuration
 import FileOrStream
@@ -218,7 +219,7 @@ executeWrite (NGOReadSet _ rs) args = do
     if woFormatFlags opts == Just "interleaved"
         then
             withOutputFileO opts $ \out ->
-                C.runConduitRes (interleaveFQs rs .| out)
+                C.runConduit (interleaveFQs rs .| out)
         else case rs of
             ReadSet [] singles ->
                 liftIO =<< moveOrCopyCompressFQs singles ofile

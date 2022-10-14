@@ -11,6 +11,7 @@ module Output
     , commentC
     , outputListLno
     , outputListLno'
+    , traceStatus
     , outputFQStatistics
     , outputMappedSetStatistics
     , writeOutputJS
@@ -20,7 +21,7 @@ module Output
     ) where
 
 import           Text.Printf (printf)
-import           System.IO (hPutStrLn, hIsTerminalDevice, stdout, stderr, Handle)
+import           System.IO (hFlush, hPutStr, hPutStrLn, hIsTerminalDevice, stdout, stderr, Handle)
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.IO.SafeWrite (withOutputFile)
 import           Data.Maybe (maybeToList, fromMaybe, isJust)
@@ -33,7 +34,7 @@ import           Data.Aeson.TH (deriveToJSON, defaultOptions, Options(..))
 import           Data.Time (getZonedTime, ZonedTime(..))
 import           Data.Time.Format (formatTime, defaultTimeLocale)
 import qualified System.Console.ANSI as ANSI
-import           Control.Monad
+import           Control.Monad (forM_, when, unless)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Extra (whenJust)
 import           Numeric (showFFloat)
@@ -57,7 +58,6 @@ import NGLess.NGError
 
 data AutoComment = AutoScript | AutoDate | AutoResultHash
                         deriving (Eq, Show)
-
 
 buildComment :: Maybe T.Text -> [AutoComment] -> T.Text -> NGLessIO [T.Text]
 buildComment c ac rh = do
@@ -173,12 +173,52 @@ shouldPrint :: Bool -- ^ is terminal
                 -> OutputType
                 -> Verbosity
                 -> Bool
-shouldPrint _ TraceOutput _ = False
-shouldPrint _      _ Loud = True
-shouldPrint False ot Quiet = ot == ErrorOutput
-shouldPrint False ot Normal = ot > InfoOutput
-shouldPrint True  ot Quiet = ot >= WarningOutput
-shouldPrint True  ot Normal = ot >= InfoOutput
+shouldPrint _ TraceOutput _  = False
+shouldPrint _      _ Loud    = True
+shouldPrint False ot Quiet   = ot == ErrorOutput
+shouldPrint False ot Normal  = ot > InfoOutput
+shouldPrint True  ot Quiet   = ot >= WarningOutput
+shouldPrint True  ot Normal  = ot >= InfoOutput
+
+traceStatus :: String -> NGLessIO ()
+traceStatus s = do
+    outputListLno' TraceOutput [s]
+    traceSet <- nConfTrace <$> nglConfiguration
+    unless traceSet $ do
+        outputTo <- nConfOutputTo <$> nglConfiguration
+        let outputHandle = case outputTo of
+                NGLOutStdout -> stdout
+                NGLOutStderr -> stderr
+        isTerm <- liftIO $ hIsTerminalDevice outputHandle
+        doColor <- isDoColor
+        verb <- nConfVerbosity <$> nglConfiguration
+        when (shouldPrint isTerm InfoOutput verb) $
+            liftIO $ do
+                let c = colorFor InfoOutput
+                    st = if doColor
+                            then ANSI.setSGRCode [ANSI.SetColor ANSI.Foreground ANSI.Dull c]
+                            else ""
+                    rst = if doColor
+                            then ANSI.setSGRCode [ANSI.Reset]
+                            else ""
+                hPutStr outputHandle (st ++ s ++ "..." ++ rst)
+                hFlush outputHandle
+                hPutStr outputHandle "\r"
+
+isDoColor :: NGLessIO Bool
+isDoColor = do
+    colorOpt <- nConfColor <$> nglConfiguration
+    case colorOpt of
+        ForceColor -> return True
+        NoColor -> return False
+        AutoColor -> do
+            outputTo <- nConfOutputTo <$> nglConfiguration
+            let outputHandle = case outputTo of
+                    NGLOutStdout -> stdout
+                    NGLOutStderr -> stderr
+            isTerm <- liftIO $ hIsTerminalDevice outputHandle
+            hasNOCOLOR <- isJust <$> liftIO (lookupEnv "NO_COLOR")
+            return (isTerm && not hasNOCOLOR)
 
 output :: OutputType -> Int -> String -> NGLessIO ()
 output !ot !lno !msg = do
@@ -187,21 +227,15 @@ output !ot !lno !msg = do
             NGLOutStdout -> stdout
             NGLOutStderr -> stderr
     isTerm <- liftIO $ hIsTerminalDevice outputHandle
-    hasNOCOLOR <- isJust <$> liftIO (lookupEnv "NO_COLOR")
     verb <- nConfVerbosity <$> nglConfiguration
     traceSet <- nConfTrace <$> nglConfiguration
-    colorOpt <- nConfColor <$> nglConfiguration
-    let sp = traceSet || shouldPrint isTerm ot verb
-        doColor = case colorOpt of
-            ForceColor -> True
-            NoColor -> False
-            AutoColor -> isTerm && not hasNOCOLOR
-    c <- colorFor ot
+    doColor <- isDoColor
     liftIO $ do
         t <- getZonedTime
         modifyIORef savedOutput (addOutputLine $ OutputLine lno ot t msg)
-        when sp $ do
-            let st = if doColor
+        when (traceSet || shouldPrint isTerm ot verb) $ do
+            let c = colorFor ot
+                st = if doColor
                         then ANSI.setSGRCode [ANSI.SetColor ANSI.Foreground ANSI.Dull c]
                         else ""
                 rst = if doColor
@@ -216,15 +250,13 @@ output !ot !lno !msg = do
                                 else "" :: String
             hPutStrLn outputHandle $ printf "%s[%s]%s: %s%s" st tstr lineStr msg rst
 
-colorFor :: OutputType -> NGLessIO ANSI.Color
-colorFor = return . colorFor'
-    where
-        colorFor' TraceOutput   = ANSI.White
-        colorFor' DebugOutput   = ANSI.White
-        colorFor' InfoOutput    = ANSI.Blue
-        colorFor' ResultOutput  = ANSI.Black
-        colorFor' WarningOutput = ANSI.Yellow
-        colorFor' ErrorOutput   = ANSI.Red
+colorFor :: OutputType -> ANSI.Color
+colorFor TraceOutput   = ANSI.White
+colorFor DebugOutput   = ANSI.White
+colorFor InfoOutput    = ANSI.Blue
+colorFor ResultOutput  = ANSI.Black
+colorFor WarningOutput = ANSI.Yellow
+colorFor ErrorOutput   = ANSI.Red
 
 
 encodeBPStats :: FQ.FQStatistics -> [BPosInfo]

@@ -25,6 +25,7 @@ import           GHC.Conc (getNumCapabilities)
 import           Control.Monad.Trans.Class (lift)
 
 import Data.FastQ
+import Data.FastQ.Utils
 import Data.Sam (isSamHeaderString)
 import Output
 import NGLess
