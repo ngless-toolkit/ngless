@@ -188,7 +188,7 @@ uninterleave enc fname = do
             src
             .| linesC
             .| fqDecodeC fname enc'
-            .| C.passthroughSink fqStatsC (\stats -> outputFQStatistics fname stats enc')
+            .| C.passthroughSink fqStatsC (\stats -> outputFQStatistics fname fname stats enc')
             .| uninterleaveC
             .| subsampleC (CAlg.dispatchC
                         [CAlg.asyncZstdTo 3 h1
@@ -221,7 +221,7 @@ asFQFilePathMayQC qc enc fp =  do
     enc' <- maybe (encodingFor fp) return enc
     when qc $ do
         s <- statsFromFastQ fp enc'
-        outputFQStatistics fp s enc'
+        outputFQStatistics fp fp s enc'
     return $! FastQFilePath enc' fp
 
 executePaired :: NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
@@ -256,8 +256,8 @@ executePaired (NGOString mate1) args = NGOReadSet mate1 <$> do
                             (try $ testNGLessIO $ statsFromFastQ fp2' enc2)
                 s1 <- runNGLess es1
                 s2 <- runNGLess es2
-                outputFQStatistics fp1' s1 enc1
-                outputFQStatistics fp2' s2 enc2
+                outputFQStatistics fp1' fp1' s1 enc1
+                outputFQStatistics fp1' fp2' s2 enc2
                 return (FastQFilePath enc1 fp1', FastQFilePath enc2 fp2')
     when (enc1 /= enc2) $
         throwDataError ("Mates do not seem to have the same quality encoding! (first mate [" ++ fp1 ++ "] had " ++ show enc1 ++ ", second one [" ++ fp2 ++ "] " ++ show enc2 ++ ").")

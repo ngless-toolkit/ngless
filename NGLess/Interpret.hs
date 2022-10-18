@@ -449,7 +449,7 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block (Variabl
                                     input .| writeAndContinue q
                                     lift $ release k
                                     s' <- liftIO $ A.wait s
-                                    lift $ outputFQStatistics f s' enc
+                                    lift $ outputFQStatistics f f s' enc
                             asSource rest
 
 
@@ -485,9 +485,9 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block (Variabl
             outputListLno' DebugOutput ["Preprocess finished"]
 
             Just lno <- ngleLno <$> nglEnvironment
-            outputFQStatistics ("preproc.lno"++show lno++".pairs.1") s1' outenc
-            outputFQStatistics ("preproc.lno"++show lno++".pairs.2") s2' outenc
-            outputFQStatistics ("preproc.lno"++show lno++".singles") s3' outenc
+            outputFQStatistics fp1' ("preproc.lno"++show lno++".pairs.1") s1' outenc
+            outputFQStatistics fp2' ("preproc.lno"++show lno++".pairs.2") s2' outenc
+            outputFQStatistics fp3' ("preproc.lno"++show lno++".singles") s3' outenc
             NGOReadSet name <$> case (nSeq s1' > 0, nSeq s2' > 0, nSeq s3' > 0) of
                         (True, True, False) -> do
                             liftIO $ removeFile fp3'

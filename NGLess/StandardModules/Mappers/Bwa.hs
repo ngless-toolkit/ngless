@@ -12,21 +12,23 @@ module StandardModules.Mappers.Bwa
 import           System.Directory (doesFileExist)
 import           System.Posix (getFileStatus, fileSize, FileOffset)
 import           System.FilePath (splitExtension)
-import           Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (liftIO, MonadIO(..))
 import qualified Data.ByteString as B
 
 import qualified Data.Conduit as C
+import Data.Conduit.Algorithms.Utils (awaitJust)
 import           Control.Monad.Extra (allM)
 import           Control.Concurrent (getNumCapabilities)
 
 import Output
 import NGLess
 import Data.FastQ
-import Data.FastQ.Utils
+import Data.FastQ.Utils (interleaveFQs)
 import Configuration
 import NGLess.NGLEnvironment
 import Dependencies.Versions (bwaVersion)
 import FileManagement (bwaBin)
+import Utils.ProgressBar (mkProgressBar, updateProgressBar)
 import Utils.Process (runProcess)
 
 -- | Appends bwa version to the index such that different versions
@@ -80,6 +82,29 @@ createIndex fafile = do
             (return ())
             (Left ())
 
+interleaveFQs' rs@(ReadSet pairs singles) = do
+    let allfs = map fst pairs ++ map snd pairs ++ singles
+        totalSize :: [FastQFilePath] -> NGLessIO (Maybe Int)
+        totalSize [] = return (Just 0)
+        totalSize (FastQFilePath _ f:fs) = lookupNrSeqs f >>= \case
+                                Nothing -> return Nothing
+                                Just !s -> ((s +) <$>) <$> totalSize fs
+    totalSize allfs >>= \case
+        Nothing -> return (interleaveFQs rs)
+        Just ts -> return (interleaveFQs rs C..| progressFQ "Mapping FASTQ files" (4 * ts))
+
+progressFQ :: MonadIO m => String -> Int -> C.ConduitT B.ByteString B.ByteString m ()
+progressFQ msg nlens = liftIO (mkProgressBar msg 80) >>= loop 0
+  where
+    loop !nln pbar = awaitJust $ \bs -> do
+            let nln' = nln + B.count 10 bs
+                progress = fromIntegral nln' / fromIntegral nlens
+            pbar' <- liftIO (updateProgressBar pbar progress)
+            C.yield bs
+            loop nln' pbar'
+
+
+
 callMapper :: FilePath -> ReadSet -> [String] -> C.ConduitT B.ByteString C.Void NGLessIO a -> NGLessIO a
 callMapper refIndex rs extraArgs outC = do
     outputListLno' InfoOutput ["Starting mapping to ", refIndex]
@@ -93,8 +118,9 @@ callMapper refIndex rs extraArgs outC = do
                                                     -- -K 100000000 is a hidden option to set the chunk size
                                                     -- this makes the output independent of the number of threads
         cmdargs =  concat [["mem", "-t", show bwathreads, "-K", "100000000", "-p"], extraArgs, [refIndex', "-"]]
+    fqs <- interleaveFQs' rs
     runProcess
             bwaPath
             cmdargs
-            (interleaveFQs rs) -- stdin
+            fqs -- stdin
             (Right outC) -- stdout

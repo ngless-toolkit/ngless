@@ -11,6 +11,7 @@ module Output
     , commentC
     , outputListLno
     , outputListLno'
+    , lookupNrSeqs
     , traceStatus
     , outputFQStatistics
     , outputMappedSetStatistics
@@ -124,6 +125,8 @@ data FQInfo = FQInfo
 
 $(deriveToJSON defaultOptions ''FQInfo)
 
+type TaggedFQInfo = (FilePath, FQInfo)
+
 data MappingInfo = MappingInfo
                 { mi_lno :: Int
                 , mi_inputFile :: FilePath
@@ -137,13 +140,18 @@ $(deriveToJSON defaultOptions{fieldLabelModifier = drop 3} ''MappingInfo)
 
 data SavedOutput = SavedOutput
         { outOutput :: [OutputLine]
-        , fqOutput :: [FQInfo]
+        , fqOutput :: [TaggedFQInfo]
         , mapOutput :: [MappingInfo]
         }
 
 savedOutput :: IORef SavedOutput
 {-# NOINLINE savedOutput #-}
 savedOutput = unsafePerformIO (newIORef (SavedOutput [] [] []))
+
+lookupNrSeqs :: FilePath -> NGLessIO (Maybe Int)
+lookupNrSeqs fname = do
+    SavedOutput{..} <- liftIO $ readIORef savedOutput
+    return $ (numSeqs <$> lookup fname fqOutput)
 
 addOutputLine :: OutputLine -> SavedOutput -> SavedOutput
 addOutputLine !oline so@(SavedOutput ells _ _) = so { outOutput = oline:ells }
@@ -263,8 +271,8 @@ encodeBPStats :: FQ.FQStatistics -> [BPosInfo]
 encodeBPStats res = map encode1 (FQ.qualityPercentiles res)
     where encode1 (mean, median, lq, uq) = BPosInfo mean median lq uq
 
-outputFQStatistics :: FilePath -> FQ.FQStatistics -> FastQEncoding -> NGLessIO ()
-outputFQStatistics fname stats enc = do
+outputFQStatistics :: FilePath -> FilePath -> FQ.FQStatistics -> FastQEncoding -> NGLessIO ()
+outputFQStatistics rawpath fname stats enc = do
     lno' <- ngleLno <$> nglEnvironment
     let enc'    = encodingName enc
         sSize'  = FQ.seqSize stats
@@ -280,7 +288,7 @@ outputFQStatistics fname stats enc = do
     p "Number of base pairs: "      (show $ length (FQ.qualCounts stats))
     p "Encoding is: "               (show enc)
     p "Number of sequences: "   (show $ FQ.nSeq stats)
-    liftIO $ modifyIORef savedOutput (addFQOutput binfo)
+    liftIO $ modifyIORef savedOutput (addFQOutput (rawpath, binfo))
 
 outputMappedSetStatistics :: MappingInfo -> NGLessIO ()
 outputMappedSetStatistics mi@(MappingInfo _ _ ref total aligned unique) = do
@@ -338,7 +346,8 @@ writeOutputTo h = do
 
 writeOutputJS :: FilePath -> FilePath -> T.Text -> NGLessIO ()
 writeOutputJS odir scriptName script = liftIO $ do
-    SavedOutput fullOutput fqStats mapStats <- outputReverse <$> readIORef savedOutput
+    SavedOutput fullOutput taggedFQStats mapStats <- outputReverse <$> readIORef savedOutput
+    let fqStats = map snd taggedFQStats
     t <- getZonedTime
     let script' = zip [1..] (T.lines script)
         sInfo = ScriptInfo (odir </> "output.js") (show t) (wrapScript script' fqStats (mi_lno <$> mapStats))
@@ -358,7 +367,8 @@ writeOutputTSV :: Bool -- ^ whether to transpose matrix
                 -> Maybe FilePath -- ^ Mapping statistics
                 -> NGLessIO ()
 writeOutputTSV transpose fqStatsFp mapStatsFp = liftIO $ do
-        SavedOutput _ fqStats mapStats <- outputReverse <$> readIORef savedOutput
+        SavedOutput _ taggedFQStats mapStats <- outputReverse <$> readIORef savedOutput
+        let fqStats = map snd taggedFQStats
         whenJust fqStatsFp $ \fp ->
             withOutputFile fp $ \hout ->
                 BL.hPut hout  . formatTSV $ encodeFQStats <$> fqStats
