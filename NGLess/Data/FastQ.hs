@@ -16,6 +16,7 @@ module Data.FastQ
     , encodingName
     , fqDecodeVector
     , fqDecodeC
+    , fqDecodeVC
     , fqEncode
     , fqEncodeC
     , gcFraction
@@ -33,6 +34,7 @@ import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString as B
 import qualified Data.Conduit as C
 import qualified Data.Conduit.List as CL
+import Data.Conduit.Combinators qualified as CC
 import           Control.DeepSeq (NFData(..))
 import           Data.Conduit ((.|))
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
@@ -50,6 +52,8 @@ import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
 import qualified Data.Vector.Unboxed.Mutable as VUM
+import Data.Conduit.Algorithms.Utils (awaitJust)
+
 
 import Foreign.Ptr (Ptr, plusPtr)
 import Foreign.Storable (poke)
@@ -217,6 +221,15 @@ statsFromFastQ fp enc = C.runConduitRes $
             .| linesC
             .| fqDecodeC fp enc
             .| fqStatsC
+
+fqDecodeVC :: (MonadError NGError m) => FilePath -> Int -> FastQEncoding -> C.ConduitT (V.Vector ByteLine) ShortRead m ()
+fqDecodeVC fp !lno enc = awaitJust $ \v ->
+                            let n = V.length v
+                            in if n `mod` 4 /= 0
+                                then (throwDataError ("Parsing file '" ++ fp ++ "': Number of lines in FastQ file is not multiple of 4! EOF found"))
+                                else do
+                                    lift (runNGLess $ fqDecodeVector lno enc v) >>= CC.yieldMany
+                                    fqDecodeVC fp (n + lno) enc
 
 fqStatsC :: forall m. (MonadIO m) => C.ConduitT ShortRead C.Void m FQStatistics
 fqStatsC = do

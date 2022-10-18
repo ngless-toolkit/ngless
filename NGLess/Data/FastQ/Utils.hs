@@ -6,12 +6,12 @@ module Data.FastQ.Utils
 
 
 import qualified Data.Conduit as C
-import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString as B
 import           Data.Conduit ((.|))
 import           Control.Monad (forM_)
+import Data.Vector qualified as V
 import Control.Monad.Trans.Class (lift)
 
 
@@ -20,8 +20,8 @@ import Data.List (isSuffixOf)
 import NGLess.NGError (NGLessIO, throwShouldNotOccur)
 
 import FileManagement (makeNGLTempFile)
-import Utils.Conduit (linesC, unwrapByteLine)
-import Data.FastQ (ReadSet(..), FastQFilePath(..), fqDecodeC, fqEncodeC)
+import Utils.Conduit (linesVC, unwrapByteLine, ByteLine(..), zipSource2)
+import Data.FastQ (ReadSet(..), FastQFilePath(..), fqDecodeVC, fqEncodeC)
 import Data.Conduit.Algorithms.Async (asyncGzipTo, conduitPossiblyCompressedFile)
 import Output (traceStatus)
 
@@ -33,8 +33,8 @@ concatenateFQs (FastQFilePath enc fp:rest) = do
         let catTo f enc'
                 | enc /= enc' =
                     conduitPossiblyCompressedFile f
-                        .| linesC
-                        .| fqDecodeC f enc'
+                        .| linesVC 4096
+                        .| fqDecodeVC f 0 enc'
                         .| fqEncodeC enc
                         .| asyncGzipTo hout
                 | ".gz" `isSuffixOf` f = CB.sourceFile f .| CB.sinkHandle hout
@@ -56,8 +56,16 @@ interleaveFQs (ReadSet pairs singletons) = do
     where
         interleavePair :: FilePath -> FilePath -> C.ConduitT () B.ByteString NGLessIO ()
         interleavePair f0 f1 =
-                ((conduitPossiblyCompressedFile f0 .| linesC .| CL.chunksOf 4) `zipSources` (conduitPossiblyCompressedFile f1 .| linesC .| CL.chunksOf 4))
-                .| C.awaitForever (\(r0,r1) -> C.yield (ul r0) >> C.yield (ul r1))
-        zipSources a b = C.getZipSource ((,) <$> C.ZipSource a <*> C.ZipSource b)
-        ul = B8.unlines . map unwrapByteLine
+                ((conduitPossiblyCompressedFile f0 .| linesVC 4096) `zipSource2` (conduitPossiblyCompressedFile f1 .| linesVC 4096))
+                .| C.awaitForever (\(v0,v1) -> do
+                            if V.length v0 == V.length v1
+                                then C.yield (interleaveV v0 v1)
+                                else throwShouldNotOccur ("interleavePair: mismatched lengths: " ++ show (V.length v0, V.length v1)))
+        interleaveV :: V.Vector ByteLine -> V.Vector ByteLine -> B.ByteString
+        interleaveV v0 v1 =
+            B8.unlines $ V.toList $ V.map unwrapByteLine $ V.generate (V.length v0 + V.length v1) $ \i ->
+                let (seqi, si) = i `divMod` 4
+                in if even seqi
+                    then v0 V.! (seqi * 2 + si)
+                    else v1 V.! ((seqi - 1) * 2 + si)
 
