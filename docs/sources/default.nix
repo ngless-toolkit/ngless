@@ -2,8 +2,8 @@
 
 with (import (builtins.fetchTarball {
   name = "nixpksg-pinned";
-  url = "https://github.com/nixos/nixpkgs/archive/1bb17332abf7a782ed7fa3101fd7ba54dd239694.tar.gz";
-  sha256 = "17y5xb109vnkvqqf8nlx6b7as3f9p4v7z6xjfq9mg3vyyhym33fl";
+  url = "https://github.com/nixos/nixpkgs/archive/e17b079679d75b59934e02664fec6b214b2779e9.tar.gz";
+  sha256 = "026q0k70d6k3gnsaxfclxp9130v253nr0zlrf2xiv7r6cz8ky569";
 }) {});
 
 let
@@ -39,7 +39,7 @@ pyp.buildPythonPackage {
      python
      stdenv
      virtualenv
-     recommonmark
+     myst-parser
      setuptools
      numpydoc
      readline

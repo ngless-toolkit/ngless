@@ -13,17 +13,16 @@
 
 import subprocess
 
-from recommonmark.parser import CommonMarkParser
 try:
     import guzzle_sphinx_theme
     has_guzzle = True
 except ImportError:
     has_guzzle = False
 
-source_parsers = {
-    '.md': CommonMarkParser,
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.md': 'markdown',
 }
-
 
 # -- General configuration ------------------------------------------------
 
@@ -33,7 +32,7 @@ source_parsers = {
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = []
+extensions = ['myst_parser']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
