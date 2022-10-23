@@ -20,12 +20,15 @@ You can specify a list of samples in YAML format.
             - data/Sample2.1.fq.gz
             - data/Sample2.2.fq.gz
         - single:
-            - data/Sample2.extra.fq.gz
+            - data/Sample2.A.fq.gz
+        - single:
+            - data/Sample2.B.fq.gz
 
 The format is the following
 
 - `basedir` *(optional)*: if specified, all relative paths are relative to this directory. Otherwise, paths are relative to the current directory where NGLess is executing (**not** where the YAML file is located)
-- `samples`: a dictionary mapping a sample name to a list of files
+- `samples`: a dictionary mapping a sample name to a list of paired-end files
+- Paired-end files very simple dictionary mappings: either a single entry called `single` and a list with a single path; or a single entry called `paired` and two paths.
 
 ## Using the YAML format in NGLess
 
