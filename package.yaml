@@ -17,6 +17,7 @@ default-extensions:
   - ImportQualifiedPost
   - LambdaCase
   - TupleSections
+  - MultiWayIf
 other-extensions:
   - DeriveDataTypeable
   - TemplateHaskell
