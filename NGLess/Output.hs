@@ -19,6 +19,7 @@ module Output
     , writeOutputTSV
     , writeOutputTo
     , outputConfiguration
+    , writeTransientMsg
     ) where
 
 import           Text.Printf (printf)
@@ -26,7 +27,7 @@ import           System.IO (hFlush, hPutStr, hPutStrLn, hIsTerminalDevice, stdou
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.IO.SafeWrite (withOutputFile)
 import           Data.Maybe (maybeToList, fromMaybe, isJust)
-import           Data.IORef (IORef, newIORef, modifyIORef, readIORef)
+import           Data.IORef (IORef, newIORef, modifyIORef, readIORef, writeIORef)
 import           Data.List (sort)
 import           Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
@@ -37,7 +38,7 @@ import           Data.Time.Format (formatTime, defaultTimeLocale)
 import qualified System.Console.ANSI as ANSI
 import           Control.Monad (forM_, when, unless)
 import           Control.Monad.IO.Class (liftIO)
-import           Control.Monad.Extra (whenJust)
+import           Control.Monad.Extra (whenJust, whenM)
 import           Numeric (showFFloat)
 import           Control.Arrow (first)
 import qualified Data.Text as T
@@ -148,6 +149,10 @@ savedOutput :: IORef SavedOutput
 {-# NOINLINE savedOutput #-}
 savedOutput = unsafePerformIO (newIORef (SavedOutput [] [] []))
 
+lineClearNeeded :: IORef Bool
+{-# NOINLINE lineClearNeeded #-}
+lineClearNeeded = unsafePerformIO (newIORef False)
+
 lookupNrSeqs :: FilePath -> NGLessIO (Maybe Int)
 lookupNrSeqs fname = do
     SavedOutput{..} <- liftIO $ readIORef savedOutput
@@ -193,25 +198,18 @@ traceStatus s = do
     outputListLno' TraceOutput [s]
     traceSet <- nConfTrace <$> nglConfiguration
     unless traceSet $ do
-        outputTo <- nConfOutputTo <$> nglConfiguration
-        let outputHandle = case outputTo of
-                NGLOutStdout -> stdout
-                NGLOutStderr -> stderr
-        isTerm <- liftIO $ hIsTerminalDevice outputHandle
+        writeTransientMsg s
         doColor <- isDoColor
         verb <- nConfVerbosity <$> nglConfiguration
-        when (shouldPrint isTerm InfoOutput verb) $
-            liftIO $ do
-                let c = colorFor InfoOutput
-                    st = if doColor
-                            then ANSI.setSGRCode [ANSI.SetColor ANSI.Foreground ANSI.Dull c]
-                            else ""
-                    rst = if doColor
-                            then ANSI.setSGRCode [ANSI.Reset]
-                            else ""
-                hPutStr outputHandle (st ++ s ++ "..." ++ rst)
-                hFlush outputHandle
-                hPutStr outputHandle "\r"
+        when (shouldPrint True InfoOutput verb) $ do
+            let c = colorFor InfoOutput
+                st = if doColor
+                        then ANSI.setSGRCode [ANSI.SetColor ANSI.Foreground ANSI.Dull c]
+                        else ""
+                rst = if doColor
+                        then ANSI.setSGRCode [ANSI.Reset]
+                        else ""
+            writeTransientMsg (st ++ s ++ rst)
 
 isDoColor :: NGLessIO Bool
 isDoColor = do
@@ -256,7 +254,28 @@ output !ot !lno !msg = do
                 lineStr = if lno > 0
                                 then printf " Line %s" (show lno)
                                 else "" :: String
+            clearTransientIfNeeded outputHandle
             hPutStrLn outputHandle $ printf "%s[%s]%s: %s%s" st tstr lineStr msg rst
+            writeIORef lineClearNeeded False
+
+writeTransientMsg :: String -> NGLessIO ()
+writeTransientMsg m = do
+    outputTo <- nConfOutputTo <$> nglConfiguration
+    let outputHandle = case outputTo of
+            NGLOutStdout -> stdout
+            NGLOutStderr -> stderr
+    liftIO $ whenM (hIsTerminalDevice outputHandle) $ do
+        clearTransientIfNeeded outputHandle
+        hPutStr outputHandle m
+        ANSI.hSetCursorColumn outputHandle 0
+        hFlush outputHandle
+        writeIORef lineClearNeeded True
+
+clearTransientIfNeeded :: Handle -> IO ()
+clearTransientIfNeeded h =
+    whenM (readIORef lineClearNeeded) $
+        ANSI.hClearLine h
+
 
 colorFor :: OutputType -> ANSI.Color
 colorFor TraceOutput   = ANSI.White

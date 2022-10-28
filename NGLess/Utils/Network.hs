@@ -10,7 +10,7 @@ module Utils.Network
 
 import           Control.Monad.IO.Class (liftIO, MonadIO(..))
 import           Control.Monad (void)
-import qualified Data.Conduit as C
+import Conduit qualified as C
 import qualified Data.Conduit.List as CL
 import           Data.Conduit ((.|))
 import qualified Data.Conduit.Tar as CTar
@@ -49,10 +49,10 @@ downloadFile url destPath = do
     let req' = req { HTTP.decompress = const False,
                     HTTP.requestHeaders = [("User-Agent", B8.pack $ "NGLess/"++versionStr)]
                     }
-    r <- liftIO $ HTTPSimple.withResponse req' $ \res ->
+    r <- HTTPSimple.withResponse req' $ \res ->
         case HTTPSimple.getResponseStatusCode res of
             200 -> do
-                C.runConduitRes $
+                C.runConduit $
                     HTTP.responseBody res
                         .| case lookup "Content-Length" (HTTP.responseHeaders res) of
                             Nothing -> CL.map id
@@ -77,13 +77,13 @@ downloadExpandTar url destdir = do
         removeFile tarName
 
 
-printProgress :: MonadIO m => String -> Int -> C.ConduitT B.ByteString B.ByteString m ()
+printProgress :: String -> Int -> C.ConduitT B.ByteString B.ByteString NGLessIO ()
 printProgress msg csize = liftIO (mkProgressBar msg 40) >>= loop 0
   where
     loop !len pbar = awaitJust $ \bs -> do
             let len' = len + B.length bs
                 progress = fromIntegral len' / fromIntegral csize
-            pbar' <- liftIO (updateProgressBar pbar progress)
+            pbar' <- C.lift $ updateProgressBar pbar progress
             C.yield bs
             loop len' pbar'
 

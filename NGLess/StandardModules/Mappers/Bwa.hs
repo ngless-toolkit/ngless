@@ -15,7 +15,7 @@ import           System.FilePath (splitExtension)
 import Control.Monad.IO.Class (liftIO, MonadIO(..))
 import qualified Data.ByteString as B
 
-import qualified Data.Conduit as C
+import qualified Conduit as C
 import Data.Conduit.Algorithms.Utils (awaitJust)
 import           Control.Monad.Extra (allM)
 import           Control.Concurrent (getNumCapabilities)
@@ -93,13 +93,13 @@ interleaveFQs' rs@(ReadSet pairs singles) = do
         Nothing -> return (interleaveFQs rs)
         Just ts -> return (interleaveFQs rs C..| progressFQ "Mapping FASTQ files" (4 * ts))
 
-progressFQ :: MonadIO m => String -> Int -> C.ConduitT B.ByteString B.ByteString m ()
+progressFQ :: String -> Int -> C.ConduitT B.ByteString B.ByteString NGLessIO ()
 progressFQ msg nlens = liftIO (mkProgressBar msg 80) >>= loop 0
   where
     loop !nln pbar = awaitJust $ \bs -> do
             let nln' = nln + B.count 10 bs
                 progress = fromIntegral nln' / fromIntegral nlens
-            pbar' <- liftIO (updateProgressBar pbar progress)
+            pbar' <- C.lift (updateProgressBar pbar progress)
             C.yield bs
             loop nln' pbar'
 
