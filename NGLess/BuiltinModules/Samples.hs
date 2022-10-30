@@ -138,8 +138,8 @@ yamlFunctions =
         { funcName = FuncName "load_sample_from_yaml"
         , funcArgType = Just NGLString
         , funcArgChecks = [ArgCheckFileReadable]
-        , funcRetType = NGList NGLReadSet
-        , funcKwArgs = [ArgInformation "sample" True (NGList NGLString) []]
+        , funcRetType = NGLReadSet
+        , funcKwArgs = [ArgInformation "sample" True NGLString []]
         , funcAllowsAutoComprehension = True
         , funcChecks = [FunctionCheckMinNGLessVersion (1,5)
                        ,FunctionCheckReturnAssigned]
