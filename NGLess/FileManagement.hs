@@ -43,6 +43,7 @@ import           Control.Monad (unless, forM_, when)
 import           System.Posix.Files (setFileMode, createSymbolicLink)
 import           System.Posix.Internals (c_getpid)
 import           Data.List (isSuffixOf, isPrefixOf)
+import Data.List.NonEmpty qualified as NE
 
 import qualified System.Directory as SD
 import System.IO
@@ -96,10 +97,9 @@ inferCompression fp
 {- Ensure that the file is compressed using an acceptable compression format
  - (potentially by recompressing).
  -}
-ensureCompressionIsOneOf :: [Compression] -- ^ Acceptable formats
+ensureCompressionIsOneOf :: NE.NonEmpty Compression -- ^ Acceptable formats
                                 -> FilePath -- ^ input file
                                 -> NGLessIO FilePath
-ensureCompressionIsOneOf [] fp = return fp
 ensureCompressionIsOneOf cs fp
         | inferCompression fp `elem` cs = return fp
         | otherwise = makeNGLTempFile fp "adjust_compression_" ext' $ \h ->

@@ -12,7 +12,7 @@ import           Control.Monad.Except (liftIO)
 import           Data.Default (def)
 import           GHC.Conc (getNumCapabilities)
 import           Control.Monad.Trans.Resource (release)
-
+import Data.List.NonEmpty qualified as NE
 
 import Language
 import Configuration
@@ -27,24 +27,24 @@ import Utils.Process (runProcess)
 
 
 maybeRecompress :: FastQFilePath -> NGLessIO FilePath
-maybeRecompress (FastQFilePath _ fp) = ensureCompressionIsOneOf [NoCompression, GzipCompression] fp
+maybeRecompress (FastQFilePath _ fp) = ensureCompressionIsOneOf (NoCompression `NE.cons` NE.singleton GzipCompression) fp
 
 executeAssemble :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
 executeAssemble "assemble" expr kwargs = do
-    files <- case expr of
-            NGOReadSet _ (ReadSet [] singles) -> do
-                f <- maybeRecompress =<< concatenateFQs singles
-                return ["-r", f]
-            NGOReadSet _ (ReadSet pairs []) -> do
-                f1 <- maybeRecompress =<< concatenateFQs (fst <$> pairs)
-                f2 <- maybeRecompress =<< concatenateFQs (snd <$> pairs)
-                return ["-1", f1, "-2", f2]
-            NGOReadSet _ (ReadSet pairs singles) -> do
-                f1 <- maybeRecompress =<< concatenateFQs (fst <$> pairs)
-                f2 <- maybeRecompress =<< concatenateFQs (snd <$> pairs)
-                f3 <- maybeRecompress =<< concatenateFQs singles
-                return ["-1", f1, "-2", f2, "-r", f3]
-            _ -> throwScriptError ("megahit:assemble first argument should have been readset, got '"++show expr++"'")
+    (pairs, singles) <- case expr of
+        NGOReadSet _ (ReadSet pairs singles) -> return (pairs, singles)
+        _ -> throwScriptError ("megahit:assemble first argument should have been readset, got '"++show expr++"'")
+    pairedArgs <- case NE.nonEmpty pairs of
+        Nothing -> return []
+        Just pairs' -> do
+            f1 <- maybeRecompress =<< concatenateFQs (fst <$> pairs')
+            f2 <- maybeRecompress =<< concatenateFQs (snd <$> pairs')
+            return ["-1", f1, "-2", f2]
+    singlesArgs <- case NE.nonEmpty singles of
+        Nothing -> return []
+        Just singles' -> do
+            f <- maybeRecompress =<< concatenateFQs singles'
+            return ["-r", f]
     megahitPath <- megahitBin
     keepTempFiles <- nConfKeepTemporaryFiles <$> nglConfiguration
     nthreads <- liftIO getNumCapabilities
@@ -52,7 +52,7 @@ executeAssemble "assemble" expr kwargs = do
     (_, tdir) <- createTempDir "ngless-megahit-assembly"
     (mt, mhtmpdir) <- createTempDir "ngless-megahit-tmpdir"
     let odir = tdir </> "megahit-output"
-        args = files ++
+        args = pairedArgs ++ singlesArgs ++
                         ["-o", odir
                         ,"--num-cpu-threads", show nthreads
                         ,"--tmp-dir", mhtmpdir

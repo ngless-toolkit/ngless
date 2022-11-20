@@ -13,6 +13,7 @@ import           Data.Conduit ((.|))
 import           Control.Monad (forM_)
 import Data.Vector qualified as V
 import Control.Monad.Trans.Class (lift)
+import Data.List.NonEmpty qualified as NE
 
 
 import Data.List (isSuffixOf)
@@ -25,10 +26,9 @@ import Data.FastQ (ReadSet(..), FastQFilePath(..), fqDecodeVC, fqEncodeC)
 import Data.Conduit.Algorithms.Async (asyncGzipTo, conduitPossiblyCompressedFile)
 import Output (traceStatus)
 
-concatenateFQs :: [FastQFilePath] -> NGLessIO FastQFilePath
-concatenateFQs [] = throwShouldNotOccur "Empty argument to concatenateFQs"
-concatenateFQs [f] = return f
-concatenateFQs (FastQFilePath enc fp:rest) = do
+concatenateFQs :: NE.NonEmpty FastQFilePath -> NGLessIO FastQFilePath
+concatenateFQs (f NE.:| []) = return f
+concatenateFQs (FastQFilePath enc fp NE.:| rest) = do
     fres <- makeNGLTempFile fp "concatenate" "fq.gz" $ \hout -> do
         let catTo f enc'
                 | enc /= enc' =

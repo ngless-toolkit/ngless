@@ -21,6 +21,7 @@ import           GHC.Conc (getNumCapabilities)
 import           Data.Yaml ((.!=), (.:?), (.:))
 import qualified Data.Aeson as Aeson
 import qualified Data.Yaml as Yaml
+import Data.List.NonEmpty qualified as NE
 
 import Control.Applicative
 import Control.Monad
@@ -321,8 +322,7 @@ adjustCompression _ f = return f
 
 asFilePaths :: NGLessObject -> Maybe CommandExtra -> NGLessIO  [FilePath]
 asFilePaths (NGOReadSet _ (ReadSet paired singles)) argOptions = do
-    let concatenateFQs' [] = return Nothing
-        concatenateFQs' rs = Just <$> concatenateFQs rs
+    let concatenateFQs' rs = fmapMaybeM concatenateFQs (NE.nonEmpty rs)
     fq1 <- concatenateFQs' (fst <$> paired)
     fq2 <- concatenateFQs' (snd <$> paired)
     fq3 <- concatenateFQs' singles
