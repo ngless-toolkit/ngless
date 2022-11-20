@@ -800,8 +800,10 @@ The output format is typically determined from the ``ofile`` extension, but the
 
 By default, ReadSets are written a set of one to three FastQ files (2 files for
 the paired-end reads, and one file for the single-end ones, with empty files
-omitted). ``format\_flags`` (since NGLess 0.7) currently supports only
-``{interleaved}`` to output an interleaved FastQ file instead.
+omitted). ``format\_flags`` currently supports ``{interleaved}`` to output an
+interleaved FastQ file instead and (since NGLess version 1.6)
+``{always_3_fq_files}`` to **always** output three files (two for the
+paired-end reads, and one for single reads) even if some of these may be empty.
 
 Compression is inferred from the ``ofile`` argument:
 

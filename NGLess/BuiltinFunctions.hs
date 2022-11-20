@@ -77,7 +77,9 @@ writeArgs =
     [ArgInformation "ofile" True NGLString [ArgCheckFileWritable]
     ,ArgInformation "format" False NGLSymbol [ArgCheckSymbol ["tsv", "csv", "bam", "sam"]]
     ,ArgInformation "format_flags" False NGLSymbol [ArgCheckMinVersion (0,7)
-                                                   ,ArgCheckSymbol ["interleaved"]]
+                                                   ,ArgCheckSymbol ["interleaved"]
+                                                   ,ArgCheckSymbol ["always_3_fq_files"]
+                                                   ]
     ,ArgInformation "verbose" False NGLBool []
     ,ArgInformation "comment" False NGLString []
     ,ArgInformation "auto_comments" False (NGList NGLSymbol) [ArgCheckSymbol ["date", "script", "hash"]]

@@ -2,6 +2,14 @@
 What's New (History)
 ====================
 
+Unreleased
+----------
+
+User-visible improvements
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Added ``{always_3_fq_files}`` format flag to ``write()``
+
 Version 1.5.0
 -------------
 

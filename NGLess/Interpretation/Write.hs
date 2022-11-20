@@ -208,7 +208,10 @@ executeWrite (NGOReadSet _ rs) args = do
     opts <- parseWriteOptions args
     let ofile = woOFile opts
         moveOrCopyCompressFQs :: [FastQFilePath] -> FilePath -> NGLessIO (IO ())
-        moveOrCopyCompressFQs [] _ = return (return ())
+        moveOrCopyCompressFQs [] ofname =
+            return $ do
+                withOutputFileO (opts { woOFile = ofname }) $ \out ->
+                    C.runConduitRes $ (return () .| out)
         moveOrCopyCompressFQs [FastQFilePath _ f] ofname = moveOrCopyCompress' (opts {woOFile = ofname}) f
         moveOrCopyCompressFQs multiple ofname = do
             let inputs = fqpathFilePath <$> multiple
@@ -221,6 +224,17 @@ executeWrite (NGOReadSet _ rs) args = do
             withOutputFileO opts $ \out ->
                 C.runConduit (interleaveFQs rs .| out)
         else case rs of
+            -- GHC gets confused here and believe that the case is not exhaustive
+            ReadSet pairs singletons
+                | woFormatFlags opts == Just "always_3_fq_files" ||
+                  not (null pairs) && not (null singletons) -> do
+                    fname1 <- _formatFQOname ofile "pair.1"
+                    fname2 <- _formatFQOname ofile "pair.2"
+                    fname3 <- _formatFQOname ofile "singles"
+                    cp1 <- moveOrCopyCompressFQs (fst <$> pairs) fname1
+                    cp2 <- moveOrCopyCompressFQs (snd <$> pairs) fname2
+                    cp3 <- moveOrCopyCompressFQs singletons fname3
+                    liftIO $ cp1 `concurrently_` cp2 `concurrently_` cp3
             ReadSet [] singles ->
                 liftIO =<< moveOrCopyCompressFQs singles ofile
             ReadSet pairs [] -> do
@@ -229,14 +243,6 @@ executeWrite (NGOReadSet _ rs) args = do
                 cp1 <- moveOrCopyCompressFQs (fst <$> pairs) fname1
                 cp2 <- moveOrCopyCompressFQs (snd <$> pairs) fname2
                 liftIO $ cp1 `concurrently_` cp2
-            ReadSet pairs singletons -> do
-                fname1 <- _formatFQOname ofile "pair.1"
-                fname2 <- _formatFQOname ofile "pair.2"
-                fname3 <- _formatFQOname ofile "singles"
-                cp1 <- moveOrCopyCompressFQs (fst <$> pairs) fname1
-                cp2 <- moveOrCopyCompressFQs (snd <$> pairs) fname2
-                cp3 <- moveOrCopyCompressFQs singletons fname3
-                liftIO $ cp1 `concurrently_` cp2 `concurrently_` cp3
     return (NGOFilename ofile)
 
 executeWrite el@(NGOMappedReadSet _ iout  _) args = do

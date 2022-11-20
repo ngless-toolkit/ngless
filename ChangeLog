@@ -4,6 +4,7 @@ Unreleased
 	* Faster file permission checks for readsets
 	* More output tracing
 	* Fix `load_sample_from_yaml` (it had the wrong arguments before)
+	* Added `{always_3_fq_files}` format flag to `write()`
 
 Version 1.5.0 2022-09-14 by luispedro
 	* Add `compress_level` option to `write()` function
