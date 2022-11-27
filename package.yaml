@@ -8,15 +8,13 @@ maintainer:     luis@luispedro.org
 github:         ngless-toolkit/ngless
 license:        MIT
 license-file:   COPYING
+default-language: GHC2021
 c-sources:
   - NGLess/Dependencies/embedded.c
   - NGLess/Data/FastQ.c
 default-extensions:
-  - BangPatterns
   - OverloadedStrings
-  - ImportQualifiedPost
   - LambdaCase
-  - TupleSections
   - MultiWayIf
 other-extensions:
   - DeriveDataTypeable

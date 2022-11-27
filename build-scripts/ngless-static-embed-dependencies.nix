@@ -3,8 +3,8 @@ let
   sources = {
     haskellNix = builtins.fetchTarball {
         name = "haskell-nix-snap";
-        url = "https://github.com/input-output-hk/haskell.nix/archive/17e5f35d56c57b20ba2397010fcd4032fb6acc2b.tar.gz";
-        sha256 = "0b3pwrib289bhidv1q27k6k53zwyahdffi2ynww19qnviqwlm21a";
+        url = "https://github.com/input-output-hk/haskell.nix/archive/fadf9227afcdd93eedc656ba380f6a55d08fa650.tar.gz";
+        sha256 = "0bxk9gdw393gm9h2vr9lh70488n7pzj060ik1s2q54d2ydb44xfn";
     };
   };
 
@@ -24,7 +24,7 @@ let
 in pkgs.haskell-nix.stackProject {
   name = "NGLess";
   src = (import ./sources-with-static-dependencies.nix) ;
-  stack-sha256 = "0m0kkykh6zicmzcgs1fyxnjaxpsf8ylvvdq4cawjmpd3csnxqvgg";
+  stack-sha256 = "159b7sfkjfv5m0ppfb9lkr4vcplb152s3b7j6g9jhg9kcd9w0rmi";
   materialized = ./sources-with-static-dependencies.materialized;
   inherit checkMaterialization;
 }

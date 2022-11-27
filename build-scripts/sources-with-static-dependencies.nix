@@ -3,8 +3,8 @@ let
   sources = {
     haskellNix = builtins.fetchTarball {
         name = "haskell-nix-snap";
-        url = "https://github.com/input-output-hk/haskell.nix/archive/17e5f35d56c57b20ba2397010fcd4032fb6acc2b.tar.gz";
-        sha256 = "0b3pwrib289bhidv1q27k6k53zwyahdffi2ynww19qnviqwlm21a";
+        url = "https://github.com/input-output-hk/haskell.nix/archive/fadf9227afcdd93eedc656ba380f6a55d08fa650.tar.gz";
+        sha256 = "0bxk9gdw393gm9h2vr9lh70488n7pzj060ik1s2q54d2ydb44xfn";
     };
   };
 
@@ -34,7 +34,7 @@ let
 
 in pkgs.stdenv.mkDerivation {
     name = "ngless-source-with-dependencies";
-    version = "1.4.1";
+    version = "1.5.0";
     nativeBuildInputs = with pkgsStatic ; [ megahit-static samtools-static bwa prodigal minimap2 ];
     buildInputs = with pkgs; [ xxd stdenv ];
     src = pkgs.lib.cleanSourceWith {
