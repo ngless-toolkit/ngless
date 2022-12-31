@@ -2,10 +2,13 @@
  - License: MIT
  -}
 
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP, FlexibleContexts #-}
 
 module BuiltinModules.QCStats
     ( loadModule
+#ifdef IS_BUILDING_TEST
+    , pureMod
+#endif
     ) where
 
 import qualified Data.Text as T
@@ -44,7 +47,10 @@ qcStatsFunction = Function
     }
 
 loadModule :: T.Text -> NGLessIO Module
-loadModule _ = return def
+loadModule _ = return pureMod
+
+pureMod :: Module
+pureMod = def
     { modInfo = ModInfo "builtin.stats" "0.6"
     , modFunctions = [qcStatsFunction]
     , runFunction = const executeStats

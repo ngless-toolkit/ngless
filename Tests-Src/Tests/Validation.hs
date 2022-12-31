@@ -15,12 +15,13 @@ import ValidationIO
 import Utils.Here
 import BuiltinFunctions (builtinModule)
 import NGLess.NGLEnvironment (NGLVersion(..))
+import BuiltinModules.QCStats qualified as ModQCStats
 
 tgroup_Validation = $(testGroupGenerator)
 
 -- Pure Validation
 
-mods = [builtinModule (NGLVersion 1 3)]
+mods = [builtinModule (NGLVersion 1 3), ModQCStats.pureMod]
 
 isValidateOk ftext = case parsetest ftext >>= validate mods of
     Right _ -> return ()
@@ -30,6 +31,30 @@ isValidateError ftext = isErrorMsg ("Validation should have picked error for scr
 case_bad_function_attr_count = isValidateError
     "ngless '0.0'\n\
     \count(annotated, features='gene')\n"
+
+case_bad_symbol_arg = isValidateError
+    [here|
+ngless '1.4'
+input = fastq('input.fq.gz')
+write(
+    map(input, reference='sacCer3'),
+            ofile='result.sam',
+            format={yolo})
+|]
+
+case_bad_symbol_arg0 = isValidateError [here|
+ngless '1.4'
+input = fastq('input.fq.gz')
+output = map(input, reference='sacCer3')
+write(qcstats({yolo}), ofile='result.tsv')
+|]
+
+case_good_symbol_arg0 = isValidateOk [here|
+ngless '1.4'
+input = fastq('input.fq.gz')
+output = map(input, reference='sacCer3')
+write(qcstats({mapping}), ofile='result.tsv')
+|]
 
 case_map_not_assigned = isValidateError
     [here|

@@ -106,7 +106,7 @@ validateVariables mods (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e 
         checkVarUsage (Lookup _ (Variable v)) = do
                 used <- get
                 when (v `notElem` used) $
-                    tell [T.concat ["Could not find variable `", T.pack . show $v, "`. ", suggestionMessage v used]]
+                    tell [T.concat ["Could not find variable `", T.pack . show $ v, "`. ", suggestionMessage v used]]
         checkVarUsage (FunctionCall _ _ _ (Just block)) = do
             vs <- get
             let Variable v' = blockVariable block
@@ -119,16 +119,18 @@ validateVariables mods (Script _ es) = runChecker $ forM_ es $ \(_,e) -> case e 
 validateSymbolInArgs :: [Module] -> Script -> Writer [T.Text] ()
 validateSymbolInArgs mods = checkRecursiveScriptWriter validateSymbolInArgs'
     where
-        validateSymbolInArgs' (FunctionCall f _ args _) = checkFunction f args
+        validateSymbolInArgs' (FunctionCall f e args _) = checkFunction f e args
         validateSymbolInArgs' (MethodCall m _ arg0 args) = checkMethod m arg0 args
         validateSymbolInArgs' _ = return ()
 
-        checkFunction :: FuncName -> [(Variable, Expression)]-> Writer [T.Text] ()
-        checkFunction f args = case findFunction mods f of
+        checkFunction :: FuncName -> Expression -> [(Variable, Expression)]-> Writer [T.Text] ()
+        checkFunction f arg0 args = case findFunction mods f of
                 Nothing -> tell [T.concat ["Function '", T.pack . show $ f, "' not found"]]
-                Just finfo -> mapM_ (check1 finfo) args
+                Just finfo -> do
+                    mapM_ (checkA (Variable "main arg", arg0)) (funcArgChecks finfo)
+                    mapM_ (check1 finfo) args
             where
-                check1 finfo (Variable v, expr) = let legal = allowedFunction finfo v in case expr of
+                checkA (Variable v, expr) ac@(ArgCheckSymbol legal) = case expr of
                         ConstSymbol s
                             | s `notElem` legal -> tell . (:[]) . T.concat $
                                 case findSuggestion s legal of
@@ -137,15 +139,12 @@ validateSymbolInArgs mods = checkRecursiveScriptWriter validateSymbolInArgs'
                                     Just (Suggestion valid reason) ->
                                         ["Argument `", v, "` for function ", T.pack (show f), ", got {", s, "}.\n\tDid you mean {", valid, "} (", reason, ")\n\n",
                                         "Legal arguments are: [", showA legal, "]\n"]
-                        ListExpression es   -> mapM_ (\e -> check1 finfo (Variable v, e)) es
+                        ListExpression es   -> mapM_ (\e -> checkA (Variable v, e) ac) es
                         _                   -> return ()
-
-        allowedFunction :: Function -> T.Text -> [T.Text]
-        allowedFunction finfo v = fromMaybe [] $ do
-            argInfo <- find ((==v) . argName) (funcKwArgs finfo)
-            ArgCheckSymbol ss <- find (\case { ArgCheckSymbol{} -> True; _ -> False }) (argChecks argInfo)
-            return ss
-
+                checkA _ _ = return ()
+                check1 finfo ve@(Variable v, _) = case find ((==v) . argName) (funcKwArgs finfo) of
+                    Nothing -> tell [T.concat ["Function '", T.pack . show $ f, "' does not accept argument '", v, "'"]]
+                    Just ainfo -> mapM_ (checkA ve) (argChecks ainfo)
 
         allowedMethod minfo v = fromMaybe [] $ do
             argInfo <- find ((==v) . argName) (methodKwargsInfo minfo)
@@ -157,6 +156,7 @@ validateSymbolInArgs mods = checkRecursiveScriptWriter validateSymbolInArgs'
                 Nothing -> tell [T.concat ["Method'", T.pack . show $ m, "' not found"]]
                 Just minfo -> mapM_ (check1m minfo) args
             where
+
                 check1m minfo (Variable v, expr) = let legal = allowedMethod minfo v in case expr of
                     ConstSymbol s
                         | s `notElem` legal ->  tell . (:[]) . T.concat $
