@@ -1,4 +1,4 @@
-{- Copyright 2013-2022 NGLess Authors
+{- Copyright 2013-2023 NGLess Authors
  - License: MIT
  -}
 module Main
@@ -359,7 +359,7 @@ modeExec (CmdArgs.CheckInstallMode verbose) = runNGLessIO "Checking install" $ d
 main' = do
     let metainfo = fullDesc <> footer foottext <> progDesc "ngless implement the NGLess language"
         foottext = concat [
-                            "ngless v", Version.versionStrLong, "(C) NGLess Authors 2013-2022\n",
+                            "ngless v", Version.versionStrLong, "(C) NGLess Authors 2013-2023\n",
                             "For more information:\n",
                             "\thttps://ngless.embl.de/\n",
                             "For comments/discussion:\n",
