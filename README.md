@@ -5,7 +5,7 @@ NGS (next-generation sequencing data) processing.
 
 [![Build & test](https://github.com/ngless-toolkit/ngless/actions/workflows/build_w_nix.yml/badge.svg)](https://github.com/ngless-toolkit/ngless/actions/workflows/build_w_nix.yml)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/hyperium/hyper/master/LICENSE)
-[![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/installer/conda.svg)](https://anaconda.org/bioconda/ngless)
+[![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/version.svg)](https://anaconda.org/bioconda/ngless)
 [![Install with Bioconda](https://anaconda.org/bioconda/ngless/badges/downloads.svg)](https://anaconda.org/bioconda/ngless)
 [![Citation for NGLess](https://img.shields.io/badge/CITATION-DOI%3A10.1186%252Fs40168--019--0684--8-brightgreen.svg)](https://doi.org/10.1186/s40168-019-0684-8)
 
