@@ -109,7 +109,7 @@ output of sample test cases.
 
     cd tests
 
-Once in the `test` directory, select any of the test folders to run NGless.
+Once in the `tests` directory, select any of the test folders to run NGless.
 
 For example, here we would run the `regression-fqgz` test:
 
