@@ -8,7 +8,7 @@ maintainer:     luis@luispedro.org
 github:         ngless-toolkit/ngless
 license:        MIT
 license-file:   COPYING
-default-language: GHC2021
+language: GHC2021
 c-sources:
   - NGLess/Dependencies/embedded.c
   - NGLess/Data/FastQ.c
@@ -24,7 +24,7 @@ dependencies:
   - ansi-terminal
   - async
   - atomic-write >=0.2
-  - base >= 4.12 && < 4.16
+  - base >= 4.12 && < 4.20
   - bytestring
   - bytestring-lexing
   - optparse-applicative
