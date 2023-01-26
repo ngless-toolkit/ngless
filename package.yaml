@@ -9,9 +9,6 @@ github:         ngless-toolkit/ngless
 license:        MIT
 license-file:   COPYING
 language: GHC2021
-c-sources:
-  - NGLess/Dependencies/embedded.c
-  - NGLess/Data/FastQ.c
 default-extensions:
   - OverloadedStrings
   - LambdaCase
@@ -116,6 +113,9 @@ when:
 
 library:
   source-dirs: NGLess/
+  c-sources:
+    - NGLess/Data/FastQ.c
+    - NGLess/Dependencies/embedded.c
   when:
     - condition: 'flag(static)'
       ld-options:
@@ -148,6 +148,9 @@ tests:
     source-dirs:
         - NGLess # We cannot depend on NGLess because we compile with -DIS_BUILDING_TEST
         - Tests-Src/
+    c-sources:
+      - NGLess/Data/FastQ.c
+      - NGLess/Dependencies/embedded.c
     cpp-options: -DIS_BUILDING_TEST
     dependencies:
     - HUnit >=1.3
