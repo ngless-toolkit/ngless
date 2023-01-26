@@ -1,4 +1,3 @@
-#include <stdio.h>
 void updateCharCount(unsigned int n, char* pc, long int* v) {
     unsigned int i;
     unsigned char* p = (unsigned char*)pc;
