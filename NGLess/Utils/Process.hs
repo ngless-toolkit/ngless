@@ -43,18 +43,13 @@ runProcess binPath args stdin stdout = do
         CPT.withProcessWait (
                         -- No need to keep these open
                         CPT.setCloseFds True
-                        -- We need the Handle for stdin because we need to hClose it!
-                        -- Therefore, we cannot use `CPT.setStdin CTP.createSink`
-                        $ CPT.setStdin CPT.createPipe
+                        $ CPT.setStdin CPT.createSinkClose
                         $ CPT.setStderr CPT.byteStringOutput
                         $ CPT.setStdout CPT.createSource
                         $ CPT.proc binPath args) $ \p ->
             U.runConcurrently $ (,,)
                 <$> U.Concurrently (CPT.waitExitCode p)
-                <*  U.Concurrently (do
-                                        let hin = CPT.getStdin p
-                                        C.runConduit (stdin .| CC.sinkHandle hin)
-                                        U.hClose hin)
+                <*  U.Concurrently (C.runConduit (stdin .| CPT.getStdin p))
                 <*> U.Concurrently (C.runConduit (CPT.getStdout p .| stdout'))
                 <*> U.Concurrently (liftIO $ STM.atomically (CPT.getStderr p))
     let err' = BL8.unpack err
