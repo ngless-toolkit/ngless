@@ -9,6 +9,8 @@ User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Added ``{always_3_fq_files}`` format flag to ``write()``
+* Better suggestions for mistyped arguments/flags by matching prefixes (_e.g._, using ``ref=`` instead of ``reference=``).
+
 
 Version 1.5.0
 -------------

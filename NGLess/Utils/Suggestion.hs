@@ -1,4 +1,4 @@
-{- Copyright 2016-2017 NGLess Authors
+{- Copyright 2016-2023 NGLess Authors
  - License: MIT
  -}
 
@@ -11,11 +11,12 @@ module Utils.Suggestion
 
 import qualified Data.Text as T
 import qualified Text.EditDistance as TED
-import           Control.Monad (msum, guard)
-import           Control.Applicative ((<|>))
-import           System.IO.Error (catchIOError)
-import           System.FilePath (takeDirectory)
-import           System.Directory (doesFileExist, getDirectoryContents, getPermissions, readable)
+import Control.Monad (guard)
+import Data.List.Extra (firstJust)
+import Control.Applicative ((<|>))
+import System.IO.Error (catchIOError)
+import System.FilePath (takeDirectory)
+import System.Directory (doesFileExist, getDirectoryContents, getPermissions, readable)
 
 data Suggestion = Suggestion
                         !T.Text
@@ -34,16 +35,20 @@ findSuggestion :: T.Text
                     -- ^ List of legal options
                     -> Maybe Suggestion
                     -- ^ Suggestion if one is found, else Nothing
-findSuggestion used possible = matchCase <|> bestMatch
+findSuggestion used possible = matchCase <|> prefixMatch <|> bestMatch
     where
-        matchCase = msum (map matchCase1 possible)
+        matchCase = firstJust matchCase1 possible
         matchCase1 s = do
             guard (T.toLower used == T.toLower s)
             return $! Suggestion s "note that ngless is case-sensitive"
-        bestMatch = msum (map goodMatch1 possible)
+        bestMatch = firstJust goodMatch1 possible
+        prefixMatch = firstJust prefixMatch1 possible
         goodMatch1 s = do
             guard (dist used s <= 2)
             return $! Suggestion s "closest match"
+        prefixMatch1 s = do
+            guard (T.isPrefixOf used s)
+            return $! Suggestion s "prefix match"
 
 dist :: T.Text -> T.Text -> Int
 dist a b = TED.levenshteinDistance TED.defaultEditCosts (T.unpack a) (T.unpack b)

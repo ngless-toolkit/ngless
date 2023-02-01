@@ -15,6 +15,7 @@ import ValidationIO
 import Utils.Here
 import BuiltinFunctions (builtinModule)
 import NGLess.NGLEnvironment (NGLVersion(..))
+import Utils.Suggestion (findSuggestion, Suggestion(..))
 import BuiltinModules.QCStats qualified as ModQCStats
 
 tgroup_Validation = $(testGroupGenerator)
@@ -199,3 +200,21 @@ ngless '1.5'
 notConst = 1
 notConst = 2
 |]
+
+assertSuggested :: T.Text -> Maybe Suggestion -> Assertion
+assertSuggested s Nothing = assertFailure $ "Expected suggestion " ++ show s ++ " but got Nothing"
+assertSuggested s (Just (Suggestion s' _))
+    | s == s' = return ()
+    | otherwise = assertFailure $ "Expected suggestion " ++ show s ++ " but got " ++ show s'
+
+
+case_find_suggestion_case = do
+    assertSuggested "fastq" $ findSuggestion "fastQ" ["fastq", "other"]
+    assertSuggested "fastq" $ findSuggestion "FASTQ" ["first", "fastq", "other"]
+
+case_find_suggestion_prefix = do
+    assertSuggested "fastq" $ findSuggestion "fast" ["first", "fastq", "other"]
+    assertSuggested "reference" $ findSuggestion "ref" ["first", "reference", "other"]
+
+case_find_suggestion_typo = do
+    assertSuggested "fastq" $ findSuggestion "fqstq" ["first", "fastq", "other"]
