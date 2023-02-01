@@ -1,4 +1,4 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2023 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -41,7 +41,7 @@ import           Control.Monad.Except
 
 import Language
 import NGLess.NGError
-import Utils.Suggestion
+import Utils.Suggestion (suggestionMessage)
 
 type KwArgsValues = [(T.Text, NGLessObject)]
 
