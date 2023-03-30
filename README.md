@@ -38,6 +38,13 @@ If you are using NGLess, please cite:
             ofile='gene_counts.csv',
             format={csv})
 
+
+For more information, check [the docs](https://ngless.embl.de). We also have [a
+YouTube
+tutorial](https://www.youtube.com/playlist?list=PLn-ZqA9cHNdSsmVTojYL1lEcfh-J3Hdff)
+on how to use NGLess and [SemiBin](https://semibin.rtfd.io/) together (but you
+can learn to use NGLess independently of SemiBin).
+
 ## Installing
 
 See the [install documentation](https://ngless.embl.de/install.html) for more
