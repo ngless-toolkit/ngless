@@ -22,6 +22,7 @@ import qualified Data.Aeson.KeyMap as Aeson
 import qualified Data.Aeson.Key as Aeson
 import qualified Data.Yaml as Yaml
 import qualified Data.Vector as V
+import           Control.Monad.Extra (findM)
 import           Control.Monad.IO.Class (liftIO)
 import           System.FilePath ((</>), isAbsolute)
 
@@ -31,7 +32,6 @@ import Language
 import Data.FastQ
 import Modules
 import NGLess
-import Utils.Utils (findM)
 
 data SampleData = SampleData
     { sampleName :: !T.Text
@@ -118,11 +118,8 @@ executeLoadSample fname kwargs = do
     samples <- executeLoadSampleList fname []
     case samples of
         NGOList l -> do
-            found <- findM l $ \case
-                s@(NGOReadSet n _) ->
-                    if n == sample
-                        then return (Just s)
-                        else return Nothing
+            found <- flip findM l $ \case
+                NGOReadSet n _ -> return (n == sample)
                 _ -> throwShouldNotOccur "load_sample_from_yaml: sample list is not a list of samples"
             case found of
                 Just s -> return s

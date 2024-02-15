@@ -40,6 +40,7 @@ import qualified Conduit as C
 import           Conduit ((.|))
 import           System.FilePath (takeDirectory, (</>), (<.>), (-<.>))
 import           Control.Monad (unless, forM_, when)
+import           Control.Monad.Extra (firstJustM)
 import           System.Posix.Files (setFileMode, createSymbolicLink)
 import           System.Posix.Internals (c_getpid)
 import           Data.List (isSuffixOf, isPrefixOf)
@@ -63,7 +64,7 @@ import NGLess.NGLEnvironment
 import qualified Dependencies.Embedded as Deps
 import NGLess.NGError
 import Utils.LockFile
-import Utils.Utils (findM, withOutputFile)
+import Utils.Utils (withOutputFile)
 
 
 {- Note on temporary files
@@ -277,7 +278,7 @@ binPath User = ((</> "bin") . nConfUserDirectory) <$> nglConfiguration
 -- | Attempts to find the absolute path for the requested binary (checks permissions)
 findBin :: FilePath -> NGLessIO (Maybe FilePath)
 findBin fname = do
-        nglPath <- findM [Root, User] $ \p -> do
+        nglPath <- flip firstJustM [Root, User] $ \p -> do
             path <- (</> fname) <$> binPath p
             ex <- canExecute path
             if ex
@@ -388,18 +389,12 @@ expandPath fbase = do
         searchpath <- nConfSearchPath <$> nglConfiguration
         outputListLno' TraceOutput ["Looking for file '", fbase, "' (search path is ", show searchpath, ")"]
         let candidates = expandPath' fbase searchpath
-        findMaybeM candidates $ \p -> do
+        flip firstJustM candidates $ \p -> do
             outputListLno' TraceOutput ["Looking for file (", fbase, ") in ", p]
             exists <- liftIO (SD.doesFileExist p)
             return $! if exists
                             then Just p
                             else Nothing
-    where
-        findMaybeM :: Monad m => [a] -> (a -> m (Maybe b)) -> m (Maybe b)
-        findMaybeM [] _ = return Nothing
-        findMaybeM (x:xs) f = f x >>= \case
-            Nothing -> findMaybeM xs f
-            val -> return val
 
 expandPath' :: FilePath -> [FilePath] -> [FilePath]
 expandPath' fbase search = case RE.matchedText $ fbase RE.?=~ [RE.re|<(@{%id})?>|] of

@@ -1,4 +1,4 @@
-{- Copyright 2015-2019 NGLess Authors
+{- Copyright 2015-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -9,7 +9,6 @@ module Utils.Utils
     , maybeM
     , mapMaybeM
     , fmapMaybeM
-    , findM
     , uniq
     , allSame
     , passthrough
@@ -73,15 +72,6 @@ moveOrCopy :: FilePath -> FilePath -> IO ()
 moveOrCopy oldfp newfp = renameFile oldfp newfp `catch` (\e -> case ioeGetErrorType e of
             UnsupportedOperation -> copyFile oldfp newfp
             _ -> ioError e)
-
--- | Monadic version of find: returns the result of the first application of
--- the argument which is not 'Nothing' or, if all applications fail, return
--- 'Nothing'
-findM :: Monad m => [a] -> (a -> m (Maybe b)) -> m (Maybe b)
-findM [] _ = return Nothing
-findM (x:xs) f = f x >>= \case
-    Nothing -> findM xs f
-    val -> return val
 
 secondM :: Monad m => (a -> m b) -> (c,a) -> m (c,b)
 secondM f (a,c) = (a,) <$> f c

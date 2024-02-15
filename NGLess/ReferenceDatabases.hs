@@ -24,6 +24,7 @@ import Data.Foldable
 import Data.Maybe
 
 import Control.Monad (liftM2)
+import Control.Monad.Extra (firstJustM)
 import Control.Applicative ((<|>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource(release)
@@ -39,7 +40,7 @@ import NGLess
 import Dependencies.Versions (bwaVersion)
 import Utils.Network (downloadExpandTar, downloadOrCopyFile, downloadFile, isUrl)
 import Utils.LockFile (withLockFile, LockParameters(..), WhenExistsStrategy(..))
-import Utils.Utils (findM, withOutputFile)
+import Utils.Utils (withOutputFile)
 
 data ReferenceFilePaths = ReferenceFilePaths
     { rfpFaFile :: Maybe FilePath
@@ -108,8 +109,8 @@ downloadIfUrl basedir fname (Just path)
 moduleDirectReference :: T.Text -> NGLessIO (Maybe ReferenceFilePaths)
 moduleDirectReference rname = do
     mods <- ngleLoadedModules <$> nglEnvironment
-    findM mods $ \m ->
-        findM (modReferences m) $ \case
+    flip firstJustM mods $ \m ->
+        flip firstJustM (modReferences m) $ \case
             ExternalReference eref fafile gtffile mapfile
                 | eref == rname -> do
                     fafile'  <- downloadIfUrl (modPath m) (T.unpack rname <.> "fna.gz") (Just fafile)
