@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-{- Copyright 2022 NGLess Authors
+{- Copyright 2022-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -13,7 +13,6 @@ module BuiltinModules.Samples
 
 import qualified Data.ByteString as B
 import qualified Data.Text as T
-import           Data.List (find)
 import           Data.Default (def)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
@@ -32,6 +31,7 @@ import Language
 import Data.FastQ
 import Modules
 import NGLess
+import Utils.Utils (findM)
 
 data SampleData = SampleData
     { sampleName :: !T.Text
@@ -117,9 +117,16 @@ executeLoadSample fname kwargs = do
     sample <- lookupStringOrScriptError "load_sample_from_yaml arguments" "sample" kwargs
     samples <- executeLoadSampleList fname []
     case samples of
-        NGOList l -> case find (\(NGOReadSet n _) -> n == sample) l of
-            Just s -> return s
-            _ -> throwDataError ("load_sample_from_yaml: sample " ++ show sample ++ " not found in file " ++ show fname)
+        NGOList l -> do
+            found <- findM l $ \case
+                s@(NGOReadSet n _) ->
+                    if n == sample
+                        then return (Just s)
+                        else return Nothing
+                _ -> throwShouldNotOccur "load_sample_from_yaml: sample list is not a list of samples"
+            case found of
+                Just s -> return s
+                _ -> throwDataError ("load_sample_from_yaml: sample " ++ show sample ++ " not found in file " ++ show fname)
         _ -> throwShouldNotOccur "load_sample_from_yaml: sample list is not a list"
 
 

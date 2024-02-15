@@ -243,6 +243,7 @@ executeWrite (NGOReadSet _ rs) args = do
                 cp1 <- moveOrCopyCompressFQs (fst <$> pairs) fname1
                 cp2 <- moveOrCopyCompressFQs (snd <$> pairs) fname2
                 liftIO $ cp1 `concurrently_` cp2
+            _ -> error "This should never be reached"
     return (NGOFilename ofile)
 
 executeWrite el@(NGOMappedReadSet _ iout  _) args = do

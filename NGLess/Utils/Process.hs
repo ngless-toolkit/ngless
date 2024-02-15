@@ -9,7 +9,6 @@ import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Conduit.Process.Typed as CPT
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit as C
-import qualified Data.Conduit.Combinators as CC
 import           Data.Conduit ((.|))
 import qualified UnliftIO as U
 import           Control.Concurrent (getNumCapabilities, setNumCapabilities)

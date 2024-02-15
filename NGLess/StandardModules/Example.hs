@@ -1,4 +1,4 @@
-{- Copyright 2015-2016 NGLess Authors
+{- Copyright 2015-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -17,7 +17,7 @@ import Modules
 import NGLess
 
 execute :: T.Text -> NGLessObject -> KwArgsValues -> NGLessIO NGLessObject
-execute fname input args = liftIO $do
+execute fname input args = liftIO $ do
     putStrLn ("Called example function '"++T.unpack fname++"'")
     putStrLn ("First argument is "++show input)
     putStrLn ("Keyword arguments are "++show args)
