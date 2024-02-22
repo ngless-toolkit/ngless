@@ -113,7 +113,7 @@
             ]);
         buildable = true;
         modules = [ "Paths_NGLess" ];
-        cSources = [ "NGLess/Dependencies/embedded.c" "NGLess/Data/FastQ.c" ];
+        cSources = [ "NGLess/Data/FastQ.c" "NGLess/Dependencies/embedded.c" ];
         hsSourceDirs = [ "NGLess/" ];
         };
       exes = {
@@ -191,7 +191,6 @@
               (hsPkgs."unix" or (errorHandler.buildDepError "unix"))
               ]);
           buildable = true;
-          cSources = [ "NGLess/Dependencies/embedded.c" "NGLess/Data/FastQ.c" ];
           hsSourceDirs = [ "Execs" ];
           mainPath = (([ "Main.hs" ] ++ [
             ""
@@ -279,7 +278,7 @@
               ]);
           buildable = true;
           modules = [ "Paths_NGLess" ];
-          cSources = [ "NGLess/Dependencies/embedded.c" "NGLess/Data/FastQ.c" ];
+          cSources = [ "NGLess/Data/FastQ.c" "NGLess/Dependencies/embedded.c" ];
           hsSourceDirs = [ "NGLess" "Tests-Src/" ];
           mainPath = [ "Tests.hs" ];
           };
@@ -361,7 +360,6 @@
               (hsPkgs."unix" or (errorHandler.buildDepError "unix"))
               ]);
           buildable = true;
-          cSources = [ "NGLess/Dependencies/embedded.c" "NGLess/Data/FastQ.c" ];
           hsSourceDirs = [ "Execs/" ];
           };
         };

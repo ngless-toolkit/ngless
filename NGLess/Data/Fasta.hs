@@ -14,6 +14,7 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Data.Conduit as C
 import           Data.Conduit ((.|))
 import           Data.Word
+import           Control.Monad.IO.Class
 import           Control.Monad.Except
 import           Control.DeepSeq
 

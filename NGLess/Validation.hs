@@ -1,4 +1,4 @@
-{- Copyright 2013-2022 NGLess Authors
+{- Copyright 2013-2024 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -13,6 +13,7 @@ import qualified Data.Text.Read as T
 import           Data.Either.Combinators (rightToMaybe)
 import           Control.Monad.Extra (whenJust)
 import           Control.Monad.Writer.Strict
+import           Control.Monad
 import           Control.Monad.RWS
 import           Data.List (find, isSuffixOf)
 import           Data.Maybe

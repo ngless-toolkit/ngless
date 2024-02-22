@@ -1,4 +1,4 @@
-{- Copyright 2013-2022 NGLess Authors
+{- Copyright 2013-2024 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -15,7 +15,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Builder as BB
 import           Control.Monad
-import           Control.Monad.Except
+import           Control.Monad.IO.Class
 
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
@@ -25,6 +25,7 @@ import qualified Data.Conduit.Algorithms.Async as CAlg
 import           Data.Conduit ((.|))
 import           Data.Conduit.Algorithms.Utils (awaitJust)
 import           Control.Monad.Extra (unlessM)
+import           Control.Monad.Trans.Class
 import           Data.List (sort)
 
 

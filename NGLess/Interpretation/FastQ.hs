@@ -1,4 +1,4 @@
-{- Copyright 2013-2020 NGLess Authors
+{- Copyright 2013-2024 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, MultiWayIf, CPP #-}
@@ -32,7 +32,9 @@ import           Data.Conduit.Algorithms.Async (withPossiblyCompressedFile)
 import qualified Data.Conduit.Algorithms.Utils as CAlg
 import           Control.Monad.Trans.Resource (runResourceT)
 import Control.Exception (try)
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.Trans.Class
+import Control.Monad.IO.Class
 import Data.Maybe
 import Data.Word
 

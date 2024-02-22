@@ -15,10 +15,12 @@ module NGLess.NGError
 
 import           Control.DeepSeq
 import           Control.Monad.Except
+import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Primitive
 import           Control.Monad.Catch
 import           Control.Exception
+
 
 -- This file should be a leaf in the import graph (i.e., not import any other NGLess modules)
 

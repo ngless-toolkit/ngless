@@ -1,4 +1,4 @@
-{- Copyright 2016-2022 NGLess Authors
+{- Copyright 2016-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -11,7 +11,8 @@ module BuiltinModules.Checks
 import qualified Data.Text as T
 import           Data.Default (def)
 import Control.Monad.Extra (whenJust)
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.IO.Class
 import System.Directory
 import System.FilePath (takeDirectory)
 

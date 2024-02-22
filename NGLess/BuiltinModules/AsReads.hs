@@ -1,4 +1,4 @@
-{- Copyright 2015-2018 NGLess Authors
+{- Copyright 2015-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -18,7 +18,8 @@ import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.Algorithms.Async as CAlg
 import Control.Monad.Trans.Resource (release)
 import Data.Conduit ((.|))
-import Control.Monad.Except
+import Control.Monad
+import Control.Monad.IO.Class (liftIO)
 import System.IO
 import Data.Default (def)
 import Data.IORef (newIORef, writeIORef, readIORef)

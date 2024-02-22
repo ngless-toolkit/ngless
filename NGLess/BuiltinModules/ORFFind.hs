@@ -1,4 +1,4 @@
-{- Copyright 2017-2022 NGLess Authors
+{- Copyright 2017-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -8,7 +8,7 @@ module BuiltinModules.ORFFind
 
 import qualified Data.Text as T
 import           System.IO (hClose)
-import           Control.Monad.Except (liftIO)
+import           Control.Monad.IO.Class (liftIO)
 import           Data.Default (def)
 
 import Language

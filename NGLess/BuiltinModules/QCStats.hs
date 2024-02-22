@@ -1,4 +1,4 @@
-{- Copyright 2017-2019 NGLess Authors
+{- Copyright 2017-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -13,7 +13,7 @@ module BuiltinModules.QCStats
 
 import qualified Data.Text as T
 import           Data.Default (def)
-import Control.Monad.Except
+import           Control.Monad.IO.Class
 import System.IO
 
 import Language

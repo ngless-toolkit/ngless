@@ -1,4 +1,4 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -40,7 +40,7 @@ findFunctionIO fname = asks (flip findFunction fname) >>= \case
 -- | Run as many checks as possible (including non-pure, IO consuming, checks)
 validateIO :: [Module] -> Script -> NGLessIO (Maybe [T.Text])
 validateIO mods sc = do
-        err <- runReaderT (execWriterT (mapM ($sc) checks)) mods
+        err <- runReaderT (execWriterT (mapM ($ sc) checks)) mods
         case err of
             [] -> return Nothing
             errors -> return (Just errors)

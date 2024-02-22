@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts, ScopedTypeVariables, MultiWayIf #-}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, CPP #-}
-{- Copyright 2013-2019 NGLess Authors
+{- Copyright 2013-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -38,7 +38,10 @@ import Data.Conduit.Combinators qualified as CC
 import           Control.DeepSeq (NFData(..))
 import           Data.Conduit ((.|))
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
+import           Control.Monad.IO.Class
+import Control.Monad (forM, forM_, when)
 import Control.Monad.Except
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Resource
 import Control.Exception
 

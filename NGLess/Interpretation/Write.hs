@@ -30,6 +30,8 @@ import           Data.Default (Default(..))
 import           Data.Maybe
 import           Data.String.Utils (replace, endswith)
 import           Control.Monad.IO.Unlift (MonadUnliftIO)
+import           Control.Monad.IO.Class
+import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Catch (MonadMask)
 import           System.IO (Handle, stdout)

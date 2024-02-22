@@ -18,6 +18,7 @@ import Data.Maybe
 import Control.Monad.State.Strict
 import Control.Monad.Trans.Except
 import Control.Monad.Reader (ReaderT(..), asks)
+import Control.Monad
 import Control.Monad.Writer
 import           Control.Applicative ((<|>))
 import           Data.String (fromString)

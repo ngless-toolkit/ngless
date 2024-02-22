@@ -44,6 +44,7 @@ import Control.Error (note)
 import Control.DeepSeq
 
 import Data.Maybe
+import           Control.Monad.IO.Class
 import Control.Monad.Except
 import NGLess.NGError
 import Utils.Utils

@@ -29,6 +29,8 @@ import Data.Time (NominalDiffTime
                  , getCurrentTime
                  , diffUTCTime
                  )
+import Control.Monad.IO.Class
+import Control.Monad
 import Control.Monad.Except
 import Control.Exception
 import Control.Concurrent (threadDelay)

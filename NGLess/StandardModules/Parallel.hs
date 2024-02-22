@@ -1,4 +1,4 @@
-{- Copyright 2016-2022 NGLess Authors
+{- Copyright 2016-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -38,11 +38,11 @@ import qualified Data.Conduit.TQueue as CA
 import qualified Data.Conduit.Algorithms as CAlg
 import qualified Data.Conduit.Algorithms.Async as CAlg
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
+import           Control.Monad
 import           Control.Monad.ST (runST)
 import           Control.Monad.Except (throwError)
 import           Control.Monad.Extra (allM, unlessM)
 import           Control.DeepSeq
-import           Data.Traversable
 import           Control.Monad.Trans.Class
 import           System.AtomicWrite.Writer.Text (atomicWriteFile)
 import           System.Random.Shuffle (shuffleM)
@@ -83,11 +83,11 @@ import           Utils.LockFile (LockParameters(..))
 syncFile :: FilePath -> IO ()
 #ifndef WINDOWS
 syncFile fname = do
-    bracket (openFd fname ReadWrite Nothing defaultFileFlags)
+    bracket (openFd fname ReadWrite defaultFileFlags)
         closeFd
         fileSynchronise
     -- The code below will not work on Windows
-    bracket (openFd (takeDirectory fname) ReadOnly Nothing defaultFileFlags)
+    bracket (openFd (takeDirectory fname) ReadOnly defaultFileFlags)
         closeFd
         fileSynchronise
 

@@ -28,6 +28,7 @@ module Language
 {- This module defines the internal representation the language -}
 import qualified Data.Text as T
 import           Data.Either.Extra (eitherToMaybe)
+import           Control.Monad (forM)
 import           Control.Monad.Extra (whenJust)
 import           Control.Monad.Writer
 import           System.FilePath ((</>))

@@ -1,4 +1,4 @@
-{- Copyright 2017-2022 NGLess Authors
+{- Copyright 2017-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -8,7 +8,7 @@ module BuiltinModules.Assemble
 
 import qualified Data.Text as T
 import           System.FilePath ((</>))
-import           Control.Monad.Except (liftIO)
+import           Control.Monad.IO.Class (liftIO)
 import           Data.Default (def)
 import           GHC.Conc (getNumCapabilities)
 import           Control.Monad.Trans.Resource (release)

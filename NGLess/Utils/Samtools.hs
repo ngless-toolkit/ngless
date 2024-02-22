@@ -1,4 +1,4 @@
-{- Copyright 2015-2022 NGLess Authors
+{- Copyright 2015-2024 NGLess Authors
  - License: MIT
  -}
 
@@ -23,7 +23,8 @@ import qualified Control.Concurrent.Async as A
 import qualified UnliftIO as U
 import           Data.Conduit ((.|))
 import           Data.Conduit.Algorithms.Async (conduitPossiblyCompressedFile)
-import           Control.Monad.Except
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
 import           Control.Concurrent (getNumCapabilities, setNumCapabilities)
 import           Data.List (isSuffixOf)
 import           System.Process (proc)

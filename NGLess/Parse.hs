@@ -1,4 +1,4 @@
-{- Copyright 2013-2021 NGLess Authors
+{- Copyright 2013-2024 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE CPP #-}
@@ -165,7 +165,7 @@ funccall = try paired <|> FunctionCall <$>
 funcblock = optionMaybe (Block <$> (reserved "using" *> operator '|' *> variable <* operator '|' <* operator ':') <*> block)
 
 paired = FunctionCall
-            <$> (match_word "paired" $> (FuncName "paired"))
+            <$> (match_word "paired" $> FuncName "paired")
             <*> (operator '(' *> innerexpression <* operator ',')
             <*> pairedKwArgs
             <*> pure Nothing

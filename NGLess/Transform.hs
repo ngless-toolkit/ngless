@@ -12,7 +12,7 @@ module Transform
 
 import qualified Data.Text as T
 import Control.Monad.Trans.Cont
-import Control.Monad.Except
+import Control.Monad
 import Control.Monad.Writer
 import Control.Monad.RWS
 import Control.Arrow (first, second)
