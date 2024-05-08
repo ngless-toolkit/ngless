@@ -201,6 +201,7 @@ Authors
    searchpath
    reproducible
    faq
+   motus3
    nglesspy
    cwl
    advanced
