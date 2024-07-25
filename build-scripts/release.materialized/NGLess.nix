@@ -34,10 +34,10 @@
         "test_samples/data_set_repeated.fq"
         "test_samples/very_short.gtf"
         "Makefile"
-        ];
+      ];
       extraTmpFiles = [];
       extraDocFiles = [];
-      };
+    };
     components = {
       "library" = {
         depends = [
@@ -101,21 +101,21 @@
           (hsPkgs."vector-algorithms" or (errorHandler.buildDepError "vector-algorithms"))
           (hsPkgs."yaml" or (errorHandler.buildDepError "yaml"))
           (hsPkgs."zlib" or (errorHandler.buildDepError "zlib"))
-          ] ++ (if system.isWindows
+        ] ++ (if system.isWindows
           then [
             (hsPkgs."atomic-write" or (errorHandler.buildDepError "atomic-write"))
-            ]
+          ]
           else [
             (hsPkgs."bzlib-conduit" or (errorHandler.buildDepError "bzlib-conduit"))
             (hsPkgs."double-conversion" or (errorHandler.buildDepError "double-conversion"))
             (hsPkgs."safeio" or (errorHandler.buildDepError "safeio"))
             (hsPkgs."unix" or (errorHandler.buildDepError "unix"))
-            ]);
+          ]);
         buildable = true;
         modules = [ "Paths_NGLess" ];
         cSources = [ "NGLess/Data/FastQ.c" "NGLess/Dependencies/embedded.c" ];
         hsSourceDirs = [ "NGLess/" ];
-        };
+      };
       exes = {
         "ngless" = {
           depends = [
@@ -180,23 +180,23 @@
             (hsPkgs."vector-algorithms" or (errorHandler.buildDepError "vector-algorithms"))
             (hsPkgs."yaml" or (errorHandler.buildDepError "yaml"))
             (hsPkgs."zlib" or (errorHandler.buildDepError "zlib"))
-            ] ++ (if system.isWindows
+          ] ++ (if system.isWindows
             then [
               (hsPkgs."atomic-write" or (errorHandler.buildDepError "atomic-write"))
-              ]
+            ]
             else [
               (hsPkgs."bzlib-conduit" or (errorHandler.buildDepError "bzlib-conduit"))
               (hsPkgs."double-conversion" or (errorHandler.buildDepError "double-conversion"))
               (hsPkgs."safeio" or (errorHandler.buildDepError "safeio"))
               (hsPkgs."unix" or (errorHandler.buildDepError "unix"))
-              ]);
+            ]);
           buildable = true;
           hsSourceDirs = [ "Execs" ];
           mainPath = (([ "Main.hs" ] ++ [
             ""
-            ]) ++ (pkgs.lib).optional (flags.static) "") ++ (pkgs.lib).optional (flags.embed) "";
-          };
+          ]) ++ pkgs.lib.optional (flags.static) "") ++ pkgs.lib.optional (flags.embed) "";
         };
+      };
       tests = {
         "nglesstest" = {
           depends = [
@@ -266,23 +266,23 @@
             (hsPkgs."vector-algorithms" or (errorHandler.buildDepError "vector-algorithms"))
             (hsPkgs."yaml" or (errorHandler.buildDepError "yaml"))
             (hsPkgs."zlib" or (errorHandler.buildDepError "zlib"))
-            ] ++ (if system.isWindows
+          ] ++ (if system.isWindows
             then [
               (hsPkgs."atomic-write" or (errorHandler.buildDepError "atomic-write"))
-              ]
+            ]
             else [
               (hsPkgs."bzlib-conduit" or (errorHandler.buildDepError "bzlib-conduit"))
               (hsPkgs."double-conversion" or (errorHandler.buildDepError "double-conversion"))
               (hsPkgs."safeio" or (errorHandler.buildDepError "safeio"))
               (hsPkgs."unix" or (errorHandler.buildDepError "unix"))
-              ]);
+            ]);
           buildable = true;
           modules = [ "Paths_NGLess" ];
           cSources = [ "NGLess/Data/FastQ.c" "NGLess/Dependencies/embedded.c" ];
           hsSourceDirs = [ "NGLess" "Tests-Src/" ];
           mainPath = [ "Tests.hs" ];
-          };
         };
+      };
       benchmarks = {
         "nglessbench" = {
           depends = [
@@ -349,21 +349,21 @@
             (hsPkgs."vector-algorithms" or (errorHandler.buildDepError "vector-algorithms"))
             (hsPkgs."yaml" or (errorHandler.buildDepError "yaml"))
             (hsPkgs."zlib" or (errorHandler.buildDepError "zlib"))
-            ] ++ (if system.isWindows
+          ] ++ (if system.isWindows
             then [
               (hsPkgs."atomic-write" or (errorHandler.buildDepError "atomic-write"))
-              ]
+            ]
             else [
               (hsPkgs."bzlib-conduit" or (errorHandler.buildDepError "bzlib-conduit"))
               (hsPkgs."double-conversion" or (errorHandler.buildDepError "double-conversion"))
               (hsPkgs."safeio" or (errorHandler.buildDepError "safeio"))
               (hsPkgs."unix" or (errorHandler.buildDepError "unix"))
-              ]);
+            ]);
           buildable = true;
           hsSourceDirs = [ "Execs/" ];
-          };
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault ./.; }) // {
+    };
+  } // rec { src = pkgs.lib.mkDefault ./.; }) // {
     cabal-generator = "hpack";
-    }
+  }

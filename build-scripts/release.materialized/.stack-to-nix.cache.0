@@ -21,7 +21,7 @@
       synopsis = "Interval map";
       description = "";
       buildType = "Simple";
-      };
+    };
     components = {
       "library" = {
         depends = [
@@ -32,9 +32,9 @@
           (hsPkgs."primitive" or (errorHandler.buildDepError "primitive"))
           (hsPkgs."vector" or (errorHandler.buildDepError "vector"))
           (hsPkgs."vector-algorithms" or (errorHandler.buildDepError "vector-algorithms"))
-          ];
+        ];
         buildable = true;
-        };
+      };
       tests = {
         "interval-int-map-test" = {
           depends = [
@@ -51,11 +51,11 @@
             (hsPkgs."tasty-th" or (errorHandler.buildDepError "tasty-th"))
             (hsPkgs."vector" or (errorHandler.buildDepError "vector"))
             (hsPkgs."vector-algorithms" or (errorHandler.buildDepError "vector-algorithms"))
-            ];
+          ];
           buildable = true;
-          };
         };
       };
-    } // rec {
-    src = (pkgs.lib).mkDefault /nix/store/ga5a6bgyvkh1mhkwx8n518hx07js4rg7-interval-to-int-78289f6;
-    }
+    };
+  } // rec {
+    src = pkgs.lib.mkDefault /nix/store/ga5a6bgyvkh1mhkwx8n518hx07js4rg7-interval-to-int-78289f6;
+  }
