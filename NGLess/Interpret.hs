@@ -105,7 +105,7 @@ import Interpretation.FastQ
 import Interpretation.Write
 import Interpretation.Select (executeSelect, executeMappedReadMethod, reinjectSequences)
 import Interpretation.Unique
-import Interpretation.Substrim
+import Interpretation.Substrim (substrim, endstrim, smoothtrim, EndstrimEnds(..))
 import Utils.Utils
 import Utils.Suggestion
 import Utils.Conduit

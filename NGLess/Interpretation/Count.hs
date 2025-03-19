@@ -157,7 +157,9 @@ type GFFAnnotationMapAcc = M.Map BS.ShortByteString GffIMMapAcc
 type AnnotationRule = GffIMMap -> GffStrand -> IM.Interval -> [AnnotationInfo]
 
 -- This implements MOCAT-style "gene name" -> "feature" annotation
-type GeneMapAnnotation = M.Map B.ByteString [Int]
+type GeneMapAnnotation = M.Map
+                            B.ByteString -- ^ gene name
+                            [Int] -- ^ indices into the refseqinfo vector
 
 data MMMethod = MMCountAll | MM1OverN | MMDist1 | MMUniqueOnly
     deriving (Eq)
