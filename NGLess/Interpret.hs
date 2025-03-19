@@ -1,4 +1,4 @@
-{- Copyright 2013-2022 NGLess Authors
+{- Copyright 2013-2025 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, CPP #-}
@@ -431,9 +431,11 @@ executePreprocess (NGOReadSet name (ReadSet pairs singles)) args (Block (Variabl
 
 
             let inencs = fqpathEncoding <$> (fst <$> pairs) ++ (snd <$> pairs) ++ singles
-                outenc
-                    | allSame inencs = head inencs
-                    | otherwise = SangerEncoding
+                outenc = case inencs of
+                    [] -> SangerEncoding
+                    (e:es)
+                        | all (==e) es -> e
+                        | otherwise -> SangerEncoding
             let asSource :: [FastQFilePath] -> C.ConduitT () (V.Vector ShortRead) NGLessIO ()
                 asSource [] = return ()
                 asSource (FastQFilePath enc f:rest) =

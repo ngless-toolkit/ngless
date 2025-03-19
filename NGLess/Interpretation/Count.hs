@@ -1,4 +1,4 @@
-{- Copyright 2015-2020 NGLess Authors
+{- Copyright 2015-2025 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, CPP, TypeApplications #-}
@@ -552,7 +552,9 @@ performCount istream gname annotators0 opts = do
         BL.hPut hout (BL.fromChunks [delim, T.encodeUtf8 gname, "\n"])
         let maybeSkipM1
                 | optIncludeMinus1 opts = id
-                | otherwise = tail
+                | otherwise = tailOrEmpty
+            tailOrEmpty [] = []
+            tailOrEmpty (_:xs) = xs
         forM_ (zip annotators results) $ \(ann,result) ->
             forM_ (maybeSkipM1 $ annEnumerate ann) $ \(h,i) -> do
                 let nlB :: BB.Builder
@@ -731,8 +733,8 @@ loadFunctionalMap fname columns = do
 
         lookUpColumns :: Int -> [B.ByteString] -> NGLess ([Int], [B.ByteString])
         lookUpColumns line_nr [] = throwDataError ("Loading functional map file '" ++ fname ++ "' (line " ++ show line_nr ++ "): Header line missing!")
-        lookUpColumns _ headers = do
-            cis <- mapM (lookUpColumns' $ M.fromList (zip (tail headers) [0..])) columns
+        lookUpColumns _ (_:headers) = do
+            cis <- mapM (lookUpColumns' $ M.fromList (zip headers [0..])) columns
             return $ unzip $ sort $ zip cis columns
 
         lookUpColumns' :: M.Map B.ByteString Int -> B.ByteString -> NGLess Int

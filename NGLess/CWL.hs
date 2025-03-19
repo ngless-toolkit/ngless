@@ -58,6 +58,7 @@ extractARGVUsage e = evalCont $ callCC $ \exit -> do
 extractAllARGVUsage :: Script -> [Integer]
 extractAllARGVUsage (Script _ body) = mapMaybe extractARGVUsage (snd <$> body)
 
+extractOutput :: Script -> Integer
 extractOutput (Script _ body) = head $ mapMaybe  extractOutput' (snd <$> body)
     where
         extractOutput' :: Expression -> Maybe Integer

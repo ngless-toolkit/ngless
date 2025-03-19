@@ -1,4 +1,4 @@
-{- Copyright 2013-2024 NGLess Authors
+{- Copyright 2013-2025 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -355,8 +355,8 @@ mergeSAMGroups strategy groups
                                                         else (g1, g2, s:gS))) ([], [], []) $ concat groups
         group :: Bool -> [SamLine] -> [SamLine]
         group _ [] = []
-        group useNewer gs = case filter isAligned gs of
-            [] -> [head gs]
+        group useNewer gs@(g:_) = case filter isAligned gs of
+            [] -> [g]
             gs' -> pick useNewer strategy gs'
         pick :: Bool -> MergeStrategy -> [SamLine] -> [SamLine]
         pick useNewer MSBestOnly gs =

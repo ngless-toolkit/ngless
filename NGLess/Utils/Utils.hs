@@ -1,4 +1,4 @@
-{- Copyright 2015-2024 NGLess Authors
+{- Copyright 2015-2025 NGLess Authors
  - License: MIT
  -}
 
@@ -11,6 +11,7 @@ module Utils.Utils
     , fmapMaybeM
     , uniq
     , allSame
+    , safeHead
     , passthrough
     , moveOrCopy
     , secondM
@@ -24,7 +25,7 @@ import Control.Exception
 import GHC.IO.Exception (IOErrorType(..))
 import Safe (lookupJustDef)
 import Data.List (group)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, mapMaybe)
 #ifdef WINDOWS
 import           System.AtomicWrite.Internal (tempFileFor, closeAndRename)
 #else
@@ -43,7 +44,11 @@ lookupWithDefault = lookupJustDef
 
 -- | equivalent to the Unix command 'uniq'
 uniq :: Eq a => [a] -> [a]
-uniq = map head . group
+uniq = mapMaybe safeHead . group
+
+safeHead :: [a] -> Maybe a
+safeHead [] = Nothing
+safeHead (x:_) = Just x
 
 allSame :: Eq a => [a] -> Bool
 allSame [] = True

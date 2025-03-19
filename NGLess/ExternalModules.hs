@@ -1,4 +1,4 @@
-{- Copyright 2015-2022 NGLess Authors
+{- Copyright 2015-2025 NGLess Authors
  - License: MIT
  -}
 
@@ -381,7 +381,9 @@ encodeArgument (CommandArgument ai _ payload) (Just v)
             NGLSymbol -> T.unpack <$> symbolOrTypeError "in external module" v
             NGLInteger ->  show <$> integerOrTypeError "in external module" v
             NGLMappedReadSet -> case v of
-                NGOMappedReadSet{} -> head <$> asFilePaths v payload
+                NGOMappedReadSet{} -> asFilePaths v payload >>= \case
+                    [] -> throwShouldNotOccur ("Expected single file path for mappedreadset argument in function call, got " ++ show v)
+                    (fp:_) -> return fp
                 _ -> throwScriptError ("Expected mappedreadset for argument in function call, got " ++ show v)
             NGLCounts -> asCountsFile v payload
             other -> throwShouldNotOccur ("Unexpected type tag in external module " ++ show other)

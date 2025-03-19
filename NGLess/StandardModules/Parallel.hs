@@ -1,4 +1,4 @@
-{- Copyright 2016-2024 NGLess Authors
+{- Copyright 2016-2025 NGLess Authors
  - License: MIT
  -}
 
@@ -369,11 +369,11 @@ partialPaste (first_ell:ells) = runST $ do
 
 concatPartials :: [(V.Vector B.ByteString, V.Vector B.ByteString)] -> NGLess BL.ByteString
 concatPartials [] = throwShouldNotOccur "concatPartials of empty set"
-concatPartials groups
+concatPartials groups@(g:_)
     | not (allSame (fst <$> groups)) = throwDataError "indices do not match"
     | otherwise = do
         let contents = snd <$> groups
-            header = fst (head groups)
+            header = fst g
         return . BL.fromChunks $ concatMap (\ix -> (header V.! ix):(map (V.! ix) contents ++ ["\n"])) [0 .. V.length header - 1]
 
 -- | strict variation of sinkTBMQueue

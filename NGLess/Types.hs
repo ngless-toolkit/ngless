@@ -1,4 +1,4 @@
-{- Copyright 2013-2022 NGLess Authors
+{- Copyright 2013-2025 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -263,12 +263,12 @@ checkindexable (ListExpression []) = return (Just NGLVoid)
 checkindexable (ListExpression es) = do
     types <- nglTypeOf `mapM` es
     let ts = catMaybes types
-    if null ts
-        then return Nothing
-        else do
-            unless (allSame ts)
-                (errorInLine "List of mixed type")
-            return (Just $ head ts)
+    case ts of
+        [] -> return Nothing
+        (t:rest) -> do
+            unless (all (==t) rest) $
+                errorInLine ("List of mixed type")
+            return (Just t)
 checkindexable expr = do
     t <- nglTypeOf expr
     case t of

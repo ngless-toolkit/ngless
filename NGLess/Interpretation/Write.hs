@@ -1,4 +1,4 @@
-{- Copyright 2013-2022 NGLess Authors
+{- Copyright 2013-2025 NGLess Authors
  - License: MIT
  -}
 
@@ -216,8 +216,9 @@ executeWrite (NGOReadSet _ rs) args = do
                     C.runConduitRes $ (return () .| out)
         moveOrCopyCompressFQs [FastQFilePath _ f] ofname = moveOrCopyCompress' (opts {woOFile = ofname}) f
         moveOrCopyCompressFQs multiple ofname = do
-            let inputs = fqpathFilePath <$> multiple
-            fp' <- makeNGLTempFile (head inputs) "concat" "tmp" $ \h ->
+            -- The following is safe because multiple is never empty (or would have matched already)
+            let inputs@(f:_) = fqpathFilePath <$> multiple
+            fp' <- makeNGLTempFile f "concat" "tmp" $ \h ->
                 C.runConduit
                     (mapM_ conduitPossiblyCompressedFile inputs .| C.sinkHandle h)
             moveOrCopyCompress' (opts {woCanMove = True, woOFile = ofname}) fp'

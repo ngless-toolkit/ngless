@@ -1,4 +1,4 @@
-{- Copyright 2016-2019 NGLess Authors
+{- Copyright 2016-2025 NGLess Authors
  - License: MIT
  -}
 {-# LANGUAGE FlexibleContexts, RankNTypes #-}
@@ -44,7 +44,7 @@ import Utils.Conduit (ByteLine(..), linesC)
 import FileManagement
 import Configuration
 import NGLess.NGLEnvironment
-import Utils.Utils (dropEnd)
+import Utils.Utils (dropEnd, safeHead)
 
 hasValidIndex :: FilePath -> NGLessIO Bool
 hasValidIndex basepath = liftIO $ flip allM indexRequiredFormats $ \ext -> doesFileExist (basepath' ++ ext)
@@ -186,5 +186,5 @@ makeSAMHeader fafile = conduitPossiblyCompressedFile fafile .| linesC .| asSamHe
         readId line = do
             (mark,rest) <- B8.uncons line
             guard (mark == '>')
-            return $ head (B8.split ' ' rest)
+            safeHead $ B8.split ' ' rest
         emit rid n = C.yield $ B.concat ["@SQ\tSN:", rid, "\t", B8.pack (show n), "\n"]
