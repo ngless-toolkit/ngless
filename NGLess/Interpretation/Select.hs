@@ -25,7 +25,6 @@ import qualified Data.Text.Encoding as TE
 import           Data.Bits (Bits(..))
 import           Control.Monad.Except (throwError)
 import           Data.Either.Combinators (fromRight)
-import           Data.List (foldl')
 import           Data.Either.Extra (eitherToMaybe)
 import           Data.Tuple.Extra (fst3)
 import           Data.Ratio (Ratio, (%))

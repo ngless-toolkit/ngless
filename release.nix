@@ -3,8 +3,8 @@ let
   sources = {
     haskellNix = builtins.fetchTarball {
       name = "haskell-nix-snap";
-      url = "https://github.com/input-output-hk/haskell.nix/archive/a7f031ac146666657824f3c4603bf87d3507c1a6.tar.gz";
-      sha256 = "1p4rrq2apw2lnswj6km7ni9zc6gvr1ly03pkparyjslmcf5d57n4";
+      url = "https://github.com/input-output-hk/haskell.nix/archive/8cbc9c467e3990204ebbafba29bd53f6bea60757.tar.gz";
+      sha256 = "1bciwshiax23sbgmzzkam4amswphxg7v3g5032c5z5dvnhwjd097";
     };
   };
 
@@ -32,7 +32,15 @@ in pkgs.haskell-nix.stackProject {
     filter = path: type: let baseName = baseNameOf (toString path); in !(pkgs.lib.elem baseName ignoredPaths);
   };
   materialized = ./build-scripts/release.materialized;
-  stack-sha256 = "12zp3w2mpcv2fx5h631nxpi2m0fzrxi3pn1b916b0vlbyglk71y6";
+  stack-sha256 = "1raq8s3r786j83yqsf3wi00qhxbmmwwvrs1fdr901ixa3v05gha7";
   inherit checkMaterialization;
+  modules = [
+    {
+      packages.directory.flags.os-string = true;
+      packages.unix.flags.os-string = true;
+      packages.process.flags.os-string = true;
+    }
+  ];
+
 }
 

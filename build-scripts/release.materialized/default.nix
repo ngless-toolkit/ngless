@@ -2,12 +2,11 @@
   extras = hackage:
     {
       packages = {
-        "conduit-algorithms" = hackage.conduit-algorithms."0.0.14.0".revisions.default;
         NGLess = ./NGLess.nix;
         int-interval-map = ./.stack-to-nix.cache.0;
       };
     };
-  resolver = "lts-22.30";
+  resolver = "lts-24.28";
   modules = [
     ({ lib, ... }:
       { packages = {}; })

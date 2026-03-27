@@ -56,7 +56,7 @@ import           Control.Monad.Primitive (PrimMonad(..))
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class   (liftIO)
-import Data.List                (foldl', sort, sortOn)
+import Data.List                (sort, sortOn)
 import GHC.Conc                 (getNumCapabilities)
 import Control.DeepSeq          (NFData(..))
 import Control.Error            (note)

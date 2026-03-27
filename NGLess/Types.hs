@@ -22,7 +22,7 @@ import Control.Monad
 import Control.Monad.Writer
 import           Control.Applicative ((<|>))
 import           Data.String (fromString)
-import           Data.List (find, foldl')
+import           Data.List (find)
 import           Data.Functor (($>))
 
 import Modules

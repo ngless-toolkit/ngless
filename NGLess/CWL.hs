@@ -1,4 +1,4 @@
-{- Copyright 2017 NGLess Authors
+{- Copyright 2017-2026 NGLess Authors
  - License: MIT
  -}
 module CWL
@@ -9,6 +9,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import           Data.Maybe
 import           Control.Monad.Trans.Cont (evalCont, callCC)
+import           Data.List.Extra (firstJust)
 
 import Utils.Utils
 import Language
@@ -59,7 +60,7 @@ extractAllARGVUsage :: Script -> [Integer]
 extractAllARGVUsage (Script _ body) = mapMaybe extractARGVUsage (snd <$> body)
 
 extractOutput :: Script -> Integer
-extractOutput (Script _ body) = head $ mapMaybe  extractOutput' (snd <$> body)
+extractOutput (Script _ body) = fromMaybe (-1) $ firstJust extractOutput' (snd <$> body)
     where
         extractOutput' :: Expression -> Maybe Integer
         extractOutput' (FunctionCall (FuncName "write") _ kwargs _) = do

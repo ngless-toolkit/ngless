@@ -21,7 +21,7 @@ dependencies:
   - ansi-terminal
   - async
   - atomic-write >=0.2
-  - base >= 4.12 && < 4.20
+  - base >= 4.12 && < 4.21
   - bytestring
   - bytestring-lexing
   - optparse-applicative
