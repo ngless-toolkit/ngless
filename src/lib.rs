@@ -1,14 +1,20 @@
 //! NGLess — Rust reimplementation (work in progress).
 //!
-//! This is the milestone-1 scaffold (see `rust-migration.md` at the repo root). Only the
-//! command-line entry point exists: informational flags (`--version`, `--version-short`,
-//! `--version-debug`, `--date-short`) and `--check-install`. The tokenizer, parser, type
-//! checker and interpreter are not implemented yet — running an actual `.ngl` script exits
-//! non-zero with a "not yet implemented" message.
+//! This is an early milestone (see `rust-migration.md` at the repo root). The command-line
+//! entry point handles the informational flags (`--version`, `--version-short`,
+//! `--version-debug`, `--date-short`) and `--check-install`. The front end (tokenizer →
+//! parser → AST) is being ported under [`tokens`], [`ast`] and [`parser`]; the type checker,
+//! validation and interpreter are not implemented yet, so running an actual `.ngl` script
+//! exits non-zero with a "not yet implemented" message.
 //!
 //! The goal of the rewrite is *behavioral parity* with the Haskell implementation for
 //! `ngless "1.5"`+ scripts, verified against the existing functional test suite under
 //! `tests/` via `NGLESS_BIN=<this binary> ./run-tests.sh`.
+
+pub mod ast;
+pub mod errors;
+pub mod parser;
+pub mod tokens;
 
 /// Version strings, mirroring `NGLess/Version.hs` and `Execs/Main.hs` exactly so that
 /// `--version*` output stays byte-identical to the Haskell binary.
@@ -64,6 +70,27 @@ where
             "--check-install" => return check_install(),
             _ => {}
         }
+    }
+
+    // Hidden developer aid: parse a script and report success/failure. Used to smoke-test the
+    // front-end port against the real `tests/` scripts before the interpreter exists.
+    if args.len() == 2 && args[0] == "--debug-parse" {
+        return match std::fs::read_to_string(&args[1]) {
+            Ok(src) => match parser::parse_ngless(&args[1], true, &src) {
+                Ok(script) => {
+                    println!("OK: {} top-level expressions", script.body.len());
+                    0
+                }
+                Err(e) => {
+                    eprintln!("PARSE ERROR: {e}");
+                    1
+                }
+            },
+            Err(e) => {
+                eprintln!("could not read {}: {e}", args[1]);
+                1
+            }
+        };
     }
 
     // Anything else means executing a real script, which is not implemented yet.
