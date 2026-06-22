@@ -1,8 +1,9 @@
 # Rewriting NGLess in Rust — Scoping & Execution Plan
 
 > **Status:** Milestone 1 (harness + scaffold) in progress on branch `rust-migration`.
-> The Rust crate lives under `rust/`; the functional test harness (`run-tests.sh`) can be
-> pointed at any binary via the `NGLESS_BIN` environment variable.
+> The Rust crate lives at the repository root (`Cargo.toml`, `src/`), since it is intended
+> to eventually replace the Haskell implementation in place. The functional test harness
+> (`run-tests.sh`) can be pointed at any binary via the `NGLESS_BIN` environment variable.
 
 ## Context
 

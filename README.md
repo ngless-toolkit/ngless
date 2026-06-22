@@ -131,6 +131,32 @@ For developers who have done this much more datasets for testing purposes can be
 **[Ocean Metagenomics Assembly and Gene Prediction](https://ngless.embl.de/tutorial-assembly-gp.html)**
 
 
+## Rust reimplementation (work in progress)
+
+NGLess is being incrementally rewritten in Rust (see
+[`rust-migration.md`](rust-migration.md) for the full plan). The current, supported
+implementation is the Haskell one described above; the Rust sources at the repository root
+(`Cargo.toml`, `src/`) are **milestone 1 — a CLI scaffold only**, with no interpreter yet.
+
+Only `ngless "1.5"`+ scripts will be supported by the Rust version. Behavioral parity with
+the Haskell implementation is verified against the existing functional test suite under
+`tests/`.
+
+### Build & test
+
+    cargo build --release      # produces target/release/ngless
+    cargo test                 # unit tests
+
+### Parity check against the functional test suite
+
+The committed `expected.*` files in each `tests/` directory are the Haskell binary's output,
+so running the functional suite against the Rust binary *is* a parity check against Haskell.
+Point the harness at the Rust build via `NGLESS_BIN`:
+
+    NGLESS_BIN=target/release/ngless ./run-tests.sh
+
+(Most tests fail today because the interpreter is a stub — that is expected at milestone 1.)
+
 ## More information
 
 - [Full documentation](https://ngless.embl.de/)

@@ -11,6 +11,10 @@
 *.o
 *.hi
 *.pyc
+
+# Rust build artifacts
+/target/
+/Cargo.lock
 Html/fonts/
 Html/htmllibs/
 ngless-locks/

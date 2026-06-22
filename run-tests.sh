@@ -6,7 +6,7 @@ shopt -s nullglob
 basedir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Which ngless binary to test. Defaults to `ngless` on the PATH (the Haskell build);
-# point it at the Rust build with e.g. NGLESS_BIN=rust/target/release/ngless ./run-tests.sh
+# point it at the Rust build with e.g. NGLESS_BIN=target/release/ngless ./run-tests.sh
 NGLESS_BIN="${NGLESS_BIN:-ngless}"
 
 # Check that ngless is correctly installed:

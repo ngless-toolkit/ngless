@@ -1,0 +1,15 @@
+[package]
+name = "ngless"
+version = "1.5.0"
+edition = "2021"
+description = "NGLess: NGS processing with Less work — Rust reimplementation (work in progress)"
+license = "MIT"
+repository = "https://github.com/ngless-toolkit/ngless"
+
+# Sources live at the repository root (src/lib.rs, src/main.rs) and are auto-detected;
+# the binary inherits the package name `ngless`.
+
+[workspace]
+# The root package is the workspace root. As the rewrite grows, factor subsystems into
+# member crates here, e.g.:
+#   members = ["crates/ngless-parser", "crates/ngless-types", "crates/ngless-runtime"]

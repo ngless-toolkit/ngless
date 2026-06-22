@@ -9,17 +9,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: rust
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust
       - name: Format check
         run: cargo fmt --all -- --check
       - name: Clippy
@@ -40,9 +35,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust
       - name: Build Rust ngless
-        run: cargo build --release --manifest-path rust/Cargo.toml
+        run: cargo build --release
       - name: Run functional tests against the Rust binary
-        run: NGLESS_BIN="$PWD/rust/target/release/ngless" ./run-tests.sh
+        run: NGLESS_BIN="$PWD/target/release/ngless" ./run-tests.sh
