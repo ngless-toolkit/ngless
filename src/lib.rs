@@ -17,6 +17,7 @@ pub mod modules;
 pub mod parser;
 pub mod tokens;
 pub mod types;
+pub mod validation;
 
 /// Version strings, mirroring `NGLess/Version.hs` and `Execs/Main.hs` exactly so that
 /// `--version*` output stays byte-identical to the Haskell binary.
