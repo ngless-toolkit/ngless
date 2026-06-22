@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = ["ngless"]
+
+# As the rewrite grows, add member crates here, e.g.:
+#   "ngless-parser"   (tokenizer + parser + AST)
+#   "ngless-types"    (type checker + validation)
+#   "ngless-runtime"  (interpreter + FileOrStream + streaming)

@@ -5,15 +5,19 @@ shopt -s nullglob
 # This script is located on the root of the repository:
 basedir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Check that ngless is in the PATH and correctly installed:
-if ! ngless --check-install ; then
-    echo "$(which ngless) --check-install failed."
+# Which ngless binary to test. Defaults to `ngless` on the PATH (the Haskell build);
+# point it at the Rust build with e.g. NGLESS_BIN=rust/target/release/ngless ./run-tests.sh
+NGLESS_BIN="${NGLESS_BIN:-ngless}"
+
+# Check that ngless is correctly installed:
+if ! "$NGLESS_BIN" --check-install ; then
+    echo "$NGLESS_BIN --check-install failed."
     exit 1
 fi
 
 TEST_PREFIX="$1"
 
-echo ">>> Running tests with: $(ngless --version-debug) <<<"
+echo ">>> Running tests with: $("$NGLESS_BIN" --version-debug) <<<"
 
 ok="yes"
 failed_tests=""
@@ -40,7 +44,7 @@ for testdir in tests/*; do
         if test -f cmdargs ; then
             cmd_args="$(cat cmdargs)"
         fi
-        ngless --quiet -t temp $cmd_args $validate_arg *.ngl > output.stdout.txt 2>output.stderr.txt
+        "$NGLESS_BIN" --quiet -t temp $cmd_args $validate_arg *.ngl > output.stdout.txt 2>output.stderr.txt
         ngless_exit=$?
         if [[ $testdir == tests/error-* ]] ; then
             if test $ngless_exit -eq "0"; then
