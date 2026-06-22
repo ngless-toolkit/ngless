@@ -1,9 +1,20 @@
 # Rewriting NGLess in Rust — Scoping & Execution Plan
 
-> **Status:** Milestone 1 (harness + scaffold) in progress on branch `rust-migration`.
-> The Rust crate lives at the repository root (`Cargo.toml`, `src/`), since it is intended
-> to eventually replace the Haskell implementation in place. The functional test harness
-> (`run-tests.sh`) can be pointed at any binary via the `NGLESS_BIN` environment variable.
+> **Status:** Milestones 1–3 landed on branch `rust-migration`. The Rust crate lives at the
+> repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
+> Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
+> pointed at any binary via the `NGLESS_BIN` environment variable.
+>
+> - **M1 (scaffold):** CLI info flags + `--check-install`, byte-matching the Haskell CLI.
+> - **M2 (front end):** tokenizer, parser, AST, type checker, pure validation — all with
+>   ported unit tests (`Tests/{Parse,Types,Validation}.hs`).
+> - **M3 (core runtime, partial):** CLI flow (load → parse → version-gate `>=1.5` → type
+>   check → validate → interpret), runtime values + `evalBinary/Unary/Index`, and an
+>   interpreter for the pure subset plus `print`/`println`/`read_int`/`read_double`/
+>   `__assert`/`to_string`. Not yet: `FileOrStream`, temp-file lifecycle, module loading,
+>   and the data subsystems (so `fastq`/`map`/`count`/`write`/blocks return a clear
+>   "not implemented yet"). The citation header and `clap`-based arg parsing are also still
+>   pending, so functional-test stdout parity is not yet attempted.
 
 ## Context
 

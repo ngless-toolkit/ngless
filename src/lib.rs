@@ -12,12 +12,15 @@
 //! `tests/` via `NGLESS_BIN=<this binary> ./run-tests.sh`.
 
 pub mod ast;
+pub mod cli;
 pub mod errors;
+pub mod interpret;
 pub mod modules;
 pub mod parser;
 pub mod tokens;
 pub mod types;
 pub mod validation;
+pub mod values;
 
 /// Version strings, mirroring `NGLess/Version.hs` and `Execs/Main.hs` exactly so that
 /// `--version*` output stays byte-identical to the Haskell binary.
@@ -96,12 +99,9 @@ where
         };
     }
 
-    // Anything else means executing a real script, which is not implemented yet.
-    eprintln!(
-        "ngless (Rust): interpreter not yet implemented (milestone 1 scaffold).\n\
-         Available so far: --version, --version-short, --version-debug, --date-short, --check-install."
-    );
-    1
+    // Otherwise, run the default mode: load, parse, version-gate, type check, validate and
+    // interpret a script. Only a subset of the language is implemented so far (see `interpret`).
+    cli::run_default_mode(&args)
 }
 
 /// `--check-install`: the Haskell version verifies that bundled external tools
