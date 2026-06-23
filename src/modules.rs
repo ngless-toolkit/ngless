@@ -262,6 +262,19 @@ mod builders {
                 vec![],
                 vec![ReturnAssigned],
             ),
+            // From the always-loaded builtin "as_reads" module (BuiltinModules/AsReads.hs).
+            {
+                let mut f = func(
+                    "as_reads",
+                    Some(MappedReadSet),
+                    vec![],
+                    ReadSet,
+                    vec![],
+                    vec![ReturnAssigned],
+                );
+                f.allows_auto_comprehension = true;
+                f
+            },
             // From the always-loaded builtin "stats" module (BuiltinModules/QCStats.hs).
             func(
                 "qcstats",

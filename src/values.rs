@@ -30,6 +30,12 @@ pub enum NGLessObject {
     /// A counts/statistics table backed by a TSV file on disk (mirrors `NGOCounts (File ...)`),
     /// e.g. the result of `qcstats`. `write` copies the file to the output.
     Counts(std::path::PathBuf),
+    /// A mapped read set backed by a SAM/BAM file on disk (mirrors `NGOMappedReadSet`), e.g. the
+    /// result of `samfile`. `name` is the user-facing group name.
+    MappedReadSet {
+        name: String,
+        path: std::path::PathBuf,
+    },
 }
 
 impl NGLessObject {
@@ -46,6 +52,7 @@ impl NGLessObject {
             NGLessObject::Read(_) => "read",
             NGLessObject::ReadSet { .. } => "readset",
             NGLessObject::Counts(_) => "counts",
+            NGLessObject::MappedReadSet { .. } => "mappedreadset",
         }
     }
 }

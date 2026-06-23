@@ -19,6 +19,7 @@ pub mod fastq;
 pub mod interpret;
 pub mod modules;
 pub mod parser;
+pub mod sam;
 pub mod tokens;
 pub mod types;
 pub mod validation;

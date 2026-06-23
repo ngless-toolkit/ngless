@@ -43,7 +43,14 @@
 >   checks, no version-conditional behavior, so Haskell output is unchanged).
 >   Simplifications to lift next: files are read whole rather than streamed (no
 >   `FileOrStream`/bounded queues), bzip2/zstd compression, and per-position quality
->   percentiles. Still not started: module loading and the `map`/`count`/SAM subsystems.
+>   percentiles.
+> - **M5 (mapping + SAM, partial):** a minimal SAM layer (`src/sam.rs`: parse header/alignment
+>   lines, flag predicates) plus `samfile` (reference a SAM/BAM file as a file-backed
+>   `MappedReadSet`) and `as_reads` (reconstruct FASTQ from SAM records — grouped by read name,
+>   mates split into pair.1/pair.2 by flag, lone reads as singletons; mirrors `samToFastQ`).
+>   `tests/as_reads_encoding` passes (`as_reads(samfile(...))` → paired preprocess → write).
+>   `map` itself needs an aligner (bwa/minimap2) and is not started; `select`, the
+>   `samtools_*` module functions, and SAM↔BAM conversion are also still pending.
 
 ## Context
 

@@ -28,6 +28,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::ast::*;
 use crate::errors::{NgError, NgErrorType, NgResult};
 use crate::fastq::{self, FastQEncoding, FastQFilePath, ReadSet, ShortRead};
+use crate::sam::{self, SamLine, SamRecord};
 use crate::values::{eval_binary, eval_index, eval_unary, show_double, NGLessObject};
 
 /// Interpret a script body (already type-checked and validated). `temp_dir` is where
@@ -253,10 +254,114 @@ impl Interpreter {
         match f.0.as_str() {
             "fastq" => self.execute_fastq(&expr_v),
             "paired" => self.execute_paired(&expr_v, &argvs),
+            "samfile" => execute_samfile(&expr_v, &argvs),
+            "as_reads" => self.execute_as_reads(&expr_v),
             "qcstats" => self.execute_qcstats(&expr_v),
             "write" => execute_write(&expr_v, &argvs),
             _ => execute_function(f, &expr_v, &argvs),
         }
+    }
+
+    /// `as_reads(mapped)`: reconstruct FASTQ reads from the SAM records (mirrors `executeReads`
+    /// / `samToFastQ`). Records are grouped by read name; within a group, mates are split into
+    /// pair.1/pair.2 by their flag bits and lone reads become singletons.
+    fn execute_as_reads(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
+        let (name, path) = match expr {
+            NGLessObject::MappedReadSet { name, path } => (name.clone(), path.clone()),
+            other => {
+                return Err(NgError::should_not_occur(format!(
+                    "as_reads expected a mapped read set, got {other:?}"
+                )))
+            }
+        };
+        let text = read_sam_text(&path.to_string_lossy())?;
+        let records = sam::parse_sam(&text)?;
+        let lines: Vec<&SamLine> = records
+            .iter()
+            .filter_map(|r| match r {
+                SamRecord::Line(l) => Some(l),
+                SamRecord::Header(_) => None,
+            })
+            .collect();
+
+        let (mut p1, mut p2, mut s) = (String::new(), String::new(), String::new());
+        let (mut has_paired, mut has_single) = (false, false);
+        let mut i = 0;
+        while i < lines.len() {
+            // Group consecutive records with the same read name.
+            let mut j = i + 1;
+            while j < lines.len() && lines[j].qname == lines[i].qname {
+                j += 1;
+            }
+            match as_fq(&lines[i..j]) {
+                FQResult::Single(b) => {
+                    s.push_str(&b);
+                    has_single = true;
+                }
+                FQResult::Paired(a, b) => {
+                    p1.push_str(&a);
+                    p2.push_str(&b);
+                    has_paired = true;
+                }
+                FQResult::None => {}
+            }
+            i = j;
+        }
+
+        let readset = match (has_paired, has_single) {
+            (true, true) => {
+                let enc = fastq::detect_encoding(&p1)?;
+                ReadSet {
+                    pairs: vec![(
+                        self.write_fq_temp(&p1, enc, "reads_.1.")?,
+                        self.write_fq_temp(&p2, enc, "reads_.2.")?,
+                    )],
+                    singletons: vec![self.write_fq_temp(&s, enc, "reads_.singles.")?],
+                }
+            }
+            (true, false) => {
+                let enc = fastq::detect_encoding(&p1)?;
+                ReadSet {
+                    pairs: vec![(
+                        self.write_fq_temp(&p1, enc, "reads_.1.")?,
+                        self.write_fq_temp(&p2, enc, "reads_.2.")?,
+                    )],
+                    singletons: Vec::new(),
+                }
+            }
+            (false, true) => {
+                let enc = fastq::detect_encoding(&s)?;
+                ReadSet {
+                    pairs: Vec::new(),
+                    singletons: vec![self.write_fq_temp(&s, enc, "reads_.singles.")?],
+                }
+            }
+            (false, false) => ReadSet {
+                pairs: vec![(
+                    self.write_fq_temp("", FastQEncoding::Sanger, "reads_.1.")?,
+                    self.write_fq_temp("", FastQEncoding::Sanger, "reads_.2.")?,
+                )],
+                singletons: Vec::new(),
+            },
+        };
+        Ok(NGLessObject::ReadSet { name, readset })
+    }
+
+    /// Write FASTQ text to a fresh temp file and reference it with the given encoding.
+    fn write_fq_temp(
+        &self,
+        data: &str,
+        encoding: FastQEncoding,
+        prefix: &str,
+    ) -> NgResult<FastQFilePath> {
+        let path = self.new_temp_path(prefix, "fq");
+        std::fs::write(&path, data).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write temp file {}: {e}", path.display()),
+            )
+        })?;
+        Ok(FastQFilePath { encoding, path })
     }
 
     /// Decode a FASTQ file, register its statistics under `label`, and return a reference to it
@@ -743,6 +848,81 @@ fn output_encoding(files: &[FastQFilePath]) -> fastq::FastQEncoding {
 /// Read a (possibly compressed) FASTQ file into memory.
 fn read_fastq_text(path: &str) -> NgResult<String> {
     crate::compression::read_to_string(path)
+}
+
+/// Read a (possibly gz-compressed) SAM file into memory. BAM is not handled yet.
+fn read_sam_text(path: &str) -> NgResult<String> {
+    if path.ends_with(".bam") {
+        return Err(NgError::script(format!(
+            "BAM input ('{path}') is not supported in this build yet."
+        )));
+    }
+    crate::compression::read_to_string(path)
+}
+
+/// `samfile(fname)`: reference a SAM/BAM file as a mapped read set (mirrors `executeSamfile`).
+fn execute_samfile(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResult<NGLessObject> {
+    let fname = as_string(expr, "samfile")?;
+    let name = match lookup_arg(args, "name") {
+        Some(NGLessObject::String(s)) => s.clone(),
+        _ => fname.clone(),
+    };
+    if let Some(NGLessObject::String(h)) = lookup_arg(args, "headers") {
+        if !h.is_empty() {
+            return Err(NgError::script(
+                "samfile(headers=...) is not supported in this build yet.",
+            ));
+        }
+    }
+    Ok(NGLessObject::MappedReadSet {
+        name,
+        path: PathBuf::from(fname),
+    })
+}
+
+/// The outcome of reconstructing reads for one read-name group (mirrors `FQResult`).
+enum FQResult {
+    None,
+    Single(String),
+    Paired(String, String),
+}
+
+/// Reconstruct FASTQ text for one read-name group (mirrors `asFQ`).
+fn as_fq(group: &[&SamLine]) -> FQResult {
+    let with_seq: Vec<&SamLine> = group.iter().copied().filter(|l| l.has_sequence()).collect();
+    let tagged = as_fq_collect(&with_seq);
+    match tagged.as_slice() {
+        [(_, b)] => FQResult::Single(b.clone()),
+        [(1, a), (2, b)] => FQResult::Paired(a.clone(), b.clone()),
+        [(2, b), (1, a)] => FQResult::Paired(a.clone(), b.clone()),
+        _ => FQResult::None,
+    }
+}
+
+/// Tag each sequence-bearing record as mate 1, mate 2 or a singleton (mirrors `asFQ'`): a lone
+/// record is always a singleton (tag 3); otherwise the first first-in-pair and first
+/// second-in-pair records are taken.
+fn as_fq_collect(lines: &[&SamLine]) -> Vec<(i32, String)> {
+    if lines.len() == 1 {
+        return vec![(3, as_fq1(lines[0]))];
+    }
+    let mut out = Vec::new();
+    let (mut seen1, mut seen2) = (false, false);
+    for l in lines {
+        if l.is_first_in_pair() && !seen1 {
+            out.push((1, as_fq1(l)));
+            seen1 = true;
+        } else if l.is_second_in_pair() && !seen2 {
+            out.push((2, as_fq1(l)));
+            seen2 = true;
+        }
+    }
+    out
+}
+
+/// Format one SAM record as a 4-line FASTQ record (mirrors `asFQ1`).
+fn as_fq1(l: &SamLine) -> String {
+    format!("@{}\n{}\n+\n{}\n", l.qname, l.seq, l.qual)
 }
 
 /// `write(rs, ofile=...)`: write the read set's current file(s) to `ofile` (mirrors
