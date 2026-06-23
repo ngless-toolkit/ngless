@@ -13,6 +13,7 @@
 
 pub mod ast;
 pub mod cli;
+pub mod compression;
 pub mod errors;
 pub mod fastq;
 pub mod interpret;

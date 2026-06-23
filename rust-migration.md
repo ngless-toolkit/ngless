@@ -21,14 +21,18 @@
 >   `discard`/`continue`, read-write block variable, and the `avg_quality`/`fraction_at_least`/
 >   `n_to_zero_quality` methods) to a fresh temp file, and `write` copies the current file.
 >   This file-backed model is what makes `write` byte-identical to its input.
+>   Compressed FASTQ I/O is handled transparently for **gzip** (a small `compression` module
+>   over `flate2`, dispatched on file extension): `fastq` reads `.fq.gz`, and `write`
+>   recompresses on format change or copies bytes verbatim when formats match (mirroring
+>   `moveOrCopyCompress`). bzip2/zstd report a clear "not supported yet" error.
 >   **First functional tests now pass against the Rust binary** (identical output to the
->   committed `expected.*`): `tests/write_fq`, `tests/write_fq_inline`, and `tests/preprocess`
+>   committed `expected.*`): `tests/write_fq`, `tests/write_fq_inline`, `tests/preprocess`
 >   (all six outputs: copy, substrim, endstrim, smoothtrim, `avg_quality` filter, and
->   `n_to_zero_quality`). Their `ngless "1.1"` headers were bumped to `"1.5"` (these features
->   have only minimum-version checks, no version-conditional behavior, so Haskell output is
->   unchanged).
+>   `n_to_zero_quality`), and `tests/regression-fqgz` (gz input → uncompressed output). Their
+>   `ngless "1.1"` headers were bumped to `"1.5"` (these features have only minimum-version
+>   checks, no version-conditional behavior, so Haskell output is unchanged).
 >   Simplifications to lift next: files are read whole rather than streamed (no
->   `FileOrStream`/bounded queues), compressed (gz/bz2/zstd) I/O, paired ends, and FASTQ QC
+>   `FileOrStream`/bounded queues), bzip2/zstd compression, paired ends, and FASTQ QC
 >   statistics. Still not started: module loading and the `map`/`count`/SAM subsystems.
 
 ## Context

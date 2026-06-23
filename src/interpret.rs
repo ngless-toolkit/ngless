@@ -12,14 +12,15 @@
 //! `preprocess` streams it to a fresh temp file, and `write` copies the current file. This is
 //! what makes `write` of an un-preprocessed read set byte-identical to its input.
 //!
-//! Simplifications vs. the Haskell runtime, to be lifted in later milestones: files are read
-//! whole rather than streamed (no FileOrStream/bounded queues), compressed (gz/bz2/zstd) FASTQ
-//! I/O is not handled, and only single-end read sets are supported (no paired ends).
+//! Compressed I/O is transparent for gzip (see [`crate::compression`]); bzip2/zstd are not
+//! handled yet. Other simplifications vs. the Haskell runtime, to be lifted in later
+//! milestones: files are read whole rather than streamed (no FileOrStream/bounded queues), and
+//! only single-end read sets are supported (no paired ends).
 
-use std::cell::Cell;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::ast::*;
 use crate::errors::{NgError, NgErrorType, NgResult};
@@ -32,7 +33,6 @@ pub fn interpret(body: &[(usize, Expression)], temp_dir: &Path) -> NgResult<()> 
     let mut interp = Interpreter {
         env: HashMap::new(),
         temp_dir: temp_dir.to_path_buf(),
-        temp_counter: Cell::new(0),
     };
     for (_lno, e) in body {
         interp.interpret_top(e)?;
@@ -43,7 +43,6 @@ pub fn interpret(body: &[(usize, Expression)], temp_dir: &Path) -> NgResult<()> 
 struct Interpreter {
     env: HashMap<String, NGLessObject>,
     temp_dir: PathBuf,
-    temp_counter: Cell<u64>,
 }
 
 /// The outcome of running a (block) statement, mirroring `BlockStatus`.
@@ -236,10 +235,11 @@ impl Interpreter {
         }
     }
 
-    /// Allocate a fresh temp file path under the configured temp directory.
+    /// Allocate a fresh temp file path under the configured temp directory. The counter is
+    /// process-global so paths stay unique across interpreter instances sharing a temp dir.
     fn new_temp_path(&self, prefix: &str, ext: &str) -> PathBuf {
-        let n = self.temp_counter.get();
-        self.temp_counter.set(n + 1);
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
         self.temp_dir
             .join(format!("{prefix}{}.{n}.{ext}", std::process::id()))
     }
@@ -506,25 +506,9 @@ fn output_encoding(files: &[FastQFilePath]) -> fastq::FastQEncoding {
     }
 }
 
-/// Read a FASTQ file into memory. Compressed inputs are not handled in this build yet.
+/// Read a (possibly compressed) FASTQ file into memory.
 fn read_fastq_text(path: &str) -> NgResult<String> {
-    if is_compressed(path) {
-        return Err(NgError::script(format!(
-            "Compressed FASTQ input ('{path}') is not supported in this build yet."
-        )));
-    }
-    std::fs::read_to_string(path).map_err(|e| {
-        NgError::new(
-            NgErrorType::DataError,
-            format!("Could not read {path}: {e}"),
-        )
-    })
-}
-
-fn is_compressed(path: &str) -> bool {
-    [".gz", ".bz2", ".zst", ".zstd"]
-        .iter()
-        .any(|ext| path.ends_with(ext))
+    crate::compression::read_to_string(path)
 }
 
 /// `write(rs, ofile=...)`: copy the read set's current file(s) to `ofile`. For an
@@ -566,20 +550,23 @@ fn execute_write(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResu
     }
 }
 
-/// Copy a FASTQ file to `ofile`. Recompression (gz/bz2/zstd) is not implemented yet, so this
-/// requires the input and output to share the (uncompressed) format.
+/// Copy a FASTQ file to `ofile` (mirrors `moveOrCopyCompress`). When the source and
+/// destination share a compression format the bytes are copied verbatim; otherwise the source
+/// is decompressed and re-compressed to the destination format.
 fn copy_fastq(src: &Path, ofile: &str) -> NgResult<()> {
-    if is_compressed(ofile) || is_compressed(&src.to_string_lossy()) {
-        return Err(NgError::script(format!(
-            "Compressed FASTQ output ('{ofile}') is not supported in this build yet."
-        )));
+    use crate::compression::{detect, read_bytes, write_bytes};
+    let src_str = src.to_string_lossy();
+    if detect(&src_str) == detect(ofile) {
+        std::fs::copy(src, ofile).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write {ofile}: {e}"),
+            )
+        })?;
+    } else {
+        let data = read_bytes(&src_str)?;
+        write_bytes(ofile, &data)?;
     }
-    std::fs::copy(src, ofile).map_err(|e| {
-        NgError::new(
-            NgErrorType::SystemError,
-            format!("Could not write {ofile}: {e}"),
-        )
-    })?;
     Ok(())
 }
 
@@ -744,13 +731,23 @@ mod tests {
         assert!(run("ngless '1.5'\nx = fastq('/nonexistent.fq')\ny = map(x)\n").is_err());
     }
 
-    // --- FASTQ path (in-memory) ---------------------------------------------
+    // --- FASTQ path (file-backed) -------------------------------------------
 
-    fn write_temp_fastq() -> std::path::PathBuf {
+    /// A unique temp path tagged by the caller, so parallel tests never collide.
+    fn unique_temp(tag: &str, ext: &str) -> std::path::PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static N: AtomicU64 = AtomicU64::new(0);
+        let n = N.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!(
+            "ngless_rust_{tag}_{}_{n}.{ext}",
+            std::process::id()
+        ))
+    }
+
+    fn write_temp_fastq(tag: &str) -> std::path::PathBuf {
         // Three reads; qualities chosen (Sanger) so substrim(min_quality=20) and the length
         // filter give predictable results.
-        let dir = std::env::temp_dir();
-        let p = dir.join(format!("ngless_rust_test_{}.fq", std::process::id()));
+        let p = unique_temp(tag, "fq");
         // 'I' = qual 40, '#' = qual 2 (Sanger offset 33)
         let content = "\
 @r1\nACGTACGT\n+\nIIIIIIII\n\
@@ -762,9 +759,8 @@ mod tests {
 
     #[test]
     fn fastq_preprocess_write_end_to_end() {
-        let input = write_temp_fastq();
-        let output =
-            std::env::temp_dir().join(format!("ngless_rust_out_{}.fq", std::process::id()));
+        let input = write_temp_fastq("ppin");
+        let output = unique_temp("ppout", "fq");
         let script = format!(
             "ngless '1.5'\n\
              input = fastq('{}')\n\
@@ -789,9 +785,8 @@ mod tests {
 
     #[test]
     fn read_slicing_in_block() {
-        let input = write_temp_fastq();
-        let output =
-            std::env::temp_dir().join(format!("ngless_rust_slice_{}.fq", std::process::id()));
+        let input = write_temp_fastq("slicein");
+        let output = unique_temp("sliceout", "fq");
         let script = format!(
             "ngless '1.5'\n\
              input = fastq('{}')\n\
