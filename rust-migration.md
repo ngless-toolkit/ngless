@@ -25,15 +25,21 @@
 >   over `flate2`, dispatched on file extension): `fastq` reads `.fq.gz`, and `write`
 >   recompresses on format change or copies bytes verbatim when formats match (mirroring
 >   `moveOrCopyCompress`). bzip2/zstd report a clear "not supported yet" error.
+>   Paired-end read sets are supported: `paired(m1, second=m2, singles=m3)` references the mate
+>   files (encoding-checked, empty singles dropped), `preprocess` processes mates in lockstep
+>   (both survive → pair, one survives → singleton via `keep_singles`), and `write` derives
+>   `pair.1`/`pair.2`/`singles` names (`_formatFQOname`) and concatenates per-slot files.
 >   **First functional tests now pass against the Rust binary** (identical output to the
 >   committed `expected.*`): `tests/write_fq`, `tests/write_fq_inline`, `tests/preprocess`
 >   (all six outputs: copy, substrim, endstrim, smoothtrim, `avg_quality` filter, and
->   `n_to_zero_quality`), and `tests/regression-fqgz` (gz input → uncompressed output). Their
+>   `n_to_zero_quality`), `tests/regression-fqgz` (gz input → uncompressed output), and
+>   `tests/preprocess3_empty_singles` (paired preprocess → `pair.1`/`pair.2`). Their
 >   `ngless "1.1"` headers were bumped to `"1.5"` (these features have only minimum-version
 >   checks, no version-conditional behavior, so Haskell output is unchanged).
 >   Simplifications to lift next: files are read whole rather than streamed (no
->   `FileOrStream`/bounded queues), bzip2/zstd compression, paired ends, and FASTQ QC
->   statistics. Still not started: module loading and the `map`/`count`/SAM subsystems.
+>   `FileOrStream`/bounded queues), bzip2/zstd compression, and FASTQ QC statistics
+>   (`qcstats`, needed by `tests/preprocess3`). Still not started: module loading and the
+>   `map`/`count`/SAM subsystems.
 
 ## Context
 

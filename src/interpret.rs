@@ -8,14 +8,15 @@
 //! `substrim`/`endstrim`/`smoothtrim`, read slicing, `len`, `discard`/`continue`), and `write`
 //! (copy the read set's current file to the output).
 //!
-//! Read sets are file-backed (see [`crate::fastq::ReadSet`]): `fastq` keeps the original file,
-//! `preprocess` streams it to a fresh temp file, and `write` copies the current file. This is
-//! what makes `write` of an un-preprocessed read set byte-identical to its input.
+//! Read sets are file-backed (see [`crate::fastq::ReadSet`]): `fastq`/`paired` keep the
+//! original files, `preprocess` streams them to fresh temp files, and `write` copies the
+//! current files (deriving `pair.1`/`pair.2`/`singles` names for paired sets). This is what
+//! makes `write` of an un-preprocessed single-end set byte-identical to its input.
 //!
 //! Compressed I/O is transparent for gzip (see [`crate::compression`]); bzip2/zstd are not
 //! handled yet. Other simplifications vs. the Haskell runtime, to be lifted in later
 //! milestones: files are read whole rather than streamed (no FileOrStream/bounded queues), and
-//! only single-end read sets are supported (no paired ends).
+//! FASTQ QC statistics (`qcstats`) are not produced.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -230,6 +231,7 @@ impl Interpreter {
         // the rest are pure and handled by the free `execute_function`.
         match f.0.as_str() {
             "fastq" => self.execute_fastq(&expr_v),
+            "paired" => self.execute_paired(&expr_v, &argvs),
             "write" => execute_write(&expr_v, &argvs),
             _ => execute_function(f, &expr_v, &argvs),
         }
@@ -251,23 +253,73 @@ impl Interpreter {
     /// `executeFastq` for the non-interleaved case).
     fn execute_fastq(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
         let path = as_string(expr, "fastq")?;
-        let text = read_fastq_text(&path)?;
-        let encoding = fastq::detect_encoding(&text)?;
+        let fqf = detect_file(&path)?;
         Ok(NGLessObject::ReadSet {
-            name: path.clone(),
+            name: path,
             readset: ReadSet {
                 pairs: Vec::new(),
-                singletons: vec![FastQFilePath {
-                    encoding,
-                    path: PathBuf::from(path),
-                }],
+                singletons: vec![fqf],
             },
         })
     }
 
-    /// `preprocess(rs) using |read|: ...`: stream each input file through the block, writing the
-    /// surviving reads to a fresh temp file (mirrors `executePreprocess`). Output encoding is the
-    /// common input encoding, or Sanger if the inputs disagree.
+    /// `paired(mate1, second=mate2, singles=mate3)`: reference the mate files (mirrors
+    /// `executePaired`). The mates must share an encoding; an empty `singles` file (or one whose
+    /// encoding disagrees but is empty) is dropped.
+    fn execute_paired(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let mate1 = as_string(expr, "paired")?;
+        let mate2 = match lookup_arg(args, "second") {
+            Some(NGLessObject::String(s)) => s.clone(),
+            _ => return Err(NgError::script("paired: a second mate file is required")),
+        };
+        let mate3 = match lookup_arg(args, "singles") {
+            Some(NGLessObject::String(s)) => s.clone(),
+            _ => String::new(),
+        };
+        let f1 = detect_file(&mate1)?;
+        let f2 = detect_file(&mate2)?;
+        if f1.encoding != f2.encoding {
+            return Err(NgError::new(
+                NgErrorType::DataError,
+                format!(
+                    "Mates do not seem to have the same quality encoding! ([{mate1}] vs [{mate2}])."
+                ),
+            ));
+        }
+        let pair = (f1.clone(), f2);
+        let singletons = if mate3.is_empty() {
+            Vec::new()
+        } else {
+            let f3 = detect_file(&mate3)?;
+            if f1.encoding != f3.encoding {
+                // Special case seen in the wild: an empty singles file with a default encoding.
+                if read_fastq_text(&mate3)?.trim().is_empty() {
+                    Vec::new()
+                } else {
+                    return Err(NgError::new(NgErrorType::DataError,
+                        format!("Mates do not seem to have the same quality encoding! (paired mates vs single [{mate3}]).")));
+                }
+            } else {
+                vec![f3]
+            }
+        };
+        Ok(NGLessObject::ReadSet {
+            name: mate1,
+            readset: ReadSet {
+                pairs: vec![pair],
+                singletons,
+            },
+        })
+    }
+
+    /// `preprocess(rs) using |read|: ...`: stream the read set through the block (mirrors
+    /// `executePreprocess`). Paired reads are processed in lockstep — a pair where both mates
+    /// survive stays paired, a pair where one survives becomes a singleton (`keep_singles`,
+    /// default true). Output encoding is the common input encoding, or Sanger if they disagree.
     fn execute_preprocess(&self, readset: &NGLessObject, block: &Block) -> NgResult<NGLessObject> {
         let (name, rs) = match readset {
             NGLessObject::ReadSet { name, readset } => (name.clone(), readset.clone()),
@@ -277,50 +329,113 @@ impl Interpreter {
                 )))
             }
         };
-        if !rs.pairs.is_empty() {
-            return Err(NgError::script(
-                "preprocess of paired-end read sets is not implemented in this build yet.",
-            ));
+        let mut inputs: Vec<FastQFilePath> = Vec::new();
+        for (a, b) in &rs.pairs {
+            inputs.push(a.clone());
+            inputs.push(b.clone());
         }
-        let outenc = output_encoding(&rs.singletons);
+        inputs.extend(rs.singletons.iter().cloned());
+        let outenc = output_encoding(&inputs);
         let var = &block.variable.0;
-        let mut out = String::new();
-        for fqf in &rs.singletons {
-            let text = read_fastq_text(&fqf.path.to_string_lossy())?;
-            let reads = fastq::fq_decode(fqf.encoding, &text)?;
-            for r in reads {
-                let (status, value) =
-                    self.interpret_block_stmt(var, NGLessObject::Read(r), &block.body)?;
-                match status {
-                    BlockStatus::Discarded => {}
-                    BlockStatus::Ok | BlockStatus::Continued => match value {
-                        NGLessObject::Read(sr) => out.push_str(&fastq::fq_encode(outenc, &sr)),
-                        other => {
-                            return Err(NgError::should_not_occur(format!(
-                                "preprocess block produced a non-read value: {other:?}"
-                            )))
+        let keep_singles = true;
+
+        let (mut p1, mut p2, mut s) = (String::new(), String::new(), String::new());
+        let (mut n_pairs, mut n_singles) = (0usize, 0usize);
+
+        for (f1, f2) in &rs.pairs {
+            let reads1 =
+                fastq::fq_decode(f1.encoding, &read_fastq_text(&f1.path.to_string_lossy())?)?;
+            let reads2 =
+                fastq::fq_decode(f2.encoding, &read_fastq_text(&f2.path.to_string_lossy())?)?;
+            for (r1, r2) in reads1.into_iter().zip(reads2.into_iter()) {
+                let o1 = self.run_block_on_read(var, r1, block)?;
+                let o2 = self.run_block_on_read(var, r2, block)?;
+                match (o1, o2) {
+                    (Some(a), Some(b)) => {
+                        p1.push_str(&fastq::fq_encode(outenc, &a));
+                        p2.push_str(&fastq::fq_encode(outenc, &b));
+                        n_pairs += 1;
+                    }
+                    (Some(r), None) | (None, Some(r)) => {
+                        if keep_singles {
+                            s.push_str(&fastq::fq_encode(outenc, &r));
+                            n_singles += 1;
                         }
-                    },
+                    }
+                    (None, None) => {}
                 }
             }
         }
-        let outfile = self.new_temp_path("preprocessed.singles.", "fq");
-        std::fs::write(&outfile, out).map_err(|e| {
-            NgError::new(
-                NgErrorType::SystemError,
-                format!("Could not write temp file {}: {e}", outfile.display()),
-            )
-        })?;
-        Ok(NGLessObject::ReadSet {
-            name,
-            readset: ReadSet {
-                pairs: Vec::new(),
-                singletons: vec![FastQFilePath {
-                    encoding: outenc,
-                    path: outfile,
-                }],
+        for fqf in &rs.singletons {
+            let reads =
+                fastq::fq_decode(fqf.encoding, &read_fastq_text(&fqf.path.to_string_lossy())?)?;
+            for r in reads {
+                if let Some(sr) = self.run_block_on_read(var, r, block)? {
+                    s.push_str(&fastq::fq_encode(outenc, &sr));
+                    n_singles += 1;
+                }
+            }
+        }
+
+        // Choose the result shape exactly as executePreprocess does, materialising only the
+        // temp files the result references.
+        let make = |this: &Self, prefix: &str, data: &str| -> NgResult<FastQFilePath> {
+            let path = this.new_temp_path(prefix, "fq");
+            std::fs::write(&path, data).map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Could not write temp file {}: {e}", path.display()),
+                )
+            })?;
+            Ok(FastQFilePath {
+                encoding: outenc,
+                path,
+            })
+        };
+        let readset = match (n_pairs > 0, n_singles > 0) {
+            (true, false) => ReadSet {
+                pairs: vec![(
+                    make(self, "preprocessed.1.", &p1)?,
+                    make(self, "preprocessed.2.", &p2)?,
+                )],
+                singletons: Vec::new(),
             },
-        })
+            (false, true) => ReadSet {
+                pairs: Vec::new(),
+                singletons: vec![make(self, "preprocessed.singles.", &s)?],
+            },
+            _ if rs.pairs.is_empty() => ReadSet {
+                pairs: Vec::new(),
+                singletons: vec![make(self, "preprocessed.singles.", &s)?],
+            },
+            _ => ReadSet {
+                pairs: vec![(
+                    make(self, "preprocessed.1.", &p1)?,
+                    make(self, "preprocessed.2.", &p2)?,
+                )],
+                singletons: vec![make(self, "preprocessed.singles.", &s)?],
+            },
+        };
+        Ok(NGLessObject::ReadSet { name, readset })
+    }
+
+    /// Run the preprocess block on a single read, returning `None` if it was discarded.
+    fn run_block_on_read(
+        &self,
+        var: &str,
+        r: ShortRead,
+        block: &Block,
+    ) -> NgResult<Option<ShortRead>> {
+        let (status, value) = self.interpret_block_stmt(var, NGLessObject::Read(r), &block.body)?;
+        match status {
+            BlockStatus::Discarded => Ok(None),
+            BlockStatus::Ok | BlockStatus::Continued => match value {
+                NGLessObject::Read(sr) => Ok(Some(sr)),
+                other => Err(NgError::should_not_occur(format!(
+                    "preprocess block produced a non-read value: {other:?}"
+                ))),
+            },
+        }
     }
 
     /// Interpret one block statement, mirroring `interpretBlock1`/`interpretBlock`. The block
@@ -511,9 +626,20 @@ fn read_fastq_text(path: &str) -> NgResult<String> {
     crate::compression::read_to_string(path)
 }
 
-/// `write(rs, ofile=...)`: copy the read set's current file(s) to `ofile`. For an
-/// un-preprocessed read set this reproduces the input byte-for-byte (mirrors `executeWrite`
-/// of an `NGOReadSet`, which `moveOrCopyCompress`es the underlying FASTQ files).
+/// Reference a FASTQ file with its auto-detected encoding.
+fn detect_file(path: &str) -> NgResult<FastQFilePath> {
+    let text = read_fastq_text(path)?;
+    let encoding = fastq::detect_encoding(&text)?;
+    Ok(FastQFilePath {
+        encoding,
+        path: PathBuf::from(path),
+    })
+}
+
+/// `write(rs, ofile=...)`: write the read set's current file(s) to `ofile` (mirrors
+/// `executeWrite` of an `NGOReadSet`). A single-end set goes straight to `ofile`; a paired set
+/// produces `<base>.pair.1.<ext>` / `.pair.2.<ext>` (and `.singles.<ext>` when singletons
+/// remain). For an un-preprocessed single-end set this reproduces the input byte-for-byte.
 fn execute_write(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResult<NGLessObject> {
     let ofile = match lookup_arg(args, "ofile") {
         Some(NGLessObject::String(s)) => s.clone(),
@@ -525,28 +651,62 @@ fn execute_write(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResu
     };
     match expr {
         NGLessObject::ReadSet { readset, .. } => {
-            if !readset.pairs.is_empty() {
-                return Err(NgError::script(
-                    "write of paired-end read sets is not implemented in this build yet.",
-                ));
-            }
-            match readset.singletons.as_slice() {
-                [single] => {
-                    copy_fastq(&single.path, &ofile)?;
-                    Ok(NGLessObject::String(ofile))
+            if readset.pairs.is_empty() {
+                let files: Vec<&FastQFilePath> = readset.singletons.iter().collect();
+                write_fq_files(&files, &ofile)?;
+            } else {
+                let f1: Vec<&FastQFilePath> = readset.pairs.iter().map(|(a, _)| a).collect();
+                let f2: Vec<&FastQFilePath> = readset.pairs.iter().map(|(_, b)| b).collect();
+                write_fq_files(&f1, &format_fq_oname(&ofile, "pair.1")?)?;
+                write_fq_files(&f2, &format_fq_oname(&ofile, "pair.2")?)?;
+                if !readset.singletons.is_empty() {
+                    let f3: Vec<&FastQFilePath> = readset.singletons.iter().collect();
+                    write_fq_files(&f3, &format_fq_oname(&ofile, "singles")?)?;
                 }
-                [] => Err(NgError::script(
-                    "write: the read set has no files to write.",
-                )),
-                _ => Err(NgError::script(
-                    "write of a multi-file read set is not implemented in this build yet.",
-                )),
             }
+            Ok(NGLessObject::String(ofile))
         }
         other => Err(NgError::script(format!(
             "write of {} is not implemented in this build yet.",
             type_label(other)
         ))),
+    }
+}
+
+/// Derive a per-mate output name from a base name and an insert (mirrors `_formatFQOname`):
+/// `output.fq` + `pair.1` -> `output.pair.1.fq`.
+fn format_fq_oname(base: &str, insert: &str) -> NgResult<String> {
+    if let Some(stripped) = base.strip_suffix(".subsampled") {
+        return format_fq_oname(stripped, &format!("{insert}.subsampled"));
+    }
+    if base.contains("{index}") {
+        return Ok(base.replace("{index}", insert));
+    }
+    for ext in [".fq", ".fq.gz", ".fq.bz2"] {
+        if let Some(stripped) = base.strip_suffix(ext) {
+            return Ok(format!("{stripped}.{insert}{ext}"));
+        }
+    }
+    Err(NgError::script(format!(
+        "Cannot handle filename {base} (expected extension .fq/.fq.gz/.fq.bz2)."
+    )))
+}
+
+/// Write a list of FASTQ files to a single output (mirrors `moveOrCopyCompressFQs`): one file
+/// is copied/recompressed, several are concatenated (decompressed) then compressed to `ofile`,
+/// and an empty list produces an empty output file.
+fn write_fq_files(files: &[&FastQFilePath], ofile: &str) -> NgResult<()> {
+    use crate::compression::{read_bytes, write_bytes};
+    match files {
+        [] => write_bytes(ofile, b""),
+        [single] => copy_fastq(&single.path, ofile),
+        many => {
+            let mut data = Vec::new();
+            for f in many {
+                data.extend(read_bytes(&f.path.to_string_lossy())?);
+            }
+            write_bytes(ofile, &data)
+        }
     }
 }
 
@@ -802,5 +962,63 @@ mod tests {
         assert!(out.contains("@r1\nGTACGT\n"));
         let _ = std::fs::remove_file(&input);
         let _ = std::fs::remove_file(&output);
+    }
+
+    #[test]
+    fn format_fq_oname_cases() {
+        assert_eq!(
+            format_fq_oname("output.fq", "pair.1").unwrap(),
+            "output.pair.1.fq"
+        );
+        assert_eq!(
+            format_fq_oname("o.fq.gz", "singles").unwrap(),
+            "o.singles.fq.gz"
+        );
+        assert_eq!(
+            format_fq_oname("x{index}y.fq", "pair.2").unwrap(),
+            "xpair.2y.fq"
+        );
+        assert!(format_fq_oname("output.sam", "pair.1").is_err());
+    }
+
+    #[test]
+    fn paired_preprocess_write_end_to_end() {
+        // Each mate has two reads: r1 stays long enough to survive, r2 is trimmed away in both
+        // mates -> the pair is dropped entirely, leaving no singletons.
+        let content = "\
+@p1\nACGTACGTAC\n+\nIIIIIIIIII\n\
+@p2\nAC\n+\nII\n";
+        let m1 = unique_temp("m1", "fq");
+        let m2 = unique_temp("m2", "fq");
+        std::fs::write(&m1, content).unwrap();
+        std::fs::write(&m2, content).unwrap();
+        let base = unique_temp("pout", "fq");
+        let script = format!(
+            "ngless '1.5'\n\
+             input = paired('{}', '{}')\n\
+             input = preprocess(input) using |read|:\n\
+             \x20\x20\x20\x20if len(read) < 5:\n\
+             \x20\x20\x20\x20\x20\x20\x20\x20discard\n\
+             write(input, ofile='{}')\n",
+            m1.display(),
+            m2.display(),
+            base.display()
+        );
+        run(&script).unwrap();
+        let base_s = base.to_string_lossy().to_string();
+        let o1 = format_fq_oname(&base_s, "pair.1").unwrap();
+        let o2 = format_fq_oname(&base_s, "pair.2").unwrap();
+        let singles = format_fq_oname(&base_s, "singles").unwrap();
+        let out1 = std::fs::read_to_string(&o1).unwrap();
+        let out2 = std::fs::read_to_string(&o2).unwrap();
+        assert_eq!(out1, "@p1\nACGTACGTAC\n+\nIIIIIIIIII\n");
+        assert_eq!(out2, "@p1\nACGTACGTAC\n+\nIIIIIIIIII\n");
+        // No singletons survived, so the singles file is never written.
+        assert!(!std::path::Path::new(&singles).exists());
+        for p in [&m1, &m2] {
+            let _ = std::fs::remove_file(p);
+        }
+        let _ = std::fs::remove_file(&o1);
+        let _ = std::fs::remove_file(&o2);
     }
 }
