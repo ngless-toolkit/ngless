@@ -11,10 +11,14 @@
 > - **M3 (core runtime, partial):** CLI flow (load → parse → version-gate `>=1.5` → type
 >   check → validate → interpret), runtime values + `evalBinary/Unary/Index`, and an
 >   interpreter for the pure subset plus `print`/`println`/`read_int`/`read_double`/
->   `__assert`/`to_string`. Not yet: `FileOrStream`, temp-file lifecycle, module loading,
->   and the data subsystems (so `fastq`/`map`/`count`/`write`/blocks return a clear
->   "not implemented yet"). The citation header and `clap`-based arg parsing are also still
+>   `__assert`/`to_string`. The citation header and `clap`-based arg parsing are still
 >   pending, so functional-test stdout parity is not yet attempted.
+> - **M4 (FASTQ path, partial):** the pure trimming core (`substrim`/`endstrim`/`smoothtrim`,
+>   encode/decode, `compatibleHeader`) plus an **in-memory** `fastq` → `preprocess(...) using
+>   |read|:` → `write` path (block interpreter with read slicing, `len`, `discard`/`continue`,
+>   and read-write block variable). Simplifications to lift later: reads are in memory (no
+>   `FileOrStream`/streaming), FASTQ is uncompressed and assumed Sanger, single-end only.
+>   Still not started: module loading and the `map`/`count`/SAM subsystems.
 
 ## Context
 

@@ -1,16 +1,22 @@
 //! Interpreter for the currently-supported subset of NGLess, mirroring `NGLess/Interpret.hs`.
 //!
 //! Implemented: pure expression evaluation (constants, variables, operators, indexing, lists),
-//! conditionals and assignment, and the simple builtins `print`, `println`, `read_int`,
-//! `read_double`, `__assert`, plus the `to_string` method. Everything that needs the
-//! FASTQ/SAM/counts subsystems (`fastq`, `map`, `count`, `write`, blocks, ...) returns a clear
-//! "not implemented yet" error.
+//! conditionals and assignment; the simple builtins `print`, `println`, `read_int`,
+//! `read_double`, `__assert`, the `to_string` method; and an in-memory FASTQ path —
+//! `fastq` (read a file into a read set), `preprocess(...) using |read|:` blocks
+//! (with `substrim`/`endstrim`/`smoothtrim`, read slicing, `len`, `discard`/`continue`), and
+//! `write` of a read set to a FASTQ file.
+//!
+//! Simplifications vs. the Haskell runtime, to be lifted in later milestones: reads are held
+//! in memory (no FileOrStream/streaming), FASTQ is read/written uncompressed and assumed to be
+//! Sanger-encoded, and only single-end read sets are handled.
 
 use std::collections::HashMap;
 use std::io::Write;
 
 use crate::ast::*;
-use crate::errors::{NgError, NgResult};
+use crate::errors::{NgError, NgErrorType, NgResult};
+use crate::fastq::{self, FastQEncoding, ShortRead};
 use crate::values::{eval_binary, eval_index, eval_unary, show_double, NGLessObject};
 
 /// Interpret a script body (already type-checked and validated).
@@ -26,6 +32,14 @@ pub fn interpret(body: &[(usize, Expression)]) -> NgResult<()> {
 
 struct Interpreter {
     env: HashMap<String, NGLessObject>,
+}
+
+/// The outcome of running a (block) statement, mirroring `BlockStatus`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BlockStatus {
+    Ok,
+    Discarded,
+    Continued,
 }
 
 impl Interpreter {
@@ -79,12 +93,24 @@ impl Interpreter {
         }
     }
 
-    /// Evaluate a pure expression (no function calls, read-only environment).
-    fn interpret_expr(&self, e: &Expression) -> NgResult<NGLessObject> {
+    /// Evaluate a pure expression. `overlay` is an optional read-write block variable that
+    /// shadows the (read-only) global environment, used while interpreting a block body.
+    fn eval(
+        &self,
+        e: &Expression,
+        overlay: Option<(&str, &NGLessObject)>,
+    ) -> NgResult<NGLessObject> {
         match e {
-            Expression::Lookup(_, Variable(v)) => self.env.get(v).cloned().ok_or_else(|| {
-                NgError::should_not_occur(format!("Variable lookup error. Variable: {v}"))
-            }),
+            Expression::Lookup(_, Variable(v)) => {
+                if let Some((name, value)) = overlay {
+                    if name == v {
+                        return Ok(value.clone());
+                    }
+                }
+                self.env.get(v).cloned().ok_or_else(|| {
+                    NgError::should_not_occur(format!("Variable lookup error. Variable: {v}"))
+                })
+            }
             Expression::BuiltinConstant(Variable(v)) => match v.as_str() {
                 "STDIN" => Ok(NGLessObject::String("/dev/stdin".into())),
                 "STDOUT" => Ok(NGLessObject::String("/dev/stdout".into())),
@@ -99,54 +125,62 @@ impl Interpreter {
             Expression::ConstInt(n) => Ok(NGLessObject::Integer(*n)),
             Expression::ConstDouble(n) => Ok(NGLessObject::Double(*n)),
             Expression::UnaryOp(op, v) => {
-                let v = self.interpret_expr(v)?;
+                let v = self.eval(v, overlay)?;
                 eval_unary(*op, &v)
             }
             Expression::BinaryOp(op, a, b) => {
-                let a = self.interpret_expr(a)?;
-                let b = self.interpret_expr(b)?;
+                let a = self.eval(a, overlay)?;
+                let b = self.eval(b, overlay)?;
                 eval_binary(*op, &a, &b)
             }
             Expression::IndexExpression(expr, ix) => {
-                let v = self.interpret_expr(expr)?;
-                let indices = self.interpret_index(ix)?;
+                let v = self.eval(expr, overlay)?;
+                let indices = self.interpret_index(ix, overlay)?;
                 eval_index(&v, &indices)
             }
             Expression::ListExpression(es) => {
                 let mut out = Vec::with_capacity(es.len());
                 for e in es {
-                    out.push(self.interpret_expr(e)?);
+                    out.push(self.eval(e, overlay)?);
                 }
                 Ok(NGLessObject::List(out))
             }
             Expression::MethodCall(met, self_e, arg, args) => {
-                let self_v = self.interpret_expr(self_e)?;
+                let self_v = self.eval(self_e, overlay)?;
                 let arg_v = match arg {
-                    Some(a) => Some(self.interpret_expr(a)?),
+                    Some(a) => Some(self.eval(a, overlay)?),
                     None => None,
                 };
                 let mut argvs = Vec::new();
                 for (Variable(v), e) in args {
-                    argvs.push((v.clone(), self.interpret_expr(e)?));
+                    argvs.push((v.clone(), self.eval(e, overlay)?));
                 }
                 execute_method(met, &self_v, arg_v.as_ref(), &argvs)
             }
             other => Err(NgError::should_not_occur(format!(
-                "Expected an expression, received {other:?} (in interpret_expr)"
+                "Expected an expression, received {other:?} (in eval)"
             ))),
         }
     }
 
-    fn interpret_index(&self, ix: &Index) -> NgResult<Vec<Option<NGLessObject>>> {
+    fn interpret_expr(&self, e: &Expression) -> NgResult<NGLessObject> {
+        self.eval(e, None)
+    }
+
+    fn interpret_index(
+        &self,
+        ix: &Index,
+        overlay: Option<(&str, &NGLessObject)>,
+    ) -> NgResult<Vec<Option<NGLessObject>>> {
         match ix {
-            Index::One(a) => Ok(vec![Some(self.interpret_expr(a)?)]),
+            Index::One(a) => Ok(vec![Some(self.eval(a, overlay)?)]),
             Index::Two(a, b) => {
                 let a = match a {
-                    Some(a) => Some(self.interpret_expr(a)?),
+                    Some(a) => Some(self.eval(a, overlay)?),
                     None => None,
                 };
                 let b = match b {
-                    Some(b) => Some(self.interpret_expr(b)?),
+                    Some(b) => Some(self.eval(b, overlay)?),
                     None => None,
                 };
                 Ok(vec![a, b])
@@ -161,6 +195,15 @@ impl Interpreter {
         args: &[(Variable, Expression)],
         block: Option<&Block>,
     ) -> NgResult<NGLessObject> {
+        if f.0 == "preprocess" {
+            return match block {
+                Some(b) => {
+                    let readset = self.interpret_expr(expr)?;
+                    self.execute_preprocess(&readset, b)
+                }
+                None => Err(NgError::script("preprocess requires a block")),
+            };
+        }
         if block.is_some() {
             return Err(NgError::script(format!(
                 "Function '{}' with a block is not implemented in this build yet.",
@@ -173,6 +216,183 @@ impl Interpreter {
             argvs.push((v.clone(), self.interpret_expr(e)?));
         }
         execute_function(f, &expr_v, &argvs)
+    }
+
+    // --- preprocess blocks ---------------------------------------------------
+
+    fn execute_preprocess(&self, readset: &NGLessObject, block: &Block) -> NgResult<NGLessObject> {
+        let (name, reads) = match readset {
+            NGLessObject::ReadSet { name, reads } => (name.clone(), reads.clone()),
+            other => {
+                return Err(NgError::should_not_occur(format!(
+                    "preprocess expected a read set, got {other:?}"
+                )))
+            }
+        };
+        let var = &block.variable.0;
+        let mut out = Vec::new();
+        for r in reads {
+            let (status, value) =
+                self.interpret_block_stmt(var, NGLessObject::Read(r), &block.body)?;
+            match status {
+                BlockStatus::Discarded => {}
+                BlockStatus::Ok | BlockStatus::Continued => match value {
+                    NGLessObject::Read(sr) => out.push(sr),
+                    other => {
+                        return Err(NgError::should_not_occur(format!(
+                            "preprocess block produced a non-read value: {other:?}"
+                        )))
+                    }
+                },
+            }
+        }
+        Ok(NGLessObject::ReadSet { name, reads: out })
+    }
+
+    /// Interpret one block statement, mirroring `interpretBlock1`/`interpretBlock`. The block
+    /// variable `name` currently holds `value`; returns the updated value and the status.
+    fn interpret_block_stmt(
+        &self,
+        name: &str,
+        value: NGLessObject,
+        e: &Expression,
+    ) -> NgResult<(BlockStatus, NGLessObject)> {
+        match e {
+            Expression::Assignment(Variable(n), val) => {
+                let v = self.eval_block_expr(val, name, &value)?;
+                if n != name {
+                    return Err(NgError::should_not_occur(format!(
+                        "only assignments to the block variable are possible [assigning to '{n}']"
+                    )));
+                }
+                Ok((BlockStatus::Ok, v))
+            }
+            Expression::Discard => Ok((BlockStatus::Discarded, value)),
+            Expression::Continue => Ok((BlockStatus::Continued, value)),
+            Expression::Condition(c, t_branch, f_branch) => {
+                let cond = match self.eval_block_expr(c, name, &value)? {
+                    NGLessObject::Bool(b) => b,
+                    _ => {
+                        return Err(NgError::should_not_occur(
+                            "Wrong type for condition (interpret_block_stmt)",
+                        ))
+                    }
+                };
+                self.interpret_block_stmt(name, value, if cond { t_branch } else { f_branch })
+            }
+            Expression::Sequence(es) => {
+                let mut value = value;
+                for e in es {
+                    let (status, v) = self.interpret_block_stmt(name, value, e)?;
+                    value = v;
+                    if status != BlockStatus::Ok {
+                        return Ok((status, value));
+                    }
+                }
+                Ok((BlockStatus::Ok, value))
+            }
+            other => Err(NgError::should_not_occur(format!(
+                "interpret_block_stmt: unexpected {other:?}"
+            ))),
+        }
+    }
+
+    /// Evaluate an expression inside a block, mirroring `interpretPreProcessExpr`: the trimming
+    /// functions operate on the (read) value, everything else is ordinary evaluation with the
+    /// block variable overlaid.
+    fn eval_block_expr(
+        &self,
+        e: &Expression,
+        name: &str,
+        value: &NGLessObject,
+    ) -> NgResult<NGLessObject> {
+        let overlay = Some((name, value));
+        if let Expression::FunctionCall(FuncName(fname), var, args, _) = e {
+            match fname.as_str() {
+                "substrim" => {
+                    let r = self.eval_read(var, overlay)?;
+                    let mq = self.kwarg_int(args, "min_quality", 0, overlay)?;
+                    return Ok(NGLessObject::Read(fastq::substrim(mq, &r)));
+                }
+                "endstrim" => {
+                    let r = self.eval_read(var, overlay)?;
+                    let mq = self.kwarg_int(args, "min_quality", 0, overlay)?;
+                    let ends = self.kwarg_symbol(args, "from_ends", "both", overlay)?;
+                    let ends = match ends.as_str() {
+                        "both" => fastq::EndstrimEnds::Both,
+                        "3" => fastq::EndstrimEnds::Three,
+                        "5" => fastq::EndstrimEnds::Five,
+                        other => {
+                            return Err(NgError::script(format!(
+                                "Illegal argument for `from_ends`: {other}"
+                            )))
+                        }
+                    };
+                    return Ok(NGLessObject::Read(fastq::endstrim(ends, mq, &r)));
+                }
+                "smoothtrim" => {
+                    let r = self.eval_read(var, overlay)?;
+                    let mq = self.kwarg_int(args, "min_quality", 0, overlay)?;
+                    let w = self.kwarg_int(args, "window", 0, overlay)?;
+                    return Ok(NGLessObject::Read(fastq::smoothtrim(w, mq, &r)));
+                }
+                _ => {}
+            }
+        }
+        self.eval(e, overlay)
+    }
+
+    fn eval_read(
+        &self,
+        e: &Expression,
+        overlay: Option<(&str, &NGLessObject)>,
+    ) -> NgResult<ShortRead> {
+        match self.eval(e, overlay)? {
+            NGLessObject::Read(r) => Ok(r),
+            other => Err(NgError::should_not_occur(format!(
+                "Expected a read, got {other:?}"
+            ))),
+        }
+    }
+
+    fn kwarg_int(
+        &self,
+        args: &[(Variable, Expression)],
+        name: &str,
+        default: i32,
+        overlay: Option<(&str, &NGLessObject)>,
+    ) -> NgResult<i32> {
+        for (Variable(v), e) in args {
+            if v == name {
+                return match self.eval(e, overlay)? {
+                    NGLessObject::Integer(i) => Ok(i as i32),
+                    other => Err(NgError::script(format!(
+                        "Argument `{name}` should be an integer, got {other:?}"
+                    ))),
+                };
+            }
+        }
+        Ok(default)
+    }
+
+    fn kwarg_symbol(
+        &self,
+        args: &[(Variable, Expression)],
+        name: &str,
+        default: &str,
+        overlay: Option<(&str, &NGLessObject)>,
+    ) -> NgResult<String> {
+        for (Variable(v), e) in args {
+            if v == name {
+                return match self.eval(e, overlay)? {
+                    NGLessObject::Symbol(s) => Ok(s),
+                    other => Err(NgError::script(format!(
+                        "Argument `{name}` should be a symbol, got {other:?}"
+                    ))),
+                };
+            }
+        }
+        Ok(default.to_string())
     }
 }
 
@@ -196,8 +416,53 @@ fn execute_function(
                 "Assert did not receive a boolean!",
             )),
         },
+        "fastq" => execute_fastq(expr),
+        "write" => execute_write(expr, args),
         other => Err(NgError::script(format!(
             "Interpretation of function `{other}` is not implemented in this build yet."
+        ))),
+    }
+}
+
+fn execute_fastq(expr: &NGLessObject) -> NgResult<NGLessObject> {
+    let path = as_string(expr, "fastq")?;
+    let text = std::fs::read_to_string(&path).map_err(|e| {
+        NgError::new(
+            NgErrorType::DataError,
+            format!("Could not read {path}: {e}"),
+        )
+    })?;
+    // TODO: encoding detection (encodingFor); Sanger is assumed for now.
+    let reads = fastq::fq_decode(FastQEncoding::Sanger, &text)?;
+    Ok(NGLessObject::ReadSet { name: path, reads })
+}
+
+fn execute_write(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResult<NGLessObject> {
+    let ofile = match lookup_arg(args, "ofile") {
+        Some(NGLessObject::String(s)) => s.clone(),
+        _ => {
+            return Err(NgError::script(
+                "write: argument `ofile` (a string) is required",
+            ))
+        }
+    };
+    match expr {
+        NGLessObject::ReadSet { reads, .. } => {
+            let mut out = String::new();
+            for r in reads {
+                out.push_str(&fastq::fq_encode(FastQEncoding::Sanger, r));
+            }
+            std::fs::write(&ofile, out).map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Could not write {ofile}: {e}"),
+                )
+            })?;
+            Ok(NGLessObject::String(ofile))
+        }
+        other => Err(NgError::script(format!(
+            "write of {} is not implemented in this build yet.",
+            type_label(other)
         ))),
     }
 }
@@ -212,7 +477,7 @@ fn execute_print(v: &NGLessObject) -> NgResult<NGLessObject> {
     let stdout = std::io::stdout();
     let mut h = stdout.lock();
     h.write_all(s.as_bytes())
-        .map_err(|e| NgError::new(crate::errors::NgErrorType::SystemError, e.to_string()))?;
+        .map_err(|e| NgError::new(NgErrorType::SystemError, e.to_string()))?;
     Ok(NGLessObject::Void)
 }
 
@@ -230,7 +495,7 @@ fn execute_read_int(v: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResu
                 .map(NGLessObject::Integer)
                 .map_err(|e| {
                     NgError::new(
-                        crate::errors::NgErrorType::DataError,
+                        NgErrorType::DataError,
                         format!("Could not parse integer from '{s}'. Error: {e}"),
                     )
                 })
@@ -259,7 +524,7 @@ fn execute_read_double(
             .map(NGLessObject::Double)
             .map_err(|e| {
                 NgError::new(
-                    crate::errors::NgErrorType::DataError,
+                    NgErrorType::DataError,
                     format!("Could not parse double from '{s}'. Error: {e}"),
                 )
             }),
@@ -288,13 +553,29 @@ fn lookup_arg<'a>(args: &'a [(String, NGLessObject)], name: &str) -> Option<&'a 
     args.iter().find(|(k, _)| k == name).map(|(_, v)| v)
 }
 
+fn as_string(v: &NGLessObject, who: &str) -> NgResult<String> {
+    match v {
+        NGLessObject::String(s) => Ok(s.clone()),
+        NGLessObject::Filename(s) => Ok(s.clone()),
+        other => Err(NgError::script(format!(
+            "{who}: expected a string, got {other:?}"
+        ))),
+    }
+}
+
+fn type_label(v: &NGLessObject) -> &'static str {
+    match v {
+        NGLessObject::String(_) => "a string",
+        NGLessObject::ReadSet { .. } => "a read set",
+        _ => "this value",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::parser::parse_ngless;
 
-    /// Interpret a (header-carrying) script, returning Ok/Err. stdout side effects are not
-    /// captured here; correctness of output is checked end-to-end via the binary.
     fn run(text: &str) -> NgResult<()> {
         let script = parse_ngless("test", true, text).expect("parse failed");
         interpret(&script.body)
@@ -331,6 +612,72 @@ mod tests {
 
     #[test]
     fn unimplemented_function_errors() {
-        assert!(run("ngless '1.5'\nx = fastq('foo.fq')\n").is_err());
+        // map is not implemented yet.
+        assert!(run("ngless '1.5'\nx = fastq('/nonexistent.fq')\ny = map(x)\n").is_err());
+    }
+
+    // --- FASTQ path (in-memory) ---------------------------------------------
+
+    fn write_temp_fastq() -> std::path::PathBuf {
+        // Three reads; qualities chosen (Sanger) so substrim(min_quality=20) and the length
+        // filter give predictable results.
+        let dir = std::env::temp_dir();
+        let p = dir.join(format!("ngless_rust_test_{}.fq", std::process::id()));
+        // 'I' = qual 40, '#' = qual 2 (Sanger offset 33)
+        let content = "\
+@r1\nACGTACGT\n+\nIIIIIIII\n\
+@r2\nAAAATTTT\n+\nIIII####\n\
+@r3\nGGGGCCCC\n+\n########\n";
+        std::fs::write(&p, content).unwrap();
+        p
+    }
+
+    #[test]
+    fn fastq_preprocess_write_end_to_end() {
+        let input = write_temp_fastq();
+        let output =
+            std::env::temp_dir().join(format!("ngless_rust_out_{}.fq", std::process::id()));
+        let script = format!(
+            "ngless '1.5'\n\
+             input = fastq('{}')\n\
+             input = preprocess(input) using |read|:\n\
+             \x20\x20\x20\x20read = substrim(read, min_quality=20)\n\
+             \x20\x20\x20\x20if len(read) < 4:\n\
+             \x20\x20\x20\x20\x20\x20\x20\x20discard\n\
+             write(input, ofile='{}')\n",
+            input.display(),
+            output.display()
+        );
+        run(&script).unwrap();
+        let out = std::fs::read_to_string(&output).unwrap();
+        // r1 is all high quality -> kept (length 8). r2 keeps only "AAAA" (length 4) -> kept.
+        // r3 is all low quality -> trimmed to length 0 -> discarded by the length filter.
+        assert!(out.contains("@r1"));
+        assert!(out.contains("@r2\nAAAA\n"));
+        assert!(!out.contains("@r3"));
+        let _ = std::fs::remove_file(&input);
+        let _ = std::fs::remove_file(&output);
+    }
+
+    #[test]
+    fn read_slicing_in_block() {
+        let input = write_temp_fastq();
+        let output =
+            std::env::temp_dir().join(format!("ngless_rust_slice_{}.fq", std::process::id()));
+        let script = format!(
+            "ngless '1.5'\n\
+             input = fastq('{}')\n\
+             input = preprocess(input) using |read|:\n\
+             \x20\x20\x20\x20read = read[2:]\n\
+             write(input, ofile='{}')\n",
+            input.display(),
+            output.display()
+        );
+        run(&script).unwrap();
+        let out = std::fs::read_to_string(&output).unwrap();
+        // r1 ACGTACGT sliced from index 2 -> GTACGT
+        assert!(out.contains("@r1\nGTACGT\n"));
+        let _ = std::fs::remove_file(&input);
+        let _ = std::fs::remove_file(&output);
     }
 }

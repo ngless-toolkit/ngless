@@ -8,6 +8,7 @@
 
 use crate::ast::BOp;
 use crate::errors::{NgError, NgResult};
+use crate::fastq::ShortRead;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum NGLessObject {
@@ -19,6 +20,13 @@ pub enum NGLessObject {
     Filename(String),
     Void,
     List(Vec<NGLessObject>),
+    Read(ShortRead),
+    /// An in-memory read set (single-end). The Haskell runtime keeps reads on disk; this is a
+    /// simplified in-memory model for the current milestone.
+    ReadSet {
+        name: String,
+        reads: Vec<ShortRead>,
+    },
 }
 
 impl NGLessObject {
@@ -32,6 +40,8 @@ impl NGLessObject {
             NGLessObject::Filename(_) => "filename",
             NGLessObject::Void => "void",
             NGLessObject::List(_) => "list",
+            NGLessObject::Read(_) => "read",
+            NGLessObject::ReadSet { .. } => "readset",
         }
     }
 }
@@ -123,6 +133,7 @@ pub fn eval_unary(op: crate::ast::UOp, v: &NGLessObject) -> NgResult<NGLessObjec
     match (op, v) {
         (UOp::Minus, Integer(n)) => Ok(Integer(-n)),
         (UOp::Len, List(elems)) => Ok(Integer(elems.len() as i64)),
+        (UOp::Len, Read(r)) => Ok(Integer(r.len() as i64)),
         (UOp::Not, Bool(b)) => Ok(Bool(!b)),
         _ => Err(NgError::script(format!(
             "invalid unary operation ({op:?}) on value of type {}",
@@ -134,8 +145,9 @@ pub fn eval_unary(op: crate::ast::UOp, v: &NGLessObject) -> NgResult<NGLessObjec
 /// Evaluate an index expression, mirroring `_evalIndex`. `indices` is the already-evaluated
 /// index (one element for `[i]`, two for `[a:b]`).
 pub fn eval_index(v: &NGLessObject, indices: &[Option<NGLessObject>]) -> NgResult<NGLessObject> {
+    use NGLessObject::*;
     match (v, indices) {
-        (NGLessObject::List(elems), [Some(NGLessObject::Integer(ix))]) => {
+        (List(elems), [Some(Integer(ix))]) => {
             let ix = *ix;
             if ix < 0 || ix as usize >= elems.len() {
                 Err(NgError::script(format!(
@@ -146,8 +158,23 @@ pub fn eval_index(v: &NGLessObject, indices: &[Option<NGLessObject>]) -> NgResul
                 Ok(elems[ix as usize].clone())
             }
         }
+        // Read slicing, mirroring the IndexTwo cases of `_evalIndex`.
+        (Read(r), [Some(Integer(s)), None]) => read_slice(r, *s, r.len() as i64),
+        (Read(r), [None, Some(Integer(e))]) => read_slice(r, 0, *e),
+        (Read(r), [Some(Integer(s)), Some(Integer(e))]) => read_slice(r, *s, *e),
         _ => Err(NgError::script("_evalIndex: invalid operation")),
     }
+}
+
+/// Slice a read for `read[s:e]` (half-open), with bounds checking.
+fn read_slice(r: &ShortRead, s: i64, e: i64) -> NgResult<NGLessObject> {
+    if s < 0 || e < s || e as usize > r.len() {
+        return Err(NgError::script(format!(
+            "Invalid slice [{s}:{e}] of read of length {}.",
+            r.len()
+        )));
+    }
+    Ok(NGLessObject::Read(r.slice(s as usize, (e - s) as usize)))
 }
 
 #[cfg(test)]
