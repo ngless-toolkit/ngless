@@ -29,17 +29,21 @@
 >   files (encoding-checked, empty singles dropped), `preprocess` processes mates in lockstep
 >   (both survive → pair, one survives → singleton via `keep_singles`), and `write` derives
 >   `pair.1`/`pair.2`/`singles` names (`_formatFQOname`) and concatenates per-slot files.
+>   FASTQ QC statistics are collected as `fastq`/`paired`/`preprocess` run (per-file base
+>   composition, GC/non-ATCG fractions, sequence-length range, encoding), and `qcstats({fastq})`
+>   serialises them to the transposed TSV (mirroring `writeOutputTSV`); `write` of the resulting
+>   counts file copies it out. This needed a faithful port of Haskell's `show :: Double -> String`
+>   (fixed vs. scientific notation, e.g. `3.896103896103896e-2`) in `values::show_double`.
 >   **First functional tests now pass against the Rust binary** (identical output to the
 >   committed `expected.*`): `tests/write_fq`, `tests/write_fq_inline`, `tests/preprocess`
->   (all six outputs: copy, substrim, endstrim, smoothtrim, `avg_quality` filter, and
->   `n_to_zero_quality`), `tests/regression-fqgz` (gz input → uncompressed output), and
->   `tests/preprocess3_empty_singles` (paired preprocess → `pair.1`/`pair.2`). Their
+>   (copy, substrim, endstrim, smoothtrim, `avg_quality` filter, `n_to_zero_quality`),
+>   `tests/regression-fqgz` (gz input), `tests/preprocess3_empty_singles` (paired preprocess),
+>   and `tests/preprocess3` (paired preprocess + gz output + `qcstats` TSV). Their
 >   `ngless "1.1"` headers were bumped to `"1.5"` (these features have only minimum-version
 >   checks, no version-conditional behavior, so Haskell output is unchanged).
 >   Simplifications to lift next: files are read whole rather than streamed (no
->   `FileOrStream`/bounded queues), bzip2/zstd compression, and FASTQ QC statistics
->   (`qcstats`, needed by `tests/preprocess3`). Still not started: module loading and the
->   `map`/`count`/SAM subsystems.
+>   `FileOrStream`/bounded queues), bzip2/zstd compression, and per-position quality
+>   percentiles. Still not started: module loading and the `map`/`count`/SAM subsystems.
 
 ## Context
 

@@ -27,6 +27,9 @@ pub enum NGLessObject {
         name: String,
         readset: ReadSet,
     },
+    /// A counts/statistics table backed by a TSV file on disk (mirrors `NGOCounts (File ...)`),
+    /// e.g. the result of `qcstats`. `write` copies the file to the output.
+    Counts(std::path::PathBuf),
 }
 
 impl NGLessObject {
@@ -42,19 +45,64 @@ impl NGLessObject {
             NGLessObject::List(_) => "list",
             NGLessObject::Read(_) => "read",
             NGLessObject::ReadSet { .. } => "readset",
+            NGLessObject::Counts(_) => "counts",
         }
     }
 }
 
-/// Format a double the way Haskell's `show` does for the common cases: integral values keep a
-/// trailing `.0`. (Haskell uses scientific notation for very large/small magnitudes; that is
-/// not reproduced yet.)
-pub fn show_double(d: f64) -> String {
-    let s = format!("{d}");
-    if s.contains('.') || s.contains('e') || s.contains("inf") || s.contains("NaN") {
-        s
+/// Format a double exactly the way Haskell's `show` does (`showFloat`/`formatRealFloat
+/// FFGeneric`): a fixed-point layout for exponents in `0..=7`, scientific notation otherwise,
+/// always with a fractional part (e.g. `1.0`, `36.0`, `3.896103896103896e-2`). The shortest
+/// round-tripping digits come from Rust's `{:e}` formatting, which (like Haskell's
+/// `floatToDigits`) yields the unique minimal digit sequence.
+pub fn show_double(x: f64) -> String {
+    if x.is_nan() {
+        return "NaN".to_string();
+    }
+    if x.is_infinite() {
+        return if x < 0.0 { "-Infinity" } else { "Infinity" }.to_string();
+    }
+    if x == 0.0 {
+        return if x.is_sign_negative() { "-0.0" } else { "0.0" }.to_string();
+    }
+    if x < 0.0 {
+        return format!("-{}", show_double(-x));
+    }
+    // `{:e}` gives `d[.ddd]e±X`, i.e. value = mantissa × 10^X with a single leading digit.
+    let s = format!("{x:e}");
+    let (mantissa, exp_str) = s.split_once('e').expect("{:e} always contains 'e'");
+    let exp_x: i32 = exp_str.parse().expect("valid exponent");
+    let ds: Vec<char> = mantissa.chars().filter(|c| *c != '.').collect();
+    // floatToDigits exponent: value = 0.d1d2… × 10^e, so e = X + 1.
+    let e = exp_x + 1;
+    if !(0..=7).contains(&e) {
+        // Scientific: d.rest e(e-1), with `.0` when there is no remaining digit.
+        let d = ds[0];
+        let rest: String = ds[1..].iter().collect();
+        let rest = if rest.is_empty() {
+            "0".to_string()
+        } else {
+            rest
+        };
+        format!("{d}.{rest}e{}", e - 1)
+    } else if e <= 0 {
+        let zeros = "0".repeat((-e) as usize);
+        let digits: String = ds.iter().collect();
+        format!("0.{zeros}{digits}")
     } else {
-        format!("{s}.0")
+        let e = e as usize;
+        let mut ds = ds;
+        while ds.len() < e {
+            ds.push('0');
+        }
+        let before: String = ds[..e].iter().collect();
+        let after: String = ds[e..].iter().collect();
+        let after = if after.is_empty() {
+            "0".to_string()
+        } else {
+            after
+        };
+        format!("{before}.{after}")
     }
 }
 
@@ -230,7 +278,17 @@ mod tests {
 
     #[test]
     fn double_formatting() {
+        // Matches Haskell's `show` for Double, including its scientific-notation threshold.
         assert_eq!(show_double(1.0), "1.0");
         assert_eq!(show_double(1.5), "1.5");
+        assert_eq!(show_double(36.0), "36.0");
+        assert_eq!(show_double(0.0), "0.0");
+        assert_eq!(show_double(29.0 / 74.0), "0.3918918918918919");
+        // Magnitude < 0.1 switches to scientific notation, like Haskell.
+        assert_eq!(show_double(3.0 / 77.0), "3.896103896103896e-2");
+        assert_eq!(show_double(0.005), "5.0e-3");
+        assert_eq!(show_double(7.0e7), "7.0e7");
+        assert_eq!(show_double(7_000_000.0), "7000000.0");
+        assert_eq!(show_double(-1.5), "-1.5");
     }
 }

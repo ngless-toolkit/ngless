@@ -52,6 +52,72 @@ impl FastQEncoding {
             FastQEncoding::Solexa => 64,
         }
     }
+
+    /// Human-readable name, matching `encodingName` (used in the qcstats TSV).
+    pub fn name(self) -> &'static str {
+        match self {
+            FastQEncoding::Sanger => "Sanger (33 offset)",
+            FastQEncoding::Solexa => "Solexa (64 offset)",
+        }
+    }
+}
+
+/// Per-file FASTQ statistics, mirroring the relevant fields of `FQStatistics` plus the derived
+/// `gcFraction`/`nonATCGFrac`/`nBasepairs`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FastQStats {
+    pub n_seq: i64,
+    pub min_len: i64,
+    pub max_len: i64,
+    /// Base counts: (A, C, G, T, other), each case-insensitive.
+    pub bp: (i64, i64, i64, i64, i64),
+}
+
+impl FastQStats {
+    pub fn num_basepairs(&self) -> i64 {
+        let (a, c, g, t, o) = self.bp;
+        a + c + g + t + o
+    }
+
+    /// GC fraction over A/C/G/T only (mirrors `gcFraction`).
+    pub fn gc_fraction(&self) -> f64 {
+        let (a, c, g, t, _) = self.bp;
+        (c + g) as f64 / (a + c + g + t) as f64
+    }
+
+    /// Fraction of non-ATCG bases over all bases (mirrors `nonATCGFrac`).
+    pub fn non_atcg_fraction(&self) -> f64 {
+        let (a, c, g, t, o) = self.bp;
+        o as f64 / (a + c + t + g + o) as f64
+    }
+}
+
+/// Compute FASTQ statistics from decoded reads (mirrors `fqStatsC`). For an empty input the
+/// sequence-length range is `(maxBound, 0)` as in the Haskell code.
+pub fn stats_from_reads(reads: &[ShortRead]) -> FastQStats {
+    let (mut a, mut c, mut g, mut t, mut o) = (0i64, 0i64, 0i64, 0i64, 0i64);
+    let mut min_len = i64::MAX;
+    let mut max_len = 0i64;
+    for r in reads {
+        let len = r.sequence.len() as i64;
+        min_len = min_len.min(len);
+        max_len = max_len.max(len);
+        for &b in r.sequence.as_bytes() {
+            match b.to_ascii_lowercase() {
+                b'a' => a += 1,
+                b'c' => c += 1,
+                b'g' => g += 1,
+                b't' => t += 1,
+                _ => o += 1,
+            }
+        }
+    }
+    FastQStats {
+        n_seq: reads.len() as i64,
+        min_len,
+        max_len,
+        bp: (a, c, g, t, o),
+    }
 }
 
 impl ShortRead {
@@ -433,6 +499,25 @@ mod tests {
             smoothtrim_pos(10, &[24, 2, 24, 24, 24, 24, 2, 24, 24, 24, 24, 2, 24], 20),
             (0, 13)
         );
+    }
+
+    #[test]
+    fn stats_from_reads_cases() {
+        // Two reads, case-insensitive base counting, one N (non-ATCG).
+        let reads = vec![
+            ShortRead::new("a", "ACGT", vec![30, 30, 30, 30]),
+            ShortRead::new("b", "acgN", vec![20, 20, 20, 20]),
+        ];
+        let st = stats_from_reads(&reads);
+        assert_eq!(st.n_seq, 2);
+        assert_eq!(st.min_len, 4);
+        assert_eq!(st.max_len, 4);
+        assert_eq!(st.bp, (2, 2, 2, 1, 1)); // A, C, G, T, other
+        assert_eq!(st.num_basepairs(), 8);
+        // GC over ATCG only: (C+G)/(A+C+G+T) = 4/7.
+        assert_eq!(st.gc_fraction(), 4.0 / 7.0);
+        // non-ATCG over all: 1/8.
+        assert_eq!(st.non_atcg_fraction(), 1.0 / 8.0);
     }
 
     #[test]

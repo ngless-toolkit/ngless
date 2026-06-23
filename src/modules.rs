@@ -262,6 +262,18 @@ mod builders {
                 vec![],
                 vec![ReturnAssigned],
             ),
+            // From the always-loaded builtin "stats" module (BuiltinModules/QCStats.hs).
+            func(
+                "qcstats",
+                Some(NGLType::Symbol),
+                vec![sym(&["fastq", "mapping"])],
+                Counts,
+                vec![],
+                vec![
+                    ReturnAssigned,
+                    NGLVersionIncompatibleChange(0, 8, "".to_string()),
+                ],
+            ),
             func("write", Some(Any), vec![], write_ret, write_args(), vec![]),
             func("print", Some(print_type()), vec![], Void, vec![], vec![]),
             func("println", Some(print_type()), vec![], Void, vec![], vec![]),

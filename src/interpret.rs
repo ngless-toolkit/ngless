@@ -13,11 +13,13 @@
 //! current files (deriving `pair.1`/`pair.2`/`singles` names for paired sets). This is what
 //! makes `write` of an un-preprocessed single-end set byte-identical to its input.
 //!
-//! Compressed I/O is transparent for gzip (see [`crate::compression`]); bzip2/zstd are not
-//! handled yet. Other simplifications vs. the Haskell runtime, to be lifted in later
-//! milestones: files are read whole rather than streamed (no FileOrStream/bounded queues), and
-//! FASTQ QC statistics (`qcstats`) are not produced.
+//! `qcstats({fastq})` produces the per-file QC statistics TSV (collected as `fastq`/`paired`/
+//! `preprocess` run). Compressed I/O is transparent for gzip (see [`crate::compression`]);
+//! bzip2/zstd are not handled yet. Other simplifications vs. the Haskell runtime, to be lifted
+//! in later milestones: files are read whole rather than streamed (no FileOrStream/bounded
+//! queues), and per-position quality percentiles are not collected.
 
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -25,7 +27,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::ast::*;
 use crate::errors::{NgError, NgErrorType, NgResult};
-use crate::fastq::{self, FastQFilePath, ReadSet, ShortRead};
+use crate::fastq::{self, FastQEncoding, FastQFilePath, ReadSet, ShortRead};
 use crate::values::{eval_binary, eval_index, eval_unary, show_double, NGLessObject};
 
 /// Interpret a script body (already type-checked and validated). `temp_dir` is where
@@ -34,16 +36,35 @@ pub fn interpret(body: &[(usize, Expression)], temp_dir: &Path) -> NgResult<()> 
     let mut interp = Interpreter {
         env: HashMap::new(),
         temp_dir: temp_dir.to_path_buf(),
+        cur_lno: Cell::new(0),
+        fq_stats: RefCell::new(Vec::new()),
     };
-    for (_lno, e) in body {
+    for (lno, e) in body {
+        interp.cur_lno.set(*lno);
         interp.interpret_top(e)?;
     }
     Ok(())
 }
 
+/// Collected per-file FASTQ statistics, in registration order (mirrors the `savedOutput`
+/// accumulator). `qcstats({fastq})` serialises these to a TSV.
+struct FqInfo {
+    file: String,
+    encoding: String,
+    gc_content: f64,
+    non_atcg: f64,
+    n_seq: i64,
+    n_basepairs: i64,
+    min_len: i64,
+    max_len: i64,
+}
+
 struct Interpreter {
     env: HashMap<String, NGLessObject>,
     temp_dir: PathBuf,
+    /// Line number of the top-level statement currently executing (used for `preproc.lnoN`).
+    cur_lno: Cell<usize>,
+    fq_stats: RefCell<Vec<FqInfo>>,
 }
 
 /// The outcome of running a (block) statement, mirroring `BlockStatus`.
@@ -232,9 +253,91 @@ impl Interpreter {
         match f.0.as_str() {
             "fastq" => self.execute_fastq(&expr_v),
             "paired" => self.execute_paired(&expr_v, &argvs),
+            "qcstats" => self.execute_qcstats(&expr_v),
             "write" => execute_write(&expr_v, &argvs),
             _ => execute_function(f, &expr_v, &argvs),
         }
+    }
+
+    /// Decode a FASTQ file, register its statistics under `label`, and return a reference to it
+    /// (mirrors `asFQFilePathMayQC` with QC enabled).
+    fn load_and_qc(&self, path: &str, label: &str) -> NgResult<FastQFilePath> {
+        let text = read_fastq_text(path)?;
+        let encoding = fastq::detect_encoding(&text)?;
+        let reads = fastq::fq_decode(encoding, &text)?;
+        self.register_fq_stats(label, &reads, encoding);
+        Ok(FastQFilePath {
+            encoding,
+            path: PathBuf::from(path),
+        })
+    }
+
+    /// Compute and record FASTQ statistics for a set of reads (mirrors `outputFQStatistics`).
+    fn register_fq_stats(&self, label: &str, reads: &[ShortRead], enc: FastQEncoding) {
+        let st = fastq::stats_from_reads(reads);
+        self.fq_stats.borrow_mut().push(FqInfo {
+            file: label.to_string(),
+            encoding: enc.name().to_string(),
+            gc_content: st.gc_fraction(),
+            non_atcg: st.non_atcg_fraction(),
+            n_seq: st.n_seq,
+            n_basepairs: st.num_basepairs(),
+            min_len: st.min_len,
+            max_len: st.max_len,
+        });
+    }
+
+    /// `qcstats({fastq})`: serialise the collected FASTQ statistics to a TSV temp file and return
+    /// it as a counts table (mirrors `executeStats` + `writeOutputTSV` for the fastq case).
+    fn execute_qcstats(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
+        let stats_type = match expr {
+            NGLessObject::Symbol(s) => s.as_str(),
+            other => {
+                return Err(NgError::should_not_occur(format!(
+                    "qcstats expected a symbol, got {other:?}"
+                )))
+            }
+        };
+        match stats_type {
+            "fastq" => {
+                let tsv = self.format_fq_stats_tsv();
+                let path = self.new_temp_path("qcstats.", "tsv");
+                std::fs::write(&path, tsv).map_err(|e| {
+                    NgError::new(
+                        NgErrorType::SystemError,
+                        format!("Could not write {}: {e}", path.display()),
+                    )
+                })?;
+                Ok(NGLessObject::Counts(path))
+            }
+            "mapping" => Err(NgError::script(
+                "qcstats({mapping}) is not implemented in this build yet.",
+            )),
+            other => Err(NgError::script(format!("Unknown stats type: {other}"))),
+        }
+    }
+
+    /// Serialise collected FASTQ stats as the transposed TSV produced by `writeOutputTSV`.
+    fn format_fq_stats_tsv(&self) -> String {
+        let stats = self.fq_stats.borrow();
+        let mut out = String::from("\tstats\n");
+        for (i, info) in stats.iter().enumerate() {
+            // Keys in the alphabetical order produced by Haskell's `sort` over (key, value).
+            let rows = [
+                ("encoding", info.encoding.clone()),
+                ("file", info.file.clone()),
+                ("gcContent", show_double(info.gc_content)),
+                ("maxSeqLen", info.max_len.to_string()),
+                ("minSeqLen", info.min_len.to_string()),
+                ("nonATCGFraction", show_double(info.non_atcg)),
+                ("numBasepairs", info.n_basepairs.to_string()),
+                ("numSeqs", info.n_seq.to_string()),
+            ];
+            for (k, v) in rows {
+                out.push_str(&format!("{i}:{k}\t{v}\n"));
+            }
+        }
+        out
     }
 
     /// Allocate a fresh temp file path under the configured temp directory. The counter is
@@ -253,7 +356,7 @@ impl Interpreter {
     /// `executeFastq` for the non-interleaved case).
     fn execute_fastq(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
         let path = as_string(expr, "fastq")?;
-        let fqf = detect_file(&path)?;
+        let fqf = self.load_and_qc(&path, &path)?;
         Ok(NGLessObject::ReadSet {
             name: path,
             readset: ReadSet {
@@ -280,8 +383,8 @@ impl Interpreter {
             Some(NGLessObject::String(s)) => s.clone(),
             _ => String::new(),
         };
-        let f1 = detect_file(&mate1)?;
-        let f2 = detect_file(&mate2)?;
+        let f1 = self.load_and_qc(&mate1, &mate1)?;
+        let f2 = self.load_and_qc(&mate2, &mate2)?;
         if f1.encoding != f2.encoding {
             return Err(NgError::new(
                 NgErrorType::DataError,
@@ -294,17 +397,24 @@ impl Interpreter {
         let singletons = if mate3.is_empty() {
             Vec::new()
         } else {
-            let f3 = detect_file(&mate3)?;
-            if f1.encoding != f3.encoding {
+            // QC stats are registered for the singles file even if it is later dropped.
+            let text = read_fastq_text(&mate3)?;
+            let enc3 = fastq::detect_encoding(&text)?;
+            let reads3 = fastq::fq_decode(enc3, &text)?;
+            self.register_fq_stats(&mate3, &reads3, enc3);
+            if f1.encoding != enc3 {
                 // Special case seen in the wild: an empty singles file with a default encoding.
-                if read_fastq_text(&mate3)?.trim().is_empty() {
+                if reads3.is_empty() {
                     Vec::new()
                 } else {
                     return Err(NgError::new(NgErrorType::DataError,
                         format!("Mates do not seem to have the same quality encoding! (paired mates vs single [{mate3}]).")));
                 }
             } else {
-                vec![f3]
+                vec![FastQFilePath {
+                    encoding: enc3,
+                    path: PathBuf::from(&mate3),
+                }]
             }
         };
         Ok(NGLessObject::ReadSet {
@@ -339,8 +449,8 @@ impl Interpreter {
         let var = &block.variable.0;
         let keep_singles = true;
 
-        let (mut p1, mut p2, mut s) = (String::new(), String::new(), String::new());
-        let (mut n_pairs, mut n_singles) = (0usize, 0usize);
+        let (mut p1, mut p2, mut s): (Vec<ShortRead>, Vec<ShortRead>, Vec<ShortRead>) =
+            (Vec::new(), Vec::new(), Vec::new());
 
         for (f1, f2) in &rs.pairs {
             let reads1 =
@@ -352,14 +462,12 @@ impl Interpreter {
                 let o2 = self.run_block_on_read(var, r2, block)?;
                 match (o1, o2) {
                     (Some(a), Some(b)) => {
-                        p1.push_str(&fastq::fq_encode(outenc, &a));
-                        p2.push_str(&fastq::fq_encode(outenc, &b));
-                        n_pairs += 1;
+                        p1.push(a);
+                        p2.push(b);
                     }
                     (Some(r), None) | (None, Some(r)) => {
                         if keep_singles {
-                            s.push_str(&fastq::fq_encode(outenc, &r));
-                            n_singles += 1;
+                            s.push(r);
                         }
                     }
                     (None, None) => {}
@@ -371,15 +479,26 @@ impl Interpreter {
                 fastq::fq_decode(fqf.encoding, &read_fastq_text(&fqf.path.to_string_lossy())?)?;
             for r in reads {
                 if let Some(sr) = self.run_block_on_read(var, r, block)? {
-                    s.push_str(&fastq::fq_encode(outenc, &sr));
-                    n_singles += 1;
+                    s.push(sr);
                 }
             }
         }
 
+        // Register QC statistics for all three output slots, as executePreprocess does (before
+        // deciding the result shape), labelled with the preprocess statement's line number.
+        let lno = self.cur_lno.get();
+        self.register_fq_stats(&format!("preproc.lno{lno}.pairs.1"), &p1, outenc);
+        self.register_fq_stats(&format!("preproc.lno{lno}.pairs.2"), &p2, outenc);
+        self.register_fq_stats(&format!("preproc.lno{lno}.singles"), &s, outenc);
+
         // Choose the result shape exactly as executePreprocess does, materialising only the
         // temp files the result references.
-        let make = |this: &Self, prefix: &str, data: &str| -> NgResult<FastQFilePath> {
+        let (n_pairs, n_singles) = (p1.len(), s.len());
+        let make = |this: &Self, prefix: &str, reads: &[ShortRead]| -> NgResult<FastQFilePath> {
+            let mut data = String::new();
+            for r in reads {
+                data.push_str(&fastq::fq_encode(outenc, r));
+            }
             let path = this.new_temp_path(prefix, "fq");
             std::fs::write(&path, data).map_err(|e| {
                 NgError::new(
@@ -626,16 +745,6 @@ fn read_fastq_text(path: &str) -> NgResult<String> {
     crate::compression::read_to_string(path)
 }
 
-/// Reference a FASTQ file with its auto-detected encoding.
-fn detect_file(path: &str) -> NgResult<FastQFilePath> {
-    let text = read_fastq_text(path)?;
-    let encoding = fastq::detect_encoding(&text)?;
-    Ok(FastQFilePath {
-        encoding,
-        path: PathBuf::from(path),
-    })
-}
-
 /// `write(rs, ofile=...)`: write the read set's current file(s) to `ofile` (mirrors
 /// `executeWrite` of an `NGOReadSet`). A single-end set goes straight to `ofile`; a paired set
 /// produces `<base>.pair.1.<ext>` / `.pair.2.<ext>` (and `.singles.<ext>` when singletons
@@ -664,6 +773,10 @@ fn execute_write(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResu
                     write_fq_files(&f3, &format_fq_oname(&ofile, "singles")?)?;
                 }
             }
+            Ok(NGLessObject::String(ofile))
+        }
+        NGLessObject::Counts(path) => {
+            copy_fastq(path, &ofile)?;
             Ok(NGLessObject::String(ofile))
         }
         other => Err(NgError::script(format!(
