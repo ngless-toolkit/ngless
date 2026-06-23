@@ -432,8 +432,8 @@ fn execute_fastq(expr: &NGLessObject) -> NgResult<NGLessObject> {
             format!("Could not read {path}: {e}"),
         )
     })?;
-    // TODO: encoding detection (encodingFor); Sanger is assumed for now.
-    let reads = fastq::fq_decode(FastQEncoding::Sanger, &text)?;
+    let enc = fastq::detect_encoding(&text)?;
+    let reads = fastq::fq_decode(enc, &text)?;
     Ok(NGLessObject::ReadSet { name: path, reads })
 }
 

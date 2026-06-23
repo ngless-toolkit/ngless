@@ -97,6 +97,41 @@ pub fn fq_decode(enc: FastQEncoding, text: &str) -> NgResult<Vec<ShortRead>> {
     Ok(out)
 }
 
+/// Guess the FASTQ quality encoding from the quality lines, mirroring `encodingFor`
+/// (Interpretation/FastQ.hs). Scans 4-line records tracking the min/max quality byte:
+/// any byte `< 33` is an error; a min byte `< 58` means Sanger; a max byte `>= 78` means
+/// Solexa; otherwise the heuristic is inconclusive and defaults to Sanger.
+pub fn detect_encoding(text: &str) -> NgResult<FastQEncoding> {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut minv: u8 = 255;
+    let mut maxv: u8 = 0;
+    for chunk in lines.chunks(4) {
+        if chunk.len() < 4 {
+            break;
+        }
+        let qs = chunk[3].as_bytes();
+        if qs.is_empty() {
+            continue;
+        }
+        minv = minv.min(*qs.iter().min().unwrap());
+        maxv = maxv.max(*qs.iter().max().unwrap());
+        if minv < 33 {
+            return Err(NgError::new(
+                crate::errors::NgErrorType::DataError,
+                format!("No known encodings with chars < 33 (Yours was {minv})."),
+            ));
+        }
+        if minv < 58 {
+            return Ok(FastQEncoding::Sanger);
+        }
+        if maxv >= 33 + 45 {
+            return Ok(FastQEncoding::Solexa);
+        }
+    }
+    // Empty or inconclusive: default to Sanger (33 offset).
+    Ok(FastQEncoding::Sanger)
+}
+
 /// Whether two paired-end headers refer to the same fragment (mirrors `compatibleHeader`).
 pub fn compatible_header(h1: &str, h2: &str) -> bool {
     if h1 == h2 {
@@ -247,6 +282,27 @@ mod tests {
     #[test]
     fn parse_encode_solexa() {
         assert_eq!(encode_recover(FastQEncoding::Solexa).unwrap(), reads3());
+    }
+
+    #[test]
+    fn detect_encoding_cases() {
+        // A min byte < 58 ('#' = 35) => Sanger.
+        assert_eq!(
+            detect_encoding("@r\nAC\n+\n#I\n").unwrap(),
+            FastQEncoding::Sanger
+        );
+        // min >= 58 and a max byte >= 78 ('W' = 87) => Solexa (e.g. the low_quality sample).
+        assert_eq!(
+            detect_encoding("@r\nGTCAGGACAAT\n+\n<=>?@ABCAWA\n").unwrap(),
+            FastQEncoding::Solexa
+        );
+        // Inconclusive (all bytes in [58, 78)) => default Sanger.
+        assert_eq!(
+            detect_encoding("@r\nAC\n+\nKK\n").unwrap(),
+            FastQEncoding::Sanger
+        );
+        // A byte < 33 (space = 32) is an error.
+        assert!(detect_encoding("@r\nAC\n+\n A\n").is_err());
     }
 
     #[test]
