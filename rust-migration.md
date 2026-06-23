@@ -69,10 +69,17 @@
 >   `module_functions` contributes `samtools_sort` (0.0+) and `samtools_view` (0.1/1.0) to the
 >   type checker, validation and interpreter. Passing: `tests/regression-cigar-filter`
 >   (`samtools_sort by={name}` → write SAM) and `tests/regression-bad-sam` (`select` → write
->   SAM **and** BAM). `tests/samfile-write` works for its BAM-input case but is blocked by its
->   `.sam.zst` input (zstd decompression still pending). Still pending: `map` itself (needs
->   bwa/minimap2 — not installable here), zstd/bzip2 (de)compression, and the remaining
->   mapped-read methods (`pe_filter`/`unique`/`allbest`/`some_match`).
+>   SAM **and** BAM). Still pending: `map` itself (needs bwa/minimap2 — not installable here)
+>   and the remaining mapped-read methods (`pe_filter`/`unique`/`allbest`/`some_match`).
+> - **Compression (gzip/bzip2/zstd):** `src/compression.rs` now (de)compresses all of gzip
+>   (`flate2`), bzip2 (`bzip2` crate, pure-Rust `libbz2-rs-sys` backend) and zstd (`zstd` crate);
+>   output is content-equivalent (the suite compares decompressed data, so exact bytes need not
+>   match). samtools cannot read zstd/bzip2, so SAM inputs in those formats are decompressed to a
+>   plain SAM temp before `samtools sort`/`view`/conversion (`samtools_input`). With this,
+>   `tests/samfile-write` passes end-to-end *functionally* (BAM input → `samtools_sort` → BAM and
+>   `.sam.gz` outputs all match); only its `check.sh` (bare `ngless --print-path samtools`) can't
+>   be driven here, the same limitation that blocks every samtools `check.sh` test locally (no
+>   `ngless` on PATH).
 
 ## Context
 

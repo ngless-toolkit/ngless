@@ -10,8 +10,10 @@ repository = "https://github.com/ngless-toolkit/ngless"
 # the binary inherits the package name `ngless`.
 
 [dependencies]
+bzip2 = "0.6.1"
 # Transparent gzip read/write for FASTQ (`.fq.gz`). bzip2/zstd support arrives later.
 flate2 = "1"
+zstd = "0.13.3"
 
 [workspace]
 # The root package is the workspace root. As the rewrite grows, factor subsystems into

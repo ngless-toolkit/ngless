@@ -1,9 +1,9 @@
-//! Transparent (de)compression for FASTQ I/O, dispatched on filename extension.
+//! Transparent (de)compression for FASTQ/SAM I/O, dispatched on filename extension.
 //!
 //! Mirrors the behaviour of `withPossiblyCompressedFile` (read) and `moveOrCopyCompress`
-//! (write) for the formats supported so far. NGLess recognises gzip (`.gz`), bzip2 (`.bz2`)
-//! and zstd (`.zst`/`.zstd`); only gzip is implemented in this build, the others report a
-//! clear "not supported yet" error rather than silently producing wrong output.
+//! (write). NGLess recognises gzip (`.gz`), bzip2 (`.bz2`) and zstd (`.zst`/`.zstd`); all four
+//! states (including uncompressed) are handled here. Output is content-equivalent to NGLess —
+//! the exact compressed bytes need not match, since the test suite compares decompressed data.
 
 use std::fs::File;
 use std::io::{BufWriter, Read, Write};
@@ -13,6 +13,9 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 
 use crate::errors::{NgError, NgErrorType, NgResult};
+
+/// zstd compression level used for output (NGLess commonly uses level 3).
+const ZSTD_LEVEL: i32 = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Compress {
@@ -44,17 +47,6 @@ fn io_err(path: &str) -> impl Fn(std::io::Error) -> NgError + '_ {
     }
 }
 
-fn unsupported(path: &str, c: Compress) -> NgError {
-    let name = match c {
-        Compress::Bzip2 => "bzip2",
-        Compress::Zstd => "zstd",
-        _ => "this compression",
-    };
-    NgError::script(format!(
-        "{name} compression ('{path}') is not supported in this build yet."
-    ))
-}
-
 /// Read a (possibly compressed) file fully into a byte vector, decompressing by extension.
 pub fn read_bytes(path: &str) -> NgResult<Vec<u8>> {
     let f = File::open(path).map_err(io_err(path))?;
@@ -68,7 +60,14 @@ pub fn read_bytes(path: &str) -> NgResult<Vec<u8>> {
             let mut r = MultiGzDecoder::new(f);
             r.read_to_end(&mut buf).map_err(io_err(path))?;
         }
-        other => return Err(unsupported(path, other)),
+        Compress::Bzip2 => {
+            let mut r = bzip2::read::MultiBzDecoder::new(f);
+            r.read_to_end(&mut buf).map_err(io_err(path))?;
+        }
+        // `decode_all` consumes the whole stream, including concatenated frames.
+        Compress::Zstd => {
+            buf = zstd::stream::decode_all(f).map_err(io_err(path))?;
+        }
     }
     Ok(buf)
 }
@@ -104,7 +103,18 @@ pub fn write_bytes(path: &str, data: &[u8]) -> NgResult<()> {
             w.write_all(data).map_err(write_err)?;
             w.finish().map_err(write_err)?;
         }
-        other => return Err(unsupported(path, other)),
+        Compress::Bzip2 => {
+            let mut w =
+                bzip2::write::BzEncoder::new(BufWriter::new(f), bzip2::Compression::default());
+            w.write_all(data).map_err(write_err)?;
+            w.finish().map_err(write_err)?;
+        }
+        Compress::Zstd => {
+            let compressed = zstd::stream::encode_all(data, ZSTD_LEVEL).map_err(write_err)?;
+            let mut w = BufWriter::new(f);
+            w.write_all(&compressed).map_err(write_err)?;
+            w.flush().map_err(write_err)?;
+        }
     }
     Ok(())
 }
@@ -138,7 +148,31 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_formats_error() {
+    fn missing_file_errors() {
         assert!(read_bytes("nonexistent.fq.bz2").is_err());
+        assert!(read_bytes("nonexistent.fq.zst").is_err());
+    }
+
+    fn round_trip(ext: &str) {
+        let dir = std::env::temp_dir();
+        let p = dir.join(format!("ngless_comp_{}_{}.{ext}", std::process::id(), ext));
+        let ps = p.to_string_lossy().to_string();
+        let payload = "@r\nACGTACGTACGT\n+\nIIIIIIIIIIII\n";
+        write_bytes(&ps, payload.as_bytes()).unwrap();
+        // The on-disk bytes are actually compressed, not the plain payload...
+        assert_ne!(std::fs::read(&p).unwrap(), payload.as_bytes());
+        // ...but read back transparently.
+        assert_eq!(read_to_string(&ps).unwrap(), payload);
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn bzip2_round_trip() {
+        round_trip("bz2");
+    }
+
+    #[test]
+    fn zstd_round_trip() {
+        round_trip("zst");
     }
 }

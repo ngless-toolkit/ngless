@@ -501,6 +501,19 @@ impl Interpreter {
         })
     }
 
+    /// Give samtools a file it can read natively. samtools handles `.sam`, `.bam` and gzipped
+    /// SAM, but not zstd/bzip2; for those we decompress to a plain SAM temp first.
+    fn samtools_input(&self, path: &Path) -> NgResult<PathBuf> {
+        let s = path.to_string_lossy().to_string();
+        match crate::compression::detect(&s) {
+            crate::compression::Compress::Zstd | crate::compression::Compress::Bzip2 => {
+                let text = read_sam_text(&s)?;
+                self.write_sam_temp(&text)
+            }
+            _ => Ok(path.to_path_buf()),
+        }
+    }
+
     /// Write SAM text to a fresh temp file and return its path.
     fn write_sam_temp(&self, data: &str) -> NgResult<PathBuf> {
         let path = self.new_temp_path("selected_", "sam");
@@ -531,9 +544,10 @@ impl Interpreter {
                 )))
             }
         };
+        let input = self.samtools_input(&path)?;
         let out = self.new_temp_path("sorted_", "sam");
         let temp_prefix = self.new_temp_path("samtools_sort_temp", "tmp");
-        crate::samtools::sort(&path, &out, "sam", by_name, &temp_prefix)?;
+        crate::samtools::sort(&input, &out, "sam", by_name, &temp_prefix)?;
         Ok(NGLessObject::MappedReadSet { name, path: out })
     }
 
@@ -553,8 +567,9 @@ impl Interpreter {
                 ))
             }
         };
+        let input = self.samtools_input(&path)?;
         let out = self.new_temp_path("subset_", "sam");
-        crate::samtools::view_bed(&path, &bed, &out, "sam")?;
+        crate::samtools::view_bed(&input, &bed, &out, "sam")?;
         Ok(NGLessObject::MappedReadSet { name, path: out })
     }
 
@@ -603,8 +618,9 @@ impl Interpreter {
             }
             ("bam", true) => path.to_path_buf(),
             (_, _) => {
+                let input = self.samtools_input(path)?;
                 let out = self.new_temp_path("converted_", "bam");
-                crate::samtools::convert_sam_to_bam(path, &out)?;
+                crate::samtools::convert_sam_to_bam(&input, &out)?;
                 out
             }
         };
