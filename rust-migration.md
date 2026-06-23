@@ -60,10 +60,19 @@
 >   `tests/samfile-headers` (the `ngless "1.1"` headers bumped to `"1.5"`; `select`/`filter`
 >   have no behavior change at ≥1.1, since `addUseNewer` only injects the old-behaviour flag
 >   *below* 1.1, and the select-0.8 reinject change is already on at ≥0.8).
->   Still pending: `map` itself (needs bwa/minimap2 — not installable here), the `samtools_*`
->   module functions, SAM↔BAM conversion (so `.bam` output / `regression-bad-sam` and
->   `samfile-write`), and the remaining mapped-read methods (`pe_filter`/`unique`/`allbest`/
->   `some_match`).
+> - **M5 (BAM + samtools module):** `src/samtools.rs` shells out to the external `samtools`
+>   binary (`$NGLESS_SAMTOOLS_BIN` or `samtools` on PATH; the Haskell build bundles a pinned
+>   one) for BAM↔SAM conversion (`convertSamToBam`/`convertBamToSam`), reading BAM as SAM text
+>   (`samBamConduit`), `samtools sort` and `samtools view -L`. BAM input now flows through
+>   `samfile`/`select`/`as_reads`; `write` of a `MappedReadSet` to `.bam` (or `.sam.gz`)
+>   converts/recompresses as needed. The `import "samtools" version "X"` statement is honoured —
+>   `module_functions` contributes `samtools_sort` (0.0+) and `samtools_view` (0.1/1.0) to the
+>   type checker, validation and interpreter. Passing: `tests/regression-cigar-filter`
+>   (`samtools_sort by={name}` → write SAM) and `tests/regression-bad-sam` (`select` → write
+>   SAM **and** BAM). `tests/samfile-write` works for its BAM-input case but is blocked by its
+>   `.sam.zst` input (zstd decompression still pending). Still pending: `map` itself (needs
+>   bwa/minimap2 — not installable here), zstd/bzip2 (de)compression, and the remaining
+>   mapped-read methods (`pe_filter`/`unique`/`allbest`/`some_match`).
 
 ## Context
 

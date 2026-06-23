@@ -120,10 +120,19 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
             header.version
         )));
     }
-    if !header.modules.is_empty() {
-        return Err(NgError::script(
-            "Module imports are not supported in this build yet.",
-        ));
+    // Gather the functions contributed by imported modules (only `samtools` is supported).
+    let mut extra_funcs = Vec::new();
+    for m in &header.modules {
+        match crate::modules::module_functions(m.name(), m.version()) {
+            Some(fs) => extra_funcs.extend(fs),
+            None => {
+                return Err(NgError::script(format!(
+                    "Module '{}' version '{}' is not supported in this build.",
+                    m.name(),
+                    m.version()
+                )))
+            }
+        }
     }
 
     if opts.debug == "ast" {
@@ -134,8 +143,9 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     }
 
     // Type check, then validate.
-    let typed = crate::types::checktypes(version, &script)?;
-    let funcs = builtin_functions(version);
+    let typed = crate::types::checktypes(version, &script, &extra_funcs)?;
+    let mut funcs = builtin_functions(version);
+    funcs.extend(extra_funcs);
     crate::validation::validate(&funcs, &[], &typed)?;
 
     if opts.validate_only {

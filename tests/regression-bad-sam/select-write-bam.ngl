@@ -1,4 +1,4 @@
-ngless "1.1"
+ngless "1.5"
 
 input = samfile("input.sam")
 filtered = select(input, keep_if=[{mapped}])

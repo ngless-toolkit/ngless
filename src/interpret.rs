@@ -269,7 +269,9 @@ impl Interpreter {
             "samfile" => self.execute_samfile(&expr_v, &argvs),
             "as_reads" => self.execute_as_reads(&expr_v),
             "qcstats" => self.execute_qcstats(&expr_v),
-            "write" => execute_write(&expr_v, &argvs),
+            "samtools_sort" => self.execute_samtools_sort(&expr_v, &argvs),
+            "samtools_view" => self.execute_samtools_view(&expr_v, &argvs),
+            "write" => self.execute_write(&expr_v, &argvs),
             _ => execute_function(f, &expr_v, &argvs),
         }
     }
@@ -509,6 +511,104 @@ impl Interpreter {
             )
         })?;
         Ok(path)
+    }
+
+    /// `samtools_sort(mapped, by={coordinate|name})` (from the `samtools` module, mirrors
+    /// `executeSort`). The result is materialised as a sorted SAM temp file; `write` later
+    /// converts it to BAM if the output filename asks for it.
+    fn execute_samtools_sort(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let (name, path) = mapped_read_set(expr, "samtools_sort")?;
+        let by_name = match lookup_symbol(args, "by", "coordinate")?.as_str() {
+            "coordinate" => false,
+            "name" => true,
+            other => {
+                return Err(NgError::should_not_occur(format!(
+                    "Check failed. No samtool_sort option: {other}"
+                )))
+            }
+        };
+        let out = self.new_temp_path("sorted_", "sam");
+        let temp_prefix = self.new_temp_path("samtools_sort_temp", "tmp");
+        crate::samtools::sort(&path, &out, "sam", by_name, &temp_prefix)?;
+        Ok(NGLessObject::MappedReadSet { name, path: out })
+    }
+
+    /// `samtools_view(mapped, bed_file=...)` (from the `samtools` module, mirrors `executeView`):
+    /// keep only records overlapping the BED regions, materialised as a SAM temp file.
+    fn execute_samtools_view(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let (name, path) = mapped_read_set(expr, "samtools_view")?;
+        let bed = match lookup_arg(args, "bed_file") {
+            Some(NGLessObject::String(s)) => s.clone(),
+            _ => {
+                return Err(NgError::script(
+                    "samtools_view: `bed_file` (a string) is required",
+                ))
+            }
+        };
+        let out = self.new_temp_path("subset_", "sam");
+        crate::samtools::view_bed(&path, &bed, &out, "sam")?;
+        Ok(NGLessObject::MappedReadSet { name, path: out })
+    }
+
+    /// `write(...)`: dispatch on the value type (mirrors `executeWrite`). Read sets and counts are
+    /// handled by the free helpers; mapped read sets may need samtools for BAM conversion, which
+    /// needs the interpreter's temp dir, hence this lives on the interpreter.
+    fn execute_write(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        if let NGLessObject::MappedReadSet { path, .. } = expr {
+            let ofile = match lookup_arg(args, "ofile") {
+                Some(NGLessObject::String(s)) => s.clone(),
+                _ => {
+                    return Err(NgError::script(
+                        "write: argument `ofile` (a string) is required",
+                    ))
+                }
+            };
+            self.write_mapped_read_set(path, &ofile)?;
+            return Ok(NGLessObject::String(ofile));
+        }
+        execute_write(expr, args)
+    }
+
+    /// Write a mapped read set to `ofile` (mirrors `executeWrite` of an `NGOMappedReadSet`). The
+    /// output format comes from the extension; SAM/BAM conversion goes through samtools.
+    fn write_mapped_read_set(&self, path: &Path, ofile: &str) -> NgResult<()> {
+        let is_bam = |p: &str| p.ends_with(".bam");
+        let sam_ext = [".sam", ".sam.gz", ".sam.bz2", ".sam.zst", ".sam.zstd"];
+        let format = if ofile == "/dev/stdout" || sam_ext.iter().any(|e| ofile.ends_with(e)) {
+            "sam"
+        } else {
+            // `.bam`, or (as in Haskell) anything unrecognised, defaults to BAM.
+            "bam"
+        };
+        let src = path.to_string_lossy().to_string();
+        // Produce a file in the requested format, converting via samtools when needed.
+        let orig: PathBuf = match (format, is_bam(&src)) {
+            ("sam", false) => path.to_path_buf(),
+            ("sam", true) => {
+                let out = self.new_temp_path("converted_", "sam");
+                crate::samtools::convert_bam_to_sam(path, &out)?;
+                out
+            }
+            ("bam", true) => path.to_path_buf(),
+            (_, _) => {
+                let out = self.new_temp_path("converted_", "bam");
+                crate::samtools::convert_sam_to_bam(path, &out)?;
+                out
+            }
+        };
+        copy_fastq(&orig, ofile)
     }
 
     /// Decode a FASTQ file, register its statistics under `label`, and return a reference to it
@@ -997,12 +1097,11 @@ fn read_fastq_text(path: &str) -> NgResult<String> {
     crate::compression::read_to_string(path)
 }
 
-/// Read a (possibly gz-compressed) SAM file into memory. BAM is not handled yet.
+/// Read a SAM file into memory. BAM is decoded via samtools (mirrors `samBamConduit`); gzip is
+/// transparent.
 fn read_sam_text(path: &str) -> NgResult<String> {
     if path.ends_with(".bam") {
-        return Err(NgError::script(format!(
-            "BAM input ('{path}') is not supported in this build yet."
-        )));
+        return crate::samtools::bam_to_sam_text(path);
     }
     crate::compression::read_to_string(path)
 }
@@ -1150,10 +1249,6 @@ fn execute_write(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResu
             copy_fastq(path, &ofile)?;
             Ok(NGLessObject::String(ofile))
         }
-        NGLessObject::MappedReadSet { path, .. } => {
-            write_mapped_read_set(path, &ofile)?;
-            Ok(NGLessObject::String(ofile))
-        }
         other => Err(NgError::script(format!(
             "write of {} is not implemented in this build yet.",
             type_label(other)
@@ -1216,32 +1311,6 @@ fn copy_fastq(src: &Path, ofile: &str) -> NgResult<()> {
         write_bytes(ofile, &data)?;
     }
     Ok(())
-}
-
-/// Write a mapped read set to `ofile` (mirrors `executeWrite` of an `NGOMappedReadSet`). The
-/// output format is taken from the extension; SAM output copies/recompresses the backing file.
-/// BAM output (and BAM input) need samtools and are not handled yet.
-fn write_mapped_read_set(path: &Path, ofile: &str) -> NgResult<()> {
-    let is_bam = |p: &str| p.ends_with(".bam");
-    let sam_ext = [".sam", ".sam.gz", ".sam.bz2", ".sam.zst", ".sam.zstd"];
-    let format = if ofile == "/dev/stdout" || sam_ext.iter().any(|e| ofile.ends_with(e)) {
-        "sam"
-    } else if is_bam(ofile) {
-        "bam"
-    } else {
-        // Haskell warns and defaults to BAM here.
-        "bam"
-    };
-    let src = path.to_string_lossy().to_string();
-    match format {
-        "sam" if is_bam(&src) => Err(NgError::script(
-            "BAM input ('.bam') is not supported in this build yet.",
-        )),
-        "sam" => copy_fastq(path, ofile),
-        _ => Err(NgError::script(
-            "Writing BAM output is not supported in this build yet.",
-        )),
-    }
 }
 
 fn execute_print(v: &NGLessObject) -> NgResult<NGLessObject> {

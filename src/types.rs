@@ -27,11 +27,13 @@ struct TypeChecker {
 
 /// Type-check a script against the builtin module for the given language version. On success
 /// returns the script with all `Lookup` nodes annotated with their inferred types.
-pub fn checktypes(ver: NGLVersion, script: &Script) -> NgResult<Script> {
+pub fn checktypes(ver: NGLVersion, script: &Script, extra_funcs: &[Function]) -> NgResult<Script> {
+    let mut functions = builtin_functions(ver);
+    functions.extend_from_slice(extra_funcs);
     let mut tc = TypeChecker {
         line: 0,
         tmap: HashMap::new(),
-        functions: builtin_functions(ver),
+        functions,
         methods: builtin_methods(),
         constants: Vec::new(),
         errors: Vec::new(),
@@ -714,7 +716,7 @@ mod tests {
 
     fn is_ok_text(text: &str) {
         let script = parse_ngless("test", true, text).expect("parse failed");
-        if let Err(e) = checktypes(mods(), &script) {
+        if let Err(e) = checktypes(mods(), &script, &[]) {
             panic!("Type error on good code: {e} for script:\n{text}");
         }
     }
@@ -722,7 +724,7 @@ mod tests {
     fn is_error_text(text: &str) {
         let script = parse_ngless("test", true, text).expect("parse failed");
         assert!(
-            checktypes(mods(), &script).is_err(),
+            checktypes(mods(), &script, &[]).is_err(),
             "expected type error for script:\n{text}"
         );
     }
@@ -739,14 +741,20 @@ mod tests {
 
     #[test]
     fn bad_type_fastq() {
-        assert!(checktypes(mods(), &func_call("fastq", Expression::ConstInt(3), vec![])).is_err());
+        assert!(checktypes(
+            mods(),
+            &func_call("fastq", Expression::ConstInt(3), vec![]),
+            &[]
+        )
+        .is_err());
     }
 
     #[test]
     fn good_type_fastq() {
         assert!(checktypes(
             mods(),
-            &func_call("fastq", Expression::ConstStr("fastq.fq".into()), vec![])
+            &func_call("fastq", Expression::ConstStr("fastq.fq".into()), vec![]),
+            &[]
         )
         .is_ok());
     }
@@ -758,7 +766,7 @@ mod tests {
             Expression::ConstStr("fastq.fq".into()),
             vec![(Variable("fname".into()), Expression::ConstInt(10))],
         );
-        assert!(checktypes(mods(), &s).is_err());
+        assert!(checktypes(mods(), &s, &[]).is_err());
     }
 
     #[test]

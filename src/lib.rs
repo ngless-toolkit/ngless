@@ -20,6 +20,7 @@ pub mod interpret;
 pub mod modules;
 pub mod parser;
 pub mod sam;
+pub mod samtools;
 pub mod select;
 pub mod tokens;
 pub mod types;

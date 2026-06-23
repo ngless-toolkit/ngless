@@ -79,7 +79,7 @@ pub struct MethodInfo {
 
 // --- builders -------------------------------------------------------------
 
-pub use builders::{builtin_functions, builtin_methods};
+pub use builders::{builtin_functions, builtin_methods, module_functions};
 
 /// The builtin tables live in an inner module so that `use NGLType::*` (which makes `String`,
 /// `Integer`, ... name `NGLType` variants) does not clash with the `std` `String` used in the
@@ -316,6 +316,48 @@ mod builders {
                 vec![],
             ),
         ]
+    }
+
+    /// Functions contributed by an imported module (mirrors the `modFunctions` of the standard
+    /// modules). Returns `None` for an unknown module/version. Only the `samtools` module is
+    /// supported so far (`StandardModules/Samtools.hs`).
+    pub fn module_functions(name: &str, version: &str) -> Option<Vec<Function>> {
+        match (name, version) {
+            ("samtools", "0.0") => Some(vec![samtools_sort_function()]),
+            ("samtools", "1.0") | ("samtools", "0.1") => {
+                Some(vec![samtools_sort_function(), samtools_view_function()])
+            }
+            _ => None,
+        }
+    }
+
+    fn samtools_sort_function() -> Function {
+        func(
+            "samtools_sort",
+            Some(MappedReadSet),
+            vec![],
+            MappedReadSet,
+            vec![
+                arg("by", false, Symbol, vec![sym(&["coordinate", "name"])]),
+                // Injected by the `sortOFormat` transform in Haskell; accepted but defaulted.
+                arg("__output_bam", false, Bool, vec![]),
+            ],
+            vec![],
+        )
+    }
+
+    fn samtools_view_function() -> Function {
+        func(
+            "samtools_view",
+            Some(MappedReadSet),
+            vec![],
+            MappedReadSet,
+            vec![
+                arg("bed_file", true, String, vec![ArgCheck::FileReadable]),
+                arg("__output_bam", false, Bool, vec![]),
+            ],
+            vec![],
+        )
     }
 
     fn group_args() -> Vec<ArgInformation> {
