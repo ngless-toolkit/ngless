@@ -9,6 +9,7 @@
 use crate::ast::BOp;
 use crate::errors::{NgError, NgResult};
 use crate::fastq::{ReadSet, ShortRead};
+use crate::sam::SamLine;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum NGLessObject {
@@ -36,6 +37,9 @@ pub enum NGLessObject {
         name: String,
         path: std::path::PathBuf,
     },
+    /// One group of SAM alignment records sharing a read name (mirrors `NGOMappedRead`). This is
+    /// the value bound to the block variable of `select(...) using |mr|:`.
+    MappedRead(Vec<SamLine>),
 }
 
 impl NGLessObject {
@@ -53,6 +57,7 @@ impl NGLessObject {
             NGLessObject::ReadSet { .. } => "readset",
             NGLessObject::Counts(_) => "counts",
             NGLessObject::MappedReadSet { .. } => "mappedreadset",
+            NGLessObject::MappedRead(_) => "mappedread",
         }
     }
 }

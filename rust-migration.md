@@ -44,13 +44,26 @@
 >   Simplifications to lift next: files are read whole rather than streamed (no
 >   `FileOrStream`/bounded queues), bzip2/zstd compression, and per-position quality
 >   percentiles.
-> - **M5 (mapping + SAM, partial):** a minimal SAM layer (`src/sam.rs`: parse header/alignment
->   lines, flag predicates) plus `samfile` (reference a SAM/BAM file as a file-backed
->   `MappedReadSet`) and `as_reads` (reconstruct FASTQ from SAM records — grouped by read name,
->   mates split into pair.1/pair.2 by flag, lone reads as singletons; mirrors `samToFastQ`).
->   `tests/as_reads_encoding` passes (`as_reads(samfile(...))` → paired preprocess → write).
->   `map` itself needs an aligner (bwa/minimap2) and is not started; `select`, the
->   `samtools_*` module functions, and SAM↔BAM conversion are also still pending.
+> - **M5 (mapping + SAM, partial):** a SAM data layer (`src/sam.rs`: full 12-field parse
+>   faithful to the Haskell `SimpleParser` — including its quirk that an 11-column line leaves
+>   `qual` empty and stores the qualities in `extra` — plus `encodeSamLine`, the flag predicates,
+>   CIGAR `matchSize`/`matchIdentity`, `samIntTag` and `fixCigar`). On top of it:
+>   `samfile` (reference a SAM file, or merge a `headers=` file in front of it) as a file-backed
+>   `MappedReadSet`; `as_reads` (reconstruct FASTQ from SAM records — grouped by read name, mates
+>   split by flag, lone reads as singletons; mirrors `samToFastQ`); and `select` in both forms —
+>   the call form (`keep_if`/`drop_if`, mirrors `executeSelect`) and the block form
+>   (`select(mapped) using |mr|:` with `mr.filter(min_match_size/min_identity_pc/max_trim/
+>   action/reverse)` and `mr.flag({mapped})`, mirrors `executeSelectWBlock`), including the
+>   "sequence reinjection" + `fixCigar` path (`src/select.rs`). `write` of a `MappedReadSet`
+>   copies/recompresses the backing SAM. Passing: `tests/as_reads_encoding`,
+>   `tests/sam_reverse_order`, `tests/select_sam_optional_fields`, `tests/fix_cigarSam`,
+>   `tests/samfile-headers` (the `ngless "1.1"` headers bumped to `"1.5"`; `select`/`filter`
+>   have no behavior change at ≥1.1, since `addUseNewer` only injects the old-behaviour flag
+>   *below* 1.1, and the select-0.8 reinject change is already on at ≥0.8).
+>   Still pending: `map` itself (needs bwa/minimap2 — not installable here), the `samtools_*`
+>   module functions, SAM↔BAM conversion (so `.bam` output / `regression-bad-sam` and
+>   `samfile-write`), and the remaining mapped-read methods (`pe_filter`/`unique`/`allbest`/
+>   `some_match`).
 
 ## Context
 

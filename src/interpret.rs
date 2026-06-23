@@ -28,7 +28,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::ast::*;
 use crate::errors::{NgError, NgErrorType, NgResult};
 use crate::fastq::{self, FastQEncoding, FastQFilePath, ReadSet, ShortRead};
-use crate::sam::{self, SamLine, SamRecord};
+use crate::sam::{self, encode_sam_line, is_header_line, parse_sam_line, SamLine, SamRecord};
+use crate::select::{self, FilterAction, FilterOptions};
 use crate::values::{eval_binary, eval_index, eval_unary, show_double, NGLessObject};
 
 /// Interpret a script body (already type-checked and validated). `temp_dir` is where
@@ -238,6 +239,17 @@ impl Interpreter {
                 None => Err(NgError::script("preprocess requires a block")),
             };
         }
+        if f.0 == "select" {
+            let expr_v = self.interpret_top_value(expr)?;
+            let mut argvs = Vec::new();
+            for (Variable(v), e) in args {
+                argvs.push((v.clone(), self.interpret_expr(e)?));
+            }
+            return match block {
+                Some(b) => self.execute_select_block(&expr_v, &argvs, b),
+                None => self.execute_select(&expr_v, &argvs),
+            };
+        }
         if block.is_some() {
             return Err(NgError::script(format!(
                 "Function '{}' with a block is not implemented in this build yet.",
@@ -254,7 +266,7 @@ impl Interpreter {
         match f.0.as_str() {
             "fastq" => self.execute_fastq(&expr_v),
             "paired" => self.execute_paired(&expr_v, &argvs),
-            "samfile" => execute_samfile(&expr_v, &argvs),
+            "samfile" => self.execute_samfile(&expr_v, &argvs),
             "as_reads" => self.execute_as_reads(&expr_v),
             "qcstats" => self.execute_qcstats(&expr_v),
             "write" => execute_write(&expr_v, &argvs),
@@ -362,6 +374,141 @@ impl Interpreter {
             )
         })?;
         Ok(FastQFilePath { encoding, path })
+    }
+
+    /// `samfile(fname [, name=, headers=])`: reference a SAM file as a mapped read set (mirrors
+    /// `executeSamfile`). With `headers`, the header file is prepended to the alignments by
+    /// materialising the concatenation to a temp file.
+    fn execute_samfile(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let fname = as_string(expr, "samfile")?;
+        let name = match lookup_arg(args, "name") {
+            Some(NGLessObject::String(s)) => s.clone(),
+            _ => fname.clone(),
+        };
+        let headers = match lookup_arg(args, "headers") {
+            Some(NGLessObject::String(s)) => s.clone(),
+            _ => String::new(),
+        };
+        if headers.is_empty() {
+            return Ok(NGLessObject::MappedReadSet {
+                name,
+                path: PathBuf::from(fname),
+            });
+        }
+        // Sourcing `headers` then `fname` and re-emitting line-by-line is, for newline-terminated
+        // files, the same as concatenating their bytes.
+        let mut data = read_sam_text(&headers)?;
+        data.push_str(&read_sam_text(&fname)?);
+        let path = self.write_sam_temp(&data)?;
+        Ok(NGLessObject::MappedReadSet { name, path })
+    }
+
+    /// `select(mapped, keep_if=/drop_if=)` (call form, mirrors `executeSelect`): apply the
+    /// conditions per read-name group, reinjecting sequence where a kept mate lost it, and write
+    /// the surviving lines (with headers preserved) to a fresh SAM temp file.
+    fn execute_select(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let (name, path) = mapped_read_set(expr, "select")?;
+        let paired = lookup_bool(args, "paired", true)?;
+        let keep_if = lookup_symbol_list(args, "keep_if");
+        let drop_if = lookup_symbol_list(args, "drop_if");
+        let cond = select::parse_conditions(&keep_if, &drop_if)?;
+        let text = read_sam_text(&path.to_string_lossy())?;
+        let mut out = String::new();
+        for item in group_sam(&text, paired)? {
+            match item {
+                SamItem::Header(line) => {
+                    out.push_str(&line);
+                    out.push('\n');
+                }
+                SamItem::Data(group) => {
+                    let filtered = select::apply_conditions(&cond, group.clone());
+                    for line in reinject_call(&group, filtered)? {
+                        out.push_str(&line);
+                        out.push('\n');
+                    }
+                }
+            }
+        }
+        let outpath = self.write_sam_temp(&out)?;
+        Ok(NGLessObject::MappedReadSet {
+            name,
+            path: outpath,
+        })
+    }
+
+    /// `select(mapped) using |mr|: ...` (block form, mirrors `executeSelectWBlock`): run the block
+    /// on every read-name group, re-encode the surviving (reinjected) records, and write the
+    /// result — with leading headers preserved — to a fresh SAM temp file.
+    fn execute_select_block(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+        block: &Block,
+    ) -> NgResult<NGLessObject> {
+        let (name, path) = mapped_read_set(expr, "select")?;
+        let paired = lookup_bool(args, "paired", true)?;
+        let var = &block.variable.0;
+        let text = read_sam_text(&path.to_string_lossy())?;
+        let mut out = String::new();
+        for item in group_sam(&text, paired)? {
+            match item {
+                SamItem::Header(line) => {
+                    out.push_str(&line);
+                    out.push('\n');
+                }
+                SamItem::Data(group) => {
+                    let group_lines: Vec<SamLine> = group.iter().map(|(s, _)| s.clone()).collect();
+                    let (status, value) = self.interpret_block_stmt(
+                        var,
+                        NGLessObject::MappedRead(group_lines.clone()),
+                        &block.body,
+                    )?;
+                    if status == BlockStatus::Discarded {
+                        continue;
+                    }
+                    let rs = match value {
+                        NGLessObject::MappedRead(rs) => rs,
+                        other => {
+                            return Err(NgError::should_not_occur(format!(
+                                "Expected variable {var} to contain a mapped read, got {other:?}"
+                            )))
+                        }
+                    };
+                    if rs.is_empty() {
+                        continue;
+                    }
+                    for l in select::reinject_sequences(&group_lines, &rs)? {
+                        out.push_str(&encode_sam_line(&l));
+                        out.push('\n');
+                    }
+                }
+            }
+        }
+        let outpath = self.write_sam_temp(&out)?;
+        Ok(NGLessObject::MappedReadSet {
+            name,
+            path: outpath,
+        })
+    }
+
+    /// Write SAM text to a fresh temp file and return its path.
+    fn write_sam_temp(&self, data: &str) -> NgResult<PathBuf> {
+        let path = self.new_temp_path("selected_", "sam");
+        std::fs::write(&path, data).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write temp file {}: {e}", path.display()),
+            )
+        })?;
+        Ok(path)
     }
 
     /// Decode a FASTQ file, register its statistics under `label`, and return a reference to it
@@ -860,24 +1007,68 @@ fn read_sam_text(path: &str) -> NgResult<String> {
     crate::compression::read_to_string(path)
 }
 
-/// `samfile(fname)`: reference a SAM/BAM file as a mapped read set (mirrors `executeSamfile`).
-fn execute_samfile(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResult<NGLessObject> {
-    let fname = as_string(expr, "samfile")?;
-    let name = match lookup_arg(args, "name") {
-        Some(NGLessObject::String(s)) => s.clone(),
-        _ => fname.clone(),
-    };
-    if let Some(NGLessObject::String(h)) = lookup_arg(args, "headers") {
-        if !h.is_empty() {
-            return Err(NgError::script(
-                "samfile(headers=...) is not supported in this build yet.",
-            ));
+/// One grouping unit of a SAM file for `select`: a header line (verbatim) or a group of
+/// alignment records (with their original raw lines) that share a read name.
+enum SamItem {
+    Header(String),
+    Data(Vec<(SamLine, String)>),
+}
+
+/// Group SAM text the way `select` does (mirrors `readSamGroupsAsConduit`): header lines are
+/// each their own item; consecutive alignment lines with the same read name (and, when not
+/// `paired`, the same first-in-pair bit) form one data group.
+fn group_sam(text: &str, paired: bool) -> NgResult<Vec<SamItem>> {
+    let mut items = Vec::new();
+    let mut cur: Vec<(SamLine, String)> = Vec::new();
+    let mut cur_key: Option<(String, bool)> = None;
+    for line in text.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        if is_header_line(line) {
+            if !cur.is_empty() {
+                items.push(SamItem::Data(std::mem::take(&mut cur)));
+            }
+            cur_key = None;
+            items.push(SamItem::Header(line.to_string()));
+            continue;
+        }
+        let sl = parse_sam_line(line)?;
+        let key = (
+            sl.qname.clone(),
+            if paired { false } else { sl.is_first_in_pair() },
+        );
+        if cur_key.as_ref() == Some(&key) {
+            cur.push((sl, line.to_string()));
+        } else {
+            if !cur.is_empty() {
+                items.push(SamItem::Data(std::mem::take(&mut cur)));
+            }
+            cur_key = Some(key);
+            cur.push((sl, line.to_string()));
         }
     }
-    Ok(NGLessObject::MappedReadSet {
-        name,
-        path: PathBuf::from(fname),
-    })
+    if !cur.is_empty() {
+        items.push(SamItem::Data(cur));
+    }
+    Ok(items)
+}
+
+/// Produce the output lines for one filtered group in the `select` *call* form (mirrors
+/// `reinjectSequencesIfNeeded`): when the survivors lost their sequence, reinject it and re-encode
+/// every line; otherwise emit the original raw lines unchanged.
+fn reinject_call(
+    orig: &[(SamLine, String)],
+    filtered: Vec<(SamLine, String)>,
+) -> NgResult<Vec<String>> {
+    let filtered_lines: Vec<SamLine> = filtered.iter().map(|(s, _)| s.clone()).collect();
+    if select::needs_reinject(&filtered_lines) {
+        let orig_lines: Vec<SamLine> = orig.iter().map(|(s, _)| s.clone()).collect();
+        let reinjected = select::reinject_sequences(&orig_lines, &filtered_lines)?;
+        Ok(reinjected.iter().map(encode_sam_line).collect())
+    } else {
+        Ok(filtered.into_iter().map(|(_, line)| line).collect())
+    }
 }
 
 /// The outcome of reconstructing reads for one read-name group (mirrors `FQResult`).
@@ -959,6 +1150,10 @@ fn execute_write(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResu
             copy_fastq(path, &ofile)?;
             Ok(NGLessObject::String(ofile))
         }
+        NGLessObject::MappedReadSet { path, .. } => {
+            write_mapped_read_set(path, &ofile)?;
+            Ok(NGLessObject::String(ofile))
+        }
         other => Err(NgError::script(format!(
             "write of {} is not implemented in this build yet.",
             type_label(other)
@@ -1021,6 +1216,32 @@ fn copy_fastq(src: &Path, ofile: &str) -> NgResult<()> {
         write_bytes(ofile, &data)?;
     }
     Ok(())
+}
+
+/// Write a mapped read set to `ofile` (mirrors `executeWrite` of an `NGOMappedReadSet`). The
+/// output format is taken from the extension; SAM output copies/recompresses the backing file.
+/// BAM output (and BAM input) need samtools and are not handled yet.
+fn write_mapped_read_set(path: &Path, ofile: &str) -> NgResult<()> {
+    let is_bam = |p: &str| p.ends_with(".bam");
+    let sam_ext = [".sam", ".sam.gz", ".sam.bz2", ".sam.zst", ".sam.zstd"];
+    let format = if ofile == "/dev/stdout" || sam_ext.iter().any(|e| ofile.ends_with(e)) {
+        "sam"
+    } else if is_bam(ofile) {
+        "bam"
+    } else {
+        // Haskell warns and defaults to BAM here.
+        "bam"
+    };
+    let src = path.to_string_lossy().to_string();
+    match format {
+        "sam" if is_bam(&src) => Err(NgError::script(
+            "BAM input ('.bam') is not supported in this build yet.",
+        )),
+        "sam" => copy_fastq(path, ofile),
+        _ => Err(NgError::script(
+            "Writing BAM output is not supported in this build yet.",
+        )),
+    }
 }
 
 fn execute_print(v: &NGLessObject) -> NgResult<NGLessObject> {
@@ -1097,6 +1318,51 @@ fn execute_method(
     _args: &[(String, NGLessObject)],
 ) -> NgResult<NGLessObject> {
     match (met.0.as_str(), self_v) {
+        // NGOMappedRead methods (mirrors `executeMappedReadMethod`).
+        ("flag", NGLessObject::MappedRead(samlines)) => {
+            let flag = match _arg {
+                Some(NGLessObject::Symbol(s)) => s.as_str(),
+                _ => return Err(NgError::script("flag method requires a symbol argument")),
+            };
+            let v = match flag {
+                "mapped" => samlines.iter().any(|s| s.is_aligned()),
+                "unmapped" => !samlines.iter().any(|s| s.is_aligned()),
+                other => {
+                    return Err(NgError::script(format!(
+                        "Flag {other:?} is unknown for method flag"
+                    )))
+                }
+            };
+            Ok(NGLessObject::Bool(v))
+        }
+        ("filter", NGLessObject::MappedRead(samlines)) => {
+            let min_id_pc = lookup_int(_args, "min_identity_pc", -1)?;
+            let min_match_size = lookup_int(_args, "min_match_size", -1)?;
+            let max_trim = lookup_int(_args, "max_trim", -1)?;
+            let reverse = lookup_bool(_args, "reverse", false)?;
+            let use_newer = lookup_bool(_args, "__version11_or_higher", false)?;
+            let action = match lookup_symbol(_args, "action", "drop")?.as_str() {
+                "drop" => FilterAction::Drop,
+                "unmatch" => FilterAction::Unmatch,
+                other => {
+                    return Err(NgError::script(format!(
+                        "unknown action in filter(): `{other}`.\nAllowed values are:\n\tdrop\n\tunmatch\n\tkeep\n"
+                    )))
+                }
+            };
+            let opts = FilterOptions {
+                min_id: min_id_pc as f64 / 100.0,
+                min_match_size,
+                max_trim,
+                reverse,
+                action,
+                use_newer,
+            };
+            Ok(NGLessObject::MappedRead(select::apply_filter(
+                &opts,
+                samlines.clone(),
+            )))
+        }
         ("to_string", NGLessObject::Double(d)) => Ok(NGLessObject::String(show_double(*d))),
         ("to_string", NGLessObject::Integer(i)) => Ok(NGLessObject::String(i.to_string())),
         ("avg_quality", NGLessObject::Read(r)) => Ok(NGLessObject::Double(r.avg_quality())),
@@ -1119,6 +1385,60 @@ fn execute_method(
 
 fn lookup_arg<'a>(args: &'a [(String, NGLessObject)], name: &str) -> Option<&'a NGLessObject> {
     args.iter().find(|(k, _)| k == name).map(|(_, v)| v)
+}
+
+fn lookup_bool(args: &[(String, NGLessObject)], name: &str, default: bool) -> NgResult<bool> {
+    match lookup_arg(args, name) {
+        None => Ok(default),
+        Some(NGLessObject::Bool(b)) => Ok(*b),
+        Some(other) => Err(NgError::script(format!(
+            "Argument `{name}` should be a boolean, got {other:?}"
+        ))),
+    }
+}
+
+fn lookup_int(args: &[(String, NGLessObject)], name: &str, default: i64) -> NgResult<i64> {
+    match lookup_arg(args, name) {
+        None => Ok(default),
+        Some(NGLessObject::Integer(i)) => Ok(*i),
+        Some(other) => Err(NgError::script(format!(
+            "Argument `{name}` should be an integer, got {other:?}"
+        ))),
+    }
+}
+
+fn lookup_symbol(args: &[(String, NGLessObject)], name: &str, default: &str) -> NgResult<String> {
+    match lookup_arg(args, name) {
+        None => Ok(default.to_string()),
+        Some(NGLessObject::Symbol(s)) => Ok(s.clone()),
+        Some(other) => Err(NgError::script(format!(
+            "Argument `{name}` should be a symbol, got {other:?}"
+        ))),
+    }
+}
+
+/// Extract a list-of-symbols keyword argument (e.g. `keep_if=[{mapped}]`), defaulting to empty.
+fn lookup_symbol_list(args: &[(String, NGLessObject)], name: &str) -> Vec<String> {
+    match lookup_arg(args, name) {
+        Some(NGLessObject::List(xs)) => xs
+            .iter()
+            .filter_map(|x| match x {
+                NGLessObject::Symbol(s) => Some(s.clone()),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Destructure a mapped read set value into its name and backing file path.
+fn mapped_read_set(v: &NGLessObject, who: &str) -> NgResult<(String, PathBuf)> {
+    match v {
+        NGLessObject::MappedReadSet { name, path } => Ok((name.clone(), path.clone())),
+        other => Err(NgError::should_not_occur(format!(
+            "{who} expected a mapped read set, got {other:?}"
+        ))),
+    }
 }
 
 fn as_string(v: &NGLessObject, who: &str) -> NgResult<String> {
