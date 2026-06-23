@@ -145,7 +145,12 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         return Ok(0);
     }
 
-    crate::interpret::interpret(&typed.body)?;
+    let temp_dir = opts
+        .temp_dir
+        .clone()
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+    crate::interpret::interpret(&typed.body, &temp_dir)?;
     Ok(0)
 }
 

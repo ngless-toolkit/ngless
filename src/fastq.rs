@@ -7,6 +7,8 @@
 //! streaming pipeline (compressed I/O, parallel decode, the `preprocess` block interpreter)
 //! is a later milestone.
 
+use std::path::PathBuf;
+
 use crate::errors::{NgError, NgResult};
 
 /// A single read, with qualities already decoded to integer values.
@@ -21,6 +23,26 @@ pub struct ShortRead {
 pub enum FastQEncoding {
     Sanger,
     Solexa,
+}
+
+/// A FASTQ file on disk together with its quality encoding (mirrors `FastQFilePath`).
+///
+/// NGLess read sets are file-backed, not in-memory: `fastq` references the original input
+/// file, `preprocess` streams it to a fresh temp file, and `write` copies/recompresses the
+/// current file. Keeping the data on disk is what makes `write` of an un-preprocessed read
+/// set byte-identical to its input (preserving the original `+`-comment lines and encoding).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FastQFilePath {
+    pub encoding: FastQEncoding,
+    pub path: PathBuf,
+}
+
+/// A set of FASTQ files (mirrors `ReadSet`). Single-end read sets have an empty `pairs` and
+/// one or more `singletons`; paired-end support arrives in a later milestone.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReadSet {
+    pub pairs: Vec<(FastQFilePath, FastQFilePath)>,
+    pub singletons: Vec<FastQFilePath>,
 }
 
 impl FastQEncoding {
@@ -55,6 +77,40 @@ impl ShortRead {
             header: self.header.clone(),
             sequence: self.sequence[s..s + n].to_string(),
             qualities: self.qualities[s..s + n].to_vec(),
+        }
+    }
+
+    /// Mean quality value (mirrors the `avg_quality` method).
+    pub fn avg_quality(&self) -> f64 {
+        let sum: i64 = self.qualities.iter().map(|&q| q as i64).sum();
+        sum as f64 / self.qualities.len() as f64
+    }
+
+    /// Fraction of bases with quality at least `minq` (mirrors `fraction_at_least`).
+    pub fn fraction_at_least(&self, minq: i64) -> f64 {
+        let n = self.qualities.iter().filter(|&&q| q as i64 >= minq).count();
+        n as f64 / self.qualities.len() as f64
+    }
+
+    /// Set the quality to 0 at every `N`/`n` base (mirrors `n_to_zero_quality`).
+    pub fn n_to_zero_quality(&self) -> ShortRead {
+        let bytes = self.sequence.as_bytes();
+        let qualities = self
+            .qualities
+            .iter()
+            .enumerate()
+            .map(|(i, &q)| {
+                if bytes[i] == b'N' || bytes[i] == b'n' {
+                    0
+                } else {
+                    q
+                }
+            })
+            .collect();
+        ShortRead {
+            header: self.header.clone(),
+            sequence: self.sequence.clone(),
+            qualities,
         }
     }
 }
@@ -377,6 +433,21 @@ mod tests {
             smoothtrim_pos(10, &[24, 2, 24, 24, 24, 24, 2, 24, 24, 24, 24, 2, 24], 20),
             (0, 13)
         );
+    }
+
+    #[test]
+    fn read_quality_methods() {
+        // avg_quality: mean of the quality values.
+        let sr = ShortRead::new("r", "ACGT", vec![10, 20, 30, 40]);
+        assert_eq!(sr.avg_quality(), 25.0);
+        // fraction_at_least: fraction of bases with quality >= minq.
+        assert_eq!(sr.fraction_at_least(20), 0.75);
+        assert_eq!(sr.fraction_at_least(100), 0.0);
+        // n_to_zero_quality: zero the quality at N/n bases, leave others.
+        let withn = ShortRead::new("r", "AnGN", vec![10, 20, 30, 40]);
+        let z = withn.n_to_zero_quality();
+        assert_eq!(z.qualities, vec![10, 0, 30, 0]);
+        assert_eq!(z.sequence, "AnGN");
     }
 
     #[test]

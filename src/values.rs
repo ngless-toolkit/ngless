@@ -8,7 +8,7 @@
 
 use crate::ast::BOp;
 use crate::errors::{NgError, NgResult};
-use crate::fastq::ShortRead;
+use crate::fastq::{ReadSet, ShortRead};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum NGLessObject {
@@ -21,11 +21,11 @@ pub enum NGLessObject {
     Void,
     List(Vec<NGLessObject>),
     Read(ShortRead),
-    /// An in-memory read set (single-end). The Haskell runtime keeps reads on disk; this is a
-    /// simplified in-memory model for the current milestone.
+    /// A file-backed read set (see [`ReadSet`]). `name` is the user-facing name (the original
+    /// file path or a `group`/`paired` name); the data lives in the referenced files on disk.
     ReadSet {
         name: String,
-        reads: Vec<ShortRead>,
+        readset: ReadSet,
     },
 }
 

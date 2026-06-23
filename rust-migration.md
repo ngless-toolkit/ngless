@@ -14,11 +14,22 @@
 >   `__assert`/`to_string`. The citation header and `clap`-based arg parsing are still
 >   pending, so functional-test stdout parity is not yet attempted.
 > - **M4 (FASTQ path, partial):** the pure trimming core (`substrim`/`endstrim`/`smoothtrim`,
->   encode/decode, `compatibleHeader`) plus an **in-memory** `fastq` → `preprocess(...) using
->   |read|:` → `write` path (block interpreter with read slicing, `len`, `discard`/`continue`,
->   and read-write block variable). Simplifications to lift later: reads are in memory (no
->   `FileOrStream`/streaming), FASTQ is uncompressed and assumed Sanger, single-end only.
->   Still not started: module loading and the `map`/`count`/SAM subsystems.
+>   encode/decode, `compatibleHeader`) plus a **file-backed** single-end `fastq` →
+>   `preprocess(...) using |read|:` → `write` path. Read sets reference FASTQ files on disk
+>   (mirroring `FastQFilePath`/`ReadSet`): `fastq` keeps the original file with its detected
+>   encoding, `preprocess` streams it through the block (read slicing, `len`,
+>   `discard`/`continue`, read-write block variable, and the `avg_quality`/`fraction_at_least`/
+>   `n_to_zero_quality` methods) to a fresh temp file, and `write` copies the current file.
+>   This file-backed model is what makes `write` byte-identical to its input.
+>   **First functional tests now pass against the Rust binary** (identical output to the
+>   committed `expected.*`): `tests/write_fq`, `tests/write_fq_inline`, and `tests/preprocess`
+>   (all six outputs: copy, substrim, endstrim, smoothtrim, `avg_quality` filter, and
+>   `n_to_zero_quality`). Their `ngless "1.1"` headers were bumped to `"1.5"` (these features
+>   have only minimum-version checks, no version-conditional behavior, so Haskell output is
+>   unchanged).
+>   Simplifications to lift next: files are read whole rather than streamed (no
+>   `FileOrStream`/bounded queues), compressed (gz/bz2/zstd) I/O, paired ends, and FASTQ QC
+>   statistics. Still not started: module loading and the `map`/`count`/SAM subsystems.
 
 ## Context
 

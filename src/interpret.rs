@@ -2,27 +2,37 @@
 //!
 //! Implemented: pure expression evaluation (constants, variables, operators, indexing, lists),
 //! conditionals and assignment; the simple builtins `print`, `println`, `read_int`,
-//! `read_double`, `__assert`, the `to_string` method; and an in-memory FASTQ path —
-//! `fastq` (read a file into a read set), `preprocess(...) using |read|:` blocks
-//! (with `substrim`/`endstrim`/`smoothtrim`, read slicing, `len`, `discard`/`continue`), and
-//! `write` of a read set to a FASTQ file.
+//! `read_double`, `__assert`, the `to_string`/`avg_quality`/`fraction_at_least`/
+//! `n_to_zero_quality` methods; and a file-backed FASTQ path — `fastq` (reference a file with
+//! its detected encoding), `preprocess(...) using |read|:` blocks (with
+//! `substrim`/`endstrim`/`smoothtrim`, read slicing, `len`, `discard`/`continue`), and `write`
+//! (copy the read set's current file to the output).
 //!
-//! Simplifications vs. the Haskell runtime, to be lifted in later milestones: reads are held
-//! in memory (no FileOrStream/streaming), FASTQ is read/written uncompressed and assumed to be
-//! Sanger-encoded, and only single-end read sets are handled.
+//! Read sets are file-backed (see [`crate::fastq::ReadSet`]): `fastq` keeps the original file,
+//! `preprocess` streams it to a fresh temp file, and `write` copies the current file. This is
+//! what makes `write` of an un-preprocessed read set byte-identical to its input.
+//!
+//! Simplifications vs. the Haskell runtime, to be lifted in later milestones: files are read
+//! whole rather than streamed (no FileOrStream/bounded queues), compressed (gz/bz2/zstd) FASTQ
+//! I/O is not handled, and only single-end read sets are supported (no paired ends).
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
 use crate::ast::*;
 use crate::errors::{NgError, NgErrorType, NgResult};
-use crate::fastq::{self, FastQEncoding, ShortRead};
+use crate::fastq::{self, FastQFilePath, ReadSet, ShortRead};
 use crate::values::{eval_binary, eval_index, eval_unary, show_double, NGLessObject};
 
-/// Interpret a script body (already type-checked and validated).
-pub fn interpret(body: &[(usize, Expression)]) -> NgResult<()> {
+/// Interpret a script body (already type-checked and validated). `temp_dir` is where
+/// intermediate FASTQ files (e.g. from `preprocess`) are written.
+pub fn interpret(body: &[(usize, Expression)], temp_dir: &Path) -> NgResult<()> {
     let mut interp = Interpreter {
         env: HashMap::new(),
+        temp_dir: temp_dir.to_path_buf(),
+        temp_counter: Cell::new(0),
     };
     for (_lno, e) in body {
         interp.interpret_top(e)?;
@@ -32,6 +42,8 @@ pub fn interpret(body: &[(usize, Expression)]) -> NgResult<()> {
 
 struct Interpreter {
     env: HashMap<String, NGLessObject>,
+    temp_dir: PathBuf,
+    temp_counter: Cell<u64>,
 }
 
 /// The outcome of running a (block) statement, mirroring `BlockStatus`.
@@ -215,38 +227,100 @@ impl Interpreter {
         for (Variable(v), e) in args {
             argvs.push((v.clone(), self.interpret_expr(e)?));
         }
-        execute_function(f, &expr_v, &argvs)
+        // Functions that touch the filesystem need interpreter state (the temp dir);
+        // the rest are pure and handled by the free `execute_function`.
+        match f.0.as_str() {
+            "fastq" => self.execute_fastq(&expr_v),
+            "write" => execute_write(&expr_v, &argvs),
+            _ => execute_function(f, &expr_v, &argvs),
+        }
     }
 
-    // --- preprocess blocks ---------------------------------------------------
+    /// Allocate a fresh temp file path under the configured temp directory.
+    fn new_temp_path(&self, prefix: &str, ext: &str) -> PathBuf {
+        let n = self.temp_counter.get();
+        self.temp_counter.set(n + 1);
+        self.temp_dir
+            .join(format!("{prefix}{}.{n}.{ext}", std::process::id()))
+    }
 
+    // --- fastq / preprocess --------------------------------------------------
+
+    /// `fastq(fname)`: reference the input file with its detected (or given) encoding. The file
+    /// is *not* rewritten, so a later `write` reproduces it byte-for-byte (mirrors
+    /// `executeFastq` for the non-interleaved case).
+    fn execute_fastq(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
+        let path = as_string(expr, "fastq")?;
+        let text = read_fastq_text(&path)?;
+        let encoding = fastq::detect_encoding(&text)?;
+        Ok(NGLessObject::ReadSet {
+            name: path.clone(),
+            readset: ReadSet {
+                pairs: Vec::new(),
+                singletons: vec![FastQFilePath {
+                    encoding,
+                    path: PathBuf::from(path),
+                }],
+            },
+        })
+    }
+
+    /// `preprocess(rs) using |read|: ...`: stream each input file through the block, writing the
+    /// surviving reads to a fresh temp file (mirrors `executePreprocess`). Output encoding is the
+    /// common input encoding, or Sanger if the inputs disagree.
     fn execute_preprocess(&self, readset: &NGLessObject, block: &Block) -> NgResult<NGLessObject> {
-        let (name, reads) = match readset {
-            NGLessObject::ReadSet { name, reads } => (name.clone(), reads.clone()),
+        let (name, rs) = match readset {
+            NGLessObject::ReadSet { name, readset } => (name.clone(), readset.clone()),
             other => {
                 return Err(NgError::should_not_occur(format!(
                     "preprocess expected a read set, got {other:?}"
                 )))
             }
         };
+        if !rs.pairs.is_empty() {
+            return Err(NgError::script(
+                "preprocess of paired-end read sets is not implemented in this build yet.",
+            ));
+        }
+        let outenc = output_encoding(&rs.singletons);
         let var = &block.variable.0;
-        let mut out = Vec::new();
-        for r in reads {
-            let (status, value) =
-                self.interpret_block_stmt(var, NGLessObject::Read(r), &block.body)?;
-            match status {
-                BlockStatus::Discarded => {}
-                BlockStatus::Ok | BlockStatus::Continued => match value {
-                    NGLessObject::Read(sr) => out.push(sr),
-                    other => {
-                        return Err(NgError::should_not_occur(format!(
-                            "preprocess block produced a non-read value: {other:?}"
-                        )))
-                    }
-                },
+        let mut out = String::new();
+        for fqf in &rs.singletons {
+            let text = read_fastq_text(&fqf.path.to_string_lossy())?;
+            let reads = fastq::fq_decode(fqf.encoding, &text)?;
+            for r in reads {
+                let (status, value) =
+                    self.interpret_block_stmt(var, NGLessObject::Read(r), &block.body)?;
+                match status {
+                    BlockStatus::Discarded => {}
+                    BlockStatus::Ok | BlockStatus::Continued => match value {
+                        NGLessObject::Read(sr) => out.push_str(&fastq::fq_encode(outenc, &sr)),
+                        other => {
+                            return Err(NgError::should_not_occur(format!(
+                                "preprocess block produced a non-read value: {other:?}"
+                            )))
+                        }
+                    },
+                }
             }
         }
-        Ok(NGLessObject::ReadSet { name, reads: out })
+        let outfile = self.new_temp_path("preprocessed.singles.", "fq");
+        std::fs::write(&outfile, out).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write temp file {}: {e}", outfile.display()),
+            )
+        })?;
+        Ok(NGLessObject::ReadSet {
+            name,
+            readset: ReadSet {
+                pairs: Vec::new(),
+                singletons: vec![FastQFilePath {
+                    encoding: outenc,
+                    path: outfile,
+                }],
+            },
+        })
     }
 
     /// Interpret one block statement, mirroring `interpretBlock1`/`interpretBlock`. The block
@@ -416,27 +490,46 @@ fn execute_function(
                 "Assert did not receive a boolean!",
             )),
         },
-        "fastq" => execute_fastq(expr),
-        "write" => execute_write(expr, args),
         other => Err(NgError::script(format!(
             "Interpretation of function `{other}` is not implemented in this build yet."
         ))),
     }
 }
 
-fn execute_fastq(expr: &NGLessObject) -> NgResult<NGLessObject> {
-    let path = as_string(expr, "fastq")?;
-    let text = std::fs::read_to_string(&path).map_err(|e| {
+/// Common encoding of a list of files: the shared encoding if they all agree, else Sanger
+/// (mirrors the `outenc` computation in `executePreprocess`).
+fn output_encoding(files: &[FastQFilePath]) -> fastq::FastQEncoding {
+    match files.split_first() {
+        None => fastq::FastQEncoding::Sanger,
+        Some((first, rest)) if rest.iter().all(|f| f.encoding == first.encoding) => first.encoding,
+        _ => fastq::FastQEncoding::Sanger,
+    }
+}
+
+/// Read a FASTQ file into memory. Compressed inputs are not handled in this build yet.
+fn read_fastq_text(path: &str) -> NgResult<String> {
+    if is_compressed(path) {
+        return Err(NgError::script(format!(
+            "Compressed FASTQ input ('{path}') is not supported in this build yet."
+        )));
+    }
+    std::fs::read_to_string(path).map_err(|e| {
         NgError::new(
             NgErrorType::DataError,
             format!("Could not read {path}: {e}"),
         )
-    })?;
-    let enc = fastq::detect_encoding(&text)?;
-    let reads = fastq::fq_decode(enc, &text)?;
-    Ok(NGLessObject::ReadSet { name: path, reads })
+    })
 }
 
+fn is_compressed(path: &str) -> bool {
+    [".gz", ".bz2", ".zst", ".zstd"]
+        .iter()
+        .any(|ext| path.ends_with(ext))
+}
+
+/// `write(rs, ofile=...)`: copy the read set's current file(s) to `ofile`. For an
+/// un-preprocessed read set this reproduces the input byte-for-byte (mirrors `executeWrite`
+/// of an `NGOReadSet`, which `moveOrCopyCompress`es the underlying FASTQ files).
 fn execute_write(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResult<NGLessObject> {
     let ofile = match lookup_arg(args, "ofile") {
         Some(NGLessObject::String(s)) => s.clone(),
@@ -447,24 +540,47 @@ fn execute_write(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResu
         }
     };
     match expr {
-        NGLessObject::ReadSet { reads, .. } => {
-            let mut out = String::new();
-            for r in reads {
-                out.push_str(&fastq::fq_encode(FastQEncoding::Sanger, r));
+        NGLessObject::ReadSet { readset, .. } => {
+            if !readset.pairs.is_empty() {
+                return Err(NgError::script(
+                    "write of paired-end read sets is not implemented in this build yet.",
+                ));
             }
-            std::fs::write(&ofile, out).map_err(|e| {
-                NgError::new(
-                    NgErrorType::SystemError,
-                    format!("Could not write {ofile}: {e}"),
-                )
-            })?;
-            Ok(NGLessObject::String(ofile))
+            match readset.singletons.as_slice() {
+                [single] => {
+                    copy_fastq(&single.path, &ofile)?;
+                    Ok(NGLessObject::String(ofile))
+                }
+                [] => Err(NgError::script(
+                    "write: the read set has no files to write.",
+                )),
+                _ => Err(NgError::script(
+                    "write of a multi-file read set is not implemented in this build yet.",
+                )),
+            }
         }
         other => Err(NgError::script(format!(
             "write of {} is not implemented in this build yet.",
             type_label(other)
         ))),
     }
+}
+
+/// Copy a FASTQ file to `ofile`. Recompression (gz/bz2/zstd) is not implemented yet, so this
+/// requires the input and output to share the (uncompressed) format.
+fn copy_fastq(src: &Path, ofile: &str) -> NgResult<()> {
+    if is_compressed(ofile) || is_compressed(&src.to_string_lossy()) {
+        return Err(NgError::script(format!(
+            "Compressed FASTQ output ('{ofile}') is not supported in this build yet."
+        )));
+    }
+    std::fs::copy(src, ofile).map_err(|e| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!("Could not write {ofile}: {e}"),
+        )
+    })?;
+    Ok(())
 }
 
 fn execute_print(v: &NGLessObject) -> NgResult<NGLessObject> {
@@ -543,6 +659,18 @@ fn execute_method(
     match (met.0.as_str(), self_v) {
         ("to_string", NGLessObject::Double(d)) => Ok(NGLessObject::String(show_double(*d))),
         ("to_string", NGLessObject::Integer(i)) => Ok(NGLessObject::String(i.to_string())),
+        ("avg_quality", NGLessObject::Read(r)) => Ok(NGLessObject::Double(r.avg_quality())),
+        ("n_to_zero_quality", NGLessObject::Read(r)) => {
+            Ok(NGLessObject::Read(r.n_to_zero_quality()))
+        }
+        ("fraction_at_least", NGLessObject::Read(r)) => match _arg {
+            Some(NGLessObject::Integer(minq)) => {
+                Ok(NGLessObject::Double(r.fraction_at_least(*minq)))
+            }
+            _ => Err(NgError::script(
+                "fraction_at_least requires an integer argument",
+            )),
+        },
         (other, _) => Err(NgError::script(format!(
             "Method `{other}` is not implemented in this build yet."
         ))),
@@ -578,7 +706,7 @@ mod tests {
 
     fn run(text: &str) -> NgResult<()> {
         let script = parse_ngless("test", true, text).expect("parse failed");
-        interpret(&script.body)
+        interpret(&script.body, &std::env::temp_dir())
     }
 
     #[test]
