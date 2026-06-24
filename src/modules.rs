@@ -308,6 +308,14 @@ mod builders {
             ),
             func("__assert", Some(Bool), vec![], Void, vec![], vec![]),
             func(
+                "readlines",
+                Some(String),
+                vec![FileReadable],
+                list(String),
+                vec![],
+                vec![ReturnAssigned],
+            ),
+            func(
                 "__merge_samfiles",
                 Some(list(String)),
                 vec![],

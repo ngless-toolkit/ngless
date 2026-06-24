@@ -1481,6 +1481,7 @@ fn execute_function(
         }
         "read_int" => execute_read_int(expr, args),
         "read_double" => execute_read_double(expr, args),
+        "readlines" => execute_readlines(expr),
         "__assert" => match expr {
             NGLessObject::Bool(true) => Ok(NGLessObject::Void),
             NGLessObject::Bool(false) => Err(NgError::script("Assert failed")),
@@ -2045,6 +2046,33 @@ fn execute_print(v: &NGLessObject) -> NgResult<NGLessObject> {
     h.write_all(s.as_bytes())
         .map_err(|e| NgError::new(NgErrorType::SystemError, e.to_string()))?;
     Ok(NGLessObject::Void)
+}
+
+/// `readlines(fname)`: read a file and return its lines as a list of strings (mirrors
+/// `executeReadlines`). Lines are split on `\n`, a trailing `\r` is stripped (Windows line
+/// endings), and no trailing empty line is produced when the file ends with a newline — exactly
+/// what `linesC` does and what Rust's `str::lines()` provides.
+fn execute_readlines(v: &NGLessObject) -> NgResult<NGLessObject> {
+    let fname = match v {
+        NGLessObject::String(s) => s,
+        other => {
+            return Err(NgError::should_not_occur(format!(
+                "executeReadlines called with argument: {other:?}"
+            )))
+        }
+    };
+    let content = std::fs::read_to_string(fname).map_err(|e| {
+        NgError::new(
+            NgErrorType::DataError,
+            format!("Could not read file '{fname}': {e}"),
+        )
+    })?;
+    Ok(NGLessObject::List(
+        content
+            .lines()
+            .map(|l| NGLessObject::String(l.to_string()))
+            .collect(),
+    ))
 }
 
 fn execute_read_int(v: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResult<NGLessObject> {
