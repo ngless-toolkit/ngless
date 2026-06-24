@@ -141,10 +141,6 @@ fn path_append(a: &str, b: &str) -> String {
 }
 
 /// Evaluate a binary operator, mirroring `evalBinary` in Language.hs.
-///
-/// Note: the `BOpMul` fallback for non-integer operands reproduces the Haskell behaviour
-/// exactly, including its long-standing quirk of using addition rather than multiplication for
-/// the floating-point case.
 pub fn eval_binary(op: BOp, a: &NGLessObject, b: &NGLessObject) -> NgResult<NGLessObject> {
     use NGLessObject::*;
     match op {
@@ -155,8 +151,7 @@ pub fn eval_binary(op: BOp, a: &NGLessObject, b: &NGLessObject) -> NgResult<NGLe
         },
         BOp::Mul => match (a, b) {
             (Integer(x), Integer(y)) => Ok(Integer(x * y)),
-            // Faithful to Language.hs: the double fallback uses `(+)`, not `(*)`.
-            _ => Ok(Double(as_double(a)? + as_double(b)?)),
+            _ => Ok(Double(as_double(a)? * as_double(b)?)),
         },
         BOp::PathAppend => match (a, b) {
             (String(x), String(y)) => Ok(String(path_append(x, y))),

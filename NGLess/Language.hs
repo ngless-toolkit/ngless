@@ -197,7 +197,7 @@ evalBinary BOpAdd (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a + b)
 evalBinary BOpAdd (NGOString a) (NGOString b) = Right $ NGOString (T.concat [a, b])
 evalBinary BOpAdd a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
 evalBinary BOpMul (NGOInteger a) (NGOInteger b) = Right $ NGOInteger (a * b)
-evalBinary BOpMul a b = (NGODouble .) . (+) <$> asDouble a <*> asDouble b
+evalBinary BOpMul a b = (NGODouble .) . (*) <$> asDouble a <*> asDouble b
 evalBinary BOpPathAppend a b = case (a,b) of
     (NGOString pa, NGOString pb) -> return . NGOString $! T.pack (T.unpack pa </> T.unpack pb)
     _ -> throwShouldNotOccur ("Operator </>: invalid arguments" :: String)
