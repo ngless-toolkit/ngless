@@ -80,6 +80,30 @@
 >   `.sam.gz` outputs all match); only its `check.sh` (bare `ngless --print-path samtools`) can't
 >   be driven here, the same limitation that blocks every samtools `check.sh` test locally (no
 >   `ngless` on PATH).
+> - **M6 (counting, part 1):** `count()` with all three annotation modes and all four
+>   normalizations (`src/count.rs` + `src/gff.rs`, mirroring `Interpretation/Count.hs` and
+>   `Data/GFF.hs`). The seqname annotator is built from the `@SQ` header (sorted by name, sizes
+>   from `LN:`); the functional-map annotator parses a MOCAT-style TSV (one annotator per feature
+>   column, sorted by tag, `feature:` prefix only when >1 feature, sizes summed from `@SQ` when
+>   `normalization={normed}`); the GFF annotator parses GFF3/GTF (per-attribute `=`-vs-space and
+>   comma-split values), reindexes feature ids to sorted order and resolves overlaps with
+>   `union`/`intersection_strict`/`intersection_non_empty` under `sense`/`antisense` strand rules.
+>   Multi-mappers follow `all1`/`1overN`/`unique_only`/`dist1` (the dist1 second pass distributes by
+>   size-normalized weight, or 1/N when zero); `scaled`/`fpkm` rescale over the totals excluding the
+>   `-1` bucket. Output uses Rust's shortest-round-trip `f64` `Display`, which matches
+>   double-conversion's `toShortest` for every value in the suite. `write()` of counts gained
+>   `format={csv}` (tab→comma) and a manual `comment=` (`# ` prefix). The Haskell async/conduit
+>   pipeline is performance-only and is replaced by a serial whole-file pass. Passing (headers
+>   bumped `1.1`/`1.2`→`1.5`): `tests/count-basic` (seqname; all1/dist1/1overN, normed/scaled, csv),
+>   `tests/count-map-file` (functional map; raw/normed/dist1, multi-column, `discard_zeros`),
+>   `tests/count-gff` (GFF union; strand/sense/antisense, scaled, `min`, `include_minus1`) and
+>   `tests/count-gff-corner-cases` (GFF subfeatures with comma-split attributes). Still pending:
+>   `auto_comments=[{script}]` on `write()` (needs the original script source threaded into the
+>   interpreter — a `write()` concern), which leaves `tests/count-fpkm` kept at `1.1` for now
+>   (its fpkm/scaled math is verified and unit-tested, but two of its outputs embed the script via
+>   `auto_comments`); `count-mode`/`count-subfeatures` need `map()`/bwa (CI only, though their GFF
+>   modes are covered above); `countfile()`/`mapstats()` and the double-conversion scientific
+>   switch for out-of-range exponents are deferred.
 
 ## Context
 

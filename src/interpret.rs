@@ -271,6 +271,7 @@ impl Interpreter {
             "qcstats" => self.execute_qcstats(&expr_v),
             "samtools_sort" => self.execute_samtools_sort(&expr_v, &argvs),
             "samtools_view" => self.execute_samtools_view(&expr_v, &argvs),
+            "count" => self.execute_count(&expr_v, &argvs),
             "write" => self.execute_write(&expr_v, &argvs),
             _ => execute_function(f, &expr_v, &argvs),
         }
@@ -359,6 +360,57 @@ impl Interpreter {
             },
         };
         Ok(NGLessObject::ReadSet { name, readset })
+    }
+
+    /// `count(mapped, ...)`: annotate and count mapped reads against sequence names, a GFF file or
+    /// a functional map (mirrors `executeCount`). Returns a `Counts` value backed by a TSV file.
+    fn execute_count(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        if let NGLessObject::List(es) = expr {
+            let counted = es
+                .iter()
+                .map(|e| self.execute_count(e, args))
+                .collect::<NgResult<Vec<_>>>()?;
+            return Ok(NGLessObject::List(counted));
+        }
+        let (name, path) = mapped_read_set(expr, "count")?;
+        let opts = parse_count_opts(args)?;
+
+        let text = read_sam_text(&path.to_string_lossy())?;
+        let records = sam::parse_sam(&text)?;
+        let mut sq_header: Vec<(String, i64)> = Vec::new();
+        let mut groups: Vec<Vec<SamLine>> = Vec::new();
+        for rec in records {
+            match rec {
+                SamRecord::Header(h) => {
+                    if let Some(sq) = parse_sq_header(&h) {
+                        sq_header.push(sq);
+                    }
+                }
+                SamRecord::Line(l) => {
+                    if let Some(last) = groups.last_mut() {
+                        if last[0].qname == l.qname {
+                            last.push(l);
+                            continue;
+                        }
+                    }
+                    groups.push(vec![l]);
+                }
+            }
+        }
+
+        let tsv = crate::count::perform_count(&groups, &sq_header, &name, &opts)?;
+        let out = self.new_temp_path("counts.", "txt");
+        std::fs::write(&out, tsv).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write counts file: {e}"),
+            )
+        })?;
+        Ok(NGLessObject::Counts(out))
     }
 
     /// Write FASTQ text to a fresh temp file and reference it with the given encoding.
@@ -1262,7 +1314,7 @@ fn execute_write(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResu
             Ok(NGLessObject::String(ofile))
         }
         NGLessObject::Counts(path) => {
-            copy_fastq(path, &ofile)?;
+            write_counts(path, &ofile, args)?;
             Ok(NGLessObject::String(ofile))
         }
         other => Err(NgError::script(format!(
@@ -1327,6 +1379,48 @@ fn copy_fastq(src: &Path, ofile: &str) -> NgResult<()> {
         write_bytes(ofile, &data)?;
     }
     Ok(())
+}
+
+/// Write a counts TSV to `ofile` (mirrors the `NGOCounts` arm of `executeWrite`). Supports
+/// `format={tsv|csv}` and a manual `comment=` (each line prefixed `# `). `auto_comments` is not
+/// supported yet and is ignored.
+fn write_counts(path: &Path, ofile: &str, args: &[(String, NGLessObject)]) -> NgResult<()> {
+    let format = match lookup_arg(args, "format") {
+        None => "tsv".to_string(),
+        Some(NGLessObject::Symbol(s)) => s.clone(),
+        Some(other) => {
+            return Err(NgError::script(format!(
+                "write: `format` should be a symbol, got {other:?}"
+            )))
+        }
+    };
+    let comment = match lookup_arg(args, "comment") {
+        Some(NGLessObject::String(s)) => Some(s.clone()),
+        _ => None,
+    };
+    // Fast path: an unmodified TSV is copied (and recompressed) verbatim.
+    if format == "tsv" && comment.is_none() {
+        return copy_fastq(path, ofile);
+    }
+    let body = crate::compression::read_to_string(&path.to_string_lossy())?;
+    let mut out = String::new();
+    if let Some(c) = &comment {
+        for line in c.split('\n') {
+            out.push_str("# ");
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    match format.as_str() {
+        "tsv" => out.push_str(&body),
+        "csv" => out.push_str(&body.replace('\t', ",")),
+        f => {
+            return Err(NgError::script(format!(
+                "Invalid format in write: {{{f}}}.\n\tWhen writing counts, only accepted values are {{tsv}} (TAB separated values; default) or {{csv}} (COMMA separated values)."
+            )))
+        }
+    }
+    crate::compression::write_bytes(ofile, out.as_bytes())
 }
 
 fn execute_print(v: &NGLessObject) -> NgResult<NGLessObject> {
@@ -1514,6 +1608,143 @@ fn lookup_symbol_list(args: &[(String, NGLessObject)], name: &str) -> Vec<String
             .collect(),
         _ => Vec::new(),
     }
+}
+
+/// Extract a string or list-of-strings keyword argument; `None` when absent (mirrors the
+/// `features`/`subfeatures` parsing in `parseOptions`).
+fn lookup_string_list(
+    args: &[(String, NGLessObject)],
+    name: &str,
+) -> NgResult<Option<Vec<String>>> {
+    match lookup_arg(args, name) {
+        None => Ok(None),
+        Some(NGLessObject::String(s)) => Ok(Some(vec![s.clone()])),
+        Some(NGLessObject::List(xs)) => {
+            let mut out = Vec::with_capacity(xs.len());
+            for x in xs {
+                match x {
+                    NGLessObject::String(s) => out.push(s.clone()),
+                    other => {
+                        return Err(NgError::script(format!(
+                            "Argument `{name}` should be a list of strings, got element {other:?}"
+                        )))
+                    }
+                }
+            }
+            Ok(Some(out))
+        }
+        Some(other) => Err(NgError::script(format!(
+            "Argument `{name}` should be a string or list of strings, got {other:?}"
+        ))),
+    }
+}
+
+/// Look up an optional string/filename keyword argument.
+fn lookup_opt_string(args: &[(String, NGLessObject)], name: &str) -> Option<String> {
+    match lookup_arg(args, name) {
+        Some(NGLessObject::String(s)) | Some(NGLessObject::Filename(s)) => Some(s.clone()),
+        _ => None,
+    }
+}
+
+/// Parse an `@SQ` header line into `(sequence name, length)`; `None` for other headers or when
+/// `SN:`/`LN:` are missing.
+fn parse_sq_header(line: &str) -> Option<(String, i64)> {
+    let mut fields = line.split('\t');
+    if fields.next() != Some("@SQ") {
+        return None;
+    }
+    let (mut name, mut len) = (None, None);
+    for f in fields {
+        if let Some(n) = f.strip_prefix("SN:") {
+            name = Some(n.to_string());
+        } else if let Some(l) = f.strip_prefix("LN:") {
+            len = l.parse::<i64>().ok();
+        }
+    }
+    Some((name?, len?))
+}
+
+/// Build [`count::CountOpts`] from the keyword arguments (mirrors `parseOptions`).
+fn parse_count_opts(args: &[(String, NGLessObject)]) -> NgResult<crate::count::CountOpts> {
+    use crate::count::{AnnotationMode, CountOpts, IntersectMode, MMMethod, NMode, StrandMode};
+
+    let features =
+        lookup_string_list(args, "features")?.unwrap_or_else(|| vec!["gene".to_string()]);
+    let subfeatures = lookup_string_list(args, "subfeatures")?;
+
+    let mm_method = match lookup_symbol(args, "multiple", "dist1")?.as_str() {
+        "all1" => MMMethod::CountAll,
+        "dist1" => MMMethod::Dist1,
+        "1overN" => MMMethod::OneOverN,
+        "unique_only" => MMMethod::UniqueOnly,
+        other => return Err(NgError::script(format!("Unexpected value for `multiple`: {other}"))),
+    };
+
+    let strand_specific = lookup_bool(args, "strand", false)?;
+    let sense_default = if strand_specific { "sense" } else { "both" };
+    let strand_mode = match lookup_symbol(args, "sense", sense_default)?.as_str() {
+        "both" => StrandMode::Both,
+        "sense" => StrandMode::Sense,
+        "antisense" => StrandMode::Antisense,
+        other => return Err(NgError::script(format!("Unexpected value for `sense`: {other}"))),
+    };
+
+    let intersect_mode = match lookup_symbol(args, "mode", "union")?.as_str() {
+        "union" => IntersectMode::Union,
+        "intersection_strict" => IntersectMode::Strict,
+        "intersection_non_empty" => IntersectMode::NonEmpty,
+        other => return Err(NgError::script(format!("Unexpected value for `mode`: {other}"))),
+    };
+
+    let norm_size = lookup_bool(args, "norm", false)?;
+    let norm_default = if norm_size { "normed" } else { "raw" };
+    let norm_mode = match lookup_symbol(args, "normalization", norm_default)?.as_str() {
+        "raw" => NMode::Raw,
+        "normed" => NMode::Normed,
+        "scaled" => NMode::Scaled,
+        "fpkm" => NMode::Fpkm,
+        other => {
+            return Err(NgError::script(format!(
+                "Unexpected value for `normalization`: {other}"
+            )))
+        }
+    };
+
+    let min_count = if lookup_bool(args, "discard_zeros", false)? {
+        f64::MIN_POSITIVE
+    } else {
+        lookup_int(args, "min", 0)? as f64
+    };
+    let include_minus1 = lookup_bool(args, "include_minus1", true)?;
+
+    let annotation_mode = if features == ["seqname"] {
+        AnnotationMode::SeqName
+    } else if let Some(m) = lookup_opt_string(args, "functional_map") {
+        AnnotationMode::FunctionalMap(m)
+    } else if let Some(g) = lookup_opt_string(args, "gff_file") {
+        AnnotationMode::Gff(g)
+    } else if lookup_opt_string(args, "reference").is_some() {
+        return Err(NgError::script(
+            "count(): the `reference` argument (automatic annotation download) is not supported in this build yet.".to_string(),
+        ));
+    } else {
+        return Err(NgError::script(
+            "For counting, you must use seqname mode, pass a `gff_file`, or pass a `functional_map`.".to_string(),
+        ));
+    };
+
+    Ok(CountOpts {
+        features,
+        subfeatures,
+        annotation_mode,
+        intersect_mode,
+        strand_mode,
+        min_count,
+        mm_method,
+        norm_mode,
+        include_minus1,
+    })
 }
 
 /// Destructure a mapped read set value into its name and backing file path.

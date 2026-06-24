@@ -14,8 +14,10 @@
 pub mod ast;
 pub mod cli;
 pub mod compression;
+pub mod count;
 pub mod errors;
 pub mod fastq;
+pub mod gff;
 pub mod interpret;
 pub mod modules;
 pub mod parser;
