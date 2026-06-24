@@ -303,6 +303,13 @@ fn validate_stdin_used_once(script: &Script) -> Vec<String> {
     out
 }
 
+/// Whether any expression in the script writes to `STDOUT` (mirrors `uses_STDOUT` in
+/// `Validation.hs`). When true, NGLess suppresses the run header so it does not corrupt the
+/// data stream (mirrors `setQuiet` on `uses_STDOUT`).
+pub fn uses_stdout(script: &Script) -> bool {
+    script.body.iter().any(|(_, e)| constant_used("STDOUT", e))
+}
+
 fn constant_used(k: &str, e: &Expression) -> bool {
     match e {
         Expression::BuiltinConstant(Variable(k2)) => k == k2,

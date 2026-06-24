@@ -12,6 +12,7 @@
 //! `tests/` via `NGLESS_BIN=<this binary> ./run-tests.sh`.
 
 pub mod ast;
+pub mod citations;
 pub mod cli;
 pub mod compression;
 pub mod count;

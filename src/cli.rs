@@ -164,6 +164,13 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         return Ok(0);
     }
 
+    // The run header is suppressed by `--no-header` or when the script writes to STDOUT
+    // (mirrors `nConfPrintHeader` and `setQuiet` on `uses_STDOUT`).
+    if !opts.no_header && !crate::validation::uses_stdout(&typed) {
+        let citations = crate::citations::collect_citations(&typed);
+        crate::citations::print_header(&citations);
+    }
+
     let temp_dir = opts
         .temp_dir
         .clone()
