@@ -39,6 +39,7 @@ pub fn interpret(
     temp_dir: &Path,
     script_text: &str,
     search_path: &[String],
+    argv: &[String],
 ) -> NgResult<()> {
     let mut interp = Interpreter {
         env: HashMap::new(),
@@ -47,6 +48,7 @@ pub fn interpret(
         fq_stats: RefCell::new(Vec::new()),
         script_text: script_text.to_string(),
         search_path: search_path.to_vec(),
+        argv: argv.to_vec(),
     };
     for (lno, e) in body {
         interp.cur_lno.set(*lno);
@@ -80,6 +82,9 @@ struct Interpreter {
     /// Reference search path (`--search-path`), used to resolve `<references>` placeholders in
     /// `map(..., fafile=...)` (mirrors `nConfSearchPath`).
     search_path: Vec<String>,
+    /// The command-line arguments exposed as the `ARGV` constant (`[script_path, ...extra]`,
+    /// mirroring `nConfArgv`/`builtin.argv`).
+    argv: Vec<String>,
 }
 
 /// The outcome of running a (block) statement, mirroring `BlockStatus`.
@@ -162,6 +167,9 @@ impl Interpreter {
             Expression::BuiltinConstant(Variable(v)) => match v.as_str() {
                 "STDIN" => Ok(NGLessObject::String("/dev/stdin".into())),
                 "STDOUT" => Ok(NGLessObject::String("/dev/stdout".into())),
+                "ARGV" => Ok(NGLessObject::List(
+                    self.argv.iter().cloned().map(NGLessObject::String).collect(),
+                )),
                 "__VOID" => Ok(NGLessObject::Void),
                 other => Err(NgError::should_not_occur(format!(
                     "Unknown builtin constant '{other}': it should not have been accepted."
@@ -2458,7 +2466,7 @@ mod tests {
 
     fn run(text: &str) -> NgResult<()> {
         let script = parse_ngless("test", true, text).expect("parse failed");
-        interpret(&script.body, &std::env::temp_dir(), text, &[])
+        interpret(&script.body, &std::env::temp_dir(), text, &[], &[])
     }
 
     #[test]

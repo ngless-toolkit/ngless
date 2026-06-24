@@ -20,6 +20,8 @@ struct RunOpts {
     debug: String,
     temp_dir: Option<String>,
     search_path: Vec<String>,
+    /// Positional arguments after the script path, exposed (with the script path) as `ARGV`.
+    extra_args: Vec<String>,
 }
 
 /// Entry point for the non-informational command line (everything except `--version*` and
@@ -83,6 +85,8 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
             _ => {
                 if opts.script.is_none() {
                     opts.script = Some(a.clone());
+                } else {
+                    opts.extra_args.push(a.clone());
                 }
             }
         }
@@ -176,7 +180,10 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         .clone()
         .map(std::path::PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
-    crate::interpret::interpret(&typed.body, &temp_dir, &text, &opts.search_path)?;
+    // ARGV = [script_path, ...extra_args] (mirrors `nConfArgv` in Configuration.hs).
+    let mut argv = vec![fname.clone()];
+    argv.extend(opts.extra_args.iter().cloned());
+    crate::interpret::interpret(&typed.body, &temp_dir, &text, &opts.search_path, &argv)?;
     Ok(0)
 }
 

@@ -31,7 +31,7 @@ const RESERVED_WORDS: &[&str] = &[
     "if", "else", "ngless", "len", "discard", "continue", "not", "local", "import", "using",
 ];
 
-const CONSTANTS: &[&str] = &["STDIN", "STDOUT"];
+const CONSTANTS: &[&str] = &["STDIN", "STDOUT", "ARGV"];
 
 /// Binary operators, longest-match-first within each starting character, in the same order as
 /// `Tokens.hs` so ordered matching is identical.

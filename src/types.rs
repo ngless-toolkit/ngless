@@ -697,6 +697,8 @@ impl TypeChecker {
 fn type_of_constant(v: &str) -> Option<NGLType> {
     match v {
         "STDIN" | "STDOUT" => Some(NGLType::String),
+        // `ARGV` is the builtin.argv module constant: a list of the command-line arguments.
+        "ARGV" => Some(NGLType::List(Box::new(NGLType::String))),
         _ => None,
     }
 }
