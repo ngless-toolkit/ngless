@@ -5,7 +5,7 @@
 > repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
 > Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
-> **55 of the 96 functional tests pass** against the Rust binary with output identical to
+> **56 of the 96 functional tests pass** against the Rust binary with output identical to
 > Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`). See
 > the [Functional test status](#functional-test-status) table below for the per-test breakdown.
 >
@@ -79,9 +79,10 @@
 >   `module_functions` contributes `samtools_sort` (0.0+) and `samtools_view` (0.1/1.0) to the
 >   type checker, validation and interpreter. Passing: `tests/regression-cigar-filter`
 >   (`samtools_sort by={name}` → write SAM) and `tests/regression-bad-sam` (`select` → write
->   SAM **and** BAM). Still pending here: the remaining mapped-read
->   methods (`pe_filter`/`unique`/`allbest`/`some_match`); `map` itself is now done — see the
->   bwa milestone below.
+>   SAM **and** BAM). `__merge_samfiles` is also done (`execute_merge_sams`, mirroring
+>   `executeMergeSams`/`mergeSAMGroups MSBestOnly`; `tests/merge-sams` passes). Still pending here:
+>   the remaining mapped-read methods (`pe_filter`/`unique`/`allbest`/`some_match`); `map` itself
+>   is now done — see the bwa milestone below.
 > - **Compression (gzip/bzip2/zstd):** `src/compression.rs` now (de)compresses all of gzip
 >   (`flate2`), bzip2 (`bzip2` crate, pure-Rust `libbz2-rs-sys` backend) and zstd (`zstd` crate);
 >   output is content-equivalent (the suite compares decompressed data, so exact bytes need not
@@ -299,7 +300,7 @@ and run via `pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debu
 Legend: ✅ passes · ❌ not yet supported. `--print-path EXEC` is now implemented (resolves a
 tool from `$NGLESS_<TOOL>_BIN` or `PATH`, mirroring `PrintPathMode`/`findNGLessBin`), so the
 samtools `check.sh` scripts that shell out to `$(ngless --print-path samtools)` can now be
-driven locally. **Tally: 55 ✅ · 41 ❌ (96 total).**
+driven locally. **Tally: 56 ✅ · 40 ❌ (96 total).**
 
 | Test | Status | Note / planned milestone |
 |---|---|---|
@@ -344,7 +345,7 @@ driven locally. **Tally: 55 ✅ · 41 ❌ (96 total).**
 | mapstats | ✅ | M6 |
 | map-windows_line_terminators | ✅ | M7 |
 | max_filename_length | ✅ | M4 |
-| merge-sams | ❌ | M5-pending — `__merge_samfiles` |
+| merge-sams | ✅ | M5 — `__merge_samfiles` |
 | mocat_sample_bz2 | ❌ | M7 — mocat module |
 | mocat_sample_bz2_paired | ❌ | M7 — mocat module |
 | mocat_sample_bz2_paired_mixed | ❌ | M7 — mocat module |
