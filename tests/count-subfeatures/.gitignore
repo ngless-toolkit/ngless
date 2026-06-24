@@ -1,1 +1,5 @@
-../count-mode/.gitignore
+ref.fna.gz.amb
+ref.fna.gz.ann
+ref.fna.gz.bwt
+ref.fna.gz.pac
+ref.fna.gz.sa
