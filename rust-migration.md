@@ -1,9 +1,14 @@
 # Rewriting NGLess in Rust — Scoping & Execution Plan
 
-> **Status:** Milestones 1–3 landed on branch `rust-migration`. The Rust crate lives at the
+> **Status:** Milestones 1–3 are complete and milestones 4–7 are partially landed on branch
+> `rust-migration`. The Rust crate lives at the
 > repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
 > Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
-> pointed at any binary via the `NGLESS_BIN` environment variable.
+> pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
+> **46 of the 96 functional tests pass** against the Rust binary with output identical to
+> Haskell, plus 5 more whose interpreter path works but whose `check.sh` cannot be driven
+> locally (they shell out to `samtools`/`ngless` on `PATH`). See the
+> [Functional test status](#functional-test-status) table below for the per-test breakdown.
 >
 > - **M1 (scaffold):** CLI info flags + `--check-install`, byte-matching the Haskell CLI.
 > - **M2 (front end):** tokenizer, parser, AST, type checker, pure validation — all with
@@ -143,7 +148,8 @@
 
 NGLess is a ~15–16k-line Haskell program (`NGLess/`, 86 `.hs` files) implementing a
 version-pinned DSL for NGS/metagenomics workflows, plus ~1.6k lines of unit tests and
-112 functional tests under `tests/`. The motivation for a Rust rewrite is **not**
+96 functional tests under `tests/` (the pre-1.5 cases have been removed). The motivation for
+a Rust rewrite is **not**
 performance — Haskell/conduit already streams large files fine. The drivers are:
 
 - **Build/maintenance pain** — GHC + Stack + Nix + `haskell.nix` materialized deps is a
@@ -170,7 +176,7 @@ that proves this.
 
 ## The single biggest asset: the functional test suite as a parity oracle
 
-`tests/` (112 `.ngl` scripts + `expected.*` outputs, driven by `run-tests.sh`) is
+`tests/` (96 `.ngl` scripts + `expected.*` outputs, driven by `run-tests.sh`) is
 **language-agnostic** — it runs a binary and diffs outputs. The entire rewrite should be
 driven test-first against this suite:
 
@@ -262,6 +268,114 @@ Note this **eliminates all bundled C/C++/FFI** (`FastQ.c`, `RefSeqInfoVector.h`,
     every example script runs. Ship as a major version; keep the Haskell binary published
     in parallel for one release cycle as a fallback.
 
+## Functional test status
+
+Status of every test under `tests/` against the current Rust binary (built with `cargo build`
+and run via `pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debug/ngless
+./run-tests.sh'`, with `bwa`/`samtools` provided by the pixi environment).
+
+Legend: ✅ passes · ⚠️ interpreter path works but `check.sh` cannot be driven here (needs
+`samtools`/`ngless` on `PATH`) · ❌ not yet supported. **Tally: 46 ✅ · 5 ⚠️ · 45 ❌ (96 total).**
+
+| Test | Status | Note / planned milestone |
+|---|---|---|
+| arg1NotPathExternalModule | ❌ | M7 — external YAML modules (`Module 'test' not supported`) |
+| argv | ❌ | M3-pending — needs `ARGV` builtin + citation header |
+| as_reads | ❌ | M7 — packaged `reference=` databases (`map` here uses one) |
+| as-reads-3 | ❌ | M4-pending — interleaved I/O (`format_flags={interleaved}`, `fastq(interleaved=True)`) |
+| as_reads-bam | ✅ | M5 |
+| as_reads_encoding | ✅ | M5 |
+| as_reads_regression | ✅ | M5 |
+| assemble-gp | ❌ | M7 — `assemble`/`orf_find` |
+| compress_sam | ✅ | M5 |
+| count-basic | ✅ | M6 |
+| countfile-reorder | ✅ | M6 |
+| count-fpkm | ✅ | M6 |
+| count-gff | ✅ | M6 |
+| count-gff-corner-cases | ✅ | M6 |
+| count-map-file | ✅ | M6 |
+| count-mode | ✅ | M6 (via M7 bwa) |
+| count-subfeatures | ✅ | M6 (via M7 bwa) |
+| error-bad-fq | ✅ | M4 |
+| error-block-assignment | ✅ | M2 |
+| error-check-file-early | ✅ | M3 |
+| error-count-nofile | ✅ | M6 |
+| error-map-file | ❌ | Future — early validation: bad column must be caught before any `write`, else `should.not.be.created.txt` is written |
+| error-ofile-complex | ❌ | Future — early output-dir validation + error-message parity + citation header |
+| error-unique-on-sorted | ❌ | M5-pending — `unique` select method / its error check |
+| error-validate-nofafile | ✅ | M5 |
+| error-write-no-output-dir | ✅ | M4 |
+| exampleExternalModule | ❌ | M7 — external modules |
+| exampleModule | ❌ | M7 — external modules |
+| fix_cigarSam | ✅ | M5 |
+| grouped | ❌ | M7 — packaged `reference=` databases |
+| len_list | ❌ | M3-pending — pure script; only the citation/copyright header is missing |
+| load_fastq_directory | ❌ | M7 — `load_fastq_directory` stdlib fn |
+| load_sample_list | ❌ | M7 — `load_sample_list` stdlib fn |
+| map3 | ✅ | M7 (bwa) |
+| map-minimap2 | ❌ | M7/Future — minimap2 mapper |
+| map_search_path | ✅ | M7 |
+| map_search_path_multiple | ❌ | Bug — `@HD` header line ordering in SAM output (alignment records match) |
+| map_sort_stream | ✅ | M7 |
+| mapstats | ✅ | M6 |
+| map-windows_line_terminators | ✅ | M7 |
+| max_filename_length | ✅ | M4 |
+| merge-sams | ❌ | M5-pending — `__merge_samfiles` |
+| mocat_sample_bz2 | ❌ | M7 — mocat module |
+| mocat_sample_bz2_paired | ❌ | M7 — mocat module |
+| mocat_sample_bz2_paired_mixed | ❌ | M7 — mocat module |
+| mocat_sample_gz | ❌ | M7 — mocat module |
+| mocat_sample_gz_paired | ❌ | M7 — mocat module |
+| mocat_sample_uncompressed | ❌ | M7 — mocat module |
+| mocat_sample_uncompressed_paired | ❌ | M7 — mocat module |
+| parallel | ❌ | M7 — parallel module |
+| parallel_collect_many | ❌ | M7 — parallel module |
+| parallel_collect_subdir | ❌ | M7 — parallel module |
+| parallel_folder_lock | ❌ | M7 — parallel module |
+| parse_odd_corners | ❌ | Future — `readlines` builtin + citation header |
+| paste | ❌ | M7 — parallel module |
+| preprocess | ✅ | M4 |
+| preprocess3 | ✅ | M4 |
+| preprocess3_empty_singles | ✅ | M4 |
+| preprocess_fastx_mocat | ✅ | M4 |
+| readlines | ❌ | Future — `readlines` builtin |
+| reference_alias | ❌ | M7 — packaged `reference=` databases |
+| regression-bad-sam | ✅ | M5 |
+| regression-bz2-chunk | ✅ | M4 |
+| regression-cigar-filter | ✅ | M5 |
+| regression-fqgz | ✅ | M4 |
+| regression-resave | ✅ | M5 |
+| regression-subsample_write | ❌ | M7 — mocat module |
+| regression-unique-same-contig | ✅ | M6 |
+| regression-write-fqgz | ❌ | M7 — mocat module |
+| reuse | ✅ | M3 |
+| same-hash-collect | ❌ | M7 — parallel module |
+| same-hash-collect-2 | ❌ | M7 — parallel module |
+| samfile-headers | ✅ | M5 |
+| samfile-select-sort | ⚠️ | Env — `check.sh` needs `samtools` on `PATH` |
+| samfile-select-view | ⚠️ | Env — `check.sh` needs `samtools` on `PATH` |
+| samfile-write | ⚠️ | Env — functionally passes; `check.sh` needs `ngless`/`samtools` on `PATH` |
+| sam_reverse_order | ✅ | M5 |
+| searchpathExternalModule | ❌ | M7 — external modules |
+| select | ❌ | M7 — packaged `reference=` databases |
+| select-bam | ⚠️ | Env — `check.sh` needs `samtools` on `PATH` |
+| select_block | ❌ | M7 — packaged `reference=` databases |
+| select_block_filter | ❌ | M5-pending — `allbest` method |
+| select_block_filter_unmatch | ✅ | M5 |
+| select_max_trim | ✅ | M5 |
+| select-multi-conditions | ✅ | M5 |
+| select_regression_past | ✅ | M5 |
+| select_sam_optional_fields | ✅ | M5 |
+| shortreads | ✅ | M4 |
+| type-conversions | ❌ | Future — `read_int`/`read_double` as expression args fail in eval |
+| whenTrueModule | ❌ | M7 — external modules |
+| write_compression | ⚠️ | Env — map+write path works; `check.sh` needs `samtools` on `PATH` |
+| write_fq | ✅ | M4 |
+| write_fq_inline | ✅ | M4 |
+| write_fq_STDOUT | ❌ | Future — `write(..., ofile=STDOUT)` / `/dev/stdout` |
+| write-hash | ❌ | M6-pending — `auto_comments={hash}` |
+| write-hash2 | ❌ | M6-pending — `auto_comments={hash}` |
+
 ## Critical files to mirror (highest leverage)
 
 - `NGLess/Language.hs`, `Types.hs`, `Parse.hs`, `Tokens.hs`, `Validation.hs`,
@@ -292,7 +406,7 @@ Note this **eliminates all bundled C/C++/FFI** (`FastQ.c`, `RefSeqInfoVector.h`,
 
 ## Verification
 
-- Primary: `NGLESS_BIN=<rust-binary> ./run-tests.sh` — must reach 112/112 with diffs
+- Primary: `NGLESS_BIN=<rust-binary> ./run-tests.sh` — must reach 96/96 with diffs
   identical to the Haskell binary, run per-milestone on the gated subset.
 - Differential CI job: build both binaries, run each `tests/*` script through both, fail on
   any output diff (the strongest possible parity check).
