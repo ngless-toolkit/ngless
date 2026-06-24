@@ -1,4 +1,4 @@
-ngless '1.1'
+ngless '1.5'
 
 sf = samfile('seq1_2.sam.bz2')
 recounts = count(sf,

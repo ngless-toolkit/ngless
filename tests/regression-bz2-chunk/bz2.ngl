@@ -1,4 +1,4 @@
-ngless "1.1"
+ngless "1.5"
 
 write(fastq('sample-multichunk-bzip2.fq.bz2'),
         ofile='output.fq')

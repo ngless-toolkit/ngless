@@ -1,4 +1,4 @@
-ngless "1.2"
+ngless "1.5"
 
 input = load_fastq_directory('sample')
 

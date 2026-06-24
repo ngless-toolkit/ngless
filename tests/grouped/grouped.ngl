@@ -1,4 +1,4 @@
-ngless '1.1'
+ngless '1.5'
 one = fastq('sample.fq')
 mapped = map(one,reference='sacCer3')
 write(mapped, ofile='one.sam')

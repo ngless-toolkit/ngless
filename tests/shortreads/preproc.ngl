@@ -1,4 +1,4 @@
-ngless "1.1"
+ngless "1.5"
 
 input = fastq('input.fq')
 input = preprocess(input) using |r|:

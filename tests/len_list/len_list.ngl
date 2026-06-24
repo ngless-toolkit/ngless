@@ -1,4 +1,4 @@
-ngless "1.0"
+ngless "1.5"
 
 list = ["one", "two", "three"]
 
