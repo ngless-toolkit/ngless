@@ -5,10 +5,9 @@
 > repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
 > Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
-> **46 of the 96 functional tests pass** against the Rust binary with output identical to
-> Haskell, plus 5 more whose interpreter path works but whose `check.sh` cannot be driven
-> locally (they shell out to `samtools`/`ngless` on `PATH`). See the
-> [Functional test status](#functional-test-status) table below for the per-test breakdown.
+> **55 of the 96 functional tests pass** against the Rust binary with output identical to
+> Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`). See
+> the [Functional test status](#functional-test-status) table below for the per-test breakdown.
 >
 > - **M1 (scaffold):** CLI info flags + `--check-install`, byte-matching the Haskell CLI.
 > - **M2 (front end):** tokenizer, parser, AST, type checker, pure validation — all with
@@ -16,8 +15,14 @@
 > - **M3 (core runtime, partial):** CLI flow (load → parse → version-gate `>=1.5` → type
 >   check → validate → interpret), runtime values + `evalBinary/Unary/Index`, and an
 >   interpreter for the pure subset plus `print`/`println`/`read_int`/`read_double`/
->   `__assert`/`to_string`. The citation header and `clap`-based arg parsing are still
->   pending, so functional-test stdout parity is not yet attempted.
+>   `__assert`/`to_string`. The run header (version/copyright banner + the sorted, deduplicated
+>   citation block, mirroring `printHeader`/`collectCitations` in `src/citations.rs`) is now
+>   printed before interpretation, gated on `--no-header` and suppressed when the script writes to
+>   `STDOUT` (`uses_stdout`, mirroring `setQuiet`). The `ARGV` builtin constant (`[script_path,
+>   ...extra_args]`), the `readlines` builtin, and pure function calls in expression position
+>   (e.g. `read_int(s)` inside `__assert`) are also done. With these, the remaining pure/front-end
+>   functional tests pass: `tests/len_list`, `tests/argv`, `tests/type-conversions`,
+>   `tests/readlines`, `tests/parse_odd_corners`. `clap`-based arg parsing is still pending.
 > - **M4 (FASTQ path, partial):** the pure trimming core (`substrim`/`endstrim`/`smoothtrim`,
 >   encode/decode, `compatibleHeader`) plus a **file-backed** single-end `fastq` →
 >   `preprocess(...) using |read|:` → `write` path. Read sets reference FASTQ files on disk
@@ -294,12 +299,12 @@ and run via `pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debu
 Legend: ✅ passes · ❌ not yet supported. `--print-path EXEC` is now implemented (resolves a
 tool from `$NGLESS_<TOOL>_BIN` or `PATH`, mirroring `PrintPathMode`/`findNGLessBin`), so the
 samtools `check.sh` scripts that shell out to `$(ngless --print-path samtools)` can now be
-driven locally. **Tally: 50 ✅ · 46 ❌ (96 total).**
+driven locally. **Tally: 55 ✅ · 41 ❌ (96 total).**
 
 | Test | Status | Note / planned milestone |
 |---|---|---|
 | arg1NotPathExternalModule | ❌ | M7 — external YAML modules (`Module 'test' not supported`) |
-| argv | ❌ | M3-pending — needs `ARGV` builtin + citation header |
+| argv | ✅ | M3 — `ARGV` builtin + citation header |
 | as_reads | ❌ | M7 — packaged `reference=` databases (`map` here uses one) |
 | as-reads-3 | ❌ | M4-pending — interleaved I/O (`format_flags={interleaved}`, `fastq(interleaved=True)`) |
 | as_reads-bam | ✅ | M5 |
@@ -328,7 +333,7 @@ driven locally. **Tally: 50 ✅ · 46 ❌ (96 total).**
 | exampleModule | ❌ | M7 — external modules |
 | fix_cigarSam | ✅ | M5 |
 | grouped | ❌ | M7 — packaged `reference=` databases |
-| len_list | ❌ | M3-pending — pure script; only the citation/copyright header is missing |
+| len_list | ✅ | M3 — citation/copyright header |
 | load_fastq_directory | ❌ | M7 — `load_fastq_directory` stdlib fn |
 | load_sample_list | ❌ | M7 — `load_sample_list` stdlib fn |
 | map3 | ✅ | M7 (bwa) |
@@ -351,13 +356,13 @@ driven locally. **Tally: 50 ✅ · 46 ❌ (96 total).**
 | parallel_collect_many | ❌ | M7 — parallel module |
 | parallel_collect_subdir | ❌ | M7 — parallel module |
 | parallel_folder_lock | ❌ | M7 — parallel module |
-| parse_odd_corners | ❌ | Future — `readlines` builtin + citation header |
+| parse_odd_corners | ✅ | M3 — `readlines` builtin + citation header |
 | paste | ❌ | M7 — parallel module |
 | preprocess | ✅ | M4 |
 | preprocess3 | ✅ | M4 |
 | preprocess3_empty_singles | ✅ | M4 |
 | preprocess_fastx_mocat | ✅ | M4 |
-| readlines | ❌ | Future — `readlines` builtin |
+| readlines | ✅ | M3 — `readlines` builtin |
 | reference_alias | ❌ | M7 — packaged `reference=` databases |
 | regression-bad-sam | ✅ | M5 |
 | regression-bz2-chunk | ✅ | M4 |
@@ -386,7 +391,7 @@ driven locally. **Tally: 50 ✅ · 46 ❌ (96 total).**
 | select_regression_past | ✅ | M5 |
 | select_sam_optional_fields | ✅ | M5 |
 | shortreads | ✅ | M4 |
-| type-conversions | ❌ | Future — `read_int`/`read_double` as expression args fail in eval |
+| type-conversions | ✅ | M3 — `read_int`/`read_double` as expression args |
 | whenTrueModule | ❌ | M7 — external modules |
 | write_compression | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | write_fq | ✅ | M4 |
