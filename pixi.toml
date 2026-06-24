@@ -1,0 +1,15 @@
+[workspace]
+authors = ["Luis Pedro Coelho <luis@luispedro.org>"]
+channels = ["conda-forge", "https://conda.anaconda.org/bioconda"]
+name = "ngless_test"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+prodigal = ">=2.6.3,<3"
+megahit = ">=1.2.9,<2"
+samtools = ">=1.23.1,<2"
+minimap2 = ">=2.31,<3"
+bwa = ">=0.7.19,<0.8"
