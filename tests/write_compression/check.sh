@@ -4,6 +4,11 @@ set -e
 
 SAMTOOLS="$("${NGLESS_BIN:-ngless}" --print-path samtools)"
 
+if test x$SAMTOOLS = x ; then
+    echo "samtools not found, cannot run test"
+    exit 1
+fi
+
 echo "Comparing SAM"
 diff -q <(grep -v '^@[PG|HD]' output.sam) texpected.sam
 echo "Comparing SAM.gz"
