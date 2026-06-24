@@ -213,6 +213,16 @@ impl Interpreter {
                 }
                 execute_method(met, &self_v, arg_v.as_ref(), &argvs)
             }
+            // A function call in expression position (e.g. `read_int(s)` inside an `__assert`).
+            // Only pure functions are valid here; IO functions error clearly via `execute_function`.
+            Expression::FunctionCall(f, expr, args, None) => {
+                let expr_v = self.eval(expr, overlay)?;
+                let mut argvs = Vec::new();
+                for (Variable(v), e) in args {
+                    argvs.push((v.clone(), self.eval(e, overlay)?));
+                }
+                execute_function(f, &expr_v, &argvs)
+            }
             other => Err(NgError::should_not_occur(format!(
                 "Expected an expression, received {other:?} (in eval)"
             ))),
