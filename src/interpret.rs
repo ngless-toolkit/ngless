@@ -272,6 +272,7 @@ impl Interpreter {
             "samtools_sort" => self.execute_samtools_sort(&expr_v, &argvs),
             "samtools_view" => self.execute_samtools_view(&expr_v, &argvs),
             "count" => self.execute_count(&expr_v, &argvs),
+            "countfile" => self.execute_countfile(&expr_v),
             "write" => self.execute_write(&expr_v, &argvs),
             _ => execute_function(f, &expr_v, &argvs),
         }
@@ -408,6 +409,25 @@ impl Interpreter {
             NgError::new(
                 NgErrorType::SystemError,
                 format!("Could not write counts file: {e}"),
+            )
+        })?;
+        Ok(NGLessObject::Counts(out))
+    }
+
+    /// `countfile(fname)`: reference an existing counts TSV, reordering its rows by tag (the first
+    /// column) when they are not already sorted (mirrors `executeCountFile`). Leading comment lines
+    /// and the sample-name header line are kept in place; only the data rows are sorted.
+    fn execute_countfile(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
+        let fname = as_string(expr, "countfile")?;
+        let text = crate::compression::read_to_string(&fname)?;
+        if is_tag_ordered(&text) {
+            return Ok(NGLessObject::Counts(PathBuf::from(fname)));
+        }
+        let out = self.new_temp_path("normalized", "tsv");
+        std::fs::write(&out, normalize_count_file(&text)).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write normalized counts file: {e}"),
             )
         })?;
         Ok(NGLessObject::Counts(out))
@@ -1665,6 +1685,50 @@ fn parse_sq_header(line: &str) -> Option<(String, i64)> {
     Some((name?, len?))
 }
 
+/// The tag of a counts line: the bytes before the first TAB (mirrors `Interpretation.CountFile.tag`).
+fn count_tag(line: &str) -> &str {
+    match line.find('\t') {
+        Some(i) => &line[..i],
+        None => line,
+    }
+}
+
+/// Whether every consecutive pair of lines is strictly tag-ordered (`checkCountFile`).
+fn is_tag_ordered(text: &str) -> bool {
+    let mut prev: Option<&str> = None;
+    for line in text.lines() {
+        if let Some(p) = prev {
+            if count_tag(p) >= count_tag(line) {
+                return false;
+            }
+        }
+        prev = Some(line);
+    }
+    true
+}
+
+/// Reorder a counts file by tag (`normalizeCountFile`): keep leading comment/blank lines and the
+/// following sample-name header line in place, then stable-sort the remaining rows by tag.
+fn normalize_count_file(text: &str) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut i = 0;
+    let mut out: Vec<&str> = Vec::with_capacity(lines.len());
+    while i < lines.len() && (lines[i].is_empty() || lines[i].starts_with('#')) {
+        out.push(lines[i]);
+        i += 1;
+    }
+    if i < lines.len() {
+        out.push(lines[i]);
+        i += 1;
+    }
+    let mut content: Vec<&str> = lines[i..].to_vec();
+    content.sort_by(|a, b| count_tag(a).cmp(count_tag(b)));
+    out.extend(content);
+    let mut s = out.join("\n");
+    s.push('\n');
+    s
+}
+
 /// Build [`count::CountOpts`] from the keyword arguments (mirrors `parseOptions`).
 fn parse_count_opts(args: &[(String, NGLessObject)]) -> NgResult<crate::count::CountOpts> {
     use crate::count::{AnnotationMode, CountOpts, IntersectMode, MMMethod, NMode, StrandMode};
@@ -1778,6 +1842,23 @@ fn type_label(v: &NGLessObject) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn count_file_unordered_is_normalized() {
+        let input = "# comment\n\tsample.fq\nB\t112\nA\t1\n-1\t5\n";
+        assert!(!is_tag_ordered(input));
+        assert_eq!(
+            normalize_count_file(input),
+            "# comment\n\tsample.fq\n-1\t5\nA\t1\nB\t112\n"
+        );
+    }
+
+    #[test]
+    fn count_file_already_ordered() {
+        // No comments; header tag "" sorts before the rest, which are ascending.
+        let input = "\tsample.fq\n-1\t5\nA\t1\nB\t2\n";
+        assert!(is_tag_ordered(input));
+    }
     use crate::parser::parse_ngless;
 
     fn run(text: &str) -> NgResult<()> {
