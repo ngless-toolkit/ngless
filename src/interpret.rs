@@ -38,6 +38,7 @@ pub fn interpret(
     body: &[(usize, Expression)],
     temp_dir: &Path,
     script_text: &str,
+    search_path: &[String],
 ) -> NgResult<()> {
     let mut interp = Interpreter {
         env: HashMap::new(),
@@ -45,6 +46,7 @@ pub fn interpret(
         cur_lno: Cell::new(0),
         fq_stats: RefCell::new(Vec::new()),
         script_text: script_text.to_string(),
+        search_path: search_path.to_vec(),
     };
     for (lno, e) in body {
         interp.cur_lno.set(*lno);
@@ -75,6 +77,9 @@ struct Interpreter {
     /// The original (verbatim) script source, used by `write(..., auto_comments=[{script}])`
     /// (mirrors `ngleScriptText`).
     script_text: String,
+    /// Reference search path (`--search-path`), used to resolve `<references>` placeholders in
+    /// `map(..., fafile=...)` (mirrors `nConfSearchPath`).
+    search_path: Vec<String>,
 }
 
 /// The outcome of running a (block) statement, mirroring `BlockStatus`.
@@ -275,6 +280,7 @@ impl Interpreter {
             "fastq" => self.execute_fastq(&expr_v),
             "paired" => self.execute_paired(&expr_v, &argvs),
             "samfile" => self.execute_samfile(&expr_v, &argvs),
+            "map" => self.execute_map(&expr_v, &argvs),
             "as_reads" => self.execute_as_reads(&expr_v),
             "qcstats" => self.execute_qcstats(&expr_v),
             "samtools_sort" => self.execute_samtools_sort(&expr_v, &argvs),
@@ -536,6 +542,249 @@ impl Interpreter {
         data.push_str(&read_sam_text(&fname)?);
         let path = self.write_sam_temp(&data)?;
         Ok(NGLessObject::MappedReadSet { name, path })
+    }
+
+    /// `map(reads, fafile=/reference=, mode_all=, mapper=, block_size_megabases=, __extra_args=)`:
+    /// map a read set against a reference with bwa (mirrors `executeMap`). This build supports the
+    /// `fafile=` form with the `bwa` mapper; packaged `reference=` databases and the minimap2/soap
+    /// mappers are not implemented yet.
+    fn execute_map(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        // Auto-comprehension: `map` over a list of read sets returns a list (mirrors the
+        // `NGOList` arm of `executeMap'`).
+        if let NGLessObject::List(es) = expr {
+            let mapped = es
+                .iter()
+                .map(|e| self.execute_map(e, args))
+                .collect::<NgResult<Vec<_>>>()?;
+            return Ok(NGLessObject::List(mapped));
+        }
+        let (name, rs) = match expr {
+            NGLessObject::ReadSet { name, readset } => (name.clone(), readset.clone()),
+            other => {
+                return Err(NgError::should_not_occur(format!(
+                    "map expects ReadSet, got {other:?}"
+                )))
+            }
+        };
+
+        let mapper = lookup_opt_string(args, "mapper").unwrap_or_else(|| "bwa".to_string());
+        if mapper != "bwa" {
+            return Err(NgError::script(format!(
+                "map(): mapper '{mapper}' is not supported in this build yet (only 'bwa' is)."
+            )));
+        }
+
+        // lookupReference: exactly one of `reference`/`fafile` (mirrors `lookupReference`).
+        let reference = lookup_opt_string(args, "reference");
+        let fafile = lookup_opt_string(args, "fafile");
+        let fafile = match (reference, fafile) {
+            (None, None) => {
+                return Err(NgError::script("Either reference or fafile must be passed"))
+            }
+            (Some(_), Some(_)) => {
+                return Err(NgError::script(
+                    "Reference and fafile cannot be used simmultaneously",
+                ))
+            }
+            (Some(_), None) => {
+                return Err(NgError::script(
+                    "map(): packaged `reference=` databases are not supported in this build yet; \
+                     use `fafile=` with a local FASTA file.",
+                ))
+            }
+            (None, Some(fa)) => fa,
+        };
+
+        let mode_all = lookup_bool(args, "mode_all", false)?;
+        let mut bwa_args = lookup_string_list(args, "__extra_args")?.unwrap_or_default();
+        if mode_all {
+            bwa_args.push("-a".to_string());
+        }
+        let block_size = lookup_int(args, "block_size_megabases", 0)?;
+
+        // Resolve the FASTA file through the search path (handles `<references>` placeholders).
+        let fapath = self.expand_path(&fafile)?;
+        self.perform_map(&fapath, block_size, &name, &rs, &bwa_args)
+    }
+
+    /// Build (lazily) the needed bwa index(es) and map `rs` against them (mirrors `performMap`).
+    /// With no block size there is a single index; otherwise the FASTA is split into blocks, each
+    /// indexed and mapped, and the partial SAMs are merged (best-only).
+    fn perform_map(
+        &self,
+        fafile: &str,
+        block_size: i64,
+        name: &str,
+        rs: &ReadSet,
+        extra_args: &[String],
+    ) -> NgResult<NGLessObject> {
+        let refs = self.ensure_index_exists(block_size, fafile)?;
+        let path = match refs.as_slice() {
+            [single] => self.map_to_reference(single, rs, extra_args)?,
+            blocks => {
+                let mut partials = Vec::with_capacity(blocks.len());
+                for b in blocks {
+                    partials.push(self.map_to_reference(b, rs, extra_args)?);
+                }
+                self.merge_sam_files(&partials)?
+            }
+        };
+        Ok(NGLessObject::MappedReadSet {
+            name: name.to_string(),
+            path,
+        })
+    }
+
+    /// Ensure a bwa index exists for `fafile` (or for each of its splits) and return the FASTA
+    /// path(s) to map against (mirrors `ensureIndexExists`). Index creation is *not* lock-guarded
+    /// here (unlike the Haskell version), which is safe for the single-process runs this build
+    /// targets.
+    fn ensure_index_exists(&self, block_size: i64, fafile: &str) -> NgResult<Vec<String>> {
+        if block_size <= 0 {
+            if !crate::mapper::has_valid_index(fafile)? {
+                crate::mapper::create_index(fafile)?;
+            }
+            Ok(vec![fafile.to_string()])
+        } else {
+            let blocks = self.ensure_splits_exist(block_size, fafile)?;
+            for b in &blocks {
+                if !crate::mapper::has_valid_index(b)? {
+                    crate::mapper::create_index(b)?;
+                }
+            }
+            Ok(blocks)
+        }
+    }
+
+    /// Map `rs` against one indexed reference, returning the SAM temp file (mirrors
+    /// `mapToReference`). The reads are interleaved and streamed to bwa on stdin.
+    fn map_to_reference(
+        &self,
+        ref_index: &str,
+        rs: &ReadSet,
+        extra_args: &[String],
+    ) -> NgResult<PathBuf> {
+        let interleaved = interleave_fastq(rs)?;
+        let out = self.new_temp_path("mapped_", "sam");
+        crate::mapper::call_mapper(ref_index, &interleaved, extra_args, &out)?;
+        Ok(out)
+    }
+
+    /// Split `fafile` into block-sized FASTA chunks if not already done, returning the chunk paths
+    /// (mirrors `ensureSplitsExist`). A `.done` receipt file records completion so repeated runs
+    /// reuse existing splits.
+    fn ensure_splits_exist(&self, block_size: i64, fafile: &str) -> NgResult<Vec<String>> {
+        let p = Path::new(fafile);
+        let stem = p
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let base_name = format!("{stem}.splits_{block_size}m");
+        let ofa_base = match p.parent() {
+            Some(dir) if !dir.as_os_str().is_empty() => {
+                dir.join(&base_name).to_string_lossy().to_string()
+            }
+            _ => base_name.clone(),
+        };
+        let receipt = format!("{ofa_base}.done");
+        if Path::new(&receipt).exists() {
+            // Reuse: collect the existing `<base>.*.fna` chunks, sorted lexicographically (as
+            // Haskell's `sort . namesMatching` does).
+            let dir = p.parent().filter(|d| !d.as_os_str().is_empty());
+            let prefix = format!("{base_name}.");
+            let mut found = Vec::new();
+            let read_dir = match dir {
+                Some(d) => std::fs::read_dir(d),
+                None => std::fs::read_dir("."),
+            }
+            .map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Could not list split directory: {e}"),
+                )
+            })?;
+            for entry in read_dir.flatten() {
+                let fname = entry.file_name().to_string_lossy().to_string();
+                if fname.starts_with(&prefix) && fname.ends_with(".fna") {
+                    let full = match dir {
+                        Some(d) => d.join(&fname).to_string_lossy().to_string(),
+                        None => fname.clone(),
+                    };
+                    found.push(full);
+                }
+            }
+            found.sort();
+            return Ok(found);
+        }
+        let splits = split_fasta(block_size, fafile, &ofa_base)?;
+        std::fs::write(
+            &receipt,
+            format!("FASTA file '{fafile}' split into blocks of {block_size} megabases.\n"),
+        )
+        .map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write split receipt {receipt}: {e}"),
+            )
+        })?;
+        Ok(splits)
+    }
+
+    /// Merge partial SAM files from block mapping, keeping the best alignment(s) per read (mirrors
+    /// `mergeSamFiles` + `mergeSAMGroups MSBestOnly`). Headers from every partial are preserved.
+    fn merge_sam_files(&self, partials: &[PathBuf]) -> NgResult<PathBuf> {
+        let mut headers: Vec<String> = Vec::new();
+        let mut per_file: Vec<Vec<Vec<SamLine>>> = Vec::new();
+        for p in partials {
+            let text = read_sam_text(&p.to_string_lossy())?;
+            let mut groups = Vec::new();
+            for item in group_sam(&text, true)? {
+                match item {
+                    SamItem::Header(h) => headers.push(h),
+                    SamItem::Data(g) => groups.push(g.into_iter().map(|(s, _)| s).collect()),
+                }
+            }
+            per_file.push(groups);
+        }
+        let mut out = String::new();
+        for h in &headers {
+            out.push_str(h);
+            out.push('\n');
+        }
+        let ngroups = per_file.first().map(|g| g.len()).unwrap_or(0);
+        if per_file.iter().any(|g| g.len() != ngroups) {
+            return Err(NgError::new(
+                NgErrorType::DataError,
+                "Merging unsynced SAM files (not implemented yet)".to_string(),
+            ));
+        }
+        for gi in 0..ngroups {
+            let combined: Vec<SamLine> =
+                per_file.iter().flat_map(|g| g[gi].clone()).collect();
+            for l in merge_sam_group(&combined)? {
+                out.push_str(&encode_sam_line(&l));
+                out.push('\n');
+            }
+        }
+        self.write_sam_temp(&out)
+    }
+
+    /// Resolve a FASTA path through the search path, expanding `<references>`-style placeholders
+    /// (mirrors `expandPath` + `indexReference`). Errors if no candidate exists on disk.
+    fn expand_path(&self, fbase: &str) -> NgResult<String> {
+        for candidate in expand_path_candidates(fbase, &self.search_path) {
+            if Path::new(&candidate).exists() {
+                return Ok(candidate);
+            }
+        }
+        Err(NgError::new(
+            NgErrorType::DataError,
+            format!("Could not find FASTA file: {fbase}"),
+        ))
     }
 
     /// `select(mapped, keep_if=/drop_if=)` (call form, mirrors `executeSelect`): apply the
@@ -1249,6 +1498,216 @@ fn read_sam_text(path: &str) -> NgResult<String> {
         return crate::samtools::bam_to_sam_text(path);
     }
     crate::compression::read_to_string(path)
+}
+
+/// Interleave a read set into a single FASTQ byte stream for `bwa mem -p` (mirrors
+/// `interleaveFQs`): each pair is emitted record-by-record (mate 1's record, then mate 2's),
+/// re-normalised to LF line endings; the singleton files are then appended verbatim
+/// (decompressed). Both mates of a pair must have the same number of lines.
+fn interleave_fastq(rs: &ReadSet) -> NgResult<Vec<u8>> {
+    let mut out: Vec<u8> = Vec::new();
+    for (f1, f2) in &rs.pairs {
+        let t1 = read_fastq_text(&f1.path.to_string_lossy())?;
+        let t2 = read_fastq_text(&f2.path.to_string_lossy())?;
+        let l1: Vec<&str> = t1.lines().collect();
+        let l2: Vec<&str> = t2.lines().collect();
+        if l1.len() != l2.len() {
+            return Err(NgError::should_not_occur(format!(
+                "interleavePair: mismatched lengths: ({}, {})",
+                l1.len(),
+                l2.len()
+            )));
+        }
+        let mut i = 0;
+        while i < l1.len() {
+            for k in 0..4 {
+                if let Some(line) = l1.get(i + k) {
+                    out.extend_from_slice(line.as_bytes());
+                    out.push(b'\n');
+                }
+            }
+            for k in 0..4 {
+                if let Some(line) = l2.get(i + k) {
+                    out.extend_from_slice(line.as_bytes());
+                    out.push(b'\n');
+                }
+            }
+            i += 4;
+        }
+    }
+    for s in &rs.singletons {
+        out.extend_from_slice(&crate::compression::read_bytes(&s.path.to_string_lossy())?);
+    }
+    Ok(out)
+}
+
+/// Candidate paths for a FASTA reference under the search path (mirrors `expandPath'`). With no
+/// `<...>` placeholder the path is used as-is; otherwise, for each search-path entry, the
+/// placeholder is resolved (supporting `name=/path` entries) and joined with the remainder.
+fn expand_path_candidates(fbase: &str, search: &[String]) -> Vec<String> {
+    match find_angle_group(fbase) {
+        None => vec![fbase.to_string()],
+        Some((start, end, code)) => {
+            // The remainder is the path with the `<...>` removed and any leading slashes dropped.
+            let mut rest = String::new();
+            rest.push_str(&fbase[..start]);
+            rest.push_str(&fbase[end..]);
+            let fbase2 = rest.trim_start_matches('/').to_string();
+            search
+                .iter()
+                .filter_map(|p| {
+                    let base = simplify_search(&code, p)?;
+                    Some(Path::new(&base).join(&fbase2).to_string_lossy().to_string())
+                })
+                .collect()
+        }
+    }
+}
+
+/// Find the first `<...>` placeholder in `fbase`, returning `(start, end, code)` where the
+/// bracketed `code` is an (optionally empty) identifier. Returns `None` if there is no such
+/// well-formed placeholder (matching the `<(@{%id})?>` regex used in Haskell).
+fn find_angle_group(fbase: &str) -> Option<(usize, usize, String)> {
+    let bytes = fbase.as_bytes();
+    let start = fbase.find('<')?;
+    let mut i = start + 1;
+    while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+        i += 1;
+    }
+    if i < bytes.len() && bytes[i] == b'>' {
+        let code = fbase[start + 1..i].to_string();
+        Some((start, i + 1, code))
+    } else {
+        None
+    }
+}
+
+/// Resolve one search-path entry for a placeholder named `code` (mirrors `simplify`): a plain
+/// directory is used directly; a `name=/path` entry matches only when `name == code`.
+fn simplify_search(code: &str, path: &str) -> Option<String> {
+    if !path.contains('=') {
+        Some(path.to_string())
+    } else {
+        path.strip_prefix(&format!("{code}=")).map(String::from)
+    }
+}
+
+/// One FASTA record, kept as its (LF-normalised) text plus the length of its sequence in bases.
+struct FaSeq {
+    record: String,
+    length: i64,
+}
+
+/// Parse FASTA text into records, preserving each record's lines (mirrors `faConduit` closely
+/// enough for splitting: sequence length is the number of sequence bases).
+fn parse_fasta(text: &str) -> Vec<FaSeq> {
+    let mut out = Vec::new();
+    let mut cur: Option<FaSeq> = None;
+    for line in text.lines() {
+        if line.starts_with('>') {
+            if let Some(s) = cur.take() {
+                out.push(s);
+            }
+            cur = Some(FaSeq {
+                record: format!("{line}\n"),
+                length: 0,
+            });
+        } else if let Some(s) = cur.as_mut() {
+            s.record.push_str(line);
+            s.record.push('\n');
+            s.length += line.len() as i64;
+        }
+    }
+    if let Some(s) = cur {
+        out.push(s);
+    }
+    out
+}
+
+/// Split a FASTA file into blocks of at most `block_size` megabases, writing `<ofile_base>.<n>.fna`
+/// chunks (mirrors `splitFASTA`/`splitWriter`). A sequence longer than the block size is placed
+/// alone in its own chunk (NGLess never splits a single sequence).
+fn split_fasta(block_size: i64, ifile: &str, ofile_base: &str) -> NgResult<Vec<String>> {
+    let text = read_fastq_text(ifile)?;
+    let seqs = parse_fasta(&text);
+    let max_bps = 1_000_000 * block_size;
+    let mut chunks = Vec::new();
+    let mut idx = 0;
+    let mut n = 0;
+    while idx < seqs.len() {
+        let f = format!("{ofile_base}.{n}.fna");
+        let mut content = String::new();
+        content.push_str(&seqs[idx].record);
+        let mut sofar = seqs[idx].length;
+        let first_fits = seqs[idx].length <= max_bps;
+        if !first_fits {
+            eprintln!(
+                "While splitting file '{ifile}': a sequence is {} bases long (longer than the \
+                 block size). Note that NGLess does not split sequences.",
+                seqs[idx].length
+            );
+        }
+        idx += 1;
+        if first_fits {
+            while idx < seqs.len() && seqs[idx].length + sofar <= max_bps {
+                content.push_str(&seqs[idx].record);
+                sofar += seqs[idx].length;
+                idx += 1;
+            }
+        }
+        std::fs::write(&f, content).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write split file {f}: {e}"),
+            )
+        })?;
+        chunks.push(f);
+        n += 1;
+    }
+    Ok(chunks)
+}
+
+/// Merge the alignment records of one read across block-partial files, keeping the best match(es)
+/// (mirrors `mergeSAMGroups MSBestOnly` with the post-1.1 behaviour). Records are partitioned into
+/// first-in-pair, second-in-pair and singleton, and within each partition only the alignments with
+/// the maximal `matchSize - NM` are kept (unaligned reads pass through a single representative).
+fn merge_sam_group(combined: &[SamLine]) -> NgResult<Vec<SamLine>> {
+    let mut g1 = Vec::new();
+    let mut g2 = Vec::new();
+    let mut gs = Vec::new();
+    for s in combined {
+        if s.is_first_in_pair() {
+            g1.push(s.clone());
+        } else if s.is_second_in_pair() {
+            g2.push(s.clone());
+        } else {
+            gs.push(s.clone());
+        }
+    }
+    let mut out = Vec::new();
+    for sub in [g1, g2, gs] {
+        out.extend(pick_best(sub));
+    }
+    Ok(out)
+}
+
+/// Pick the best-scoring alignments from a partition (mirrors `group`/`pick`): if none are
+/// aligned, keep the first record; otherwise keep every aligned record whose `matchSize - NM` is
+/// maximal.
+fn pick_best(group: Vec<SamLine>) -> Vec<SamLine> {
+    if group.is_empty() {
+        return group;
+    }
+    let aligned: Vec<&SamLine> = group.iter().filter(|s| s.is_aligned()).collect();
+    if aligned.is_empty() {
+        return vec![group[0].clone()];
+    }
+    let match_value = |s: &SamLine| s.match_size(true).unwrap_or(0) - s.int_tag("NM").unwrap_or(0);
+    let best = aligned.iter().map(|s| match_value(s)).max().unwrap();
+    group
+        .into_iter()
+        .filter(|s| s.is_aligned() && match_value(s) == best)
+        .collect()
 }
 
 /// One grouping unit of a SAM file for `select`: a header line (verbatim) or a group of
@@ -1999,7 +2458,7 @@ mod tests {
 
     fn run(text: &str) -> NgResult<()> {
         let script = parse_ngless("test", true, text).expect("parse failed");
-        interpret(&script.body, &std::env::temp_dir(), text)
+        interpret(&script.body, &std::env::temp_dir(), text, &[])
     }
 
     #[test]
@@ -2032,9 +2491,74 @@ mod tests {
     }
 
     #[test]
-    fn unimplemented_function_errors() {
-        // map is not implemented yet.
+    fn fastq_of_missing_file_errors() {
+        // `fastq` of a non-existent file fails before mapping is ever reached.
         assert!(run("ngless '1.5'\nx = fastq('/nonexistent.fq')\ny = map(x)\n").is_err());
+    }
+
+    #[test]
+    fn expand_path_no_placeholder_is_identity() {
+        assert_eq!(expand_path_candidates("ref.fna", &[]), vec!["ref.fna"]);
+        assert_eq!(
+            expand_path_candidates("dir/ref.fna", &["ignored".to_string()]),
+            vec!["dir/ref.fna"]
+        );
+    }
+
+    #[test]
+    fn expand_path_placeholder_joins_search_dirs() {
+        let search = vec!["subdir1".to_string(), "subdir2".to_string()];
+        assert_eq!(
+            expand_path_candidates("<data>/ref.fna", &search),
+            vec!["subdir1/ref.fna", "subdir2/ref.fna"]
+        );
+        // An empty placeholder `<>` works the same way.
+        assert_eq!(
+            expand_path_candidates("<>/ref.fna", &["d".to_string()]),
+            vec!["d/ref.fna"]
+        );
+    }
+
+    #[test]
+    fn expand_path_named_search_entries() {
+        // `name=/path` entries only match the matching placeholder name.
+        let search = vec!["data=/opt/refs".to_string(), "other=/elsewhere".to_string()];
+        assert_eq!(
+            expand_path_candidates("<data>/ref.fna", &search),
+            vec!["/opt/refs/ref.fna"]
+        );
+        // A plain entry always matches.
+        assert_eq!(
+            expand_path_candidates("<data>/ref.fna", &["/plain".to_string()]),
+            vec!["/plain/ref.fna"]
+        );
+    }
+
+    #[test]
+    fn parse_fasta_counts_sequence_bases() {
+        let fa = ">seq1 desc\nACGT\nACGT\n>seq2\nTTTTTT\n";
+        let seqs = parse_fasta(fa);
+        assert_eq!(seqs.len(), 2);
+        assert_eq!(seqs[0].length, 8);
+        assert_eq!(seqs[0].record, ">seq1 desc\nACGT\nACGT\n");
+        assert_eq!(seqs[1].length, 6);
+    }
+
+    #[test]
+    fn pick_best_keeps_maximal_match() {
+        // Two alignments of the same mate: a 50-base perfect match beats a 30-base one.
+        let good = parse_sam_line("r\t0\tg1\t1\t60\t50M\t*\t0\t0\tACGT\tIIII\tNM:i:0").unwrap();
+        let worse = parse_sam_line("r\t0\tg2\t1\t60\t30M20S\t*\t0\t0\tACGT\tIIII\tNM:i:0").unwrap();
+        let merged = merge_sam_group(&[good.clone(), worse]).unwrap();
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].rname, "g1");
+    }
+
+    #[test]
+    fn pick_best_unaligned_passes_one_through() {
+        let una = parse_sam_line("r\t4\t*\t0\t0\t*\t*\t0\t0\tACGT\tIIII\tNM:i:0").unwrap();
+        let merged = merge_sam_group(&[una.clone(), una]).unwrap();
+        assert_eq!(merged.len(), 1);
     }
 
     // --- FASTQ path (file-backed) -------------------------------------------

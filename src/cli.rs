@@ -19,6 +19,7 @@ struct RunOpts {
     no_header: bool,
     debug: String,
     temp_dir: Option<String>,
+    search_path: Vec<String>,
 }
 
 /// Entry point for the non-informational command line (everything except `--version*` and
@@ -60,6 +61,14 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
             "--debug" => {
                 i += 1;
                 opts.debug = arg_value(args, i, a)?;
+            }
+            "--search-path" => {
+                i += 1;
+                opts.search_path.push(arg_value(args, i, a)?);
+            }
+            other if other.starts_with("--search-path=") => {
+                opts.search_path
+                    .push(other["--search-path=".len()..].to_string());
             }
             other if other.starts_with("--temporary-directory=") => {
                 opts.temp_dir = Some(other["--temporary-directory=".len()..].to_string());
@@ -160,7 +169,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         .clone()
         .map(std::path::PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
-    crate::interpret::interpret(&typed.body, &temp_dir, &text)?;
+    crate::interpret::interpret(&typed.body, &temp_dir, &text, &opts.search_path)?;
     Ok(0)
 }
 

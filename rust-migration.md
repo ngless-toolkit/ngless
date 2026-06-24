@@ -69,8 +69,9 @@
 >   `module_functions` contributes `samtools_sort` (0.0+) and `samtools_view` (0.1/1.0) to the
 >   type checker, validation and interpreter. Passing: `tests/regression-cigar-filter`
 >   (`samtools_sort by={name}` → write SAM) and `tests/regression-bad-sam` (`select` → write
->   SAM **and** BAM). Still pending: `map` itself (needs bwa/minimap2 — not installable here)
->   and the remaining mapped-read methods (`pe_filter`/`unique`/`allbest`/`some_match`).
+>   SAM **and** BAM). Still pending here: the remaining mapped-read
+>   methods (`pe_filter`/`unique`/`allbest`/`some_match`); `map` itself is now done — see the
+>   bwa milestone below.
 > - **Compression (gzip/bzip2/zstd):** `src/compression.rs` now (de)compresses all of gzip
 >   (`flate2`), bzip2 (`bzip2` crate, pure-Rust `libbz2-rs-sys` backend) and zstd (`zstd` crate);
 >   output is content-equivalent (the suite compares decompressed data, so exact bytes need not
@@ -115,6 +116,28 @@
 >   non-deterministic — `build_comment` errors on them); `count-mode`/`count-subfeatures` need
 >   `map()`/bwa (CI only, though their GFF modes are covered above); and the double-conversion
 >   scientific switch for out-of-range exponents is deferred.
+> - **M7 (mapping with bwa):** `map()` is implemented for the `fafile=` form with the bwa mapper
+>   (`src/mapper.rs` + `execute_map`/`perform_map` in `src/interpret.rs`, mirroring
+>   `Interpretation/Map.hs` and `StandardModules/Mappers/Bwa.hs`). `src/mapper.rs` shells out to
+>   the external `bwa` (`$NGLESS_BWA_BIN` or `bwa` on PATH; the Haskell build bundles a pinned one),
+>   querying its version at runtime and embedding it in the index file names (`<base>-bwa-<ver>.<ext>`,
+>   mirroring `indexPrefix`/`bwaVersion`); indices are built lazily (`bwa index`, with the
+>   1/10th-filesize `-b` block size for ≥100MB references) and reused via the `.amb/.ann/.bwt/.pac/.sa`
+>   set. Reads are interleaved for `bwa mem -K 100000000 -p` (`interleave_fastq`, mirroring
+>   `interleaveFQs`: pairs emitted record-by-record and re-normalised to LF — so Windows line
+>   endings are handled — then singletons appended verbatim) and streamed on stdin while stdout is
+>   redirected to a SAM temp. `block_size_megabases=` splits the FASTA into block-sized chunks
+>   (`split_fasta`/`ensure_splits_exist`, mirroring `splitFASTA` with the `.splits_Nm.K.fna`
+>   naming and `.done` receipt); a single chunk maps directly, multiple chunks map separately and
+>   merge best-only (`merge_sam_files`/`merge_sam_group`, mirroring `mergeSAMGroups MSBestOnly` at
+>   ≥1.1). `fafile=` is resolved through `--search-path` with `<references>`-style placeholders
+>   (`expand_path`/`expand_path_candidates`, mirroring `expandPath'`, incl. `name=/path` entries).
+>   Passing (verified against pixi-provided bwa 0.7.19/samtools): `tests/map3` (single + split),
+>   `tests/map_search_path`, `tests/map_search_path_multiple`, `tests/map_sort_stream`
+>   (→ `samtools_sort by={name}`) and `tests/map-windows_line_terminators` (single + split). Still
+>   pending: packaged `reference=` databases (need the reference-download infrastructure) and the
+>   minimap2/soap mappers (`map(..., mapper='minimap2')` errors clearly for now); index creation is
+>   not lock-guarded (safe for single-process runs).
 
 ## Context
 
