@@ -273,6 +273,7 @@ impl Interpreter {
             "samtools_view" => self.execute_samtools_view(&expr_v, &argvs),
             "count" => self.execute_count(&expr_v, &argvs),
             "countfile" => self.execute_countfile(&expr_v),
+            "mapstats" => self.execute_mapstats(&expr_v),
             "write" => self.execute_write(&expr_v, &argvs),
             _ => execute_function(f, &expr_v, &argvs),
         }
@@ -409,6 +410,54 @@ impl Interpreter {
             NgError::new(
                 NgErrorType::SystemError,
                 format!("Could not write counts file: {e}"),
+            )
+        })?;
+        Ok(NGLessObject::Counts(out))
+    }
+
+    /// `mapstats(mapped)`: summarize a mapped read set as total / aligned / unique read groups
+    /// (mirrors `executeMapStats` + `samStatsC'`). Reads are grouped by name (both mates together);
+    /// a group is *aligned* if any read is aligned, and *unique* if it is aligned and all its
+    /// records share one reference name.
+    fn execute_mapstats(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
+        let (name, path) = mapped_read_set(expr, "mapstats")?;
+        let text = read_sam_text(&path.to_string_lossy())?;
+        let records = sam::parse_sam(&text)?;
+        let lines: Vec<&SamLine> = records
+            .iter()
+            .filter_map(|r| match r {
+                SamRecord::Line(l) => Some(l),
+                SamRecord::Header(_) => None,
+            })
+            .collect();
+
+        let (mut total, mut aligned, mut unique) = (0i64, 0i64, 0i64);
+        let mut i = 0;
+        while i < lines.len() {
+            let mut j = i + 1;
+            while j < lines.len() && lines[j].qname == lines[i].qname {
+                j += 1;
+            }
+            let group = &lines[i..j];
+            total += 1;
+            let is_aligned = group.iter().any(|l| l.is_aligned());
+            let same_rname = group.iter().all(|l| l.rname == group[0].rname);
+            if is_aligned {
+                aligned += 1;
+                if same_rname {
+                    unique += 1;
+                }
+            }
+            i = j;
+        }
+
+        let tsv =
+            format!("\t{name}\ntotal\t{total}\naligned\t{aligned}\nunique\t{unique}\n");
+        let out = self.new_temp_path("sam_stats_", "stats");
+        std::fs::write(&out, tsv).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write mapstats file: {e}"),
             )
         })?;
         Ok(NGLessObject::Counts(out))

@@ -100,13 +100,18 @@
 >   `tests/count-gff-corner-cases` (GFF subfeatures with comma-split attributes). `countfile()`
 >   (`Interpretation/CountFile.hs`) is also done: it references an existing counts TSV, reordering
 >   the data rows by tag (the first column) when they are not already sorted while keeping leading
->   comments and the sample-name header in place (`tests/countfile-reorder` passes). Still pending:
+>   comments and the sample-name header in place (`tests/countfile-reorder` passes). `mapstats()`
+>   (`executeMapStats` + `samStatsC'`) is done too: it summarizes a mapped read set as
+>   total/aligned/unique read groups (grouped by name, a group is *aligned* if any read aligns and
+>   *unique* if aligned and all records share one reference); `tests/mapstats` passes end-to-end,
+>   including the chained `select(...keep_if=[{mapped}/{unique}])` inputs and the `ofile=STDOUT`
+>   output. Still pending:
 >   `auto_comments=[{script}]` on `write()` (needs the original script source threaded into the
 >   interpreter — a `write()` concern), which leaves `tests/count-fpkm` kept at `1.1` for now
 >   (its fpkm/scaled math is verified and unit-tested, but two of its outputs embed the script via
 >   `auto_comments`); `count-mode`/`count-subfeatures` need `map()`/bwa (CI only, though their GFF
->   modes are covered above); `mapstats()` and the double-conversion scientific switch for
->   out-of-range exponents are deferred.
+>   modes are covered above); and the double-conversion scientific switch for out-of-range
+>   exponents is deferred.
 
 ## Context
 
