@@ -160,7 +160,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         .clone()
         .map(std::path::PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
-    crate::interpret::interpret(&typed.body, &temp_dir)?;
+    crate::interpret::interpret(&typed.body, &temp_dir, &text)?;
     Ok(0)
 }
 
