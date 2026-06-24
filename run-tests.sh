@@ -9,6 +9,14 @@ basedir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # point it at the Rust build with e.g. NGLESS_BIN=target/release/ngless ./run-tests.sh
 NGLESS_BIN="${NGLESS_BIN:-ngless}"
 
+# Resolve to an absolute path so it keeps working after we `cd` into each test
+# directory (e.g. when check.sh scripts invoke it), and export it so those
+# scripts can find the same binary that is being tested.
+if [[ "$NGLESS_BIN" == */* ]]; then
+    NGLESS_BIN="$( cd "$( dirname "$NGLESS_BIN" )" && pwd )/$( basename "$NGLESS_BIN" )"
+fi
+export NGLESS_BIN
+
 # Check that ngless is correctly installed:
 if ! "$NGLESS_BIN" --check-install ; then
     echo "$NGLESS_BIN --check-install failed."

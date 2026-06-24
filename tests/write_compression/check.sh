@@ -2,7 +2,7 @@
 
 set -e
 
-SAMTOOLS="$(ngless --print-path samtools)"
+SAMTOOLS="$("${NGLESS_BIN:-ngless}" --print-path samtools)"
 
 echo "Comparing SAM"
 diff -q <(grep -v '^@[PG|HD]' output.sam) texpected.sam

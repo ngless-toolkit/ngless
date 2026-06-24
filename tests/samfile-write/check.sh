@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-SAMTOOLS="$(ngless --print-path samtools)"
+SAMTOOLS="$("${NGLESS_BIN:-ngless}" --print-path samtools)"
 
 failed=0
 if ! diff <($SAMTOOLS view -h output.1.bam | grep -v '^@PG') texpected.sam ; then
