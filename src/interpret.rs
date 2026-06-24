@@ -306,6 +306,7 @@ impl Interpreter {
             "count" => self.execute_count(&expr_v, &argvs),
             "countfile" => self.execute_countfile(&expr_v),
             "mapstats" => self.execute_mapstats(&expr_v),
+            "__merge_samfiles" => self.execute_merge_sams(&expr_v),
             "write" => self.execute_write(&expr_v, &argvs),
             _ => execute_function(f, &expr_v, &argvs),
         }
@@ -789,6 +790,33 @@ impl Interpreter {
             }
         }
         self.write_sam_temp(&out)
+    }
+
+    /// `__merge_samfiles([f1, f2, ...])`: merge several SAM files into one mapped read set
+    /// (mirrors `executeMergeSams`). The argument is a list of file paths; merging keeps the
+    /// headers from every input and resolves per-read-name groups best-only.
+    fn execute_merge_sams(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
+        let files = match expr {
+            NGLessObject::List(items) => items
+                .iter()
+                .map(|o| match o {
+                    NGLessObject::String(s) => Ok(PathBuf::from(s)),
+                    other => Err(NgError::script(format!(
+                        "__merge_samfiles: expected a string, got {other:?}"
+                    ))),
+                })
+                .collect::<NgResult<Vec<_>>>()?,
+            other => {
+                return Err(NgError::script(format!(
+                    "Wrong argument for internal function __merge_samfiles: {other:?}"
+                )))
+            }
+        };
+        let path = self.merge_sam_files(&files)?;
+        Ok(NGLessObject::MappedReadSet {
+            name: "test".to_string(),
+            path,
+        })
     }
 
     /// Resolve a FASTA path through the search path, expanding `<references>`-style placeholders
@@ -1694,7 +1722,9 @@ fn merge_sam_group(combined: &[SamLine]) -> NgResult<Vec<SamLine>> {
     let mut g1 = Vec::new();
     let mut g2 = Vec::new();
     let mut gs = Vec::new();
-    for s in combined {
+    // The Haskell `foldl (\... s -> (s:g1, ...)) ([],[],[])` *prepends*, so each partition ends
+    // up reversed relative to the input order; mirror that to keep output ordering identical.
+    for s in combined.iter().rev() {
         if s.is_first_in_pair() {
             g1.push(s.clone());
         } else if s.is_second_in_pair() {
