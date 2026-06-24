@@ -2210,6 +2210,26 @@ fn execute_method(
                 samlines.clone(),
             )))
         }
+        ("some_match", NGLessObject::MappedRead(samlines)) => {
+            let target = match _arg {
+                Some(NGLessObject::String(s)) => s.as_str(),
+                _ => return Err(NgError::script("some_match method requires a string argument")),
+            };
+            Ok(NGLessObject::Bool(samlines.iter().any(|s| s.rname == target)))
+        }
+        ("pe_filter", NGLessObject::MappedRead(samlines)) => Ok(NGLessObject::MappedRead(
+            select::filter_pe(samlines.clone()),
+        )),
+        ("unique", NGLessObject::MappedRead(samlines)) => Ok(NGLessObject::MappedRead(
+            select::m_unique(samlines.clone()),
+        )),
+        ("allbest", NGLessObject::MappedRead(samlines)) => {
+            let use_newer = lookup_bool(_args, "__version11_or_higher", false)?;
+            Ok(NGLessObject::MappedRead(select::m_besthit(
+                use_newer,
+                samlines.clone(),
+            )))
+        }
         ("to_string", NGLessObject::Double(d)) => Ok(NGLessObject::String(show_double(*d))),
         ("to_string", NGLessObject::Integer(i)) => Ok(NGLessObject::String(i.to_string())),
         ("avg_quality", NGLessObject::Read(r)) => Ok(NGLessObject::Double(r.avg_quality())),

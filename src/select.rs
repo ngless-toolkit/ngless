@@ -124,6 +124,75 @@ fn samlines<T>(g: &[(SamLine, T)]) -> Vec<SamLine> {
     g.iter().map(|(s, _)| s.clone()).collect()
 }
 
+/// `mUnique`: keep the group only if it maps uniquely, otherwise drop it entirely.
+pub fn m_unique(group: Vec<SamLine>) -> Vec<SamLine> {
+    if is_group_unique(&group) {
+        group
+    } else {
+        Vec::new()
+    }
+}
+
+/// `pe_filter` (`filterPE`): keep only aligned, properly-mated pairs. For each aligned
+/// positive-strand record, find the first aligned negative-strand record on the same reference and
+/// emit the pair; unmatched records are dropped.
+pub fn filter_pe(group: Vec<SamLine>) -> Vec<SamLine> {
+    let aligned: Vec<SamLine> = group.into_iter().filter(|s| s.is_aligned()).collect();
+    let mut out = Vec::new();
+    for sl in &aligned {
+        if !sl.is_positive() {
+            continue;
+        }
+        if let Some(sl2) = aligned
+            .iter()
+            .find(|o| o.is_negative() && o.rname == sl.rname)
+        {
+            out.push(sl.clone());
+            out.push(sl2.clone());
+        }
+    }
+    out
+}
+
+/// `allbest` (`mBesthit`): within each mate bucket, keep only the records with the best
+/// (minimum-NM) match. The `use_newer` flag controls how match sizes are computed, but since the
+/// per-record max match size cancels out of the comparison, only the NM distance matters.
+pub fn m_besthit(use_newer: bool, group: Vec<SamLine>) -> Vec<SamLine> {
+    if group.len() <= 1 {
+        return group;
+    }
+    let (g1, g2, gs) = split3(&group);
+    let mut out = m_besthit_bucket(use_newer, g1);
+    out.extend(m_besthit_bucket(use_newer, g2));
+    out.extend(m_besthit_bucket(use_newer, gs));
+    out
+}
+
+fn m_besthit_bucket(use_newer: bool, group: Vec<SamLine>) -> Vec<SamLine> {
+    if group.len() <= 1 {
+        return group;
+    }
+    // Records that have both an NM tag and a computable match size; others are dropped (unless
+    // none qualify, in which case the bucket is returned unchanged).
+    let extracted: Vec<(i64, SamLine)> = group
+        .iter()
+        .filter_map(|s| {
+            let dist = s.int_tag("NM")?;
+            let _size = s.match_size(use_newer).ok()?;
+            Some((dist, s.clone()))
+        })
+        .collect();
+    if extracted.is_empty() {
+        return group;
+    }
+    let min_dist = extracted.iter().map(|(d, _)| *d).min().unwrap();
+    extracted
+        .into_iter()
+        .filter(|(d, _)| *d <= min_dist)
+        .map(|(_, s)| s)
+        .collect()
+}
+
 /// What to do with a record that fails the `.filter(...)` test (mirrors `FilterAction`).
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FilterAction {

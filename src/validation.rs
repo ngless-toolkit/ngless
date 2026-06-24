@@ -26,6 +26,10 @@ pub fn validate(funcs: &[Function], constants: &[String], script: &Script) -> Ng
     errs.extend(validate_pure_functions(funcs, script));
     errs.extend(validate_write_oname(script));
     errs.extend(validate_block_assignments(script));
+    // Samtools-module check: only active when the module's functions are in scope.
+    if funcs.iter().any(|f| f.name.0 == "samtools_sort") {
+        errs.extend(validate_select_unique_not_sorted(script));
+    }
     if errs.is_empty() {
         Ok(())
     } else {
@@ -364,6 +368,72 @@ fn validate_map_ref(script: &Script) -> Vec<String> {
         out.extend(add_lno(*lno, local));
     }
     out
+}
+
+/// `checkUnique` (samtools module): selecting unique reads from a `samtools_sort`ed read set is an
+/// error, since uniqueness is computed per read-name group which sorting destroys. For each
+/// `v = select(w, keep_if=[..{unique}..])`, trace `w`'s assignment chain backwards; if any link is
+/// a `samtools_sort`, report an error.
+fn validate_select_unique_not_sorted(script: &Script) -> Vec<String> {
+    let mut out = Vec::new();
+    for (i, (lno, e)) in script.body.iter().enumerate() {
+        if let Expression::Assignment(_, rhs) = e {
+            if let Expression::FunctionCall(FuncName(name), arg, kwargs, None) = rhs.as_ref() {
+                if name == "select" && selects_unique(kwargs) {
+                    if let Expression::Lookup(_, Variable(v)) = arg.as_ref() {
+                        // Preceding statements, most-recent first (mirrors `map snd rest`).
+                        let preceding: Vec<&Expression> =
+                            script.body[..i].iter().rev().map(|(_, e)| e).collect();
+                        if traces_to_sort(v, &preceding) {
+                            out.push(line_msg(
+                                *lno,
+                                format!(
+                                    "Cannot select unique reads from a sorted mappedreadset (at line {lno}).\n\tConsider selecting, *then* sorting."
+                                ),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Whether `kwargs` contains `keep_if=` with a `{unique}` symbol (possibly inside a list).
+fn selects_unique(kwargs: &[(Variable, Expression)]) -> bool {
+    fn has_unique(e: &Expression) -> bool {
+        match e {
+            Expression::ConstSymbol(s) => s == "unique",
+            Expression::ListExpression(vs) => vs.iter().any(has_unique),
+            _ => false,
+        }
+    }
+    kwargs
+        .iter()
+        .any(|(Variable(k), v)| k == "keep_if" && has_unique(v))
+}
+
+/// Trace variable `v` back through `preceding` assignments (most-recent first): a `samtools_sort`
+/// link means sorted; a `Lookup` link continues the trace through the new variable.
+fn traces_to_sort(v: &str, preceding: &[&Expression]) -> bool {
+    let target = v.to_string();
+    for (idx, e) in preceding.iter().enumerate() {
+        if let Expression::Assignment(Variable(v2), expr) = e {
+            if *v2 == target {
+                match expr.as_ref() {
+                    Expression::FunctionCall(FuncName(n), _, _, _) if n == "samtools_sort" => {
+                        return true
+                    }
+                    Expression::Lookup(_, Variable(v3)) => {
+                        return traces_to_sort(v3, &preceding[idx + 1..])
+                    }
+                    _ => return false,
+                }
+            }
+        }
+    }
+    false
 }
 
 fn validate_no_constant_assignments(constants: &[String], script: &Script) -> Vec<String> {

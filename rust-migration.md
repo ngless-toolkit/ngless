@@ -5,7 +5,7 @@
 > repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
 > Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
-> **56 of the 96 functional tests pass** against the Rust binary with output identical to
+> **58 of the 96 functional tests pass** against the Rust binary with output identical to
 > Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`). See
 > the [Functional test status](#functional-test-status) table below for the per-test breakdown.
 >
@@ -80,9 +80,12 @@
 >   type checker, validation and interpreter. Passing: `tests/regression-cigar-filter`
 >   (`samtools_sort by={name}` → write SAM) and `tests/regression-bad-sam` (`select` → write
 >   SAM **and** BAM). `__merge_samfiles` is also done (`execute_merge_sams`, mirroring
->   `executeMergeSams`/`mergeSAMGroups MSBestOnly`; `tests/merge-sams` passes). Still pending here:
->   the remaining mapped-read methods (`pe_filter`/`unique`/`allbest`/`some_match`); `map` itself
->   is now done — see the bwa milestone below.
+>   `executeMergeSams`/`mergeSAMGroups MSBestOnly`; `tests/merge-sams` passes). The mapped-read
+>   methods `pe_filter`/`unique`/`allbest`/`some_match` are now implemented (`src/select.rs`:
+>   `filter_pe`/`m_unique`/`m_besthit`, dispatched in `execute_method`), and the samtools
+>   `checkUnique` validation (selecting `{unique}` from a `samtools_sort`ed set is an error) is
+>   wired into `validation::validate` (`tests/select_block_filter`, `tests/error-unique-on-sorted`).
+>   `map` itself is now done — see the bwa milestone below.
 > - **Compression (gzip/bzip2/zstd):** `src/compression.rs` now (de)compresses all of gzip
 >   (`flate2`), bzip2 (`bzip2` crate, pure-Rust `libbz2-rs-sys` backend) and zstd (`zstd` crate);
 >   output is content-equivalent (the suite compares decompressed data, so exact bytes need not
@@ -327,7 +330,7 @@ driven locally. **Tally: 56 ✅ · 40 ❌ (96 total).**
 | error-count-nofile | ✅ | M6 |
 | error-map-file | ❌ | Future — early validation: bad column must be caught before any `write`, else `should.not.be.created.txt` is written |
 | error-ofile-complex | ❌ | Future — early output-dir validation + error-message parity + citation header |
-| error-unique-on-sorted | ❌ | M5-pending — `unique` select method / its error check |
+| error-unique-on-sorted | ✅ | M5 — samtools `checkUnique` validation |
 | error-validate-nofafile | ✅ | M5 |
 | error-write-no-output-dir | ✅ | M4 |
 | exampleExternalModule | ❌ | M7 — external modules |
@@ -385,7 +388,7 @@ driven locally. **Tally: 56 ✅ · 40 ❌ (96 total).**
 | select | ❌ | M7 — packaged `reference=` databases |
 | select-bam | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | select_block | ❌ | M7 — packaged `reference=` databases |
-| select_block_filter | ❌ | M5-pending — `allbest` method |
+| select_block_filter | ✅ | M5 — `allbest`/`unique`/`pe_filter`/`some_match` methods |
 | select_block_filter_unmatch | ✅ | M5 |
 | select_max_trim | ✅ | M5 |
 | select-multi-conditions | ✅ | M5 |
