@@ -62,6 +62,18 @@ where
 {
     let args: Vec<String> = args.into_iter().map(|s| s.as_ref().to_string()).collect();
 
+    // `--print-path EXEC`: print the resolved path to a bundled external tool. Takes a
+    // positional argument, so it is handled before the single-flag loop below.
+    if let Some(pos) = args.iter().position(|a| a == "--print-path") {
+        return match args.get(pos + 1) {
+            Some(exec) => print_path(exec),
+            None => {
+                eprintln!("--print-path requires an argument (EXEC)");
+                1
+            }
+        };
+    }
+
     // Informational flags, matching the Haskell CLI (Execs/Main.hs). These short-circuit.
     for a in &args {
         match a.as_str() {
@@ -112,6 +124,96 @@ where
     cli::run_default_mode(&args)
 }
 
+/// `--print-path EXEC`: print the path to the external tool `EXEC` (mirrors `PrintPathMode`
+/// in `Execs/Main.hs`). The Rust build bundles no binaries, so the path is resolved from the
+/// per-tool `NGLESS_*_BIN` environment variable or from `PATH`.
+fn print_path(exec: &str) -> i32 {
+    use errors::{NgError, NgErrorType};
+    let resolved = match exec {
+        "samtools" => find_bin("NGLESS_SAMTOOLS_BIN", "samtools"),
+        "prodigal" => find_bin("NGLESS_PRODIGAL_BIN", "prodigal"),
+        "megahit" => find_bin("NGLESS_MEGAHIT_BIN", "megahit"),
+        "bwa" => find_bin("NGLESS_BWA_BIN", "bwa"),
+        "minimap2" => find_bin("NGLESS_MINIMAP2_BIN", "minimap2"),
+        other => Err(NgError::new(
+            NgErrorType::SystemError,
+            format!("Unknown binary {other}."),
+        )),
+    };
+    match resolved {
+        Ok(path) => {
+            println!("{path}");
+            0
+        }
+        Err(e) => {
+            eprintln!("{e}");
+            1
+        }
+    }
+}
+
+/// Resolve the path to an external tool, mirroring `findNGLessBin`/`checkExecutable` in
+/// `NGLess/FileManagement.hs` for a build without embedded dependencies: honour the
+/// `NGLESS_*_BIN` override (which must point at an executable file), otherwise look the tool
+/// up on `PATH`.
+fn find_bin(envvar: &str, fname: &str) -> errors::NgResult<String> {
+    use errors::{NgError, NgErrorType};
+    if let Ok(bin) = std::env::var(envvar) {
+        let path = std::path::Path::new(&bin);
+        if !path.is_file() {
+            return Err(NgError::new(
+                NgErrorType::SystemError,
+                format!("{envvar} binary not found!\nExpected it at {bin}"),
+            ));
+        }
+        if !is_executable(path) {
+            return Err(NgError::new(
+                NgErrorType::SystemError,
+                format!("{envvar} binary found at {bin}.\nHowever, it is not an executable file!"),
+            ));
+        }
+        return Ok(bin);
+    }
+    match find_on_path(fname) {
+        Some(p) => Ok(p),
+        None => Err(NgError::new(
+            NgErrorType::SystemError,
+            format!(
+                "Cannot find {fname} on the system and this is a build without embedded dependencies."
+            ),
+        )),
+    }
+}
+
+/// Search the directories in `$PATH` for an executable file named `fname`.
+fn find_on_path(fname: &str) -> Option<String> {
+    let path = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path) {
+        let candidate = dir.join(fname);
+        if candidate.is_file() && is_executable(&candidate) {
+            return Some(candidate.to_string_lossy().into_owned());
+        }
+    }
+    None
+}
+
+/// Whether `path` is executable by the current process. On Unix this checks the executable
+/// permission bits; on other platforms existence as a file is taken as sufficient.
+fn is_executable(path: &std::path::Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        match std::fs::metadata(path) {
+            Ok(m) => m.permissions().mode() & 0o111 != 0,
+            Err(_) => false,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        path.is_file()
+    }
+}
+
 /// `--check-install`: the Haskell version verifies that bundled external tools
 /// (samtools, bwa, megahit, ...) are reachable. The Rust build does not manage external
 /// tools yet, so this reports success to let the test harness' install check pass while the
@@ -153,6 +255,21 @@ mod tests {
     #[test]
     fn check_install_exits_zero() {
         assert_eq!(run(["--check-install"]), 0);
+    }
+
+    #[test]
+    fn print_path_unknown_binary_exits_nonzero() {
+        assert_eq!(run(["--print-path", "no-such-tool"]), 1);
+    }
+
+    #[test]
+    fn print_path_env_override_is_resolved() {
+        // Point a tool at a known executable via its override variable and check it round-trips.
+        let me = std::env::current_exe().unwrap();
+        std::env::set_var("NGLESS_SAMTOOLS_BIN", &me);
+        let resolved = find_bin("NGLESS_SAMTOOLS_BIN", "samtools").unwrap();
+        std::env::remove_var("NGLESS_SAMTOOLS_BIN");
+        assert_eq!(resolved, me.to_string_lossy());
     }
 
     #[test]

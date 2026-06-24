@@ -82,10 +82,27 @@
 >   output is content-equivalent (the suite compares decompressed data, so exact bytes need not
 >   match). samtools cannot read zstd/bzip2, so SAM inputs in those formats are decompressed to a
 >   plain SAM temp before `samtools sort`/`view`/conversion (`samtools_input`). With this,
->   `tests/samfile-write` passes end-to-end *functionally* (BAM input → `samtools_sort` → BAM and
->   `.sam.gz` outputs all match); only its `check.sh` (bare `ngless --print-path samtools`) can't
->   be driven here, the same limitation that blocks every samtools `check.sh` test locally (no
->   `ngless` on PATH).
+>   `tests/samfile-write` passes end-to-end (BAM input → `samtools_sort` → BAM and `.sam.gz`
+>   outputs all match), including its `check.sh` now that `--print-path samtools` is implemented
+>   (see below).
+> - **`--print-path EXEC`:** implemented in `src/lib.rs` (mirroring `PrintPathMode` in
+>   `Execs/Main.hs` and `findNGLessBin`/`checkExecutable` in `FileManagement.hs`). Since the Rust
+>   build embeds no binaries, the tool path is resolved from `$NGLESS_<TOOL>_BIN` (which must point
+>   at an executable file) or by searching `PATH`; unknown tool names error with `Unknown binary
+>   <name>.`, as in Haskell. This unblocks every samtools `check.sh` that shells out to
+>   `$(ngless --print-path samtools)`: `tests/samfile-select-sort`, `tests/samfile-write`,
+>   `tests/select-bam` and `tests/write_compression` now pass end-to-end. `tests/samfile-select-view`
+>   now runs but fails on a **samtools version-drift** difference, not a port bug: its
+>   `samtools_view(mapped, bed_file=...)` runs `samtools view -h -O sam -L short.bed.gz` (exactly
+>   the Haskell `executeView` command line), and samtools 1.23.1 emits one extra alignment record
+>   (`SRR070372.2719`, `X:4992867`, CIGAR `31M1I134M1D204M2S`) that overlaps the large
+>   `X:4972559-4997598` gene interval. The committed `texpected.sam.gz` (Jul 2024) was generated
+>   with an older samtools whose `-L` overlap semantics excluded that read (newer samtools only
+>   excludes it under the `-M` multi-region iterator). Removing that single record makes the Rust
+>   output byte-identical to `texpected.sam.gz`, and the Haskell binary run against samtools 1.23.1
+>   would produce the same extra read — i.e. this is the "outputs depend on samtools version"
+>   reproducibility caveat (Risks section), to be resolved by pinning samtools or regenerating the
+>   expected file, not by changing NGLess.
 > - **M6 (counting, part 1):** `count()` with all three annotation modes and all four
 >   normalizations (`src/count.rs` + `src/gff.rs`, mirroring `Interpretation/Count.hs` and
 >   `Data/GFF.hs`). The seqname annotator is built from the `@SQ` header (sorted by name, sizes
@@ -274,8 +291,10 @@ Status of every test under `tests/` against the current Rust binary (built with 
 and run via `pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debug/ngless
 ./run-tests.sh'`, with `bwa`/`samtools` provided by the pixi environment).
 
-Legend: ✅ passes · ⚠️ interpreter path works but `check.sh` cannot be driven here (needs
-`samtools`/`ngless` on `PATH`) · ❌ not yet supported. **Tally: 46 ✅ · 5 ⚠️ · 45 ❌ (96 total).**
+Legend: ✅ passes · ❌ not yet supported. `--print-path EXEC` is now implemented (resolves a
+tool from `$NGLESS_<TOOL>_BIN` or `PATH`, mirroring `PrintPathMode`/`findNGLessBin`), so the
+samtools `check.sh` scripts that shell out to `$(ngless --print-path samtools)` can now be
+driven locally. **Tally: 50 ✅ · 46 ❌ (96 total).**
 
 | Test | Status | Note / planned milestone |
 |---|---|---|
@@ -352,13 +371,13 @@ Legend: ✅ passes · ⚠️ interpreter path works but `check.sh` cannot be dri
 | same-hash-collect | ❌ | M7 — parallel module |
 | same-hash-collect-2 | ❌ | M7 — parallel module |
 | samfile-headers | ✅ | M5 |
-| samfile-select-sort | ⚠️ | Env — `check.sh` needs `samtools` on `PATH` |
-| samfile-select-view | ⚠️ | Env — `check.sh` needs `samtools` on `PATH` |
-| samfile-write | ⚠️ | Env — functionally passes; `check.sh` needs `ngless`/`samtools` on `PATH` |
+| samfile-select-sort | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
+| samfile-select-view | ❌ | samtools drift — `samtools view -L` includes one extra read (`SRR070372.2719`) vs the stale `texpected.sam.gz`; Rust matches Haskell on the same samtools (see note) |
+| samfile-write | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | sam_reverse_order | ✅ | M5 |
 | searchpathExternalModule | ❌ | M7 — external modules |
 | select | ❌ | M7 — packaged `reference=` databases |
-| select-bam | ⚠️ | Env — `check.sh` needs `samtools` on `PATH` |
+| select-bam | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | select_block | ❌ | M7 — packaged `reference=` databases |
 | select_block_filter | ❌ | M5-pending — `allbest` method |
 | select_block_filter_unmatch | ✅ | M5 |
@@ -369,7 +388,7 @@ Legend: ✅ passes · ⚠️ interpreter path works but `check.sh` cannot be dri
 | shortreads | ✅ | M4 |
 | type-conversions | ❌ | Future — `read_int`/`read_double` as expression args fail in eval |
 | whenTrueModule | ❌ | M7 — external modules |
-| write_compression | ⚠️ | Env — map+write path works; `check.sh` needs `samtools` on `PATH` |
+| write_compression | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | write_fq | ✅ | M4 |
 | write_fq_inline | ✅ | M4 |
 | write_fq_STDOUT | ❌ | Future — `write(..., ofile=STDOUT)` / `/dev/stdout` |
