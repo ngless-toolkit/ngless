@@ -160,6 +160,53 @@ fn subsample_text(text: &str) -> String {
     out
 }
 
+/// Summarise SAM alignment records as (total, aligned, unique) read groups (mirrors `samStatsC'`).
+/// Records are grouped by consecutive read name (both mates together); a group is *aligned* if any
+/// record aligns, and *unique* if aligned and all its records share one reference name.
+fn sam_group_stats(lines: &[&SamLine]) -> (i64, i64, i64) {
+    let (mut total, mut aligned, mut unique) = (0i64, 0i64, 0i64);
+    let mut i = 0;
+    while i < lines.len() {
+        let mut j = i + 1;
+        while j < lines.len() && lines[j].qname == lines[i].qname {
+            j += 1;
+        }
+        let group = &lines[i..j];
+        total += 1;
+        let is_aligned = group.iter().any(|l| l.is_aligned());
+        let same_rname = group.iter().all(|l| l.rname == group[0].rname);
+        if is_aligned {
+            aligned += 1;
+            if same_rname {
+                unique += 1;
+            }
+        }
+        i = j;
+    }
+    (total, aligned, unique)
+}
+
+/// The NGLess data directories, in search order (user then global), mirroring `findDataFiles`'s
+/// `User <|> Root`. The user directory is `$HOME/.local/share/ngless/data` (as in
+/// `Configuration.hs`); the global one is `<binary-dir>/../share/ngless/data`.
+fn data_directories() -> Vec<String> {
+    let mut dirs = Vec::new();
+    if let Ok(home) = std::env::var("HOME") {
+        dirs.push(format!("{home}/.local/share/ngless/data"));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(bindir) = exe.parent() {
+            dirs.push(
+                bindir
+                    .join("../share/ngless/data")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+    }
+    dirs
+}
+
 /// `discard_singles(rs)`: drop the singleton reads, keeping the pairs (mirrors
 /// `executeDiscardSingles`).
 fn execute_discard_singles(expr: &NGLessObject) -> NgResult<NGLessObject> {
@@ -192,6 +239,7 @@ pub fn interpret(
         temp_dir: temp_dir.to_path_buf(),
         cur_lno: Cell::new(0),
         fq_stats: RefCell::new(Vec::new()),
+        map_stats: RefCell::new(Vec::new()),
         script_text: script_text.to_string(),
         search_path: search_path.to_vec(),
         argv: argv.to_vec(),
@@ -217,12 +265,27 @@ struct FqInfo {
     max_len: i64,
 }
 
+/// Collected per-`map()`-call mapping statistics (mirrors `MappingInfo`). `qcstats({mapping})`
+/// serialises these. The `input_file`/`reference` fields hold temp/index paths exactly as the
+/// Haskell code records them, so this output is not byte-reproducible (no test diffs it).
+struct MapInfo {
+    lno: usize,
+    input_file: String,
+    reference: String,
+    total: i64,
+    aligned: i64,
+    unique: i64,
+}
+
 struct Interpreter {
     env: HashMap<String, NGLessObject>,
     temp_dir: PathBuf,
     /// Line number of the top-level statement currently executing (used for `preproc.lnoN`).
     cur_lno: Cell<usize>,
     fq_stats: RefCell<Vec<FqInfo>>,
+    /// Collected mapping statistics, one entry per `map()` call (mirrors the `mapOutput`
+    /// accumulator). `qcstats({mapping})` serialises these.
+    map_stats: RefCell<Vec<MapInfo>>,
     /// The original (verbatim) script source, used by `write(..., auto_comments=[{script}])`
     /// (mirrors `ngleScriptText`).
     script_text: String,
@@ -620,25 +683,7 @@ impl Interpreter {
             })
             .collect();
 
-        let (mut total, mut aligned, mut unique) = (0i64, 0i64, 0i64);
-        let mut i = 0;
-        while i < lines.len() {
-            let mut j = i + 1;
-            while j < lines.len() && lines[j].qname == lines[i].qname {
-                j += 1;
-            }
-            let group = &lines[i..j];
-            total += 1;
-            let is_aligned = group.iter().any(|l| l.is_aligned());
-            let same_rname = group.iter().all(|l| l.rname == group[0].rname);
-            if is_aligned {
-                aligned += 1;
-                if same_rname {
-                    unique += 1;
-                }
-            }
-            i = j;
-        }
+        let (total, aligned, unique) = sam_group_stats(&lines);
 
         let tsv =
             format!("\t{name}\ntotal\t{total}\naligned\t{aligned}\nunique\t{unique}\n");
@@ -765,13 +810,10 @@ impl Interpreter {
                     "Reference and fafile cannot be used simmultaneously",
                 ))
             }
-            (Some(_), None) => {
-                return Err(NgError::script(
-                    "map(): packaged `reference=` databases are not supported in this build yet; \
-                     use `fafile=` with a local FASTA file.",
-                ))
-            }
-            (None, Some(fa)) => fa,
+            // A packaged `reference=` is resolved to its FASTA in the data directories; the FASTA
+            // then flows through the same indexing/mapping path as `fafile=`.
+            (Some(refname), None) => self.resolve_reference(&refname)?,
+            (None, Some(fa)) => self.expand_path(&fa)?,
         };
 
         let mode_all = lookup_bool(args, "mode_all", false)?;
@@ -781,9 +823,32 @@ impl Interpreter {
         }
         let block_size = lookup_int(args, "block_size_megabases", 0)?;
 
-        // Resolve the FASTA file through the search path (handles `<references>` placeholders).
-        let fapath = self.expand_path(&fafile)?;
-        self.perform_map(&fapath, block_size, &name, &rs, &bwa_args)
+        self.perform_map(&fafile, block_size, &name, &rs, &bwa_args)
+    }
+
+    /// Resolve a packaged `reference=` database name to its FASTA file (mirrors
+    /// `ensureDataPresent`/`findDataFiles`). The reference directory is named by the user-typed
+    /// name (so `sacCer3` and its alias `Saccharomyces_cerevisiae_R64-1-1` resolve to separate,
+    /// independently-installed directories) and is searched for in the user data directory first,
+    /// then the global one. Downloading a missing reference is not supported in this build.
+    fn resolve_reference(&self, refname: &str) -> NgResult<String> {
+        for base in data_directories() {
+            let fa = Path::new(&base)
+                .join("References")
+                .join(refname)
+                .join("Sequence/BWAIndex/reference.fa.gz");
+            if fa.is_file() {
+                return Ok(fa.to_string_lossy().into_owned());
+            }
+        }
+        Err(NgError::new(
+            NgErrorType::DataError,
+            format!(
+                "Could not find reference '{refname}'. Packaged-reference download is not supported \
+                 in this build yet; install it with the Haskell build (it will be cached under \
+                 ~/.local/share/ngless/data/References/), or pass a local `fafile=` instead."
+            ),
+        ))
     }
 
     /// Build (lazily) the needed bwa index(es) and map `rs` against them (mirrors `performMap`).
@@ -798,20 +863,46 @@ impl Interpreter {
         extra_args: &[String],
     ) -> NgResult<NGLessObject> {
         let refs = self.ensure_index_exists(block_size, fafile)?;
-        let path = match refs.as_slice() {
-            [single] => self.map_to_reference(single, rs, extra_args)?,
+        let (path, reference) = match refs.as_slice() {
+            [single] => (self.map_to_reference(single, rs, extra_args)?, single.clone()),
             blocks => {
                 let mut partials = Vec::with_capacity(blocks.len());
                 for b in blocks {
                     partials.push(self.map_to_reference(b, rs, extra_args)?);
                 }
-                self.merge_sam_files(&partials)?
+                (self.merge_sam_files(&partials)?, fafile.to_string())
             }
         };
+        // Record mapping statistics for `qcstats({mapping})` (mirrors `outputMappedSetStatistics`).
+        self.register_map_stats(&path, &reference)?;
         Ok(NGLessObject::MappedReadSet {
             name: name.to_string(),
             path,
         })
+    }
+
+    /// Compute (total, aligned, unique) read groups for a freshly-mapped SAM and record them in the
+    /// mapping-stats accumulator (mirrors the `addMapOutput` in `outputMappedSetStatistics`).
+    fn register_map_stats(&self, sam: &Path, reference: &str) -> NgResult<()> {
+        let text = read_sam_text(&sam.to_string_lossy())?;
+        let records = sam::parse_sam(&text)?;
+        let lines: Vec<&SamLine> = records
+            .iter()
+            .filter_map(|r| match r {
+                SamRecord::Line(l) => Some(l),
+                SamRecord::Header(_) => None,
+            })
+            .collect();
+        let (total, aligned, unique) = sam_group_stats(&lines);
+        self.map_stats.borrow_mut().push(MapInfo {
+            lno: self.cur_lno.get(),
+            input_file: sam.to_string_lossy().into_owned(),
+            reference: reference.to_string(),
+            total,
+            aligned,
+            unique,
+        });
+        Ok(())
     }
 
     /// Ensure a bwa index exists for `fafile` (or for each of its splits) and return the FASTA
@@ -1258,9 +1349,17 @@ impl Interpreter {
                 })?;
                 Ok(NGLessObject::Counts(path))
             }
-            "mapping" => Err(NgError::script(
-                "qcstats({mapping}) is not implemented in this build yet.",
-            )),
+            "mapping" => {
+                let tsv = self.format_map_stats_tsv();
+                let path = self.new_temp_path("qcstats.", "tsv");
+                std::fs::write(&path, tsv).map_err(|e| {
+                    NgError::new(
+                        NgErrorType::SystemError,
+                        format!("Could not write {}: {e}", path.display()),
+                    )
+                })?;
+                Ok(NGLessObject::Counts(path))
+            }
             other => Err(NgError::script(format!("Unknown stats type: {other}"))),
         }
     }
@@ -1280,6 +1379,31 @@ impl Interpreter {
                 ("nonATCGFraction", show_double(info.non_atcg)),
                 ("numBasepairs", info.n_basepairs.to_string()),
                 ("numSeqs", info.n_seq.to_string()),
+            ];
+            for (k, v) in rows {
+                out.push_str(&format!("{i}:{k}\t{v}\n"));
+            }
+        }
+        out
+    }
+
+    /// Serialise collected mapping stats as the transposed TSV produced by `writeOutputTSV` for the
+    /// mapping case (`encodeMapStats`: keys sorted alphabetically). Empty input yields an empty file.
+    fn format_map_stats_tsv(&self) -> String {
+        let stats = self.map_stats.borrow();
+        if stats.is_empty() {
+            return String::new();
+        }
+        let mut out = String::from("\tstats\n");
+        for (i, info) in stats.iter().enumerate() {
+            // Keys in the alphabetical order produced by Haskell's `sort` over (key, value).
+            let rows = [
+                ("aligned", info.aligned.to_string()),
+                ("inputFile", info.input_file.clone()),
+                ("lineNumber", info.lno.to_string()),
+                ("reference", info.reference.clone()),
+                ("total", info.total.to_string()),
+                ("unique", info.unique.to_string()),
             ];
             for (k, v) in rows {
                 out.push_str(&format!("{i}:{k}\t{v}\n"));

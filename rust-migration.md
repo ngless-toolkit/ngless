@@ -5,7 +5,7 @@
 > repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
 > Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
-> **69 of the 96 functional tests pass** against the Rust binary with output identical to
+> **74 of the 96 functional tests pass** against the Rust binary with output identical to
 > Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`). See
 > the [Functional test status](#functional-test-status) table below for the per-test breakdown.
 >
@@ -191,6 +191,30 @@
 >   `discard_singles` `mocat_sample_uncompressed_paired`), `tests/regression-write-fqgz` and
 >   `tests/regression-subsample_write`. Still pending in M7: packaged `reference=` databases (M7b),
 >   external YAML modules (M7c), the parallel module (M7d), and assemble/orf_find (M7e).
+> - **M7b (modules + stdlib — packaged reference databases):** `map(..., reference="...")` now
+>   resolves a packaged reference to its FASTA and feeds it through the same indexing/mapping path
+>   as `fafile=` (`resolve_reference` in `src/interpret.rs`, mirroring `ensureDataPresent`/
+>   `findDataFiles`). The reference directory is named by the *user-typed* name — so `sacCer3` and
+>   its alias `Saccharomyces_cerevisiae_R64-1-1` resolve to separate, independently-installed
+>   directories — and is searched for at `References/<name>/Sequence/BWAIndex/reference.fa.gz` in
+>   the user data directory (`$HOME/.local/share/ngless/data`) first, then the global one
+>   (`<binary-dir>/../share/ngless/data`), matching `findDataFiles`'s `User <|> Root`. The bwa
+>   index is then (re)built lazily next to the cached FASTA by the existing `ensure_index_exists`
+>   path (so a reference packaged with an older bwa gets a fresh `<base>-bwa-<ver>` index for the
+>   running bwa). Downloading a missing reference is *not* supported in this build — it errors with
+>   a clear, actionable message (install via the Haskell build, which caches under
+>   `~/.local/share/ngless/data/References/`, or pass a local `fafile=`). `qcstats({mapping})` is
+>   also done: each `map()` call records `(total, aligned, unique)` read groups into a mapping-stats
+>   accumulator (`register_map_stats` + the shared `sam_group_stats`, mirroring `samStatsC'` and
+>   `outputMappedSetStatistics`), and `qcstats({mapping})` serialises them to the transposed TSV
+>   (`format_map_stats_tsv`, mirroring `writeOutputTSV`'s `encodeMapStats`); its `inputFile`/
+>   `reference` fields hold temp/index paths exactly as Haskell records them, so the output is not
+>   byte-reproducible and no test diffs it. Passing (verified against the locally-cached `sacCer3`
+>   and pixi bwa/samtools): `tests/as_reads`, `tests/reference_alias`, `tests/select`,
+>   `tests/select_block`, and `tests/grouped` (group → map → `qcstats({fastq})`/`qcstats({mapping})`,
+>   with `check.sh` confirming `map` of a grouped two-file read set equals `map` of the
+>   concatenation). Still pending in M7: external YAML modules (M7c), the parallel module (M7d), and
+>   assemble/orf_find (M7e).
 >
 ## Context
 
@@ -325,13 +349,13 @@ and run via `pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debu
 Legend: ✅ passes · ❌ not yet supported. `--print-path EXEC` is now implemented (resolves a
 tool from `$NGLESS_<TOOL>_BIN` or `PATH`, mirroring `PrintPathMode`/`findNGLessBin`), so the
 samtools `check.sh` scripts that shell out to `$(ngless --print-path samtools)` can now be
-driven locally. **Tally: 69 ✅ · 27 ❌ (96 total).**
+driven locally. **Tally: 74 ✅ · 22 ❌ (96 total).**
 
 | Test | Status | Note / planned milestone |
 |---|---|---|
 | arg1NotPathExternalModule | ❌ | M7 — external YAML modules (`Module 'test' not supported`) |
 | argv | ✅ | M3 — `ARGV` builtin + citation header |
-| as_reads | ❌ | M7 — packaged `reference=` databases (`map` here uses one) |
+| as_reads | ✅ | M7b — packaged `reference=` (sacCer3) |
 | as-reads-3 | ❌ | M4-pending — interleaved I/O (`format_flags={interleaved}`, `fastq(interleaved=True)`) |
 | as_reads-bam | ✅ | M5 |
 | as_reads_encoding | ✅ | M5 |
@@ -358,7 +382,7 @@ driven locally. **Tally: 69 ✅ · 27 ❌ (96 total).**
 | exampleExternalModule | ❌ | M7 — external modules |
 | exampleModule | ❌ | M7 — external modules |
 | fix_cigarSam | ✅ | M5 |
-| grouped | ❌ | M7 — packaged `reference=` databases |
+| grouped | ✅ | M7b — `reference=` + `qcstats({mapping})` |
 | len_list | ✅ | M3 — citation/copyright header |
 | load_fastq_directory | ✅ | M7a — `load_fastq_directory` + `group` |
 | load_sample_list | ✅ | M7a — `load_sample_list` (YAML manifest) |
@@ -389,7 +413,7 @@ driven locally. **Tally: 69 ✅ · 27 ❌ (96 total).**
 | preprocess3_empty_singles | ✅ | M4 |
 | preprocess_fastx_mocat | ✅ | M4 |
 | readlines | ✅ | M3 — `readlines` builtin |
-| reference_alias | ❌ | M7 — packaged `reference=` databases |
+| reference_alias | ✅ | M7b — `reference=` by alias |
 | regression-bad-sam | ✅ | M5 |
 | regression-bz2-chunk | ✅ | M4 |
 | regression-cigar-filter | ✅ | M5 |
@@ -407,9 +431,9 @@ driven locally. **Tally: 69 ✅ · 27 ❌ (96 total).**
 | samfile-write | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | sam_reverse_order | ✅ | M5 |
 | searchpathExternalModule | ❌ | M7 — external modules |
-| select | ❌ | M7 — packaged `reference=` databases |
+| select | ✅ | M7b — packaged `reference=` (sacCer3) |
 | select-bam | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
-| select_block | ❌ | M7 — packaged `reference=` databases |
+| select_block | ✅ | M7b — packaged `reference=` (sacCer3) |
 | select_block_filter | ✅ | M5 — `allbest`/`unique`/`pe_filter`/`some_match` methods |
 | select_block_filter_unmatch | ✅ | M5 |
 | select_max_trim | ✅ | M5 |
