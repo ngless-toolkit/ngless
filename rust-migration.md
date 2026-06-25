@@ -5,7 +5,7 @@
 > repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
 > Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
-> **79 of the 96 functional tests pass** against the Rust binary with output identical to
+> **88 of the 96 functional tests pass** against the Rust binary with output identical to
 > Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`). See
 > the [Functional test status](#functional-test-status) table below for the per-test breakdown.
 >
@@ -241,6 +241,31 @@
 >   (external YAML modules, incl. `init`/`min-ngless-version`/read-set args/search-path expansion)
 >   and `tests/exampleModule` (the `example` standard module + constants + Haskell-`show`). Still
 >   pending in M7: the parallel module (M7d) and assemble/orf_find (M7e).
+> - **M7d (modules + stdlib — the parallel module + output hashing):** the `parallel` standard
+>   module (`StandardModules/Parallel.hs`) is ported, along with the script transforms that feed it
+>   (`src/transform.rs`, mirroring `Transform.hs`). The headline piece is **output hashing**:
+>   `add_output_hash` injects a hidden `__hash` keyword argument into every `write`/`collect` call
+>   whose value is **byte-identical** to Haskell's `MD5.md5s . MD5.Str . (versionString ++) . show`.
+>   This required reproducing (a) a from-scratch MD5, (b) Haskell's derived `Show` for the AST
+>   (`show_expr`/`show_ngltype`, including `Lookup '<var>' as <type>`, `BinaryOp(.. -BOpAdd- ..)`,
+>   quoted strings, and `{symbol}`), (c) the `versionString` = `show nv ++ show (sortOn modName
+>   modInfos)` over the exact list of loaded modules (`loaded_modules`, mirroring
+>   `Execs/Main.hs::loadModules`), and (d) the effect of the `addTemporaries` pass (nested non-void
+>   calls are lifted into temporaries, so each lifted call's hash replaces its `Lookup`). This is
+>   what makes `write-hash` and `write-hash2` share a hash and what `auto_comments=[{hash}]` reports
+>   as `# Output hash: <md5>`. The `parallel_transform` ports `processRunForAll` (the v1.1
+>   `run_for_all` rewrite that saves `$parallel$iterator`/`$parallel$list` and injects
+>   `current`/`allneeded` into later `collect`s), `processSetParallelTag`, and `addLockHash`. At run
+>   time, `lock1`/`run_for_all` claim one list entry by creating a `<sane>.lock` file in a hash
+>   directory under `ngless-locks/` (`setup_hash_directory`/`get_lock`/`sanitize_path`, so
+>   `project/sample` locks safely); `collect` writes each sample's counts as a gzipped partial under
+>   `ngless-partials/` and, once all needed partials exist, merges them with `paste_counts` (the
+>   sparse index-keyed merge of `pasteCounts`, filling missing rows with zeros) prefixed by the
+>   `{script}`/`{hash}` comment block; `__paste` exposes the same merge. Passing: `tests/parallel`,
+>   `tests/parallel_collect_many` (v1.1 `run_for_all`), `tests/parallel_collect_subdir`,
+>   `tests/parallel_folder_lock` (path sanitization), `tests/paste`, `tests/same-hash-collect`,
+>   `tests/same-hash-collect-2`, `tests/write-hash`, `tests/write-hash2`. Still pending in M7:
+>   assemble/orf_find (M7e).
 >
 ## Context
 
@@ -375,7 +400,7 @@ and run via `pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debu
 Legend: ✅ passes · ❌ not yet supported. `--print-path EXEC` is now implemented (resolves a
 tool from `$NGLESS_<TOOL>_BIN` or `PATH`, mirroring `PrintPathMode`/`findNGLessBin`), so the
 samtools `check.sh` scripts that shell out to `$(ngless --print-path samtools)` can now be
-driven locally. **Tally: 79 ✅ · 17 ❌ (96 total).**
+driven locally. **Tally: 88 ✅ · 8 ❌ (96 total).**
 
 | Test | Status | Note / planned milestone |
 |---|---|---|
@@ -428,12 +453,12 @@ driven locally. **Tally: 79 ✅ · 17 ❌ (96 total).**
 | mocat_sample_gz_paired | ✅ | M7a — mocat module |
 | mocat_sample_uncompressed | ✅ | M7a — mocat module |
 | mocat_sample_uncompressed_paired | ✅ | M7a — mocat module + `discard_singles` |
-| parallel | ❌ | M7 — parallel module |
-| parallel_collect_many | ❌ | M7 — parallel module |
-| parallel_collect_subdir | ❌ | M7 — parallel module |
-| parallel_folder_lock | ❌ | M7 — parallel module |
+| parallel | ✅ | M7d — parallel module (lock1/collect) |
+| parallel_collect_many | ✅ | M7d — parallel module (run_for_all) |
+| parallel_collect_subdir | ✅ | M7d — parallel module |
+| parallel_folder_lock | ✅ | M7d — parallel module (path sanitization) |
 | parse_odd_corners | ✅ | M3 — `readlines` builtin + citation header |
-| paste | ❌ | M7 — parallel module |
+| paste | ✅ | M7d — parallel module (__paste / pasteCounts) |
 | preprocess | ✅ | M4 |
 | preprocess3 | ✅ | M4 |
 | preprocess3_empty_singles | ✅ | M4 |
@@ -449,8 +474,8 @@ driven locally. **Tally: 79 ✅ · 17 ❌ (96 total).**
 | regression-unique-same-contig | ✅ | M6 |
 | regression-write-fqgz | ✅ | M7a — mocat module |
 | reuse | ✅ | M3 |
-| same-hash-collect | ❌ | M7 — parallel module |
-| same-hash-collect-2 | ❌ | M7 — parallel module |
+| same-hash-collect | ✅ | M7d — parallel module + output hash |
+| same-hash-collect-2 | ✅ | M7d — parallel module + output hash |
 | samfile-headers | ✅ | M5 |
 | samfile-select-sort | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | samfile-select-view | ❌ | samtools drift — `samtools view -L` includes one extra read (`SRR070372.2719`) vs the stale `texpected.sam.gz`; Rust matches Haskell on the same samtools (see note) |
@@ -473,8 +498,8 @@ driven locally. **Tally: 79 ✅ · 17 ❌ (96 total).**
 | write_fq | ✅ | M4 |
 | write_fq_inline | ✅ | M4 |
 | write_fq_STDOUT | ❌ | Future — `write(..., ofile=STDOUT)` / `/dev/stdout` |
-| write-hash | ❌ | M6-pending — `auto_comments={hash}` |
-| write-hash2 | ❌ | M6-pending — `auto_comments={hash}` |
+| write-hash | ✅ | M7d — `auto_comments={hash}` output hashing |
+| write-hash2 | ✅ | M7d — `auto_comments={hash}` output hashing |
 
 ## Critical files to mirror (highest leverage)
 

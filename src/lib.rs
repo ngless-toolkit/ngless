@@ -28,6 +28,7 @@ pub mod sam;
 pub mod samtools;
 pub mod select;
 pub mod tokens;
+pub mod transform;
 pub mod types;
 pub mod validation;
 pub mod values;

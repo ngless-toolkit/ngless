@@ -197,6 +197,24 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         crate::citations::print_header(&citations);
     }
 
+    // Post-validation transforms (mirrors `Transform.transform`, run after `validate`). Inject
+    // the `__hash` keyword argument into `write`/`collect` calls so `auto_comments=[{hash}]` can
+    // report a content hash that is byte-identical to the Haskell build.
+    let mut typed = typed;
+    crate::transform::add_output_hash(
+        &mut typed.body,
+        (version.major, version.minor),
+        &header.modules,
+        &funcs,
+    );
+    // The parallel module contributes its own transform (`run_for_all`/`set_parallel_tag`/lock
+    // hash). It runs after `add_output_hash`, mirroring Haskell's pre-transforms-then-module order.
+    if let Some(parallel) = header.modules.iter().find(|m| m.name() == "parallel") {
+        let include_for_all = parallel.version() == "1.1";
+        crate::transform::parallel_transform(&mut typed.body, include_for_all)
+            .map_err(NgError::script)?;
+    }
+
     // ARGV = [script_path, ...extra_args] (mirrors `nConfArgv` in Configuration.hs).
     let mut argv = vec![fname.clone()];
     argv.extend(opts.extra_args.iter().cloned());

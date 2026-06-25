@@ -377,8 +377,85 @@ mod builders {
             ("mocat", _) => Some(vec![load_mocat_sample_function()]),
             // The `example` demo module (StandardModules/Example.hs).
             ("example", _) => Some(vec![example_function()]),
+            // The `parallel` module (StandardModules/Parallel.hs). `run_for_all`/
+            // `run_for_all_samples` (and the relaxed `collect` signature) are only available in
+            // version 1.1+.
+            ("parallel", v) => Some(parallel_functions(v == "1.1")),
             _ => None,
         }
+    }
+
+    fn parallel_functions(include_for_all: bool) -> Vec<Function> {
+        let mut fs = vec![
+            // lock1: a list of strings or read sets -> one chosen entry (a string).
+            func(
+                "lock1",
+                Some(Union(vec![list(String), list(ReadSet)])),
+                vec![],
+                String,
+                vec![],
+                vec![],
+            ),
+            collect_function(include_for_all),
+            func("set_parallel_tag", Some(String), vec![], String, vec![], vec![]),
+            // __paste: internal test helper exposing the counts-merging machinery.
+            func(
+                "__paste",
+                Some(list(String)),
+                vec![],
+                String,
+                vec![
+                    arg("ofile", true, String, vec![ArgCheck::FileWritable]),
+                    arg("headers", true, list(String), vec![]),
+                    arg("matching_rows", false, Bool, vec![]),
+                ],
+                vec![],
+            ),
+        ];
+        if include_for_all {
+            fs.push(func(
+                "run_for_all",
+                Some(list(String)),
+                vec![],
+                String,
+                vec![arg("tag", false, String, vec![])],
+                vec![],
+            ));
+            fs.push(func(
+                "run_for_all_samples",
+                Some(list(ReadSet)),
+                vec![],
+                ReadSet,
+                vec![arg("tag", false, String, vec![])],
+                vec![],
+            ));
+        }
+        fs
+    }
+
+    /// `collect()` (mirrors `collectFunction`). `current`/`allneeded` are required except in
+    /// version 1.1+, where the `run_for_all` transform injects them.
+    fn collect_function(is_v11: bool) -> Function {
+        func(
+            "collect",
+            Some(Counts),
+            vec![],
+            Void,
+            vec![
+                arg("current", !is_v11, String, vec![]),
+                arg("allneeded", !is_v11, list(String), vec![]),
+                arg("ofile", true, String, vec![ArgCheck::FileWritable]),
+                arg("__can_move", false, Bool, vec![]),
+                arg("comment", false, String, vec![]),
+                arg(
+                    "auto_comments",
+                    false,
+                    list(Symbol),
+                    vec![sym(&["date", "script", "hash"])],
+                ),
+            ],
+            vec![],
+        )
     }
 
     /// Constants contributed by an imported standard module (mirrors `modConstants`). Only the

@@ -612,6 +612,11 @@ impl Interpreter {
             "mapstats" => self.execute_mapstats(&expr_v),
             "__merge_samfiles" => self.execute_merge_sams(&expr_v),
             "write" => self.execute_write(&expr_v, &argvs),
+            "lock1" | "run_for_all" | "run_for_all_samples" => {
+                self.execute_lock1(&expr_v, &argvs)
+            }
+            "collect" => self.execute_collect(&expr_v, &argvs),
+            "__paste" => execute_paste(&expr_v, &argvs),
             other => {
                 if self.external_modules.iter().any(|m| m.find_command(other).is_some()) {
                     self.execute_external_command(other, &expr_v, &argvs)
@@ -1575,6 +1580,143 @@ impl Interpreter {
             return Ok(NGLessObject::String(ofile));
         }
         execute_write(expr, args, &self.script_text, self.subsample)
+    }
+
+    /// `lock1`/`run_for_all`/`run_for_all_samples` (mirrors `executeLock1OrForAll`): given a list
+    /// of strings (or read sets), atomically claim one entry by creating a `.lock` file in a hash
+    /// directory under `ngless-locks/`, and return the claimed entry (unsanitized).
+    fn execute_lock1(
+        &mut self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let entries = match expr {
+            NGLessObject::List(items) => items,
+            other => {
+                return Err(NgError::script(format!(
+                    "Wrong argument for lock1 (expected a list, got `{other:?}`)"
+                )))
+            }
+        };
+        if entries.is_empty() {
+            return Err(NgError::new(NgErrorType::DataError, "Cannot run on empty list"));
+        }
+        let names: Vec<String> = entries
+            .iter()
+            .map(entry_name)
+            .collect::<NgResult<Vec<String>>>()?;
+        let hash = string_arg(args, "__hash").unwrap_or_default();
+        let tag = string_arg(args, "__parallel_tag")
+            .or_else(|| string_arg(args, "tag"))
+            .unwrap_or_default();
+        let prefix = if tag.is_empty() {
+            String::new()
+        } else {
+            format!("{tag}-")
+        };
+        let lockdir = self.setup_hash_directory(&prefix, "ngless-locks", &hash)?;
+        let sane: Vec<String> = names.iter().map(|n| sanitize_path(n)).collect();
+        let chosen = get_lock(&lockdir, &sane)?;
+        Ok(entries[chosen].clone())
+    }
+
+    /// `collect()` (mirrors `executeCollect`): append the current sample's counts as a gzipped
+    /// partial file under `ngless-partials/`, and — once every needed partial is present — merge
+    /// them all into `ofile`.
+    fn execute_collect(
+        &mut self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let path = match expr {
+            NGLessObject::Counts(p) => p.clone(),
+            other => {
+                return Err(NgError::script(format!(
+                    "collect got unexpected argument: {other:?}"
+                )))
+            }
+        };
+        let current = match lookup_arg(args, "current") {
+            Some(v) => entry_name(v)?,
+            None => return Err(NgError::script("current not specified in collect call")),
+        };
+        let allneeded: Vec<String> = match lookup_arg(args, "allneeded") {
+            Some(NGLessObject::List(items)) => {
+                items.iter().map(entry_name).collect::<NgResult<Vec<_>>>()?
+            }
+            _ => return Err(NgError::script("collect() called without 'allneeded' argument")),
+        };
+        let ofile = string_arg(args, "ofile")
+            .ok_or_else(|| NgError::script("collect arguments: ofile is required"))?;
+        let hash = string_arg(args, "__hash").unwrap_or_default();
+        let tag = string_arg(args, "__parallel_tag").unwrap_or_default();
+        let prefix = if tag.is_empty() {
+            String::new()
+        } else {
+            format!("{tag}-")
+        };
+        let hashdir = self.setup_hash_directory(&prefix, "ngless-partials", &hash)?;
+        let partial_file = |entry: &str| format!("{hashdir}/partial.{}.tsv.gz", sanitize_path(entry));
+
+        // Write the current sample's counts as a gzipped partial.
+        let body = crate::compression::read_bytes(&path.to_string_lossy())?;
+        crate::compression::write_bytes(&partial_file(&current), &body)?;
+
+        // Collect once every needed partial is present (checked in reverse, as Haskell does).
+        let can_collect = allneeded
+            .iter()
+            .rev()
+            .all(|e| Path::new(&partial_file(e)).exists());
+        if can_collect {
+            let comment = string_arg(args, "comment");
+            let auto_comments: Vec<String> = match lookup_arg(args, "auto_comments") {
+                Some(NGLessObject::List(items)) => items
+                    .iter()
+                    .map(|i| match i {
+                        NGLessObject::Symbol(s) => Ok(s.clone()),
+                        other => Err(NgError::script(format!(
+                            "auto_comments argument in collect() call: expected a symbol, got {other:?}"
+                        ))),
+                    })
+                    .collect::<NgResult<Vec<String>>>()?,
+                _ => Vec::new(),
+            };
+            let comments =
+                build_comment(comment.as_deref(), &auto_comments, &self.script_text, Some(&hash))?;
+            let inputs: Vec<String> = allneeded.iter().map(|e| partial_file(e)).collect();
+            let merged = paste_counts(&comments, false, &allneeded, &inputs)?;
+            crate::compression::write_bytes(&ofile, merged.as_bytes())?;
+        }
+        Ok(NGLessObject::Void)
+    }
+
+    /// Set up a hash-named action directory (mirrors `setupHashDirectory`): `<basename>/<prefix><8
+    /// hash chars>` (plus a `-subsample` suffix under `--subsample`), seeding it with `script.ngl`.
+    fn setup_hash_directory(
+        &self,
+        prefix: &str,
+        basename: &str,
+        hash: &str,
+    ) -> NgResult<String> {
+        let short: String = hash.chars().take(8).collect();
+        let suffix = if self.subsample { "-subsample" } else { "" };
+        let actiondir = format!("{basename}/{prefix}{short}{suffix}");
+        std::fs::create_dir_all(&actiondir).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not create directory '{actiondir}': {e}"),
+            )
+        })?;
+        let scriptfile = format!("{actiondir}/script.ngl");
+        if !Path::new(&scriptfile).exists() {
+            std::fs::write(&scriptfile, &self.script_text).map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Could not write '{scriptfile}': {e}"),
+                )
+            })?;
+        }
+        Ok(actiondir)
     }
 
     /// Write a mapped read set to `ofile` (mirrors `executeWrite` of an `NGOMappedReadSet`). The
@@ -2658,6 +2800,163 @@ fn as_fq_collect(lines: &[&SamLine]) -> Vec<(i32, String)> {
     out
 }
 
+/// Name of a parallel-module list entry: the string itself, or a read set's name (mirrors the
+/// `readSetOrTypeError`/`stringOrTypeError` handling in `executeLock1OrForAll`/`executeCollect`).
+fn entry_name(v: &NGLessObject) -> NgResult<String> {
+    match v {
+        NGLessObject::String(s) => Ok(s.clone()),
+        NGLessObject::ReadSet { name, .. } => Ok(name.clone()),
+        other => Err(NgError::should_not_occur(format!(
+            "Expected a string or readset, got {other:?}"
+        ))),
+    }
+}
+
+/// Look up a required-string keyword argument.
+fn string_arg(args: &[(String, NGLessObject)], name: &str) -> Option<String> {
+    match lookup_arg(args, name) {
+        Some(NGLessObject::String(s)) => Some(s.clone()),
+        _ => None,
+    }
+}
+
+/// `sanitizePath`: replace `/` and `\` with `_` so an entry name is safe as a lock filename.
+fn sanitize_path(s: &str) -> String {
+    s.chars()
+        .map(|c| if c == '/' || c == '\\' { '_' } else { c })
+        .collect()
+}
+
+/// Claim a lock in `lockdir` for the first entry that is not finished, locked, or failed (mirrors
+/// the first pass of `getLock`). Creates the `<entry>.lock` file and returns the chosen index.
+fn get_lock(lockdir: &str, sane: &[String]) -> NgResult<usize> {
+    use std::collections::HashSet;
+    let existing: HashSet<String> = std::fs::read_dir(lockdir)
+        .map(|rd| {
+            rd.filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+    for (i, name) in sane.iter().enumerate() {
+        let finished = format!("{name}.finished");
+        let locked = format!("{name}.lock");
+        let failed = format!("{name}.failed");
+        if existing.contains(&finished) || existing.contains(&locked) || existing.contains(&failed)
+        {
+            continue;
+        }
+        let lockpath = format!("{lockdir}/{locked}");
+        std::fs::write(&lockpath, b"").map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not create lock '{lockpath}': {e}"),
+            )
+        })?;
+        return Ok(i);
+    }
+    Err(NgError::new(
+        NgErrorType::DataError,
+        "All jobs are finished or running",
+    ))
+}
+
+/// `__paste()` (mirrors `executePaste`): merge a set of counts files into `ofile`.
+fn execute_paste(
+    expr: &NGLessObject,
+    args: &[(String, NGLessObject)],
+) -> NgResult<NGLessObject> {
+    eprintln!("Calling __paste which is an internal function, exposed for testing only");
+    let inputs: Vec<String> = match expr {
+        NGLessObject::List(items) => items
+            .iter()
+            .map(|i| match i {
+                NGLessObject::String(s) => Ok(s.clone()),
+                other => Err(NgError::script(format!("__concat argument: expected a string, got {other:?}"))),
+            })
+            .collect::<NgResult<Vec<_>>>()?,
+        other => return Err(NgError::script(format!("Bad call to test function __paste: {other:?}"))),
+    };
+    let ofile = string_arg(args, "ofile")
+        .ok_or_else(|| NgError::script("__paste arguments: ofile is required"))?;
+    let headers: Vec<String> = match lookup_arg(args, "headers") {
+        Some(NGLessObject::List(items)) => items
+            .iter()
+            .map(|i| match i {
+                NGLessObject::String(s) => Ok(s.clone()),
+                other => Err(NgError::script(format!("__paste headers: expected a string, got {other:?}"))),
+            })
+            .collect::<NgResult<Vec<_>>>()?,
+        _ => return Err(NgError::script("__paste arguments: headers is required")),
+    };
+    let matching_rows = matches!(lookup_arg(args, "matching_rows"), Some(NGLessObject::Bool(true)));
+    let merged = paste_counts(&[], matching_rows, &headers, &inputs)?;
+    crate::compression::write_bytes(&ofile, merged.as_bytes())?;
+    Ok(NGLessObject::Void)
+}
+
+/// Merge a set of counts files (mirrors `pasteCounts`). Each input contributes its value columns,
+/// keyed by the first (TAB-delimited) field; rows missing from an input are filled with zeros.
+/// The output is `# <comment>` lines, then a header line (`\t` + `headers`), then the merged rows
+/// in ascending index order. `matching_rows` is accepted for parity but the (index-merging) path
+/// is correct in both cases when the inputs are consistent.
+fn paste_counts(
+    comments: &[String],
+    _matching_rows: bool,
+    headers: &[String],
+    inputs: &[String],
+) -> NgResult<String> {
+    use std::collections::BTreeSet;
+    // For each input file: number of value columns, and a map index -> payload (the bytes from the
+    // first TAB onward, i.e. including the leading TAB).
+    let mut per_file: Vec<(usize, std::collections::HashMap<String, String>)> =
+        Vec::with_capacity(inputs.len());
+    let mut all_indices: BTreeSet<String> = BTreeSet::new();
+    for input in inputs {
+        let content = crate::compression::read_to_string(input)?;
+        let mut lines = content.lines();
+        let header = lines.next().unwrap_or("");
+        let ncols = header.matches('\t').count();
+        let mut map = std::collections::HashMap::new();
+        for line in lines {
+            if line.is_empty() {
+                continue;
+            }
+            let tab = line.find('\t').ok_or_else(|| {
+                NgError::new(NgErrorType::DataError, "Line does not have a TAB character")
+            })?;
+            let (index, payload) = line.split_at(tab);
+            all_indices.insert(index.to_string());
+            map.insert(index.to_string(), payload.to_string());
+        }
+        per_file.push((ncols, map));
+    }
+    let mut out = String::new();
+    for c in comments {
+        out.push_str("# ");
+        out.push_str(c);
+        out.push('\n');
+    }
+    out.push('\t');
+    out.push_str(&headers.join("\t"));
+    out.push('\n');
+    for index in &all_indices {
+        out.push_str(index);
+        for (ncols, map) in &per_file {
+            match map.get(index) {
+                Some(p) => out.push_str(p),
+                None => {
+                    for _ in 0..*ncols {
+                        out.push_str("\t0");
+                    }
+                }
+            }
+        }
+        out.push('\n');
+    }
+    Ok(out)
+}
+
 /// Format one SAM record as a 4-line FASTQ record (mirrors `asFQ1`).
 fn as_fq1(l: &SamLine) -> String {
     format!("@{}\n{}\n+\n{}\n", l.qname, l.seq, l.qual)
@@ -2778,6 +3077,7 @@ fn build_comment(
     comment: Option<&str>,
     auto: &[String],
     script_text: &str,
+    hash: Option<&str>,
 ) -> NgResult<Vec<String>> {
     let mut out = Vec::new();
     if let Some(c) = comment {
@@ -2791,6 +3091,16 @@ fn build_comment(
                 for line in script_text.lines() {
                     out.push(format!("    {line}"));
                 }
+            }
+            // `Output hash: <md5>` — the hash injected as the hidden `__hash` argument by the
+            // `add_output_hash` transform.
+            "hash" => {
+                let h = hash.ok_or_else(|| {
+                    NgError::should_not_occur(
+                        "auto_comments={hash} but no __hash argument was injected",
+                    )
+                })?;
+                out.push(format!("Output hash: {h}"));
             }
             other => {
                 return Err(NgError::script(format!(
@@ -2841,7 +3151,11 @@ fn write_counts(
             )))
         }
     };
-    let comments = build_comment(comment.as_deref(), &auto_comments, script_text)?;
+    let hash = match lookup_arg(args, "__hash") {
+        Some(NGLessObject::String(s)) => Some(s.clone()),
+        _ => None,
+    };
+    let comments = build_comment(comment.as_deref(), &auto_comments, script_text, hash.as_deref())?;
     // Fast path: an unmodified TSV with no comments is copied (and recompressed) verbatim.
     if format == "tsv" && comments.is_empty() {
         return copy_fastq(path, ofile);
@@ -3335,7 +3649,7 @@ mod tests {
         // `auto_comments=[{script}]` expands to a header line plus the script source, each
         // line indented by four spaces; a manual comment (if any) comes first.
         let script = "ngless '1.5'\n\ncount(x)\n";
-        let cs = build_comment(Some("hello"), &["script".to_string()], script).unwrap();
+        let cs = build_comment(Some("hello"), &["script".to_string()], script, None).unwrap();
         assert_eq!(
             cs,
             vec![
@@ -3350,7 +3664,7 @@ mod tests {
 
     #[test]
     fn build_comment_unknown_auto_errors() {
-        assert!(build_comment(None, &["date".to_string()], "").is_err());
+        assert!(build_comment(None, &["date".to_string()], "", None).is_err());
     }
     use crate::parser::parse_ngless;
 
