@@ -22,18 +22,20 @@ jobs:
       - name: Unit tests
         run: cargo test --workspace
 
-  # Parity smoke test: run the functional suite against the Rust binary. The interpreter is
-  # still a stub, so this is allowed to fail for now; flip continue-on-error off once the
-  # corresponding milestone lands and the gated subset is expected to pass.
+  # Parity smoke test: run the functional suite against the Rust binary. The external tools
+  # (samtools/bwa/minimap2/prodigal/megahit) are provided by the pinned pixi environment so the
+  # fixtures line up with the same tool versions we use locally.
   functional-parity:
     runs-on: ubuntu-latest
     needs: build
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          environments: default
       - name: Build Rust ngless
         run: cargo build --release
       - name: Run functional tests against the Rust binary
-        run: NGLESS_BIN="$PWD/target/release/ngless" ./run-tests.sh
+        run: pixi run --environment default bash -c 'NGLESS_BIN="$PWD/target/release/ngless" ./run-tests.sh'
