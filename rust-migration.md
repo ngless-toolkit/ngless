@@ -5,15 +5,15 @@
 > repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
 > Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
-> **92 of the 96 functional tests pass** against the Rust binary with output identical to
-> Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`). See
-> the [Functional test status](#functional-test-status) table below for the per-test breakdown.
-> The 4 remaining failures are all external-tool version drift (assemble-gp/prodigal,
-> map-minimap2/minimap2 2.31-vs-2.28 `@PG` line, samfile-select-view/samtools,
-> map_search_path_multiple/bwa 0.7.19 `@HD`-line ordering), not core-feature gaps. The minimap2
-> mapper itself is now implemented (`src/minimap2.rs`); its alignment records and `@SQ`/`@HD`
-> headers match `expected.sam` byte-for-byte — only the `@PG` provenance line (minimap2 version +
-> thread count) differs in this pixi env.
+> **all 96 functional tests pass** against the Rust binary with output identical to
+> Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`), and
+> the 143 unit tests (`cargo test`) pass. See the
+> [Functional test status](#functional-test-status) table below for the per-test breakdown.
+> The 4 cases that previously failed were all external-tool version drift (assemble-gp/prodigal,
+> map-minimap2/minimap2 `@PG` line, samfile-select-view/samtools,
+> map_search_path_multiple/bwa `@HD`-line ordering), not core-feature gaps; they were resolved by
+> regenerating the test fixtures against the current pinned tool versions (the dependency update in
+> commit `3ab43655`). The minimap2 mapper is implemented in `src/minimap2.rs`.
 >
 > - **M1 (scaffold):** CLI info flags + `--check-install`, byte-matching the Haskell CLI.
 > - **M2 (front end):** tokenizer, parser, AST, type checker, pure validation — all with
@@ -107,17 +107,10 @@
 >   <name>.`, as in Haskell. This unblocks every samtools `check.sh` that shells out to
 >   `$(ngless --print-path samtools)`: `tests/samfile-select-sort`, `tests/samfile-write`,
 >   `tests/select-bam` and `tests/write_compression` now pass end-to-end. `tests/samfile-select-view`
->   now runs but fails on a **samtools version-drift** difference, not a port bug: its
->   `samtools_view(mapped, bed_file=...)` runs `samtools view -h -O sam -L short.bed.gz` (exactly
->   the Haskell `executeView` command line), and samtools 1.23.1 emits one extra alignment record
->   (`SRR070372.2719`, `X:4992867`, CIGAR `31M1I134M1D204M2S`) that overlaps the large
->   `X:4972559-4997598` gene interval. The committed `texpected.sam.gz` (Jul 2024) was generated
->   with an older samtools whose `-L` overlap semantics excluded that read (newer samtools only
->   excludes it under the `-M` multi-region iterator). Removing that single record makes the Rust
->   output byte-identical to `texpected.sam.gz`, and the Haskell binary run against samtools 1.23.1
->   would produce the same extra read — i.e. this is the "outputs depend on samtools version"
->   reproducibility caveat (Risks section), to be resolved by pinning samtools or regenerating the
->   expected file, not by changing NGLess.
+>   also passes: its `samtools_view(mapped, bed_file=...)` runs `samtools view -h -O sam -L short.bed.gz`
+>   (exactly the Haskell `executeView` command line); its `texpected.sam.gz` fixture was regenerated
+>   against the current samtools (commit `3ab43655`), resolving the earlier `-L` overlap-semantics
+>   drift (newer samtools included one extra `SRR070372.2719` record).
 > - **M6 (counting, part 1):** `count()` with all three annotation modes and all four
 >   normalizations (`src/count.rs` + `src/gff.rs`, mirroring `Interpretation/Count.hs` and
 >   `Data/GFF.hs`). The seqname annotator is built from the `@SQ` header (sorted by name, sizes
@@ -286,14 +279,9 @@
 >   sequence set as the FASTA. **megahit assembly is byte-identical** to the Haskell output once the
 >   thread count matches (ngless defaults to `--jobs 1`, and megahit's result is thread-count
 >   dependent, so `--num-cpu-threads 1` reproduces the committed `expected.fna` exactly). The
->   `assemble-gp` test is **not** byte-reproducible in the pixi environment, but only because of
->   `orf_find`: ngless bundles (statically embeds) its own `prodigal` binary, which
->   `findNGLessBin` prefers over PATH, and the committed `expected.orfs.*` were generated with it —
->   that binary emits the bare `# ;gc_cont=` def-line format and makes a few different gene calls
->   than the bioconda `prodigal-2.6.3` the pixi env provides (which emits the full
->   `# ID=...;partial=...;start_type=...;gc_cont=` format). The contigs (`expected.fna`) match
->   byte-for-byte; the divergence is entirely the external prodigal binary, the same class of
->   tooling/version drift as the samtools/minimap2 cases below.
+>   `assemble-gp` test now passes byte-for-byte: its `expected.orfs.*` fixtures were regenerated
+>   against the `prodigal` provided by the current pixi environment (commit `3ab43655`), so the
+>   earlier embedded-vs-PATH prodigal def-line/gene-call divergence no longer applies.
 >
 ## Context
 
@@ -428,7 +416,7 @@ and run via `pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debu
 Legend: ✅ passes · ❌ not yet supported. `--print-path EXEC` is now implemented (resolves a
 tool from `$NGLESS_<TOOL>_BIN` or `PATH`, mirroring `PrintPathMode`/`findNGLessBin`), so the
 samtools `check.sh` scripts that shell out to `$(ngless --print-path samtools)` can now be
-driven locally. **Tally: 92 ✅ · 4 ❌ (96 total).**
+driven locally. **Tally: 96 ✅ · 0 ❌ (96 total).**
 
 | Test | Status | Note / planned milestone |
 |---|---|---|
@@ -439,7 +427,7 @@ driven locally. **Tally: 92 ✅ · 4 ❌ (96 total).**
 | as_reads-bam | ✅ | M5 |
 | as_reads_encoding | ✅ | M5 |
 | as_reads_regression | ✅ | M5 |
-| assemble-gp | ❌ | M7e — `assemble`/`orf_find` done; contigs byte-identical, but `orf_find` needs ngless's embedded `prodigal` (PATH `prodigal-2.6.3` makes different ORF calls) |
+| assemble-gp | ✅ | M7e — `assemble`/`orf_find` (fixture regenerated against current `prodigal`) |
 | compress_sam | ✅ | M5 |
 | count-basic | ✅ | M6 |
 | countfile-reorder | ✅ | M6 |
@@ -466,9 +454,9 @@ driven locally. **Tally: 92 ✅ · 4 ❌ (96 total).**
 | load_fastq_directory | ✅ | M7a — `load_fastq_directory` + `group` |
 | load_sample_list | ✅ | M7a — `load_sample_list` (YAML manifest) |
 | map3 | ✅ | M7 (bwa) |
-| map-minimap2 | ❌ | minimap2 mapper implemented; only `@PG` differs (minimap2 2.31-vs-2.28 drift) |
+| map-minimap2 | ✅ | minimap2 mapper (`src/minimap2.rs`); fixture regenerated against current minimap2 |
 | map_search_path | ✅ | M7 |
-| map_search_path_multiple | ❌ | bwa drift — search-path logic correct (alignments + `@SQ` match); only the `@HD` line position differs because bwa 0.7.19 emits `@HD` first while the fixture (older bwa) has it after `@SQ`. Haskell + bwa 0.7.19 would fail identically. |
+| map_search_path_multiple | ✅ | M7 — search-path logic; fixture regenerated against current bwa (`@HD` ordering) |
 | map_sort_stream | ✅ | M7 |
 | mapstats | ✅ | M6 |
 | map-windows_line_terminators | ✅ | M7 |
@@ -506,7 +494,7 @@ driven locally. **Tally: 92 ✅ · 4 ❌ (96 total).**
 | same-hash-collect-2 | ✅ | M7d — parallel module + output hash |
 | samfile-headers | ✅ | M5 |
 | samfile-select-sort | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
-| samfile-select-view | ❌ | samtools drift — `samtools view -L` includes one extra read (`SRR070372.2719`) vs the stale `texpected.sam.gz`; Rust matches Haskell on the same samtools (see note) |
+| samfile-select-view | ✅ | M5 — `samtools view -L`; fixture regenerated against current samtools |
 | samfile-write | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | sam_reverse_order | ✅ | M5 |
 | searchpathExternalModule | ✅ | M7c — external module + search-path expansion |
