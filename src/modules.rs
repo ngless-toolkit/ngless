@@ -79,7 +79,7 @@ pub struct MethodInfo {
 
 // --- builders -------------------------------------------------------------
 
-pub use builders::{builtin_functions, builtin_methods, module_functions};
+pub use builders::{builtin_functions, builtin_methods, module_constants, module_functions};
 
 /// The builtin tables live in an inner module so that `use NGLType::*` (which makes `String`,
 /// `Integer`, ... name `NGLType` variants) does not clash with the `std` `String` used in the
@@ -372,12 +372,40 @@ mod builders {
                 Some(vec![samtools_sort_function(), samtools_view_function()])
             }
             // The `mocat` module (StandardModules/Mocat.hs) exposes `load_mocat_sample`, a thin
-            // wrapper over `load_fastq_directory`.
-            ("mocat", "0.0") | ("mocat", "1.0") | ("mocat", "1.1") => {
-                Some(vec![load_mocat_sample_function()])
-            }
+            // wrapper over `load_fastq_directory`. The standard module is loaded by name, so any
+            // requested version is accepted.
+            ("mocat", _) => Some(vec![load_mocat_sample_function()]),
+            // The `example` demo module (StandardModules/Example.hs).
+            ("example", _) => Some(vec![example_function()]),
             _ => None,
         }
+    }
+
+    /// Constants contributed by an imported standard module (mirrors `modConstants`). Only the
+    /// `example` module exposes any. Returns the constant names and their types for the type
+    /// checker; the runtime values live in `interpret::module_constant_values`.
+    pub fn module_constants(name: &str, _version: &str) -> Vec<(std::string::String, NGLType)> {
+        match name {
+            "example" => vec![
+                ("EXAMPLE_0".to_string(), Integer),
+                ("EXAMPLE_TRUE".to_string(), Bool),
+                ("EXAMPLE_HELLO".to_string(), String),
+            ],
+            _ => Vec::new(),
+        }
+    }
+
+    fn example_function() -> Function {
+        let mut f = func(
+            "example",
+            Some(ReadSet),
+            vec![],
+            ReadSet,
+            vec![arg("opt1", false, Symbol, vec![sym(&["test1", "test2"])])],
+            vec![],
+        );
+        f.allows_auto_comprehension = true;
+        f
     }
 
     /// Keyword arguments shared by `load_fastq_directory` and `load_mocat_sample`.

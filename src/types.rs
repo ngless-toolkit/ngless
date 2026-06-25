@@ -27,7 +27,12 @@ struct TypeChecker {
 
 /// Type-check a script against the builtin module for the given language version. On success
 /// returns the script with all `Lookup` nodes annotated with their inferred types.
-pub fn checktypes(ver: NGLVersion, script: &Script, extra_funcs: &[Function]) -> NgResult<Script> {
+pub fn checktypes(
+    ver: NGLVersion,
+    script: &Script,
+    extra_funcs: &[Function],
+    constants: &[(String, NGLType)],
+) -> NgResult<Script> {
     let mut functions = builtin_functions(ver);
     functions.extend_from_slice(extra_funcs);
     let mut tc = TypeChecker {
@@ -35,7 +40,7 @@ pub fn checktypes(ver: NGLVersion, script: &Script, extra_funcs: &[Function]) ->
         tmap: HashMap::new(),
         functions,
         methods: builtin_methods(),
-        constants: Vec::new(),
+        constants: constants.to_vec(),
         errors: Vec::new(),
     };
     let _ = tc.infer_script(&script.body);
@@ -613,14 +618,21 @@ impl TypeChecker {
     fn add_types_expr(&self, e: &Expression) -> NgResult<Expression> {
         use Expression::*;
         Ok(match e {
-            Lookup(None, v @ Variable(n)) => match self.tmap.get(n) {
-                Some(t) => Lookup(Some(t.clone()), v.clone()),
-                None => {
-                    return Err(NgError::script(format!(
-                        "Could not assign type to variable '{n}'."
-                    )))
+            Lookup(None, v @ Variable(n)) => {
+                let t = self
+                    .tmap
+                    .get(n)
+                    .cloned()
+                    .or_else(|| self.constants.iter().find(|(c, _)| c == n).map(|(_, t)| t.clone()));
+                match t {
+                    Some(t) => Lookup(Some(t), v.clone()),
+                    None => {
+                        return Err(NgError::script(format!(
+                            "Could not assign type to variable '{n}'."
+                        )))
+                    }
                 }
-            },
+            }
             Lookup(Some(_), _) => e.clone(),
             ListExpression(es) => ListExpression(self.add_types_vec(es)?),
             UnaryOp(op, a) => UnaryOp(*op, Box::new(self.add_types_expr(a)?)),
@@ -718,7 +730,7 @@ mod tests {
 
     fn is_ok_text(text: &str) {
         let script = parse_ngless("test", true, text).expect("parse failed");
-        if let Err(e) = checktypes(mods(), &script, &[]) {
+        if let Err(e) = checktypes(mods(), &script, &[], &[]) {
             panic!("Type error on good code: {e} for script:\n{text}");
         }
     }
@@ -726,7 +738,7 @@ mod tests {
     fn is_error_text(text: &str) {
         let script = parse_ngless("test", true, text).expect("parse failed");
         assert!(
-            checktypes(mods(), &script, &[]).is_err(),
+            checktypes(mods(), &script, &[], &[]).is_err(),
             "expected type error for script:\n{text}"
         );
     }
@@ -746,6 +758,7 @@ mod tests {
         assert!(checktypes(
             mods(),
             &func_call("fastq", Expression::ConstInt(3), vec![]),
+            &[],
             &[]
         )
         .is_err());
@@ -756,6 +769,7 @@ mod tests {
         assert!(checktypes(
             mods(),
             &func_call("fastq", Expression::ConstStr("fastq.fq".into()), vec![]),
+            &[],
             &[]
         )
         .is_ok());
@@ -768,7 +782,7 @@ mod tests {
             Expression::ConstStr("fastq.fq".into()),
             vec![(Variable("fname".into()), Expression::ConstInt(10))],
         );
-        assert!(checktypes(mods(), &s, &[]).is_err());
+        assert!(checktypes(mods(), &s, &[], &[]).is_err());
     }
 
     #[test]

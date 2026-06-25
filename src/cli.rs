@@ -5,6 +5,7 @@
 //! `run-tests.sh`): `-n/--validate-only`, `-t/--temporary-directory`, `--quiet`,
 //! `-v/--verbosity`, `--debug`, `--no-header`, and a single positional script path.
 
+use crate::ast::NGLType;
 use crate::errors::{NgError, NgResult};
 use crate::modules::{builtin_functions, NGLVersion};
 
@@ -137,17 +138,33 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
             header.version
         )));
     }
-    // Gather the functions contributed by imported modules (only `samtools` is supported).
+    let temp_dir = opts
+        .temp_dir
+        .clone()
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+
+    // Gather the functions contributed by imported modules. Built-in standard modules
+    // (`samtools`/`mocat`/...) are handled by `module_functions`; everything else is loaded as an
+    // external YAML module (`Modules/<name>.ngm/<version>/module.yaml`).
     let mut extra_funcs = Vec::new();
+    let mut external_modules = Vec::new();
+    let mut constants: Vec<(String, NGLType)> = Vec::new();
+    let mut constant_values = Vec::new();
     for m in &header.modules {
+        constants.extend(crate::modules::module_constants(m.name(), m.version()));
+        constant_values.extend(crate::interpret::module_constant_values(m.name(), m.version()));
         match crate::modules::module_functions(m.name(), m.version()) {
             Some(fs) => extra_funcs.extend(fs),
             None => {
-                return Err(NgError::script(format!(
-                    "Module '{}' version '{}' is not supported in this build.",
+                let em = crate::external_modules::find_load(
                     m.name(),
-                    m.version()
-                )))
+                    m.version(),
+                    &crate::interpret::data_directories(),
+                )?;
+                em.validate((version.major, version.minor), &temp_dir)?;
+                extra_funcs.extend(em.functions_for_typecheck());
+                external_modules.push(em);
             }
         }
     }
@@ -160,10 +177,11 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     }
 
     // Type check, then validate.
-    let typed = crate::types::checktypes(version, &script, &extra_funcs)?;
+    let typed = crate::types::checktypes(version, &script, &extra_funcs, &constants)?;
     let mut funcs = builtin_functions(version);
     funcs.extend(extra_funcs);
-    crate::validation::validate(&funcs, &[], &typed)?;
+    let constant_names: Vec<String> = constants.iter().map(|(n, _)| n.clone()).collect();
+    crate::validation::validate(&funcs, &constant_names, &typed)?;
 
     if opts.validate_only {
         if !opts.quiet {
@@ -179,11 +197,6 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         crate::citations::print_header(&citations);
     }
 
-    let temp_dir = opts
-        .temp_dir
-        .clone()
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir);
     // ARGV = [script_path, ...extra_args] (mirrors `nConfArgv` in Configuration.hs).
     let mut argv = vec![fname.clone()];
     argv.extend(opts.extra_args.iter().cloned());
@@ -194,6 +207,8 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         &opts.search_path,
         &argv,
         opts.subsample,
+        external_modules,
+        constant_values,
     )?;
     Ok(0)
 }

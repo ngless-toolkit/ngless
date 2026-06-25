@@ -186,10 +186,35 @@ fn sam_group_stats(lines: &[&SamLine]) -> (i64, i64, i64) {
     (total, aligned, unique)
 }
 
+/// Runtime values of the constants contributed by a standard module (mirrors `modConstants`).
+/// Only the `example` module exposes any; the corresponding types live in
+/// `modules::module_constants`.
+pub fn module_constant_values(name: &str, _version: &str) -> Vec<(String, NGLessObject)> {
+    match name {
+        "example" => vec![
+            ("EXAMPLE_0".to_string(), NGLessObject::Integer(0)),
+            ("EXAMPLE_TRUE".to_string(), NGLessObject::Bool(true)),
+            ("EXAMPLE_HELLO".to_string(), NGLessObject::String("Hello".to_string())),
+        ],
+        _ => Vec::new(),
+    }
+}
+
+/// Convert an external-module argument default into a runtime value (mirrors `cargDef`).
+fn default_to_object(d: &crate::external_modules::DefaultVal) -> NGLessObject {
+    use crate::external_modules::DefaultVal;
+    match d {
+        DefaultVal::Bool(b) => NGLessObject::Bool(*b),
+        DefaultVal::Sym(s) => NGLessObject::Symbol(s.clone()),
+        DefaultVal::Int(i) => NGLessObject::Integer(*i),
+        DefaultVal::Str(s) => NGLessObject::String(s.clone()),
+    }
+}
+
 /// The NGLess data directories, in search order (user then global), mirroring `findDataFiles`'s
 /// `User <|> Root`. The user directory is `$HOME/.local/share/ngless/data` (as in
 /// `Configuration.hs`); the global one is `<binary-dir>/../share/ngless/data`.
-fn data_directories() -> Vec<String> {
+pub fn data_directories() -> Vec<String> {
     let mut dirs = Vec::new();
     if let Ok(home) = std::env::var("HOME") {
         dirs.push(format!("{home}/.local/share/ngless/data"));
@@ -205,6 +230,56 @@ fn data_directories() -> Vec<String> {
         }
     }
     dirs
+}
+
+/// `example(input)`: the demo standard module function (mirrors `StandardModules.Example`).
+/// Prints diagnostic information (including the Haskell-`show` of its arguments) and returns the
+/// input unchanged.
+fn execute_example(input: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResult<NGLessObject> {
+    println!("Called example function 'example'");
+    println!("First argument is {}", haskell_show(input));
+    let kwargs: Vec<String> = args
+        .iter()
+        .map(|(k, v)| format!("({:?},{})", k, haskell_show(v)))
+        .collect();
+    println!("Keyword arguments are [{}]", kwargs.join(","));
+    println!("This function does nothing except print this information");
+    Ok(input.clone())
+}
+
+/// Render an `NGLessObject` in Haskell's derived-`Show` format (as produced by `show` on the
+/// Haskell `NGLessObject`). Only the cases reachable from the `example` module are implemented.
+fn haskell_show(v: &NGLessObject) -> String {
+    match v {
+        NGLessObject::String(s) => format!("{s:?}"),
+        NGLessObject::Integer(i) => format!("NGOInteger {i}"),
+        NGLessObject::Bool(b) => format!("NGOBool {}", if *b { "True" } else { "False" }),
+        NGLessObject::Symbol(s) => format!("NGOSymbol {s:?}"),
+        NGLessObject::ReadSet { name, readset } => {
+            let fqpath = |f: &FastQFilePath| {
+                let enc = match f.encoding {
+                    FastQEncoding::Sanger => "SangerEncoding",
+                    FastQEncoding::Solexa => "SolexaEncoding",
+                };
+                format!(
+                    "FastQFilePath {{fqpathEncoding = {enc}, fqpathFilePath = {:?}}}",
+                    f.path.to_string_lossy()
+                )
+            };
+            let pairs: Vec<String> = readset
+                .pairs
+                .iter()
+                .map(|(a, b)| format!("({},{})", fqpath(a), fqpath(b)))
+                .collect();
+            let singles: Vec<String> = readset.singletons.iter().map(fqpath).collect();
+            format!(
+                "NGOReadSet {name:?} (ReadSet {{pairedSamples = [{}], singleSamples = [{}]}})",
+                pairs.join(","),
+                singles.join(",")
+            )
+        }
+        other => format!("{other:?}"),
+    }
 }
 
 /// `discard_singles(rs)`: drop the singleton reads, keeping the pairs (mirrors
@@ -233,9 +308,15 @@ pub fn interpret(
     search_path: &[String],
     argv: &[String],
     subsample: bool,
+    external_modules: Vec<crate::external_modules::ExternalModule>,
+    constants: Vec<(String, NGLessObject)>,
 ) -> NgResult<()> {
+    let mut env = HashMap::new();
+    for (name, value) in constants {
+        env.insert(name, value);
+    }
     let mut interp = Interpreter {
-        env: HashMap::new(),
+        env,
         temp_dir: temp_dir.to_path_buf(),
         cur_lno: Cell::new(0),
         fq_stats: RefCell::new(Vec::new()),
@@ -244,6 +325,7 @@ pub fn interpret(
         search_path: search_path.to_vec(),
         argv: argv.to_vec(),
         subsample,
+        external_modules,
     };
     for (lno, e) in body {
         interp.cur_lno.set(*lno);
@@ -298,6 +380,8 @@ struct Interpreter {
     /// `--subsample`: keep a deterministic 1/10 of reads on FASTQ load (mirrors
     /// `nConfSubsample`).
     subsample: bool,
+    /// Loaded external YAML modules, used to dispatch their command functions.
+    external_modules: Vec<crate::external_modules::ExternalModule>,
 }
 
 /// The outcome of running a (block) statement, mirroring `BlockStatus`.
@@ -516,6 +600,7 @@ impl Interpreter {
             }
             "load_sample_list" => self.execute_load_sample_list(&expr_v),
             "discard_singles" => execute_discard_singles(&expr_v),
+            "example" => execute_example(&expr_v, &argvs),
             "samfile" => self.execute_samfile(&expr_v, &argvs),
             "map" => self.execute_map(&expr_v, &argvs),
             "as_reads" => self.execute_as_reads(&expr_v),
@@ -527,7 +612,13 @@ impl Interpreter {
             "mapstats" => self.execute_mapstats(&expr_v),
             "__merge_samfiles" => self.execute_merge_sams(&expr_v),
             "write" => self.execute_write(&expr_v, &argvs),
-            _ => execute_function(f, &expr_v, &argvs),
+            other => {
+                if self.external_modules.iter().any(|m| m.find_command(other).is_some()) {
+                    self.execute_external_command(other, &expr_v, &argvs)
+                } else {
+                    execute_function(f, &expr_v, &argvs)
+                }
+            }
         }
     }
 
@@ -849,6 +940,225 @@ impl Interpreter {
                  ~/.local/share/ngless/data/References/), or pass a local `fafile=` instead."
             ),
         ))
+    }
+
+    /// Run an external-module command function (mirrors `executeCommand`): encode the unnamed input
+    /// argument and the named arguments onto the command line, run the module's executable with the
+    /// module environment, and decode the result.
+    fn execute_external_command(
+        &self,
+        funcname: &str,
+        input: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        // Locate the module + command (cloned to release the borrow on `self`).
+        let (module_dir, cmd) = self
+            .external_modules
+            .iter()
+            .find_map(|m| m.find_command(funcname).map(|c| (m.dir.clone(), c.clone())))
+            .ok_or_else(|| {
+                NgError::should_not_occur(format!("Call to undefined function {funcname}."))
+            })?;
+
+        let mut cmdline: Vec<String> = self.encode_command_arg(&cmd.arg1, Some(input))?;
+        for a in &cmd.additional {
+            let value = lookup_arg(args, &a.name);
+            cmdline.extend(self.encode_command_arg(a, value)?);
+        }
+
+        // A non-void return adds a `--name=<tempfile>` output argument.
+        let out_file = match cmd.ret.rtype {
+            NGLType::Void => None,
+            _ => {
+                let ext = if cmd.ret.extension.is_empty() {
+                    "out"
+                } else {
+                    &cmd.ret.extension
+                };
+                let path = self.new_temp_path("eout_", ext);
+                std::fs::write(&path, b"").ok();
+                let p = path.to_string_lossy().into_owned();
+                cmdline.push(format!("--{}={p}", cmd.ret.name));
+                Some(p)
+            }
+        };
+
+        let exe = module_dir.join(&cmd.arg0);
+        let output = std::process::Command::new(&exe)
+            .args(&cmdline)
+            .envs(crate::external_modules::module_env(&module_dir, &self.temp_dir))
+            .output()
+            .map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Error running command for function {funcname}: {e}"),
+                )
+            })?;
+        if !output.status.success() {
+            return Err(NgError::new(
+                NgErrorType::SystemError,
+                format!(
+                    "Error running command for function {funcname}\n\texit code = {}\n\tstdout='{}'\n\tstderr='{}'",
+                    output.status.code().unwrap_or(-1),
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr),
+                ),
+            ));
+        }
+
+        let group_name = match input {
+            NGLessObject::ReadSet { name, .. } => name.clone(),
+            NGLessObject::MappedReadSet { name, .. } => name.clone(),
+            _ => String::new(),
+        };
+        match (out_file, &cmd.ret.rtype) {
+            (None, _) => Ok(NGLessObject::Void),
+            (Some(p), NGLType::Counts) => Ok(NGLessObject::Counts(PathBuf::from(p))),
+            (Some(p), NGLType::MappedReadSet) => Ok(NGLessObject::MappedReadSet {
+                name: group_name,
+                path: PathBuf::from(p),
+            }),
+            (Some(_), other) => Err(NgError::should_not_occur(format!(
+                "External module return type {other:?} is not implemented in this build yet."
+            ))),
+        }
+    }
+
+    /// Encode one command argument onto the command line (mirrors `encodeArgument`).
+    fn encode_command_arg(
+        &self,
+        arg: &crate::external_modules::CommandArg,
+        value: Option<&NGLessObject>,
+    ) -> NgResult<Vec<String>> {
+        use crate::external_modules::ArgKind;
+
+        // Fall back to the declared default when no value is supplied (mirrors the `Nothing` arm).
+        let owned_default = value.is_none().then(|| arg.default.as_ref().map(default_to_object));
+        let value: Option<&NGLessObject> = match value {
+            Some(v) => Some(v),
+            None => match &owned_default {
+                Some(Some(v)) => Some(v),
+                _ => {
+                    if arg.required {
+                        return Err(NgError::script(format!(
+                            "Missing value for required argument {}.",
+                            arg.name
+                        )));
+                    }
+                    return Ok(Vec::new());
+                }
+            },
+        };
+        let value = value.unwrap();
+
+        match arg.kind {
+            ArgKind::Flag => {
+                let on = matches!(value, NGLessObject::Bool(true));
+                if !on {
+                    Ok(Vec::new())
+                } else if let Some(flags) = &arg.when_true {
+                    Ok(flags.clone())
+                } else {
+                    Ok(vec![format!("--{}", arg.name)])
+                }
+            }
+            ArgKind::ReadSet => self.encode_readset_files(value),
+            _ => {
+                let as_str = match arg.kind {
+                    ArgKind::Str => {
+                        let s = as_string(value, "external module")?;
+                        if arg.expand_searchpath {
+                            self.expand_path_or_self(&s)
+                        } else {
+                            s
+                        }
+                    }
+                    ArgKind::Option => match value {
+                        NGLessObject::Symbol(s) => s.clone(),
+                        other => {
+                            return Err(NgError::script(format!(
+                                "Expected a symbol in external module, got {other:?}"
+                            )))
+                        }
+                    },
+                    ArgKind::Int => match value {
+                        NGLessObject::Integer(i) => i.to_string(),
+                        other => {
+                            return Err(NgError::script(format!(
+                                "Expected an integer in external module, got {other:?}"
+                            )))
+                        }
+                    },
+                    ArgKind::MappedReadSet => match value {
+                        NGLessObject::MappedReadSet { path, .. } => {
+                            path.to_string_lossy().into_owned()
+                        }
+                        other => {
+                            return Err(NgError::script(format!(
+                                "Expected a mapped read set in external module, got {other:?}"
+                            )))
+                        }
+                    },
+                    ArgKind::Counts => match value {
+                        NGLessObject::Counts(p) => p.to_string_lossy().into_owned(),
+                        other => {
+                            return Err(NgError::script(format!(
+                                "Expected counts in external module, got {other:?}"
+                            )))
+                        }
+                    },
+                    _ => unreachable!("flag/readset handled above"),
+                };
+                Ok(if arg.name.is_empty() {
+                    vec![as_str]
+                } else {
+                    vec![format!("--{}={as_str}", arg.name)]
+                })
+            }
+        }
+    }
+
+    /// Encode a read set as command-line file paths (mirrors `asFilePaths`): the paired mate-1 and
+    /// mate-2 files and/or the singletons are each concatenated to a temp file. With only
+    /// singletons the result is `[singles]`; with pairs it is `[mate1, mate2]` (plus `[singles]`).
+    fn encode_readset_files(&self, value: &NGLessObject) -> NgResult<Vec<String>> {
+        let rs = match value {
+            NGLessObject::ReadSet { readset, .. } => readset,
+            other => {
+                return Err(NgError::script(format!(
+                    "Expected readset for argument in function call, got {other:?}"
+                )))
+            }
+        };
+        let concat = |files: Vec<&FastQFilePath>| -> NgResult<Option<String>> {
+            if files.is_empty() {
+                return Ok(None);
+            }
+            let out = self.new_temp_path("module_in_", "fq");
+            let o = out.to_string_lossy().into_owned();
+            write_fq_files(&files, &o)?;
+            Ok(Some(o))
+        };
+        let fq1 = concat(rs.pairs.iter().map(|(a, _)| a).collect())?;
+        let fq2 = concat(rs.pairs.iter().map(|(_, b)| b).collect())?;
+        let fq3 = concat(rs.singletons.iter().collect())?;
+        match (fq1, fq2, fq3) {
+            (None, None, Some(f)) => Ok(vec![f]),
+            (Some(f1), Some(f2), None) => Ok(vec![f1, f2]),
+            (Some(f1), Some(f2), Some(f3)) => Ok(vec![f1, f2, f3]),
+            _ => Err(NgError::script("Malformed input argument to external module")),
+        }
+    }
+
+    /// Expand `<...>` search-path placeholders, falling back to the original string when no
+    /// expansion resolves to an existing file (mirrors `fromMaybe str <$> expandPath str`).
+    fn expand_path_or_self(&self, s: &str) -> String {
+        for candidate in expand_path_candidates(s, &self.search_path) {
+            if Path::new(&candidate).is_file() {
+                return candidate;
+            }
+        }
+        s.to_string()
     }
 
     /// Build (lazily) the needed bwa index(es) and map `rs` against them (mirrors `performMap`).
@@ -3101,7 +3411,16 @@ mod tests {
 
     fn run(text: &str) -> NgResult<()> {
         let script = parse_ngless("test", true, text).expect("parse failed");
-        interpret(&script.body, &std::env::temp_dir(), text, &[], &[], false)
+        interpret(
+            &script.body,
+            &std::env::temp_dir(),
+            text,
+            &[],
+            &[],
+            false,
+            Vec::new(),
+            Vec::new(),
+        )
     }
 
     #[test]

@@ -5,7 +5,7 @@
 > repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
 > Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
-> **74 of the 96 functional tests pass** against the Rust binary with output identical to
+> **79 of the 96 functional tests pass** against the Rust binary with output identical to
 > Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`). See
 > the [Functional test status](#functional-test-status) table below for the per-test breakdown.
 >
@@ -215,6 +215,32 @@
 >   with `check.sh` confirming `map` of a grouped two-file read set equals `map` of the
 >   concatenation). Still pending in M7: external YAML modules (M7c), the parallel module (M7d), and
 >   assemble/orf_find (M7e).
+> - **M7c (modules + stdlib — external YAML modules + the `example` standard module):** external
+>   `.ngm` modules are now loaded and executed (`src/external_modules.rs`, mirroring
+>   `ExternalModules.hs`). `find_load` searches `.`/global/user for
+>   `Modules/<name>.ngm/<version>/module.yaml`, parses it with `serde_yaml` (functions, `arg1`,
+>   `additional` args, `init`, `min-ngless-version`, citations), checks the version is compatible,
+>   and `validate` runs the optional `init` command with the module environment
+>   (`NGLESS_MODULE_DIR`/`TMPDIR`/...). `functions_for_typecheck` exposes each command as a
+>   `Function` (mirroring `asFunction`). At run time, unknown function calls are dispatched to
+>   `execute_external_command` (mirroring `executeCommand`): `encode_command_arg` builds the command
+>   line exactly as `encodeArgument` does — the unnamed `arg1` is positional, named args become
+>   `--name=value`, `flag`s emit their `when-true` tokens (or `--name`) when true and nothing when
+>   false, defaults (`def`) fill omitted args, `str` args with `expand_searchpath` go through
+>   `<...>` search-path expansion (falling back to the literal string), and a read-set argument is
+>   concatenated to mate-1/mate-2/singles temp files (`encode_readset_files`, mirroring
+>   `asFilePaths`). A non-void `return` adds a `--name=<tempfile>` output argument and decodes the
+>   result. cli.rs routes built-in standard modules (`samtools`/`mocat`/`example`) through
+>   `module_functions` and everything else through the external loader (the `mocat` standard module
+>   now accepts any requested version). The `example` standard module (`StandardModules/Example.hs`)
+>   is also ported, which required threading **module constants** (`EXAMPLE_HELLO`, ...) through the
+>   type checker (`checktypes` now takes a `constants` list), validation, and the interpreter
+>   (constant values seed the env); `example()` prints its diagnostics including a faithful
+>   Haskell-`show` of the read set (`haskell_show`). Passing: `tests/arg1NotPathExternalModule`,
+>   `tests/whenTrueModule`, `tests/searchpathExternalModule`, `tests/exampleExternalModule`
+>   (external YAML modules, incl. `init`/`min-ngless-version`/read-set args/search-path expansion)
+>   and `tests/exampleModule` (the `example` standard module + constants + Haskell-`show`). Still
+>   pending in M7: the parallel module (M7d) and assemble/orf_find (M7e).
 >
 ## Context
 
@@ -349,11 +375,11 @@ and run via `pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debu
 Legend: ✅ passes · ❌ not yet supported. `--print-path EXEC` is now implemented (resolves a
 tool from `$NGLESS_<TOOL>_BIN` or `PATH`, mirroring `PrintPathMode`/`findNGLessBin`), so the
 samtools `check.sh` scripts that shell out to `$(ngless --print-path samtools)` can now be
-driven locally. **Tally: 74 ✅ · 22 ❌ (96 total).**
+driven locally. **Tally: 79 ✅ · 17 ❌ (96 total).**
 
 | Test | Status | Note / planned milestone |
 |---|---|---|
-| arg1NotPathExternalModule | ❌ | M7 — external YAML modules (`Module 'test' not supported`) |
+| arg1NotPathExternalModule | ✅ | M7c — external YAML modules |
 | argv | ✅ | M3 — `ARGV` builtin + citation header |
 | as_reads | ✅ | M7b — packaged `reference=` (sacCer3) |
 | as-reads-3 | ❌ | M4-pending — interleaved I/O (`format_flags={interleaved}`, `fastq(interleaved=True)`) |
@@ -379,8 +405,8 @@ driven locally. **Tally: 74 ✅ · 22 ❌ (96 total).**
 | error-unique-on-sorted | ✅ | M5 — samtools `checkUnique` validation |
 | error-validate-nofafile | ✅ | M5 |
 | error-write-no-output-dir | ✅ | M4 |
-| exampleExternalModule | ❌ | M7 — external modules |
-| exampleModule | ❌ | M7 — external modules |
+| exampleExternalModule | ✅ | M7c — external YAML modules |
+| exampleModule | ✅ | M7c — `example` standard module + constants |
 | fix_cigarSam | ✅ | M5 |
 | grouped | ✅ | M7b — `reference=` + `qcstats({mapping})` |
 | len_list | ✅ | M3 — citation/copyright header |
@@ -430,7 +456,7 @@ driven locally. **Tally: 74 ✅ · 22 ❌ (96 total).**
 | samfile-select-view | ❌ | samtools drift — `samtools view -L` includes one extra read (`SRR070372.2719`) vs the stale `texpected.sam.gz`; Rust matches Haskell on the same samtools (see note) |
 | samfile-write | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | sam_reverse_order | ✅ | M5 |
-| searchpathExternalModule | ❌ | M7 — external modules |
+| searchpathExternalModule | ✅ | M7c — external module + search-path expansion |
 | select | ✅ | M7b — packaged `reference=` (sacCer3) |
 | select-bam | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | select_block | ✅ | M7b — packaged `reference=` (sacCer3) |
@@ -442,7 +468,7 @@ driven locally. **Tally: 74 ✅ · 22 ❌ (96 total).**
 | select_sam_optional_fields | ✅ | M5 |
 | shortreads | ✅ | M4 |
 | type-conversions | ✅ | M3 — `read_int`/`read_double` as expression args |
-| whenTrueModule | ❌ | M7 — external modules |
+| whenTrueModule | ✅ | M7c — external module flag `when-true` |
 | write_compression | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | write_fq | ✅ | M4 |
 | write_fq_inline | ✅ | M4 |
