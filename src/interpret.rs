@@ -3166,7 +3166,19 @@ fn execute_write(
     if subsample {
         ofile.push_str(".subsampled");
     }
+    let format_flags = match lookup_arg(args, "format_flags") {
+        Some(NGLessObject::Symbol(s)) => Some(s.clone()),
+        _ => None,
+    };
     match expr {
+        // `format_flags={interleaved}`: stream the interleaved pairs (then singletons) to a single
+        // output, which may be STDOUT (`/dev/stdout`). Mirrors the `interleaveFQs` branch of
+        // `executeWrite`; no per-mate filename derivation (so no extension check on STDOUT).
+        NGLessObject::ReadSet { readset, .. } if format_flags.as_deref() == Some("interleaved") => {
+            let data = interleave_fastq(readset)?;
+            crate::compression::write_bytes(&ofile, &data)?;
+            Ok(NGLessObject::String(ofile))
+        }
         NGLessObject::ReadSet { readset, .. } => {
             if readset.pairs.is_empty() {
                 let files: Vec<&FastQFilePath> = readset.singletons.iter().collect();
