@@ -860,6 +860,54 @@ mod tests {
         assert_eq!(ann.annotate_read_group(&opts, &off).unwrap(), vec![0]);
     }
 
+    // Two overlapping `+`-strand genes on reference X (mirrors `gff1` in Tests/Count.hs).
+    fn gff1_annotator(feature: &str) -> Annotator {
+        let gff = "X\tprotein_coding\tgene\t100\t400\t.\t+\t.\tgene_id \"Gene100\";\n\
+                   X\tprotein_coding\tgene\t300\t600\t.\t+\t.\tgene_id \"Gene300\";\n";
+        let lines: Vec<gff::GffLine> = gff
+            .lines()
+            .map(gff::read_gff_line)
+            .collect::<NgResult<_>>()
+            .unwrap();
+        build_gff_annotator(&lines, feature, &None, true)
+    }
+
+    // Mirrors `case_gff_strand_check` / `case_gff_strand_check_negstrand`: with `strand=sense`, a
+    // read on the same strand as a `+` gene is counted; a reverse-strand read is not.
+    #[test]
+    fn gff_strand_sense() {
+        let ann = gff1_annotator("gene");
+        let mut opts = base_opts(AnnotationMode::Gff(String::new()));
+        opts.strand_mode = StrandMode::Sense;
+        // Sorted headers are [Gene100, Gene300]; a 35bp read at pos 200 overlaps only Gene100.
+        let pos_read = vec![sl("X", 200, 0, 35)];
+        assert_eq!(ann.annotate_read_group(&opts, &pos_read).unwrap(), vec![1]);
+        // The same span on the reverse strand (flag 0x10) does not match the `+` gene.
+        let neg_read = vec![sl("X", 200, 16, 35)];
+        assert_eq!(ann.annotate_read_group(&opts, &neg_read).unwrap(), vec![0]);
+    }
+
+    // Mirrors `case_gff_feature_mismatch`: requesting a feature type absent from the GFF yields no
+    // annotations (the read falls into the `-1` bucket).
+    #[test]
+    fn gff_feature_mismatch() {
+        let ann = gff1_annotator("CDS");
+        let opts = base_opts(AnnotationMode::Gff(String::new()));
+        let read = vec![sl("X", 200, 0, 35)];
+        assert_eq!(ann.annotate_read_group(&opts, &read).unwrap(), vec![0]);
+    }
+
+    // Mirrors `case_gff_feature_ambiguous*`: a read overlapping both genes is annotated to both
+    // features (it is the multi-mapper resolution that later decides how to distribute it).
+    #[test]
+    fn gff_ambiguous_overlaps_both() {
+        let ann = gff1_annotator("gene");
+        let opts = base_opts(AnnotationMode::Gff(String::new()));
+        // A 35bp read at pos 280 (span 280..315) overlaps both Gene100 (..401) and Gene300 (300..).
+        let read = vec![sl("X", 280, 0, 35)];
+        assert_eq!(ann.annotate_read_group(&opts, &read).unwrap(), vec![1, 2]);
+    }
+
     #[test]
     fn dist1_distributes_evenly_when_zero() {
         // Two reads, each multi-mapping to the same two features -> 1.0 each.

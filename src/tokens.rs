@@ -536,6 +536,53 @@ mod tests {
         assert_eq!(toks("  "), vec![Token::Indent(2)]);
     }
 
+    // Mirrors Tests.hs `case_tok_multi_line_comment`: a `/* ... */` block (spanning lines)
+    // collapses to an `Indent(0)`, leaving the surrounding tokens intact.
+    #[test]
+    fn multi_line_comment() {
+        assert_eq!(
+            toks("a=0/* This\n\nwith\nlines*/\nb=1\n"),
+            vec![
+                Token::Word("a".into()),
+                Token::Operator('='),
+                Token::Expr(Expression::ConstInt(0)),
+                Token::Indent(0),
+                Token::NewLine,
+                Token::Word("b".into()),
+                Token::Operator('='),
+                Token::Expr(Expression::ConstInt(1)),
+                Token::NewLine,
+            ]
+        );
+    }
+
+    // Mirrors Tests.hs `case_tok_cr`: a CRLF line ending is a single NewLine.
+    #[test]
+    fn crlf_is_newline() {
+        assert_eq!(
+            toks("a=0\r\nb=1\r\n"),
+            vec![
+                Token::Word("a".into()),
+                Token::Operator('='),
+                Token::Expr(Expression::ConstInt(0)),
+                Token::NewLine,
+                Token::Word("b".into()),
+                Token::Operator('='),
+                Token::Expr(Expression::ConstInt(1)),
+                Token::NewLine,
+            ]
+        );
+    }
+
+    // Mirrors Tests.hs `case_tok_word_`: underscores are word characters.
+    #[test]
+    fn word_with_underscore() {
+        assert_eq!(
+            toks("word_with_underscore"),
+            vec![Token::Word("word_with_underscore".into())]
+        );
+    }
+
     #[test]
     fn tabs_are_rejected() {
         assert!(tokenize("test", "\t").is_err());

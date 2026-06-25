@@ -4043,6 +4043,78 @@ mod tests {
         assert_eq!(paired.len(), 1);
     }
 
+    // Mirrors Tests/LoadFQDirectory.hs `case_error_p1`/`case_error_p2`: a lone mate (pair.1 with no
+    // pair.2, or vice-versa) is an error.
+    #[test]
+    fn match_up_unpaired_mate_is_error() {
+        assert!(match_up(&s(&["sample/sample.pair.1.fq.bz2"])).is_err());
+        assert!(match_up(&s(&["sample/sample.pair.2.fq.bz2"])).is_err());
+    }
+
+    // Mirrors Tests/LoadFQDirectory.hs `known_cases`: a single uncompressed/compressed read file
+    // with no pairing markers is a singleton, not a pair.
+    #[test]
+    fn match_up_lone_files_are_singletons() {
+        for f in ["sample/uncompressed.fq", "sample/sample.fq.gz", "sample/sample.fq.bz2"] {
+            let (singletons, paired) = match_up(&s(&[f])).unwrap();
+            assert_eq!(singletons, s(&[f]));
+            assert!(paired.is_empty());
+        }
+    }
+
+    // Mirrors Tests/LoadFQDirectory.hs `known_cases`: bz2 pair.1/pair.2/single in a deeper
+    // directory group into one paired record with a singles file.
+    #[test]
+    fn match_up_bz2_paired_with_single() {
+        let files = s(&[
+            "mocat_sample_bz2_paired/sample/sample.pair.1.fq.bz2",
+            "mocat_sample_bz2_paired/sample/sample.pair.2.fq.bz2",
+            "mocat_sample_bz2_paired/sample/sample.single.fq.bz2",
+        ]);
+        let (singletons, paired) = match_up(&files).unwrap();
+        assert!(singletons.is_empty());
+        assert_eq!(
+            paired,
+            vec![(
+                "mocat_sample_bz2_paired/sample/sample.pair.1.fq.bz2".to_string(),
+                "mocat_sample_bz2_paired/sample/sample.pair.2.fq.bz2".to_string(),
+                Some("mocat_sample_bz2_paired/sample/sample.single.fq.bz2".to_string())
+            )]
+        );
+    }
+
+    // Mirrors Tests/LoadFQDirectory.hs `known_cases` "mixed": two paired samples (one with a
+    // singles file, one without) plus an unrelated single-end file.
+    #[test]
+    fn match_up_mixed() {
+        let files = s(&[
+            "sample/sampleC.single.fq.bz2",
+            "sample/sampleB.pair.1.fq.bz2",
+            "sample/sampleB.pair.2.fq.bz2",
+            "sample/sampleA.pair.1.fq.bz2",
+            "sample/sampleA.pair.2.fq.bz2",
+            "sample/sampleA.single.fq.bz2",
+        ]);
+        let (singletons, mut paired) = match_up(&files).unwrap();
+        assert_eq!(singletons, s(&["sample/sampleC.single.fq.bz2"]));
+        paired.sort();
+        assert_eq!(
+            paired,
+            vec![
+                (
+                    "sample/sampleA.pair.1.fq.bz2".to_string(),
+                    "sample/sampleA.pair.2.fq.bz2".to_string(),
+                    Some("sample/sampleA.single.fq.bz2".to_string())
+                ),
+                (
+                    "sample/sampleB.pair.1.fq.bz2".to_string(),
+                    "sample/sampleB.pair.2.fq.bz2".to_string(),
+                    None
+                ),
+            ]
+        );
+    }
+
     #[test]
     fn subsample_keeps_one_in_ten_records() {
         // 20 four-line records => 80 lines. drop90 keeps the first 4 of every 40 lines,

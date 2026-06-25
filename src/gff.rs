@@ -161,4 +161,69 @@ mod tests {
         assert_eq!(l.strand, GffStrand::Neg);
         assert_eq!(l.attr_values("ID"), vec!["AC062_1558".to_string()]);
     }
+
+    // Mirrors Tests.hs `case_trim_attrs_1..5`: `_trimString` strips only leading/trailing spaces.
+    #[test]
+    fn trim_string_strips_outer_spaces() {
+        assert_eq!(trim_spaces(" x = 10"), "x = 10");
+        assert_eq!(trim_spaces(" x = 10 "), "x = 10");
+        assert_eq!(trim_spaces("x = 10 "), "x = 10");
+        assert_eq!(trim_spaces("x = 10"), "x = 10");
+        assert_eq!(trim_spaces("   X    "), "X");
+    }
+
+    // Mirrors Tests.hs `case_parse_gff_atributes_normal_*` / `*_trail_del*`: GFF3 `key=value`
+    // attributes, with an optional single trailing `;` (and trailing space) dropped.
+    #[test]
+    fn gff3_attributes_trailing_delimiter() {
+        let expected = vec![
+            ("ID".to_string(), "chrI".to_string()),
+            ("dbxref".to_string(), "NCBI:NC_001133".to_string()),
+            ("Name".to_string(), "chrI".to_string()),
+        ];
+        assert_eq!(
+            parse_gff_attributes("ID=chrI;dbxref=NCBI:NC_001133;Name=chrI"),
+            expected
+        );
+        let expected2 = vec![
+            ("gene_id".to_string(), "chrI".to_string()),
+            ("dbxref".to_string(), "NCBI:NC_001133".to_string()),
+            ("Name".to_string(), "chrI".to_string()),
+        ];
+        assert_eq!(
+            parse_gff_attributes("gene_id=chrI;dbxref=NCBI:NC_001133;Name=chrI"),
+            expected2
+        );
+        assert_eq!(
+            parse_gff_attributes("gene_id=chrI;dbxref=NCBI:NC_001133;Name=chrI;"),
+            expected2
+        );
+        assert_eq!(
+            parse_gff_attributes("gene_id=chrI;dbxref=NCBI:NC_001133;Name=chrI; "),
+            expected2
+        );
+    }
+
+    // Mirrors Tests.hs `case_parse_gff_line`: a full GTF exon line with quoted attributes and a
+    // negative strand.
+    #[test]
+    fn gtf_full_line() {
+        let line = "chrI\tunknown\texon\t4124\t4358\t.\t-\t.\tgene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";";
+        let l = read_gff_line(line).unwrap();
+        assert_eq!(l.seq_id, "chrI");
+        assert_eq!(l.gtype, "exon");
+        assert_eq!(l.start, 4124);
+        assert_eq!(l.end, 4358);
+        assert_eq!(l.strand, GffStrand::Neg);
+        assert_eq!(
+            parse_gff_attributes("gene_id \"Y74C9A.3\"; transcript_id \"NM_058260\"; gene_name \"Y74C9A.3\"; p_id \"P23728\"; tss_id \"TSS14501\";"),
+            vec![
+                ("gene_id".to_string(), "Y74C9A.3".to_string()),
+                ("transcript_id".to_string(), "NM_058260".to_string()),
+                ("gene_name".to_string(), "Y74C9A.3".to_string()),
+                ("p_id".to_string(), "P23728".to_string()),
+                ("tss_id".to_string(), "TSS14501".to_string()),
+            ]
+        );
+    }
 }

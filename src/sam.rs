@@ -340,6 +340,33 @@ mod tests {
         assert_eq!(l.match_identity(false).unwrap(), 1.0);
     }
 
+    // Mirrors Tests/Select.hs `case_matchSize1..3`, `case_match_identity_soft` and
+    // `case_isAligned_raw`: match sizes for real alignments with deletions, soft and hard clips
+    // and an insertion, plus the soft-clip identity and the aligned-flag check.
+    #[test]
+    fn match_size_and_identity_real_alignments() {
+        // 26M3D9M3D6M6D8M2D21M: only the M runs consume read bases -> 26+9+6+8+21 = 70.
+        let complex = "SRR070372.3\t16\tV\t7198336\t21\t26M3D9M3D6M6D8M2D21M\t*\t0\t0\tCCCTTATGCAGGTCTTAACACAATTCTTGTATGTTCCATCGTTCTCCAGAATGAATATCAATGATACCAA\t014<<BBBBDDFFFDDDDFHHFFD?@??DBBBB5555::?=BBBBDDF@BBFHHHHHHHFFFFFD@@@@@\tNM:i:14\tMD:Z:26^TTT9^TTC6^TTTTTT8^AA21\tAS:i:3\tXS:i:0";
+        let complex = parse_sam_line(complex).unwrap();
+        assert_eq!(complex.match_size(true).unwrap(), 26 + 9 + 6 + 8 + 21);
+        assert!(complex.is_aligned());
+
+        // 69M16S: soft clips do not count -> 69.
+        let simple = "simulated:1:1:38:663#0\t0\tRef1\t1018\t3\t69M16S\t=\t1018\t0\tTTCGAGAAGATGGGTATCGTGGGAAATAACGGAACGGGGAAGTCTACCTTCATCAAGATGCTGCTGGGCTTGGTGAAACCCGACA\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\tNM:i:5\tMD:Z:17T5T14A2A2G24\tAS:i:44\tXS:i:40";
+        let simple = parse_sam_line(simple).unwrap();
+        assert_eq!(simple.match_size(true).unwrap(), 69);
+
+        // 5M1I40M54H: the insertion counts (include_i), hard clips do not -> 5+1+40 = 46.
+        let refinsert = "SRR6028238.2619770\t417\tX\t1319005\t0\t5M1I40M54H\t=\t2019245\t700291\tTTTTCCGCTGAATATGCCCAAAGTGCAACAACGACGACCGCCGCCA\t@DDDEDDDDBDDDEEECDDDDDCAACCCCBBDDDBBBBBB<@BBDB\tNM:i:1\tMD:Z:45\tMC:Z:51M50H\tAS:i:40";
+        let refinsert = parse_sam_line(refinsert).unwrap();
+        assert_eq!(refinsert.match_size(true).unwrap(), 46);
+
+        // 40M with NM:i:1 -> identity (40-1)/40 = 0.975.
+        let soft = "IRIS:7:3:1046:1723#0\t4\t*\t0\t0\t40M\t*\t0\t0\tAAAAAAAAAAAAAAAAAAAATTTAAA\taaaaaaaaaaaaaaaaaa`abbba`^\tAS:i:0\tXS:i:0\tNM:i:1";
+        let soft = parse_sam_line(soft).unwrap();
+        assert_eq!(soft.match_identity(true).unwrap(), 0.975);
+    }
+
     #[test]
     fn fix_cigar_rewrites_hard_to_soft() {
         // 19H48M consumes 48 read bases; to represent length 67 the H must become S.

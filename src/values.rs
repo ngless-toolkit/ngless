@@ -287,6 +287,74 @@ mod tests {
         assert!(eval_index(&l, &[Some(Integer(5))]).is_err());
     }
 
+    // Mirrors Tests.hs `case_bop_*`: integer comparison/arithmetic operators.
+    #[test]
+    fn integer_binary_ops() {
+        let i = Integer;
+        assert_eq!(eval_binary(BOp::GTE, &i(10), &i(10)).unwrap(), Bool(true));
+        assert_eq!(eval_binary(BOp::GTE, &i(10), &i(11)).unwrap(), Bool(false));
+        assert_eq!(eval_binary(BOp::GT, &i(10), &i(10)).unwrap(), Bool(false));
+        assert_eq!(eval_binary(BOp::GT, &i(11), &i(10)).unwrap(), Bool(true));
+        assert_eq!(eval_binary(BOp::LT, &i(10), &i(11)).unwrap(), Bool(true));
+        assert_eq!(eval_binary(BOp::LT, &i(10), &i(10)).unwrap(), Bool(false));
+        assert_eq!(eval_binary(BOp::LTE, &i(10), &i(10)).unwrap(), Bool(true));
+        assert_eq!(eval_binary(BOp::LTE, &i(11), &i(10)).unwrap(), Bool(false));
+        assert_eq!(eval_binary(BOp::EQ, &i(10), &i(10)).unwrap(), Bool(true));
+        assert_eq!(eval_binary(BOp::EQ, &i(10), &i(0)).unwrap(), Bool(false));
+        assert_eq!(eval_binary(BOp::NEQ, &i(0), &i(10)).unwrap(), Bool(true));
+        assert_eq!(eval_binary(BOp::NEQ, &i(10), &i(10)).unwrap(), Bool(false));
+        assert_eq!(eval_binary(BOp::Add, &i(10), &i(10)).unwrap(), Integer(20));
+        assert_eq!(eval_binary(BOp::Mul, &i(10), &i(0)).unwrap(), Integer(0));
+        assert_eq!(eval_binary(BOp::Mul, &i(10), &i(10)).unwrap(), Integer(100));
+    }
+
+    // Mirrors Tests.hs `case_bop_add_path_*`: the `</>` path-append operator.
+    #[test]
+    fn path_append_op() {
+        let pa = |a: &str, b: &str| {
+            eval_binary(BOp::PathAppend, &String(a.into()), &String(b.into())).unwrap()
+        };
+        assert_eq!(pa("dir", "file"), String("dir/file".into()));
+        assert_eq!(pa("dir/subdir", "file"), String("dir/subdir/file".into()));
+        assert_eq!(pa("dir/subdir/", "file"), String("dir/subdir/file".into()));
+        assert_eq!(pa("../dir/subdir/", "file"), String("../dir/subdir/file".into()));
+        assert_eq!(pa("/abs/dir/subdir/", "file"), String("/abs/dir/subdir/file".into()));
+    }
+
+    // Mirrors Tests.hs `case_uop_minus_*`.
+    #[test]
+    fn unary_minus() {
+        assert_eq!(eval_unary(UOp::Minus, &Integer(10)).unwrap(), Integer(-10));
+        assert_eq!(eval_unary(UOp::Minus, &Integer(-10)).unwrap(), Integer(10));
+    }
+
+    // Mirrors Tests.hs `case_pre_process_length_1` and `case_pre_process_indexation_1..3`:
+    // `len(read)` and `read[a:b]` slicing on a ShortRead. The qualities are the raw byte values
+    // of "aa`aaaaa" (a=97, `=96), matching the Haskell `sr` helper.
+    #[test]
+    fn read_length_and_slicing() {
+        let quals: Vec<i8> = b"aa`aaaaa".iter().map(|&b| b as i8).collect();
+        let read = || NGLessObject::Read(ShortRead::new("@IRIS", "AGTACCAA", quals.clone()));
+
+        assert_eq!(eval_unary(UOp::Len, &read()).unwrap(), Integer(8));
+
+        // read[5:] -> "CAA"
+        assert_eq!(
+            eval_index(&read(), &[Some(Integer(5)), None]).unwrap(),
+            NGLessObject::Read(ShortRead::new("@IRIS", "CAA", vec![97, 97, 97]))
+        );
+        // read[:3] -> "AGT"
+        assert_eq!(
+            eval_index(&read(), &[None, Some(Integer(3))]).unwrap(),
+            NGLessObject::Read(ShortRead::new("@IRIS", "AGT", vec![97, 97, 96]))
+        );
+        // read[2:5] -> "TAC"
+        assert_eq!(
+            eval_index(&read(), &[Some(Integer(2)), Some(Integer(5))]).unwrap(),
+            NGLessObject::Read(ShortRead::new("@IRIS", "TAC", vec![96, 97, 97]))
+        );
+    }
+
     #[test]
     fn double_formatting() {
         // Matches Haskell's `show` for Double, including its scientific-notation threshold.
