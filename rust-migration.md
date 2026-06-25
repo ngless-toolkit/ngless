@@ -5,7 +5,7 @@
 > repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
 > Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
-> **58 of the 96 functional tests pass** against the Rust binary with output identical to
+> **69 of the 96 functional tests pass** against the Rust binary with output identical to
 > Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`). See
 > the [Functional test status](#functional-test-status) table below for the per-test breakdown.
 >
@@ -170,6 +170,28 @@
 >   minimap2/soap mappers (`map(..., mapper='minimap2')` errors clearly for now); index creation is
 >   not lock-guarded (safe for single-process runs).
 
+> - **M7a (modules + stdlib — sample/directory loading):** the lowest-risk slice of M7, built on
+>   the already-working FASTQ path. `group()` is now interpreted (`execute_group`, mirroring
+>   `executeGroup`/`groupFiles`: a single member is renamed, multiple members have their pair- and
+>   singleton-file lists concatenated in order; empty groups error). On top of it,
+>   `load_fastq_directory` (`BuiltinModules/LoadDirectory.hs`) globs `<dir>/*.{fq,fastq}{,.gz,.bz2,
+>   .xz}` (sorted), pairs files by the `matchUp` rules (cross product of the extensions with
+>   `(.1,.2)`/`(_1,_2)`/`(_F,_R)` markers, `nub`-dedup, singles file derived by `pair.N`→`single`),
+>   loads singletons via `fastq` and pairs via `paired`, then `group`s them under the directory
+>   name. The `mocat` module (`StandardModules/Mocat.hs`) exposes `load_mocat_sample` as a thin
+>   wrapper over the same loader (versions `0.0`/`1.0`/`1.1`, with the MOCAT/MOCAT2 citations).
+>   `load_sample_list` (`BuiltinModules/Samples.hs`) parses a YAML sample manifest (`serde_yaml`;
+>   optional `basedir`, `samples:` map of name → `[{paired:[a,b]}|{single:..}]`) into a list of
+>   named, Sanger-encoded read sets. The `.name()` method on a read set and `discard_singles`
+>   (`AsReads.hs`: keep pairs, drop singletons) are also done, as is the `--subsample` flag
+>   (deterministic 1/10 record sample on load — `subsample_text` mirrors `drop90`/`performSubsample`
+>   keeping the first 4 of every 40 lines, capped at 100000 — plus the `.subsampled` write-output
+>   marker from `parseWriteOptions`). Passing: `tests/load_fastq_directory`, `tests/load_sample_list`,
+>   the seven `tests/mocat_sample_*` cases (gz/uncompressed/bz2, single + paired, incl. the
+>   `discard_singles` `mocat_sample_uncompressed_paired`), `tests/regression-write-fqgz` and
+>   `tests/regression-subsample_write`. Still pending in M7: packaged `reference=` databases (M7b),
+>   external YAML modules (M7c), the parallel module (M7d), and assemble/orf_find (M7e).
+>
 ## Context
 
 NGLess is a ~15–16k-line Haskell program (`NGLess/`, 86 `.hs` files) implementing a
@@ -303,7 +325,7 @@ and run via `pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debu
 Legend: ✅ passes · ❌ not yet supported. `--print-path EXEC` is now implemented (resolves a
 tool from `$NGLESS_<TOOL>_BIN` or `PATH`, mirroring `PrintPathMode`/`findNGLessBin`), so the
 samtools `check.sh` scripts that shell out to `$(ngless --print-path samtools)` can now be
-driven locally. **Tally: 56 ✅ · 40 ❌ (96 total).**
+driven locally. **Tally: 69 ✅ · 27 ❌ (96 total).**
 
 | Test | Status | Note / planned milestone |
 |---|---|---|
@@ -338,8 +360,8 @@ driven locally. **Tally: 56 ✅ · 40 ❌ (96 total).**
 | fix_cigarSam | ✅ | M5 |
 | grouped | ❌ | M7 — packaged `reference=` databases |
 | len_list | ✅ | M3 — citation/copyright header |
-| load_fastq_directory | ❌ | M7 — `load_fastq_directory` stdlib fn |
-| load_sample_list | ❌ | M7 — `load_sample_list` stdlib fn |
+| load_fastq_directory | ✅ | M7a — `load_fastq_directory` + `group` |
+| load_sample_list | ✅ | M7a — `load_sample_list` (YAML manifest) |
 | map3 | ✅ | M7 (bwa) |
 | map-minimap2 | ❌ | M7/Future — minimap2 mapper |
 | map_search_path | ✅ | M7 |
@@ -349,13 +371,13 @@ driven locally. **Tally: 56 ✅ · 40 ❌ (96 total).**
 | map-windows_line_terminators | ✅ | M7 |
 | max_filename_length | ✅ | M4 |
 | merge-sams | ✅ | M5 — `__merge_samfiles` |
-| mocat_sample_bz2 | ❌ | M7 — mocat module |
-| mocat_sample_bz2_paired | ❌ | M7 — mocat module |
-| mocat_sample_bz2_paired_mixed | ❌ | M7 — mocat module |
-| mocat_sample_gz | ❌ | M7 — mocat module |
-| mocat_sample_gz_paired | ❌ | M7 — mocat module |
-| mocat_sample_uncompressed | ❌ | M7 — mocat module |
-| mocat_sample_uncompressed_paired | ❌ | M7 — mocat module |
+| mocat_sample_bz2 | ✅ | M7a — mocat module |
+| mocat_sample_bz2_paired | ✅ | M7a — mocat module |
+| mocat_sample_bz2_paired_mixed | ✅ | M7a — mocat module |
+| mocat_sample_gz | ✅ | M7a — mocat module |
+| mocat_sample_gz_paired | ✅ | M7a — mocat module |
+| mocat_sample_uncompressed | ✅ | M7a — mocat module |
+| mocat_sample_uncompressed_paired | ✅ | M7a — mocat module + `discard_singles` |
 | parallel | ❌ | M7 — parallel module |
 | parallel_collect_many | ❌ | M7 — parallel module |
 | parallel_collect_subdir | ❌ | M7 — parallel module |
@@ -373,9 +395,9 @@ driven locally. **Tally: 56 ✅ · 40 ❌ (96 total).**
 | regression-cigar-filter | ✅ | M5 |
 | regression-fqgz | ✅ | M4 |
 | regression-resave | ✅ | M5 |
-| regression-subsample_write | ❌ | M7 — mocat module |
+| regression-subsample_write | ✅ | M7a — mocat module + `--subsample` |
 | regression-unique-same-contig | ✅ | M6 |
-| regression-write-fqgz | ❌ | M7 — mocat module |
+| regression-write-fqgz | ✅ | M7a — mocat module |
 | reuse | ✅ | M3 |
 | same-hash-collect | ❌ | M7 — parallel module |
 | same-hash-collect-2 | ❌ | M7 — parallel module |

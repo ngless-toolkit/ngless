@@ -275,6 +275,19 @@ mod builders {
                 f.allows_auto_comprehension = true;
                 f
             },
+            // Also from the "as_reads" module: drop the singleton reads from a read set.
+            {
+                let mut f = func(
+                    "discard_singles",
+                    Some(ReadSet),
+                    vec![],
+                    ReadSet,
+                    vec![],
+                    vec![MinNGLessVersion(1, 1), ReturnAssigned],
+                );
+                f.allows_auto_comprehension = true;
+                f
+            },
             // From the always-loaded builtin "stats" module (BuiltinModules/QCStats.hs).
             func(
                 "qcstats",
@@ -323,6 +336,29 @@ mod builders {
                 vec![],
                 vec![],
             ),
+            // From the always-loaded builtin "load_directory" module
+            // (BuiltinModules/LoadDirectory.hs).
+            func(
+                "load_fastq_directory",
+                Some(String),
+                vec![],
+                ReadSet,
+                load_directory_args(),
+                vec![],
+            ),
+            // From the always-loaded builtin "samples" module (BuiltinModules/Samples.hs).
+            {
+                let mut f = func(
+                    "load_sample_list",
+                    Some(String),
+                    vec![FileReadable],
+                    list(ReadSet),
+                    vec![],
+                    vec![MinNGLessVersion(1, 5), ReturnAssigned],
+                );
+                f.allows_auto_comprehension = true;
+                f
+            },
         ]
     }
 
@@ -335,8 +371,37 @@ mod builders {
             ("samtools", "1.0") | ("samtools", "0.1") => {
                 Some(vec![samtools_sort_function(), samtools_view_function()])
             }
+            // The `mocat` module (StandardModules/Mocat.hs) exposes `load_mocat_sample`, a thin
+            // wrapper over `load_fastq_directory`.
+            ("mocat", "0.0") | ("mocat", "1.0") | ("mocat", "1.1") => {
+                Some(vec![load_mocat_sample_function()])
+            }
             _ => None,
         }
+    }
+
+    /// Keyword arguments shared by `load_fastq_directory` and `load_mocat_sample`.
+    fn load_directory_args() -> Vec<ArgInformation> {
+        vec![
+            arg("__perform_qc", false, Bool, vec![]),
+            arg(
+                "encoding",
+                false,
+                Symbol,
+                vec![sym(&["auto", "33", "64", "sanger", "solexa"])],
+            ),
+        ]
+    }
+
+    fn load_mocat_sample_function() -> Function {
+        func(
+            "load_mocat_sample",
+            Some(String),
+            vec![],
+            ReadSet,
+            load_directory_args(),
+            vec![],
+        )
     }
 
     fn samtools_sort_function() -> Function {

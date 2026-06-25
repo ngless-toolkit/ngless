@@ -20,6 +20,9 @@ struct RunOpts {
     debug: String,
     temp_dir: Option<String>,
     search_path: Vec<String>,
+    /// `--subsample`: keep only a deterministic 1/10 of the reads on FASTQ load (mirrors
+    /// `nConfSubsample`); also appends `.subsampled` to write outputs.
+    subsample: bool,
     /// Positional arguments after the script path, exposed (with the script path) as `ARGV`.
     extra_args: Vec<String>,
 }
@@ -51,6 +54,7 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
         match a.as_str() {
             "-n" | "--validate-only" => opts.validate_only = true,
             "--quiet" => opts.quiet = true,
+            "--subsample" => opts.subsample = true,
             "--no-header" => opts.no_header = true,
             "-t" | "--temporary-directory" => {
                 i += 1;
@@ -183,7 +187,14 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // ARGV = [script_path, ...extra_args] (mirrors `nConfArgv` in Configuration.hs).
     let mut argv = vec![fname.clone()];
     argv.extend(opts.extra_args.iter().cloned());
-    crate::interpret::interpret(&typed.body, &temp_dir, &text, &opts.search_path, &argv)?;
+    crate::interpret::interpret(
+        &typed.body,
+        &temp_dir,
+        &text,
+        &opts.search_path,
+        &argv,
+        opts.subsample,
+    )?;
     Ok(0)
 }
 

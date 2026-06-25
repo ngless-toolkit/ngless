@@ -32,6 +32,151 @@ use crate::sam::{self, encode_sam_line, is_header_line, parse_sam_line, SamLine,
 use crate::select::{self, FilterAction, FilterOptions};
 use crate::values::{eval_binary, eval_index, eval_unary, show_double, NGLessObject};
 
+use serde::Deserialize;
+use std::collections::BTreeMap;
+
+/// A YAML sample manifest for `load_sample_list` (mirrors `SampleFile` in
+/// BuiltinModules/Samples.hs). Each sample maps to a list of single-key entries (`{paired: [..]}`
+/// or `{single: ..}`). `BTreeMap` keeps samples in the sorted order the Haskell aeson
+/// `KeyMap.toList` produces.
+#[derive(Deserialize)]
+struct SampleFile {
+    basedir: Option<String>,
+    samples: BTreeMap<String, Vec<BTreeMap<String, serde_yaml::Value>>>,
+}
+
+/// Recognised FASTQ file extensions for directory loading (mirrors `exts`).
+fn fastq_directory_exts() -> Vec<String> {
+    let mut out = Vec::new();
+    for fq in [".fq", ".fastq"] {
+        for comp in ["", ".gz", ".bz2", ".xz"] {
+            out.push(format!("{fq}{comp}"));
+        }
+    }
+    out
+}
+
+/// Pair up FASTQ files in a directory by mate suffix (mirrors `matchUp`). Returns the leftover
+/// singletons and the paired files (mate1, mate2, optional singles), preserving input order.
+#[allow(clippy::type_complexity)]
+fn match_up(fqfiles: &[String]) -> NgResult<(Vec<String>, Vec<(String, String, Option<String>)>)> {
+    // Pair suffixes: the cross product of the extensions with the three mate-marker pairs.
+    let mut paired_ends: Vec<(String, String)> = Vec::new();
+    for ext in fastq_directory_exts() {
+        for (s1, s2) in [(".1", ".2"), ("_1", "_2"), ("_F", "_R")] {
+            paired_ends.push((format!("{s1}{ext}"), format!("{s2}{ext}")));
+        }
+    }
+    // For a file ending in a mate-1 (or mate-2) suffix, recover the (mate1, mate2) base pair.
+    let match1 = |fp: &str| -> Option<(String, String)> {
+        for (p1, p2) in &paired_ends {
+            if let Some(base) = fp.strip_suffix(p1.as_str()) {
+                return Some((fp.to_string(), format!("{base}{p2}")));
+            }
+            if let Some(base) = fp.strip_suffix(p2.as_str()) {
+                return Some((format!("{base}{p1}"), fp.to_string()));
+            }
+        }
+        None
+    };
+    // `nub` over the matched pairs (both pair.1 and pair.2 map to the same record).
+    let mut matched1: Vec<(String, String)> = Vec::new();
+    for fp in fqfiles {
+        if let Some(m) = match1(fp) {
+            if !matched1.contains(&m) {
+                matched1.push(m);
+            }
+        }
+    }
+    let exists = |f: &str| fqfiles.iter().any(|x| x == f);
+    let mut paired = Vec::new();
+    for (m1, m2) in matched1 {
+        if !exists(&m1) {
+            return Err(NgError::new(
+                NgErrorType::DataError,
+                format!("Cannot find match for file: {m2}"),
+            ));
+        }
+        if !exists(&m2) {
+            return Err(NgError::new(
+                NgErrorType::DataError,
+                format!("Cannot find match for file: {m1}"),
+            ));
+        }
+        let singles = build_single(&m1);
+        let singles = if exists(&singles) { Some(singles) } else { None };
+        paired.push((m1, m2, singles));
+    }
+    // Files not used by any pair (incl. the matched singles) are singletons.
+    let mut used: Vec<&str> = Vec::new();
+    for (a, b, c) in &paired {
+        used.push(a);
+        used.push(b);
+        if let Some(c) = c {
+            used.push(c);
+        }
+    }
+    let singletons = fqfiles
+        .iter()
+        .filter(|f| !used.contains(&f.as_str()))
+        .cloned()
+        .collect();
+    Ok((singletons, paired))
+}
+
+/// Derive the singles-file name for a paired sample by replacing `pair.1`/`pair.2` with `single`
+/// (mirrors `buildSingle`). Returns a marker that never matches when no `pair.N` is present.
+fn build_single(m1: &str) -> String {
+    if m1.contains("pair.1") {
+        m1.replace("pair.1", "single")
+    } else if m1.contains("pair.2") {
+        m1.replace("pair.2", "single")
+    } else {
+        "MARKER_FOR_FILE_WHICH_DOES_NOT_EXIST".to_string()
+    }
+}
+
+/// Deterministically keep a 1/10 sample of FASTQ records (mirrors `drop90`/`performSubsample`):
+/// keep the first 4 of every 40 input lines (one record in ten), then take at most 100000 of the
+/// kept lines.
+fn subsample_text(text: &str) -> String {
+    // Mirror conduit's `CB.lines`: split on `\n` and drop a single trailing empty fragment.
+    let mut lines: Vec<&str> = text.split('\n').collect();
+    if lines.last() == Some(&"") {
+        lines.pop();
+    }
+    let mut out = String::new();
+    let mut kept = 0usize;
+    for (i, line) in lines.iter().enumerate() {
+        if i % 40 < 4 {
+            out.push_str(line);
+            out.push('\n');
+            kept += 1;
+            if kept >= 100000 {
+                break;
+            }
+        }
+    }
+    out
+}
+
+/// `discard_singles(rs)`: drop the singleton reads, keeping the pairs (mirrors
+/// `executeDiscardSingles`).
+fn execute_discard_singles(expr: &NGLessObject) -> NgResult<NGLessObject> {
+    match expr {
+        NGLessObject::ReadSet { name, readset } => Ok(NGLessObject::ReadSet {
+            name: name.clone(),
+            readset: ReadSet {
+                pairs: readset.pairs.clone(),
+                singletons: Vec::new(),
+            },
+        }),
+        other => Err(NgError::should_not_occur(format!(
+            "discard_singles expected a read set, got {other:?}"
+        ))),
+    }
+}
+
 /// Interpret a script body (already type-checked and validated). `temp_dir` is where
 /// intermediate FASTQ files (e.g. from `preprocess`) are written.
 pub fn interpret(
@@ -40,6 +185,7 @@ pub fn interpret(
     script_text: &str,
     search_path: &[String],
     argv: &[String],
+    subsample: bool,
 ) -> NgResult<()> {
     let mut interp = Interpreter {
         env: HashMap::new(),
@@ -49,6 +195,7 @@ pub fn interpret(
         script_text: script_text.to_string(),
         search_path: search_path.to_vec(),
         argv: argv.to_vec(),
+        subsample,
     };
     for (lno, e) in body {
         interp.cur_lno.set(*lno);
@@ -85,6 +232,9 @@ struct Interpreter {
     /// The command-line arguments exposed as the `ARGV` constant (`[script_path, ...extra]`,
     /// mirroring `nConfArgv`/`builtin.argv`).
     argv: Vec<String>,
+    /// `--subsample`: keep a deterministic 1/10 of reads on FASTQ load (mirrors
+    /// `nConfSubsample`).
+    subsample: bool,
 }
 
 /// The outcome of running a (block) statement, mirroring `BlockStatus`.
@@ -297,6 +447,12 @@ impl Interpreter {
         match f.0.as_str() {
             "fastq" => self.execute_fastq(&expr_v),
             "paired" => self.execute_paired(&expr_v, &argvs),
+            "group" => self.execute_group(&expr_v, &argvs),
+            "load_fastq_directory" | "load_mocat_sample" => {
+                self.execute_load_directory(&expr_v, &argvs)
+            }
+            "load_sample_list" => self.execute_load_sample_list(&expr_v),
+            "discard_singles" => execute_discard_singles(&expr_v),
             "samfile" => self.execute_samfile(&expr_v, &argvs),
             "map" => self.execute_map(&expr_v, &argvs),
             "as_reads" => self.execute_as_reads(&expr_v),
@@ -1017,7 +1173,7 @@ impl Interpreter {
             self.write_mapped_read_set(path, &ofile)?;
             return Ok(NGLessObject::String(ofile));
         }
-        execute_write(expr, args, &self.script_text)
+        execute_write(expr, args, &self.script_text, self.subsample)
     }
 
     /// Write a mapped read set to `ofile` (mirrors `executeWrite` of an `NGOMappedReadSet`). The
@@ -1147,15 +1303,35 @@ impl Interpreter {
     /// is *not* rewritten, so a later `write` reproduces it byte-for-byte (mirrors
     /// `executeFastq` for the non-interleaved case).
     fn execute_fastq(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
-        let path = as_string(expr, "fastq")?;
+        let name = as_string(expr, "fastq")?;
+        let path = self.maybe_subsample(&name)?;
         let fqf = self.load_and_qc(&path, &path)?;
         Ok(NGLessObject::ReadSet {
-            name: path,
+            name,
             readset: ReadSet {
                 pairs: Vec::new(),
                 singletons: vec![fqf],
             },
         })
+    }
+
+    /// If `--subsample` is active, deterministically keep a 1/10 sample of the FASTQ records and
+    /// return the path to a temp file holding them; otherwise return `path` unchanged (mirrors
+    /// `optionalSubsample`/`performSubsample`).
+    fn maybe_subsample(&self, path: &str) -> NgResult<String> {
+        if !self.subsample {
+            return Ok(path.to_string());
+        }
+        let text = read_fastq_text(path)?;
+        let sampled = subsample_text(&text);
+        let out = self.new_temp_path("subsampled.", "fq");
+        std::fs::write(&out, sampled).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write temp file {}: {e}", out.display()),
+            )
+        })?;
+        Ok(out.to_string_lossy().into_owned())
     }
 
     /// `paired(mate1, second=mate2, singles=mate3)`: reference the mate files (mirrors
@@ -1175,8 +1351,10 @@ impl Interpreter {
             Some(NGLessObject::String(s)) => s.clone(),
             _ => String::new(),
         };
-        let f1 = self.load_and_qc(&mate1, &mate1)?;
-        let f2 = self.load_and_qc(&mate2, &mate2)?;
+        let p1 = self.maybe_subsample(&mate1)?;
+        let p2 = self.maybe_subsample(&mate2)?;
+        let f1 = self.load_and_qc(&p1, &p1)?;
+        let f2 = self.load_and_qc(&p2, &p2)?;
         if f1.encoding != f2.encoding {
             return Err(NgError::new(
                 NgErrorType::DataError,
@@ -1189,11 +1367,12 @@ impl Interpreter {
         let singletons = if mate3.is_empty() {
             Vec::new()
         } else {
+            let p3 = self.maybe_subsample(&mate3)?;
             // QC stats are registered for the singles file even if it is later dropped.
-            let text = read_fastq_text(&mate3)?;
+            let text = read_fastq_text(&p3)?;
             let enc3 = fastq::detect_encoding(&text)?;
             let reads3 = fastq::fq_decode(enc3, &text)?;
-            self.register_fq_stats(&mate3, &reads3, enc3);
+            self.register_fq_stats(&p3, &reads3, enc3);
             if f1.encoding != enc3 {
                 // Special case seen in the wild: an empty singles file with a default encoding.
                 if reads3.is_empty() {
@@ -1205,7 +1384,7 @@ impl Interpreter {
             } else {
                 vec![FastQFilePath {
                     encoding: enc3,
-                    path: PathBuf::from(&mate3),
+                    path: PathBuf::from(&p3),
                 }]
             }
         };
@@ -1216,6 +1395,188 @@ impl Interpreter {
                 singletons,
             },
         })
+    }
+
+    /// `group([rs...], name=...)`: combine read sets into one named read set (mirrors
+    /// `executeGroup`/`groupFiles`). A single member is just renamed; multiple members have their
+    /// pair- and singleton-file lists concatenated in order.
+    fn execute_group(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let name = match lookup_arg(args, "name") {
+            Some(NGLessObject::String(s)) => s.clone(),
+            _ => return Err(NgError::script("group: argument `name` (a string) is required")),
+        };
+        let members = match expr {
+            NGLessObject::List(items) => items,
+            other => {
+                return Err(NgError::should_not_occur(format!(
+                    "group expected a list of read sets, got {other:?}"
+                )))
+            }
+        };
+        let mut pairs = Vec::new();
+        let mut singletons = Vec::new();
+        for m in members {
+            match m {
+                NGLessObject::ReadSet { readset, .. } => {
+                    pairs.extend(readset.pairs.iter().cloned());
+                    singletons.extend(readset.singletons.iter().cloned());
+                }
+                other => {
+                    return Err(NgError::should_not_occur(format!(
+                        "In group call, all arguments should have been read sets, got {other:?}"
+                    )))
+                }
+            }
+        }
+        if pairs.is_empty() && singletons.is_empty() {
+            return Err(NgError::new(
+                NgErrorType::DataError,
+                format!(
+                    "Attempted to group sample '{name}' but sample is empty (no read files)."
+                ),
+            ));
+        }
+        Ok(NGLessObject::ReadSet {
+            name,
+            readset: ReadSet { pairs, singletons },
+        })
+    }
+
+    /// `load_fastq_directory(dir)` / `load_mocat_sample(dir)`: discover FASTQ files in a directory,
+    /// pairing them by suffix, and group them into a single named read set (mirrors
+    /// `executeLoad`/`loadDirectoryFiles` in BuiltinModules/LoadDirectory.hs).
+    fn execute_load_directory(
+        &self,
+        expr: &NGLessObject,
+        _args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let basedir = as_string(expr, "load_fastq_directory")?;
+        if !Path::new(&basedir).is_dir() {
+            return Err(NgError::new(
+                NgErrorType::DataError,
+                format!(
+                    "Attempting to load directory '{basedir}', but directory does not exist."
+                ),
+            ));
+        }
+        // Glob `<dir>/*.{fq,fastq}{,.gz,.bz2,.xz}` and sort (mirrors the `exts`/`namesMatching` set).
+        let mut fqfiles: Vec<String> = Vec::new();
+        for entry in std::fs::read_dir(&basedir).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not read directory {basedir}: {e}"),
+            )
+        })? {
+            let entry = entry.map_err(|e| {
+                NgError::new(NgErrorType::SystemError, format!("Error reading directory: {e}"))
+            })?;
+            let fname = entry.file_name().to_string_lossy().into_owned();
+            if fastq_directory_exts().iter().any(|ext| fname.ends_with(ext)) {
+                fqfiles.push(
+                    Path::new(&basedir)
+                        .join(&fname)
+                        .to_string_lossy()
+                        .into_owned(),
+                );
+            }
+        }
+        fqfiles.sort();
+
+        let (singletons, paired) = match_up(&fqfiles)?;
+        let mut members: Vec<NGLessObject> = Vec::new();
+        for f in &singletons {
+            members.push(self.execute_fastq(&NGLessObject::String(f.clone()))?);
+        }
+        for p in &paired {
+            let mut pargs = vec![("second".to_string(), NGLessObject::String(p.1.clone()))];
+            if let Some(singles) = &p.2 {
+                pargs.push(("singles".to_string(), NGLessObject::String(singles.clone())));
+            }
+            members.push(self.execute_paired(&NGLessObject::String(p.0.clone()), &pargs)?);
+        }
+        self.execute_group(
+            &NGLessObject::List(members),
+            &[("name".to_string(), NGLessObject::String(basedir))],
+        )
+    }
+
+    /// `load_sample_list(yaml)`: parse a YAML sample manifest into a list of named read sets
+    /// (mirrors `executeLoadSampleList`/`normalize` in BuiltinModules/Samples.hs). All files are
+    /// referenced with Sanger encoding, as in the Haskell code.
+    fn execute_load_sample_list(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
+        let fname = as_string(expr, "load_sample_list")?;
+        let text = std::fs::read_to_string(&fname).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not read sample information file {fname}: {e}"),
+            )
+        })?;
+        let parsed: SampleFile = serde_yaml::from_str(&text).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not parse sample information file {fname}. Error was `{e}`"),
+            )
+        })?;
+        let mut out = Vec::new();
+        for (name, entries) in parsed.samples {
+            let mut pairs = Vec::new();
+            let mut singletons = Vec::new();
+            let resolve = |p: &str| -> FastQFilePath {
+                let path = match &parsed.basedir {
+                    Some(base) if !Path::new(p).is_absolute() => {
+                        Path::new(base).join(p).to_string_lossy().into_owned()
+                    }
+                    _ => p.to_string(),
+                };
+                FastQFilePath {
+                    encoding: FastQEncoding::Sanger,
+                    path: PathBuf::from(path),
+                }
+            };
+            let invalid = || {
+                NgError::new(
+                    NgErrorType::DataError,
+                    format!("Invalid sample '{name}'"),
+                )
+            };
+            for entry in entries {
+                if let Some(v) = entry.get("paired") {
+                    let seq = v.as_sequence().ok_or_else(invalid)?;
+                    let files: Vec<&str> = seq.iter().filter_map(|e| e.as_str()).collect();
+                    if files.len() != 2 {
+                        return Err(NgError::new(
+                            NgErrorType::DataError,
+                            format!("Invalid paired sample '{name}'"),
+                        ));
+                    }
+                    pairs.push((resolve(files[0]), resolve(files[1])));
+                } else if let Some(v) = entry.get("single") {
+                    // A bare string or a one-element list (mirrors the aeson parser).
+                    if let Some(s) = v.as_str() {
+                        singletons.push(resolve(s));
+                    } else if let Some(seq) = v.as_sequence() {
+                        let files: Vec<&str> = seq.iter().filter_map(|e| e.as_str()).collect();
+                        if files.len() != 1 {
+                            return Err(invalid());
+                        }
+                        singletons.push(resolve(files[0]));
+                    } else {
+                        return Err(invalid());
+                    }
+                } else {
+                    return Err(invalid());
+                }
+            }
+            out.push(NGLessObject::ReadSet {
+                name,
+                readset: ReadSet { pairs, singletons },
+            });
+        }
+        Ok(NGLessObject::List(out))
     }
 
     /// `preprocess(rs) using |read|: ...`: stream the read set through the block (mirrors
@@ -1876,8 +2237,9 @@ fn execute_write(
     expr: &NGLessObject,
     args: &[(String, NGLessObject)],
     script_text: &str,
+    subsample: bool,
 ) -> NgResult<NGLessObject> {
-    let ofile = match lookup_arg(args, "ofile") {
+    let mut ofile = match lookup_arg(args, "ofile") {
         Some(NGLessObject::String(s)) => s.clone(),
         _ => {
             return Err(NgError::script(
@@ -1885,6 +2247,11 @@ fn execute_write(
             ))
         }
     };
+    // Under `--subsample`, the output name gains a `.subsampled` marker that `format_fq_oname`
+    // moves before the extension (mirrors the `subpostfix` in `parseWriteOptions`).
+    if subsample {
+        ofile.push_str(".subsampled");
+    }
     match expr {
         NGLessObject::ReadSet { readset, .. } => {
             if readset.pairs.is_empty() {
@@ -2230,6 +2597,7 @@ fn execute_method(
                 samlines.clone(),
             )))
         }
+        ("name", NGLessObject::ReadSet { name, .. }) => Ok(NGLessObject::String(name.clone())),
         ("to_string", NGLessObject::Double(d)) => Ok(NGLessObject::String(show_double(*d))),
         ("to_string", NGLessObject::Integer(i)) => Ok(NGLessObject::String(i.to_string())),
         ("avg_quality", NGLessObject::Read(r)) => Ok(NGLessObject::Double(r.avg_quality())),
@@ -2552,9 +2920,64 @@ mod tests {
     }
     use crate::parser::parse_ngless;
 
+    fn s(v: &[&str]) -> Vec<String> {
+        v.iter().map(|x| x.to_string()).collect()
+    }
+
+    #[test]
+    fn match_up_pairs_with_singles() {
+        // A paired sample with a singles file plus an unrelated single-end file.
+        let files = s(&["a.pair.1.fq", "a.pair.2.fq", "a.single.fq", "b.fq"]);
+        let (singletons, paired) = match_up(&files).unwrap();
+        assert_eq!(singletons, s(&["b.fq"]));
+        assert_eq!(
+            paired,
+            vec![(
+                "a.pair.1.fq".to_string(),
+                "a.pair.2.fq".to_string(),
+                Some("a.single.fq".to_string())
+            )]
+        );
+    }
+
+    #[test]
+    fn match_up_underscore_suffix_no_singles() {
+        // `_1`/`_2` markers, gzip-compressed, with no matching singles file.
+        let files = s(&["x_1.fq.gz", "x_2.fq.gz"]);
+        let (singletons, paired) = match_up(&files).unwrap();
+        assert!(singletons.is_empty());
+        assert_eq!(
+            paired,
+            vec![("x_1.fq.gz".to_string(), "x_2.fq.gz".to_string(), None)]
+        );
+    }
+
+    #[test]
+    fn match_up_dedups_mate2() {
+        // Seeing pair.2 before/after pair.1 must not produce a duplicate record.
+        let files = s(&["a.pair.2.fq", "a.pair.1.fq"]);
+        let (_, paired) = match_up(&files).unwrap();
+        assert_eq!(paired.len(), 1);
+    }
+
+    #[test]
+    fn subsample_keeps_one_in_ten_records() {
+        // 20 four-line records => 80 lines. drop90 keeps the first 4 of every 40 lines,
+        // i.e. records 0 and 10 => 8 lines.
+        let mut text = String::new();
+        for i in 0..20 {
+            text.push_str(&format!("@r{i}\nACGT\n+\nIIII\n"));
+        }
+        let out = subsample_text(&text);
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), 8);
+        assert_eq!(lines[0], "@r0");
+        assert_eq!(lines[4], "@r10");
+    }
+
     fn run(text: &str) -> NgResult<()> {
         let script = parse_ngless("test", true, text).expect("parse failed");
-        interpret(&script.body, &std::env::temp_dir(), text, &[], &[])
+        interpret(&script.body, &std::env::temp_dir(), text, &[], &[], false)
     }
 
     #[test]

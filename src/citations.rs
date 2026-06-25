@@ -25,6 +25,10 @@ fn module_citations(name: &str) -> &'static [&'static str] {
     match name {
         "samtools" => &["'The Sequence Alignment/Map format and SAMtools' by Heng Li, Bob Handsaker, Alec Wysoker, Tim Fennell, Jue Ruan, Nils Homer, Gabor Marth, Goncalo Abecasis, Richard Durbin, and 1000 Genome Project Data Processing Subgroup in Bioinformatics (2009) 25 (16): 2078-2079 (2009) DOI:10.1093/bioinformatics/btp352"],
         "minimap2" => &["Li, H. (2018). Minimap2: pairwise alignment for nucleotide sequences. Bioinformatics, 34:3094-3100. doi:10.1093/bioinformatics/bty191"],
+        "mocat" => &[
+            "MOCAT2: a metagenomic assembly, annotation and profiling framework.\nKultima JR, Coelho LP, Forslund K, Huerta-Cepas J, Li S, Driessen M, et al. (2016)\nBioinformatics (2016) doi:10.1093/bioinformatics/btw183\n\n",
+            "MOCAT: A Metagenomics Assembly and Gene Prediction Toolkit.\nKultima JR, Sunagawa S, Li J, Chen W, Chen H, Mende DR, et al. (2012)\nPLoS ONE 7(10): e47656. doi:10.1371/journal.pone.0047656\n",
+        ],
         _ => &[],
     }
 }

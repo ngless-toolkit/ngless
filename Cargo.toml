@@ -14,6 +14,9 @@ bzip2 = "0.6.1"
 # Transparent gzip read/write for FASTQ (`.fq.gz`). bzip2/zstd support arrives later.
 flate2 = "1"
 zstd = "0.13.3"
+# YAML parsing for sample manifests (`load_sample_list`) and, later, external modules.
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
 
 [workspace]
 # The root package is the workspace root. As the rewrite grows, factor subsystems into
