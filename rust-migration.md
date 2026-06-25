@@ -9,8 +9,11 @@
 > Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`). See
 > the [Functional test status](#functional-test-status) table below for the per-test breakdown.
 > The 4 remaining failures are all external-tool version drift (assemble-gp/prodigal,
-> map-minimap2/new mapper, samfile-select-view/samtools, map_search_path_multiple/bwa 0.7.19
-> `@HD`-line ordering), not core-feature gaps.
+> map-minimap2/minimap2 2.31-vs-2.28 `@PG` line, samfile-select-view/samtools,
+> map_search_path_multiple/bwa 0.7.19 `@HD`-line ordering), not core-feature gaps. The minimap2
+> mapper itself is now implemented (`src/minimap2.rs`); its alignment records and `@SQ`/`@HD`
+> headers match `expected.sam` byte-for-byte — only the `@PG` provenance line (minimap2 version +
+> thread count) differs in this pixi env.
 >
 > - **M1 (scaffold):** CLI info flags + `--check-install`, byte-matching the Haskell CLI.
 > - **M2 (front end):** tokenizer, parser, AST, type checker, pure validation — all with
@@ -168,9 +171,11 @@
 >   (`expand_path`/`expand_path_candidates`, mirroring `expandPath'`, incl. `name=/path` entries).
 >   Passing (verified against pixi-provided bwa 0.7.19/samtools): `tests/map3` (single + split),
 >   `tests/map_search_path`, `tests/map_search_path_multiple`, `tests/map_sort_stream`
->   (→ `samtools_sort by={name}`) and `tests/map-windows_line_terminators` (single + split). Still
->   pending: packaged `reference=` databases (need the reference-download infrastructure) and the
->   minimap2/soap mappers (`map(..., mapper='minimap2')` errors clearly for now); index creation is
+>   (→ `samtools_sort by={name}`) and `tests/map-windows_line_terminators` (single + split). The
+>   minimap2 mapper is implemented too (`src/minimap2.rs`, `map(..., mapper='minimap2')`, activated
+>   by `import "minimap2"`): it shells out to `minimap2 -a`, then sorts the SAM (header lines kept,
+>   alignment lines bytewise-sorted) exactly like `sortSam`. Still pending: packaged `reference=`
+>   databases (need the reference-download infrastructure) and the `soap` mapper; index creation is
 >   not lock-guarded (safe for single-process runs).
 
 > - **M7a (modules + stdlib — sample/directory loading):** the lowest-risk slice of M7, built on
@@ -461,7 +466,7 @@ driven locally. **Tally: 92 ✅ · 4 ❌ (96 total).**
 | load_fastq_directory | ✅ | M7a — `load_fastq_directory` + `group` |
 | load_sample_list | ✅ | M7a — `load_sample_list` (YAML manifest) |
 | map3 | ✅ | M7 (bwa) |
-| map-minimap2 | ❌ | M7/Future — minimap2 mapper |
+| map-minimap2 | ❌ | minimap2 mapper implemented; only `@PG` differs (minimap2 2.31-vs-2.28 drift) |
 | map_search_path | ✅ | M7 |
 | map_search_path_multiple | ❌ | bwa drift — search-path logic correct (alignments + `@SQ` match); only the `@HD` line position differs because bwa 0.7.19 emits `@HD` first while the fixture (older bwa) has it after `@SQ`. Haskell + bwa 0.7.19 would fail identically. |
 | map_sort_stream | ✅ | M7 |

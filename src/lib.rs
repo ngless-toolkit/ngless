@@ -22,6 +22,7 @@ pub mod fastq;
 pub mod gff;
 pub mod interpret;
 pub mod mapper;
+pub mod minimap2;
 pub mod modules;
 pub mod parser;
 pub mod sam;

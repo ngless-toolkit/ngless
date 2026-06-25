@@ -414,6 +414,9 @@ mod builders {
             // `run_for_all_samples` (and the relaxed `collect` signature) are only available in
             // version 1.1+.
             ("parallel", v) => Some(parallel_functions(v == "1.1")),
+            // The `minimap2` module (StandardModules/Minimap2.hs) exposes no functions; importing
+            // it only activates the minimap2 mapper (see `active_mappers` in cli.rs).
+            ("minimap2", _) => Some(vec![]),
             _ => None,
         }
     }

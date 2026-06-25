@@ -350,6 +350,7 @@ pub fn interpret(
     subsample: bool,
     external_modules: Vec<crate::external_modules::ExternalModule>,
     constants: Vec<(String, NGLessObject)>,
+    active_mappers: Vec<String>,
 ) -> NgResult<()> {
     let mut env = HashMap::new();
     for (name, value) in constants {
@@ -366,6 +367,7 @@ pub fn interpret(
         argv: argv.to_vec(),
         subsample,
         external_modules,
+        active_mappers,
     };
     for (lno, e) in body {
         interp.cur_lno.set(*lno);
@@ -422,6 +424,52 @@ struct Interpreter {
     subsample: bool,
     /// Loaded external YAML modules, used to dispatch their command functions.
     external_modules: Vec<crate::external_modules::ExternalModule>,
+    /// Mappers that may be requested by `map(mapper=...)` (mirrors `ngleMappersActive`). Always
+    /// includes `bwa`; `minimap2` is added when the `minimap2` module is imported.
+    active_mappers: Vec<String>,
+}
+
+/// Which external mapper a `map()` call uses (mirrors the `Mapper` dispatch in `Map.hs`). Only
+/// bwa and minimap2 are implemented; `soap` is not.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MapperKind {
+    Bwa,
+    Minimap2,
+}
+
+impl MapperKind {
+    /// Whether a complete index already exists for `fafile` (dispatches `hasValidIndex`).
+    fn has_valid_index(self, fafile: &str) -> NgResult<bool> {
+        match self {
+            MapperKind::Bwa => crate::mapper::has_valid_index(fafile),
+            MapperKind::Minimap2 => crate::minimap2::has_valid_index(fafile),
+        }
+    }
+
+    /// Build the index for `fafile` (dispatches `createIndex`).
+    fn create_index(self, fafile: &str) -> NgResult<()> {
+        match self {
+            MapperKind::Bwa => crate::mapper::create_index(fafile),
+            MapperKind::Minimap2 => crate::minimap2::create_index(fafile),
+        }
+    }
+
+    /// Map `interleaved` reads against `ref_index`, writing SAM to `out_sam` (dispatches
+    /// `callMapper`).
+    fn call_mapper(
+        self,
+        ref_index: &str,
+        interleaved: &[u8],
+        extra_args: &[String],
+        out_sam: &Path,
+    ) -> NgResult<()> {
+        match self {
+            MapperKind::Bwa => crate::mapper::call_mapper(ref_index, interleaved, extra_args, out_sam),
+            MapperKind::Minimap2 => {
+                crate::minimap2::call_mapper(ref_index, interleaved, extra_args, out_sam)
+            }
+        }
+    }
 }
 
 /// The outcome of running a (block) statement, mirroring `BlockStatus`.
@@ -904,9 +952,9 @@ impl Interpreter {
     }
 
     /// `map(reads, fafile=/reference=, mode_all=, mapper=, block_size_megabases=, __extra_args=)`:
-    /// map a read set against a reference with bwa (mirrors `executeMap`). This build supports the
-    /// `fafile=` form with the `bwa` mapper; packaged `reference=` databases and the minimap2/soap
-    /// mappers are not implemented yet.
+    /// map a read set against a reference (mirrors `executeMap`). This build supports the `bwa`
+    /// and `minimap2` mappers; the `soap` mapper is not implemented. Packaged `reference=`
+    /// databases must already be installed locally (no download).
     fn execute_map(
         &self,
         expr: &NGLessObject,
@@ -930,12 +978,24 @@ impl Interpreter {
             }
         };
 
+        // getMapper: the requested mapper must be active (bwa always is; minimap2 requires the
+        // `minimap2` import). Resolve it to a `MapperKind` for dispatch.
         let mapper = lookup_opt_string(args, "mapper").unwrap_or_else(|| "bwa".to_string());
-        if mapper != "bwa" {
+        if !self.active_mappers.iter().any(|m| m == &mapper) {
             return Err(NgError::script(format!(
-                "map(): mapper '{mapper}' is not supported in this build yet (only 'bwa' is)."
+                "Requested mapper '{mapper}' is not active."
             )));
         }
+        let mapper = match mapper.as_str() {
+            "bwa" => MapperKind::Bwa,
+            "minimap2" => MapperKind::Minimap2,
+            other => {
+                return Err(NgError::script(format!(
+                    "map(): mapper '{other}' is not supported in this build yet (only 'bwa' and \
+                     'minimap2' are)."
+                )))
+            }
+        };
 
         // lookupReference: exactly one of `reference`/`fafile` (mirrors `lookupReference`).
         let reference = lookup_opt_string(args, "reference");
@@ -962,7 +1022,7 @@ impl Interpreter {
         }
         let block_size = lookup_int(args, "block_size_megabases", 0)?;
 
-        self.perform_map(&fafile, block_size, &name, &rs, &bwa_args)
+        self.perform_map(mapper, &fafile, block_size, &name, &rs, &bwa_args)
     }
 
     /// Resolve a packaged `reference=` database name to its FASTA file (mirrors
@@ -1214,19 +1274,23 @@ impl Interpreter {
     /// indexed and mapped, and the partial SAMs are merged (best-only).
     fn perform_map(
         &self,
+        mapper: MapperKind,
         fafile: &str,
         block_size: i64,
         name: &str,
         rs: &ReadSet,
         extra_args: &[String],
     ) -> NgResult<NGLessObject> {
-        let refs = self.ensure_index_exists(block_size, fafile)?;
+        let refs = self.ensure_index_exists(mapper, block_size, fafile)?;
         let (path, reference) = match refs.as_slice() {
-            [single] => (self.map_to_reference(single, rs, extra_args)?, single.clone()),
+            [single] => (
+                self.map_to_reference(mapper, single, rs, extra_args)?,
+                single.clone(),
+            ),
             blocks => {
                 let mut partials = Vec::with_capacity(blocks.len());
                 for b in blocks {
-                    partials.push(self.map_to_reference(b, rs, extra_args)?);
+                    partials.push(self.map_to_reference(mapper, b, rs, extra_args)?);
                 }
                 (self.merge_sam_files(&partials)?, fafile.to_string())
             }
@@ -1267,17 +1331,22 @@ impl Interpreter {
     /// path(s) to map against (mirrors `ensureIndexExists`). Index creation is *not* lock-guarded
     /// here (unlike the Haskell version), which is safe for the single-process runs this build
     /// targets.
-    fn ensure_index_exists(&self, block_size: i64, fafile: &str) -> NgResult<Vec<String>> {
+    fn ensure_index_exists(
+        &self,
+        mapper: MapperKind,
+        block_size: i64,
+        fafile: &str,
+    ) -> NgResult<Vec<String>> {
         if block_size <= 0 {
-            if !crate::mapper::has_valid_index(fafile)? {
-                crate::mapper::create_index(fafile)?;
+            if !mapper.has_valid_index(fafile)? {
+                mapper.create_index(fafile)?;
             }
             Ok(vec![fafile.to_string()])
         } else {
             let blocks = self.ensure_splits_exist(block_size, fafile)?;
             for b in &blocks {
-                if !crate::mapper::has_valid_index(b)? {
-                    crate::mapper::create_index(b)?;
+                if !mapper.has_valid_index(b)? {
+                    mapper.create_index(b)?;
                 }
             }
             Ok(blocks)
@@ -1285,16 +1354,17 @@ impl Interpreter {
     }
 
     /// Map `rs` against one indexed reference, returning the SAM temp file (mirrors
-    /// `mapToReference`). The reads are interleaved and streamed to bwa on stdin.
+    /// `mapToReference`). The reads are interleaved and streamed to the mapper on stdin.
     fn map_to_reference(
         &self,
+        mapper: MapperKind,
         ref_index: &str,
         rs: &ReadSet,
         extra_args: &[String],
     ) -> NgResult<PathBuf> {
         let interleaved = interleave_fastq(rs)?;
         let out = self.new_temp_path("mapped_", "sam");
-        crate::mapper::call_mapper(ref_index, &interleaved, extra_args, &out)?;
+        mapper.call_mapper(ref_index, &interleaved, extra_args, &out)?;
         Ok(out)
     }
 
@@ -3999,6 +4069,7 @@ mod tests {
             false,
             Vec::new(),
             Vec::new(),
+            vec!["bwa".to_string()],
         )
     }
 

@@ -252,6 +252,18 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // ARGV = [script_path, ...extra_args] (mirrors `nConfArgv` in Configuration.hs).
     let mut argv = vec![fname.clone()];
     argv.extend(opts.extra_args.iter().cloned());
+
+    // Active mappers (mirrors `ngleMappersActive`): bwa is always available; importing the
+    // `minimap2`/`soap` modules activates those mappers.
+    let mut active_mappers = vec!["bwa".to_string()];
+    for m in &header.modules {
+        match m.name() {
+            "minimap2" => active_mappers.push("minimap2".to_string()),
+            "soap" => active_mappers.push("soap".to_string()),
+            _ => {}
+        }
+    }
+
     crate::interpret::interpret(
         &typed.body,
         &temp_dir,
@@ -261,6 +273,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         opts.subsample,
         external_modules,
         constant_values,
+        active_mappers,
     )?;
     Ok(0)
 }
