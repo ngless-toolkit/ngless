@@ -28,6 +28,9 @@ pub enum NGLessObject {
         name: String,
         readset: ReadSet,
     },
+    /// A FASTA sequence set backed by a file on disk (mirrors `NGOSequenceSet`), e.g. the contigs
+    /// produced by `assemble`. `write` copies the file to the output.
+    SequenceSet(String),
     /// A counts/statistics table backed by a TSV file on disk (mirrors `NGOCounts (File ...)`),
     /// e.g. the result of `qcstats`. `write` copies the file to the output.
     Counts(std::path::PathBuf),
@@ -55,6 +58,7 @@ impl NGLessObject {
             NGLessObject::List(_) => "list",
             NGLessObject::Read(_) => "read",
             NGLessObject::ReadSet { .. } => "readset",
+            NGLessObject::SequenceSet(_) => "sequenceset",
             NGLessObject::Counts(_) => "counts",
             NGLessObject::MappedReadSet { .. } => "mappedreadset",
             NGLessObject::MappedRead(_) => "mappedread",

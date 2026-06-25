@@ -617,6 +617,8 @@ impl Interpreter {
             }
             "collect" => self.execute_collect(&expr_v, &argvs),
             "__paste" => execute_paste(&expr_v, &argvs),
+            "assemble" => self.execute_assemble(&expr_v, &argvs),
+            "orf_find" => self.execute_orf_find(&expr_v, &argvs),
             other => {
                 if self.external_modules.iter().any(|m| m.find_command(other).is_some()) {
                     self.execute_external_command(other, &expr_v, &argvs)
@@ -1688,6 +1690,122 @@ impl Interpreter {
             crate::compression::write_bytes(&ofile, merged.as_bytes())?;
         }
         Ok(NGLessObject::Void)
+    }
+
+    /// `assemble(reads)` (mirrors `executeAssemble`): run megahit over the read set and return the
+    /// resulting contigs FASTA as a sequence set. Mates and singletons are concatenated (and
+    /// recompressed to gzip, which megahit accepts) into the `-1`/`-2`/`-r` inputs.
+    fn execute_assemble(
+        &mut self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let rs = match expr {
+            NGLessObject::ReadSet { readset, .. } => readset,
+            other => {
+                return Err(NgError::script(format!(
+                    "megahit:assemble first argument should have been readset, got '{other:?}'"
+                )))
+            }
+        };
+        // Concatenate (and gzip-recompress) a group of FASTQ files into a single temp input.
+        let concat = |files: Vec<&FastQFilePath>| -> NgResult<Option<String>> {
+            if files.is_empty() {
+                return Ok(None);
+            }
+            let out = self.new_temp_path("ngless-megahit-input_", "fq.gz");
+            let o = out.to_string_lossy().into_owned();
+            write_fq_files(&files, &o)?;
+            Ok(Some(o))
+        };
+        let mut cmd_args: Vec<String> = Vec::new();
+        if !rs.pairs.is_empty() {
+            let f1 = concat(rs.pairs.iter().map(|(a, _)| a).collect())?.unwrap();
+            let f2 = concat(rs.pairs.iter().map(|(_, b)| b).collect())?.unwrap();
+            cmd_args.extend(["-1".to_string(), f1, "-2".to_string(), f2]);
+        }
+        if let Some(f) = concat(rs.singletons.iter().collect())? {
+            cmd_args.extend(["-r".to_string(), f]);
+        }
+        let extra = lookup_string_list(args, "__extra_megahit_args")?.unwrap_or_default();
+
+        // megahit creates its own output directory but not the parent, so create the enclosing
+        // assembly directory first (it must not already contain `megahit-output`).
+        let odir = self.new_temp_path("ngless-megahit-assembly_", "d");
+        let odir = odir.to_string_lossy().into_owned();
+        let mhtmp = self.new_temp_path("ngless-megahit-tmpdir_", "d");
+        let mhtmp = mhtmp.to_string_lossy().into_owned();
+        for d in [&odir, &mhtmp] {
+            std::fs::create_dir_all(d).map_err(|e| {
+                NgError::new(NgErrorType::SystemError, format!("Could not create '{d}': {e}"))
+            })?;
+        }
+        let megahit = std::env::var("NGLESS_MEGAHIT_BIN").unwrap_or_else(|_| "megahit".to_string());
+        // ngless defaults to a single thread (`--jobs 1`), and megahit's result is thread-count
+        // dependent, so the contigs are only reproducible with the same thread count.
+        cmd_args.extend([
+            "-o".to_string(),
+            format!("{odir}/megahit-output"),
+            "--num-cpu-threads".to_string(),
+            "1".to_string(),
+            "--tmp-dir".to_string(),
+            mhtmp,
+        ]);
+        cmd_args.extend(extra);
+        run_subprocess(&megahit, &cmd_args, "megahit")?;
+        Ok(NGLessObject::SequenceSet(format!(
+            "{odir}/megahit-output/final.contigs.fa"
+        )))
+    }
+
+    /// `orf_find(seqset, is_metagenome=, prots_out=, ...)` (mirrors `executeORFFind`): run prodigal
+    /// gene prediction and return the predicted-genes (nucleotide) FASTA filename.
+    fn execute_orf_find(
+        &mut self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let fp = match expr {
+            NGLessObject::SequenceSet(f) | NGLessObject::Filename(f) | NGLessObject::String(f) => {
+                f.clone()
+            }
+            other => {
+                return Err(NgError::script(format!(
+                    "orf_find first argument should have been sequenceset, got '{other:?}'"
+                )))
+            }
+        };
+        let is_metagenome = lookup_bool(args, "is_metagenome", false)?;
+        let coords_out = string_arg(args, "coords_out");
+        let aa_out = string_arg(args, "prots_out");
+        let include_fragments = lookup_bool(args, "include_fragments", true)?;
+
+        let dnaout = self.new_temp_path("gene_predict_", "fna");
+        let dnaout = dnaout.to_string_lossy().into_owned();
+        let prodigal =
+            std::env::var("NGLESS_PRODIGAL_BIN").unwrap_or_else(|_| "prodigal".to_string());
+        let mut cmd_args: Vec<String> =
+            vec!["-i".to_string(), fp, "-d".to_string(), dnaout.clone()];
+        if is_metagenome {
+            cmd_args.extend(["-p".to_string(), "meta".to_string()]);
+        }
+        match &coords_out {
+            None => cmd_args.extend(["-o".to_string(), "/dev/null".to_string()]),
+            Some(c) => cmd_args.extend([
+                "-o".to_string(),
+                c.clone(),
+                "-f".to_string(),
+                "gff".to_string(),
+            ]),
+        }
+        if let Some(ao) = &aa_out {
+            cmd_args.extend(["-a".to_string(), ao.clone()]);
+        }
+        if !include_fragments {
+            cmd_args.push("-c".to_string());
+        }
+        run_subprocess(&prodigal, &cmd_args, "prodigal")?;
+        Ok(NGLessObject::Filename(dnaout))
     }
 
     /// Set up a hash-named action directory (mirrors `setupHashDirectory`): `<basename>/<prefix><8
@@ -2957,6 +3075,28 @@ fn paste_counts(
     Ok(out)
 }
 
+/// Run an external command, inheriting stderr, and fail with a clear error on a non-zero exit or
+/// a missing binary (mirrors `Utils.Process.runProcess`).
+fn run_subprocess(bin: &str, args: &[String], label: &str) -> NgResult<()> {
+    let status = std::process::Command::new(bin)
+        .args(args)
+        .stdout(std::process::Stdio::null())
+        .status()
+        .map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not run {label} ('{bin}'): {e}"),
+            )
+        })?;
+    if !status.success() {
+        return Err(NgError::new(
+            NgErrorType::SystemError,
+            format!("{label} ('{bin}') failed with exit status {status}"),
+        ));
+    }
+    Ok(())
+}
+
 /// Format one SAM record as a 4-line FASTQ record (mirrors `asFQ1`).
 fn as_fq1(l: &SamLine) -> String {
     format!("@{}\n{}\n+\n{}\n", l.qname, l.seq, l.qual)
@@ -3004,6 +3144,12 @@ fn execute_write(
         }
         NGLessObject::Counts(path) => {
             write_counts(path, &ofile, args, script_text)?;
+            Ok(NGLessObject::String(ofile))
+        }
+        // A sequence set (assemble contigs) or a plain filename (orf_find output) is copied to the
+        // destination, recompressing only if the extension demands it (mirrors `moveOrCopyCompress`).
+        NGLessObject::SequenceSet(path) | NGLessObject::Filename(path) => {
+            copy_fastq(Path::new(path), &ofile)?;
             Ok(NGLessObject::String(ofile))
         }
         other => Err(NgError::script(format!(
@@ -3446,7 +3592,9 @@ fn lookup_string_list(
 /// Look up an optional string/filename keyword argument.
 fn lookup_opt_string(args: &[(String, NGLessObject)], name: &str) -> Option<String> {
     match lookup_arg(args, name) {
-        Some(NGLessObject::String(s)) | Some(NGLessObject::Filename(s)) => Some(s.clone()),
+        Some(NGLessObject::String(s))
+        | Some(NGLessObject::Filename(s))
+        | Some(NGLessObject::SequenceSet(s)) => Some(s.clone()),
         _ => None,
     }
 }

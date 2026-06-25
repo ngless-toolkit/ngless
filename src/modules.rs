@@ -336,6 +336,39 @@ mod builders {
                 vec![],
                 vec![],
             ),
+            // From the always-loaded builtin "assemble" module (BuiltinModules/Assemble.hs):
+            // megahit assembly of a read set into a FASTA sequence set.
+            func(
+                "assemble",
+                Some(ReadSet),
+                vec![],
+                SequenceSet,
+                vec![arg("__extra_megahit_args", false, list(String), vec![])],
+                vec![
+                    NGLVersionIncompatibleChange(
+                        1,
+                        4,
+                        "Megahit version was updated which significantly changes results".to_string(),
+                    ),
+                    ReturnAssigned,
+                ],
+            ),
+            // From the always-loaded builtin "orffind" module (BuiltinModules/ORFFind.hs):
+            // prodigal gene prediction. Takes a sequence set (typed as String), returns the
+            // predicted-genes FASTA filename.
+            func(
+                "orf_find",
+                Some(String),
+                vec![],
+                Filename,
+                vec![
+                    arg("is_metagenome", true, Bool, vec![]),
+                    arg("include_fragments", false, Bool, vec![MinVersion(1, 1)]),
+                    arg("coords_out", false, String, vec![FileWritable]),
+                    arg("prots_out", false, String, vec![FileWritable]),
+                ],
+                vec![ReturnAssigned],
+            ),
             // From the always-loaded builtin "load_directory" module
             // (BuiltinModules/LoadDirectory.hs).
             func(

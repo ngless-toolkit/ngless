@@ -266,6 +266,26 @@
 >   `tests/parallel_folder_lock` (path sanitization), `tests/paste`, `tests/same-hash-collect`,
 >   `tests/same-hash-collect-2`, `tests/write-hash`, `tests/write-hash2`. Still pending in M7:
 >   assemble/orf_find (M7e).
+> - **M7e (modules + stdlib — `assemble` + `orf_find`):** the two external-tool wrappers are
+>   ported. `assemble` (`BuiltinModules/Assemble.hs`) concatenates the read set's mates/singletons
+>   (recompressed to gzip, which megahit accepts) into `-1`/`-2`/`-r` inputs and runs `megahit`
+>   (`NGLESS_MEGAHIT_BIN` or PATH) into a fresh output directory, returning the `final.contigs.fa`
+>   as a new `NGLessObject::SequenceSet`. `orf_find` (`BuiltinModules/ORFFind.hs`) runs `prodigal`
+>   (`-i`/`-d`, `-p meta` for `is_metagenome`, `-a` for `prots_out`, `-o /dev/null`/`-f gff` for
+>   `coords_out`, `-c` for `!include_fragments`) and returns the predicted-genes FASTA filename. The
+>   type checker already allowed the `NGLSequenceSet → NGLString` coercion these need; `write` now
+>   copies a `SequenceSet`/`Filename` to its output, and `map(reads, fafile=contigs)` accepts a
+>   sequence set as the FASTA. **megahit assembly is byte-identical** to the Haskell output once the
+>   thread count matches (ngless defaults to `--jobs 1`, and megahit's result is thread-count
+>   dependent, so `--num-cpu-threads 1` reproduces the committed `expected.fna` exactly). The
+>   `assemble-gp` test is **not** byte-reproducible in the pixi environment, but only because of
+>   `orf_find`: ngless bundles (statically embeds) its own `prodigal` binary, which
+>   `findNGLessBin` prefers over PATH, and the committed `expected.orfs.*` were generated with it —
+>   that binary emits the bare `# ;gc_cont=` def-line format and makes a few different gene calls
+>   than the bioconda `prodigal-2.6.3` the pixi env provides (which emits the full
+>   `# ID=...;partial=...;start_type=...;gc_cont=` format). The contigs (`expected.fna`) match
+>   byte-for-byte; the divergence is entirely the external prodigal binary, the same class of
+>   tooling/version drift as the samtools/minimap2 cases below.
 >
 ## Context
 
@@ -411,7 +431,7 @@ driven locally. **Tally: 88 ✅ · 8 ❌ (96 total).**
 | as_reads-bam | ✅ | M5 |
 | as_reads_encoding | ✅ | M5 |
 | as_reads_regression | ✅ | M5 |
-| assemble-gp | ❌ | M7 — `assemble`/`orf_find` |
+| assemble-gp | ❌ | M7e — `assemble`/`orf_find` done; contigs byte-identical, but `orf_find` needs ngless's embedded `prodigal` (PATH `prodigal-2.6.3` makes different ORF calls) |
 | compress_sam | ✅ | M5 |
 | count-basic | ✅ | M6 |
 | countfile-reorder | ✅ | M6 |
