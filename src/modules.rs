@@ -348,7 +348,8 @@ mod builders {
                     NGLVersionIncompatibleChange(
                         1,
                         4,
-                        "Megahit version was updated which significantly changes results".to_string(),
+                        "Megahit version was updated which significantly changes results"
+                            .to_string(),
                     ),
                     ReturnAssigned,
                 ],
@@ -433,7 +434,14 @@ mod builders {
                 vec![],
             ),
             collect_function(include_for_all),
-            func("set_parallel_tag", Some(String), vec![], String, vec![], vec![]),
+            func(
+                "set_parallel_tag",
+                Some(String),
+                vec![],
+                String,
+                vec![],
+                vec![],
+            ),
             // __paste: internal test helper exposing the counts-merging machinery.
             func(
                 "__paste",

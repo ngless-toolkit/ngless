@@ -235,10 +235,7 @@ fn annotate_sam_gff(
     match opts.intersect_mode {
         IntersectMode::Union => {
             for iv in ivs {
-                if iv.start < s_end
-                    && s_start < iv.end
-                    && match_strand(line_strand, iv.strand)
-                {
+                if iv.start < s_end && s_start < iv.end && match_strand(line_strand, iv.strand) {
                     out.push(iv.feature);
                 }
             }
@@ -311,7 +308,8 @@ pub fn perform_count(
     let annotators = load_annotators(opts, sq_header)?;
 
     let mut counts: Vec<Vec<f64>> = annotators.iter().map(|a| vec![0.0; a.ann_size()]).collect();
-    let mut to_distribute: Vec<Vec<Vec<usize>>> = (0..annotators.len()).map(|_| Vec::new()).collect();
+    let mut to_distribute: Vec<Vec<Vec<usize>>> =
+        (0..annotators.len()).map(|_| Vec::new()).collect();
 
     for g in groups {
         for (ai, ann) in annotators.iter().enumerate() {
@@ -535,11 +533,8 @@ fn load_functional_map(path: &str, features: &[String]) -> NgResult<Vec<Annotato
         .ok_or_else(|| data_error(format!("Empty map file: {path}")))?;
     // Drop the first column (gene name); the rest are feature columns.
     let columns: Vec<&str> = header.split('\t').skip(1).collect();
-    let col_index: HashMap<&str, usize> = columns
-        .iter()
-        .enumerate()
-        .map(|(i, c)| (*c, i))
-        .collect();
+    let col_index: HashMap<&str, usize> =
+        columns.iter().enumerate().map(|(i, c)| (*c, i)).collect();
 
     // Requested (column-index, feature-name) pairs, ordered by column index.
     let mut requested: Vec<(usize, String)> = Vec::new();
@@ -719,10 +714,12 @@ fn build_gff_annotator(
                 }
             };
             sizes_by_id[id] += feature_size;
-            raw_intervals
-                .entry(line.seq_id.clone())
-                .or_default()
-                .push((line.start, line.end + 1, line.strand, id));
+            raw_intervals.entry(line.seq_id.clone()).or_default().push((
+                line.start,
+                line.end + 1,
+                line.strand,
+                id,
+            ));
         }
     }
 

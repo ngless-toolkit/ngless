@@ -63,15 +63,21 @@ pub fn read_gff_line(line: &str) -> NgResult<GffLine> {
     if cols.len() != 9 {
         return Err(data_error(format!("unexpected line in GFF: {line:?}")));
     }
-    let start = cols[3]
-        .parse::<i64>()
-        .map_err(|_| data_error(format!("Could not parse GFF line (reading start): {line:?}")))?;
+    let start = cols[3].parse::<i64>().map_err(|_| {
+        data_error(format!(
+            "Could not parse GFF line (reading start): {line:?}"
+        ))
+    })?;
     let end = cols[4]
         .parse::<i64>()
         .map_err(|_| data_error(format!("Could not parse GFF line (reading end): {line:?}")))?;
     let strand = match cols[6].chars().next() {
         Some(c) => parse_strand(c)?,
-        None => return Err(data_error("Could not parse GFF line (empty strand field)".into())),
+        None => {
+            return Err(data_error(
+                "Could not parse GFF line (empty strand field)".into(),
+            ))
+        }
     };
     Ok(GffLine {
         seq_id: cols[0].to_string(),

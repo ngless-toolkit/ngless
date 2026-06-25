@@ -205,7 +205,10 @@ mod tests {
 
     #[test]
     fn split_extension_inserts_before_ext() {
-        assert_eq!(split_extension("ref.fna", "-bwa-0.7.19"), "ref-bwa-0.7.19.fna");
+        assert_eq!(
+            split_extension("ref.fna", "-bwa-0.7.19"),
+            "ref-bwa-0.7.19.fna"
+        );
         assert_eq!(
             split_extension("d/ref.splits_1m.0.fna", "-bwa-0.7.19"),
             "d/ref.splits_1m.0-bwa-0.7.19.fna"

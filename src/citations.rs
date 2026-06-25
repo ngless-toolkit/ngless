@@ -100,7 +100,9 @@ fn format_citation(citation: &str) -> String {
 pub fn print_header(citations: &[String]) {
     print!("NGLess v{VERSION_STR} (C) NGLess authors\nhttps://ngless.embl.de/\n\n");
     if !citations.is_empty() {
-        print!("When publishing results from this script, please cite the following references:\n\n");
+        print!(
+            "When publishing results from this script, please cite the following references:\n\n"
+        );
         for c in citations {
             // `putStrLn (formatCitation c)` — formatCitation has a trailing newline (T.unlines),
             // then putStrLn adds another, giving a blank line between citations.

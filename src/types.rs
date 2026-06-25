@@ -619,11 +619,12 @@ impl TypeChecker {
         use Expression::*;
         Ok(match e {
             Lookup(None, v @ Variable(n)) => {
-                let t = self
-                    .tmap
-                    .get(n)
-                    .cloned()
-                    .or_else(|| self.constants.iter().find(|(c, _)| c == n).map(|(_, t)| t.clone()));
+                let t = self.tmap.get(n).cloned().or_else(|| {
+                    self.constants
+                        .iter()
+                        .find(|(c, _)| c == n)
+                        .map(|(_, t)| t.clone())
+                });
                 match t {
                     Some(t) => Lookup(Some(t), v.clone()),
                     None => {

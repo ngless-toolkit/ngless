@@ -178,7 +178,10 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     let mut constant_values = Vec::new();
     for m in &header.modules {
         constants.extend(crate::modules::module_constants(m.name(), m.version()));
-        constant_values.extend(crate::interpret::module_constant_values(m.name(), m.version()));
+        constant_values.extend(crate::interpret::module_constant_values(
+            m.name(),
+            m.version(),
+        ));
         match crate::modules::module_functions(m.name(), m.version()) {
             Some(fs) => extra_funcs.extend(fs),
             None => {

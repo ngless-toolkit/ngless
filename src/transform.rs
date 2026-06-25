@@ -84,7 +84,10 @@ fn add_check(
     lno: usize,
 ) -> Vec<(usize, Expression)> {
     if vars.len() == 1 {
-        let mut out = vec![(lno, check_file_expression(check_name, vars[0].1.clone(), lno))];
+        let mut out = vec![(
+            lno,
+            check_file_expression(check_name, vars[0].1.clone(), lno),
+        )];
         out.extend(rest);
         out
     } else {
@@ -110,7 +113,10 @@ fn maybe_add_checks(
     for (lno2, e2) in iter.by_ref() {
         if let Expression::Assignment(v2, _) = &e2 {
             if v2 == v {
-                out.push((lno2, check_file_expression(check_name, complete.clone(), lno)));
+                out.push((
+                    lno2,
+                    check_file_expression(check_name, complete.clone(), lno),
+                ));
                 out.push((lno2, e2));
                 out.extend(iter);
                 return out;
@@ -287,13 +293,7 @@ pub fn add_output_hash(
                 // The output argument was lifted by addTemporaries if it was a nested call, so it
                 // is hashed as a (potentially extracted) sub-expression: is_top = false.
                 let h = ctx.hash_of(oarg, &varmap, false);
-                kwargs.insert(
-                    0,
-                    (
-                        Variable("__hash".to_string()),
-                        Expression::ConstStr(h),
-                    ),
-                );
+                kwargs.insert(0, (Variable("__hash".to_string()), Expression::ConstStr(h)));
             }
             _ => {}
         }
@@ -478,7 +478,10 @@ fn add_lock_hash(body: &mut [(usize, Expression)]) {
             if fname == "lock1" || is_run_for_all(fname) {
                 kwargs.insert(
                     0,
-                    (Variable("__hash".to_string()), Expression::ConstStr(h.clone())),
+                    (
+                        Variable("__hash".to_string()),
+                        Expression::ConstStr(h.clone()),
+                    ),
                 );
             }
         }
@@ -527,12 +530,7 @@ impl HashCtx<'_> {
                     variable: b.variable.clone(),
                     body: Box::new(self.rewrite(&b.body, &inner, false)),
                 });
-                let call = Expression::FunctionCall(
-                    fname.clone(),
-                    Box::new(arg2),
-                    kwargs2,
-                    block2,
-                );
+                let call = Expression::FunctionCall(fname.clone(), Box::new(arg2), kwargs2, block2);
                 if is_top {
                     return call;
                 }
@@ -581,7 +579,8 @@ impl HashCtx<'_> {
             Expression::MethodCall(m, self_e, arg, kwargs) => Expression::MethodCall(
                 m.clone(),
                 Box::new(self.rewrite(self_e, varmap, false)),
-                arg.as_ref().map(|x| Box::new(self.rewrite(x, varmap, false))),
+                arg.as_ref()
+                    .map(|x| Box::new(self.rewrite(x, varmap, false))),
                 kwargs
                     .iter()
                     .map(|(k, v)| (k.clone(), self.rewrite(v, varmap, false)))
@@ -664,7 +663,9 @@ fn loaded_modules(version: (i64, i64), imports: &[crate::ast::ModInfo]) -> Vec<(
 /// Reproduce `show :: Expression -> String`.
 pub fn show_expr(e: &Expression) -> String {
     match e {
-        Expression::Lookup(Some(t), Variable(v)) => format!("Lookup '{v}' as {}", show_ngltype(t, 0)),
+        Expression::Lookup(Some(t), Variable(v)) => {
+            format!("Lookup '{v}' as {}", show_ngltype(t, 0))
+        }
         Expression::Lookup(None, Variable(v)) => format!("Lookup '{v}' (type unknown)"),
         Expression::ConstStr(t) => haskell_string(t),
         Expression::ConstInt(n) => n.to_string(),
@@ -678,7 +679,12 @@ pub fn show_expr(e: &Expression) -> String {
         Expression::UnaryOp(UOp::Len, a) => format!("len({})", show_expr(a)),
         Expression::UnaryOp(op, a) => format!("{}({})", show_uop(*op), show_expr(a)),
         Expression::BinaryOp(op, a, b) => {
-            format!("BinaryOp({} -{}- {})", show_expr(a), show_bop(*op), show_expr(b))
+            format!(
+                "BinaryOp({} -{}- {})",
+                show_expr(a),
+                show_bop(*op),
+                show_expr(b)
+            )
         }
         Expression::Condition(c, a, b) => format!(
             "if [{}] then {{{}}} else {{{}}}",
@@ -923,10 +929,7 @@ fn md5(input: &[u8]) -> [u8; 16] {
                 32..=47 => (b ^ c ^ d, (3 * i + 5) % 16),
                 _ => (c ^ (b | !d), (7 * i) % 16),
             };
-            let f = f
-                .wrapping_add(a)
-                .wrapping_add(K[i])
-                .wrapping_add(m[g]);
+            let f = f.wrapping_add(a).wrapping_add(K[i]).wrapping_add(m[g]);
             a = d;
             d = c;
             c = b;

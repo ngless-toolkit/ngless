@@ -104,7 +104,11 @@ fn match_up(fqfiles: &[String]) -> NgResult<(Vec<String>, Vec<(String, String, O
             ));
         }
         let singles = build_single(&m1);
-        let singles = if exists(&singles) { Some(singles) } else { None };
+        let singles = if exists(&singles) {
+            Some(singles)
+        } else {
+            None
+        };
         paired.push((m1, m2, singles));
     }
     // Files not used by any pair (incl. the matched singles) are singletons.
@@ -194,7 +198,10 @@ pub fn module_constant_values(name: &str, _version: &str) -> Vec<(String, NGLess
         "example" => vec![
             ("EXAMPLE_0".to_string(), NGLessObject::Integer(0)),
             ("EXAMPLE_TRUE".to_string(), NGLessObject::Bool(true)),
-            ("EXAMPLE_HELLO".to_string(), NGLessObject::String("Hello".to_string())),
+            (
+                "EXAMPLE_HELLO".to_string(),
+                NGLessObject::String("Hello".to_string()),
+            ),
         ],
         _ => Vec::new(),
     }
@@ -235,7 +242,10 @@ pub fn data_directories() -> Vec<String> {
 /// `example(input)`: the demo standard module function (mirrors `StandardModules.Example`).
 /// Prints diagnostic information (including the Haskell-`show` of its arguments) and returns the
 /// input unchanged.
-fn execute_example(input: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResult<NGLessObject> {
+fn execute_example(
+    input: &NGLessObject,
+    args: &[(String, NGLessObject)],
+) -> NgResult<NGLessObject> {
     println!("Called example function 'example'");
     println!("First argument is {}", haskell_show(input));
     let kwargs: Vec<String> = args
@@ -464,7 +474,9 @@ impl MapperKind {
         out_sam: &Path,
     ) -> NgResult<()> {
         match self {
-            MapperKind::Bwa => crate::mapper::call_mapper(ref_index, interleaved, extra_args, out_sam),
+            MapperKind::Bwa => {
+                crate::mapper::call_mapper(ref_index, interleaved, extra_args, out_sam)
+            }
             MapperKind::Minimap2 => {
                 crate::minimap2::call_mapper(ref_index, interleaved, extra_args, out_sam)
             }
@@ -553,7 +565,11 @@ impl Interpreter {
                 "STDIN" => Ok(NGLessObject::String("/dev/stdin".into())),
                 "STDOUT" => Ok(NGLessObject::String("/dev/stdout".into())),
                 "ARGV" => Ok(NGLessObject::List(
-                    self.argv.iter().cloned().map(NGLessObject::String).collect(),
+                    self.argv
+                        .iter()
+                        .cloned()
+                        .map(NGLessObject::String)
+                        .collect(),
                 )),
                 "__VOID" => Ok(NGLessObject::Void),
                 other => Err(NgError::should_not_occur(format!(
@@ -700,16 +716,18 @@ impl Interpreter {
             "mapstats" => self.execute_mapstats(&expr_v),
             "__merge_samfiles" => self.execute_merge_sams(&expr_v),
             "write" => self.execute_write(&expr_v, &argvs),
-            "lock1" | "run_for_all" | "run_for_all_samples" => {
-                self.execute_lock1(&expr_v, &argvs)
-            }
+            "lock1" | "run_for_all" | "run_for_all_samples" => self.execute_lock1(&expr_v, &argvs),
             "collect" => self.execute_collect(&expr_v, &argvs),
             "__paste" => execute_paste(&expr_v, &argvs),
             "assemble" => self.execute_assemble(&expr_v, &argvs),
             "orf_find" => self.execute_orf_find(&expr_v, &argvs),
             "__check_ofile" => execute_check_ofile(&expr_v, &argvs),
             other => {
-                if self.external_modules.iter().any(|m| m.find_command(other).is_some()) {
+                if self
+                    .external_modules
+                    .iter()
+                    .any(|m| m.find_command(other).is_some())
+                {
                     self.execute_external_command(other, &expr_v, &argvs)
                 } else {
                     execute_function(f, &expr_v, &argvs)
@@ -872,8 +890,7 @@ impl Interpreter {
 
         let (total, aligned, unique) = sam_group_stats(&lines);
 
-        let tsv =
-            format!("\t{name}\ntotal\t{total}\naligned\t{aligned}\nunique\t{unique}\n");
+        let tsv = format!("\t{name}\ntotal\t{total}\naligned\t{aligned}\nunique\t{unique}\n");
         let out = self.new_temp_path("sam_stats_", "stats");
         std::fs::write(&out, tsv).map_err(|e| {
             NgError::new(
@@ -1094,7 +1111,10 @@ impl Interpreter {
         let exe = module_dir.join(&cmd.arg0);
         let output = std::process::Command::new(&exe)
             .args(&cmdline)
-            .envs(crate::external_modules::module_env(&module_dir, &self.temp_dir))
+            .envs(crate::external_modules::module_env(
+                &module_dir,
+                &self.temp_dir,
+            ))
             .output()
             .map_err(|e| {
                 NgError::new(
@@ -1141,7 +1161,9 @@ impl Interpreter {
         use crate::external_modules::ArgKind;
 
         // Fall back to the declared default when no value is supplied (mirrors the `Nothing` arm).
-        let owned_default = value.is_none().then(|| arg.default.as_ref().map(default_to_object));
+        let owned_default = value
+            .is_none()
+            .then(|| arg.default.as_ref().map(default_to_object));
         let value: Option<&NGLessObject> = match value {
             Some(v) => Some(v),
             None => match &owned_default {
@@ -1254,7 +1276,9 @@ impl Interpreter {
             (None, None, Some(f)) => Ok(vec![f]),
             (Some(f1), Some(f2), None) => Ok(vec![f1, f2]),
             (Some(f1), Some(f2), Some(f3)) => Ok(vec![f1, f2, f3]),
-            _ => Err(NgError::script("Malformed input argument to external module")),
+            _ => Err(NgError::script(
+                "Malformed input argument to external module",
+            )),
         }
     }
 
@@ -1457,8 +1481,7 @@ impl Interpreter {
             ));
         }
         for gi in 0..ngroups {
-            let combined: Vec<SamLine> =
-                per_file.iter().flat_map(|g| g[gi].clone()).collect();
+            let combined: Vec<SamLine> = per_file.iter().flat_map(|g| g[gi].clone()).collect();
             for l in merge_sam_group(&combined)? {
                 out.push_str(&encode_sam_line(&l));
                 out.push('\n');
@@ -1712,7 +1735,10 @@ impl Interpreter {
             }
         };
         if entries.is_empty() {
-            return Err(NgError::new(NgErrorType::DataError, "Cannot run on empty list"));
+            return Err(NgError::new(
+                NgErrorType::DataError,
+                "Cannot run on empty list",
+            ));
         }
         let names: Vec<String> = entries
             .iter()
@@ -1757,7 +1783,11 @@ impl Interpreter {
             Some(NGLessObject::List(items)) => {
                 items.iter().map(entry_name).collect::<NgResult<Vec<_>>>()?
             }
-            _ => return Err(NgError::script("collect() called without 'allneeded' argument")),
+            _ => {
+                return Err(NgError::script(
+                    "collect() called without 'allneeded' argument",
+                ))
+            }
         };
         let ofile = string_arg(args, "ofile")
             .ok_or_else(|| NgError::script("collect arguments: ofile is required"))?;
@@ -1769,7 +1799,8 @@ impl Interpreter {
             format!("{tag}-")
         };
         let hashdir = self.setup_hash_directory(&prefix, "ngless-partials", &hash)?;
-        let partial_file = |entry: &str| format!("{hashdir}/partial.{}.tsv.gz", sanitize_path(entry));
+        let partial_file =
+            |entry: &str| format!("{hashdir}/partial.{}.tsv.gz", sanitize_path(entry));
 
         // Write the current sample's counts as a gzipped partial.
         let body = crate::compression::read_bytes(&path.to_string_lossy())?;
@@ -1794,8 +1825,12 @@ impl Interpreter {
                     .collect::<NgResult<Vec<String>>>()?,
                 _ => Vec::new(),
             };
-            let comments =
-                build_comment(comment.as_deref(), &auto_comments, &self.script_text, Some(&hash))?;
+            let comments = build_comment(
+                comment.as_deref(),
+                &auto_comments,
+                &self.script_text,
+                Some(&hash),
+            )?;
             let inputs: Vec<String> = allneeded.iter().map(|e| partial_file(e)).collect();
             let merged = paste_counts(&comments, false, &allneeded, &inputs)?;
             crate::compression::write_bytes(&ofile, merged.as_bytes())?;
@@ -1848,7 +1883,10 @@ impl Interpreter {
         let mhtmp = mhtmp.to_string_lossy().into_owned();
         for d in [&odir, &mhtmp] {
             std::fs::create_dir_all(d).map_err(|e| {
-                NgError::new(NgErrorType::SystemError, format!("Could not create '{d}': {e}"))
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Could not create '{d}': {e}"),
+                )
             })?;
         }
         let megahit = std::env::var("NGLESS_MEGAHIT_BIN").unwrap_or_else(|_| "megahit".to_string());
@@ -1921,12 +1959,7 @@ impl Interpreter {
 
     /// Set up a hash-named action directory (mirrors `setupHashDirectory`): `<basename>/<prefix><8
     /// hash chars>` (plus a `-subsample` suffix under `--subsample`), seeding it with `script.ngl`.
-    fn setup_hash_directory(
-        &self,
-        prefix: &str,
-        basename: &str,
-        hash: &str,
-    ) -> NgResult<String> {
+    fn setup_hash_directory(&self, prefix: &str, basename: &str, hash: &str) -> NgResult<String> {
         let short: String = hash.chars().take(8).collect();
         let suffix = if self.subsample { "-subsample" } else { "" };
         let actiondir = format!("{basename}/{prefix}{short}{suffix}");
@@ -2276,7 +2309,11 @@ impl Interpreter {
     ) -> NgResult<NGLessObject> {
         let name = match lookup_arg(args, "name") {
             Some(NGLessObject::String(s)) => s.clone(),
-            _ => return Err(NgError::script("group: argument `name` (a string) is required")),
+            _ => {
+                return Err(NgError::script(
+                    "group: argument `name` (a string) is required",
+                ))
+            }
         };
         let members = match expr {
             NGLessObject::List(items) => items,
@@ -2304,9 +2341,7 @@ impl Interpreter {
         if pairs.is_empty() && singletons.is_empty() {
             return Err(NgError::new(
                 NgErrorType::DataError,
-                format!(
-                    "Attempted to group sample '{name}' but sample is empty (no read files)."
-                ),
+                format!("Attempted to group sample '{name}' but sample is empty (no read files)."),
             ));
         }
         Ok(NGLessObject::ReadSet {
@@ -2327,9 +2362,7 @@ impl Interpreter {
         if !Path::new(&basedir).is_dir() {
             return Err(NgError::new(
                 NgErrorType::DataError,
-                format!(
-                    "Attempting to load directory '{basedir}', but directory does not exist."
-                ),
+                format!("Attempting to load directory '{basedir}', but directory does not exist."),
             ));
         }
         // Glob `<dir>/*.{fq,fastq}{,.gz,.bz2,.xz}` and sort (mirrors the `exts`/`namesMatching` set).
@@ -2341,10 +2374,16 @@ impl Interpreter {
             )
         })? {
             let entry = entry.map_err(|e| {
-                NgError::new(NgErrorType::SystemError, format!("Error reading directory: {e}"))
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Error reading directory: {e}"),
+                )
             })?;
             let fname = entry.file_name().to_string_lossy().into_owned();
-            if fastq_directory_exts().iter().any(|ext| fname.ends_with(ext)) {
+            if fastq_directory_exts()
+                .iter()
+                .any(|ext| fname.ends_with(ext))
+            {
                 fqfiles.push(
                     Path::new(&basedir)
                         .join(&fname)
@@ -2406,12 +2445,8 @@ impl Interpreter {
                     path: PathBuf::from(path),
                 }
             };
-            let invalid = || {
-                NgError::new(
-                    NgErrorType::DataError,
-                    format!("Invalid sample '{name}'"),
-                )
-            };
+            let invalid =
+                || NgError::new(NgErrorType::DataError, format!("Invalid sample '{name}'"));
             for entry in entries {
                 if let Some(v) = entry.get("paired") {
                     let seq = v.as_sequence().ok_or_else(invalid)?;
@@ -3155,20 +3190,23 @@ fn get_lock(lockdir: &str, sane: &[String]) -> NgResult<usize> {
 }
 
 /// `__paste()` (mirrors `executePaste`): merge a set of counts files into `ofile`.
-fn execute_paste(
-    expr: &NGLessObject,
-    args: &[(String, NGLessObject)],
-) -> NgResult<NGLessObject> {
+fn execute_paste(expr: &NGLessObject, args: &[(String, NGLessObject)]) -> NgResult<NGLessObject> {
     eprintln!("Calling __paste which is an internal function, exposed for testing only");
     let inputs: Vec<String> = match expr {
         NGLessObject::List(items) => items
             .iter()
             .map(|i| match i {
                 NGLessObject::String(s) => Ok(s.clone()),
-                other => Err(NgError::script(format!("__concat argument: expected a string, got {other:?}"))),
+                other => Err(NgError::script(format!(
+                    "__concat argument: expected a string, got {other:?}"
+                ))),
             })
             .collect::<NgResult<Vec<_>>>()?,
-        other => return Err(NgError::script(format!("Bad call to test function __paste: {other:?}"))),
+        other => {
+            return Err(NgError::script(format!(
+                "Bad call to test function __paste: {other:?}"
+            )))
+        }
     };
     let ofile = string_arg(args, "ofile")
         .ok_or_else(|| NgError::script("__paste arguments: ofile is required"))?;
@@ -3177,12 +3215,17 @@ fn execute_paste(
             .iter()
             .map(|i| match i {
                 NGLessObject::String(s) => Ok(s.clone()),
-                other => Err(NgError::script(format!("__paste headers: expected a string, got {other:?}"))),
+                other => Err(NgError::script(format!(
+                    "__paste headers: expected a string, got {other:?}"
+                ))),
             })
             .collect::<NgResult<Vec<_>>>()?,
         _ => return Err(NgError::script("__paste arguments: headers is required")),
     };
-    let matching_rows = matches!(lookup_arg(args, "matching_rows"), Some(NGLessObject::Bool(true)));
+    let matching_rows = matches!(
+        lookup_arg(args, "matching_rows"),
+        Some(NGLessObject::Bool(true))
+    );
     let merged = paste_counts(&[], matching_rows, &headers, &inputs)?;
     crate::compression::write_bytes(&ofile, merged.as_bytes())?;
     Ok(NGLessObject::Void)
@@ -3488,7 +3531,12 @@ fn write_counts(
         Some(NGLessObject::String(s)) => Some(s.clone()),
         _ => None,
     };
-    let comments = build_comment(comment.as_deref(), &auto_comments, script_text, hash.as_deref())?;
+    let comments = build_comment(
+        comment.as_deref(),
+        &auto_comments,
+        script_text,
+        hash.as_deref(),
+    )?;
     // Fast path: an unmodified TSV with no comments is copied (and recompressed) verbatim.
     if format == "tsv" && comments.is_empty() {
         return copy_fastq(path, ofile);
@@ -3661,16 +3709,22 @@ fn execute_method(
         ("some_match", NGLessObject::MappedRead(samlines)) => {
             let target = match _arg {
                 Some(NGLessObject::String(s)) => s.as_str(),
-                _ => return Err(NgError::script("some_match method requires a string argument")),
+                _ => {
+                    return Err(NgError::script(
+                        "some_match method requires a string argument",
+                    ))
+                }
             };
-            Ok(NGLessObject::Bool(samlines.iter().any(|s| s.rname == target)))
+            Ok(NGLessObject::Bool(
+                samlines.iter().any(|s| s.rname == target),
+            ))
         }
         ("pe_filter", NGLessObject::MappedRead(samlines)) => Ok(NGLessObject::MappedRead(
             select::filter_pe(samlines.clone()),
         )),
-        ("unique", NGLessObject::MappedRead(samlines)) => Ok(NGLessObject::MappedRead(
-            select::m_unique(samlines.clone()),
-        )),
+        ("unique", NGLessObject::MappedRead(samlines)) => {
+            Ok(NGLessObject::MappedRead(select::m_unique(samlines.clone())))
+        }
         ("allbest", NGLessObject::MappedRead(samlines)) => {
             let use_newer = lookup_bool(_args, "__version11_or_higher", false)?;
             Ok(NGLessObject::MappedRead(select::m_besthit(
@@ -3861,7 +3915,11 @@ fn parse_count_opts(args: &[(String, NGLessObject)]) -> NgResult<crate::count::C
         "dist1" => MMMethod::Dist1,
         "1overN" => MMMethod::OneOverN,
         "unique_only" => MMMethod::UniqueOnly,
-        other => return Err(NgError::script(format!("Unexpected value for `multiple`: {other}"))),
+        other => {
+            return Err(NgError::script(format!(
+                "Unexpected value for `multiple`: {other}"
+            )))
+        }
     };
 
     let strand_specific = lookup_bool(args, "strand", false)?;
@@ -3870,14 +3928,22 @@ fn parse_count_opts(args: &[(String, NGLessObject)]) -> NgResult<crate::count::C
         "both" => StrandMode::Both,
         "sense" => StrandMode::Sense,
         "antisense" => StrandMode::Antisense,
-        other => return Err(NgError::script(format!("Unexpected value for `sense`: {other}"))),
+        other => {
+            return Err(NgError::script(format!(
+                "Unexpected value for `sense`: {other}"
+            )))
+        }
     };
 
     let intersect_mode = match lookup_symbol(args, "mode", "union")?.as_str() {
         "union" => IntersectMode::Union,
         "intersection_strict" => IntersectMode::Strict,
         "intersection_non_empty" => IntersectMode::NonEmpty,
-        other => return Err(NgError::script(format!("Unexpected value for `mode`: {other}"))),
+        other => {
+            return Err(NgError::script(format!(
+                "Unexpected value for `mode`: {other}"
+            )))
+        }
     };
 
     let norm_size = lookup_bool(args, "norm", false)?;
@@ -4055,7 +4121,11 @@ mod tests {
     // with no pairing markers is a singleton, not a pair.
     #[test]
     fn match_up_lone_files_are_singletons() {
-        for f in ["sample/uncompressed.fq", "sample/sample.fq.gz", "sample/sample.fq.bz2"] {
+        for f in [
+            "sample/uncompressed.fq",
+            "sample/sample.fq.gz",
+            "sample/sample.fq.bz2",
+        ] {
             let (singletons, paired) = match_up(&s(&[f])).unwrap();
             assert_eq!(singletons, s(&[f]));
             assert!(paired.is_empty());

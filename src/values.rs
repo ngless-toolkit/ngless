@@ -317,8 +317,14 @@ mod tests {
         assert_eq!(pa("dir", "file"), String("dir/file".into()));
         assert_eq!(pa("dir/subdir", "file"), String("dir/subdir/file".into()));
         assert_eq!(pa("dir/subdir/", "file"), String("dir/subdir/file".into()));
-        assert_eq!(pa("../dir/subdir/", "file"), String("../dir/subdir/file".into()));
-        assert_eq!(pa("/abs/dir/subdir/", "file"), String("/abs/dir/subdir/file".into()));
+        assert_eq!(
+            pa("../dir/subdir/", "file"),
+            String("../dir/subdir/file".into())
+        );
+        assert_eq!(
+            pa("/abs/dir/subdir/", "file"),
+            String("/abs/dir/subdir/file".into())
+        );
     }
 
     // Mirrors Tests.hs `case_uop_minus_*`.

@@ -347,7 +347,10 @@ impl ExternalModule {
                 .map_err(|e| {
                     NgError::new(
                         NgErrorType::SystemError,
-                        format!("Error loading module {}: could not run {init}: {e}", self.name),
+                        format!(
+                            "Error loading module {}: could not run {init}: {e}",
+                            self.name
+                        ),
                     )
                 })?;
             if !output.status.success() {
@@ -385,7 +388,10 @@ fn arg_information(a: &CommandArg) -> ArgInformation {
 pub fn module_env(module_dir: &Path, temp_dir: &Path) -> Vec<(String, String)> {
     let tmp = temp_dir.to_string_lossy().into_owned();
     let mut env = vec![
-        ("NGLESS_MODULE_DIR".to_string(), module_dir.to_string_lossy().into_owned()),
+        (
+            "NGLESS_MODULE_DIR".to_string(),
+            module_dir.to_string_lossy().into_owned(),
+        ),
         ("NGLESS_NR_CORES".to_string(), "1".to_string()),
         ("TMPDIR".to_string(), tmp.clone()),
         ("TMP".to_string(), tmp.clone()),
@@ -422,7 +428,10 @@ pub fn find_load(name: &str, version: &str, data_dirs: &[String]) -> NgResult<Ex
             let raw: RawModule = serde_yaml::from_str(&text).map_err(|e| {
                 NgError::new(
                     NgErrorType::SystemError,
-                    format!("Could not load module file {}. Error was `{e}`", yaml.display()),
+                    format!(
+                        "Could not load module file {}. Error was `{e}`",
+                        yaml.display()
+                    ),
                 )
             })?;
             let module = ExternalModule::from_raw(raw, dir)?;

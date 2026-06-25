@@ -221,7 +221,10 @@ mod tests {
             split_extension("ref.fna", "-minimap2-2.31"),
             "ref-minimap2-2.31.fna"
         );
-        assert_eq!(split_extension("ref", "-minimap2-2.31"), "ref-minimap2-2.31");
+        assert_eq!(
+            split_extension("ref", "-minimap2-2.31"),
+            "ref-minimap2-2.31"
+        );
         assert_eq!(split_extension("a.b/ref", "-X"), "a.b/ref-X");
     }
 
