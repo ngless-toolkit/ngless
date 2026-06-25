@@ -632,7 +632,7 @@ impl Interpreter {
         // Functions that touch the filesystem need interpreter state (the temp dir);
         // the rest are pure and handled by the free `execute_function`.
         match f.0.as_str() {
-            "fastq" => self.execute_fastq(&expr_v),
+            "fastq" => self.execute_fastq(&expr_v, &argvs),
             "paired" => self.execute_paired(&expr_v, &argvs),
             "group" => self.execute_group(&expr_v, &argvs),
             "load_fastq_directory" | "load_mocat_sample" => {
@@ -2037,8 +2037,17 @@ impl Interpreter {
     /// `fastq(fname)`: reference the input file with its detected (or given) encoding. The file
     /// is *not* rewritten, so a later `write` reproduces it byte-for-byte (mirrors
     /// `executeFastq` for the non-interleaved case).
-    fn execute_fastq(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
+    fn execute_fastq(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
         let name = as_string(expr, "fastq")?;
+        // `fastq(fname, interleaved=True)` splits an interleaved file into a paired read set.
+        if lookup_bool(args, "interleaved", false)? {
+            let readset = self.uninterleave(&name)?;
+            return Ok(NGLessObject::ReadSet { name, readset });
+        }
         let path = self.maybe_subsample(&name)?;
         let fqf = self.load_and_qc(&path, &path)?;
         Ok(NGLessObject::ReadSet {
@@ -2047,6 +2056,61 @@ impl Interpreter {
                 pairs: Vec::new(),
                 singletons: vec![fqf],
             },
+        })
+    }
+
+    /// Split an interleaved FASTQ file into pair.1/pair.2/singles temp files (mirrors
+    /// `uninterleave`). Consecutive records whose headers are compatible (`compatible_header`)
+    /// become a mate pair; any record that does not pair with its successor is a singleton. The
+    /// result is always one pair entry and one singletons entry, even when a file is empty.
+    fn uninterleave(&self, path: &str) -> NgResult<ReadSet> {
+        let text = read_fastq_text(path)?;
+        let enc = fastq::detect_encoding(&text)?;
+        let reads = fastq::fq_decode(enc, &text)?;
+        // Statistics are computed over the whole input file (the `passthroughSink fqStatsC`).
+        self.register_fq_stats(path, &reads, enc);
+        let (mut p1, mut p2, mut s) = (String::new(), String::new(), String::new());
+        let mut i = 0;
+        while i < reads.len() {
+            if i + 1 < reads.len()
+                && fastq::compatible_header(&reads[i].header, &reads[i + 1].header)
+            {
+                p1.push_str(&fastq::fq_encode(enc, &reads[i]));
+                p2.push_str(&fastq::fq_encode(enc, &reads[i + 1]));
+                i += 2;
+            } else {
+                s.push_str(&fastq::fq_encode(enc, &reads[i]));
+                i += 1;
+            }
+        }
+        let write_temp = |contents: &str| -> NgResult<PathBuf> {
+            let p = self.new_temp_path("uninterleave_", "fq");
+            std::fs::write(&p, contents).map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Could not write temp file {}: {e}", p.display()),
+                )
+            })?;
+            Ok(p)
+        };
+        let f1 = write_temp(&p1)?;
+        let f2 = write_temp(&p2)?;
+        let f3 = write_temp(&s)?;
+        Ok(ReadSet {
+            pairs: vec![(
+                FastQFilePath {
+                    encoding: enc,
+                    path: f1,
+                },
+                FastQFilePath {
+                    encoding: enc,
+                    path: f2,
+                },
+            )],
+            singletons: vec![FastQFilePath {
+                encoding: enc,
+                path: f3,
+            }],
         })
     }
 
@@ -2224,7 +2288,7 @@ impl Interpreter {
         let (singletons, paired) = match_up(&fqfiles)?;
         let mut members: Vec<NGLessObject> = Vec::new();
         for f in &singletons {
-            members.push(self.execute_fastq(&NGLessObject::String(f.clone()))?);
+            members.push(self.execute_fastq(&NGLessObject::String(f.clone()), &[])?);
         }
         for p in &paired {
             let mut pargs = vec![("second".to_string(), NGLessObject::String(p.1.clone()))];
