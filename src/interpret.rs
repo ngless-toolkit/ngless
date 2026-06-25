@@ -299,6 +299,46 @@ fn execute_discard_singles(expr: &NGLessObject) -> NgResult<NGLessObject> {
     }
 }
 
+/// `__check_ofile(path, original_lno=N)`: verify the output directory exists (mirrors `checkOFile`
+/// + the `__check_ofile` arm of `executeChecks`). Inserted by [`crate::transform::add_file_checks`]
+/// so that a write to a non-existent directory fails *before* any preceding statement runs.
+fn execute_check_ofile(
+    expr: &NGLessObject,
+    args: &[(String, NGLessObject)],
+) -> NgResult<NGLessObject> {
+    let oname = match expr {
+        NGLessObject::String(s) => s.clone(),
+        other => {
+            return Err(NgError::should_not_occur(format!(
+                "output file check expected a string, got {other:?}"
+            )))
+        }
+    };
+    let lno = match lookup_arg(args, "original_lno") {
+        Some(NGLessObject::Integer(i)) => *i,
+        _ => 0,
+    };
+    let dirname = take_directory(&oname);
+    if !std::path::Path::new(&dirname).is_dir() {
+        return Err(NgError::new(
+            NgErrorType::SystemError,
+            format!(
+                "File name '{oname}' used as output, but directory {dirname} does not exist. (used in line {lno})."
+            ),
+        ));
+    }
+    Ok(NGLessObject::Void)
+}
+
+/// `System.FilePath.takeDirectory`: the directory portion of a path, or "." when there is none.
+fn take_directory(path: &str) -> String {
+    match path.rfind('/') {
+        None => ".".to_string(),
+        Some(0) => "/".to_string(),
+        Some(i) => path[..i].to_string(),
+    }
+}
+
 /// Interpret a script body (already type-checked and validated). `temp_dir` is where
 /// intermediate FASTQ files (e.g. from `preprocess`) are written.
 pub fn interpret(
@@ -619,6 +659,7 @@ impl Interpreter {
             "__paste" => execute_paste(&expr_v, &argvs),
             "assemble" => self.execute_assemble(&expr_v, &argvs),
             "orf_find" => self.execute_orf_find(&expr_v, &argvs),
+            "__check_ofile" => execute_check_ofile(&expr_v, &argvs),
             other => {
                 if self.external_modules.iter().any(|m| m.find_command(other).is_some()) {
                     self.execute_external_command(other, &expr_v, &argvs)

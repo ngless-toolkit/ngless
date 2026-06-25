@@ -478,6 +478,37 @@ fn is_comment(line: &str) -> bool {
     line.is_empty() || line.starts_with('#')
 }
 
+/// Check that every requested feature is a column of the functional map at `path` (mirrors the
+/// functional-map branch of `executeCountCheck`). Used by the IO-validation pass to report a
+/// missing-feature error *before* the script runs. The header line is split on tabs and compared
+/// against all columns (including the leading gene-name column, as in Haskell).
+pub fn check_functional_features(path: &str, features: &[String], lno: usize) -> NgResult<()> {
+    let text = compression::read_to_string(path)?;
+    let lines: Vec<&str> = text.lines().collect();
+    let mut first_data = 0;
+    while first_data < lines.len() && is_comment(lines[first_data]) {
+        first_data += 1;
+    }
+    let header_idx = if first_data == 0 { 0 } else { first_data - 1 };
+    let columns: Vec<&str> = match lines.get(header_idx) {
+        Some(h) => h.split('\t').collect(),
+        None => Vec::new(),
+    };
+    let missing: Vec<&String> = features
+        .iter()
+        .filter(|f| !columns.contains(&f.as_str()))
+        .collect();
+    if !missing.is_empty() {
+        let mut msg = format!("In call to count() [line {lno}], missing features:");
+        for f in missing {
+            msg.push(' ');
+            msg.push_str(f);
+        }
+        return Err(NgError::new(NgErrorType::DataError, msg));
+    }
+    Ok(())
+}
+
 /// Load a MOCAT-style functional map (`loadFunctionalMap`): one annotator per requested feature
 /// column, sorted by tag. With a single requested feature the tag is empty (no `feature:` prefix).
 fn load_functional_map(path: &str, features: &[String]) -> NgResult<Vec<Annotator>> {

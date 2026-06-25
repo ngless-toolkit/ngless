@@ -41,10 +41,35 @@ pub fn run_default_mode(args: &[String]) -> i32 {
     match run_script(&opts) {
         Ok(code) => code,
         Err(e) => {
-            eprintln!("{e}");
+            report_fatal_error(&e);
             1
         }
     }
+}
+
+/// Print a fatal error in the same format as `runNGLessIO` in `Execs/Main.hs`: a context line, a
+/// category line for the error type, then the (red) message followed by a colour reset.
+fn report_fatal_error(e: &crate::errors::NgError) {
+    use crate::errors::NgErrorType::*;
+    const RED: &str = "\u{1b}[31m";
+    const RESET: &str = "\u{1b}[0m";
+    eprintln!("Exiting after fatal error while loading and running script");
+    match e.kind {
+        ShouldNotOccur => eprintln!(
+            "Should Not Occur Error! This probably indicates a bug in ngless.\n\
+             \tPlease get in touch with the authors with a description of how this happened.\n\
+             \tIf possible run your script with the --trace flag and post the script and the resulting trace at\n\
+             \t\thttps://github.com/ngless-toolkit/ngless/issues.\n"
+        ),
+        ScriptError => eprintln!("Script Error (there is likely an error in your script)"),
+        DataError => eprintln!("Data Error (the input data did not conform to NGLess' expectations)"),
+        SystemError => {
+            eprintln!("System Error (NGLess was not able to access some necessary resource)")
+        }
+        _ => {}
+    }
+    eprintln!("{RED}{e}");
+    eprintln!("{RESET}");
 }
 
 fn parse_args(args: &[String]) -> NgResult<RunOpts> {
@@ -183,6 +208,11 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     let constant_names: Vec<String> = constants.iter().map(|(n, _)| n.clone()).collect();
     crate::validation::validate(&funcs, &constant_names, &typed)?;
 
+    // IO validation (mirrors `validateIO`): run the count check for `count()` calls whose keyword
+    // arguments are all statically known, so a non-existent feature column aborts before any output
+    // is produced. Runs before the citation header is printed, matching Haskell's ordering.
+    crate::validation::validate_count_io(&typed)?;
+
     if opts.validate_only {
         if !opts.quiet {
             eprintln!("Script OK.");
@@ -214,6 +244,10 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         crate::transform::parallel_transform(&mut typed.body, include_for_all)
             .map_err(NgError::script)?;
     }
+    // Insert the floated `__check_ofile` calls (mirrors `addFileChecks`, a builtin transform that
+    // runs after the module transforms). Done after output hashing so the inserted checks do not
+    // affect the `{hash}`/`{script}` content hashes.
+    typed.body = crate::transform::add_file_checks(std::mem::take(&mut typed.body), &funcs);
 
     // ARGV = [script_path, ...extra_args] (mirrors `nConfArgv` in Configuration.hs).
     let mut argv = vec![fname.clone()];

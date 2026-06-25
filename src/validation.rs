@@ -37,6 +37,62 @@ pub fn validate(funcs: &[Function], constants: &[String], script: &Script) -> Ng
     }
 }
 
+/// IO validation for `count()` calls (mirrors `validateCount` in `ValidationIO.hs`, which runs
+/// `executeCountCheck` on calls whose keyword arguments are all statically known). The only check
+/// performed is that, in functional-map mode, every requested feature is a column of the map file.
+pub fn validate_count_io(script: &Script) -> NgResult<()> {
+    for (lno, e) in &script.body {
+        let mut calls: Vec<Vec<(Variable, Expression)>> = Vec::new();
+        recursive_analyse(e, &mut |x| {
+            if let Expression::FunctionCall(FuncName(name), _, kwargs, None) = x {
+                if name == "count" {
+                    calls.push(kwargs.clone());
+                }
+            }
+        });
+        for kwargs in &calls {
+            // Only run when every keyword argument is statically known (`constantKWArgs`).
+            if !kwargs.iter().all(|(_, v)| is_static(v)) {
+                continue;
+            }
+            let fmap = kwargs
+                .iter()
+                .find(|(k, _)| k.0 == "functional_map")
+                .and_then(|(_, v)| static_string(v));
+            let Some(fmap) = fmap else { continue };
+            let features = kwargs
+                .iter()
+                .find(|(k, _)| k.0 == "features")
+                .and_then(|(_, v)| static_string_list(v))
+                .unwrap_or_default();
+            crate::count::check_functional_features(&fmap, &features, *lno)?;
+        }
+    }
+    Ok(())
+}
+
+/// Whether `e` is a fully static expression (mirrors `staticValue` returning `Just`).
+fn is_static(e: &Expression) -> bool {
+    match e {
+        Expression::ConstStr(_)
+        | Expression::ConstInt(_)
+        | Expression::ConstBool(_)
+        | Expression::ConstSymbol(_) => true,
+        Expression::BinaryOp(_, a, b) => is_static(a) && is_static(b),
+        Expression::ListExpression(es) => es.iter().all(is_static),
+        _ => false,
+    }
+}
+
+/// Extract a list of constant strings from a `features=` argument (a single string or a list).
+fn static_string_list(e: &Expression) -> Option<Vec<String>> {
+    match e {
+        Expression::ConstStr(s) => Some(vec![s.clone()]),
+        Expression::ListExpression(es) => es.iter().map(static_string).collect(),
+        _ => None,
+    }
+}
+
 // --- generic traversal ----------------------------------------------------
 
 /// Call `f` on `e` and every sub-expression (mirrors `recursiveAnalyse`).

@@ -19,7 +19,238 @@
 use std::collections::HashMap;
 
 use crate::ast::{BOp, Block, Expression, FuncName, Index, NGLType, UOp, Variable};
-use crate::modules::Function;
+use crate::modules::{ArgCheck, Function};
+
+/// Insert `__check_ofile` calls that float up to right after the assignment of the variable the
+/// output path depends on (mirrors the `__check_ofile` half of `addFileChecks` in `Transform.hs`).
+///
+/// Only the output-file pass is ported: a `write`/`collect`/... call whose `ofile` (or other
+/// `FileWritable` argument) is a single-variable expression gets a `__check_ofile(<path>,
+/// original_lno=<lno>)` inserted right after that variable's assignment (and a redundant one right
+/// before the call, matching Haskell). Constant paths are left for interpretation time. The input
+/// (`__check_ifile`) pass is intentionally not ported: a missing constant input file is still
+/// reported when the file is actually read, so behaviour is unchanged for valid scripts.
+pub fn add_file_checks(
+    body: Vec<(usize, Expression)>,
+    funcs: &[Function],
+) -> Vec<(usize, Expression)> {
+    // The Haskell version works on the reversed script so a check can be placed *before* (in
+    // reversed order) the assignment it depends on, i.e. *after* it in source order.
+    let rev: Vec<(usize, Expression)> = body.into_iter().rev().collect();
+    let rev = add_file_checks_pass(rev, "__check_ofile", &ArgCheck::FileWritable, funcs);
+    rev.into_iter().rev().collect()
+}
+
+/// One pass of `addFileChecks'`: process the (reversed) list head-to-tail, inserting checks into
+/// the tail. Inserted checks are re-processed by the same loop but produce no further checks.
+fn add_file_checks_pass(
+    list: Vec<(usize, Expression)>,
+    check_name: &str,
+    tag: &ArgCheck,
+    funcs: &[Function],
+) -> Vec<(usize, Expression)> {
+    let mut remaining = list;
+    let mut result: Vec<(usize, Expression)> = Vec::new();
+    while !remaining.is_empty() {
+        let (lno, e) = remaining.remove(0);
+        let vars = get_file_exprs(&e, tag, funcs);
+        // `addCheck vars (maybeAddChecks vars rest)`: first float a check up to the assignment,
+        // then (for the single-variable case) prepend a check right before this statement.
+        remaining = maybe_add_checks(&vars, remaining, check_name, lno);
+        remaining = add_check(&vars, remaining, check_name, lno);
+        result.push((lno, e));
+    }
+    result
+}
+
+/// Build a `__check_*(complete, original_lno=lno)` call expression.
+fn check_file_expression(check_name: &str, complete: Expression, lno: usize) -> Expression {
+    Expression::FunctionCall(
+        FuncName(check_name.to_string()),
+        Box::new(complete),
+        vec![(
+            Variable("original_lno".to_string()),
+            Expression::ConstInt(lno as i64),
+        )],
+        None,
+    )
+}
+
+/// `addCheck`: for the single-variable case, prepend a check to the front of the list.
+fn add_check(
+    vars: &[(Variable, Expression)],
+    rest: Vec<(usize, Expression)>,
+    check_name: &str,
+    lno: usize,
+) -> Vec<(usize, Expression)> {
+    if vars.len() == 1 {
+        let mut out = vec![(lno, check_file_expression(check_name, vars[0].1.clone(), lno))];
+        out.extend(rest);
+        out
+    } else {
+        rest
+    }
+}
+
+/// `maybeAddChecks`: for the single-variable case, walk the list and insert the check right before
+/// the assignment of that variable (the first one found). If the assignment is not present, the
+/// list is returned unchanged.
+fn maybe_add_checks(
+    vars: &[(Variable, Expression)],
+    list: Vec<(usize, Expression)>,
+    check_name: &str,
+    lno: usize,
+) -> Vec<(usize, Expression)> {
+    if vars.len() != 1 {
+        return list;
+    }
+    let (v, complete) = &vars[0];
+    let mut out: Vec<(usize, Expression)> = Vec::new();
+    let mut iter = list.into_iter();
+    for (lno2, e2) in iter.by_ref() {
+        if let Expression::Assignment(v2, _) = &e2 {
+            if v2 == v {
+                out.push((lno2, check_file_expression(check_name, complete.clone(), lno)));
+                out.push((lno2, e2));
+                out.extend(iter);
+                return out;
+            }
+        }
+        out.push((lno2, e2));
+    }
+    out
+}
+
+/// Collect `(variable, complete-expression)` pairs for every file argument (tagged with `tag`) used
+/// anywhere in `e` (mirrors `getFileExpressions` + `extractExpressions`).
+fn get_file_exprs(
+    e: &Expression,
+    tag: &ArgCheck,
+    funcs: &[Function],
+) -> Vec<(Variable, Expression)> {
+    let mut out = Vec::new();
+    recursive_collect(e, &mut |sub| {
+        if let Expression::FunctionCall(f, arg, args, _) = sub {
+            if let Some(finfo) = funcs.iter().find(|fi| &fi.name == f) {
+                if finfo.arg_checks.contains(tag) {
+                    extract_expressions(arg, &mut out);
+                }
+                for ainfo in &finfo.kwargs {
+                    if ainfo.checks.contains(tag) {
+                        if let Some(v) = args.iter().find(|(k, _)| k.0 == ainfo.name) {
+                            extract_expressions(&v.1, &mut out);
+                        }
+                    }
+                }
+            }
+        }
+    });
+    out
+}
+
+/// `extractExpressions`: a file path that is a single `Lookup` or a `BinaryOp` mentioning exactly
+/// one variable contributes that variable plus the full path expression. Constants contribute
+/// nothing; anything else "bails out" (mentions a sentinel set of variables so the uniqueness check
+/// fails and no check is inserted).
+fn extract_expressions(ofile: &Expression, out: &mut Vec<(Variable, Expression)>) {
+    match ofile {
+        Expression::BinaryOp(_, re, le) => {
+            let mut vs = valid_variables(re);
+            vs.extend(valid_variables(le));
+            let uniq = uniq_variables(&vs);
+            if uniq.len() == 1 {
+                out.push((uniq[0].clone(), ofile.clone()));
+            }
+        }
+        Expression::Lookup(_, v) => out.push((v.clone(), ofile.clone())),
+        _ => {}
+    }
+}
+
+fn valid_variables(e: &Expression) -> Vec<Variable> {
+    match e {
+        Expression::Lookup(_, v) => vec![v.clone()],
+        Expression::BinaryOp(_, re, le) => {
+            let mut vs = valid_variables(re);
+            vs.extend(valid_variables(le));
+            vs
+        }
+        Expression::ConstStr(_) => vec![],
+        // Anything else makes the caller bail out: emit a sentinel set so the uniqueness check
+        // never collapses to a single variable.
+        _ => vec![
+            Variable("this".to_string()),
+            Variable("wont".to_string()),
+            Variable("work".to_string()),
+        ],
+    }
+}
+
+fn uniq_variables(vs: &[Variable]) -> Vec<Variable> {
+    let mut out: Vec<Variable> = Vec::new();
+    for v in vs {
+        if !out.contains(v) {
+            out.push(v.clone());
+        }
+    }
+    out
+}
+
+/// Visit `e` and every sub-expression (mirrors `recursiveAnalyse`).
+fn recursive_collect(e: &Expression, f: &mut dyn FnMut(&Expression)) {
+    f(e);
+    match e {
+        Expression::ListExpression(es) | Expression::Sequence(es) => {
+            for c in es {
+                recursive_collect(c, f);
+            }
+        }
+        Expression::UnaryOp(_, a) => recursive_collect(a, f),
+        Expression::BinaryOp(_, a, b) => {
+            recursive_collect(a, f);
+            recursive_collect(b, f);
+        }
+        Expression::Condition(c, t, fe) => {
+            recursive_collect(c, f);
+            recursive_collect(t, f);
+            recursive_collect(fe, f);
+        }
+        Expression::IndexExpression(a, ix) => {
+            recursive_collect(a, f);
+            match ix {
+                Index::One(i) => recursive_collect(i, f),
+                Index::Two(a, b) => {
+                    if let Some(a) = a {
+                        recursive_collect(a, f);
+                    }
+                    if let Some(b) = b {
+                        recursive_collect(b, f);
+                    }
+                }
+            }
+        }
+        Expression::Assignment(_, a) => recursive_collect(a, f),
+        Expression::FunctionCall(_, arg, args, block) => {
+            recursive_collect(arg, f);
+            for (_, v) in args {
+                recursive_collect(v, f);
+            }
+            if let Some(b) = block {
+                recursive_collect(&b.body, f);
+            }
+        }
+        Expression::MethodCall(_, self_e, arg, args) => {
+            recursive_collect(self_e, f);
+            if let Some(a) = arg {
+                recursive_collect(a, f);
+            }
+            for (_, v) in args {
+                recursive_collect(v, f);
+            }
+        }
+        _ => {}
+    }
+}
 
 /// Inject the hidden `__hash` keyword argument into every `write`/`collect` call (mirrors
 /// `addOutputHash`). `version` is the script's `(major, minor)` language version, `imports` the
