@@ -5,9 +5,12 @@
 > repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
 > Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
-> **88 of the 96 functional tests pass** against the Rust binary with output identical to
+> **92 of the 96 functional tests pass** against the Rust binary with output identical to
 > Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`). See
 > the [Functional test status](#functional-test-status) table below for the per-test breakdown.
+> The 4 remaining failures are all external-tool version drift (assemble-gp/prodigal,
+> map-minimap2/new mapper, samfile-select-view/samtools, map_search_path_multiple/bwa 0.7.19
+> `@HD`-line ordering), not core-feature gaps.
 >
 > - **M1 (scaffold):** CLI info flags + `--check-install`, byte-matching the Haskell CLI.
 > - **M2 (front end):** tokenizer, parser, AST, type checker, pure validation — all with
@@ -420,14 +423,14 @@ and run via `pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debu
 Legend: ✅ passes · ❌ not yet supported. `--print-path EXEC` is now implemented (resolves a
 tool from `$NGLESS_<TOOL>_BIN` or `PATH`, mirroring `PrintPathMode`/`findNGLessBin`), so the
 samtools `check.sh` scripts that shell out to `$(ngless --print-path samtools)` can now be
-driven locally. **Tally: 88 ✅ · 8 ❌ (96 total).**
+driven locally. **Tally: 92 ✅ · 4 ❌ (96 total).**
 
 | Test | Status | Note / planned milestone |
 |---|---|---|
 | arg1NotPathExternalModule | ✅ | M7c — external YAML modules |
 | argv | ✅ | M3 — `ARGV` builtin + citation header |
 | as_reads | ✅ | M7b — packaged `reference=` (sacCer3) |
-| as-reads-3 | ❌ | M4-pending — interleaved I/O (`format_flags={interleaved}`, `fastq(interleaved=True)`) |
+| as-reads-3 | ✅ | M4 — interleaved I/O (`format_flags={interleaved}`, `fastq(interleaved=True)` un-interleaving) |
 | as_reads-bam | ✅ | M5 |
 | as_reads_encoding | ✅ | M5 |
 | as_reads_regression | ✅ | M5 |
@@ -445,8 +448,8 @@ driven locally. **Tally: 88 ✅ · 8 ❌ (96 total).**
 | error-block-assignment | ✅ | M2 |
 | error-check-file-early | ✅ | M3 |
 | error-count-nofile | ✅ | M6 |
-| error-map-file | ❌ | Future — early validation: bad column must be caught before any `write`, else `should.not.be.created.txt` is written |
-| error-ofile-complex | ❌ | Future — early output-dir validation + error-message parity + citation header |
+| error-map-file | ✅ | `validate_count_io` — bad feature column caught before any `write` (no output produced) |
+| error-ofile-complex | ✅ | `add_file_checks` floats `__check_ofile` up; error-message + category formatting matches `runNGLessIO` |
 | error-unique-on-sorted | ✅ | M5 — samtools `checkUnique` validation |
 | error-validate-nofafile | ✅ | M5 |
 | error-write-no-output-dir | ✅ | M4 |
@@ -460,7 +463,7 @@ driven locally. **Tally: 88 ✅ · 8 ❌ (96 total).**
 | map3 | ✅ | M7 (bwa) |
 | map-minimap2 | ❌ | M7/Future — minimap2 mapper |
 | map_search_path | ✅ | M7 |
-| map_search_path_multiple | ❌ | Bug — `@HD` header line ordering in SAM output (alignment records match) |
+| map_search_path_multiple | ❌ | bwa drift — search-path logic correct (alignments + `@SQ` match); only the `@HD` line position differs because bwa 0.7.19 emits `@HD` first while the fixture (older bwa) has it after `@SQ`. Haskell + bwa 0.7.19 would fail identically. |
 | map_sort_stream | ✅ | M7 |
 | mapstats | ✅ | M6 |
 | map-windows_line_terminators | ✅ | M7 |
@@ -517,7 +520,7 @@ driven locally. **Tally: 88 ✅ · 8 ❌ (96 total).**
 | write_compression | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | write_fq | ✅ | M4 |
 | write_fq_inline | ✅ | M4 |
-| write_fq_STDOUT | ❌ | Future — `write(..., ofile=STDOUT)` / `/dev/stdout` |
+| write_fq_STDOUT | ✅ | `write(..., ofile=STDOUT, format_flags={interleaved})` streams interleaved FASTQ to `/dev/stdout` |
 | write-hash | ✅ | M7d — `auto_comments={hash}` output hashing |
 | write-hash2 | ✅ | M7d — `auto_comments={hash}` output hashing |
 
