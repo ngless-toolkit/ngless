@@ -116,7 +116,7 @@ if has_guzzle:
 
         # Specify a base_url used to generate sitemap.xml links. If not
         # specified, then no sitemap will be built.
-        "base_url": "https://ngless.embl.de/",
+        "base_url": "https://ngless.readthedocs.io",
 
         # Visible levels of the global TOC; -1 means unlimited
         "globaltoc_depth": 2,

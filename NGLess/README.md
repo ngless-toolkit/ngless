@@ -1,5 +1,5 @@
 This is a README about the code, i.e., the implementation of ngless. For user
-documentation (i.e., how to use ngless), see https://ngless.embl.de
+documentation (i.e., how to use ngless), see https://ngless.readthedocs.io
 
 
 # Code structure

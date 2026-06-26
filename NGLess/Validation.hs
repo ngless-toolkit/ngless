@@ -303,7 +303,7 @@ validateNGLessVersionUses mods sc = case nglVersion <$> nglHeader sc of
                     | versionLE minV version = return ()
                     | otherwise = tell1lno lno (prefix ++
                             [" changed behaviour in an incompatible fashion in version ", showV minV, " (version '", version, "' is active).\n", r,
-                            "\n\nSee https://ngless.embl.de/whatsnew.html for details on changes."])
+                            "\n\nSee https://ngless.readthedocs.io/en/latest/whatsnew.html for details on changes."])
         minVersionFunction :: Function -> Maybe (Int, Int)
         minVersionFunction finfo =
             asum $ flip map (funcChecks finfo) $ \case

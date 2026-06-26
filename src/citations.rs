@@ -98,7 +98,7 @@ fn format_citation(citation: &str) -> String {
 /// Print the run header to stdout (mirrors `printHeader`). Emits the version/copyright banner and,
 /// when there are citations, the "please cite" block.
 pub fn print_header(citations: &[String]) {
-    print!("NGLess v{VERSION_STR} (C) NGLess authors\nhttps://ngless.embl.de/\n\n");
+    print!("NGLess v{VERSION_STR} (C) NGLess authors\nhttps://ngless.readthedocs.io\n\n");
     if !citations.is_empty() {
         print!(
             "When publishing results from this script, please cite the following references:\n\n"

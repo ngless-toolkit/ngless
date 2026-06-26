@@ -156,10 +156,10 @@ previous example now reads
 Obviously, this example would more interesting if the input were to come
 from another programme (not just ``cat``).
 
-`Full documentation <https://ngless.embl.de/>`__
+`Full documentation <https://ngless.readthedocs.io>`__
 
 `Frequently Asked Questions
-(FAQ) <https://ngless.embl.de/faq.html>`__
+(FAQ) <https://ngless.readthedocs.io/en/latest/faq.html>`__
 
 Authors
 -------

@@ -4,7 +4,7 @@ This document describes how to integrate mOTUs3 with NGLess. You will need to re
 
 ## Step 0. Install NGLess
 
-Install NGLess following the instructions at [https://ngless.embl.de/install/](https://ngless.embl.de/install/) into a conda environment called `ngless`.
+Install NGLess following the instructions at [https://ngless.readthedocs.io/en/latest/install/](https://ngless.readthedocs.io/en/latest/install/) into a conda environment called `ngless`.
 
 ## Step 1. Install NGLess-contrib
 

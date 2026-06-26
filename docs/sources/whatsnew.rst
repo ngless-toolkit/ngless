@@ -145,7 +145,7 @@ User-visible improvements
   module, but it had become much more flexible than the original MOCAT version,
   so it was no longer a descriptive name.
 - Better messages in `parallel
-  <https://ngless.embl.de/stdlib.html?highlight=lock1#parallel-module>`__
+  <https://ngless.readthedocs.io/en/latest/stdlib.html?highlight=lock1#parallel-module>`__
   module when there are no free locks.
 
 
@@ -176,28 +176,28 @@ User-visible improvements
 - Added `discard_singles() function <Functions.html#discard-singles>`__.
 - Added ``include_fragments`` option to `orf_find()
   <Functions.html#orf-find>`__.
-- The `countfile <https://ngless.embl.de/Functions.html#countfile>`__ now
+- The `countfile <https://ngless.readthedocs.io/en/latest/Functions.html#countfile>`__ now
   reorders its input if it is not ordered. This is necessary for correct usage.
 - More flexible loading of ``functional_map`` arguments in `count
-  <https://ngless.embl.de/Functions.html#count>`__ to accept multiple comment
+  <https://ngless.readthedocs.io/en/latest/Functions.html#count>`__ to accept multiple comment
   lines at the top of the file as produced by `eggnog-mapper
   <https://eggnog-mapper.embl.de/>`__.
 - Added ``sense`` argument to the `count
-  <https://ngless.embl.de/Functions.html#count>`__ function, generalizing the
+  <https://ngless.readthedocs.io/en/latest/Functions.html#count>`__ function, generalizing the
   previous ``strand`` argument (which is deprecated). Whereas before it was
   only possible to consider features either to be present on both strands or
   only on the strand to which they are annotated, now it is also possible to
   consider them present only on the opposite strand (which is necessary for
   some strand-specific protocols as they produce the opposite strand).
 - Added ``interleaved`` argument to `fastq
-  <https://ngless.embl.de/Functions.html#fastq>`__
+  <https://ngless.readthedocs.io/en/latest/Functions.html#fastq>`__
 - ``load_mocat_sample`` now checks for mismatched paired samples (`#120
   <https://github.com/ngless-toolkit/ngless/issues/120>`__) - Better messages
   when collect call could not finish (following discussion on the `mailing list
   <https://groups.google.com/forum/#!topic/ngless/jIEcC7LVJgI>`__)
 - Modules can now specify their resources as a URL that NGLess downloads on a
   "as needed" basis.
-- `len <https://ngless.embl.de/Functions.html#len>`__ now works on lists
+- `len <https://ngless.readthedocs.io/en/latest/Functions.html#len>`__ now works on lists
 
 Internal improvements
 ~~~~~~~~~~~~~~~~~~~~~
@@ -205,13 +205,13 @@ Internal improvements
 - ZSTD compression is available for output and intermediate files use it for
   reduced temporary space usage (and possibly faster processing).
 - Faster check for column headers in ``functional_map`` argument to `count()
-  <https://ngless.embl.de/Functions.html#count>`__ function: now it is
+  <https://ngless.readthedocs.io/en/latest/Functions.html#count>`__ function: now it is
   performed *as soon as possible* (including at the top of the script if the
   arguments are literal strings), thus NGLess can fail faster.
 - ZSTD compression is available for output and intermediate files use it for
   reduced temporary space usage (and possibly faster processing).
 - Faster check for column headers in ``functional_map`` argument to `count()
-  <https://ngless.embl.de/Functions.html#count>`__ function: now it is
+  <https://ngless.readthedocs.io/en/latest/Functions.html#count>`__ function: now it is
   performed *as soon as possible* (including at the top of the script if the
   arguments are literal strings), thus NGLess can fail faster.
 
@@ -237,11 +237,11 @@ User-visible improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - The handling of multiple annotations in `count
-  <https://ngless.embl.de/Functions.html#count>`__ (i.e., when the user
+  <https://ngless.readthedocs.io/en/latest/Functions.html#count>`__ (i.e., when the user
   requests multiple ``features`` and/or ``subfeatures``) has changed. The
   previous model caused a few issues (`#63
   <https://github.com/ngless-toolkit/ngless/issues/63>`__, but also mixing with
-  `collect() <https://ngless.embl.de/Functions.html#collect>`__. Unfortunately,
+  `collect() <https://ngless.readthedocs.io/en/latest/Functions.html#collect>`__. Unfortunately,
   this means that scripts asking for the old behaviour in their version
   declaration are no longer supported if they use multiple features.
 
@@ -261,7 +261,7 @@ User-visible improvements
 - Add `--verbose` flag to check-install mode (`ngless --check-install --verbose`)
 - Add early checks for input files in more situations (`#33 <https://github.com/ngless-toolkit/ngless/issues/33>`__)
 - Support compression in `collect()` output (`#42 <https://github.com/ngless-toolkit/ngless/issues/42>`__)
-- Add `smoothtrim() <https://ngless.embl.de/Functions.html#smoothtrim>`__ function
+- Add `smoothtrim() <https://ngless.readthedocs.io/en/latest/Functions.html#smoothtrim>`__ function
 
 Bugfixes
 ~~~~~~~~
@@ -357,7 +357,7 @@ Bugfixes
 - Fix for systems with non-working locale installations
 - Much faster `collect <Functions.html#count>`__ calls
 - Fixed `lock1
-  <https://ngless.embl.de/stdlib.html?highlight=lock1#parallel-module>`__ when
+  <https://ngless.readthedocs.io/en/latest/stdlib.html?highlight=lock1#parallel-module>`__ when
   used with full paths (see `issue #68 <https://github.com/ngless-toolkit/ngless/issues/68>`__)
 - Fix expansion of searchpath with external modules (see `issue #56
   <https://github.com/ngless-toolkit/ngless/issues/56>`__)

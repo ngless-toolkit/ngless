@@ -15,7 +15,7 @@ metagenomes.
 
 .. note::
     This tutorial is also available as a `slide presentation
-    <https://ngless.embl.de/_static/gut-metagenomics-tutorial-presentation/gut_specI_tutorial.html>`__
+    <https://ngless.readthedocs.io/en/latest/_static/gut-metagenomics-tutorial-presentation/gut_specI_tutorial.html>`__
 
 1. Download the toy dataset
 
@@ -24,7 +24,7 @@ First download all the tutorial data::
    ngless --download-demo gut-short
 
 This will `download
-<https://ngless.embl.de/ressources/Demos/gut-short.tar.gz>`__ and
+<https://ngless.readthedocs.io/en/latest/ressources/Demos/gut-short.tar.gz>`__ and
 expand the data to a directory called ``gut-short``.
 
 This is a toy dataset. It is based on `real data

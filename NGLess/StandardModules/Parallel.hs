@@ -316,7 +316,7 @@ executeCollect (NGOCounts istream) kwargs = do
                         ,"When you use the parallel module and the collect() function,\n"
                         ,"you typically need to run ngless *multiple times* (once per sample)!\n"
                         ,"\n\n"
-                        ,"For more information, see https://ngless.embl.de/stdlib.html#parallel-module"]
+                        ,"For more information, see https://ngless.readthedocs.io/en/latest/stdlib.html#parallel-module"]
     return NGOVoid
 executeCollect arg _ = throwScriptError ("collect got unexpected argument: " ++ show arg)
 

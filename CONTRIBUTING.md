@@ -1,7 +1,7 @@
 # Contributing
 
 Pull requests are welcome, but often it will be fruitful to first discuss it on [the
-mailing-list](https://ngless.embl.de/contacts.html).
+mailing-list](https://ngless.readthedocs.io/en/latest/contacts.html).
 
 Generally, making all the tests pass is needed for a pull request to be accepted, although
 sometimes a pull request can be in the form of a failing test (as a bug report). Note that

@@ -170,7 +170,7 @@ loadModules av mods  = do
 
 headerStr :: String
 headerStr = "NGLess v"++Version.versionStr++" (C) NGLess authors\n"++
-            "https://ngless.embl.de/\n"++
+            "https://ngless.readthedocs.io\n"++
             "\n"
 
 formatCitation :: T.Text -> String
@@ -363,7 +363,7 @@ main' = do
         foottext = concat [
                             "ngless v", Version.versionStrLong, "(C) NGLess Authors 2013-2023\n",
                             "For more information:\n",
-                            "\thttps://ngless.embl.de/\n",
+                            "\thttps://ngless.readthedocs.io\n",
                             "For comments/discussion:\n",
                             "\thttps://groups.google.com/forum/#!forum/ngless\n",
                             "Citation: LP Coelho et al., 2019. ",

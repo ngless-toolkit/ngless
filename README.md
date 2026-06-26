@@ -39,7 +39,7 @@ If you are using NGLess, please cite:
             format={csv})
 
 
-For more information, check [the docs](https://ngless.embl.de). We also have [a
+For more information, check [the docs](https://ngless.readthedocs.io). We also have [a
 YouTube
 tutorial](https://www.youtube.com/playlist?list=PLn-ZqA9cHNdSsmVTojYL1lEcfh-J3Hdff)
 on how to use NGLess and [SemiBin](https://semibin.rtfd.io/) together (but you
@@ -47,7 +47,7 @@ can learn to use NGLess independently of SemiBin).
 
 ## Installing
 
-See the [install documentation](https://ngless.embl.de/install.html) for more
+See the [install documentation](https://ngless.readthedocs.io/en/latest/install.html) for more
 information.
 
 ### Bioconda
@@ -126,9 +126,9 @@ For example, here we would run the `regression-fqgz` test:
 After running this script open the newly generated folder `ungzip.ngl.output_ngless` and view the template in the **index.html** file.
 
 For developers who have done this much more datasets for testing purposes can be referenced and used by reading these documentation links:
-**[Human Gut Metagenomics Functional & Taxonomic Profiling](https://ngless.embl.de/tutorial-gut-metagenomics.html#)**
-**[Ocean Metagenomics Functional Profiling](https://ngless.embl.de/tutorial-ocean-metagenomics.html)**
-**[Ocean Metagenomics Assembly and Gene Prediction](https://ngless.embl.de/tutorial-assembly-gp.html)**
+**[Human Gut Metagenomics Functional & Taxonomic Profiling](https://ngless.readthedocs.io/en/latest/tutorial-gut-metagenomics.html#)**
+**[Ocean Metagenomics Functional Profiling](https://ngless.readthedocs.io/en/latest/tutorial-ocean-metagenomics.html)**
+**[Ocean Metagenomics Assembly and Gene Prediction](https://ngless.readthedocs.io/en/latest/tutorial-assembly-gp.html)**
 
 
 ## Rust reimplementation (work in progress)
@@ -159,11 +159,11 @@ Point the harness at the Rust build via `NGLESS_BIN`:
 
 ## More information
 
-- [Full documentation](https://ngless.embl.de/)
-- [Frequently Asked Questions (FAQ)](https://ngless.embl.de/faq.html)
+- [Full documentation](https://ngless.readthedocs.io)
+- [Frequently Asked Questions (FAQ)](https://ngless.readthedocs.io/en/latest/faq.html)
 - [ngless mailing list](https://groups.google.com/forum/#!forum/ngless)
-- [What's new log](https://ngless.embl.de/whatsnew.html)
-- [NGless 1.5.0 Release Documentation](https://ngless.embl.de/whatsnew.html#version-1-5-0)
+- [What's new log](https://ngless.readthedocs.io/en/latest/whatsnew.html)
+- [NGless 1.5.0 Release Documentation](https://ngless.readthedocs.io/en/latest/whatsnew.html#version-1-5-0)
 
 ## Authors
 
