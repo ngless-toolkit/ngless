@@ -340,7 +340,12 @@
 >   `project/sample` locks safely); `collect` writes each sample's counts as a gzipped partial under
 >   `ngless-partials/` and, once all needed partials exist, merges them with `paste_counts` (the
 >   sparse index-keyed merge of `pasteCounts`, filling missing rows with zeros) prefixed by the
->   `{script}`/`{hash}` comment block; `__paste` exposes the same merge. Passing: `tests/parallel`,
+>   `{script}`/`{hash}` comment block; `__paste` exposes the same merge. (Both the partial and the
+>   final `collect` writes go through `compression::write_bytes_atomic` — temp + fsync + rename,
+>   mirroring `moveOrCopy` of a `syncFile`d temp — so a concurrent run never reads a torn partial;
+>   and when not all partials are present yet, the "run ngless once per sample" guidance Haskell
+>   defers to a `FinishOkHook` is emitted inline, gated on `--quiet`. Still unported in `collect`:
+>   the `--subsample` `.subsample` ofile suffix and `auto_comments={date}`.) Passing: `tests/parallel`,
 >   `tests/parallel_collect_many` (v1.1 `run_for_all`), `tests/parallel_collect_subdir`,
 >   `tests/parallel_folder_lock` (path sanitization), `tests/paste`, `tests/same-hash-collect`,
 >   `tests/same-hash-collect-2`, `tests/write-hash`, `tests/write-hash2`. Still pending in M7:

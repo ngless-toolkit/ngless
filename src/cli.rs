@@ -278,6 +278,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         constant_values,
         active_mappers,
         (version.major, version.minor),
+        opts.quiet,
     )?;
     Ok(0)
 }

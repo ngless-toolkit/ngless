@@ -85,38 +85,98 @@ pub fn read_to_string(path: &str) -> NgResult<String> {
 
 /// Write bytes to `path`, compressing by extension.
 pub fn write_bytes(path: &str, data: &[u8]) -> NgResult<()> {
-    let write_err = |e: std::io::Error| {
+    let f = File::create(path).map_err(|e| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!("Could not write {path}: {e}"),
+        )
+    })?;
+    let f = write_all_compressed(f, detect(path), path, data)?;
+    drop(f);
+    Ok(())
+}
+
+/// Write `data` to `path` **atomically and durably** (mirrors `moveOrCopyCompress` with
+/// `syncFile`): the bytes are compressed (per `path`'s extension) into a temporary sibling file,
+/// `fsync`ed, then `rename`d onto `path`. A reader therefore never observes a half-written file,
+/// and two processes racing to write the same `path` cannot leave a torn result — the rename is
+/// atomic on a POSIX filesystem. Used by `collect()` for its partial and final outputs.
+pub fn write_bytes_atomic(path: &str, data: &[u8]) -> NgResult<()> {
+    let sys_err = |e: std::io::Error| {
         NgError::new(
             NgErrorType::SystemError,
             format!("Could not write {path}: {e}"),
         )
     };
-    let f = File::create(path).map_err(write_err)?;
-    match detect(path) {
+    // A temp sibling in the same directory, so the final rename stays on one filesystem.
+    let tmp = format!(
+        "{path}.tmp.{}.{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    );
+    let f = File::create(&tmp).map_err(sys_err)?;
+    // Compression keys off the *final* path's extension, not the temp name.
+    let synced = (|| {
+        let f = write_all_compressed(f, detect(path), path, data)?;
+        f.sync_all().map_err(sys_err)?;
+        Ok(())
+    })();
+    if let Err(e) = synced {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        sys_err(e)
+    })?;
+    Ok(())
+}
+
+/// Write `data` to the already-open file `f`, compressing per `compress` (mirrors the body of
+/// [`write_bytes`]). Returns the underlying `File` (with all data flushed to it) so the caller can
+/// `fsync` and/or rename it.
+fn write_all_compressed(
+    f: File,
+    compress: Compress,
+    err_path: &str,
+    data: &[u8],
+) -> NgResult<File> {
+    let write_err = |e: std::io::Error| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!("Could not write {err_path}: {e}"),
+        )
+    };
+    let into_inner_err = |e: std::io::IntoInnerError<BufWriter<File>>| write_err(e.into_error());
+    match compress {
         Compress::None => {
             let mut w = BufWriter::new(f);
             w.write_all(data).map_err(write_err)?;
-            w.flush().map_err(write_err)?;
+            w.into_inner().map_err(into_inner_err)
         }
         Compress::Gzip => {
             let mut w = GzEncoder::new(BufWriter::new(f), Compression::default());
             w.write_all(data).map_err(write_err)?;
-            w.finish().map_err(write_err)?;
+            let bw = w.finish().map_err(write_err)?;
+            bw.into_inner().map_err(into_inner_err)
         }
         Compress::Bzip2 => {
             let mut w =
                 bzip2::write::BzEncoder::new(BufWriter::new(f), bzip2::Compression::default());
             w.write_all(data).map_err(write_err)?;
-            w.finish().map_err(write_err)?;
+            let bw = w.finish().map_err(write_err)?;
+            bw.into_inner().map_err(into_inner_err)
         }
         Compress::Zstd => {
             let compressed = zstd::stream::encode_all(data, ZSTD_LEVEL).map_err(write_err)?;
             let mut w = BufWriter::new(f);
             w.write_all(&compressed).map_err(write_err)?;
-            w.flush().map_err(write_err)?;
+            w.into_inner().map_err(into_inner_err)
         }
     }
-    Ok(())
 }
 
 /// Open a (possibly compressed) file for streaming, bounded-memory reads, decompressing by
@@ -370,5 +430,35 @@ mod tests {
         for p in [&a, &b, &out] {
             let _ = std::fs::remove_file(p);
         }
+    }
+
+    /// `write_bytes_atomic` is content-equivalent to `write_bytes` (compresses per the final
+    /// extension and round-trips), and leaves no temp file behind.
+    fn atomic_round_trip(ext: &str) {
+        let dir = std::env::temp_dir();
+        let p = dir.join(format!("ngless_atomic_{}.{ext}", std::process::id()));
+        let ps = p.to_string_lossy().to_string();
+        let payload = "tag\tcount\nA\t3\nB\t5\n";
+        write_bytes_atomic(&ps, payload.as_bytes()).unwrap();
+        assert_eq!(read_to_string(&ps).unwrap(), payload);
+        // No leftover `<path>.tmp.*` sibling.
+        let stray: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .filter(|n| {
+                n.starts_with(&format!("ngless_atomic_{}.{ext}.tmp.", std::process::id()))
+            })
+            .collect();
+        assert!(stray.is_empty(), "atomic write left a temp file: {stray:?}");
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn write_bytes_atomic_round_trips() {
+        atomic_round_trip("tsv");
+        atomic_round_trip("tsv.gz");
+        atomic_round_trip("tsv.bz2");
+        atomic_round_trip("tsv.zst");
     }
 }

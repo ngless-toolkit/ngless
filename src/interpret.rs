@@ -349,6 +349,7 @@ pub fn interpret(
     constants: Vec<(String, NGLessObject)>,
     active_mappers: Vec<String>,
     ngl_version: (i64, i64),
+    quiet: bool,
 ) -> NgResult<()> {
     let mut env = HashMap::new();
     for (name, value) in constants {
@@ -367,6 +368,7 @@ pub fn interpret(
         external_modules,
         active_mappers,
         ngl_version,
+        quiet,
         held_locks: Vec::new(),
     };
     for (lno, e) in body {
@@ -430,6 +432,9 @@ struct Interpreter {
     /// The script's `(major, minor)` language version, used to build the version-namespaced
     /// reference-download URL (mirrors `ngleVersion` in the `installData` URL construction).
     ngl_version: (i64, i64),
+    /// `--quiet`: suppress informational (`InfoOutput`-level) diagnostics, such as the
+    /// missing-partials guidance from `collect()` (mirrors `nConfVerbosity`/`setQuiet`).
+    quiet: bool,
     /// Lock-file guards held by `lock1`/`run_for_all` for the duration of the run (mirrors the
     /// `ReleaseKey`s registered in `executeLock1OrForAll`). Held here so the claimed `.lock` file
     /// stays in place while the entry is processed and is released (removed) when the interpreter is
@@ -1801,9 +1806,11 @@ impl Interpreter {
         let partial_file =
             |entry: &str| format!("{hashdir}/partial.{}.tsv.gz", sanitize_path(entry));
 
-        // Write the current sample's counts as a gzipped partial.
+        // Write the current sample's counts as a gzipped partial. The write is atomic (temp +
+        // fsync + rename, mirroring Haskell's `moveOrCopy` of a `syncFile`d temp), so a concurrent
+        // run never reads a half-written partial.
         let body = crate::compression::read_bytes(&path.to_string_lossy())?;
-        crate::compression::write_bytes(&partial_file(&current), &body)?;
+        crate::compression::write_bytes_atomic(&partial_file(&current), &body)?;
 
         // Collect once every needed partial is present (checked in reverse, as Haskell does).
         let can_collect = allneeded
@@ -1832,7 +1839,24 @@ impl Interpreter {
             )?;
             let inputs: Vec<String> = allneeded.iter().map(|e| partial_file(e)).collect();
             let merged = paste_counts(&comments, false, &allneeded, &inputs)?;
-            crate::compression::write_bytes(&ofile, merged.as_bytes())?;
+            crate::compression::write_bytes_atomic(&ofile, merged.as_bytes())?;
+        } else {
+            // Not all partials are present: this is the normal case when the parallel module is
+            // driven one sample per ngless invocation. Haskell defers this to a FinishOkHook; the
+            // Rust port has no hook system, so we emit the same guidance now (it is purely
+            // informational — `collect` still returns successfully). Gated on `--quiet`, matching
+            // Haskell's `InfoOutput` verbosity level. Mirrors the message in `executeCollect`.
+            if !self.quiet {
+                let lno = self.cur_lno.get();
+                eprintln!(
+                    "The collect() call at line {lno} could not be executed as there are partial \
+                     results missing.\n\
+                     When you use the parallel module and the collect() function,\n\
+                     you typically need to run ngless *multiple times* (once per sample)!\n\n\n\
+                     For more information, see \
+                     https://ngless.readthedocs.io/en/latest/stdlib.html#parallel-module"
+                );
+            }
         }
         Ok(NGLessObject::Void)
     }
@@ -4308,6 +4332,7 @@ mod tests {
             Vec::new(),
             vec!["bwa".to_string()],
             (1, 5),
+            false,
         )
     }
 
