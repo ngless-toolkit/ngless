@@ -291,6 +291,19 @@
 >   against the `prodigal` provided by the current pixi environment (commit `3ab43655`), so the
 >   earlier embedded-vs-PATH prodigal def-line/gene-call divergence no longer applies.
 >
+> - **CLI sub-modes not yet ported (no functional test covers them):** the Rust `cli.rs` handles the
+>   run/validate flags plus `--print-path` and `--check-install`, but several Haskell `modeExec`
+>   branches (`Execs/Main.hs`) are absent: `--export-json` (`JSONScript.hs`), `--export-cwl`
+>   (`CWL.hs`), `--install-reference-data` (standalone `installData`, distinct from the on-`map()`
+>   auto-download), and `--create-reference-pack` (`createReferencePack`). The
+>   **`--experimental-features`** flag is also unported — but note it is *purely a gate on the two
+>   export modes*: in `Execs/Main.hs` (lines 224–228) it only causes `--export-json`/`--export-cwl`
+>   to `fatalError` ("The use of --export-json requires the --experimental-features flag") when it is
+>   absent. It is defined as a plain `switch` in `CmdArgs.hs` and is **never threaded into** the
+>   parser, type checker, validation, interpreter, or `Configuration.hs`, so it unlocks **no**
+>   script-level language features, functions, or runtime behavior. There is therefore nothing for
+>   the Rust port to gate behind it until one of the two export modes is implemented.
+>
 ## Context
 
 NGLess is a ~15–16k-line Haskell program (`NGLess/`, 86 `.hs` files) implementing a
