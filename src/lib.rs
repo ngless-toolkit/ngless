@@ -21,6 +21,7 @@ pub mod external_modules;
 pub mod fastq;
 pub mod gff;
 pub mod interpret;
+pub mod lockfile;
 pub mod mapper;
 pub mod minimap2;
 pub mod modules;

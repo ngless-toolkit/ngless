@@ -213,8 +213,26 @@
 >   minimap2 mapper is implemented too (`src/minimap2.rs`, `map(..., mapper='minimap2')`, activated
 >   by `import "minimap2"`): it shells out to `minimap2 -a`, then sorts the SAM (header lines kept,
 >   alignment lines bytewise-sorted) exactly like `sortSam`. Still pending: packaged `reference=`
->   databases (need the reference-download infrastructure) and the `soap` mapper; index creation is
->   not lock-guarded (safe for single-process runs).
+>   databases (need the reference-download infrastructure) and the `soap` mapper.
+> - **M7f (lock files — concurrency-safe downloads/indices/splits):** `src/lockfile.rs` ports
+>   `Utils/LockFile.hs`. `acquire_lock(LockParameters)` atomically creates the lock file with
+>   `O_CREAT|O_EXCL` (`create_new`) and returns an RAII `LockGuard` that removes the file on drop
+>   (mirroring the `ResourceT`-registered `removeFileIfExists`); a lock older than `max_age` is
+>   reclaimed as stale, and `WhenExistsStrategy` (`IfLockedNothing`/`IfLockedThrow`/`IfLockedRetry`)
+>   reproduces the loser behaviour, including the retry-exhausted "Could not obtain lock ... even
+>   after waiting for its release." error. With `mtime_update`, a background thread touches the file
+>   every 10 minutes so a long critical section is not mistaken for stale (cancelled on guard drop).
+>   `with_lock_file(params, act)` is the `withLockFile` wrapper. It is wired into the three
+>   expensive, cacheable side effects, with the exact Haskell lock parameters: mapper-index creation
+>   (`ensure_one_index_exists` → `<fafile>.ngless-index.lock`, 36h max-age, 37×60 retries — rechecks
+>   `has_valid_index` under the lock), FASTA splitting (`ensure_splits_exist` →
+>   `<fafile>.<N>m.split.lock`, 120 retries), and reference download/unpack (`install_data` →
+>   `<destdir>.download.lock`, 37×60 retries — rechecks `find_data_files` under the lock). The
+>   reference-download lock goes one step beyond Haskell, whose builtin `installData` path is
+>   unlocked (only URL-typed module references lock, via `downloadIfUrl`), closing the
+>   concurrent-same-ref install race the migration plan flagged. 4 new unit tests pin
+>   acquire/release, held-lock back-off, stale reclamation, and `with_lock_file`; all 96 functional
+>   and 174 unit tests pass.
 
 > - **M7a (modules + stdlib — sample/directory loading):** the lowest-risk slice of M7, built on
 >   the already-working FASTQ path. `group()` is now interpreted (`execute_group`, mirroring

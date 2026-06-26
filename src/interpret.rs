@@ -23,11 +23,13 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::ast::*;
 use crate::errors::{NgError, NgErrorType, NgResult};
 use crate::fastq::{self, FastQEncoding, FastQFilePath, ReadSet, ShortRead};
+use crate::lockfile::{with_lock_file, LockParameters, WhenExistsStrategy};
 use crate::sam::{self, encode_sam_line, group_sam_stream, SamItem, SamLine, SamRecord};
 use crate::select::{self, FilterAction, FilterOptions};
 use crate::values::{eval_binary, eval_index, eval_unary, show_double, NGLessObject};
@@ -1313,9 +1315,10 @@ impl Interpreter {
     }
 
     /// Ensure a bwa index exists for `fafile` (or for each of its splits) and return the FASTA
-    /// path(s) to map against (mirrors `ensureIndexExists`). Index creation is *not* lock-guarded
-    /// here (unlike the Haskell version), which is safe for the single-process runs this build
-    /// targets.
+    /// path(s) to map against (mirrors `ensureIndexExists`). Index creation is lock-guarded with a
+    /// `<fafile>.ngless-index.lock` file so concurrent NGLess processes mapping against the same
+    /// reference do not build the index on top of each other (mirrors the `withLockFile` around
+    /// `createIndex`).
     fn ensure_index_exists(
         &self,
         mapper: MapperKind,
@@ -1323,19 +1326,40 @@ impl Interpreter {
         fafile: &str,
     ) -> NgResult<Vec<String>> {
         if block_size <= 0 {
-            if !mapper.has_valid_index(fafile)? {
-                mapper.create_index(fafile)?;
-            }
+            self.ensure_one_index_exists(mapper, fafile)?;
             Ok(vec![fafile.to_string()])
         } else {
             let blocks = self.ensure_splits_exist(block_size, fafile)?;
             for b in &blocks {
-                if !mapper.has_valid_index(b)? {
-                    mapper.create_index(b)?;
-                }
+                self.ensure_one_index_exists(mapper, b)?;
             }
             Ok(blocks)
         }
+    }
+
+    /// Build the index for a single FASTA under a lock if it is missing, rechecking once the lock is
+    /// held (mirrors `ensureIndexExists 0`: the index may have been built by another process while
+    /// we waited for the lock).
+    fn ensure_one_index_exists(&self, mapper: MapperKind, fafile: &str) -> NgResult<()> {
+        if mapper.has_valid_index(fafile)? {
+            return Ok(());
+        }
+        let params = LockParameters {
+            lock_fname: PathBuf::from(format!("{fafile}.ngless-index.lock")),
+            max_age: Duration::from_secs(36 * 3600),
+            when_exists: WhenExistsStrategy::IfLockedRetry {
+                nr_retries: 37 * 60,
+                time_between: Duration::from_secs(60),
+            },
+            mtime_update: true,
+        };
+        with_lock_file(params, || {
+            // Recheck under the lock: the index may have been created while we slept.
+            if !mapper.has_valid_index(fafile)? {
+                mapper.create_index(fafile)?;
+            }
+            Ok(())
+        })
     }
 
     /// Map `rs` against one indexed reference, returning the SAM temp file (mirrors
@@ -1398,7 +1422,18 @@ impl Interpreter {
             found.sort();
             return Ok(found);
         }
-        let splits = split_fasta(block_size, fafile, &ofa_base)?;
+        // Guard the (expensive) split with a lock so concurrent processes splitting the same
+        // reference do not stomp on each other (mirrors the `withLockFile` in `splitFASTA`).
+        let params = LockParameters {
+            lock_fname: PathBuf::from(format!("{fafile}.{block_size}m.split.lock")),
+            max_age: Duration::from_secs(36 * 3000),
+            when_exists: WhenExistsStrategy::IfLockedRetry {
+                nr_retries: 120,
+                time_between: Duration::from_secs(60),
+            },
+            mtime_update: true,
+        };
+        let splits = with_lock_file(params, || split_fasta(block_size, fafile, &ofa_base))?;
         std::fs::write(
             &receipt,
             format!("FASTA file '{fafile}' split into blocks of {block_size} megabases.\n"),

@@ -17,8 +17,10 @@
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use crate::errors::{NgError, NgErrorType, NgResult};
+use crate::lockfile::{with_lock_file, LockParameters, WhenExistsStrategy};
 
 /// A builtin reference: the canonical (short) name, an alias, and a pack version. Mirrors the
 /// `builtinReferences` list in `ReferenceDatabases.hs`. These references were obtained from
@@ -132,9 +134,38 @@ fn install_data(refname: &str, ngl_version: (i64, i64)) -> NgResult<PathBuf> {
     let basedir = install_basedir()?;
     let destdir = basedir.join("References").join(refname);
 
-    eprintln!("Starting download from {url}");
-    download_expand_tar(&url, &destdir)?;
-    eprintln!("Reference download completed!");
+    // Guard the download+unpack with a lock so two concurrent NGLess processes installing the same
+    // reference do not race on `destdir`. This goes beyond the Haskell builtin `installData` path
+    // (which is unlocked — only URL-typed module references lock, via `downloadIfUrl`), closing a
+    // known concurrency gap noted in the migration plan. The lock parameters mirror
+    // `downloadIfUrl`'s. We recheck `find_data_files` under the lock: another process may have
+    // finished the install while we waited.
+    let lock_fname = {
+        let mut p = destdir.as_os_str().to_os_string();
+        p.push(".download.lock");
+        PathBuf::from(p)
+    };
+    if let Some(parent) = lock_fname.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let params = LockParameters {
+        lock_fname,
+        max_age: Duration::from_secs(300),
+        when_exists: WhenExistsStrategy::IfLockedRetry {
+            nr_retries: 37 * 60,
+            time_between: Duration::from_secs(60),
+        },
+        mtime_update: true,
+    };
+    with_lock_file(params, || {
+        if find_data_files(refname).is_some() {
+            return Ok(());
+        }
+        eprintln!("Starting download from {url}");
+        download_expand_tar(&url, &destdir)?;
+        eprintln!("Reference download completed!");
+        Ok(())
+    })?;
     Ok(destdir)
 }
 
