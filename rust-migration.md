@@ -194,17 +194,25 @@
 >   external YAML modules (M7c), the parallel module (M7d), and assemble/orf_find (M7e).
 > - **M7b (modules + stdlib — packaged reference databases):** `map(..., reference="...")` now
 >   resolves a packaged reference to its FASTA and feeds it through the same indexing/mapping path
->   as `fafile=` (`resolve_reference` in `src/interpret.rs`, mirroring `ensureDataPresent`/
->   `findDataFiles`). The reference directory is named by the *user-typed* name — so `sacCer3` and
->   its alias `Saccharomyces_cerevisiae_R64-1-1` resolve to separate, independently-installed
+>   as `fafile=` (`resolve_reference` in `src/interpret.rs` → `reference::ensure_data_present` in
+>   `src/reference.rs`, mirroring `ensureDataPresent`/`findDataFiles`/`installData`). The reference
+>   directory is named by the *user-typed* name — so `sacCer3` and its alias
+>   `Saccharomyces_cerevisiae_R64-1-1` resolve to separate, independently-installed
 >   directories — and is searched for at `References/<name>/Sequence/BWAIndex/reference.fa.gz` in
 >   the user data directory (`$HOME/.local/share/ngless/data`) first, then the global one
 >   (`<binary-dir>/../share/ngless/data`), matching `findDataFiles`'s `User <|> Root`. The bwa
 >   index is then (re)built lazily next to the cached FASTA by the existing `ensure_index_exists`
 >   path (so a reference packaged with an older bwa gets a fresh `<base>-bwa-<ver>` index for the
->   running bwa). Downloading a missing reference is *not* supported in this build — it errors with
->   a clear, actionable message (install via the Haskell build, which caches under
->   `~/.local/share/ngless/data/References/`, or pass a local `fafile=`). `qcstats({mapping})` is
+>   running bwa). **A missing builtin reference is now auto-downloaded** (`ureq` over HTTPS) from
+>   `<base>/References/<maj>.<min>/<canonical-name>.tar.gz` — the `<maj>.<min>` version directory and
+>   canonical-vs-user-typed name split exactly mirror `installData` — then gunzipped+untarred
+>   (`flate2`+`tar`) into the install dir (global if writable, else user, mirroring
+>   `canInstallGlobal`). The `builtinReferences` list (16 Ensembl genomes + aliases) is ported in
+>   `src/reference.rs`; the base URL defaults to `https://ngless-resources.big-data-biology.org/` and
+>   is overridable via `NGLESS_DOWNLOAD_BASE_URL`. Verified end-to-end against a fresh data dir. Not
+>   yet ported: the download progress bar, the `withLockFile` download lock (concurrent installs of
+>   the same ref can race), and URL-typed module references (Rust external modules carry no
+>   references yet). `qcstats({mapping})` is
 >   also done: each `map()` call records `(total, aligned, unique)` read groups into a mapping-stats
 >   accumulator (`register_map_stats` + the shared `sam_group_stats`, mirroring `samStatsC'` and
 >   `outputMappedSetStatistics`), and `qcstats({mapping})` serialises them to the transposed TSV

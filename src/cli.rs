@@ -277,6 +277,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         external_modules,
         constant_values,
         active_mappers,
+        (version.major, version.minor),
     )?;
     Ok(0)
 }

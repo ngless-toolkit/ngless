@@ -219,25 +219,9 @@ fn default_to_object(d: &crate::external_modules::DefaultVal) -> NGLessObject {
 }
 
 /// The NGLess data directories, in search order (user then global), mirroring `findDataFiles`'s
-/// `User <|> Root`. The user directory is `$HOME/.local/share/ngless/data` (as in
-/// `Configuration.hs`); the global one is `<binary-dir>/../share/ngless/data`.
-pub fn data_directories() -> Vec<String> {
-    let mut dirs = Vec::new();
-    if let Ok(home) = std::env::var("HOME") {
-        dirs.push(format!("{home}/.local/share/ngless/data"));
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(bindir) = exe.parent() {
-            dirs.push(
-                bindir
-                    .join("../share/ngless/data")
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-        }
-    }
-    dirs
-}
+/// `User <|> Root`. Defined in `crate::reference`; re-exported here for callers that look it up
+/// (e.g. external-module resolution in `cli.rs`).
+pub use crate::reference::data_directories;
 
 /// `example(input)`: the demo standard module function (mirrors `StandardModules.Example`).
 /// Prints diagnostic information (including the Haskell-`show` of its arguments) and returns the
@@ -361,6 +345,7 @@ pub fn interpret(
     external_modules: Vec<crate::external_modules::ExternalModule>,
     constants: Vec<(String, NGLessObject)>,
     active_mappers: Vec<String>,
+    ngl_version: (i64, i64),
 ) -> NgResult<()> {
     let mut env = HashMap::new();
     for (name, value) in constants {
@@ -378,6 +363,7 @@ pub fn interpret(
         subsample,
         external_modules,
         active_mappers,
+        ngl_version,
     };
     for (lno, e) in body {
         interp.cur_lno.set(*lno);
@@ -437,6 +423,9 @@ struct Interpreter {
     /// Mappers that may be requested by `map(mapper=...)` (mirrors `ngleMappersActive`). Always
     /// includes `bwa`; `minimap2` is added when the `minimap2` module is imported.
     active_mappers: Vec<String>,
+    /// The script's `(major, minor)` language version, used to build the version-namespaced
+    /// reference-download URL (mirrors `ngleVersion` in the `installData` URL construction).
+    ngl_version: (i64, i64),
 }
 
 /// Which external mapper a `map()` call uses (mirrors the `Mapper` dispatch in `Map.hs`). Only
@@ -1046,25 +1035,10 @@ impl Interpreter {
     /// `ensureDataPresent`/`findDataFiles`). The reference directory is named by the user-typed
     /// name (so `sacCer3` and its alias `Saccharomyces_cerevisiae_R64-1-1` resolve to separate,
     /// independently-installed directories) and is searched for in the user data directory first,
-    /// then the global one. Downloading a missing reference is not supported in this build.
+    /// then the global one. A missing builtin reference is downloaded from the configured base URL
+    /// (mirrors `installData`), using the script's language version for the URL's version directory.
     fn resolve_reference(&self, refname: &str) -> NgResult<String> {
-        for base in data_directories() {
-            let fa = Path::new(&base)
-                .join("References")
-                .join(refname)
-                .join("Sequence/BWAIndex/reference.fa.gz");
-            if fa.is_file() {
-                return Ok(fa.to_string_lossy().into_owned());
-            }
-        }
-        Err(NgError::new(
-            NgErrorType::DataError,
-            format!(
-                "Could not find reference '{refname}'. Packaged-reference download is not supported \
-                 in this build yet; install it with the Haskell build (it will be cached under \
-                 ~/.local/share/ngless/data/References/), or pass a local `fafile=` instead."
-            ),
-        ))
+        crate::reference::ensure_data_present(refname, self.ngl_version)
     }
 
     /// Run an external-module command function (mirrors `executeCommand`): encode the unnamed input
@@ -4212,6 +4186,7 @@ mod tests {
             Vec::new(),
             Vec::new(),
             vec!["bwa".to_string()],
+            (1, 5),
         )
     }
 

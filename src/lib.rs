@@ -25,6 +25,7 @@ pub mod mapper;
 pub mod minimap2;
 pub mod modules;
 pub mod parser;
+pub mod reference;
 pub mod sam;
 pub mod samtools;
 pub mod select;
