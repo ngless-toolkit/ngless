@@ -367,6 +367,7 @@ pub fn interpret(
         external_modules,
         active_mappers,
         ngl_version,
+        held_locks: Vec::new(),
     };
     for (lno, e) in body {
         interp.cur_lno.set(*lno);
@@ -429,6 +430,11 @@ struct Interpreter {
     /// The script's `(major, minor)` language version, used to build the version-namespaced
     /// reference-download URL (mirrors `ngleVersion` in the `installData` URL construction).
     ngl_version: (i64, i64),
+    /// Lock-file guards held by `lock1`/`run_for_all` for the duration of the run (mirrors the
+    /// `ReleaseKey`s registered in `executeLock1OrForAll`). Held here so the claimed `.lock` file
+    /// stays in place while the entry is processed and is released (removed) when the interpreter is
+    /// dropped at the end of the run.
+    held_locks: Vec<crate::lockfile::LockGuard>,
 }
 
 /// Which external mapper a `map()` call uses (mirrors the `Mapper` dispatch in `Map.hs`). Only
@@ -1745,7 +1751,10 @@ impl Interpreter {
         };
         let lockdir = self.setup_hash_directory(&prefix, "ngless-locks", &hash)?;
         let sane: Vec<String> = names.iter().map(|n| sanitize_path(n)).collect();
-        let chosen = get_lock(&lockdir, &sane)?;
+        let (chosen, guard) = get_lock(&lockdir, &sane)?;
+        // Hold the lock for the rest of the run (mirrors keeping the `ReleaseKey`); it is released
+        // when the interpreter is dropped.
+        self.held_locks.push(guard);
         Ok(entries[chosen].clone())
     }
 
@@ -3216,9 +3225,15 @@ fn sanitize_path(s: &str) -> String {
         .collect()
 }
 
-/// Claim a lock in `lockdir` for the first entry that is not finished, locked, or failed (mirrors
-/// the first pass of `getLock`). Creates the `<entry>.lock` file and returns the chosen index.
-fn get_lock(lockdir: &str, sane: &[String]) -> NgResult<usize> {
+/// Claim a lock in `lockdir` for the first entry that is not finished or failed (mirrors `getLock`,
+/// collapsing its not-locked/stale-locked passes into one: each candidate is claimed through the
+/// shared `lockfile::acquire_lock`, which atomically creates `<entry>.lock` with `O_CREAT|O_EXCL`
+/// and reclaims a stale lock — one older than an hour, the `getLock'` `maxAge` — so a crashed peer
+/// does not block forever). A held, fresh lock makes `acquire_lock` return `None`, so we move on to
+/// the next entry. Returns the chosen index and its [`LockGuard`], which the caller keeps alive for
+/// the run. A non-zero exit / contention message matches the Haskell text.
+fn get_lock(lockdir: &str, sane: &[String]) -> NgResult<(usize, crate::lockfile::LockGuard)> {
+    use crate::lockfile::{acquire_lock, LockParameters, WhenExistsStrategy};
     use std::collections::HashSet;
     let existing: HashSet<String> = std::fs::read_dir(lockdir)
         .map(|rd| {
@@ -3228,21 +3243,28 @@ fn get_lock(lockdir: &str, sane: &[String]) -> NgResult<usize> {
         })
         .unwrap_or_default();
     for (i, name) in sane.iter().enumerate() {
-        let finished = format!("{name}.finished");
-        let locked = format!("{name}.lock");
-        let failed = format!("{name}.failed");
-        if existing.contains(&finished) || existing.contains(&locked) || existing.contains(&failed)
+        if existing.contains(&format!("{name}.finished")) || existing.contains(&format!("{name}.failed"))
         {
             continue;
         }
-        let lockpath = format!("{lockdir}/{locked}");
-        std::fs::write(&lockpath, b"").map_err(|e| {
-            NgError::new(
-                NgErrorType::SystemError,
-                format!("Could not create lock '{lockpath}': {e}"),
-            )
-        })?;
-        return Ok(i);
+        let params = LockParameters {
+            lock_fname: PathBuf::from(format!("{lockdir}/{name}.lock")),
+            // One hour: lock files are mtime-refreshed every ten minutes while healthy, so an older
+            // one signals a crashed process (mirrors `getLock'`).
+            max_age: Duration::from_secs(60 * 60),
+            when_exists: WhenExistsStrategy::IfLockedNothing,
+            mtime_update: true,
+        };
+        if let Some(guard) = acquire_lock(params)? {
+            // Recheck `.finished` under the lock: a peer may have finished (and released the lock)
+            // between our directory scan and the acquire (mirrors the `doesFileExist finishedName`
+            // recheck in `getLock'`).
+            if Path::new(&format!("{lockdir}/{name}.finished")).exists() {
+                drop(guard);
+                continue;
+            }
+            return Ok((i, guard));
+        }
     }
     Err(NgError::new(
         NgErrorType::DataError,

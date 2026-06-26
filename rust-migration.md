@@ -230,7 +230,14 @@
 >   `<destdir>.download.lock`, 37×60 retries — rechecks `find_data_files` under the lock). The
 >   reference-download lock goes one step beyond Haskell, whose builtin `installData` path is
 >   unlocked (only URL-typed module references lock, via `downloadIfUrl`), closing the
->   concurrent-same-ref install race the migration plan flagged. 4 new unit tests pin
+>   concurrent-same-ref install race the migration plan flagged. The **parallel module's**
+>   `get_lock` (`lock1`/`run_for_all`) was unified onto this same primitive: it previously created
+>   `<entry>.lock` with a non-atomic `std::fs::write` and had no stale handling; it now claims each
+>   candidate through `acquire_lock` (`IfLockedNothing`, 1h max-age, `mtime_update` — matching
+>   Haskell's `getLock'`), which folds the not-locked/stale-locked passes of `getLock` into one loop
+>   and rechecks `.finished` under the lock. The claimed `LockGuard` is held in the interpreter
+>   (`held_locks`) for the run and released on drop, mirroring the `ReleaseKey` Haskell keeps (the
+>   `.finished`-on-success `FinishOkHook` remains unported, as before). 4 new unit tests pin
 >   acquire/release, held-lock back-off, stale reclamation, and `with_lock_file`; all 96 functional
 >   and 174 unit tests pass.
 
