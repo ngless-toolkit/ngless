@@ -66,6 +66,13 @@ impl NGLessObject {
     }
 }
 
+// Mirrors `Index` in `ast.rs` but with already-evaluated values. `IxOne` is for `[i]`, `IxTwo` for
+// `[a:b]`.
+pub enum IndexValue {
+    One(NGLessObject),
+    Two(Option<NGLessObject>, Option<NGLessObject>),
+}
+
 /// Format a double exactly the way Haskell's `show` does (`showFloat`/`formatRealFloat
 /// FFGeneric`): a fixed-point layout for exponents in `0..=7`, scientific notation otherwise,
 /// always with a fractional part (e.g. `1.0`, `36.0`, `3.896103896103896e-2`). The shortest
@@ -203,10 +210,10 @@ pub fn eval_unary(op: crate::ast::UOp, v: &NGLessObject) -> NgResult<NGLessObjec
 
 /// Evaluate an index expression, mirroring `_evalIndex`. `indices` is the already-evaluated
 /// index (one element for `[i]`, two for `[a:b]`).
-pub fn eval_index(v: &NGLessObject, indices: &[Option<NGLessObject>]) -> NgResult<NGLessObject> {
+pub fn eval_index(v: &NGLessObject, indices: &IndexValue) -> NgResult<NGLessObject> {
     use NGLessObject::*;
     match (v, indices) {
-        (List(elems), [Some(Integer(ix))]) => {
+        (List(elems), IndexValue::One(Integer(ix))) => {
             let ix = *ix;
             if ix < 0 || ix as usize >= elems.len() {
                 Err(NgError::script(format!(
@@ -218,9 +225,9 @@ pub fn eval_index(v: &NGLessObject, indices: &[Option<NGLessObject>]) -> NgResul
             }
         }
         // Read slicing, mirroring the IndexTwo cases of `_evalIndex`.
-        (Read(r), [Some(Integer(s)), None]) => read_slice(r, *s, r.len() as i64),
-        (Read(r), [None, Some(Integer(e))]) => read_slice(r, 0, *e),
-        (Read(r), [Some(Integer(s)), Some(Integer(e))]) => read_slice(r, *s, *e),
+        (Read(r), IndexValue::Two(Some(Integer(s)), None)) => read_slice(r, *s, r.len() as i64),
+        (Read(r), IndexValue::Two(None, Some(Integer(e)))) => read_slice(r, 0, *e),
+        (Read(r), IndexValue::Two(Some(Integer(s)), Some(Integer(e)))) => read_slice(r, *s, *e),
         _ => Err(NgError::script("_evalIndex: invalid operation")),
     }
 }
@@ -283,8 +290,11 @@ mod tests {
     #[test]
     fn index_list() {
         let l = List(vec![Integer(10), Integer(20)]);
-        assert_eq!(eval_index(&l, &[Some(Integer(1))]).unwrap(), Integer(20));
-        assert!(eval_index(&l, &[Some(Integer(5))]).is_err());
+        assert_eq!(
+            eval_index(&l, &IndexValue::One(Integer(1))).unwrap(),
+            Integer(20)
+        );
+        assert!(eval_index(&l, &IndexValue::One(Integer(5))).is_err());
     }
 
     // Mirrors Tests.hs `case_bop_*`: integer comparison/arithmetic operators.
@@ -346,17 +356,21 @@ mod tests {
 
         // read[5:] -> "CAA"
         assert_eq!(
-            eval_index(&read(), &[Some(Integer(5)), None]).unwrap(),
+            eval_index(&read(), &IndexValue::Two(Some(Integer(5)), None)).unwrap(),
             NGLessObject::Read(ShortRead::new("@IRIS", "CAA", vec![97, 97, 97]))
         );
         // read[:3] -> "AGT"
         assert_eq!(
-            eval_index(&read(), &[None, Some(Integer(3))]).unwrap(),
+            eval_index(&read(), &IndexValue::Two(None, Some(Integer(3)))).unwrap(),
             NGLessObject::Read(ShortRead::new("@IRIS", "AGT", vec![97, 97, 96]))
         );
         // read[2:5] -> "TAC"
         assert_eq!(
-            eval_index(&read(), &[Some(Integer(2)), Some(Integer(5))]).unwrap(),
+            eval_index(
+                &read(),
+                &IndexValue::Two(Some(Integer(2)), Some(Integer(5)))
+            )
+            .unwrap(),
             NGLessObject::Read(ShortRead::new("@IRIS", "TAC", vec![96, 97, 97]))
         );
     }

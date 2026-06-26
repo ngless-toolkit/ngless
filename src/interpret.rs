@@ -32,7 +32,7 @@ use crate::fastq::{self, FastQEncoding, FastQFilePath, ReadSet, ShortRead};
 use crate::lockfile::{with_lock_file, LockParameters, WhenExistsStrategy};
 use crate::sam::{self, encode_sam_line, group_sam_stream, SamItem, SamLine, SamRecord};
 use crate::select::{self, FilterAction, FilterOptions};
-use crate::values::{eval_binary, eval_index, eval_unary, show_double, NGLessObject};
+use crate::values::{eval_binary, eval_index, eval_unary, show_double, IndexValue, NGLessObject};
 
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -691,9 +691,9 @@ impl Interpreter {
         &self,
         ix: &Index,
         overlay: Option<(&str, &NGLessObject)>,
-    ) -> NgResult<Vec<Option<NGLessObject>>> {
+    ) -> NgResult<IndexValue> {
         match ix {
-            Index::One(a) => Ok(vec![Some(self.eval(a, overlay)?)]),
+            Index::One(a) => Ok(IndexValue::One(self.eval(a, overlay)?)),
             Index::Two(a, b) => {
                 let a = match a {
                     Some(a) => Some(self.eval(a, overlay)?),
@@ -703,7 +703,7 @@ impl Interpreter {
                     Some(b) => Some(self.eval(b, overlay)?),
                     None => None,
                 };
-                Ok(vec![a, b])
+                Ok(IndexValue::Two(a, b))
             }
         }
     }
