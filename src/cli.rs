@@ -2,12 +2,13 @@
 //! load → parse → version gate → type check → validate → interpret.
 //!
 //! Argument parsing is hand-rolled for the subset of flags currently used (notably by
-//! `run-tests.sh`): `-n/--validate-only`, `-t/--temporary-directory`, `--quiet`,
-//! `-v/--verbosity`, `--debug`, `--no-header`, and a single positional script path.
+//! `run-tests.sh`): `-n/--validate-only`, `-t/--temporary-directory`, `-q/--quiet`,
+//! `-v/--verbosity`, `--trace`, `--debug`, `--no-header`, and a single positional script path.
 
 use crate::ast::NGLType;
 use crate::errors::{NgError, NgResult};
 use crate::modules::{builtin_functions, NGLVersion};
+use crate::output::{self, Verbosity};
 
 /// Minimum language version this build supports (the rewrite drops pre-1.5 semantics).
 const MIN_VERSION: NGLVersion = NGLVersion { major: 1, minor: 5 };
@@ -17,6 +18,11 @@ struct RunOpts {
     script: Option<String>,
     validate_only: bool,
     quiet: bool,
+    /// `-v/--verbosity quiet|normal|full` (mirrors `parseVerbosity`). Defaults to `Normal`.
+    verbosity: Verbosity,
+    /// `--trace`: highest verbosity mode — print all levels, including `Trace` (mirrors
+    /// `trace_flag`/`nConfTrace`).
+    trace: bool,
     no_header: bool,
     debug: String,
     temp_dir: Option<String>,
@@ -85,7 +91,8 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
         let a = &args[i];
         match a.as_str() {
             "-n" | "--validate-only" => opts.validate_only = true,
-            "--quiet" => opts.quiet = true,
+            "-q" | "--quiet" => opts.quiet = true,
+            "--trace" => opts.trace = true,
             "--subsample" => opts.subsample = true,
             "--no-header" => opts.no_header = true,
             "-t" | "--temporary-directory" => {
@@ -94,7 +101,10 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
             }
             "-v" | "--verbosity" => {
                 i += 1;
-                let _ = arg_value(args, i, a)?; // consumed but not yet used
+                opts.verbosity = parse_verbosity(&arg_value(args, i, a)?)?;
+            }
+            other if other.starts_with("--verbosity=") => {
+                opts.verbosity = parse_verbosity(&other["--verbosity=".len()..])?;
             }
             "--debug" => {
                 i += 1;
@@ -131,6 +141,18 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
     Ok(opts)
 }
 
+/// Parse a `-v/--verbosity` value (mirrors `readVerbosity`: `quiet`/`normal`/`full`).
+fn parse_verbosity(s: &str) -> NgResult<Verbosity> {
+    match s {
+        "quiet" => Ok(Verbosity::Quiet),
+        "normal" => Ok(Verbosity::Normal),
+        "full" => Ok(Verbosity::Loud),
+        other => Err(NgError::script(format!(
+            "Cannot parse '{other}' as a verbosity (expected 'quiet', 'normal' or 'full')."
+        ))),
+    }
+}
+
 fn arg_value(args: &[String], idx: usize, flag: &str) -> NgResult<String> {
     args.get(idx)
         .cloned()
@@ -138,6 +160,11 @@ fn arg_value(args: &[String], idx: usize, flag: &str) -> NgResult<String> {
 }
 
 fn run_script(opts: &RunOpts) -> NgResult<i32> {
+    // Configure the global output layer before any diagnostics are emitted (mirrors building
+    // `nglConfiguration` from the parsed args). `--quiet` overrides `-v`; `--trace` forces the
+    // highest verbosity.
+    output::init(opts.verbosity, opts.quiet, opts.trace);
+
     let fname = opts
         .script
         .as_ref()
@@ -284,7 +311,6 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         constant_values,
         active_mappers,
         (version.major, version.minor),
-        opts.quiet,
     )?;
     Ok(0)
 }

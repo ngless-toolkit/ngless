@@ -349,7 +349,6 @@ pub fn interpret(
     constants: Vec<(String, NGLessObject)>,
     active_mappers: Vec<String>,
     ngl_version: (i64, i64),
-    quiet: bool,
 ) -> NgResult<()> {
     let mut env = HashMap::new();
     for (name, value) in constants {
@@ -368,13 +367,14 @@ pub fn interpret(
         external_modules,
         active_mappers,
         ngl_version,
-        quiet,
         held_locks: Vec::new(),
     };
     for (lno, e) in body {
         interp.cur_lno.set(*lno);
+        crate::output::trace(*lno, &format!("Interpreting [{lno}]: {e:?}"));
         interp.interpret_top(e)?;
     }
+    crate::output::info(0, "Interpretation finished.");
     Ok(())
 }
 
@@ -432,9 +432,6 @@ struct Interpreter {
     /// The script's `(major, minor)` language version, used to build the version-namespaced
     /// reference-download URL (mirrors `ngleVersion` in the `installData` URL construction).
     ngl_version: (i64, i64),
-    /// `--quiet`: suppress informational (`InfoOutput`-level) diagnostics, such as the
-    /// missing-partials guidance from `collect()` (mirrors `nConfVerbosity`/`setQuiet`).
-    quiet: bool,
     /// Lock-file guards held by `lock1`/`run_for_all` for the duration of the run (mirrors the
     /// `ReleaseKey`s registered in `executeLock1OrForAll`). Held here so the claimed `.lock` file
     /// stays in place while the entry is processed and is released (removed) when the interpreter is
@@ -1844,19 +1841,17 @@ impl Interpreter {
             // Not all partials are present: this is the normal case when the parallel module is
             // driven one sample per ngless invocation. Haskell defers this to a FinishOkHook; the
             // Rust port has no hook system, so we emit the same guidance now (it is purely
-            // informational — `collect` still returns successfully). Gated on `--quiet`, matching
-            // Haskell's `InfoOutput` verbosity level. Mirrors the message in `executeCollect`.
-            if !self.quiet {
-                let lno = self.cur_lno.get();
-                eprintln!(
-                    "The collect() call at line {lno} could not be executed as there are partial \
-                     results missing.\n\
-                     When you use the parallel module and the collect() function,\n\
-                     you typically need to run ngless *multiple times* (once per sample)!\n\n\n\
-                     For more information, see \
-                     https://ngless.readthedocs.io/en/latest/stdlib.html#parallel-module"
-                );
-            }
+            // informational — `collect` still returns successfully). Emitted at `Info` level, so it
+            // is suppressed by `--quiet`, matching Haskell. Mirrors the message in `executeCollect`.
+            let lno = self.cur_lno.get();
+            crate::output::info(
+                lno,
+                "The collect() call could not be executed as there are partial results missing.\n\
+                 When you use the parallel module and the collect() function,\n\
+                 you typically need to run ngless *multiple times* (once per sample)!\n\n\n\
+                 For more information, see \
+                 https://ngless.readthedocs.io/en/latest/stdlib.html#parallel-module",
+            );
         }
         Ok(NGLessObject::Void)
     }
@@ -3094,10 +3089,13 @@ fn split_fasta(block_size: i64, ifile: &str, ofile_base: &str) -> NgResult<Vec<S
         let mut sofar = seqs[idx].length;
         let first_fits = seqs[idx].length <= max_bps;
         if !first_fits {
-            eprintln!(
-                "While splitting file '{ifile}': a sequence is {} bases long (longer than the \
-                 block size). Note that NGLess does not split sequences.",
-                seqs[idx].length
+            crate::output::warn(
+                0,
+                &format!(
+                    "While splitting file '{ifile}': a sequence is {} bases long (longer than the \
+                     block size). Note that NGLess does not split sequences.",
+                    seqs[idx].length
+                ),
             );
         }
         idx += 1;
@@ -4332,7 +4330,6 @@ mod tests {
             Vec::new(),
             vec!["bwa".to_string()],
             (1, 5),
-            false,
         )
     }
 

@@ -161,9 +161,9 @@ fn install_data(refname: &str, ngl_version: (i64, i64)) -> NgResult<PathBuf> {
         if find_data_files(refname).is_some() {
             return Ok(());
         }
-        eprintln!("Starting download from {url}");
+        crate::output::info(0, &format!("Starting download from {url}"));
         download_expand_tar(&url, &destdir)?;
-        eprintln!("Reference download completed!");
+        crate::output::info(0, "Reference download completed!");
         Ok(())
     })?;
     Ok(destdir)

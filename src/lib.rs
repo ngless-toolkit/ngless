@@ -25,6 +25,7 @@ pub mod lockfile;
 pub mod mapper;
 pub mod minimap2;
 pub mod modules;
+pub mod output;
 pub mod parser;
 pub mod reference;
 pub mod sam;
@@ -72,8 +73,9 @@ pub(crate) fn help_text() -> String {
          Options:\n\
          \x20 -n, --validate-only            Only validate the script; do not run it\n\
          \x20 -t, --temporary-directory DIR  Directory for temporary files\n\
-         \x20 -v, --verbosity LEVEL          Set verbosity level\n\
-         \x20     --quiet                    Suppress informational output\n\
+         \x20 -v, --verbosity LEVEL          Set verbosity level (quiet|normal|full)\n\
+         \x20 -q, --quiet                    Suppress informational output\n\
+         \x20     --trace                    Highest verbosity mode (print all trace messages)\n\
          \x20     --subsample                Subsample mode (process only a fraction of the data)\n\
          \x20     --no-header                Do not print the run header\n\
          \x20     --debug MODE               Enable debug output (e.g. 'ast')\n\
