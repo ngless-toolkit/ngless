@@ -22,7 +22,7 @@ import qualified Data.Configurator as CF
 import CmdArgs
 
 defaultBaseURL :: FilePath
-defaultBaseURL = "https://ngless.embl.de/resources/"
+defaultBaseURL = "https://ngless-resources.big-data-biology.org/"
 
 data NGLessOutputDestination = NGLOutStdout | NGLOutStderr deriving (Eq, Show)
 

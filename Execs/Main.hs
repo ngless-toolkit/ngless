@@ -321,8 +321,10 @@ modeExec (CmdArgs.DownloadDemoMode demo) = do
     let known = ["gut-short", "ocean-short"]
     if demo `elem` known
         then do
-            let url = "https://ngless.embl.de/resources/Demos/" ++ demo ++ ".tar.gz"
-            runNGLessIO "downloading a demo" $ downloadExpandTar url "."
+            runNGLessIO "downloading a demo" $ do
+                baseURL <- nConfDownloadBaseURL <$> nglConfiguration
+                let url = baseURL </> "Demos" </> demo <.> "tar.gz"
+                downloadExpandTar url "."
             putStrLn ("\nDemo downloaded to " ++ demo)
         else do
             hPutStrLn stderr (redColor ++ "Unknown demo '"++ demo ++ "'.\n"++
