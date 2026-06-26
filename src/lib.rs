@@ -58,6 +58,47 @@ pub mod version {
     }
 }
 
+/// Usage/help text, listing the flags this build actually supports (see `cli::parse_args`).
+/// Used by `--help`/`-h` (printed to stdout) and as the usage message when no script is given
+/// (printed to stderr by `cli::run_default_mode`).
+pub(crate) fn help_text() -> String {
+    format!(
+        "{header}\n\
+         \n\
+         Usage: ngless [OPTIONS] SCRIPT [ARGS...]\n\
+         \n\
+         Run the ngless script SCRIPT. Any ARGS following it are exposed to the script as ARGV.\n\
+         \n\
+         Options:\n\
+         \x20 -n, --validate-only            Only validate the script; do not run it\n\
+         \x20 -t, --temporary-directory DIR  Directory for temporary files\n\
+         \x20 -v, --verbosity LEVEL          Set verbosity level\n\
+         \x20     --quiet                    Suppress informational output\n\
+         \x20     --subsample                Subsample mode (process only a fraction of the data)\n\
+         \x20     --no-header                Do not print the run header\n\
+         \x20     --debug MODE               Enable debug output (e.g. 'ast')\n\
+         \x20     --search-path PATH         Add a search path for references/indices (repeatable)\n\
+         \x20     --print-path EXEC          Print the resolved path to a bundled tool and exit\n\
+         \n\
+         Informational:\n\
+         \x20 -V, --version                  Print version and exit\n\
+         \x20     --version-short            Print short version string and exit\n\
+         \x20     --version-debug            Print detailed version information and exit\n\
+         \x20     --date-short               Print the release date and exit\n\
+         \x20     --check-install            Verify the installation and exit\n\
+         \x20 -h, --help                     Print this help message and exit\n\
+         \n\
+         ngless v{ver}(C) NGLess Authors 2013-2023\n\
+         For more information:\n\
+         \thttps://ngless.readthedocs.io\n\
+         For comments/discussion:\n\
+         \thttps://groups.google.com/forum/#!forum/ngless\n\
+         Citation: LP Coelho et al., 2019. https://doi.org/10.1186/s40168-019-0684-8.",
+        header = version::version_line(),
+        ver = version::VERSION_STR_LONG,
+    )
+}
+
 /// Handle a command line and return the process exit code.
 ///
 /// `args` should be the arguments *after* the program name (i.e. `env::args().skip(1)`).
@@ -100,6 +141,10 @@ where
                 return 0;
             }
             "--check-install" => return check_install(),
+            "-h" | "--help" => {
+                println!("{}", help_text());
+                return 0;
+            }
             _ => {}
         }
     }

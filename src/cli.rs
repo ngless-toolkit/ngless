@@ -38,6 +38,12 @@ pub fn run_default_mode(args: &[String]) -> i32 {
             return 1;
         }
     };
+    // No script to run: print the usage message (to stderr) rather than the generic
+    // fatal-error block, mirroring optparse-applicative's behavior on a missing argument.
+    if opts.script.is_none() {
+        eprintln!("{}", crate::help_text());
+        return 1;
+    }
     match run_script(&opts) {
         Ok(code) => code,
         Err(e) => {
