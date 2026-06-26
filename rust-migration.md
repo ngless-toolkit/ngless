@@ -7,7 +7,7 @@
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
 > **all 96 functional tests pass** against the Rust binary with output identical to
 > Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`), and
-> the 143 unit tests (`cargo test`) pass. See the
+> the 169 unit tests (`cargo test`) pass. See the
 > [Functional test status](#functional-test-status) table below for the per-test breakdown.
 > The 4 cases that previously failed were all external-tool version drift (assemble-gp/prodigal,
 > map-minimap2/minimap2 `@PG` line, samfile-select-view/samtools,
@@ -57,9 +57,34 @@
 >   and `tests/preprocess3` (paired preprocess + gz output + `qcstats` TSV). Their
 >   `ngless "1.1"` headers were bumped to `"1.5"` (these features have only minimum-version
 >   checks, no version-conditional behavior, so Haskell output is unchanged).
->   Simplifications to lift next: files are read whole rather than streamed (no
->   `FileOrStream`/bounded queues), bzip2/zstd compression, and per-position quality
->   percentiles.
+>   Remaining simplification: per-position quality percentiles.
+> - **M4a (FASTQ streaming — per-stage bounded memory):** the FASTQ path no longer reads whole
+>   files into memory. Two content-agnostic streaming primitives were added to
+>   `src/compression.rs`: `open_read(path) -> Box<dyn BufRead>` (decompressing by extension,
+>   decoders matching `read_bytes`) and `StreamWriter` (an enum over the gzip/bzip2/zstd/plain
+>   encoders — not a `Box<dyn Write>`, since each `finish(self)` consumes the concrete type —
+>   replicating `write_bytes`'s compression levels, with a mandatory `finish`). On top of them
+>   `src/fastq.rs` gained `fastq_records` (a lazy `ShortRead` iterator with `fq_decode`'s verbatim
+>   error messages), `FastQStatsAcc` (an incremental `stats_from_reads` fold, sequence-only so it
+>   is encoding-independent), and `detect_encoding_stream` (prefix-only). Every FASTQ consumer in
+>   `src/interpret.rs` was converted to bounded streaming: `load_and_qc` (`fastq`/`paired`) does
+>   two bounded passes (detect then a streaming stats fold) mirroring Haskell's `encodingFor` +
+>   `fqStatsC` and keeps referencing the original file unchanged; `uninterleave` streams through
+>   three `StreamWriter`s with a one-record holdover; `interleave_fastq` became
+>   `write_interleaved<W: Write>` (bwa now streams it straight to `bwa mem` stdin — safe since its
+>   stdout is redirected to a file — while minimap2 keeps buffering, as it already slurps all of
+>   stdout to sort); `execute_preprocess` opens three writers + three `FastQStatsAcc`s, streams
+>   pairs in lockstep (with `zip` short-circuit semantics) writing each surviving read immediately,
+>   then deletes the empty outputs and picks the same result shape as before; and the multi-file
+>   `write` concat streams via `io::copy` through one `StreamWriter` (the single-file
+>   `std::fs::copy` byte-copy fast path is untouched). The model is **per-stage bounded memory**:
+>   intermediate results still go to file-backed temp files (`NGLessObject` is unchanged, no lazy
+>   `Stream` carried in values), matching Haskell's `asFile`-at-every-`write` reality; cross-stage
+>   lazy streaming and the threaded `TBMQueue`/`asyncMapC` pipeline are deliberately out of scope
+>   (performance-only). 8 new unit tests pin each primitive to its whole-file analogue; all 96
+>   functional tests and 169 unit tests pass with byte-identical output. SAM/count/map streaming
+>   is a later milestone — the primitives are FASTQ-free and `fastq_records` is generic over
+>   `BufRead`, so they serve those conversions without rework.
 > - **M5 (mapping + SAM, partial):** a SAM data layer (`src/sam.rs`: full 12-field parse
 >   faithful to the Haskell `SimpleParser` — including its quirk that an 11-column line leaves
 >   `qual` empty and stores the qualities in `extra` — plus `encodeSamLine`, the flag predicates,

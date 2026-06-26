@@ -458,16 +458,14 @@ impl MapperKind {
     fn call_mapper(
         self,
         ref_index: &str,
-        interleaved: &[u8],
+        rs: &ReadSet,
         extra_args: &[String],
         out_sam: &Path,
     ) -> NgResult<()> {
         match self {
-            MapperKind::Bwa => {
-                crate::mapper::call_mapper(ref_index, interleaved, extra_args, out_sam)
-            }
+            MapperKind::Bwa => crate::mapper::call_mapper(ref_index, rs, extra_args, out_sam),
             MapperKind::Minimap2 => {
-                crate::minimap2::call_mapper(ref_index, interleaved, extra_args, out_sam)
+                crate::minimap2::call_mapper(ref_index, rs, extra_args, out_sam)
             }
         }
     }
@@ -1360,9 +1358,8 @@ impl Interpreter {
         rs: &ReadSet,
         extra_args: &[String],
     ) -> NgResult<PathBuf> {
-        let interleaved = interleave_fastq(rs)?;
         let out = self.new_temp_path("mapped_", "sam");
-        mapper.call_mapper(ref_index, &interleaved, extra_args, &out)?;
+        mapper.call_mapper(ref_index, rs, extra_args, &out)?;
         Ok(out)
     }
 
@@ -1987,21 +1984,27 @@ impl Interpreter {
     }
 
     /// Decode a FASTQ file, register its statistics under `label`, and return a reference to it
-    /// (mirrors `asFQFilePathMayQC` with QC enabled).
+    /// (mirrors `asFQFilePathMayQC` with QC enabled). Two bounded passes — encoding detection
+    /// (prefix only) then a streaming statistics fold — mirror Haskell's `encodingFor` followed
+    /// by `fqStatsC`, so memory stays bounded and the original file is referenced unchanged
+    /// (a later `write` reproduces it byte-for-byte). The decode pass still runs to completion,
+    /// so the `%4`/length errors fire in the same order (detect, then decode).
     fn load_and_qc(&self, path: &str, label: &str) -> NgResult<FastQFilePath> {
-        let text = read_fastq_text(path)?;
-        let encoding = fastq::detect_encoding(&text)?;
-        let reads = fastq::fq_decode(encoding, &text)?;
-        self.register_fq_stats(label, &reads, encoding);
+        let encoding = fastq::detect_encoding_stream(crate::compression::open_read(path)?)?;
+        let mut acc = fastq::FastQStatsAcc::new();
+        for r in fastq::fastq_records(crate::compression::open_read(path)?, encoding) {
+            acc.update(&r?);
+        }
+        self.register_fq_stats_from(label, &acc.finish(), encoding);
         Ok(FastQFilePath {
             encoding,
             path: PathBuf::from(path),
         })
     }
 
-    /// Compute and record FASTQ statistics for a set of reads (mirrors `outputFQStatistics`).
-    fn register_fq_stats(&self, label: &str, reads: &[ShortRead], enc: FastQEncoding) {
-        let st = fastq::stats_from_reads(reads);
+    /// Record an already-computed [`fastq::FastQStats`] under `label`, used by the streaming
+    /// QC passes (mirrors `outputFQStatistics` given the folded statistics).
+    fn register_fq_stats_from(&self, label: &str, st: &fastq::FastQStats, enc: FastQEncoding) {
         self.fq_stats.borrow_mut().push(FqInfo {
             file: label.to_string(),
             encoding: enc.name().to_string(),
@@ -2141,38 +2144,53 @@ impl Interpreter {
     /// become a mate pair; any record that does not pair with its successor is a singleton. The
     /// result is always one pair entry and one singletons entry, even when a file is empty.
     fn uninterleave(&self, path: &str) -> NgResult<ReadSet> {
-        let text = read_fastq_text(path)?;
-        let enc = fastq::detect_encoding(&text)?;
-        let reads = fastq::fq_decode(enc, &text)?;
+        let enc = fastq::detect_encoding_stream(crate::compression::open_read(path)?)?;
+        let (f1, f2, f3) = (
+            self.new_temp_path("uninterleave_", "fq"),
+            self.new_temp_path("uninterleave_", "fq"),
+            self.new_temp_path("uninterleave_", "fq"),
+        );
+        let mut w1 = crate::compression::StreamWriter::create(&f1.to_string_lossy())?;
+        let mut w2 = crate::compression::StreamWriter::create(&f2.to_string_lossy())?;
+        let mut ws = crate::compression::StreamWriter::create(&f3.to_string_lossy())?;
         // Statistics are computed over the whole input file (the `passthroughSink fqStatsC`).
-        self.register_fq_stats(path, &reads, enc);
-        let (mut p1, mut p2, mut s) = (String::new(), String::new(), String::new());
-        let mut i = 0;
-        while i < reads.len() {
-            if i + 1 < reads.len()
-                && fastq::compatible_header(&reads[i].header, &reads[i + 1].header)
-            {
-                p1.push_str(&fastq::fq_encode(enc, &reads[i]));
-                p2.push_str(&fastq::fq_encode(enc, &reads[i + 1]));
-                i += 2;
-            } else {
-                s.push_str(&fastq::fq_encode(enc, &reads[i]));
-                i += 1;
+        let mut acc = fastq::FastQStatsAcc::new();
+        let mut it = fastq::fastq_records(crate::compression::open_read(path)?, enc);
+        // One-record lookahead (not `Peekable`, so iterator errors propagate cleanly): a record
+        // is paired with its successor when their headers are compatible, else it is a singleton
+        // and the successor is re-examined as the next current record.
+        let mut held: Option<ShortRead> = None;
+        loop {
+            let cur = match held.take() {
+                Some(r) => r,
+                None => match it.next() {
+                    Some(r) => r?,
+                    None => break,
+                },
+            };
+            acc.update(&cur);
+            match it.next() {
+                Some(nxt) => {
+                    let nxt = nxt?;
+                    if fastq::compatible_header(&cur.header, &nxt.header) {
+                        acc.update(&nxt);
+                        w1.write_chunk(fastq::fq_encode(enc, &cur).as_bytes())?;
+                        w2.write_chunk(fastq::fq_encode(enc, &nxt).as_bytes())?;
+                    } else {
+                        ws.write_chunk(fastq::fq_encode(enc, &cur).as_bytes())?;
+                        held = Some(nxt);
+                    }
+                }
+                None => {
+                    ws.write_chunk(fastq::fq_encode(enc, &cur).as_bytes())?;
+                    break;
+                }
             }
         }
-        let write_temp = |contents: &str| -> NgResult<PathBuf> {
-            let p = self.new_temp_path("uninterleave_", "fq");
-            std::fs::write(&p, contents).map_err(|e| {
-                NgError::new(
-                    NgErrorType::SystemError,
-                    format!("Could not write temp file {}: {e}", p.display()),
-                )
-            })?;
-            Ok(p)
-        };
-        let f1 = write_temp(&p1)?;
-        let f2 = write_temp(&p2)?;
-        let f3 = write_temp(&s)?;
+        w1.finish()?;
+        w2.finish()?;
+        ws.finish()?;
+        self.register_fq_stats_from(path, &acc.finish(), enc);
         Ok(ReadSet {
             pairs: vec![(
                 FastQFilePath {
@@ -2245,13 +2263,16 @@ impl Interpreter {
         } else {
             let p3 = self.maybe_subsample(&mate3)?;
             // QC stats are registered for the singles file even if it is later dropped.
-            let text = read_fastq_text(&p3)?;
-            let enc3 = fastq::detect_encoding(&text)?;
-            let reads3 = fastq::fq_decode(enc3, &text)?;
-            self.register_fq_stats(&p3, &reads3, enc3);
+            let enc3 = fastq::detect_encoding_stream(crate::compression::open_read(&p3)?)?;
+            let mut acc3 = fastq::FastQStatsAcc::new();
+            for r in fastq::fastq_records(crate::compression::open_read(&p3)?, enc3) {
+                acc3.update(&r?);
+            }
+            let n_singles3 = acc3.n_seq();
+            self.register_fq_stats_from(&p3, &acc3.finish(), enc3);
             if f1.encoding != enc3 {
                 // Special case seen in the wild: an empty singles file with a default encoding.
-                if reads3.is_empty() {
+                if n_singles3 == 0 {
                     Vec::new()
                 } else {
                     return Err(NgError::new(NgErrorType::DataError,
@@ -2480,25 +2501,54 @@ impl Interpreter {
         let var = &block.variable.0;
         let keep_singles = true;
 
-        let (mut p1, mut p2, mut s): (Vec<ShortRead>, Vec<ShortRead>, Vec<ShortRead>) =
-            (Vec::new(), Vec::new(), Vec::new());
+        // Stream through three output writers (pair.1, pair.2, singles), collecting QC stats per
+        // output in one pass (mirrors executePreprocess: open all three, stream, then delete the
+        // empty ones and pick the result shape from the per-output counts). Temp paths are
+        // allocated up front in slot order; `.fq` => uncompressed (StreamWriter::Plain).
+        let p1path = self.new_temp_path("preprocessed.1.", "fq");
+        let p2path = self.new_temp_path("preprocessed.2.", "fq");
+        let spath = self.new_temp_path("preprocessed.singles.", "fq");
+        let mut w1 = crate::compression::StreamWriter::create(&p1path.to_string_lossy())?;
+        let mut w2 = crate::compression::StreamWriter::create(&p2path.to_string_lossy())?;
+        let mut ws = crate::compression::StreamWriter::create(&spath.to_string_lossy())?;
+        let (mut a1, mut a2, mut as_) = (
+            fastq::FastQStatsAcc::new(),
+            fastq::FastQStatsAcc::new(),
+            fastq::FastQStatsAcc::new(),
+        );
 
         for (f1, f2) in &rs.pairs {
-            let reads1 =
-                fastq::fq_decode(f1.encoding, &read_fastq_text(&f1.path.to_string_lossy())?)?;
-            let reads2 =
-                fastq::fq_decode(f2.encoding, &read_fastq_text(&f2.path.to_string_lossy())?)?;
-            for (r1, r2) in reads1.into_iter().zip(reads2.into_iter()) {
+            let mut it1 = fastq::fastq_records(
+                crate::compression::open_read(&f1.path.to_string_lossy())?,
+                f1.encoding,
+            );
+            let mut it2 = fastq::fastq_records(
+                crate::compression::open_read(&f2.path.to_string_lossy())?,
+                f2.encoding,
+            );
+            // `zip` semantics: read mate 1 first, and only then mate 2; stop at the shorter mate.
+            loop {
+                let r1 = match it1.next() {
+                    Some(r) => r?,
+                    None => break,
+                };
+                let r2 = match it2.next() {
+                    Some(r) => r?,
+                    None => break,
+                };
                 let o1 = self.run_block_on_read(var, r1, block)?;
                 let o2 = self.run_block_on_read(var, r2, block)?;
                 match (o1, o2) {
                     (Some(a), Some(b)) => {
-                        p1.push(a);
-                        p2.push(b);
+                        w1.write_chunk(fastq::fq_encode(outenc, &a).as_bytes())?;
+                        a1.update(&a);
+                        w2.write_chunk(fastq::fq_encode(outenc, &b).as_bytes())?;
+                        a2.update(&b);
                     }
                     (Some(r), None) | (None, Some(r)) => {
                         if keep_singles {
-                            s.push(r);
+                            ws.write_chunk(fastq::fq_encode(outenc, &r).as_bytes())?;
+                            as_.update(&r);
                         }
                     }
                     (None, None) => {}
@@ -2506,66 +2556,79 @@ impl Interpreter {
             }
         }
         for fqf in &rs.singletons {
-            let reads =
-                fastq::fq_decode(fqf.encoding, &read_fastq_text(&fqf.path.to_string_lossy())?)?;
-            for r in reads {
-                if let Some(sr) = self.run_block_on_read(var, r, block)? {
-                    s.push(sr);
+            for r in fastq::fastq_records(
+                crate::compression::open_read(&fqf.path.to_string_lossy())?,
+                fqf.encoding,
+            ) {
+                if let Some(sr) = self.run_block_on_read(var, r?, block)? {
+                    ws.write_chunk(fastq::fq_encode(outenc, &sr).as_bytes())?;
+                    as_.update(&sr);
                 }
             }
         }
+        w1.finish()?;
+        w2.finish()?;
+        ws.finish()?;
 
         // Register QC statistics for all three output slots, as executePreprocess does (before
         // deciding the result shape), labelled with the preprocess statement's line number.
         let lno = self.cur_lno.get();
-        self.register_fq_stats(&format!("preproc.lno{lno}.pairs.1"), &p1, outenc);
-        self.register_fq_stats(&format!("preproc.lno{lno}.pairs.2"), &p2, outenc);
-        self.register_fq_stats(&format!("preproc.lno{lno}.singles"), &s, outenc);
+        self.register_fq_stats_from(&format!("preproc.lno{lno}.pairs.1"), &a1.finish(), outenc);
+        self.register_fq_stats_from(&format!("preproc.lno{lno}.pairs.2"), &a2.finish(), outenc);
+        self.register_fq_stats_from(&format!("preproc.lno{lno}.singles"), &as_.finish(), outenc);
 
-        // Choose the result shape exactly as executePreprocess does, materialising only the
-        // temp files the result references.
-        let (n_pairs, n_singles) = (p1.len(), s.len());
-        let make = |this: &Self, prefix: &str, reads: &[ShortRead]| -> NgResult<FastQFilePath> {
-            let mut data = String::new();
-            for r in reads {
-                data.push_str(&fastq::fq_encode(outenc, r));
+        // Choose the result shape exactly as executePreprocess does, then delete the temp files
+        // the result does not reference (instead of never writing them — unobservable, and what
+        // Haskell does).
+        let (n_pairs, n_singles) = (a1.n_seq() > 0, as_.n_seq() > 0);
+        let f1 = FastQFilePath {
+            encoding: outenc,
+            path: p1path.clone(),
+        };
+        let f2 = FastQFilePath {
+            encoding: outenc,
+            path: p2path.clone(),
+        };
+        let fs = FastQFilePath {
+            encoding: outenc,
+            path: spath.clone(),
+        };
+        // `keep` flags are [pair.1, pair.2, singles].
+        let (readset, keep) = match (n_pairs, n_singles) {
+            (true, false) => (
+                ReadSet {
+                    pairs: vec![(f1, f2)],
+                    singletons: Vec::new(),
+                },
+                [true, true, false],
+            ),
+            (false, true) => (
+                ReadSet {
+                    pairs: Vec::new(),
+                    singletons: vec![fs],
+                },
+                [false, false, true],
+            ),
+            _ if rs.pairs.is_empty() => (
+                ReadSet {
+                    pairs: Vec::new(),
+                    singletons: vec![fs],
+                },
+                [false, false, true],
+            ),
+            _ => (
+                ReadSet {
+                    pairs: vec![(f1, f2)],
+                    singletons: vec![fs],
+                },
+                [true, true, true],
+            ),
+        };
+        for (kept, path) in [(keep[0], &p1path), (keep[1], &p2path), (keep[2], &spath)] {
+            if !kept {
+                let _ = std::fs::remove_file(path);
             }
-            let path = this.new_temp_path(prefix, "fq");
-            std::fs::write(&path, data).map_err(|e| {
-                NgError::new(
-                    NgErrorType::SystemError,
-                    format!("Could not write temp file {}: {e}", path.display()),
-                )
-            })?;
-            Ok(FastQFilePath {
-                encoding: outenc,
-                path,
-            })
-        };
-        let readset = match (n_pairs > 0, n_singles > 0) {
-            (true, false) => ReadSet {
-                pairs: vec![(
-                    make(self, "preprocessed.1.", &p1)?,
-                    make(self, "preprocessed.2.", &p2)?,
-                )],
-                singletons: Vec::new(),
-            },
-            (false, true) => ReadSet {
-                pairs: Vec::new(),
-                singletons: vec![make(self, "preprocessed.singles.", &s)?],
-            },
-            _ if rs.pairs.is_empty() => ReadSet {
-                pairs: Vec::new(),
-                singletons: vec![make(self, "preprocessed.singles.", &s)?],
-            },
-            _ => ReadSet {
-                pairs: vec![(
-                    make(self, "preprocessed.1.", &p1)?,
-                    make(self, "preprocessed.2.", &p2)?,
-                )],
-                singletons: vec![make(self, "preprocessed.singles.", &s)?],
-            },
-        };
+        }
         Ok(NGLessObject::ReadSet { name, readset })
     }
 
@@ -2786,45 +2849,78 @@ fn read_sam_text(path: &str) -> NgResult<String> {
     crate::compression::read_to_string(path)
 }
 
-/// Interleave a read set into a single FASTQ byte stream for `bwa mem -p` (mirrors
-/// `interleaveFQs`): each pair is emitted record-by-record (mate 1's record, then mate 2's),
-/// re-normalised to LF line endings; the singleton files are then appended verbatim
-/// (decompressed). Both mates of a pair must have the same number of lines.
-fn interleave_fastq(rs: &ReadSet) -> NgResult<Vec<u8>> {
-    let mut out: Vec<u8> = Vec::new();
-    for (f1, f2) in &rs.pairs {
-        let t1 = read_fastq_text(&f1.path.to_string_lossy())?;
-        let t2 = read_fastq_text(&f2.path.to_string_lossy())?;
-        let l1: Vec<&str> = t1.lines().collect();
-        let l2: Vec<&str> = t2.lines().collect();
-        if l1.len() != l2.len() {
-            return Err(NgError::should_not_occur(format!(
-                "interleavePair: mismatched lengths: ({}, {})",
-                l1.len(),
-                l2.len()
-            )));
+/// Stream a read set as a single interleaved FASTQ byte stream into `out`, for `bwa mem -p`
+/// (mirrors `interleaveFQs`): each pair is emitted record-by-record (mate 1's record, then
+/// mate 2's), re-normalised to LF line endings; the singleton files are then appended verbatim
+/// (decompressed). Bounded memory — at most a few lines are held at once. Both mates of a pair
+/// must have the same number of lines.
+pub(crate) fn write_interleaved<W: Write>(rs: &ReadSet, out: &mut W) -> NgResult<()> {
+    let werr = |e: std::io::Error| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!("Could not write interleaved reads: {e}"),
+        )
+    };
+    // Read one line (newline-stripped, `\r\n`-aware) from a boxed reader; `None` at EOF.
+    fn read_one(it: &mut dyn std::io::BufRead) -> NgResult<Option<String>> {
+        let mut s = String::new();
+        let n = it.read_line(&mut s).map_err(|e| {
+            NgError::new(
+                NgErrorType::DataError,
+                format!("Could not read FastQ input: {e}"),
+            )
+        })?;
+        if n == 0 {
+            return Ok(None);
         }
-        let mut i = 0;
-        while i < l1.len() {
-            for k in 0..4 {
-                if let Some(line) = l1.get(i + k) {
-                    out.extend_from_slice(line.as_bytes());
-                    out.push(b'\n');
-                }
+        if s.ends_with('\n') {
+            s.pop();
+            if s.ends_with('\r') {
+                s.pop();
             }
-            for k in 0..4 {
-                if let Some(line) = l2.get(i + k) {
-                    out.extend_from_slice(line.as_bytes());
-                    out.push(b'\n');
-                }
+        }
+        Ok(Some(s))
+    }
+    let take4 = |it: &mut dyn std::io::BufRead| -> NgResult<Vec<String>> {
+        let mut v = Vec::with_capacity(4);
+        for _ in 0..4 {
+            match read_one(it)? {
+                Some(l) => v.push(l),
+                None => break,
             }
-            i += 4;
+        }
+        Ok(v)
+    };
+    for (f1, f2) in &rs.pairs {
+        let mut a = crate::compression::open_read(&f1.path.to_string_lossy())?;
+        let mut b = crate::compression::open_read(&f2.path.to_string_lossy())?;
+        loop {
+            let q1 = take4(&mut *a)?;
+            let q2 = take4(&mut *b)?;
+            if q1.is_empty() && q2.is_empty() {
+                break;
+            }
+            if q1.len() != q2.len() {
+                return Err(NgError::should_not_occur(format!(
+                    "interleavePair: mismatched lengths: ({}, {})",
+                    q1.len(),
+                    q2.len()
+                )));
+            }
+            for l in q1.iter().chain(q2.iter()) {
+                out.write_all(l.as_bytes()).map_err(werr)?;
+                out.write_all(b"\n").map_err(werr)?;
+            }
         }
     }
     for s in &rs.singletons {
-        out.extend_from_slice(&crate::compression::read_bytes(&s.path.to_string_lossy())?);
+        std::io::copy(
+            &mut crate::compression::open_read(&s.path.to_string_lossy())?,
+            out,
+        )
+        .map_err(werr)?;
     }
-    Ok(out)
+    Ok(())
 }
 
 /// Candidate paths for a FASTA reference under the search path (mirrors `expandPath'`). With no
@@ -3326,8 +3422,9 @@ fn execute_write(
         // output, which may be STDOUT (`/dev/stdout`). Mirrors the `interleaveFQs` branch of
         // `executeWrite`; no per-mate filename derivation (so no extension check on STDOUT).
         NGLessObject::ReadSet { readset, .. } if format_flags.as_deref() == Some("interleaved") => {
-            let data = interleave_fastq(readset)?;
-            crate::compression::write_bytes(&ofile, &data)?;
+            let mut w = crate::compression::StreamWriter::create(&ofile)?;
+            write_interleaved(readset, &mut w)?;
+            w.finish()?;
             Ok(NGLessObject::String(ofile))
         }
         NGLessObject::ReadSet { readset, .. } => {
@@ -3386,16 +3483,26 @@ fn format_fq_oname(base: &str, insert: &str) -> NgResult<String> {
 /// is copied/recompressed, several are concatenated (decompressed) then compressed to `ofile`,
 /// and an empty list produces an empty output file.
 fn write_fq_files(files: &[&FastQFilePath], ofile: &str) -> NgResult<()> {
-    use crate::compression::{read_bytes, write_bytes};
+    use crate::compression::{open_read, write_bytes, StreamWriter};
     match files {
         [] => write_bytes(ofile, b""),
+        // Single file keeps the verbatim `std::fs::copy` byte-copy fast path (load-bearing for
+        // write byte-identity of un-preprocessed sets).
         [single] => copy_fastq(&single.path, ofile),
+        // Stream each decompressed input through one compressing writer: the encoder sees the
+        // identical concatenated byte stream, so the output is content-equivalent to
+        // decompress-all-then-`write_bytes`, but bounded in memory.
         many => {
-            let mut data = Vec::new();
+            let mut w = StreamWriter::create(ofile)?;
             for f in many {
-                data.extend(read_bytes(&f.path.to_string_lossy())?);
+                std::io::copy(&mut open_read(&f.path.to_string_lossy())?, &mut w).map_err(|e| {
+                    NgError::new(
+                        NgErrorType::SystemError,
+                        format!("Could not write {ofile}: {e}"),
+                    )
+                })?;
             }
-            write_bytes(ofile, &data)
+            w.finish()
         }
     }
 }

@@ -7,9 +7,10 @@
 //! streaming pipeline (compressed I/O, parallel decode, the `preprocess` block interpreter)
 //! is a later milestone.
 
+use std::io::BufRead;
 use std::path::PathBuf;
 
-use crate::errors::{NgError, NgResult};
+use crate::errors::{NgError, NgErrorType, NgResult};
 
 /// A single read, with qualities already decoded to integer values.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -217,6 +218,205 @@ pub fn fq_decode(enc: FastQEncoding, text: &str) -> NgResult<Vec<ShortRead>> {
         out.push(ShortRead::new(rid, rseq, qualities));
     }
     Ok(out)
+}
+
+/// Read one line, returning `None` at clean EOF. Strips a trailing `\n` then `\r`, matching
+/// both `str::lines()` and Haskell's `lineWindowsTerminated` (so `\r\n` inputs decode the same
+/// as `\n`). Reading into a `String` requires valid UTF-8, as the whole-file path did.
+fn read_norm_line<R: BufRead>(reader: &mut R) -> NgResult<Option<String>> {
+    let mut s = String::new();
+    let n = reader.read_line(&mut s).map_err(|e| {
+        NgError::new(
+            NgErrorType::DataError,
+            format!("Could not read FastQ input: {e}"),
+        )
+    })?;
+    if n == 0 {
+        return Ok(None);
+    }
+    if s.ends_with('\n') {
+        s.pop();
+        if s.ends_with('\r') {
+            s.pop();
+        }
+    }
+    Ok(Some(s))
+}
+
+/// A lazy, bounded-memory iterator over the FASTQ records of a reader (mirrors a streaming
+/// `fqDecodeC`). Reads four lines per record; the `+` line is ignored, as in [`fq_decode`].
+/// When fully consumed it reproduces `fq_decode`'s validation: a clean EOF at a record
+/// boundary ends the iterator, 1–3 leftover lines yield the "not a multiple of 4" error, and a
+/// sequence/quality length mismatch yields the same error as the whole-file decoder.
+pub struct FastqReader<R: BufRead> {
+    reader: R,
+    offset: i32,
+}
+
+pub fn fastq_records<R: BufRead>(reader: R, enc: FastQEncoding) -> FastqReader<R> {
+    FastqReader {
+        reader,
+        offset: enc.offset(),
+    }
+}
+
+impl<R: BufRead> Iterator for FastqReader<R> {
+    type Item = NgResult<ShortRead>;
+
+    fn next(&mut self) -> Option<NgResult<ShortRead>> {
+        let not_mult4 = || {
+            NgError::new(
+                NgErrorType::DataError,
+                "Number of input lines in FastQ file is not a multiple of 4",
+            )
+        };
+        // Line 0 (header): clean EOF here ends the stream.
+        let header = match read_norm_line(&mut self.reader) {
+            Ok(Some(l)) => l,
+            Ok(None) => return None,
+            Err(e) => return Some(Err(e)),
+        };
+        // Lines 1..=3: EOF before completing the record is a non-multiple-of-4 error.
+        let mut next_line = || match read_norm_line(&mut self.reader) {
+            Ok(Some(l)) => Ok(l),
+            Ok(None) => Err(not_mult4()),
+            Err(e) => Err(e),
+        };
+        let rseq = match next_line() {
+            Ok(l) => l,
+            Err(e) => return Some(Err(e)),
+        };
+        let _plus = match next_line() {
+            Ok(l) => l,
+            Err(e) => return Some(Err(e)),
+        };
+        let rqs = match next_line() {
+            Ok(l) => l,
+            Err(e) => return Some(Err(e)),
+        };
+        if rseq.len() != rqs.len() {
+            return Some(Err(NgError::new(
+                NgErrorType::DataError,
+                "Length of quality line is not the same as sequence",
+            )));
+        }
+        let qualities = rqs
+            .bytes()
+            .map(|b| (b as i32 - self.offset) as i8)
+            .collect();
+        Some(Ok(ShortRead::new(&header, &rseq, qualities)))
+    }
+}
+
+/// Incremental version of [`stats_from_reads`]: fold reads one at a time so QC statistics can
+/// be collected during a single streaming pass. Uses only the sequence (never qualities), so it
+/// is independent of the quality encoding — which is what lets the QC pass be decoupled from
+/// encoding detection. `finish` on an empty accumulator yields `(min_len, max_len) =
+/// (i64::MAX, 0)`, exactly as `stats_from_reads(&[])`.
+#[derive(Clone, Debug)]
+pub struct FastQStatsAcc {
+    n_seq: i64,
+    min_len: i64,
+    max_len: i64,
+    a: i64,
+    c: i64,
+    g: i64,
+    t: i64,
+    o: i64,
+}
+
+impl Default for FastQStatsAcc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FastQStatsAcc {
+    pub fn new() -> Self {
+        FastQStatsAcc {
+            n_seq: 0,
+            min_len: i64::MAX,
+            max_len: 0,
+            a: 0,
+            c: 0,
+            g: 0,
+            t: 0,
+            o: 0,
+        }
+    }
+
+    /// Number of reads folded so far (used by `preprocess` to decide the result shape).
+    pub fn n_seq(&self) -> i64 {
+        self.n_seq
+    }
+
+    pub fn update(&mut self, sr: &ShortRead) {
+        let len = sr.sequence.len() as i64;
+        self.min_len = self.min_len.min(len);
+        self.max_len = self.max_len.max(len);
+        self.n_seq += 1;
+        for &b in sr.sequence.as_bytes() {
+            match b.to_ascii_lowercase() {
+                b'a' => self.a += 1,
+                b'c' => self.c += 1,
+                b'g' => self.g += 1,
+                b't' => self.t += 1,
+                _ => self.o += 1,
+            }
+        }
+    }
+
+    pub fn finish(&self) -> FastQStats {
+        FastQStats {
+            n_seq: self.n_seq,
+            min_len: self.min_len,
+            max_len: self.max_len,
+            bp: (self.a, self.c, self.g, self.t, self.o),
+        }
+    }
+}
+
+/// Streaming version of [`detect_encoding`]: scan only as far as needed to decide. Mirrors
+/// `detect_encoding`'s asymmetry with `fq_decode` — a trailing partial (`<4`-line) record is
+/// silently ignored rather than an error.
+pub fn detect_encoding_stream<R: BufRead>(mut reader: R) -> NgResult<FastQEncoding> {
+    let mut minv: u8 = 255;
+    let mut maxv: u8 = 0;
+    loop {
+        // A record needs all four lines; a short tail just ends the scan (no error).
+        if read_norm_line(&mut reader)?.is_none() {
+            break;
+        }
+        if read_norm_line(&mut reader)?.is_none() {
+            break;
+        }
+        if read_norm_line(&mut reader)?.is_none() {
+            break;
+        }
+        let qs = match read_norm_line(&mut reader)? {
+            Some(l) => l,
+            None => break,
+        };
+        let qs = qs.as_bytes();
+        if qs.is_empty() {
+            continue;
+        }
+        minv = minv.min(*qs.iter().min().unwrap());
+        maxv = maxv.max(*qs.iter().max().unwrap());
+        if minv < 33 {
+            return Err(NgError::new(
+                NgErrorType::DataError,
+                format!("No known encodings with chars < 33 (Yours was {minv})."),
+            ));
+        }
+        if minv < 58 {
+            return Ok(FastQEncoding::Sanger);
+        }
+        if maxv >= 33 + 45 {
+            return Ok(FastQEncoding::Solexa);
+        }
+    }
+    Ok(FastQEncoding::Sanger)
 }
 
 /// Guess the FASTQ quality encoding from the quality lines, mirroring `encodingFor`
@@ -533,6 +733,95 @@ mod tests {
         let z = withn.n_to_zero_quality();
         assert_eq!(z.qualities, vec![10, 0, 30, 0]);
         assert_eq!(z.sequence, "AnGN");
+    }
+
+    #[test]
+    fn fastq_records_matches_fq_decode() {
+        let enc = FastQEncoding::Sanger;
+        let text: String = reads3().iter().map(|r| fq_encode(enc, r)).collect();
+        let streamed: NgResult<Vec<ShortRead>> = fastq_records(text.as_bytes(), enc).collect();
+        assert_eq!(streamed.unwrap(), fq_decode(enc, &text).unwrap());
+    }
+
+    #[test]
+    fn fastq_records_missing_final_newline() {
+        // Same record, with and without a trailing newline, decode identically (matches lines()).
+        let enc = FastQEncoding::Sanger;
+        let with_nl = "@r\nACGT\n+\nIIII\n";
+        let without_nl = "@r\nACGT\n+\nIIII";
+        let a: Vec<ShortRead> = fastq_records(with_nl.as_bytes(), enc)
+            .collect::<NgResult<_>>()
+            .unwrap();
+        let b: Vec<ShortRead> = fastq_records(without_nl.as_bytes(), enc)
+            .collect::<NgResult<_>>()
+            .unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a.len(), 1);
+    }
+
+    #[test]
+    fn fastq_records_error_cases() {
+        let enc = FastQEncoding::Sanger;
+        // 1-3 leftover lines => not-a-multiple-of-4 (verbatim message).
+        let partial: NgResult<Vec<ShortRead>> =
+            fastq_records("@r\nACGT\n+\n".as_bytes(), enc).collect();
+        let err = partial.unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Number of input lines in FastQ file is not a multiple of 4"));
+        // seq/qual length mismatch (verbatim message).
+        let mismatch: NgResult<Vec<ShortRead>> =
+            fastq_records("@r\nACGT\n+\nII\n".as_bytes(), enc).collect();
+        assert!(mismatch
+            .unwrap_err()
+            .to_string()
+            .contains("Length of quality line is not the same as sequence"));
+    }
+
+    #[test]
+    fn fastq_records_crlf() {
+        // \r\n line endings decode the same as \n (the qualities must not include \r).
+        let enc = FastQEncoding::Sanger;
+        let lf: Vec<ShortRead> = fastq_records("@r\nACGT\n+\nIIII\n".as_bytes(), enc)
+            .collect::<NgResult<_>>()
+            .unwrap();
+        let crlf: Vec<ShortRead> = fastq_records("@r\r\nACGT\r\n+\r\nIIII\r\n".as_bytes(), enc)
+            .collect::<NgResult<_>>()
+            .unwrap();
+        assert_eq!(lf, crlf);
+    }
+
+    #[test]
+    fn stats_acc_matches_stats_from_reads() {
+        let reads = reads3();
+        let mut acc = FastQStatsAcc::new();
+        for r in &reads {
+            acc.update(r);
+        }
+        assert_eq!(acc.finish(), stats_from_reads(&reads));
+        // Empty => same as stats_from_reads(&[]) (min_len = i64::MAX, max_len = 0).
+        assert_eq!(FastQStatsAcc::new().finish(), stats_from_reads(&[]));
+    }
+
+    #[test]
+    fn detect_encoding_stream_matches_whole_file() {
+        for text in [
+            "@r\nAC\n+\n#I\n",
+            "@r\nGTCAGGACAAT\n+\n<=>?@ABCAWA\n",
+            "@r\nAC\n+\nKK\n",
+        ] {
+            assert_eq!(
+                detect_encoding_stream(text.as_bytes()).unwrap(),
+                detect_encoding(text).unwrap()
+            );
+        }
+        // < 33 is an error in both.
+        assert!(detect_encoding_stream("@r\nAC\n+\n A\n".as_bytes()).is_err());
+        // Trailing partial record is silently ignored (no error), like detect_encoding.
+        assert_eq!(
+            detect_encoding_stream("@r\nAC\n+\n#I\n@partial\nAC\n".as_bytes()).unwrap(),
+            FastQEncoding::Sanger
+        );
     }
 
     #[test]

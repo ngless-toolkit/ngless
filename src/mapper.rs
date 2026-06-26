@@ -7,7 +7,6 @@
 //! runtime and embedded in the index file names so that indices built with one bwa do not get
 //! reused by another (mirrors `indexPrefix`, which uses the compile-time `bwaVersion`).
 
-use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
@@ -108,7 +107,7 @@ pub fn create_index(fafile: &str) -> NgResult<()> {
 /// independent of the thread count; `-p` reads interleaved paired reads from the input.
 pub fn call_mapper(
     ref_index: &str,
-    interleaved: &[u8],
+    rs: &crate::fastq::ReadSet,
     extra_args: &[String],
     out_sam: &Path,
 ) -> NgResult<()> {
@@ -142,8 +141,8 @@ pub fn call_mapper(
             format!("Could not start bwa mem: {e}"),
         )
     })?;
-    // Feed the interleaved reads on stdin. stdout is redirected straight to the output file, so
-    // there is no risk of a pipe deadlock here.
+    // Stream the interleaved reads on stdin (bounded memory). stdout is redirected straight to
+    // the output file, so a blocking write here cannot deadlock against the SAM output.
     {
         let mut stdin = child.stdin.take().ok_or_else(|| {
             NgError::new(
@@ -151,12 +150,7 @@ pub fn call_mapper(
                 "bwa mem: could not open stdin".to_string(),
             )
         })?;
-        stdin.write_all(interleaved).map_err(|e| {
-            NgError::new(
-                NgErrorType::SystemError,
-                format!("bwa mem: could not write reads to stdin: {e}"),
-            )
-        })?;
+        crate::interpret::write_interleaved(rs, &mut stdin)?;
         // `stdin` is dropped here, closing the pipe.
     }
     let out = child.wait_with_output().map_err(|e| {

@@ -119,7 +119,7 @@ pub fn create_index(fafile: &str) -> NgResult<()> {
 /// reference is the raw FASTA (not the `.mm2.idx`), matching the Haskell module.
 pub fn call_mapper(
     ref_fasta: &str,
-    interleaved: &[u8],
+    rs: &crate::fastq::ReadSet,
     extra_args: &[String],
     out_sam: &Path,
 ) -> NgResult<()> {
@@ -143,8 +143,11 @@ pub fn call_mapper(
             format!("Could not start minimap2: {e}"),
         )
     })?;
-    // Feed the interleaved reads on stdin from a separate thread so that a large SAM output on
-    // stdout cannot fill its pipe and deadlock against our blocking write.
+    // Interleave into a buffer, then feed stdin from a separate thread so that a large SAM output
+    // on stdout cannot fill its pipe and deadlock against our blocking write. (minimap2 already
+    // slurps all of stdout to sort it, so this path is not bounded-memory regardless.)
+    let mut reads: Vec<u8> = Vec::new();
+    crate::interpret::write_interleaved(rs, &mut reads)?;
     {
         let mut stdin = child.stdin.take().ok_or_else(|| {
             NgError::new(
@@ -152,7 +155,6 @@ pub fn call_mapper(
                 "minimap2: could not open stdin".to_string(),
             )
         })?;
-        let reads = interleaved.to_vec();
         std::thread::spawn(move || {
             let _ = stdin.write_all(&reads);
             // `stdin` is dropped here, closing the pipe.
