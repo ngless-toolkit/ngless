@@ -85,6 +85,26 @@
 >   functional tests and 169 unit tests pass with byte-identical output. SAM/count/map streaming
 >   is a later milestone — the primitives are FASTQ-free and `fastq_records` is generic over
 >   `BufRead`, so they serve those conversions without rework.
+> - **M4b (SAM streaming — `select`/`count`/`mapstats` bounded memory):** the SAM read path no
+>   longer slurps whole files into memory for the main consumers. `src/sam.rs` gained `open_sam(path)
+>   -> SamReader` (transparently decompresses gzip via `compression::open_read` and decodes BAM by
+>   piping `samtools view -h` through `samtools::bam_to_sam_child` rather than capturing all of
+>   stdout — the child is waited on and a non-zero exit reported at EOF) and `group_sam_stream(path,
+>   paired) -> SamGroups`, a lazy `Iterator<Item = NgResult<SamItem>>` reproducing the old whole-file
+>   `group_sam` grouping exactly (header lines verbatim; consecutive same-read-name records — and,
+>   when not `paired`, the same first-in-pair bit — form one data group). `src/interpret.rs`
+>   consumers were converted: `execute_select`/`execute_select_block` stream groups straight to the
+>   output SAM line-by-line (`sam_temp_writer`, a `BufWriter` over a plain `.sam` temp, replacing the
+>   in-memory `String`); `execute_count` peels the leading `@SQ` header items into `sq_header` then
+>   feeds the remaining groups lazily — `count::perform_count` now takes
+>   `IntoIterator<Item = NgResult<Vec<SamLine>>>` (it needs `sq_header` up front to build annotators,
+>   and all `@SQ` headers precede the alignments); `execute_mapstats`/`register_map_stats` fold over
+>   groups via `sam_group_stats_stream` (the whole-file `sam_group_stats` removed, its per-group body
+>   extracted to `tally_group`); and `merge_sam_files` reads each partial via the streaming iterator.
+>   `execute_as_reads` is the one remaining whole-file SAM consumer (it buffers the reconstructed
+>   FASTQ and detects encoding over the whole output; deferred — its output is O(n) regardless). 1
+>   new unit test (`sam::stream_grouping_matches_whole_file`) pins the iterator to an in-tree
+>   whole-file reference; all 96 functional and 170 unit tests pass with byte-identical output.
 > - **M5 (mapping + SAM, partial):** a SAM data layer (`src/sam.rs`: full 12-field parse
 >   faithful to the Haskell `SimpleParser` — including its quirk that an 11-column line leaves
 >   `qual` empty and stores the qualities in `extra` — plus `encodeSamLine`, the flag predicates,

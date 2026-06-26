@@ -50,6 +50,24 @@ pub fn bam_to_sam_text(bamfile: &str) -> NgResult<String> {
     })
 }
 
+/// Spawn `samtools view -h` on a BAM file with its stdout piped, for *streaming* the SAM text
+/// (mirrors `samBamConduit` for `.bam`, but without slurping). The caller reads from the child's
+/// stdout and must `wait()` for the child once EOF is reached to surface a non-zero exit.
+pub fn bam_to_sam_child(bamfile: &str) -> NgResult<std::process::Child> {
+    use std::process::Stdio;
+    Command::new(samtools_bin())
+        .args(["view", "-h", bamfile])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not run samtools (view): {e}"),
+            )
+        })
+}
+
 /// Convert a SAM file to BAM, writing to `out` (mirrors `convertSamToBam`:
 /// `samtools view -bS -o out in`).
 pub fn convert_sam_to_bam(samfile: &Path, out: &Path) -> NgResult<()> {

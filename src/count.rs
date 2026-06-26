@@ -3,8 +3,8 @@
 //! `count()` annotates each mapped read group with feature indices (one of three modes:
 //! sequence names, a GFF/GTF file, or a MOCAT-style functional map), then accumulates per-feature
 //! counts, distributes multi-mappers and normalizes. The output is the counts TSV. The Haskell
-//! code is heavily threaded/streamed for performance; this port reads the SAM whole and processes
-//! read groups serially, which is deterministic and parity-preserving.
+//! code is heavily threaded/streamed for performance; this port streams read groups serially
+//! (`perform_count` takes a lazy group iterator), which is deterministic and parity-preserving.
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -299,12 +299,15 @@ fn annotate_sam_gff(
 ///
 /// `groups` are the read groups (consecutive SAM records sharing a read name, both mates
 /// together) and `sq_header` is the `@SQ` `(name, length)` list in header order.
-pub fn perform_count(
-    groups: &[Vec<SamLine>],
+pub fn perform_count<I>(
+    groups: I,
     sq_header: &[(String, i64)],
     sample_name: &str,
     opts: &CountOpts,
-) -> NgResult<String> {
+) -> NgResult<String>
+where
+    I: IntoIterator<Item = NgResult<Vec<SamLine>>>,
+{
     let annotators = load_annotators(opts, sq_header)?;
 
     let mut counts: Vec<Vec<f64>> = annotators.iter().map(|a| vec![0.0; a.ann_size()]).collect();
@@ -312,8 +315,9 @@ pub fn perform_count(
         (0..annotators.len()).map(|_| Vec::new()).collect();
 
     for g in groups {
+        let g = g?;
         for (ai, ann) in annotators.iter().enumerate() {
-            let idxs = ann.annotate_read_group(opts, g)?;
+            let idxs = ann.annotate_read_group(opts, &g)?;
             let c = &mut counts[ai];
             if idxs.len() == 1 {
                 c[idxs[0]] += 1.0;
@@ -803,7 +807,7 @@ mod tests {
             vec![sl("seq1", 5, 0, 10)],
             vec![sl("seq2", 1, 0, 10)],
         ];
-        let tsv = perform_count(&groups, &header, "s", &opts).unwrap();
+        let tsv = perform_count(groups.iter().cloned().map(Ok), &header, "s", &opts).unwrap();
         assert_eq!(tsv, "\ts\n-1\t0\nseq1\t2\nseq2\t1\n");
     }
 
@@ -813,7 +817,7 @@ mod tests {
         opts.norm_mode = NMode::Normed;
         let header = vec![("seq1".to_string(), 1000i64)];
         let groups = vec![vec![sl("seq1", 1, 0, 10)], vec![sl("seq1", 5, 0, 10)]];
-        let tsv = perform_count(&groups, &header, "s", &opts).unwrap();
+        let tsv = perform_count(groups.iter().cloned().map(Ok), &header, "s", &opts).unwrap();
         assert_eq!(tsv, "\ts\n-1\t0\nseq1\t0.002\n");
     }
 
@@ -823,7 +827,7 @@ mod tests {
         opts.norm_mode = NMode::Scaled;
         let header = vec![("seq1".to_string(), 1000i64)];
         let groups = vec![vec![sl("seq1", 1, 0, 10)], vec![sl("seq1", 5, 0, 10)]];
-        let tsv = perform_count(&groups, &header, "s", &opts).unwrap();
+        let tsv = perform_count(groups.iter().cloned().map(Ok), &header, "s", &opts).unwrap();
         // initial sum (excluding -1) is 2; size-normalize then rescale back to 2.
         assert_eq!(tsv, "\ts\n-1\t0\nseq1\t2\n");
     }
@@ -834,7 +838,7 @@ mod tests {
         opts.norm_mode = NMode::Fpkm;
         let header = vec![("seq1".to_string(), 1000i64)];
         let groups = vec![vec![sl("seq1", 1, 0, 10)], vec![sl("seq1", 5, 0, 10)]];
-        let tsv = perform_count(&groups, &header, "s", &opts).unwrap();
+        let tsv = perform_count(groups.iter().cloned().map(Ok), &header, "s", &opts).unwrap();
         // count 2, size 1000: normed = 0.002; factor = 1e9 / 2 -> 0.002 * 5e8 = 1e6.
         assert_eq!(tsv, "\ts\n-1\t0\nseq1\t1000000\n");
     }

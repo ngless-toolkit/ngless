@@ -28,7 +28,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::ast::*;
 use crate::errors::{NgError, NgErrorType, NgResult};
 use crate::fastq::{self, FastQEncoding, FastQFilePath, ReadSet, ShortRead};
-use crate::sam::{self, encode_sam_line, is_header_line, parse_sam_line, SamLine, SamRecord};
+use crate::sam::{self, encode_sam_line, group_sam_stream, SamItem, SamLine, SamRecord};
 use crate::select::{self, FilterAction, FilterOptions};
 use crate::values::{eval_binary, eval_index, eval_unary, show_double, NGLessObject};
 
@@ -164,30 +164,31 @@ fn subsample_text(text: &str) -> String {
     out
 }
 
-/// Summarise SAM alignment records as (total, aligned, unique) read groups (mirrors `samStatsC'`).
-/// Records are grouped by consecutive read name (both mates together); a group is *aligned* if any
-/// record aligns, and *unique* if aligned and all its records share one reference name.
-fn sam_group_stats(lines: &[&SamLine]) -> (i64, i64, i64) {
-    let (mut total, mut aligned, mut unique) = (0i64, 0i64, 0i64);
-    let mut i = 0;
-    while i < lines.len() {
-        let mut j = i + 1;
-        while j < lines.len() && lines[j].qname == lines[i].qname {
-            j += 1;
+/// Tally one read-name group into the `aligned`/`unique` counters (the per-group body of
+/// `samStatsC'`).
+fn tally_group(group: &[&SamLine], aligned: &mut i64, unique: &mut i64) {
+    let is_aligned = group.iter().any(|l| l.is_aligned());
+    let same_rname = group.iter().all(|l| l.rname == group[0].rname);
+    if is_aligned {
+        *aligned += 1;
+        if same_rname {
+            *unique += 1;
         }
-        let group = &lines[i..j];
-        total += 1;
-        let is_aligned = group.iter().any(|l| l.is_aligned());
-        let same_rname = group.iter().all(|l| l.rname == group[0].rname);
-        if is_aligned {
-            aligned += 1;
-            if same_rname {
-                unique += 1;
-            }
-        }
-        i = j;
     }
-    (total, aligned, unique)
+}
+
+/// Streaming `samStatsC'`: compute (total, aligned, unique) read groups directly from a SAM/BAM
+/// file without holding it in memory (groups by consecutive read name, mirroring `sam_group_stats`).
+fn sam_group_stats_stream(path: &str) -> NgResult<(i64, i64, i64)> {
+    let (mut total, mut aligned, mut unique) = (0i64, 0i64, 0i64);
+    for item in group_sam_stream(path, true)? {
+        if let SamItem::Data(g) = item? {
+            total += 1;
+            let lines: Vec<&SamLine> = g.iter().map(|(s, _)| s).collect();
+            tally_group(&lines, &mut aligned, &mut unique);
+        }
+    }
+    Ok((total, aligned, unique))
 }
 
 /// Runtime values of the constants contributed by a standard module (mirrors `modConstants`).
@@ -825,30 +826,37 @@ impl Interpreter {
         let (name, path) = mapped_read_set(expr, "count")?;
         let opts = parse_count_opts(args)?;
 
-        let text = read_sam_text(&path.to_string_lossy())?;
-        let records = sam::parse_sam(&text)?;
+        // Stream the SAM in read-name groups (mirroring the conduit pipeline) to keep memory
+        // bounded — no more than one read group is held at a time. All `@SQ` headers precede the
+        // alignment records, so we eagerly consume the leading header items into `sq_header` (which
+        // `perform_count` needs up front to build its annotators), stopping at the first data group,
+        // then feed the remaining groups lazily.
+        let mut stream = group_sam_stream(&path.to_string_lossy(), true)?;
         let mut sq_header: Vec<(String, i64)> = Vec::new();
-        let mut groups: Vec<Vec<SamLine>> = Vec::new();
-        for rec in records {
-            match rec {
-                SamRecord::Header(h) => {
+        let mut first_group: Option<Vec<SamLine>> = None;
+        for item in stream.by_ref() {
+            match item? {
+                SamItem::Header(h) => {
                     if let Some(sq) = parse_sq_header(&h) {
                         sq_header.push(sq);
                     }
                 }
-                SamRecord::Line(l) => {
-                    if let Some(last) = groups.last_mut() {
-                        if last[0].qname == l.qname {
-                            last.push(l);
-                            continue;
-                        }
-                    }
-                    groups.push(vec![l]);
+                SamItem::Data(g) => {
+                    first_group = Some(g.into_iter().map(|(s, _)| s).collect());
+                    break;
                 }
             }
         }
+        // Any header appearing after the first alignment is not valid SAM and is ignored (it cannot
+        // retroactively change the already-built annotators).
+        let rest = stream.filter_map(|item| match item {
+            Ok(SamItem::Header(_)) => None,
+            Ok(SamItem::Data(g)) => Some(Ok(g.into_iter().map(|(s, _)| s).collect())),
+            Err(e) => Some(Err(e)),
+        });
+        let groups = first_group.map(Ok).into_iter().chain(rest);
 
-        let tsv = crate::count::perform_count(&groups, &sq_header, &name, &opts)?;
+        let tsv = crate::count::perform_count(groups, &sq_header, &name, &opts)?;
         let out = self.new_temp_path("counts.", "txt");
         std::fs::write(&out, tsv).map_err(|e| {
             NgError::new(
@@ -865,17 +873,7 @@ impl Interpreter {
     /// records share one reference name.
     fn execute_mapstats(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
         let (name, path) = mapped_read_set(expr, "mapstats")?;
-        let text = read_sam_text(&path.to_string_lossy())?;
-        let records = sam::parse_sam(&text)?;
-        let lines: Vec<&SamLine> = records
-            .iter()
-            .filter_map(|r| match r {
-                SamRecord::Line(l) => Some(l),
-                SamRecord::Header(_) => None,
-            })
-            .collect();
-
-        let (total, aligned, unique) = sam_group_stats(&lines);
+        let (total, aligned, unique) = sam_group_stats_stream(&path.to_string_lossy())?;
 
         let tsv = format!("\t{name}\ntotal\t{total}\naligned\t{aligned}\nunique\t{unique}\n");
         let out = self.new_temp_path("sam_stats_", "stats");
@@ -1302,16 +1300,7 @@ impl Interpreter {
     /// Compute (total, aligned, unique) read groups for a freshly-mapped SAM and record them in the
     /// mapping-stats accumulator (mirrors the `addMapOutput` in `outputMappedSetStatistics`).
     fn register_map_stats(&self, sam: &Path, reference: &str) -> NgResult<()> {
-        let text = read_sam_text(&sam.to_string_lossy())?;
-        let records = sam::parse_sam(&text)?;
-        let lines: Vec<&SamLine> = records
-            .iter()
-            .filter_map(|r| match r {
-                SamRecord::Line(l) => Some(l),
-                SamRecord::Header(_) => None,
-            })
-            .collect();
-        let (total, aligned, unique) = sam_group_stats(&lines);
+        let (total, aligned, unique) = sam_group_stats_stream(&sam.to_string_lossy())?;
         self.map_stats.borrow_mut().push(MapInfo {
             lno: self.cur_lno.get(),
             input_file: sam.to_string_lossy().into_owned(),
@@ -1429,10 +1418,9 @@ impl Interpreter {
         let mut headers: Vec<String> = Vec::new();
         let mut per_file: Vec<Vec<Vec<SamLine>>> = Vec::new();
         for p in partials {
-            let text = read_sam_text(&p.to_string_lossy())?;
             let mut groups = Vec::new();
-            for item in group_sam(&text, true)? {
-                match item {
+            for item in group_sam_stream(&p.to_string_lossy(), true)? {
+                match item? {
                     SamItem::Header(h) => headers.push(h),
                     SamItem::Data(g) => groups.push(g.into_iter().map(|(s, _)| s).collect()),
                 }
@@ -1515,24 +1503,22 @@ impl Interpreter {
         let keep_if = lookup_symbol_list(args, "keep_if");
         let drop_if = lookup_symbol_list(args, "drop_if");
         let cond = select::parse_conditions(&keep_if, &drop_if)?;
-        let text = read_sam_text(&path.to_string_lossy())?;
-        let mut out = String::new();
-        for item in group_sam(&text, paired)? {
-            match item {
+        let outpath = self.new_temp_path("selected_", "sam");
+        let mut out = sam_temp_writer(&outpath)?;
+        for item in group_sam_stream(&path.to_string_lossy(), paired)? {
+            match item? {
                 SamItem::Header(line) => {
-                    out.push_str(&line);
-                    out.push('\n');
+                    writeln!(out, "{line}").map_err(sam_write_err)?;
                 }
                 SamItem::Data(group) => {
                     let filtered = select::apply_conditions(&cond, group.clone());
                     for line in reinject_call(&group, filtered)? {
-                        out.push_str(&line);
-                        out.push('\n');
+                        writeln!(out, "{line}").map_err(sam_write_err)?;
                     }
                 }
             }
         }
-        let outpath = self.write_sam_temp(&out)?;
+        out.flush().map_err(sam_write_err)?;
         Ok(NGLessObject::MappedReadSet {
             name,
             path: outpath,
@@ -1551,13 +1537,12 @@ impl Interpreter {
         let (name, path) = mapped_read_set(expr, "select")?;
         let paired = lookup_bool(args, "paired", true)?;
         let var = &block.variable.0;
-        let text = read_sam_text(&path.to_string_lossy())?;
-        let mut out = String::new();
-        for item in group_sam(&text, paired)? {
-            match item {
+        let outpath = self.new_temp_path("selected_", "sam");
+        let mut out = sam_temp_writer(&outpath)?;
+        for item in group_sam_stream(&path.to_string_lossy(), paired)? {
+            match item? {
                 SamItem::Header(line) => {
-                    out.push_str(&line);
-                    out.push('\n');
+                    writeln!(out, "{line}").map_err(sam_write_err)?;
                 }
                 SamItem::Data(group) => {
                     let group_lines: Vec<SamLine> = group.iter().map(|(s, _)| s.clone()).collect();
@@ -1581,13 +1566,12 @@ impl Interpreter {
                         continue;
                     }
                     for l in select::reinject_sequences(&group_lines, &rs)? {
-                        out.push_str(&encode_sam_line(&l));
-                        out.push('\n');
+                        writeln!(out, "{}", encode_sam_line(&l)).map_err(sam_write_err)?;
                     }
                 }
             }
         }
-        let outpath = self.write_sam_temp(&out)?;
+        out.flush().map_err(sam_write_err)?;
         Ok(NGLessObject::MappedReadSet {
             name,
             path: outpath,
@@ -2840,6 +2824,25 @@ fn read_fastq_text(path: &str) -> NgResult<String> {
     crate::compression::read_to_string(path)
 }
 
+/// A buffered writer over a fresh plain-SAM temp file, for streaming `select` output line-by-line.
+fn sam_temp_writer(path: &Path) -> NgResult<std::io::BufWriter<std::fs::File>> {
+    let f = std::fs::File::create(path).map_err(|e| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!("Could not write temp file {}: {e}", path.display()),
+        )
+    })?;
+    Ok(std::io::BufWriter::new(f))
+}
+
+/// Error wrapper for a failed SAM write.
+fn sam_write_err(e: std::io::Error) -> NgError {
+    NgError::new(
+        NgErrorType::SystemError,
+        format!("Could not write SAM output: {e}"),
+    )
+}
+
 /// Read a SAM file into memory. BAM is decoded via samtools (mirrors `samBamConduit`); gzip is
 /// transparent.
 fn read_sam_text(path: &str) -> NgResult<String> {
@@ -3092,53 +3095,6 @@ fn pick_best(group: Vec<SamLine>) -> Vec<SamLine> {
         .into_iter()
         .filter(|s| s.is_aligned() && match_value(s) == best)
         .collect()
-}
-
-/// One grouping unit of a SAM file for `select`: a header line (verbatim) or a group of
-/// alignment records (with their original raw lines) that share a read name.
-enum SamItem {
-    Header(String),
-    Data(Vec<(SamLine, String)>),
-}
-
-/// Group SAM text the way `select` does (mirrors `readSamGroupsAsConduit`): header lines are
-/// each their own item; consecutive alignment lines with the same read name (and, when not
-/// `paired`, the same first-in-pair bit) form one data group.
-fn group_sam(text: &str, paired: bool) -> NgResult<Vec<SamItem>> {
-    let mut items = Vec::new();
-    let mut cur: Vec<(SamLine, String)> = Vec::new();
-    let mut cur_key: Option<(String, bool)> = None;
-    for line in text.lines() {
-        if line.is_empty() {
-            continue;
-        }
-        if is_header_line(line) {
-            if !cur.is_empty() {
-                items.push(SamItem::Data(std::mem::take(&mut cur)));
-            }
-            cur_key = None;
-            items.push(SamItem::Header(line.to_string()));
-            continue;
-        }
-        let sl = parse_sam_line(line)?;
-        let key = (
-            sl.qname.clone(),
-            if paired { false } else { sl.is_first_in_pair() },
-        );
-        if cur_key.as_ref() == Some(&key) {
-            cur.push((sl, line.to_string()));
-        } else {
-            if !cur.is_empty() {
-                items.push(SamItem::Data(std::mem::take(&mut cur)));
-            }
-            cur_key = Some(key);
-            cur.push((sl, line.to_string()));
-        }
-    }
-    if !cur.is_empty() {
-        items.push(SamItem::Data(cur));
-    }
-    Ok(items)
 }
 
 /// Produce the output lines for one filtered group in the `select` *call* form (mirrors
@@ -4108,6 +4064,7 @@ fn type_label(v: &NGLessObject) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sam::parse_sam_line;
 
     #[test]
     fn count_file_unordered_is_normalized() {

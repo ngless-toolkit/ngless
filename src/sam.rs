@@ -4,6 +4,8 @@
 //! exactly as `encodeSamLine`, and provides the flag predicates, CIGAR match-size/identity
 //! helpers and the `fixCigar` rewrite used by `select`/`as_reads`.
 
+use std::io::BufRead;
+
 use crate::errors::{NgError, NgErrorType, NgResult};
 
 /// One line of a SAM file: either a header (`@...`, kept verbatim) or an alignment record.
@@ -279,6 +281,178 @@ fn read_int(input: &str) -> Option<(i64, &str)> {
     Some((if neg { -val } else { val }, &input[i..]))
 }
 
+/// A streaming reader over the *text* of a SAM/BAM file: transparently decompresses gzip
+/// (via `compression::open_read`) and decodes BAM by piping `samtools view -h` (mirrors
+/// `samBamConduit`). Unlike `read_sam_text`, the whole file is never held in memory.
+pub struct SamReader {
+    inner: Box<dyn BufRead>,
+    /// The `samtools` child for BAM input; kept alive so its stdout stays open and `wait()`-ed
+    /// on EOF to surface a non-zero exit.
+    child: Option<std::process::Child>,
+    buf: String,
+}
+
+impl SamReader {
+    /// Read the next line (newline stripped). `None` at EOF, at which point the BAM child (if any)
+    /// is waited on and a non-zero exit is reported as an error.
+    fn next_line(&mut self) -> NgResult<Option<String>> {
+        self.buf.clear();
+        let n = self.inner.read_line(&mut self.buf).map_err(|e| {
+            NgError::new(NgErrorType::DataError, format!("Could not read SAM input: {e}"))
+        })?;
+        if n == 0 {
+            self.finish()?;
+            return Ok(None);
+        }
+        if self.buf.ends_with('\n') {
+            self.buf.pop();
+            if self.buf.ends_with('\r') {
+                self.buf.pop();
+            }
+        }
+        Ok(Some(std::mem::take(&mut self.buf)))
+    }
+
+    /// Wait for the BAM `samtools` child (if any) and error on a non-zero exit.
+    fn finish(&mut self) -> NgResult<()> {
+        if let Some(mut child) = self.child.take() {
+            let mut stderr = String::new();
+            if let Some(mut e) = child.stderr.take() {
+                use std::io::Read;
+                let _ = e.read_to_string(&mut stderr);
+            }
+            let status = child.wait().map_err(|e| {
+                NgError::new(NgErrorType::SystemError, format!("samtools view failed: {e}"))
+            })?;
+            if !status.success() {
+                return Err(NgError::new(
+                    NgErrorType::SystemError,
+                    format!(
+                        "Failed samtools view (exit {:?}).\nError message was:\n{stderr}",
+                        status.code()
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Open a SAM/BAM file for streaming line-by-line (BAM decoded via samtools, gzip transparent).
+pub fn open_sam(path: &str) -> NgResult<SamReader> {
+    if path.ends_with(".bam") {
+        let mut child = crate::samtools::bam_to_sam_child(path)?;
+        let stdout = child.stdout.take().ok_or_else(|| {
+            NgError::new(NgErrorType::SystemError, "samtools view: no stdout pipe".to_string())
+        })?;
+        Ok(SamReader {
+            inner: Box::new(std::io::BufReader::new(stdout)),
+            child: Some(child),
+            buf: String::new(),
+        })
+    } else {
+        Ok(SamReader {
+            inner: crate::compression::open_read(path)?,
+            child: None,
+            buf: String::new(),
+        })
+    }
+}
+
+/// One grouping unit of a SAM file: a header line (verbatim) or a group of alignment records
+/// (with their original raw lines) that share a read name. Mirrors `readSamGroupsAsConduit`'s
+/// output: header lines are each their own item; consecutive alignment lines with the same read
+/// name (and, when not `paired`, the same first-in-pair bit) form one data group.
+pub enum SamItem {
+    Header(String),
+    Data(Vec<(SamLine, String)>),
+}
+
+/// Lazy iterator over `SamItem`s, the streaming analogue of the old whole-file `group_sam`.
+pub struct SamGroups {
+    reader: SamReader,
+    paired: bool,
+    cur: Vec<(SamLine, String)>,
+    cur_key: Option<(String, bool)>,
+    /// A line already read but not yet consumed (held back to start the next group/header).
+    pending: Option<String>,
+    done: bool,
+}
+
+/// Open `path` and group its records the way `select` does (see `SamItem`).
+pub fn group_sam_stream(path: &str, paired: bool) -> NgResult<SamGroups> {
+    Ok(SamGroups {
+        reader: open_sam(path)?,
+        paired,
+        cur: Vec::new(),
+        cur_key: None,
+        pending: None,
+        done: false,
+    })
+}
+
+impl Iterator for SamGroups {
+    type Item = NgResult<SamItem>;
+
+    fn next(&mut self) -> Option<NgResult<SamItem>> {
+        if self.done {
+            return None;
+        }
+        loop {
+            let line = match self.pending.take() {
+                Some(l) => l,
+                None => match self.reader.next_line() {
+                    Ok(Some(l)) => l,
+                    Ok(None) => {
+                        self.done = true;
+                        if !self.cur.is_empty() {
+                            self.cur_key = None;
+                            return Some(Ok(SamItem::Data(std::mem::take(&mut self.cur))));
+                        }
+                        return None;
+                    }
+                    Err(e) => {
+                        self.done = true;
+                        return Some(Err(e));
+                    }
+                },
+            };
+            if line.is_empty() {
+                continue;
+            }
+            if is_header_line(&line) {
+                if !self.cur.is_empty() {
+                    self.pending = Some(line);
+                    self.cur_key = None;
+                    return Some(Ok(SamItem::Data(std::mem::take(&mut self.cur))));
+                }
+                return Some(Ok(SamItem::Header(line)));
+            }
+            let sl = match parse_sam_line(&line) {
+                Ok(s) => s,
+                Err(e) => {
+                    self.done = true;
+                    return Some(Err(e));
+                }
+            };
+            let key = (
+                sl.qname.clone(),
+                if self.paired { false } else { sl.is_first_in_pair() },
+            );
+            if self.cur_key.as_ref() == Some(&key) {
+                self.cur.push((sl, line));
+            } else if !self.cur.is_empty() {
+                self.pending = Some(line);
+                self.cur_key = None;
+                return Some(Ok(SamItem::Data(std::mem::take(&mut self.cur))));
+            } else {
+                self.cur_key = Some(key);
+                self.cur.push((sl, line));
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -379,6 +553,79 @@ mod tests {
     #[test]
     fn too_few_fields_errors() {
         assert!(parse_sam("r1\t0\t*\n").is_err());
+    }
+
+    /// Reference (whole-file) grouping: the same logic the streaming `SamGroups` replaces. Used to
+    /// pin the streaming iterator to its in-memory analogue.
+    fn group_sam_whole(text: &str, paired: bool) -> Vec<SamItem> {
+        let mut items = Vec::new();
+        let mut cur: Vec<(SamLine, String)> = Vec::new();
+        let mut cur_key: Option<(String, bool)> = None;
+        for line in text.lines() {
+            if line.is_empty() {
+                continue;
+            }
+            if is_header_line(line) {
+                if !cur.is_empty() {
+                    items.push(SamItem::Data(std::mem::take(&mut cur)));
+                }
+                cur_key = None;
+                items.push(SamItem::Header(line.to_string()));
+                continue;
+            }
+            let sl = parse_sam_line(line).unwrap();
+            let key = (sl.qname.clone(), if paired { false } else { sl.is_first_in_pair() });
+            if cur_key.as_ref() == Some(&key) {
+                cur.push((sl, line.to_string()));
+            } else {
+                if !cur.is_empty() {
+                    items.push(SamItem::Data(std::mem::take(&mut cur)));
+                }
+                cur_key = Some(key);
+                cur.push((sl, line.to_string()));
+            }
+        }
+        if !cur.is_empty() {
+            items.push(SamItem::Data(cur));
+        }
+        items
+    }
+
+    fn item_shape(it: &SamItem) -> String {
+        match it {
+            SamItem::Header(h) => format!("H:{h}"),
+            SamItem::Data(g) => {
+                let raws: Vec<&str> = g.iter().map(|(_, raw)| raw.as_str()).collect();
+                format!("D:{}", raws.join("|"))
+            }
+        }
+    }
+
+    #[test]
+    fn stream_grouping_matches_whole_file() {
+        // Headers, a singleton, an unpaired mate pair, and a 3-record same-name group.
+        let sam = "@HD\tVN:1.0\n\
+                   @SQ\tSN:g1\tLN:100\n\
+                   r1\t0\tg1\t1\t60\t4M\t*\t0\t0\tACGT\tIIII\tNM:i:0\n\
+                   r2\t77\tg1\t1\t60\t4M\t*\t0\t0\tACGT\tIIII\tNM:i:0\n\
+                   r2\t141\tg1\t1\t60\t4M\t*\t0\t0\tTTTT\tHHHH\tNM:i:0\n\
+                   r3\t0\tg1\t1\t60\t4M\t*\t0\t0\tAAAA\tIIII\tNM:i:0\n\
+                   r3\t0\tg1\t5\t60\t4M\t*\t0\t0\tCCCC\tIIII\tNM:i:0\n";
+        let dir = std::env::temp_dir();
+        for paired in [true, false] {
+            let path = dir.join(format!("ngless_sam_stream_test_{paired}.sam"));
+            std::fs::write(&path, sam).unwrap();
+            let want: Vec<String> = group_sam_whole(sam, paired)
+                .iter()
+                .map(item_shape)
+                .collect();
+            let got: Vec<String> = group_sam_stream(&path.to_string_lossy(), paired)
+                .unwrap()
+                .map(|it| item_shape(&it.unwrap()))
+                .collect();
+            assert_eq!(got, want, "paired={paired}");
+            std::fs::remove_file(&path).ok();
+        }
     }
 
     impl SamLine {
