@@ -198,7 +198,10 @@ fn check_var_usage(e: &Expression, used: &mut Vec<String>, errs: &mut Vec<String
     match e {
         Expression::Lookup(_, Variable(v)) => {
             if !used.contains(v) {
-                errs.push(format!("Could not find variable `{v:?}`. "));
+                errs.push(format!(
+                    "Could not find variable `{v:?}`. {}",
+                    crate::suggestion::suggestion_message(v, used)
+                ));
             }
         }
         Expression::FunctionCall(_, _, _, Some(block)) => {
@@ -258,10 +261,18 @@ fn validate_symbol_in_args(
         match expr {
             Expression::ConstSymbol(s) => {
                 if !legal.contains(s) {
-                    out.push(format!(
-                        "Argument: `{argname}` (for {who}) expects one of {} but got {{{s}}}",
-                        show_a(legal)
-                    ));
+                    match crate::suggestion::find_suggestion(s, legal) {
+                        Some(sug) => out.push(format!(
+                            "Argument `{argname}` (for {who}) got {{{s}}}.\n\tDid you mean {{{}}} ({})\n\nLegal arguments are: [{}]",
+                            sug.suggestion,
+                            sug.reason,
+                            show_a(legal)
+                        )),
+                        None => out.push(format!(
+                            "Argument: `{argname}` (for {who}) expects one of {} but got {{{s}}}",
+                            show_a(legal)
+                        )),
+                    }
                 }
             }
             Expression::ListExpression(es) => {
@@ -774,6 +785,24 @@ mod tests {
     #[test]
     fn bad_symbol_arg() {
         is_error("ngless '1.4'\ninput = fastq('input.fq.gz')\nwrite(\n    map(input, reference='sacCer3'),\n            ofile='result.sam',\n            format={yolo})\n");
+    }
+
+    #[test]
+    fn bad_symbol_arg_suggests_closest() {
+        // `{sma}` is a near-miss for the legal `{sam}` write format.
+        let script = parse_ngless(
+            "test",
+            true,
+            "ngless '1.4'\ninput = fastq('input.fq.gz')\nwrite(\n    map(input, reference='sacCer3'),\n            ofile='result.sam',\n            format={sma})\n",
+        )
+        .expect("parse failed");
+        let msg = validate(&funcs(), &[], &script)
+            .expect_err("expected validation error")
+            .to_string();
+        assert!(
+            msg.contains("Did you mean {sam} (closest match)"),
+            "got: {msg}"
+        );
     }
 
     #[test]

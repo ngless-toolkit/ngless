@@ -502,9 +502,23 @@ pub fn check_functional_features(path: &str, features: &[String], lno: usize) ->
         .collect();
     if !missing.is_empty() {
         let mut msg = format!("In call to count() [line {lno}], missing features:");
-        for f in missing {
+        for f in &missing {
             msg.push(' ');
             msg.push_str(f);
+        }
+        // Point at the closest available column for each missing feature, as Haskell's
+        // `lookUpColumns'` does ("Did you mean '...'?").
+        for f in &missing {
+            if let Some(sug) = crate::suggestion::find_suggestion(f, &columns) {
+                msg.push_str(&format!(
+                    "\n\tFor feature '{f}': did you mean '{}' ({})?",
+                    sug.suggestion, sug.reason
+                ));
+            }
+        }
+        msg.push_str("\nAvailable columns are:");
+        for c in &columns {
+            msg.push_str(&format!("\n\t- '{c}'"));
         }
         return Err(NgError::new(NgErrorType::DataError, msg));
     }

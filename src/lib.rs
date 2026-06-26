@@ -31,6 +31,7 @@ pub mod reference;
 pub mod sam;
 pub mod samtools;
 pub mod select;
+pub mod suggestion;
 pub mod tokens;
 pub mod transform;
 pub mod types;

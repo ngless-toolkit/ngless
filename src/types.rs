@@ -5,7 +5,7 @@
 //! `cannot_continue` aborts immediately. If any error was produced, `checktypes` fails;
 //! otherwise every `Lookup` node is annotated with its inferred type.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::ast::*;
 use crate::errors::{NgError, NgResult};
@@ -18,6 +18,11 @@ type TR<T> = Result<T, Abort>;
 struct TypeChecker {
     line: i64,
     tmap: HashMap<String, NGLType>,
+    /// Every variable that has been assigned (or bound as a block variable), regardless of whether
+    /// a type could be inferred for it. Used to tell a genuinely undefined variable apart from one
+    /// whose assignment failed (which already produced its own error), so the "Could not find
+    /// variable" suggestion only fires for the former.
+    defined: HashSet<String>,
     functions: Vec<Function>,
     methods: Vec<MethodInfo>,
     /// Module constants (name -> type). Empty for the builtin module.
@@ -38,6 +43,7 @@ pub fn checktypes(
     let mut tc = TypeChecker {
         line: 0,
         tmap: HashMap::new(),
+        defined: HashSet::new(),
         functions,
         methods: builtin_methods(),
         constants: constants.to_vec(),
@@ -90,6 +96,9 @@ impl TypeChecker {
                 let ltype = self.env_lookup(None, v)?;
                 let mrtype = self.ngl_type_of(expr)?;
                 self.check_assignment(ltype, mrtype.clone());
+                // Mark the name defined even when the RHS type is unknown, so later uses are not
+                // also flagged as "undefined variable" on top of the right-hand-side error below.
+                self.defined.insert(v.clone());
                 match mrtype {
                     None => {
                         self.error_in_line("Cannot infer type for right-hand of assignment");
@@ -171,6 +180,7 @@ impl TypeChecker {
 
     fn env_insert(&mut self, v: &str, t: NGLType) {
         self.tmap.insert(v.to_string(), t);
+        self.defined.insert(v.to_string());
     }
 
     fn check_assignment(&mut self, a: Option<NGLType>, b: Option<NGLType>) {
@@ -201,7 +211,25 @@ impl TypeChecker {
             Expression::MethodCall(m, self_e, arg, args) => {
                 self.check_method_call(m, self_e, arg.as_deref(), args)
             }
-            Expression::Lookup(mt, Variable(v)) => self.env_lookup(mt.clone(), v),
+            Expression::Lookup(mt, Variable(v)) => {
+                let t = self.env_lookup(mt.clone(), v)?;
+                // A `None` type for a variable that was never assigned means it is genuinely
+                // undefined: report it clearly (with a suggestion) instead of letting the caller
+                // emit a generic "could not infer type of argument".
+                if t.is_none() && !self.defined.contains(v) {
+                    let mut names: Vec<std::string::String> =
+                        self.defined.iter().cloned().collect();
+                    names.extend(self.constants.iter().map(|(n, _)| n.clone()));
+                    names.extend(BUILTIN_CONSTANTS.iter().map(|s| s.to_string()));
+                    names.sort();
+                    names.dedup();
+                    let msg = crate::suggestion::suggestion_message(v, &names);
+                    let sep = if msg.is_empty() { "" } else { " " };
+                    self.error_in_line(format!("Could not find variable `{v}`.{sep}{msg}"));
+                    return Err(self.cannot_continue());
+                }
+                Ok(t)
+            }
             Expression::BuiltinConstant(Variable(v)) => Ok(type_of_constant(v)),
             Expression::ConstStr(_) => Ok(Some(String)),
             Expression::ConstInt(_) => Ok(Some(Integer)),
@@ -402,7 +430,12 @@ impl TypeChecker {
         match matched.len() {
             1 => Ok(matched.into_iter().next().unwrap()),
             0 => {
-                self.error_in_line(format!("Unknown function '{}'.", fn_.0));
+                let names: Vec<&str> = self.functions.iter().map(|f| f.name.0.as_str()).collect();
+                self.error_in_line(format!(
+                    "Unknown function '{}'. {}",
+                    fn_.0,
+                    crate::suggestion::suggestion_message(&fn_.0, &names)
+                ));
                 Err(self.cannot_continue())
             }
             _ => {
@@ -422,7 +455,12 @@ impl TypeChecker {
         match by_name.len() {
             1 => Ok(by_name.into_iter().next().unwrap()),
             0 => {
-                self.error_in_line(format!("Cannot find method `{}`.", m.0));
+                let names: Vec<&str> = self.methods.iter().map(|mi| mi.name.0.as_str()).collect();
+                self.error_in_line(format!(
+                    "Cannot find method `{}`. {}",
+                    m.0,
+                    crate::suggestion::suggestion_message(&m.0, &names)
+                ));
                 Err(self.cannot_continue())
             }
             _ => match self.ngl_type_of(self_e)? {
@@ -524,7 +562,11 @@ impl TypeChecker {
         let ainfo = arginfo.iter().find(|ai| &ai.name == v);
         match (ainfo, e_type) {
             (None, _) => {
-                let mut msg = format!("Bad argument '{v}' for {ferr}.\nThis function takes the following arguments:\n");
+                let names: Vec<&str> = arginfo.iter().map(|ai| ai.name.as_str()).collect();
+                let mut msg = format!(
+                    "Bad argument '{v}' for {ferr}.\n{}\nThis function takes the following arguments:\n",
+                    crate::suggestion::suggestion_message(v, &names)
+                );
                 for ai in arginfo {
                     msg.push('\t');
                     msg.push_str(&ai.name);
@@ -706,6 +748,10 @@ impl TypeChecker {
         })
     }
 }
+
+/// Names of the builtin constants (kept in sync with `type_of_constant`). Used as extra candidates
+/// when suggesting a fix for an undefined variable.
+const BUILTIN_CONSTANTS: &[&str] = &["STDIN", "STDOUT", "ARGV"];
 
 fn type_of_constant(v: &str) -> Option<NGLType> {
     match v {
@@ -900,5 +946,50 @@ mod tests {
     #[test]
     fn mixed_addition() {
         is_error_text("ngless '0.0'\nnglessIsNotJS = 1 + '2'\n");
+    }
+
+    /// Type-check `text` and return the error message (panicking if it type-checks cleanly).
+    fn type_error_message(text: &str) -> String {
+        let script = parse_ngless("test", true, text).expect("parse failed");
+        match checktypes(mods(), &script, &[], &[]) {
+            Ok(_) => panic!("expected a type error for script:\n{text}"),
+            Err(e) => e.to_string(),
+        }
+    }
+
+    #[test]
+    fn unknown_function_suggests_closest() {
+        let msg = type_error_message("ngless '0.0'\nx = fastq('fq')\nprepricess(x)\n");
+        assert!(
+            msg.contains("Did you mean 'preprocess' (closest match)?"),
+            "got: {msg}"
+        );
+    }
+
+    #[test]
+    fn unknown_variable_suggests_closest() {
+        let msg = type_error_message("ngless '0.0'\ninput = fastq('fq')\nunique(inputt)\n");
+        assert!(
+            msg.contains("Could not find variable `inputt`. Did you mean 'input' (closest match)?"),
+            "got: {msg}"
+        );
+    }
+
+    #[test]
+    fn unknown_variable_no_false_suggestion() {
+        // `zzz` is not close to any defined name, so no "Did you mean" is appended.
+        let msg = type_error_message("ngless '0.0'\ninput = fastq('fq')\nunique(zzz)\n");
+        assert!(msg.contains("Could not find variable `zzz`."), "got: {msg}");
+        assert!(!msg.contains("Did you mean"), "got: {msg}");
+    }
+
+    #[test]
+    fn bad_argument_suggests_closest() {
+        let msg =
+            type_error_message("ngless '0.0'\nx = fastq('fq')\nmap(x, referense='sacCer3')\n");
+        assert!(
+            msg.contains("Did you mean 'reference' (closest match)?"),
+            "got: {msg}"
+        );
     }
 }

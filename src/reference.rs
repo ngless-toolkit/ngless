@@ -117,9 +117,17 @@ fn find_data_files(refname: &str) -> Option<PathBuf> {
 /// Download and install a reference, returning its directory (mirrors `installData`).
 fn install_data(refname: &str, ngl_version: (i64, i64)) -> NgResult<PathBuf> {
     let bref = find_builtin(refname).ok_or_else(|| {
+        // Suggest the closest builtin reference name or alias ("Did you mean ...?").
+        let mut allnames: Vec<&str> = Vec::new();
+        for r in BUILTIN_REFERENCES {
+            allnames.push(r.name);
+            allnames.push(r.alias);
+        }
+        let sug = crate::suggestion::suggestion_message(refname, &allnames);
+        let sep = if sug.is_empty() { "" } else { " " };
         NgError::script(format!(
             "Could not find reference '{refname}'. It is not builtin nor in one of the loaded \
-             modules."
+             modules.{sep}{sug}"
         ))
     })?;
 
