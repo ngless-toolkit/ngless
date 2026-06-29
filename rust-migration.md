@@ -366,19 +366,66 @@
 >   against the `prodigal` provided by the current pixi environment (commit `3ab43655`), so the
 >   earlier embedded-vs-PATH prodigal def-line/gene-call divergence no longer applies.
 >
-> - **CLI sub-modes not yet ported (no functional test covers them):** the Rust `cli.rs` handles the
->   run/validate flags plus `--print-path` and `--check-install`, but several Haskell `modeExec`
->   branches (`Execs/Main.hs`) are absent: `--export-json` (`JSONScript.hs`), `--export-cwl`
->   (`CWL.hs`), `--install-reference-data` (standalone `installData`, distinct from the on-`map()`
->   auto-download), and `--create-reference-pack` (`createReferencePack`). The
->   **`--experimental-features`** flag is also unported — but note it is *purely a gate on the two
->   export modes*: in `Execs/Main.hs` (lines 224–228) it only causes `--export-json`/`--export-cwl`
->   to `fatalError` ("The use of --export-json requires the --experimental-features flag") when it is
->   absent. It is defined as a plain `switch` in `CmdArgs.hs` and is **never threaded into** the
->   parser, type checker, validation, interpreter, or `Configuration.hs`, so it unlocks **no**
->   script-level language features, functions, or runtime behavior. There is therefore nothing for
->   the Rust port to gate behind it until one of the two export modes is implemented.
->
+## Known remaining gaps (full Haskell↔Rust comparison)
+
+All 96 functional tests pass, so parity is complete for the script surface the suite exercises.
+The items below are features present in the Haskell binary but absent (or simplified) in Rust;
+**none are covered by `tests/`**, which is why the suite is green despite them. They are grouped
+by impact. This inventory is the result of a direct module-by-module diff (2026-06-29).
+
+- **`unique()` FASTQ function — the one real parity hole a user can hit.** The read-dedup builtin
+  (`Interpretation/Unique.hs`, `unique(reads, max_copies=N)`) is **registered in the type checker**
+  (`src/modules.rs:178`) so scripts type-check and validate cleanly, but it has **no interpreter
+  arm**: at run time it falls through `execute_function`'s default and errors with
+  *"Interpretation of function `unique` is not implemented in this build yet."* (`src/interpret.rs`
+  ~2926). NB the `{unique}` **select condition** and the `.unique()` **mapped-read method** *are*
+  implemented (`src/select.rs`) — only the FASTQ dedup function is missing. No functional test uses
+  it. **Highest-priority gap.**
+- **HTML/JS run report.** `Output.hs::writeOutputJS` writes a report directory (`output.js` + HTML)
+  at end of run; `src/output.rs` has no report writer at all (only the console output layer). Not
+  diffed by `tests/`.
+- **Standard modules not ported:** `batch` (`StandardModules/Batch.hs` + `Utils/Batch.hs` — LSF/SGE
+  `$LSB_JOBINDEX`/`$SGE_TASK_ID` job-index detection and `setNumCapabilities`), `motus`
+  (`StandardModules/Motus.hs`, deprecated motus1 wrapper), and the `soap` mapper
+  (`StandardModules/Soap.hs`; registered on `import` but `execute_map` rejects it). All three are
+  referenced only for hashing in `src/transform.rs`.
+- **CLI sub-modes not yet ported:** the Rust `cli.rs` handles the run/validate flags plus
+  `--print-path` and `--check-install`, but several Haskell `modeExec` branches (`Execs/Main.hs` /
+  `CmdArgs.hs::NGLessMode`) are absent: `--export-json` (`JSONScript.hs`), `--export-cwl`
+  (`CWL.hs`), `--install-reference-data` (standalone `installData`, distinct from the on-`map()`
+  auto-download), `--create-reference-pack` (`createReferencePack`), `--download-file`
+  (`DownloadFileMode`), and `--download-demo` (`DownloadDemoMode`). The **`--experimental-features`**
+  flag is also unported — but note it is *purely a gate on the two export modes*: in `Execs/Main.hs`
+  (lines 224–228) it only causes `--export-json`/`--export-cwl` to `fatalError` when absent. It is a
+  plain `switch` in `CmdArgs.hs` and is **never threaded into** the parser, type checker, validation,
+  interpreter, or `Configuration.hs`, so it unlocks **no** script-level behavior; there is nothing
+  for the Rust port to gate behind it until an export mode is implemented.
+- **DefaultMode flags silently ignored.** Unknown flags hit a no-op arm in `src/cli.rs` (~127)
+  rather than erroring as Haskell's optparse would. Not wired: `-j/--jobs` (thread count),
+  `--strict-threads`, `--print-last`, `--create-report`/`--html-report-directory`,
+  `--keep-temporary-files`, `-c/--config` (config files), `--check-deprecation`, `--index-path`.
+- **Config-file reader.** `Configuration.hs` reads ngless config files (e.g. the `download-url`
+  key); Rust is env-var-only (`NGLESS_DOWNLOAD_BASE_URL`, see `src/reference.rs:60`).
+- **`Transform.hs` passes not ported** (Rust applies `add_output_hash`+`addTemporaries`,
+  `parallel_transform`, `add_file_checks`): **`writeToMove`/`addMove`** (inserts `__remove`,
+  `BuiltinModules/Remove.hs`, to free intermediate temp files after last use — disk-usage only, not
+  output-affecting; the `__remove` builtin itself is therefore also unported), plus the
+  output-neutral optimizations `qcInPreprocess`/`ifLenDiscardSpecial`/`substrimReassign` and the
+  early-check injections `addRSChecks`/`addIndexChecks`/`addCountsCheck` (Rust does eager IO
+  validation differently, so these are partly covered). `addUseNewer` is correctly out of scope at
+  ≥1.5.
+- **Reference-download path:** `count(reference=...)` annotation download still errors; URL-typed
+  module references unsupported (external modules carry no `references:`); download progress bar is
+  silent (see M7b/M7f notes above).
+- **Per-position quality percentiles** (`qualityPercentiles` in `Data/FastQ.hs`) are simplified out
+  of the Rust QC accumulator.
+- **Numeric:** `count()` normalization output uses Rust `{}` float formatting (`src/count.rs`
+  `to_shortest`), which never switches to scientific notation for exponents `< -6` or `>= 21`,
+  unlike Haskell's double-conversion `toShortest`. Reachable via `normalization={normed}` on
+  multi-megabase contigs.
+- **`collect()` minor gaps:** the `--subsample` `.subsample` ofile suffix, `auto_comments={date}`,
+  and `.finished`-on-success markers (`FinishOkHook`) remain unported.
+
 ## Context
 
 NGLess is a ~15–16k-line Haskell program (`NGLess/`, 86 `.hs` files) implementing a
