@@ -76,7 +76,8 @@ fn validate_read_inputs(
         recursive_analyse(e, &mut |x| {
             if let Expression::FunctionCall(f, arg, args, _) = x {
                 if let Some(finfo) = find_function(funcs, f) {
-                    let mut check = |fname: &str| check_file_readable_io(fname, search_path, &mut local);
+                    let mut check =
+                        |fname: &str| check_file_readable_io(fname, search_path, &mut local);
                     if finfo.arg_checks.contains(&ArgCheck::FileReadable) {
                         validate_str_val(arg, script, &mut check);
                     }
@@ -98,10 +99,7 @@ fn validate_read_inputs(
 /// first existing candidate (or that no candidate could be found at all).
 fn check_file_readable_io(fname: &str, search_path: &[String], local: &mut Vec<String>) {
     let candidates = crate::interpret::expand_path_candidates(fname, search_path);
-    match candidates
-        .iter()
-        .find(|p| std::path::Path::new(p).exists())
-    {
+    match candidates.iter().find(|p| std::path::Path::new(p).exists()) {
         Some(p) => {
             if let Some(err) = crate::suggestion::check_file_readable(p) {
                 local.push(err);
@@ -1024,10 +1022,7 @@ mod tests {
 
     /// Create a unique temp FASTQ file and return its path; the caller is responsible for removal.
     fn temp_fastq(tag: &str) -> std::path::PathBuf {
-        let p = std::env::temp_dir().join(format!(
-            "ngless_io_{tag}_{}.fq",
-            std::process::id()
-        ));
+        let p = std::env::temp_dir().join(format!("ngless_io_{tag}_{}.fq", std::process::id()));
         std::fs::write(&p, b"@r\nACGT\n+\nIIII\n").unwrap();
         p
     }
@@ -1084,7 +1079,10 @@ mod tests {
         let r = validate_io(&funcs(), &[], &script);
         std::fs::remove_file(&p).ok();
         let e = r.expect_err("unknown reference should error").to_string();
-        assert!(e.contains("Could not find reference no_such_ref"), "got: {e}");
+        assert!(
+            e.contains("Could not find reference no_such_ref"),
+            "got: {e}"
+        );
     }
 
     #[test]
@@ -1104,7 +1102,8 @@ mod tests {
 
     #[test]
     fn io_missing_output_dir_errors() {
-        let txt = "ngless '1.5'\ninput = fastq('whatever')\nwrite(input, ofile='/no/such/dir/out.fq')\n";
+        let txt =
+            "ngless '1.5'\ninput = fastq('whatever')\nwrite(input, ofile='/no/such/dir/out.fq')\n";
         let script = parse_ngless("test", true, txt).unwrap();
         let e = validate_io(&funcs(), &[], &script)
             .expect_err("missing output dir should error")

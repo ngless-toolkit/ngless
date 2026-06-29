@@ -446,9 +446,7 @@ mod tests {
             .unwrap()
             .filter_map(|e| e.ok())
             .map(|e| e.file_name().to_string_lossy().to_string())
-            .filter(|n| {
-                n.starts_with(&format!("ngless_atomic_{}.{ext}.tmp.", std::process::id()))
-            })
+            .filter(|n| n.starts_with(&format!("ngless_atomic_{}.{ext}.tmp.", std::process::id())))
             .collect();
         assert!(stray.is_empty(), "atomic write left a temp file: {stray:?}");
         let _ = std::fs::remove_file(&p);

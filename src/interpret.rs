@@ -23,8 +23,8 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use crate::ast::*;
 use crate::errors::{NgError, NgErrorType, NgResult};
@@ -3316,7 +3316,8 @@ fn get_lock(lockdir: &str, sane: &[String]) -> NgResult<(usize, crate::lockfile:
         })
         .unwrap_or_default();
     for (i, name) in sane.iter().enumerate() {
-        if existing.contains(&format!("{name}.finished")) || existing.contains(&format!("{name}.failed"))
+        if existing.contains(&format!("{name}.finished"))
+            || existing.contains(&format!("{name}.failed"))
         {
             continue;
         }

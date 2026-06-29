@@ -298,7 +298,10 @@ impl SamReader {
     fn next_line(&mut self) -> NgResult<Option<String>> {
         self.buf.clear();
         let n = self.inner.read_line(&mut self.buf).map_err(|e| {
-            NgError::new(NgErrorType::DataError, format!("Could not read SAM input: {e}"))
+            NgError::new(
+                NgErrorType::DataError,
+                format!("Could not read SAM input: {e}"),
+            )
         })?;
         if n == 0 {
             self.finish()?;
@@ -322,7 +325,10 @@ impl SamReader {
                 let _ = e.read_to_string(&mut stderr);
             }
             let status = child.wait().map_err(|e| {
-                NgError::new(NgErrorType::SystemError, format!("samtools view failed: {e}"))
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("samtools view failed: {e}"),
+                )
             })?;
             if !status.success() {
                 return Err(NgError::new(
@@ -343,7 +349,10 @@ pub fn open_sam(path: &str) -> NgResult<SamReader> {
     if path.ends_with(".bam") {
         let mut child = crate::samtools::bam_to_sam_child(path)?;
         let stdout = child.stdout.take().ok_or_else(|| {
-            NgError::new(NgErrorType::SystemError, "samtools view: no stdout pipe".to_string())
+            NgError::new(
+                NgErrorType::SystemError,
+                "samtools view: no stdout pipe".to_string(),
+            )
         })?;
         Ok(SamReader {
             inner: Box::new(std::io::BufReader::new(stdout)),
@@ -437,7 +446,11 @@ impl Iterator for SamGroups {
             };
             let key = (
                 sl.qname.clone(),
-                if self.paired { false } else { sl.is_first_in_pair() },
+                if self.paired {
+                    false
+                } else {
+                    sl.is_first_in_pair()
+                },
             );
             if self.cur_key.as_ref() == Some(&key) {
                 self.cur.push((sl, line));
@@ -574,7 +587,10 @@ mod tests {
                 continue;
             }
             let sl = parse_sam_line(line).unwrap();
-            let key = (sl.qname.clone(), if paired { false } else { sl.is_first_in_pair() });
+            let key = (
+                sl.qname.clone(),
+                if paired { false } else { sl.is_first_in_pair() },
+            );
             if cur_key.as_ref() == Some(&key) {
                 cur.push((sl, line.to_string()));
             } else {

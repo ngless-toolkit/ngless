@@ -63,10 +63,7 @@ impl Drop for LockGuard {
 /// Run `act` with `params`'s lock held, mirroring `withLockFile`. If the lock cannot be acquired
 /// (only possible with [`WhenExistsStrategy::IfLockedNothing`]) this is a system error, exactly as
 /// in Haskell (`throwSystemError "Could not acquire required lock file."`).
-pub fn with_lock_file<T>(
-    params: LockParameters,
-    act: impl FnOnce() -> NgResult<T>,
-) -> NgResult<T> {
+pub fn with_lock_file<T>(params: LockParameters, act: impl FnOnce() -> NgResult<T>) -> NgResult<T> {
     match acquire_lock(params)? {
         Some(_guard) => act(),
         None => Err(NgError::new(
@@ -191,7 +188,10 @@ fn touch_file(path: &Path) {
 /// Age of `path` (now − mtime), or `None` if it does not exist (mirrors `fileAge`).
 fn file_age(path: &Path) -> Option<Duration> {
     let mtime = fs::metadata(path).ok()?.modified().ok()?;
-    SystemTime::now().duration_since(mtime).ok().or(Some(Duration::ZERO))
+    SystemTime::now()
+        .duration_since(mtime)
+        .ok()
+        .or(Some(Duration::ZERO))
 }
 
 /// Remove `path`, ignoring a "does not exist" error (mirrors `removeFileIfExists`).
@@ -231,7 +231,11 @@ mod tests {
 
     fn tmp_lock(name: &str) -> PathBuf {
         let mut p = std::env::temp_dir();
-        p.push(format!("ngless-lockfile-test-{}-{}", std::process::id(), name));
+        p.push(format!(
+            "ngless-lockfile-test-{}-{}",
+            std::process::id(),
+            name
+        ));
         remove_file_if_exists(&p);
         p
     }
