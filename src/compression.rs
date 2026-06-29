@@ -198,23 +198,58 @@ pub fn open_read(path: &str) -> NgResult<Box<dyn BufRead>> {
     })
 }
 
-/// A streaming, by-extension compressing sink over a file, mirroring [`write_bytes`]'s
-/// compression choices but writing incrementally (bounded memory). Content-agnostic.
-///
-/// This is an enum over the concrete encoders rather than a `Box<dyn Write>` because
-/// `GzEncoder`/`BzEncoder`/zstd `Encoder` finalize via a `finish(self)` that consumes the
-/// concrete type — unreachable through a trait object. [`StreamWriter::finish`] is mandatory:
-/// dropping a gzip/bzip2/zstd writer without finishing truncates the stream.
-enum WriterInner {
-    Plain(BufWriter<File>),
+/// One of the concrete streaming encoders. Kept as an enum (rather than `Box<dyn Write>`)
+/// because each finalizes via a `finish(self)` that consumes the concrete type — unreachable
+/// through a trait object.
+enum Encoder {
     Gzip(GzEncoder<BufWriter<File>>),
     Bzip2(bzip2::write::BzEncoder<BufWriter<File>>),
     Zstd(zstd::stream::write::Encoder<'static, BufWriter<File>>),
 }
 
+impl Encoder {
+    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        match self {
+            Encoder::Gzip(w) => w.write_all(buf),
+            Encoder::Bzip2(w) => w.write_all(buf),
+            Encoder::Zstd(w) => w.write_all(buf),
+        }
+    }
+
+    fn finish(self) -> std::io::Result<()> {
+        match self {
+            Encoder::Gzip(w) => w.finish()?.flush(),
+            Encoder::Bzip2(w) => w.finish()?.flush(),
+            Encoder::Zstd(w) => w.finish()?.flush(),
+        }
+    }
+}
+
+/// A streaming, by-extension compressing sink over a file, mirroring [`write_bytes`]'s
+/// compression choices but writing incrementally (bounded memory). Content-agnostic.
+///
+/// Uncompressed output is written synchronously. For gzip/bzip2/zstd the (CPU-bound) compression
+/// runs on a **background thread** fed through a bounded channel, so the producing computation —
+/// e.g. `preprocess`'s parallel encode or a `map` output stream — overlaps with compression
+/// instead of blocking on it (mirrors Haskell's `asyncGzipTo`/`asyncZstdTo`). The compressed
+/// bytes themselves need not match NGLess's exactly; only the decompressed content does.
+/// [`StreamWriter::finish`] is mandatory: it closes the channel, joins the worker and surfaces
+/// any compression/IO error (and, for the compressed variants, dropping without finishing leaves
+/// a truncated file).
 pub struct StreamWriter {
     inner: WriterInner,
     path: String,
+}
+
+enum WriterInner {
+    Plain(BufWriter<File>),
+    /// Background compressor: `tx` feeds raw buffers to the worker; `handle` yields the worker's
+    /// final `NgResult` (compression/IO error, if any) on join. Both are `Option` so they can be
+    /// taken when an error is detected mid-stream or at `finish`.
+    Threaded {
+        tx: Option<std::sync::mpsc::SyncSender<Vec<u8>>>,
+        handle: Option<std::thread::JoinHandle<NgResult<()>>>,
+    },
 }
 
 impl StreamWriter {
@@ -227,26 +262,53 @@ impl StreamWriter {
                 format!("Could not write {path}: {e}"),
             )
         })?;
-        let inner = match detect(path) {
-            Compress::None => WriterInner::Plain(BufWriter::new(f)),
-            Compress::Gzip => {
-                WriterInner::Gzip(GzEncoder::new(BufWriter::new(f), Compression::default()))
+        let sys_err = |e: std::io::Error| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write {path}: {e}"),
+            )
+        };
+        // The encoder is built here so that construction errors (e.g. zstd setup) surface
+        // synchronously, then moved onto the background thread.
+        let encoder = match detect(path) {
+            Compress::None => {
+                return Ok(StreamWriter {
+                    inner: WriterInner::Plain(BufWriter::new(f)),
+                    path: path.to_string(),
+                })
             }
-            Compress::Bzip2 => WriterInner::Bzip2(bzip2::write::BzEncoder::new(
+            Compress::Gzip => Encoder::Gzip(GzEncoder::new(BufWriter::new(f), Compression::default())),
+            Compress::Bzip2 => Encoder::Bzip2(bzip2::write::BzEncoder::new(
                 BufWriter::new(f),
                 bzip2::Compression::default(),
             )),
-            Compress::Zstd => WriterInner::Zstd(
-                zstd::stream::write::Encoder::new(BufWriter::new(f), ZSTD_LEVEL).map_err(|e| {
-                    NgError::new(
-                        NgErrorType::SystemError,
-                        format!("Could not write {path}: {e}"),
-                    )
-                })?,
+            Compress::Zstd => Encoder::Zstd(
+                zstd::stream::write::Encoder::new(BufWriter::new(f), ZSTD_LEVEL).map_err(sys_err)?,
             ),
         };
+        // Bounded channel for back-pressure: a slow compressor stalls the producer rather than
+        // letting unbounded buffers pile up in memory.
+        let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(8);
+        let path_owned = path.to_string();
+        let handle = std::thread::spawn(move || -> NgResult<()> {
+            let mut encoder = encoder;
+            let werr = |e: std::io::Error| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Could not write {path_owned}: {e}"),
+                )
+            };
+            while let Ok(buf) = rx.recv() {
+                encoder.write_all(&buf).map_err(werr)?;
+            }
+            encoder.finish().map_err(werr)?;
+            Ok(())
+        });
         Ok(StreamWriter {
-            inner,
+            inner: WriterInner::Threaded {
+                tx: Some(tx),
+                handle: Some(handle),
+            },
             path: path.to_string(),
         })
     }
@@ -262,62 +324,94 @@ impl StreamWriter {
 
     /// Write `line` followed by a single `\n` (generic; no FASTQ semantics).
     pub fn write_line(&mut self, line: &[u8]) -> NgResult<()> {
-        self.write_all(line).map_err(self.write_err())?;
-        self.write_all(b"\n").map_err(self.write_err())?;
+        self.write_chunk(line)?;
+        self.write_chunk(b"\n")?;
         Ok(())
     }
 
     /// Write raw bytes verbatim (no added newline). Used for pre-encoded records that already
     /// carry their own line terminators (e.g. a `fq_encode`d FASTQ record).
     pub fn write_chunk(&mut self, buf: &[u8]) -> NgResult<()> {
-        self.write_all(buf).map_err(self.write_err())?;
-        Ok(())
-    }
-
-    /// Finalize the stream: flush/finish the encoder and the underlying buffered file. Must be
-    /// called — for gzip/bzip2/zstd, dropping without finishing leaves a truncated file.
-    pub fn finish(self) -> NgResult<()> {
-        let path = self.path;
-        let werr = |e: std::io::Error| {
-            NgError::new(
-                NgErrorType::SystemError,
-                format!("Could not write {path}: {e}"),
-            )
-        };
-        match self.inner {
-            WriterInner::Plain(mut w) => {
-                w.flush().map_err(werr)?;
-            }
-            WriterInner::Gzip(w) => {
-                w.finish().map_err(werr)?.flush().map_err(werr)?;
-            }
-            WriterInner::Bzip2(w) => {
-                w.finish().map_err(werr)?.flush().map_err(werr)?;
-            }
-            WriterInner::Zstd(w) => {
-                w.finish().map_err(werr)?.flush().map_err(werr)?;
+        match &mut self.inner {
+            WriterInner::Plain(w) => w.write_all(buf).map_err(self.write_err()),
+            WriterInner::Threaded { tx, handle } => {
+                // A send fails only if the worker has exited early (after an error); recover and
+                // report its real error by joining, rather than a generic "channel closed".
+                if tx
+                    .as_ref()
+                    .expect("write after finish")
+                    .send(buf.to_vec())
+                    .is_err()
+                {
+                    *tx = None;
+                    return Err(join_worker(handle, &self.path));
+                }
+                Ok(())
             }
         }
-        Ok(())
+    }
+
+    /// Finalize the stream: flush/finish the encoder and the underlying file. Must be called —
+    /// for gzip/bzip2/zstd, dropping without finishing leaves a truncated file. For the threaded
+    /// variants this closes the channel, joins the worker and surfaces any compression/IO error.
+    pub fn finish(self) -> NgResult<()> {
+        match self.inner {
+            WriterInner::Plain(mut w) => w.flush().map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Could not write {}: {e}", self.path),
+                )
+            }),
+            WriterInner::Threaded { tx, mut handle } => {
+                drop(tx); // close the channel so the worker finishes the stream
+                join_worker_result(&mut handle, &self.path)
+            }
+        }
+    }
+}
+
+/// Join a (still-present) worker handle and translate a panic into an error.
+fn join_worker(
+    handle: &mut Option<std::thread::JoinHandle<NgResult<()>>>,
+    path: &str,
+) -> NgError {
+    match join_worker_result(handle, path) {
+        Ok(()) => NgError::new(
+            NgErrorType::SystemError,
+            format!("Could not write {path}: compression worker stopped unexpectedly"),
+        ),
+        Err(e) => e,
+    }
+}
+
+fn join_worker_result(
+    handle: &mut Option<std::thread::JoinHandle<NgResult<()>>>,
+    path: &str,
+) -> NgResult<()> {
+    match handle.take() {
+        Some(h) => h.join().unwrap_or_else(|_| {
+            Err(NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write {path}: compression worker panicked"),
+            ))
+        }),
+        None => Ok(()),
     }
 }
 
 impl Write for StreamWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        match &mut self.inner {
-            WriterInner::Plain(w) => w.write(buf),
-            WriterInner::Gzip(w) => w.write(buf),
-            WriterInner::Bzip2(w) => w.write(buf),
-            WriterInner::Zstd(w) => w.write(buf),
-        }
+        self.write_chunk(buf)
+            .map(|()| buf.len())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
+        // Compressed data is finalized by `finish` (which joins the worker); there is no
+        // meaningful synchronous mid-stream flush for the threaded variants.
         match &mut self.inner {
             WriterInner::Plain(w) => w.flush(),
-            WriterInner::Gzip(w) => w.flush(),
-            WriterInner::Bzip2(w) => w.flush(),
-            WriterInner::Zstd(w) => w.flush(),
+            WriterInner::Threaded { .. } => Ok(()),
         }
     }
 }
