@@ -115,7 +115,6 @@ library:
   source-dirs: NGLess/
   c-sources:
     - NGLess/Data/FastQ.c
-    - NGLess/Dependencies/embedded.c
   when:
     - condition: 'flag(static)'
       ld-options:
@@ -138,9 +137,6 @@ executables:
         ld-options:
           - -static
           - -pthread
-      - condition: 'flag(embed)'
-        cc-options: -DBUILD_W_EMBED
-        cpp-options: -DBUILD_W_EMBED
 
 tests:
   nglesstest:
@@ -150,7 +146,6 @@ tests:
         - Tests-Src/
     c-sources:
       - NGLess/Data/FastQ.c
-      - NGLess/Dependencies/embedded.c
     cpp-options: -DIS_BUILDING_TEST
     dependencies:
     - HUnit >=1.3
@@ -172,9 +167,5 @@ benchmarks:
 flags:
   static:
     description: Static build
-    manual: false
-    default: false
-  embed:
-    description: Embed dependencies
     manual: false
     default: false

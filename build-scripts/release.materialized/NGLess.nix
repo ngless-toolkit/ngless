@@ -113,7 +113,7 @@
           ]);
         buildable = true;
         modules = [ "Paths_NGLess" ];
-        cSources = [ "NGLess/Data/FastQ.c" "NGLess/Dependencies/embedded.c" ];
+        cSources = [ "NGLess/Data/FastQ.c" ];
         hsSourceDirs = [ "NGLess/" ];
       };
       exes = {
@@ -278,7 +278,7 @@
             ]);
           buildable = true;
           modules = [ "Paths_NGLess" ];
-          cSources = [ "NGLess/Data/FastQ.c" "NGLess/Dependencies/embedded.c" ];
+          cSources = [ "NGLess/Data/FastQ.c" ];
           hsSourceDirs = [ "NGLess" "Tests-Src/" ];
           mainPath = [ "Tests.hs" ];
         };
