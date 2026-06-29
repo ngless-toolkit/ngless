@@ -34,6 +34,13 @@ struct RunOpts {
     /// `--subsample`: keep only a deterministic 1/10 of the reads on FASTQ load (mirrors
     /// `nConfSubsample`); also appends `.subsampled` to write outputs.
     subsample: bool,
+    /// `-j/--jobs`/`--threads`: number of threads for NGLess's own parallel work and for the
+    /// thread count handed to external tools. `0` means "unset" and resolves to 1 (the Haskell
+    /// default, `NThreads 1`); `auto` resolves to the detected CPU count at parse time.
+    n_threads: usize,
+    /// `--strict-threads`: strictly respect `--jobs` by reserving one core for NGLess/system
+    /// work when invoking external mappers (mirrors `nConfStrictThreads`).
+    strict_threads: bool,
     /// Positional arguments after the script path, exposed (with the script path) as `ARGV`.
     extra_args: Vec<String>,
 }
@@ -98,7 +105,18 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
             "-q" | "--quiet" => opts.quiet = true,
             "--trace" => opts.trace = true,
             "--subsample" => opts.subsample = true,
+            "--strict-threads" => opts.strict_threads = true,
             "--keep-temporary-files" => opts.keep_temporary_files = true,
+            "-j" | "--jobs" | "--threads" => {
+                i += 1;
+                opts.n_threads = parse_jobs(&arg_value(args, i, a)?)?;
+            }
+            other if other.starts_with("--jobs=") => {
+                opts.n_threads = parse_jobs(&other["--jobs=".len()..])?;
+            }
+            other if other.starts_with("--threads=") => {
+                opts.n_threads = parse_jobs(&other["--threads=".len()..])?;
+            }
             "--no-header" => opts.no_header = true,
             "-t" | "--temporary-directory" => {
                 i += 1;
@@ -158,6 +176,22 @@ fn parse_verbosity(s: &str) -> NgResult<Verbosity> {
     }
 }
 
+/// Parse a `-j/--jobs`/`--threads` value (mirrors `NThreadsOpts`): `auto` resolves to the
+/// detected CPU count; otherwise a positive integer. `0` is rejected.
+fn parse_jobs(s: &str) -> NgResult<usize> {
+    if s == "auto" {
+        return Ok(std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1));
+    }
+    match s.parse::<usize>() {
+        Ok(n) if n >= 1 => Ok(n),
+        _ => Err(NgError::script(format!(
+            "Cannot parse '{s}' as a thread count (expected 'auto' or a positive integer)."
+        ))),
+    }
+}
+
 fn arg_value(args: &[String], idx: usize, flag: &str) -> NgResult<String> {
     args.get(idx)
         .cloned()
@@ -169,6 +203,10 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // `nglConfiguration` from the parsed args). `--quiet` overrides `-v`; `--trace` forces the
     // highest verbosity.
     output::init(opts.verbosity, opts.quiet, opts.trace);
+    // `n_threads == 0` means the flag was not given: default to a single thread (the Haskell
+    // default), which keeps output byte-for-byte reproducible unless the user opts in.
+    let n_threads = if opts.n_threads == 0 { 1 } else { opts.n_threads };
+    crate::parallel::init(n_threads, opts.strict_threads);
 
     let fname = opts
         .script

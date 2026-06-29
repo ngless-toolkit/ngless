@@ -123,9 +123,7 @@ pub fn call_mapper(
     extra_args: &[String],
     out_sam: &Path,
 ) -> NgResult<()> {
-    let threads = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1);
+    let threads = crate::parallel::mapper_threads();
 
     let mut cmd = Command::new(minimap2_bin());
     cmd.arg("-t")

@@ -26,6 +26,7 @@ pub mod mapper;
 pub mod minimap2;
 pub mod modules;
 pub mod output;
+pub mod parallel;
 pub mod parser;
 pub mod reference;
 pub mod sam;

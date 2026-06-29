@@ -112,9 +112,7 @@ pub fn call_mapper(
     out_sam: &Path,
 ) -> NgResult<()> {
     let prefix = index_prefix(ref_index)?;
-    let threads = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1);
+    let threads = crate::parallel::mapper_threads();
     let out_file = std::fs::File::create(out_sam).map_err(|e| {
         NgError::new(
             NgErrorType::SystemError,

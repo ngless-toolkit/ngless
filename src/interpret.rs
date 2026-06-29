@@ -1963,13 +1963,15 @@ impl Interpreter {
         let mhtmp = self.temp_files.new_dir("ngless-megahit-tmpdir_")?;
         let mhtmp = mhtmp.to_string_lossy().into_owned();
         let megahit = std::env::var("NGLESS_MEGAHIT_BIN").unwrap_or_else(|_| "megahit".to_string());
-        // ngless defaults to a single thread (`--jobs 1`), and megahit's result is thread-count
-        // dependent, so the contigs are only reproducible with the same thread count.
+        // megahit's result is thread-count dependent, so the contigs are only reproducible with
+        // the same thread count; ngless defaults to a single thread (`--jobs 1`), keeping the
+        // default reproducible, and honours `--jobs N` when the user opts in (mirrors
+        // `--num-cpu-threads` in `Assemble.hs`).
         cmd_args.extend([
             "-o".to_string(),
             format!("{odir}/megahit-output"),
             "--num-cpu-threads".to_string(),
-            "1".to_string(),
+            crate::parallel::n_threads().to_string(),
             "--tmp-dir".to_string(),
             mhtmp,
         ]);
