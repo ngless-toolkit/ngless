@@ -1,0 +1,4 @@
+ngless '1.5'
+input = fastq('reads.fq')
+deduped = unique(input, max_copies=2)
+write(deduped, ofile='output.fq')

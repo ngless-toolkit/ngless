@@ -579,6 +579,38 @@ pub fn smoothtrim(window: i32, cutoff: i32, sr: &ShortRead) -> ShortRead {
     sr.slice(s, n)
 }
 
+/// Stream reads from `reader`, keeping at most `max_copies` reads per distinct sequence and
+/// writing each kept read (FASTQ-encoded with `enc`) to `out` in input order. Mirrors
+/// `Interpretation/Unique.performUnique`/`filterUniqueUpTo`: Haskell splits the input into
+/// hash-bucketed temp files purely to bound memory and dedups each bucket independently, but
+/// since all copies of one sequence land in the same bucket the *set* of kept reads is the
+/// same as this single-pass dedup (the bucket split only reorders the output, which is not
+/// observable). Returns the number of reads written.
+pub fn unique_reads<R: BufRead, W: std::io::Write>(
+    reader: R,
+    out: &mut W,
+    enc: FastQEncoding,
+    max_copies: usize,
+) -> NgResult<usize> {
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut written = 0;
+    for r in fastq_records(reader, enc) {
+        let sr = r?;
+        let count = seen.entry(sr.sequence.clone()).or_insert(0);
+        if *count < max_copies {
+            *count += 1;
+            out.write_all(fq_encode(enc, &sr).as_bytes()).map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Error writing unique reads: {e}"),
+                )
+            })?;
+            written += 1;
+        }
+    }
+    Ok(written)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -594,6 +626,49 @@ mod tests {
     fn encode_recover(enc: FastQEncoding) -> NgResult<Vec<ShortRead>> {
         let text: String = reads3().iter().map(|r| fq_encode(enc, r)).collect();
         fq_decode(enc, &text)
+    }
+
+    #[test]
+    fn unique_reads_dedup() {
+        // Build an input with sequence "acttg" appearing 3 times (headers a/b/c), "catgt"
+        // twice (d/e) and "ccggg" once (f).
+        let enc = FastQEncoding::Sanger;
+        let mk = |h: &str, s: &str| ShortRead::new(h, s, vec![35; s.len()]);
+        let input: Vec<ShortRead> = vec![
+            mk("a", "acttg"),
+            mk("b", "acttg"),
+            mk("d", "catgt"),
+            mk("c", "acttg"),
+            mk("e", "catgt"),
+            mk("f", "ccggg"),
+        ];
+        let text: String = input.iter().map(|r| fq_encode(enc, r)).collect();
+
+        let run = |max_copies: usize| -> Vec<ShortRead> {
+            let mut out: Vec<u8> = Vec::new();
+            let written = unique_reads(
+                std::io::Cursor::new(text.clone()),
+                &mut out,
+                enc,
+                max_copies,
+            )
+            .unwrap();
+            let recovered = fq_decode(enc, std::str::from_utf8(&out).unwrap()).unwrap();
+            assert_eq!(written, recovered.len());
+            recovered
+        };
+
+        // max_copies=1: one of each distinct sequence, first occurrence in input order.
+        let one: Vec<String> = run(1).iter().map(|r| r.header.clone()).collect();
+        assert_eq!(one, vec!["a", "d", "f"]);
+
+        // max_copies=2: up to two per sequence, in input order.
+        let two: Vec<String> = run(2).iter().map(|r| r.header.clone()).collect();
+        assert_eq!(two, vec!["a", "b", "d", "e", "f"]);
+
+        // max_copies large enough keeps everything unchanged.
+        let all: Vec<String> = run(10).iter().map(|r| r.header.clone()).collect();
+        assert_eq!(all, vec!["a", "b", "d", "c", "e", "f"]);
     }
 
     #[test]

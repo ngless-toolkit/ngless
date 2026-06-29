@@ -757,6 +757,7 @@ impl Interpreter {
             }
             "load_sample_list" => self.execute_load_sample_list(&expr_v),
             "discard_singles" => execute_discard_singles(&expr_v),
+            "unique" => self.execute_unique(&expr_v, &argvs),
             "example" => execute_example(&expr_v, &argvs),
             "samfile" => self.execute_samfile(&expr_v, &argvs),
             "map" => self.execute_map(&expr_v, &argvs),
@@ -2733,6 +2734,59 @@ impl Interpreter {
             }
         }
         Ok(NGLessObject::ReadSet { name, readset })
+    }
+
+    /// `unique(reads, max_copies=N)`: drop duplicate reads, keeping at most `max_copies`
+    /// copies of each distinct sequence (mirrors `Interpretation/Unique.executeUnique`). Only
+    /// single-end read sets are supported (as in Haskell); a list of read sets is mapped
+    /// element-wise. Each input file is streamed to a fresh gzipped temp file.
+    fn execute_unique(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        if let NGLessObject::List(items) = expr {
+            let mut out = Vec::with_capacity(items.len());
+            for item in items {
+                out.push(self.execute_unique(item, args)?);
+            }
+            return Ok(NGLessObject::List(out));
+        }
+        let max_copies = lookup_int(args, "max_copies", 1)?;
+        if max_copies < 1 {
+            return Err(NgError::script(format!(
+                "unique: max_copies must be at least 1, got {max_copies}"
+            )));
+        }
+        let (name, rs) = match expr {
+            NGLessObject::ReadSet { name, readset } => (name.clone(), readset.clone()),
+            other => {
+                return Err(NgError::should_not_occur(format!(
+                    "executeUnique: Cannot handle argument {other:?}"
+                )))
+            }
+        };
+        if !rs.pairs.is_empty() || rs.singletons.len() != 1 {
+            return Err(NgError::should_not_occur(
+                "executeUnique: Cannot handle paired-end read set",
+            ));
+        }
+        let input = &rs.singletons[0];
+        let dest = self.new_temp_path("unique.", "fq.gz");
+        let reader = crate::compression::open_read(&input.path.to_string_lossy())?;
+        let mut writer = crate::compression::StreamWriter::create(&dest.to_string_lossy())?;
+        fastq::unique_reads(reader, &mut writer, input.encoding, max_copies as usize)?;
+        writer.finish()?;
+        Ok(NGLessObject::ReadSet {
+            name,
+            readset: ReadSet {
+                pairs: Vec::new(),
+                singletons: vec![FastQFilePath {
+                    encoding: input.encoding,
+                    path: dest,
+                }],
+            },
+        })
     }
 
     /// Run the preprocess block on a single read, returning `None` if it was discarded.

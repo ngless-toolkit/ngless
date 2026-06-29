@@ -5,9 +5,9 @@
 > repository root (`Cargo.toml`, `src/`), since it is intended to eventually replace the
 > Haskell implementation in place. The functional test harness (`run-tests.sh`) can be
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
-> **all 96 functional tests pass** against the Rust binary with output identical to
+> **all 97 functional tests pass** against the Rust binary with output identical to
 > Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`), and
-> the 169 unit tests (`cargo test`) pass. See the
+> the 195 unit tests (`cargo test`) pass. See the
 > [Functional test status](#functional-test-status) table below for the per-test breakdown.
 > The 4 cases that previously failed were all external-tool version drift (assemble-gp/prodigal,
 > map-minimap2/minimap2 `@PG` line, samfile-select-view/samtools,
@@ -368,19 +368,27 @@
 >
 ## Known remaining gaps (full Haskell↔Rust comparison)
 
-All 96 functional tests pass, so parity is complete for the script surface the suite exercises.
+All 97 functional tests pass, so parity is complete for the script surface the suite exercises.
 The items below are features present in the Haskell binary but absent (or simplified) in Rust;
 **none are covered by `tests/`**, which is why the suite is green despite them. They are grouped
 by impact. This inventory is the result of a direct module-by-module diff (2026-06-29).
 
-- **`unique()` FASTQ function — the one real parity hole a user can hit.** The read-dedup builtin
-  (`Interpretation/Unique.hs`, `unique(reads, max_copies=N)`) is **registered in the type checker**
-  (`src/modules.rs:178`) so scripts type-check and validate cleanly, but it has **no interpreter
-  arm**: at run time it falls through `execute_function`'s default and errors with
-  *"Interpretation of function `unique` is not implemented in this build yet."* (`src/interpret.rs`
-  ~2926). NB the `{unique}` **select condition** and the `.unique()` **mapped-read method** *are*
-  implemented (`src/select.rs`) — only the FASTQ dedup function is missing. No functional test uses
-  it. **Highest-priority gap.**
+- **`unique()` FASTQ function — DONE.** The read-dedup builtin (`Interpretation/Unique.hs`,
+  `unique(reads, max_copies=N)`) is now interpreted (`Interpreter::execute_unique` in
+  `src/interpret.rs`, dispatched from `interpret_function`). The pure core is
+  `fastq::unique_reads<R: BufRead, W: Write>`, a single streaming pass keeping ≤`max_copies` reads
+  per distinct sequence (via a `HashMap<sequence, count>`) written gzip-compressed to a fresh temp
+  read set. This mirrors `executeUnique`/`performUnique`/`filterUniqueUpTo`: Haskell first
+  hash-buckets the input into `k` temp files purely to bound memory and dedups each bucket
+  independently, but since all copies of one sequence land in the same bucket the *set* of kept
+  reads is identical to the single pass (the bucket split only reorders output, which is
+  unobservable — Haskell reads the buckets back in nondeterministic `getDirectoryContents` order
+  anyway, but for any sub-512MB file `k=1`, so the bucketed and single-pass outputs are byte-identical
+  there too). Only single-end read sets are handled (as in Haskell); a `NGOList` of read sets is
+  mapped element-wise. Covered by the new `tests/unique` functional test (`unique(max_copies=2)`,
+  dedup byte-identical to Haskell since the fixture is one bucket) plus a unit test
+  (`fastq::tests::unique_reads_dedup`, pinning `max_copies` 1/2/large). NB the `{unique}` **select
+  condition** and the `.unique()` **mapped-read method** were already implemented (`src/select.rs`).
 - **HTML/JS run report.** `Output.hs::writeOutputJS` writes a report directory (`output.js` + HTML)
   at end of run; `src/output.rs` has no report writer at all (only the console output layer). Not
   diffed by `tests/`.
@@ -430,7 +438,7 @@ by impact. This inventory is the result of a direct module-by-module diff (2026-
 
 NGLess is a ~15–16k-line Haskell program (`NGLess/`, 86 `.hs` files) implementing a
 version-pinned DSL for NGS/metagenomics workflows, plus ~1.6k lines of unit tests and
-96 functional tests under `tests/` (the pre-1.5 cases have been removed). The motivation for
+97 functional tests under `tests/` (the pre-1.5 cases have been removed). The motivation for
 a Rust rewrite is **not**
 performance — Haskell/conduit already streams large files fine. The drivers are:
 
@@ -559,7 +567,7 @@ and run via `pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debu
 Legend: ✅ passes · ❌ not yet supported. `--print-path EXEC` is now implemented (resolves a
 tool from `$NGLESS_<TOOL>_BIN` or `PATH`, mirroring `PrintPathMode`/`findNGLessBin`), so the
 samtools `check.sh` scripts that shell out to `$(ngless --print-path samtools)` can now be
-driven locally. **Tally: 96 ✅ · 0 ❌ (96 total).**
+driven locally. **Tally: 97 ✅ · 0 ❌ (97 total).**
 
 | Test | Status | Note / planned milestone |
 |---|---|---|
@@ -652,6 +660,7 @@ driven locally. **Tally: 96 ✅ · 0 ❌ (96 total).**
 | select_sam_optional_fields | ✅ | M5 |
 | shortreads | ✅ | M4 |
 | type-conversions | ✅ | M3 — `read_int`/`read_double` as expression args |
+| unique | ✅ | `unique(max_copies=N)` FASTQ dedup (`fastq::unique_reads`) |
 | whenTrueModule | ✅ | M7c — external module flag `when-true` |
 | write_compression | ✅ | M5 (`check.sh` now driven via `--print-path samtools`) |
 | write_fq | ✅ | M4 |
@@ -690,7 +699,7 @@ driven locally. **Tally: 96 ✅ · 0 ❌ (96 total).**
 
 ## Verification
 
-- Primary: `NGLESS_BIN=<rust-binary> ./run-tests.sh` — must reach 96/96 with diffs
+- Primary: `NGLESS_BIN=<rust-binary> ./run-tests.sh` — must reach 97/97 with diffs
   identical to the Haskell binary, run per-milestone on the gated subset.
 - Differential CI job: build both binaries, run each `tests/*` script through both, fail on
   any output diff (the strongest possible parity check).
