@@ -23,7 +23,6 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use crate::ast::*;
@@ -393,9 +392,11 @@ fn take_directory(path: &str) -> String {
 
 /// Interpret a script body (already type-checked and validated). `temp_dir` is where
 /// intermediate FASTQ files (e.g. from `preprocess`) are written.
+#[allow(clippy::too_many_arguments)]
 pub fn interpret(
     body: &[(usize, Expression)],
     temp_dir: &Path,
+    keep_temporary_files: bool,
     script_text: &str,
     search_path: &[String],
     argv: &[String],
@@ -411,7 +412,7 @@ pub fn interpret(
     }
     let mut interp = Interpreter {
         env,
-        temp_dir: temp_dir.to_path_buf(),
+        temp_files: crate::tempfiles::TempFiles::new(temp_dir, keep_temporary_files),
         cur_lno: Cell::new(0),
         fq_stats: RefCell::new(Vec::new()),
         map_stats: RefCell::new(Vec::new()),
@@ -460,7 +461,11 @@ struct MapInfo {
 
 struct Interpreter {
     env: HashMap<String, NGLessObject>,
-    temp_dir: PathBuf,
+    /// Registry for all temporary files/directories created during the run. Allocating
+    /// through it guarantees exclusive (O_EXCL) creation, legal names, and removal of
+    /// every temp at the end of the run (unless `--keep-temporary-files`) — the latter
+    /// happens when the interpreter, and hence this field, is dropped.
+    temp_files: crate::tempfiles::TempFiles,
     /// Line number of the top-level statement currently executing (used for `preproc.lnoN`).
     cur_lno: Cell<usize>,
     fq_stats: RefCell<Vec<FqInfo>>,
@@ -924,7 +929,7 @@ impl Interpreter {
         let groups = first_group.map(Ok).into_iter().chain(rest);
 
         let tsv = crate::count::perform_count(groups, &sq_header, &name, &opts)?;
-        let out = self.new_temp_path("counts.", "txt");
+        let out = self.new_temp_path("counts.", "txt")?;
         std::fs::write(&out, tsv).map_err(|e| {
             NgError::new(
                 NgErrorType::SystemError,
@@ -943,7 +948,7 @@ impl Interpreter {
         let (total, aligned, unique) = sam_group_stats_stream(&path.to_string_lossy())?;
 
         let tsv = format!("\t{name}\ntotal\t{total}\naligned\t{aligned}\nunique\t{unique}\n");
-        let out = self.new_temp_path("sam_stats_", "stats");
+        let out = self.new_temp_path("sam_stats_", "stats")?;
         std::fs::write(&out, tsv).map_err(|e| {
             NgError::new(
                 NgErrorType::SystemError,
@@ -962,7 +967,7 @@ impl Interpreter {
         if is_tag_ordered(&text) {
             return Ok(NGLessObject::Counts(PathBuf::from(fname)));
         }
-        let out = self.new_temp_path("normalized", "tsv");
+        let out = self.new_temp_path("normalized", "tsv")?;
         std::fs::write(&out, normalize_count_file(&text)).map_err(|e| {
             NgError::new(
                 NgErrorType::SystemError,
@@ -979,7 +984,7 @@ impl Interpreter {
         encoding: FastQEncoding,
         prefix: &str,
     ) -> NgResult<FastQFilePath> {
-        let path = self.new_temp_path(prefix, "fq");
+        let path = self.new_temp_path(prefix, "fq")?;
         std::fs::write(&path, data).map_err(|e| {
             NgError::new(
                 NgErrorType::SystemError,
@@ -1137,7 +1142,7 @@ impl Interpreter {
                 } else {
                     &cmd.ret.extension
                 };
-                let path = self.new_temp_path("eout_", ext);
+                let path = self.new_temp_path("eout_", ext)?;
                 std::fs::write(&path, b"").ok();
                 let p = path.to_string_lossy().into_owned();
                 cmdline.push(format!("--{}={p}", cmd.ret.name));
@@ -1150,7 +1155,7 @@ impl Interpreter {
             .args(&cmdline)
             .envs(crate::external_modules::module_env(
                 &module_dir,
-                &self.temp_dir,
+                self.temp_files.dir(),
             ))
             .output()
             .map_err(|e| {
@@ -1301,7 +1306,7 @@ impl Interpreter {
             if files.is_empty() {
                 return Ok(None);
             }
-            let out = self.new_temp_path("module_in_", "fq");
+            let out = self.new_temp_path("module_in_", "fq")?;
             let o = out.to_string_lossy().into_owned();
             write_fq_files(&files, &o)?;
             Ok(Some(o))
@@ -1436,7 +1441,7 @@ impl Interpreter {
         rs: &ReadSet,
         extra_args: &[String],
     ) -> NgResult<PathBuf> {
-        let out = self.new_temp_path("mapped_", "sam");
+        let out = self.new_temp_path("mapped_", "sam")?;
         mapper.call_mapper(ref_index, rs, extra_args, &out)?;
         Ok(out)
     }
@@ -1603,7 +1608,7 @@ impl Interpreter {
         let keep_if = lookup_symbol_list(args, "keep_if");
         let drop_if = lookup_symbol_list(args, "drop_if");
         let cond = select::parse_conditions(&keep_if, &drop_if)?;
-        let outpath = self.new_temp_path("selected_", "sam");
+        let outpath = self.new_temp_path("selected_", "sam")?;
         let mut out = sam_temp_writer(&outpath)?;
         for item in group_sam_stream(&path.to_string_lossy(), paired)? {
             match item? {
@@ -1637,7 +1642,7 @@ impl Interpreter {
         let (name, path) = mapped_read_set(expr, "select")?;
         let paired = lookup_bool(args, "paired", true)?;
         let var = &block.variable.0;
-        let outpath = self.new_temp_path("selected_", "sam");
+        let outpath = self.new_temp_path("selected_", "sam")?;
         let mut out = sam_temp_writer(&outpath)?;
         for item in group_sam_stream(&path.to_string_lossy(), paired)? {
             match item? {
@@ -1693,7 +1698,7 @@ impl Interpreter {
 
     /// Write SAM text to a fresh temp file and return its path.
     fn write_sam_temp(&self, data: &str) -> NgResult<PathBuf> {
-        let path = self.new_temp_path("selected_", "sam");
+        let path = self.new_temp_path("selected_", "sam")?;
         std::fs::write(&path, data).map_err(|e| {
             NgError::new(
                 NgErrorType::SystemError,
@@ -1722,8 +1727,8 @@ impl Interpreter {
             }
         };
         let input = self.samtools_input(&path)?;
-        let out = self.new_temp_path("sorted_", "sam");
-        let temp_prefix = self.new_temp_path("samtools_sort_temp", "tmp");
+        let out = self.new_temp_path("sorted_", "sam")?;
+        let temp_prefix = self.new_temp_path("samtools_sort_temp", "tmp")?;
         crate::samtools::sort(&input, &out, "sam", by_name, &temp_prefix)?;
         Ok(NGLessObject::MappedReadSet { name, path: out })
     }
@@ -1745,7 +1750,7 @@ impl Interpreter {
             }
         };
         let input = self.samtools_input(&path)?;
-        let out = self.new_temp_path("subset_", "sam");
+        let out = self.new_temp_path("subset_", "sam")?;
         crate::samtools::view_bed(&input, &bed, &out, "sam")?;
         Ok(NGLessObject::MappedReadSet { name, path: out })
     }
@@ -1934,7 +1939,7 @@ impl Interpreter {
             if files.is_empty() {
                 return Ok(None);
             }
-            let out = self.new_temp_path("ngless-megahit-input_", "fq.gz");
+            let out = self.new_temp_path("ngless-megahit-input_", "fq.gz")?;
             let o = out.to_string_lossy().into_owned();
             write_fq_files(&files, &o)?;
             Ok(Some(o))
@@ -1950,20 +1955,13 @@ impl Interpreter {
         }
         let extra = lookup_string_list(args, "__extra_megahit_args")?.unwrap_or_default();
 
-        // megahit creates its own output directory but not the parent, so create the enclosing
-        // assembly directory first (it must not already contain `megahit-output`).
-        let odir = self.new_temp_path("ngless-megahit-assembly_", "d");
+        // megahit creates its own `megahit-output` subdirectory, so we allocate the enclosing
+        // assembly directory (and a separate scratch tmp-dir) exclusively; both are registered
+        // for recursive cleanup at the end of the run.
+        let odir = self.temp_files.new_dir("ngless-megahit-assembly_")?;
         let odir = odir.to_string_lossy().into_owned();
-        let mhtmp = self.new_temp_path("ngless-megahit-tmpdir_", "d");
+        let mhtmp = self.temp_files.new_dir("ngless-megahit-tmpdir_")?;
         let mhtmp = mhtmp.to_string_lossy().into_owned();
-        for d in [&odir, &mhtmp] {
-            std::fs::create_dir_all(d).map_err(|e| {
-                NgError::new(
-                    NgErrorType::SystemError,
-                    format!("Could not create '{d}': {e}"),
-                )
-            })?;
-        }
         let megahit = std::env::var("NGLESS_MEGAHIT_BIN").unwrap_or_else(|_| "megahit".to_string());
         // ngless defaults to a single thread (`--jobs 1`), and megahit's result is thread-count
         // dependent, so the contigs are only reproducible with the same thread count.
@@ -2004,7 +2002,7 @@ impl Interpreter {
         let aa_out = string_arg(args, "prots_out");
         let include_fragments = lookup_bool(args, "include_fragments", true)?;
 
-        let dnaout = self.new_temp_path("gene_predict_", "fna");
+        let dnaout = self.new_temp_path("gene_predict_", "fna")?;
         let dnaout = dnaout.to_string_lossy().into_owned();
         let prodigal =
             std::env::var("NGLESS_PRODIGAL_BIN").unwrap_or_else(|_| "prodigal".to_string());
@@ -2072,14 +2070,14 @@ impl Interpreter {
         let orig: PathBuf = match (format, is_bam(&src)) {
             ("sam", false) => path.to_path_buf(),
             ("sam", true) => {
-                let out = self.new_temp_path("converted_", "sam");
+                let out = self.new_temp_path("converted_", "sam")?;
                 crate::samtools::convert_bam_to_sam(path, &out)?;
                 out
             }
             ("bam", true) => path.to_path_buf(),
             (_, _) => {
                 let input = self.samtools_input(path)?;
-                let out = self.new_temp_path("converted_", "bam");
+                let out = self.new_temp_path("converted_", "bam")?;
                 crate::samtools::convert_sam_to_bam(&input, &out)?;
                 out
             }
@@ -2135,7 +2133,7 @@ impl Interpreter {
         match stats_type {
             "fastq" => {
                 let tsv = self.format_fq_stats_tsv();
-                let path = self.new_temp_path("qcstats.", "tsv");
+                let path = self.new_temp_path("qcstats.", "tsv")?;
                 std::fs::write(&path, tsv).map_err(|e| {
                     NgError::new(
                         NgErrorType::SystemError,
@@ -2146,7 +2144,7 @@ impl Interpreter {
             }
             "mapping" => {
                 let tsv = self.format_map_stats_tsv();
-                let path = self.new_temp_path("qcstats.", "tsv");
+                let path = self.new_temp_path("qcstats.", "tsv")?;
                 std::fs::write(&path, tsv).map_err(|e| {
                     NgError::new(
                         NgErrorType::SystemError,
@@ -2207,13 +2205,11 @@ impl Interpreter {
         out
     }
 
-    /// Allocate a fresh temp file path under the configured temp directory. The counter is
-    /// process-global so paths stay unique across interpreter instances sharing a temp dir.
-    fn new_temp_path(&self, prefix: &str, ext: &str) -> PathBuf {
-        static COUNTER: AtomicU64 = AtomicU64::new(0);
-        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        self.temp_dir
-            .join(format!("{prefix}{}.{n}.{ext}", std::process::id()))
+    /// Reserve a fresh temp file under the configured temp directory, creating it
+    /// exclusively (`O_EXCL`) and registering it for cleanup at the end of the run. See
+    /// [`crate::tempfiles::TempFiles::new_file`].
+    fn new_temp_path(&self, prefix: &str, ext: &str) -> NgResult<PathBuf> {
+        self.temp_files.new_file(prefix, ext)
     }
 
     // --- fastq / preprocess --------------------------------------------------
@@ -2250,9 +2246,9 @@ impl Interpreter {
     fn uninterleave(&self, path: &str) -> NgResult<ReadSet> {
         let enc = fastq::detect_encoding_stream(crate::compression::open_read(path)?)?;
         let (f1, f2, f3) = (
-            self.new_temp_path("uninterleave_", "fq"),
-            self.new_temp_path("uninterleave_", "fq"),
-            self.new_temp_path("uninterleave_", "fq"),
+            self.new_temp_path("uninterleave_", "fq")?,
+            self.new_temp_path("uninterleave_", "fq")?,
+            self.new_temp_path("uninterleave_", "fq")?,
         );
         let mut w1 = crate::compression::StreamWriter::create(&f1.to_string_lossy())?;
         let mut w2 = crate::compression::StreamWriter::create(&f2.to_string_lossy())?;
@@ -2322,7 +2318,7 @@ impl Interpreter {
         }
         let text = read_fastq_text(path)?;
         let sampled = subsample_text(&text);
-        let out = self.new_temp_path("subsampled.", "fq");
+        let out = self.new_temp_path("subsampled.", "fq")?;
         std::fs::write(&out, sampled).map_err(|e| {
             NgError::new(
                 NgErrorType::SystemError,
@@ -2609,9 +2605,9 @@ impl Interpreter {
         // output in one pass (mirrors executePreprocess: open all three, stream, then delete the
         // empty ones and pick the result shape from the per-output counts). Temp paths are
         // allocated up front in slot order; `.fq` => uncompressed (StreamWriter::Plain).
-        let p1path = self.new_temp_path("preprocessed.1.", "fq");
-        let p2path = self.new_temp_path("preprocessed.2.", "fq");
-        let spath = self.new_temp_path("preprocessed.singles.", "fq");
+        let p1path = self.new_temp_path("preprocessed.1.", "fq")?;
+        let p2path = self.new_temp_path("preprocessed.2.", "fq")?;
+        let spath = self.new_temp_path("preprocessed.singles.", "fq")?;
         let mut w1 = crate::compression::StreamWriter::create(&p1path.to_string_lossy())?;
         let mut w2 = crate::compression::StreamWriter::create(&p2path.to_string_lossy())?;
         let mut ws = crate::compression::StreamWriter::create(&spath.to_string_lossy())?;
@@ -2772,7 +2768,7 @@ impl Interpreter {
             ));
         }
         let input = &rs.singletons[0];
-        let dest = self.new_temp_path("unique.", "fq.gz");
+        let dest = self.new_temp_path("unique.", "fq.gz")?;
         let reader = crate::compression::open_read(&input.path.to_string_lossy())?;
         let mut writer = crate::compression::StreamWriter::create(&dest.to_string_lossy())?;
         fastq::unique_reads(reader, &mut writer, input.encoding, max_copies as usize)?;
@@ -4433,6 +4429,7 @@ mod tests {
         interpret(
             &script.body,
             &std::env::temp_dir(),
+            false,
             text,
             &[],
             &[],

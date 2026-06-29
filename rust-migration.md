@@ -7,7 +7,7 @@
 > pointed at any binary via the `NGLESS_BIN` environment variable. As of this writing
 > **all 97 functional tests pass** against the Rust binary with output identical to
 > Haskell (including the samtools `check.sh` cases, now driven via `--print-path samtools`), and
-> the 195 unit tests (`cargo test`) pass. See the
+> the 201 unit tests (`cargo test`) pass. See the
 > [Functional test status](#functional-test-status) table below for the per-test breakdown.
 > The 4 cases that previously failed were all external-tool version drift (assemble-gp/prodigal,
 > map-minimap2/minimap2 `@PG` line, samfile-select-view/samtools,
@@ -411,13 +411,18 @@ by impact. This inventory is the result of a direct module-by-module diff (2026-
 - **DefaultMode flags silently ignored.** Unknown flags hit a no-op arm in `src/cli.rs` (~127)
   rather than erroring as Haskell's optparse would. Not wired: `-j/--jobs` (thread count),
   `--strict-threads`, `--print-last`, `--create-report`/`--html-report-directory`,
-  `--keep-temporary-files`, `-c/--config` (config files), `--check-deprecation`, `--index-path`.
+  `-c/--config` (config files), `--check-deprecation`, `--index-path`. (`--keep-temporary-files`
+  **is** now wired — see the temp-file lifecycle note under "Genuinely hard".)
 - **Config-file reader.** `Configuration.hs` reads ngless config files (e.g. the `download-url`
   key); Rust is env-var-only (`NGLESS_DOWNLOAD_BASE_URL`, see `src/reference.rs:60`).
 - **`Transform.hs` passes not ported** (Rust applies `add_output_hash`+`addTemporaries`,
   `parallel_transform`, `add_file_checks`): **`writeToMove`/`addMove`** (inserts `__remove`,
   `BuiltinModules/Remove.hs`, to free intermediate temp files after last use — disk-usage only, not
-  output-affecting; the `__remove` builtin itself is therefore also unported), plus the
+  output-affecting; the `__remove` builtin itself is therefore also unported). **NB this also gates
+  write's move-instead-of-copy:** `__can_move` is accepted as a `write` arg (`src/modules.rs`) but
+  never set true (no pass injects it) and never read by `execute_write`, so `write` always copies.
+  Wiring move (`moveOrCopy`, `woCanMove`) safely requires this last-use analysis first — otherwise a
+  file still referenced later could be moved away. Plus the
   output-neutral optimizations `qcInPreprocess`/`ifLenDiscardSpecial`/`substrimReassign` and the
   early-check injections `addRSChecks`/`addIndexChecks`/`addCountsCheck` (Rust does eager IO
   validation differently, so these are partly covered). `addUseNewer` is correctly out of scope at
@@ -504,9 +509,15 @@ Do this plumbing first, before writing any interpreter code.
 - **FileOrStream abstraction** (`FileOrStream.hs`) — the file-vs-lazy-stream duality threads
   through everything; needs a clean Rust equivalent (an enum yielding a boxed iterator)
   designed up front.
-- **Temp-file lifecycle / GC** — Haskell's `ResourceT` + laziness drive cleanup of
-  intermediate files. Rust needs explicit ownership (RAII guard types) for temp files and
-  the script-hash-based output caching in `Transform.hs`.
+- **Temp-file lifecycle / GC — exclusive creation + exit cleanup DONE.** Haskell's
+  `ResourceT` + laziness drive cleanup of intermediate files. Rust now has explicit
+  ownership via `src/tempfiles.rs` (`TempFiles`): every temp file/dir is allocated through
+  the registry, created **exclusively** (`O_EXCL` / exclusive `create_dir`) with a
+  length-checked name (porting `checkFilenameLength`), tracked, and removed when the
+  `Interpreter` (which owns the registry) is dropped — on success, error, or panic-unwind —
+  unless `--keep-temporary-files`. This mirrors `openNGLTempFile'` + the `ResourceT`
+  cleanup. **Still open:** the mid-run GC (`removeIfTemporary`/`writeToMove`/`addMove`,
+  disk-use only) and the script-hash-based output caching in `Transform.hs`.
 
 ## Crate mapping (recommended)
 

@@ -2,8 +2,9 @@
 //! load → parse → version gate → type check → validate → interpret.
 //!
 //! Argument parsing is hand-rolled for the subset of flags currently used (notably by
-//! `run-tests.sh`): `-n/--validate-only`, `-t/--temporary-directory`, `-q/--quiet`,
-//! `-v/--verbosity`, `--trace`, `--debug`, `--no-header`, and a single positional script path.
+//! `run-tests.sh`): `-n/--validate-only`, `-t/--temporary-directory`,
+//! `--keep-temporary-files`, `-q/--quiet`, `-v/--verbosity`, `--trace`, `--debug`,
+//! `--no-header`, and a single positional script path.
 
 use crate::ast::NGLType;
 use crate::errors::{NgError, NgResult};
@@ -26,6 +27,9 @@ struct RunOpts {
     no_header: bool,
     debug: String,
     temp_dir: Option<String>,
+    /// `--keep-temporary-files`: do not delete temporary files at the end of the run
+    /// (mirrors `nConfKeepTemporaryFiles`). Defaults to deleting them.
+    keep_temporary_files: bool,
     search_path: Vec<String>,
     /// `--subsample`: keep only a deterministic 1/10 of the reads on FASTQ load (mirrors
     /// `nConfSubsample`); also appends `.subsampled` to write outputs.
@@ -94,6 +98,7 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
             "-q" | "--quiet" => opts.quiet = true,
             "--trace" => opts.trace = true,
             "--subsample" => opts.subsample = true,
+            "--keep-temporary-files" => opts.keep_temporary_files = true,
             "--no-header" => opts.no_header = true,
             "-t" | "--temporary-directory" => {
                 i += 1;
@@ -304,6 +309,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     crate::interpret::interpret(
         &typed.body,
         &temp_dir,
+        opts.keep_temporary_files,
         &text,
         &opts.search_path,
         &argv,

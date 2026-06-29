@@ -32,6 +32,7 @@ pub mod sam;
 pub mod samtools;
 pub mod select;
 pub mod suggestion;
+pub mod tempfiles;
 pub mod tokens;
 pub mod transform;
 pub mod types;
@@ -74,6 +75,7 @@ pub(crate) fn help_text() -> String {
          Options:\n\
          \x20 -n, --validate-only            Only validate the script; do not run it\n\
          \x20 -t, --temporary-directory DIR  Directory for temporary files\n\
+         \x20     --keep-temporary-files     Do not delete temporary files when done\n\
          \x20 -v, --verbosity LEVEL          Set verbosity level (quiet|normal|full)\n\
          \x20 -q, --quiet                    Suppress informational output\n\
          \x20     --trace                    Highest verbosity mode (print all trace messages)\n\
