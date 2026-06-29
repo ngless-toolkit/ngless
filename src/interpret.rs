@@ -1634,18 +1634,39 @@ impl Interpreter {
         let cond = select::parse_conditions(&keep_if, &drop_if)?;
         let outpath = self.new_temp_path("selected_", "sam")?;
         let mut out = sam_temp_writer(&outpath)?;
-        for item in group_sam_stream(&path.to_string_lossy(), paired)? {
-            match item? {
-                SamItem::Header(line) => {
-                    writeln!(out, "{line}").map_err(sam_write_err)?;
-                }
-                SamItem::Data(group) => {
-                    let filtered = select::apply_conditions(&cond, group.clone());
-                    for line in reinject_call(&group, filtered)? {
-                        writeln!(out, "{line}").map_err(sam_write_err)?;
+        // Render each SAM item to its output bytes in parallel (order-preserving), then write the
+        // rendered blocks serially in order. The per-group work (`apply_conditions` + reinjection)
+        // is pure, so the output is byte-identical at any `--jobs` count (mirrors the `ncap-1`
+        // parallel select in `Interpret.hs`). Headers, which precede the data groups in the
+        // stream, are rendered verbatim by the same map, preserving their position.
+        let n_threads = crate::parallel::n_threads();
+        const BLOCK: usize = 1024;
+        let render = |chunk: NgResult<Vec<SamItem>>| -> NgResult<Vec<u8>> {
+            let chunk = chunk?;
+            let mut buf = Vec::new();
+            for item in chunk {
+                match item {
+                    SamItem::Header(line) => {
+                        buf.extend_from_slice(line.as_bytes());
+                        buf.push(b'\n');
+                    }
+                    SamItem::Data(group) => {
+                        let filtered = select::apply_conditions(&cond, group.clone());
+                        for line in reinject_call(&group, filtered)? {
+                            buf.extend_from_slice(line.as_bytes());
+                            buf.push(b'\n');
+                        }
                     }
                 }
             }
+            Ok(buf)
+        };
+        for bytes in crate::parallel::par_map_ordered(
+            crate::parallel::chunked(group_sam_stream(&path.to_string_lossy(), paired)?, BLOCK),
+            n_threads,
+            render,
+        ) {
+            out.write_all(&bytes?).map_err(sam_write_err)?;
         }
         out.flush().map_err(sam_write_err)?;
         Ok(NGLessObject::MappedReadSet {
