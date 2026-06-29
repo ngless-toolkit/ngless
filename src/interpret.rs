@@ -19,11 +19,11 @@
 //! in later milestones: files are read whole rather than streamed (no FileOrStream/bounded
 //! queues), and per-position quality percentiles are not collected.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use crate::ast::*;
@@ -2689,33 +2689,34 @@ impl Interpreter {
             pair_iters.push(it1.zip(it2).map(|(a, b)| a.and_then(|x| b.map(|y| (x, y)))));
         }
         let pair_records = pair_iters.into_iter().flatten();
-        let process_pairs = |chunk: NgResult<Vec<(ShortRead, ShortRead)>>| -> NgResult<PairBlockOut> {
-            let chunk = chunk?;
-            let mut out = PairBlockOut::default();
-            for (r1, r2) in chunk {
-                let o1 = self.run_block_on_read(var, r1, block)?;
-                let o2 = self.run_block_on_read(var, r2, block)?;
-                match (o1, o2) {
-                    (Some(a), Some(b)) => {
-                        out.w1
-                            .extend_from_slice(fastq::fq_encode(outenc, &a).as_bytes());
-                        out.a1.update(&a);
-                        out.w2
-                            .extend_from_slice(fastq::fq_encode(outenc, &b).as_bytes());
-                        out.a2.update(&b);
-                    }
-                    (Some(r), None) | (None, Some(r)) => {
-                        if keep_singles {
-                            out.ws
-                                .extend_from_slice(fastq::fq_encode(outenc, &r).as_bytes());
-                            out.as_.update(&r);
+        let process_pairs =
+            |chunk: NgResult<Vec<(ShortRead, ShortRead)>>| -> NgResult<PairBlockOut> {
+                let chunk = chunk?;
+                let mut out = PairBlockOut::default();
+                for (r1, r2) in chunk {
+                    let o1 = self.run_block_on_read(var, r1, block)?;
+                    let o2 = self.run_block_on_read(var, r2, block)?;
+                    match (o1, o2) {
+                        (Some(a), Some(b)) => {
+                            out.w1
+                                .extend_from_slice(fastq::fq_encode(outenc, &a).as_bytes());
+                            out.a1.update(&a);
+                            out.w2
+                                .extend_from_slice(fastq::fq_encode(outenc, &b).as_bytes());
+                            out.a2.update(&b);
                         }
+                        (Some(r), None) | (None, Some(r)) => {
+                            if keep_singles {
+                                out.ws
+                                    .extend_from_slice(fastq::fq_encode(outenc, &r).as_bytes());
+                                out.as_.update(&r);
+                            }
+                        }
+                        (None, None) => {}
                     }
-                    (None, None) => {}
                 }
-            }
-            Ok(out)
-        };
+                Ok(out)
+            };
         for out in crate::parallel::par_map_ordered(
             crate::parallel::chunked(pair_records, BLOCK),
             n_threads,

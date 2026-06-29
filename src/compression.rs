@@ -277,13 +277,16 @@ impl StreamWriter {
                     path: path.to_string(),
                 })
             }
-            Compress::Gzip => Encoder::Gzip(GzEncoder::new(BufWriter::new(f), Compression::default())),
+            Compress::Gzip => {
+                Encoder::Gzip(GzEncoder::new(BufWriter::new(f), Compression::default()))
+            }
             Compress::Bzip2 => Encoder::Bzip2(bzip2::write::BzEncoder::new(
                 BufWriter::new(f),
                 bzip2::Compression::default(),
             )),
             Compress::Zstd => Encoder::Zstd(
-                zstd::stream::write::Encoder::new(BufWriter::new(f), ZSTD_LEVEL).map_err(sys_err)?,
+                zstd::stream::write::Encoder::new(BufWriter::new(f), ZSTD_LEVEL)
+                    .map_err(sys_err)?,
             ),
         };
         // Bounded channel for back-pressure: a slow compressor stalls the producer rather than
@@ -371,10 +374,7 @@ impl StreamWriter {
 }
 
 /// Join a (still-present) worker handle and translate a panic into an error.
-fn join_worker(
-    handle: &mut Option<std::thread::JoinHandle<NgResult<()>>>,
-    path: &str,
-) -> NgError {
+fn join_worker(handle: &mut Option<std::thread::JoinHandle<NgResult<()>>>, path: &str) -> NgError {
     match join_worker_result(handle, path) {
         Ok(()) => NgError::new(
             NgErrorType::SystemError,

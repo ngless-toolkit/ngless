@@ -205,7 +205,11 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     output::init(opts.verbosity, opts.quiet, opts.trace);
     // `n_threads == 0` means the flag was not given: default to a single thread (the Haskell
     // default), which keeps output byte-for-byte reproducible unless the user opts in.
-    let n_threads = if opts.n_threads == 0 { 1 } else { opts.n_threads };
+    let n_threads = if opts.n_threads == 0 {
+        1
+    } else {
+        opts.n_threads
+    };
     crate::parallel::init(n_threads, opts.strict_threads);
 
     let fname = opts

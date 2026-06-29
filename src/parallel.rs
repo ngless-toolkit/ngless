@@ -168,16 +168,14 @@ mod tests {
         let input: Vec<u64> = (0..1000).collect();
         let serial: Vec<u64> = input.iter().map(|&x| x * x).collect();
         for n in [1usize, 2, 3, 4, 8, 16] {
-            let got: Vec<u64> =
-                par_map_ordered(input.clone().into_iter(), n, |x| x * x).collect();
+            let got: Vec<u64> = par_map_ordered(input.clone().into_iter(), n, |x| x * x).collect();
             assert_eq!(got, serial, "mismatch at n_threads={n}");
         }
     }
 
     #[test]
     fn handles_empty_input() {
-        let got: Vec<u64> =
-            par_map_ordered(Vec::<u64>::new().into_iter(), 4, |x| x).collect();
+        let got: Vec<u64> = par_map_ordered(Vec::<u64>::new().into_iter(), 4, |x| x).collect();
         assert!(got.is_empty());
     }
 
@@ -191,13 +189,17 @@ mod tests {
     #[test]
     fn first_error_wins_by_index() {
         // Items 3 and 7 fail; iterating in order, the first Err encountered must be index 3.
-        let results = par_map_ordered(0..10, 4, |x: i32| {
-            if x == 3 || x == 7 {
-                Err(x)
-            } else {
-                Ok(x)
-            }
-        });
+        let results = par_map_ordered(
+            0..10,
+            4,
+            |x: i32| {
+                if x == 3 || x == 7 {
+                    Err(x)
+                } else {
+                    Ok(x)
+                }
+            },
+        );
         let mut first_err = None;
         for r in results {
             if let Err(e) = r {
@@ -225,8 +227,7 @@ mod tests {
 
     #[test]
     fn collect_result_short_circuits() {
-        let ok: Result<Vec<i32>, i32> =
-            par_map_ordered(0..100, 4, |x: i32| Ok(x)).collect();
+        let ok: Result<Vec<i32>, i32> = par_map_ordered(0..100, 4, |x: i32| Ok(x)).collect();
         assert_eq!(ok.map(|v| v.len()), Ok(100));
     }
 }
