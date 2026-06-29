@@ -314,28 +314,51 @@ where
     let mut to_distribute: Vec<Vec<Vec<usize>>> =
         (0..annotators.len()).map(|_| Vec::new()).collect();
 
-    for g in groups {
-        let g = g?;
-        for (ai, ann) in annotators.iter().enumerate() {
-            let idxs = ann.annotate_read_group(opts, &g)?;
-            let c = &mut counts[ai];
-            if idxs.len() == 1 {
-                c[idxs[0]] += 1.0;
-            } else {
-                match opts.mm_method {
-                    MMMethod::UniqueOnly => {}
-                    MMMethod::CountAll => {
-                        for &i in &idxs {
-                            c[i] += 1.0;
+    // Annotate read groups in parallel (order-preserving), then fold the per-group results into
+    // the count vectors serially in input order. The annotation (`annotate_read_group` — the hot
+    // path for GFF interval lookups) is pure; the fold stays serial so the floating-point
+    // accumulation order, and hence the output, is identical to the single-threaded path. This
+    // mirrors Haskell's `asyncMapEitherC mapthreads` feeding an ordered count fold.
+    let n_threads = crate::parallel::n_threads();
+    const BLOCK: usize = 1024;
+    let annotate_block = |chunk: NgResult<Vec<Vec<SamLine>>>| -> NgResult<Vec<Vec<Vec<usize>>>> {
+        let chunk = chunk?;
+        let mut out = Vec::with_capacity(chunk.len());
+        for g in &chunk {
+            let mut per_ann = Vec::with_capacity(annotators.len());
+            for ann in &annotators {
+                per_ann.push(ann.annotate_read_group(opts, g)?);
+            }
+            out.push(per_ann);
+        }
+        Ok(out)
+    };
+    for block in crate::parallel::par_map_ordered(
+        crate::parallel::chunked(groups.into_iter(), BLOCK),
+        n_threads,
+        annotate_block,
+    ) {
+        for per_ann in block? {
+            for (ai, idxs) in per_ann.into_iter().enumerate() {
+                let c = &mut counts[ai];
+                if idxs.len() == 1 {
+                    c[idxs[0]] += 1.0;
+                } else {
+                    match opts.mm_method {
+                        MMMethod::UniqueOnly => {}
+                        MMMethod::CountAll => {
+                            for &i in &idxs {
+                                c[i] += 1.0;
+                            }
                         }
-                    }
-                    MMMethod::OneOverN => {
-                        let f = 1.0 / idxs.len() as f64;
-                        for &i in &idxs {
-                            c[i] += f;
+                        MMMethod::OneOverN => {
+                            let f = 1.0 / idxs.len() as f64;
+                            for &i in &idxs {
+                                c[i] += f;
+                            }
                         }
+                        MMMethod::Dist1 => to_distribute[ai].push(idxs),
                     }
-                    MMMethod::Dist1 => to_distribute[ai].push(idxs),
                 }
             }
         }
