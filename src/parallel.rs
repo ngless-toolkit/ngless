@@ -76,7 +76,7 @@ pub fn mapper_threads() -> usize {
 /// `Err` — because results are ordered, that is deterministically the lowest-indexed failure.
 pub fn par_map_ordered<T, R, F, I>(items: I, n_threads: usize, f: F) -> impl Iterator<Item = R>
 where
-    I: Iterator<Item = T> + Send,
+    I: Iterator<Item = T>,
     F: Fn(T) -> R + Sync,
     T: Send,
     R: Send,
@@ -116,6 +116,46 @@ where
             buffer.extend(wave_results);
         }
         buffer.pop_front()
+    })
+}
+
+/// Group a fallible stream into fixed-size blocks, the natural work unit for [`par_map_ordered`]
+/// (a single read is too small to amortise hand-off cost; a block of a few thousand is not).
+///
+/// Each yielded item is `Ok(Vec<_>)` of up to `size` elements, or the first `Err` encountered —
+/// at which point iteration is meant to stop (the caller short-circuits, and on error the run is
+/// abandoned, so the partially gathered block is irrelevant).
+pub fn chunked<I, X, E>(mut it: I, size: usize) -> impl Iterator<Item = Result<Vec<X>, E>>
+where
+    I: Iterator<Item = Result<X, E>>,
+{
+    let size = size.max(1);
+    let mut done = false;
+    std::iter::from_fn(move || {
+        if done {
+            return None;
+        }
+        let mut buf = Vec::with_capacity(size);
+        for _ in 0..size {
+            match it.next() {
+                Some(Ok(x)) => buf.push(x),
+                Some(Err(e)) => {
+                    // Fuse: once an error is seen, stop — the run is being abandoned and any
+                    // records gathered before it in this block are irrelevant.
+                    done = true;
+                    return Some(Err(e));
+                }
+                None => {
+                    done = true;
+                    break;
+                }
+            }
+        }
+        if buf.is_empty() {
+            None
+        } else {
+            Some(Ok(buf))
+        }
     })
 }
 
@@ -166,6 +206,21 @@ mod tests {
             }
         }
         assert_eq!(first_err, Some(3));
+    }
+
+    #[test]
+    fn chunked_groups_and_stops_on_error() {
+        let ok: Vec<Result<i32, ()>> = (0..10).map(Ok).collect();
+        let blocks: Vec<Result<Vec<i32>, ()>> = chunked(ok.into_iter(), 4).collect();
+        assert_eq!(
+            blocks,
+            vec![Ok(vec![0, 1, 2, 3]), Ok(vec![4, 5, 6, 7]), Ok(vec![8, 9])]
+        );
+        // An error terminates the stream at the block where it occurs.
+        let withbad: Vec<Result<i32, &str>> =
+            vec![Ok(0), Ok(1), Err("boom"), Ok(3)].into_iter().collect();
+        let blocks: Vec<Result<Vec<i32>, &str>> = chunked(withbad.into_iter(), 4).collect();
+        assert_eq!(blocks, vec![Err("boom")]);
     }
 
     #[test]

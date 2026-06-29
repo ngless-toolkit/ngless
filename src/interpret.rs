@@ -19,7 +19,8 @@
 //! in later milestones: files are read whole rather than streamed (no FileOrStream/bounded
 //! queues), and per-position quality percentiles are not collected.
 
-use std::cell::{Cell, RefCell};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -413,9 +414,9 @@ pub fn interpret(
     let mut interp = Interpreter {
         env,
         temp_files: crate::tempfiles::TempFiles::new(temp_dir, keep_temporary_files),
-        cur_lno: Cell::new(0),
-        fq_stats: RefCell::new(Vec::new()),
-        map_stats: RefCell::new(Vec::new()),
+        cur_lno: AtomicUsize::new(0),
+        fq_stats: Mutex::new(Vec::new()),
+        map_stats: Mutex::new(Vec::new()),
         script_text: script_text.to_string(),
         search_path: search_path.to_vec(),
         argv: argv.to_vec(),
@@ -426,7 +427,7 @@ pub fn interpret(
         held_locks: Vec::new(),
     };
     for (lno, e) in body {
-        interp.cur_lno.set(*lno);
+        interp.cur_lno.store(*lno, Ordering::Relaxed);
         crate::output::trace(*lno, &format!("Interpreting [{lno}]: {e:?}"));
         interp.interpret_top(e)?;
     }
@@ -459,6 +460,26 @@ struct MapInfo {
     unique: i64,
 }
 
+/// One block's worth of preprocessed paired output: the encoded bytes destined for each of the
+/// three output files, plus the QC accumulators for that block. Produced in parallel by a worker
+/// and then written/merged in order by the serial consumer (see `execute_preprocess`).
+#[derive(Default)]
+struct PairBlockOut {
+    w1: Vec<u8>,
+    w2: Vec<u8>,
+    ws: Vec<u8>,
+    a1: fastq::FastQStatsAcc,
+    a2: fastq::FastQStatsAcc,
+    as_: fastq::FastQStatsAcc,
+}
+
+/// One block's worth of preprocessed singleton output (the singles file only).
+#[derive(Default)]
+struct SingleBlockOut {
+    ws: Vec<u8>,
+    as_: fastq::FastQStatsAcc,
+}
+
 struct Interpreter {
     env: HashMap<String, NGLessObject>,
     /// Registry for all temporary files/directories created during the run. Allocating
@@ -467,11 +488,14 @@ struct Interpreter {
     /// happens when the interpreter, and hence this field, is dropped.
     temp_files: crate::tempfiles::TempFiles,
     /// Line number of the top-level statement currently executing (used for `preproc.lnoN`).
-    cur_lno: Cell<usize>,
-    fq_stats: RefCell<Vec<FqInfo>>,
+    /// `Atomic`/`Mutex` (rather than `Cell`/`RefCell`) so that `&Interpreter` is `Sync` and can
+    /// be shared across the worker threads of `preprocess`; they are only ever touched
+    /// single-threaded (before/after the parallel region), so there is no real contention.
+    cur_lno: AtomicUsize,
+    fq_stats: Mutex<Vec<FqInfo>>,
     /// Collected mapping statistics, one entry per `map()` call (mirrors the `mapOutput`
     /// accumulator). `qcstats({mapping})` serialises these.
-    map_stats: RefCell<Vec<MapInfo>>,
+    map_stats: Mutex<Vec<MapInfo>>,
     /// The original (verbatim) script source, used by `write(..., auto_comments=[{script}])`
     /// (mirrors `ngleScriptText`).
     script_text: String,
@@ -1373,8 +1397,8 @@ impl Interpreter {
     /// mapping-stats accumulator (mirrors the `addMapOutput` in `outputMappedSetStatistics`).
     fn register_map_stats(&self, sam: &Path, reference: &str) -> NgResult<()> {
         let (total, aligned, unique) = sam_group_stats_stream(&sam.to_string_lossy())?;
-        self.map_stats.borrow_mut().push(MapInfo {
-            lno: self.cur_lno.get(),
+        self.map_stats.lock().unwrap().push(MapInfo {
+            lno: self.cur_lno.load(Ordering::Relaxed),
             input_file: sam.to_string_lossy().into_owned(),
             reference: reference.to_string(),
             total,
@@ -1905,7 +1929,7 @@ impl Interpreter {
             // Rust port has no hook system, so we emit the same guidance now (it is purely
             // informational — `collect` still returns successfully). Emitted at `Info` level, so it
             // is suppressed by `--quiet`, matching Haskell. Mirrors the message in `executeCollect`.
-            let lno = self.cur_lno.get();
+            let lno = self.cur_lno.load(Ordering::Relaxed);
             crate::output::info(
                 lno,
                 "The collect() call could not be executed as there are partial results missing.\n\
@@ -2109,7 +2133,7 @@ impl Interpreter {
     /// Record an already-computed [`fastq::FastQStats`] under `label`, used by the streaming
     /// QC passes (mirrors `outputFQStatistics` given the folded statistics).
     fn register_fq_stats_from(&self, label: &str, st: &fastq::FastQStats, enc: FastQEncoding) {
-        self.fq_stats.borrow_mut().push(FqInfo {
+        self.fq_stats.lock().unwrap().push(FqInfo {
             file: label.to_string(),
             encoding: enc.name().to_string(),
             gc_content: st.gc_fraction(),
@@ -2161,7 +2185,7 @@ impl Interpreter {
 
     /// Serialise collected FASTQ stats as the transposed TSV produced by `writeOutputTSV`.
     fn format_fq_stats_tsv(&self) -> String {
-        let stats = self.fq_stats.borrow();
+        let stats = self.fq_stats.lock().unwrap();
         let mut out = String::from("\tstats\n");
         for (i, info) in stats.iter().enumerate() {
             // Keys in the alphabetical order produced by Haskell's `sort` over (key, value).
@@ -2185,7 +2209,7 @@ impl Interpreter {
     /// Serialise collected mapping stats as the transposed TSV produced by `writeOutputTSV` for the
     /// mapping case (`encodeMapStats`: keys sorted alphabetically). Empty input yields an empty file.
     fn format_map_stats_tsv(&self) -> String {
-        let stats = self.map_stats.borrow();
+        let stats = self.map_stats.lock().unwrap();
         if stats.is_empty() {
             return String::new();
         }
@@ -2584,6 +2608,7 @@ impl Interpreter {
     /// `executePreprocess`). Paired reads are processed in lockstep — a pair where both mates
     /// survive stays paired, a pair where one survives becomes a singleton (`keep_singles`,
     /// default true). Output encoding is the common input encoding, or Sanger if they disagree.
+    #[allow(clippy::too_many_lines)]
     fn execute_preprocess(&self, readset: &NGLessObject, block: &Block) -> NgResult<NGLessObject> {
         let (name, rs) = match readset {
             NGLessObject::ReadSet { name, readset } => (name.clone(), readset.clone()),
@@ -2619,54 +2644,100 @@ impl Interpreter {
             fastq::FastQStatsAcc::new(),
         );
 
+        // The per-read block work (decode is already done; here it is the user block + re-encode)
+        // is run in parallel over fixed-size record blocks via `par_map_ordered`, which preserves
+        // input order. Each worker encodes its block into local byte buffers and local QC
+        // accumulators; the serial consumer then writes those bytes (in order) and merges the
+        // accumulators — so the output is byte-identical at any `--jobs` count. With `--jobs 1`
+        // this degrades to a serial map, matching the previous one-read-at-a-time behaviour.
+        let n_threads = crate::parallel::n_threads();
+        const BLOCK: usize = 4096;
+
+        // Pairs: stream both mates in lockstep (`zip` stops at the shorter mate, reproducing the
+        // previous semantics) across every pair-file, then chunk and process in parallel.
+        let mut pair_iters = Vec::new();
         for (f1, f2) in &rs.pairs {
-            let mut it1 = fastq::fastq_records(
+            let it1 = fastq::fastq_records(
                 crate::compression::open_read(&f1.path.to_string_lossy())?,
                 f1.encoding,
             );
-            let mut it2 = fastq::fastq_records(
+            let it2 = fastq::fastq_records(
                 crate::compression::open_read(&f2.path.to_string_lossy())?,
                 f2.encoding,
             );
-            // `zip` semantics: read mate 1 first, and only then mate 2; stop at the shorter mate.
-            loop {
-                let r1 = match it1.next() {
-                    Some(r) => r?,
-                    None => break,
-                };
-                let r2 = match it2.next() {
-                    Some(r) => r?,
-                    None => break,
-                };
+            pair_iters.push(it1.zip(it2).map(|(a, b)| a.and_then(|x| b.map(|y| (x, y)))));
+        }
+        let pair_records = pair_iters.into_iter().flatten();
+        let process_pairs = |chunk: NgResult<Vec<(ShortRead, ShortRead)>>| -> NgResult<PairBlockOut> {
+            let chunk = chunk?;
+            let mut out = PairBlockOut::default();
+            for (r1, r2) in chunk {
                 let o1 = self.run_block_on_read(var, r1, block)?;
                 let o2 = self.run_block_on_read(var, r2, block)?;
                 match (o1, o2) {
                     (Some(a), Some(b)) => {
-                        w1.write_chunk(fastq::fq_encode(outenc, &a).as_bytes())?;
-                        a1.update(&a);
-                        w2.write_chunk(fastq::fq_encode(outenc, &b).as_bytes())?;
-                        a2.update(&b);
+                        out.w1
+                            .extend_from_slice(fastq::fq_encode(outenc, &a).as_bytes());
+                        out.a1.update(&a);
+                        out.w2
+                            .extend_from_slice(fastq::fq_encode(outenc, &b).as_bytes());
+                        out.a2.update(&b);
                     }
                     (Some(r), None) | (None, Some(r)) => {
                         if keep_singles {
-                            ws.write_chunk(fastq::fq_encode(outenc, &r).as_bytes())?;
-                            as_.update(&r);
+                            out.ws
+                                .extend_from_slice(fastq::fq_encode(outenc, &r).as_bytes());
+                            out.as_.update(&r);
                         }
                     }
                     (None, None) => {}
                 }
             }
+            Ok(out)
+        };
+        for out in crate::parallel::par_map_ordered(
+            crate::parallel::chunked(pair_records, BLOCK),
+            n_threads,
+            process_pairs,
+        ) {
+            let out = out?;
+            w1.write_chunk(&out.w1)?;
+            w2.write_chunk(&out.w2)?;
+            ws.write_chunk(&out.ws)?;
+            a1.merge(&out.a1);
+            a2.merge(&out.a2);
+            as_.merge(&out.as_);
         }
+
+        // Singletons: appended to the singles output after the pair-derived singles, in order.
+        let mut single_iters = Vec::new();
         for fqf in &rs.singletons {
-            for r in fastq::fastq_records(
+            single_iters.push(fastq::fastq_records(
                 crate::compression::open_read(&fqf.path.to_string_lossy())?,
                 fqf.encoding,
-            ) {
-                if let Some(sr) = self.run_block_on_read(var, r?, block)? {
-                    ws.write_chunk(fastq::fq_encode(outenc, &sr).as_bytes())?;
-                    as_.update(&sr);
+            ));
+        }
+        let single_records = single_iters.into_iter().flatten();
+        let process_singles = |chunk: NgResult<Vec<ShortRead>>| -> NgResult<SingleBlockOut> {
+            let chunk = chunk?;
+            let mut out = SingleBlockOut::default();
+            for r in chunk {
+                if let Some(sr) = self.run_block_on_read(var, r, block)? {
+                    out.ws
+                        .extend_from_slice(fastq::fq_encode(outenc, &sr).as_bytes());
+                    out.as_.update(&sr);
                 }
             }
+            Ok(out)
+        };
+        for out in crate::parallel::par_map_ordered(
+            crate::parallel::chunked(single_records, BLOCK),
+            n_threads,
+            process_singles,
+        ) {
+            let out = out?;
+            ws.write_chunk(&out.ws)?;
+            as_.merge(&out.as_);
         }
         w1.finish()?;
         w2.finish()?;
@@ -2674,7 +2745,7 @@ impl Interpreter {
 
         // Register QC statistics for all three output slots, as executePreprocess does (before
         // deciding the result shape), labelled with the preprocess statement's line number.
-        let lno = self.cur_lno.get();
+        let lno = self.cur_lno.load(Ordering::Relaxed);
         self.register_fq_stats_from(&format!("preproc.lno{lno}.pairs.1"), &a1.finish(), outenc);
         self.register_fq_stats_from(&format!("preproc.lno{lno}.pairs.2"), &a2.finish(), outenc);
         self.register_fq_stats_from(&format!("preproc.lno{lno}.singles"), &as_.finish(), outenc);

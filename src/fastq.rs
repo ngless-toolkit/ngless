@@ -366,6 +366,21 @@ impl FastQStatsAcc {
         }
     }
 
+    /// Fold another accumulator into this one. Every field is a commutative/associative
+    /// reduction (sum, min, max), so merging per-block accumulators in input order yields a
+    /// result identical to a single serial fold — which keeps `preprocess`'s QC stats
+    /// byte-identical when the work is parallelised.
+    pub fn merge(&mut self, other: &FastQStatsAcc) {
+        self.n_seq += other.n_seq;
+        self.min_len = self.min_len.min(other.min_len);
+        self.max_len = self.max_len.max(other.max_len);
+        self.a += other.a;
+        self.c += other.c;
+        self.g += other.g;
+        self.t += other.t;
+        self.o += other.o;
+    }
+
     pub fn finish(&self) -> FastQStats {
         FastQStats {
             n_seq: self.n_seq,
