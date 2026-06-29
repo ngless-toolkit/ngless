@@ -70,6 +70,18 @@ pub fn is_builtin_reference(name: &str) -> bool {
     find_builtin(name).is_some()
 }
 
+/// All names by which a builtin reference can be requested: every canonical name plus every alias
+/// (mirrors `(refName <$> builtinReferences) ++ mapMaybe refAlias builtinReferences` in
+/// `ValidationIO.checkReferencesExist`). Used by the IO validation pass to recognise a valid
+/// `map(..., reference=...)` argument before interpretation.
+pub fn builtin_reference_names() -> Vec<String> {
+    BUILTIN_REFERENCES
+        .iter()
+        .map(|r| r.name.to_string())
+        .chain(BUILTIN_REFERENCES.iter().map(|r| r.alias.to_string()))
+        .collect()
+}
+
 /// Find a builtin reference by name or alias (mirrors `findReference builtinReferences`).
 fn find_builtin(name: &str) -> Option<&'static BuiltinReference> {
     BUILTIN_REFERENCES

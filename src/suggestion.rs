@@ -63,6 +63,43 @@ pub fn suggestion_message<S: AsRef<str>>(used: &str, valid: &[S]) -> String {
     }
 }
 
+/// Check that `fname` exists and is readable, returning an error message (with a "did you mean"
+/// suggestion drawn from the sibling directory entries) when it is not. Mirrors `checkFileReadable`
+/// in `Utils/Suggestion.hs`: a missing file is reported with a suggestion, an existing but
+/// unreadable file with a permissions message, and a readable file yields `None`.
+pub fn check_file_readable(fname: &str) -> Option<String> {
+    let path = std::path::Path::new(fname);
+    if !path.is_file() {
+        // Offer the closest sibling filename as a suggestion (mirrors `getDirectoryContents` on the
+        // parent directory, ignoring IO errors).
+        let existing: Vec<String> = std::fs::read_dir(take_directory(fname))
+            .map(|rd| {
+                rd.filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        Some(format!(
+            "File `{fname}` does not exist. {}",
+            suggestion_message(fname, &existing)
+        ))
+    } else if std::fs::File::open(path).is_err() {
+        Some(format!(
+            "File `{fname}` is not readable (permissions problem)."
+        ))
+    } else {
+        None
+    }
+}
+
+/// `System.FilePath.takeDirectory`: the directory portion of a path, or "." when there is none.
+fn take_directory(path: &str) -> String {
+    match path.rfind('/') {
+        None => ".".to_string(),
+        Some(0) => "/".to_string(),
+        Some(i) => path[..i].to_string(),
+    }
+}
+
 /// Levenshtein edit distance between two strings, with unit costs for insertion, deletion and
 /// substitution (matching `Text.EditDistance`'s `defaultEditCosts`). Operates on Unicode scalar
 /// values (`char`), as Haskell's does on `Char`.

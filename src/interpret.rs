@@ -296,9 +296,10 @@ fn execute_discard_singles(expr: &NGLessObject) -> NgResult<NGLessObject> {
     }
 }
 
-/// `__check_ofile(path, original_lno=N)`: verify the output directory exists (mirrors `checkOFile`
-/// + the `__check_ofile` arm of `executeChecks`). Inserted by [`crate::transform::add_file_checks`]
-/// so that a write to a non-existent directory fails *before* any preceding statement runs.
+/// `__check_ofile(path, original_lno=N)`: verify the output directory exists and is writable
+/// (mirrors `checkOFile` + the `__check_ofile` arm of `executeChecks`). Inserted by
+/// [`crate::transform::add_file_checks`] so that a write to a bad directory fails *before* any
+/// preceding statement runs.
 fn execute_check_ofile(
     expr: &NGLessObject,
     args: &[(String, NGLessObject)],
@@ -315,16 +316,65 @@ fn execute_check_ofile(
         Some(NGLessObject::Integer(i)) => *i,
         _ => 0,
     };
-    let dirname = take_directory(&oname);
-    if !std::path::Path::new(&dirname).is_dir() {
+    if let Some(err) = check_ofile(&oname) {
         return Err(NgError::new(
             NgErrorType::SystemError,
-            format!(
-                "File name '{oname}' used as output, but directory {dirname} does not exist. (used in line {lno})."
-            ),
+            format!("{err} (used in line {lno})."),
         ));
     }
     Ok(NGLessObject::Void)
+}
+
+/// `__check_ifile(path, original_lno=N)`: verify an input file exists and is readable (mirrors the
+/// `__check_ifile` arm of `executeChecks`). Inserted by [`crate::transform::add_file_checks`] for
+/// *non-constant* input paths, so a missing file is reported right after the variable it depends on
+/// is bound rather than when the file is finally read. The literal path is checked (no search-path
+/// expansion), matching Haskell.
+fn execute_check_ifile(
+    expr: &NGLessObject,
+    args: &[(String, NGLessObject)],
+) -> NgResult<NGLessObject> {
+    let fname = match expr {
+        NGLessObject::String(s) => s.clone(),
+        other => {
+            return Err(NgError::should_not_occur(format!(
+                "input file check expected a string, got {other:?}"
+            )))
+        }
+    };
+    let lno = match lookup_arg(args, "original_lno") {
+        Some(NGLessObject::Integer(i)) => *i,
+        _ => 0,
+    };
+    if let Some(err) = crate::suggestion::check_file_readable(&fname) {
+        return Err(NgError::new(
+            NgErrorType::SystemError,
+            format!("{err} (used in line {lno})."),
+        ));
+    }
+    Ok(NGLessObject::Void)
+}
+
+/// Check that `oname`'s directory exists and is writable (mirrors `checkOFile` in
+/// `BuiltinModules/Checks.hs`). Returns an error message, or `None` when the file can be written.
+pub(crate) fn check_ofile(oname: &str) -> Option<String> {
+    let dirname = take_directory(oname);
+    if !std::path::Path::new(&dirname).is_dir() {
+        return Some(format!(
+            "File name '{oname}' used as output, but directory {dirname} does not exist."
+        ));
+    }
+    // `writable <$> getPermissions dirname`. `Permissions::readonly()` is true only when *no* write
+    // bit is set, so this errs toward "writable" (never a false alarm for a user-owned directory).
+    let writable = std::fs::metadata(&dirname)
+        .map(|m| !m.permissions().readonly())
+        .unwrap_or(false);
+    if !writable {
+        return Some(format!(
+            "write call to file {oname}, but directory {dirname} is not writable."
+        ));
+    }
+    None
 }
 
 /// `System.FilePath.takeDirectory`: the directory portion of a path, or "." when there is none.
@@ -720,6 +770,7 @@ impl Interpreter {
             "assemble" => self.execute_assemble(&expr_v, &argvs),
             "orf_find" => self.execute_orf_find(&expr_v, &argvs),
             "__check_ofile" => execute_check_ofile(&expr_v, &argvs),
+            "__check_ifile" => execute_check_ifile(&expr_v, &argvs),
             other => {
                 if self
                     .external_modules
@@ -2992,7 +3043,7 @@ pub(crate) fn write_interleaved<W: Write>(rs: &ReadSet, out: &mut W) -> NgResult
 /// Candidate paths for a FASTA reference under the search path (mirrors `expandPath'`). With no
 /// `<...>` placeholder the path is used as-is; otherwise, for each search-path entry, the
 /// placeholder is resolved (supporting `name=/path` entries) and joined with the remainder.
-fn expand_path_candidates(fbase: &str, search: &[String]) -> Vec<String> {
+pub(crate) fn expand_path_candidates(fbase: &str, search: &[String]) -> Vec<String> {
     match find_angle_group(fbase) {
         None => vec![fbase.to_string()],
         Some((start, end, code)) => {

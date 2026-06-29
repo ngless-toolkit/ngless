@@ -21,22 +21,25 @@ use std::collections::HashMap;
 use crate::ast::{BOp, Block, Expression, FuncName, Index, NGLType, UOp, Variable};
 use crate::modules::{ArgCheck, Function};
 
-/// Insert `__check_ofile` calls that float up to right after the assignment of the variable the
-/// output path depends on (mirrors the `__check_ofile` half of `addFileChecks` in `Transform.hs`).
+/// Insert `__check_ifile`/`__check_ofile` calls that float up to right after the assignment of the
+/// variable the file path depends on (mirrors `addFileChecks` in `Transform.hs`).
 ///
-/// Only the output-file pass is ported: a `write`/`collect`/... call whose `ofile` (or other
-/// `FileWritable` argument) is a single-variable expression gets a `__check_ofile(<path>,
-/// original_lno=<lno>)` inserted right after that variable's assignment (and a redundant one right
-/// before the call, matching Haskell). Constant paths are left for interpretation time. The input
-/// (`__check_ifile`) pass is intentionally not ported: a missing constant input file is still
-/// reported when the file is actually read, so behaviour is unchanged for valid scripts.
+/// A call whose input path (a `FileReadable` argument) or output path (a `FileWritable` argument) is
+/// a single-variable expression gets a `__check_ifile`/`__check_ofile(<path>, original_lno=<lno>)`
+/// inserted right after that variable's assignment (and a redundant one right before the call,
+/// matching Haskell). This surfaces a missing input file or unwritable output directory as early as
+/// possible — right when the path becomes known — rather than only when the file is finally
+/// read/written. Constant paths are handled eagerly by the IO validation pass
+/// ([`crate::validation::validate_io`]) instead.
 pub fn add_file_checks(
     body: Vec<(usize, Expression)>,
     funcs: &[Function],
 ) -> Vec<(usize, Expression)> {
     // The Haskell version works on the reversed script so a check can be placed *before* (in
-    // reversed order) the assignment it depends on, i.e. *after* it in source order.
+    // reversed order) the assignment it depends on, i.e. *after* it in source order. The input pass
+    // runs first, then the output pass over its result (mirrors `checkIFiles >=> checkOFiles`).
     let rev: Vec<(usize, Expression)> = body.into_iter().rev().collect();
+    let rev = add_file_checks_pass(rev, "__check_ifile", &ArgCheck::FileReadable, funcs);
     let rev = add_file_checks_pass(rev, "__check_ofile", &ArgCheck::FileWritable, funcs);
     rev.into_iter().rev().collect()
 }

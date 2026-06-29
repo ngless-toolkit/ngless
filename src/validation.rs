@@ -37,10 +37,162 @@ pub fn validate(funcs: &[Function], constants: &[String], script: &Script) -> Ng
     }
 }
 
-/// IO validation for `count()` calls (mirrors `validateCount` in `ValidationIO.hs`, which runs
-/// `executeCountCheck` on calls whose keyword arguments are all statically known). The only check
-/// performed is that, in functional-map mode, every requested feature is a column of the map file.
-pub fn validate_count_io(script: &Script) -> NgResult<()> {
+/// Run the IO-dependent validation pass (mirrors `validateIO` in `ValidationIO.hs`): an eager,
+/// up-front search for problems that would otherwise only surface once interpretation reaches the
+/// offending call. It checks that constant input files exist and are readable, that constant output
+/// directories exist and are writable (warning on overwrite), that `map(..., reference=...)` names a
+/// known reference, and runs the `count()` feature check. Collected errors are joined and returned
+/// as a single script error (matching Main.hs joining with blank lines); the `count` check throws
+/// directly, as in Haskell.
+///
+/// `funcs` is the full function table (to look up the `FileReadable`/`FileWritable` argument tags);
+/// `search_path` is used to expand `<...>`-placeholder input paths exactly as interpretation will.
+pub fn validate_io(funcs: &[Function], search_path: &[String], script: &Script) -> NgResult<()> {
+    let mut errs: Vec<String> = Vec::new();
+    validate_read_inputs(funcs, search_path, script, &mut errs);
+    validate_ofile(funcs, script, &mut errs);
+    check_references_exist(script, &mut errs);
+    // `validateCount` throws directly rather than accumulating (it calls `executeCountCheck`), so it
+    // runs last and propagates, mirroring the Haskell ordering.
+    validate_count(script)?;
+    if errs.is_empty() {
+        Ok(())
+    } else {
+        Err(NgError::script(errs.join("\n\n")))
+    }
+}
+
+/// `validateReadInputs`: for every call argument tagged `FileReadable` whose value is a constant
+/// string (a literal or a variable that traces to a unique constant assignment), check that the file
+/// exists and is readable, expanding `<...>` placeholders through the search path first.
+fn validate_read_inputs(
+    funcs: &[Function],
+    search_path: &[String],
+    script: &Script,
+    errs: &mut Vec<String>,
+) {
+    for (lno, e) in &script.body {
+        let mut local: Vec<String> = Vec::new();
+        recursive_analyse(e, &mut |x| {
+            if let Expression::FunctionCall(f, arg, args, _) = x {
+                if let Some(finfo) = find_function(funcs, f) {
+                    let mut check = |fname: &str| check_file_readable_io(fname, search_path, &mut local);
+                    if finfo.arg_checks.contains(&ArgCheck::FileReadable) {
+                        validate_str_val(arg, script, &mut check);
+                    }
+                    for ainfo in &finfo.kwargs {
+                        if ainfo.checks.contains(&ArgCheck::FileReadable) {
+                            if let Some(v) = lookup_arg(args, &ainfo.name) {
+                                validate_str_val(v, script, &mut check);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        errs.extend(add_lno(*lno, local));
+    }
+}
+
+/// `checkFileReadable'`: expand the path through the search path, then report a problem with the
+/// first existing candidate (or that no candidate could be found at all).
+fn check_file_readable_io(fname: &str, search_path: &[String], local: &mut Vec<String>) {
+    let candidates = crate::interpret::expand_path_candidates(fname, search_path);
+    match candidates
+        .iter()
+        .find(|p| std::path::Path::new(p).exists())
+    {
+        Some(p) => {
+            if let Some(err) = crate::suggestion::check_file_readable(p) {
+                local.push(err);
+            }
+        }
+        None => local.push(format!("Could not find necessary input file {fname}")),
+    }
+}
+
+/// `validateOFile`: for every call argument tagged `FileWritable` whose value is a constant string,
+/// check that the output directory exists and is writable, and warn when an existing file would be
+/// overwritten.
+fn validate_ofile(funcs: &[Function], script: &Script, errs: &mut Vec<String>) {
+    for (lno, e) in &script.body {
+        let mut local: Vec<String> = Vec::new();
+        recursive_analyse(e, &mut |x| {
+            if let Expression::FunctionCall(f, arg, args, _) = x {
+                if let Some(finfo) = find_function(funcs, f) {
+                    let mut check = |ofile: &str| check_ofile_io(ofile, &mut local);
+                    if finfo.arg_checks.contains(&ArgCheck::FileWritable) {
+                        validate_str_val(arg, script, &mut check);
+                    }
+                    for ainfo in &finfo.kwargs {
+                        if ainfo.checks.contains(&ArgCheck::FileWritable) {
+                            if let Some(v) = lookup_arg(args, &ainfo.name) {
+                                validate_str_val(v, script, &mut check);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        errs.extend(add_lno(*lno, local));
+    }
+}
+
+/// `checkOFileV`: collect any directory problem, and warn (not error) if the file already exists.
+fn check_ofile_io(ofile: &str, local: &mut Vec<String>) {
+    if let Some(err) = crate::interpret::check_ofile(ofile) {
+        local.push(err);
+    }
+    if std::path::Path::new(ofile).exists() {
+        // Mirrors `outputListLno' WarningOutput`, which carries no explicit line number here.
+        crate::output::warn(
+            0,
+            &format!("Writing to file '{ofile}' will overwrite existing file."),
+        );
+    }
+}
+
+/// `checkReferencesExist`: a `map(..., reference=...)` whose constant value is neither a builtin
+/// reference name/alias nor an existing file on disk is an error (with a "did you mean" suggestion).
+fn check_references_exist(script: &Script, errs: &mut Vec<String>) {
+    let allnames = crate::reference::builtin_reference_names();
+    for (lno, e) in &script.body {
+        let mut local: Vec<String> = Vec::new();
+        recursive_analyse(e, &mut |x| {
+            if let Expression::FunctionCall(FuncName(name), _, args, _) = x {
+                if name == "map" {
+                    if let Some(v) = lookup_arg(args, "reference") {
+                        validate_str_val(v, script, &mut |r| {
+                            if !allnames.iter().any(|n| n == r) {
+                                let exists = std::path::Path::new(r).is_file();
+                                let mut msg = format!(
+                                    "Could not find reference {r} (it is neither built in nor in any of the loaded modules).\n"
+                                );
+                                if exists {
+                                    msg.push_str(&format!(
+                                        "\n\tDid you mean to use the argument `fafile` to specify the FASTA file `{r}`?\n\tmap() uses the argument `reference` for builtin references and `fafile` for a FASTA file path."
+                                    ));
+                                }
+                                msg.push_str(&crate::suggestion::suggestion_message(r, &allnames));
+                                msg.push_str("\n\tValid options are:");
+                                for v in &allnames {
+                                    msg.push_str(&format!("\n\t\t - {v}"));
+                                }
+                                local.push(msg);
+                            }
+                        });
+                    }
+                }
+            }
+        });
+        errs.extend(add_lno(*lno, local));
+    }
+}
+
+/// `validateCount` (mirrors `ValidationIO.hs`): run `executeCountCheck` on `count()` calls whose
+/// keyword arguments are all statically known. The only check performed is that, in functional-map
+/// mode, every requested feature is a column of the map file. Errors propagate directly.
+fn validate_count(script: &Script) -> NgResult<()> {
     for (lno, e) in &script.body {
         let mut calls: Vec<Vec<(Variable, Expression)>> = Vec::new();
         recursive_analyse(e, &mut |x| {
@@ -69,6 +221,37 @@ pub fn validate_count_io(script: &Script) -> NgResult<()> {
         }
     }
     Ok(())
+}
+
+/// `validateStrVal`: apply `f` to the string value of `e` when it is a constant — either a literal
+/// `ConstStr` or a `Lookup` of a variable that traces to a unique constant string assignment.
+fn validate_str_val(e: &Expression, script: &Script, f: &mut dyn FnMut(&str)) {
+    match e {
+        Expression::ConstStr(v) => f(v),
+        Expression::Lookup(_, var) => {
+            if let Some(v) = try_const_string(var, script) {
+                f(&v);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// `tryConstValue` (for strings): if the script has exactly one top-level assignment to `var` and
+/// its right-hand side is a constant string, return that string.
+fn try_const_string(var: &Variable, script: &Script) -> Option<String> {
+    let assigned: Vec<&Expression> = script
+        .body
+        .iter()
+        .filter_map(|(_, e)| match e {
+            Expression::Assignment(v, rhs) if v == var => Some(rhs.as_ref()),
+            _ => None,
+        })
+        .collect();
+    match assigned.as_slice() {
+        [rhs] => static_string(rhs),
+        _ => None,
+    }
 }
 
 /// Whether `e` is a fully static expression (mirrors `staticValue` returning `Just`).
@@ -835,5 +1018,100 @@ mod tests {
     #[test]
     fn assign_variable_ok() {
         is_ok("ngless '1.5'\nnotConst = 1\nnotConst = 2\n");
+    }
+
+    // --- IO validation (`validate_io`) ------------------------------------
+
+    /// Create a unique temp FASTQ file and return its path; the caller is responsible for removal.
+    fn temp_fastq(tag: &str) -> std::path::PathBuf {
+        let p = std::env::temp_dir().join(format!(
+            "ngless_io_{tag}_{}.fq",
+            std::process::id()
+        ));
+        std::fs::write(&p, b"@r\nACGT\n+\nIIII\n").unwrap();
+        p
+    }
+
+    #[test]
+    fn io_missing_input_file_errors() {
+        let script = parse_ngless(
+            "test",
+            true,
+            "ngless '1.5'\ninput = fastq('/no/such/path/xyz.fq')\n",
+        )
+        .unwrap();
+        let e = validate_io(&funcs(), &[], &script)
+            .expect_err("missing input should error")
+            .to_string();
+        assert!(e.contains("xyz.fq"), "got: {e}");
+    }
+
+    #[test]
+    fn io_existing_input_file_ok() {
+        let p = temp_fastq("ok");
+        let txt = format!("ngless '1.5'\ninput = fastq('{}')\n", p.display());
+        let script = parse_ngless("test", true, &txt).unwrap();
+        let r = validate_io(&funcs(), &[], &script);
+        std::fs::remove_file(&p).ok();
+        assert!(r.is_ok(), "got: {:?}", r.err());
+    }
+
+    #[test]
+    fn io_input_file_via_constant_variable_errors() {
+        // A variable that traces to a unique constant string is checked too (`tryConstValue`).
+        let script = parse_ngless(
+            "test",
+            true,
+            "ngless '1.5'\nfname = '/no/such/path/traced.fq'\ninput = fastq(fname)\n",
+        )
+        .unwrap();
+        let e = validate_io(&funcs(), &[], &script)
+            .expect_err("missing input should error")
+            .to_string();
+        assert!(e.contains("traced.fq"), "got: {e}");
+    }
+
+    #[test]
+    fn io_unknown_reference_errors() {
+        let p = temp_fastq("ref");
+        let ofile = std::env::temp_dir().join("ngless_io_out.sam");
+        let txt = format!(
+            "ngless '1.5'\ninput = fastq('{}')\nmapped = map(input, reference='no_such_ref')\nwrite(mapped, ofile='{}')\n",
+            p.display(),
+            ofile.display(),
+        );
+        let script = parse_ngless("test", true, &txt).unwrap();
+        let r = validate_io(&funcs(), &[], &script);
+        std::fs::remove_file(&p).ok();
+        let e = r.expect_err("unknown reference should error").to_string();
+        assert!(e.contains("Could not find reference no_such_ref"), "got: {e}");
+    }
+
+    #[test]
+    fn io_builtin_reference_ok() {
+        let p = temp_fastq("builtinref");
+        let ofile = std::env::temp_dir().join("ngless_io_out2.sam");
+        let txt = format!(
+            "ngless '1.5'\ninput = fastq('{}')\nmapped = map(input, reference='sacCer3')\nwrite(mapped, ofile='{}')\n",
+            p.display(),
+            ofile.display(),
+        );
+        let script = parse_ngless("test", true, &txt).unwrap();
+        let r = validate_io(&funcs(), &[], &script);
+        std::fs::remove_file(&p).ok();
+        assert!(r.is_ok(), "got: {:?}", r.err());
+    }
+
+    #[test]
+    fn io_missing_output_dir_errors() {
+        let txt = "ngless '1.5'\ninput = fastq('whatever')\nwrite(input, ofile='/no/such/dir/out.fq')\n";
+        let script = parse_ngless("test", true, txt).unwrap();
+        let e = validate_io(&funcs(), &[], &script)
+            .expect_err("missing output dir should error")
+            .to_string();
+        assert!(
+            e.contains("directory /no/such/dir does not exist"),
+            "got: {e}"
+        );
     }
 }

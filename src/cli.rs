@@ -244,10 +244,11 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     let constant_names: Vec<String> = constants.iter().map(|(n, _)| n.clone()).collect();
     crate::validation::validate(&funcs, &constant_names, &typed)?;
 
-    // IO validation (mirrors `validateIO`): run the count check for `count()` calls whose keyword
-    // arguments are all statically known, so a non-existent feature column aborts before any output
-    // is produced. Runs before the citation header is printed, matching Haskell's ordering.
-    crate::validation::validate_count_io(&typed)?;
+    // IO validation (mirrors `validateIO`): eagerly check that input files exist, output
+    // directories are writable, `map` references are known, and `count()` features are valid, so
+    // these problems abort before any work is done. Runs before the citation header is printed,
+    // matching Haskell's ordering.
+    crate::validation::validate_io(&funcs, &opts.search_path, &typed)?;
 
     if opts.validate_only {
         if !opts.quiet {
