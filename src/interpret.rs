@@ -334,11 +334,16 @@ fn execute_check_ifile(
     expr: &NGLessObject,
     args: &[(String, NGLessObject)],
 ) -> NgResult<NGLessObject> {
+    // Mirrors `filepathOrTypeError`: the checked argument may be a plain path string, a
+    // `Filename`, or a `SequenceSet` (e.g. `map(..., fafile=assemble(...))`), each of which
+    // carries a file path to verify.
     let fname = match expr {
-        NGLessObject::String(s) => s.clone(),
+        NGLessObject::String(s) | NGLessObject::Filename(s) | NGLessObject::SequenceSet(s) => {
+            s.clone()
+        }
         other => {
-            return Err(NgError::should_not_occur(format!(
-                "input file check expected a string, got {other:?}"
+            return Err(NgError::script(format!(
+                "Expected a filepath (received {other:?}) in context 'checking input file'"
             )))
         }
     };
