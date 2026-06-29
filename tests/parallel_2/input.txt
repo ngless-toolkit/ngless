@@ -1,0 +1,2 @@
+sample.fq
+sample2.fq

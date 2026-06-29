@@ -48,12 +48,17 @@ for testdir in tests/*; do
         if [[ $testdir == tests/error-validation-* ]] ; then
             validate_arg="-n"
         fi
-        cmd_args=""
-        if test -f cmdargs ; then
-            cmd_args="$(cat cmdargs)"
+        if test -x run.sh; then
+            NGLESS_BIN=$NGLESS_BIN ./run.sh >output.stdout.txt 2>output.stderr.txt
+            ngless_exit=$?
+        else
+            cmd_args=""
+            if test -f cmdargs ; then
+                cmd_args="$(cat cmdargs)"
+            fi
+            "$NGLESS_BIN" --quiet -t temp $cmd_args $validate_arg *.ngl > output.stdout.txt 2>output.stderr.txt
+            ngless_exit=$?
         fi
-        "$NGLESS_BIN" --quiet -t temp $cmd_args $validate_arg *.ngl > output.stdout.txt 2>output.stderr.txt
-        ngless_exit=$?
         if [[ $testdir == tests/error-* ]] ; then
             if test $ngless_exit -eq "0"; then
                 echo "NGLess exited with exit code 0, even though an error was expected in test"
