@@ -49,6 +49,9 @@ pub enum WhenExistsStrategy {
 pub struct LockGuard {
     path: PathBuf,
     stop: Option<Arc<AtomicBool>>,
+    /// Registration with the signal-cleanup registry, so the lock file is removed even if the
+    /// process is killed before this guard drops (see [`crate::cleanup`]).
+    cleanup_id: u64,
 }
 
 impl Drop for LockGuard {
@@ -56,6 +59,7 @@ impl Drop for LockGuard {
         if let Some(stop) = &self.stop {
             stop.store(true, Ordering::SeqCst);
         }
+        crate::cleanup::unregister(self.cleanup_id);
         remove_file_if_exists(&self.path);
     }
 }
@@ -85,9 +89,11 @@ pub fn acquire_lock(mut params: LockParameters) -> NgResult<Option<LockGuard>> {
                 } else {
                     None
                 };
+                let cleanup_id = crate::cleanup::register(&params.lock_fname);
                 return Ok(Some(LockGuard {
                     path: params.lock_fname,
                     stop,
+                    cleanup_id,
                 }));
             }
             None => match file_age(&params.lock_fname) {

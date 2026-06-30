@@ -48,6 +48,9 @@ struct RunOpts {
 /// Entry point for the non-informational command line (everything except `--version*` and
 /// `--check-install`, which are handled in `lib::run`). Returns the process exit code.
 pub fn run_default_mode(args: &[String]) -> i32 {
+    // Install signal-driven removal of lock/temporary files before any worker threads are spawned,
+    // so an interrupted run (Ctrl+C / SIGTERM) does not leave stale artifacts behind.
+    crate::cleanup::install();
     let opts = match parse_args(args) {
         Ok(o) => o,
         Err(e) => {

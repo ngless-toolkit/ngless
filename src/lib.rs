@@ -13,6 +13,7 @@
 
 pub mod ast;
 pub mod citations;
+pub mod cleanup;
 pub mod cli;
 pub mod compression;
 pub mod count;
