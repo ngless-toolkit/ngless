@@ -425,12 +425,35 @@ pub fn interpret(
         active_mappers,
         ngl_version,
         held_locks: Vec::new(),
+        claimed_locks: Vec::new(),
     };
-    for (lno, e) in body {
-        interp.cur_lno.store(*lno, Ordering::Relaxed);
-        crate::output::trace(*lno, &format!("Interpreting [{lno}]: {e:?}"));
-        interp.interpret_top(e)?;
+    let result: NgResult<()> = (|| {
+        for (lno, e) in body {
+            interp.cur_lno.store(*lno, Ordering::Relaxed);
+            crate::output::trace(*lno, &format!("Interpreting [{lno}]: {e:?}"));
+            interp.interpret_top(e)?;
+        }
+        Ok(())
+    })();
+    // End-of-run markers for `lock1`/`run_for_all` claims (mirrors the `FinishOkHook` /
+    // `registerFailHook` pair): `.finished` on success, `.failed` on error. Best-effort — a
+    // marker-write failure must never mask the run's actual result.
+    for claim in std::mem::take(&mut interp.claimed_locks) {
+        let (suffix, line) = match &result {
+            Ok(()) => (
+                "finished",
+                format!(
+                    "Finished {} at {}\n",
+                    claim.sane_entry,
+                    crate::output::finished_timestamp()
+                ),
+            ),
+            Err(e) => ("failed", format!("Execution failed. Execution log:\n{e}\n")),
+        };
+        let path = format!("{}/{}.{suffix}", claim.lockdir, claim.sane_entry);
+        let _ = std::fs::write(&path, line);
     }
+    result?;
     crate::output::info(0, "Interpretation finished.");
     Ok(())
 }
@@ -521,6 +544,19 @@ struct Interpreter {
     /// stays in place while the entry is processed and is released (removed) when the interpreter is
     /// dropped at the end of the run.
     held_locks: Vec<crate::lockfile::LockGuard>,
+    /// Entries claimed via `lock1`/`run_for_all`. After the body completes, each gets a
+    /// `<sane>.finished` receipt (on success) or a `<sane>.failed` log (on error). Written once at
+    /// the end of the run; `get_lock` uses the markers to skip completed and de-prioritize failed
+    /// entries on the next run.
+    claimed_locks: Vec<ClaimedLock>,
+}
+
+/// An entry claimed by `lock1`/`run_for_all`, recorded so the run can write its end-of-run marker
+/// (mirrors the `FinishOkHook` + `registerFailHook` pair in `executeLock1OrForAll`).
+struct ClaimedLock {
+    lockdir: String,
+    /// Sanitized entry name — `get_lock` keys `.finished`/`.failed` off the sane name.
+    sane_entry: String,
 }
 
 /// Which external mapper a `map()` call uses (mirrors the `Mapper` dispatch in `Map.hs`). Only
@@ -1864,6 +1900,12 @@ impl Interpreter {
         // Hold the lock for the rest of the run (mirrors keeping the `ReleaseKey`); it is released
         // when the interpreter is dropped.
         self.held_locks.push(guard);
+        // Record the claim so the end-of-run drain can write its `.finished`/`.failed` marker. Use
+        // the sanitized name, matching what `get_lock` checks for.
+        self.claimed_locks.push(ClaimedLock {
+            lockdir: lockdir.clone(),
+            sane_entry: sane[chosen].clone(),
+        });
         Ok(entries[chosen].clone())
     }
 
@@ -3465,31 +3507,59 @@ fn get_lock(lockdir: &str, sane: &[String]) -> NgResult<(usize, crate::lockfile:
                 .collect()
         })
         .unwrap_or_default();
+
+    // Try to claim entry `i` (the `name` is the sanitized entry). A held, fresh lock makes
+    // `acquire_lock` return `None`, so the caller moves on to the next candidate.
+    let try_claim =
+        |i: usize, name: &str| -> NgResult<Option<(usize, crate::lockfile::LockGuard)>> {
+            let params = LockParameters {
+                lock_fname: PathBuf::from(format!("{lockdir}/{name}.lock")),
+                // One hour: lock files are mtime-refreshed every ten minutes while healthy, so an older
+                // one signals a crashed process (mirrors `getLock'`).
+                max_age: Duration::from_secs(60 * 60),
+                when_exists: WhenExistsStrategy::IfLockedNothing,
+                mtime_update: true,
+            };
+            if let Some(guard) = acquire_lock(params)? {
+                // Recheck `.finished` under the lock: a peer may have finished (and released the lock)
+                // between our directory scan and the acquire (mirrors the `doesFileExist finishedName`
+                // recheck in `getLock'`).
+                if Path::new(&format!("{lockdir}/{name}.finished")).exists() {
+                    drop(guard);
+                    return Ok(None);
+                }
+                return Ok(Some((i, guard)));
+            }
+            Ok(None)
+        };
+
+    // Pass 1: entries that are neither finished nor failed. The `acquire_lock` `max_age` reclaim
+    // already covers Haskell's separate stale-locked pass, so there is no third pass.
     for (i, name) in sane.iter().enumerate() {
         if existing.contains(&format!("{name}.finished"))
             || existing.contains(&format!("{name}.failed"))
         {
             continue;
         }
-        let params = LockParameters {
-            lock_fname: PathBuf::from(format!("{lockdir}/{name}.lock")),
-            // One hour: lock files are mtime-refreshed every ten minutes while healthy, so an older
-            // one signals a crashed process (mirrors `getLock'`).
-            max_age: Duration::from_secs(60 * 60),
-            when_exists: WhenExistsStrategy::IfLockedNothing,
-            mtime_update: true,
-        };
-        if let Some(guard) = acquire_lock(params)? {
-            // Recheck `.finished` under the lock: a peer may have finished (and released the lock)
-            // between our directory scan and the acquire (mirrors the `doesFileExist finishedName`
-            // recheck in `getLock'`).
-            if Path::new(&format!("{lockdir}/{name}.finished")).exists() {
-                drop(guard);
-                continue;
-            }
-            return Ok((i, guard));
+        if let Some(v) = try_claim(i, name)? {
+            return Ok(v);
         }
     }
+
+    // Pass 2: retry previously-failed entries last (mirrors `getLock`'s final fallback over the
+    // failed set). A `.finished` entry is always skipped. Haskell randomizes this order only to
+    // reduce concurrent-process contention; order does not affect correctness, so we go in order.
+    for (i, name) in sane.iter().enumerate() {
+        if existing.contains(&format!("{name}.finished"))
+            || !existing.contains(&format!("{name}.failed"))
+        {
+            continue;
+        }
+        if let Some(v) = try_claim(i, name)? {
+            return Ok(v);
+        }
+    }
+
     Err(NgError::new(
         NgErrorType::DataError,
         "All jobs are finished or running",

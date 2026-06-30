@@ -157,6 +157,14 @@
   unified onto this same primitive: it claims each candidate through `acquire_lock` (`IfLockedNothing`,
   1h max-age, `mtime_update` — matching Haskell's `getLock'`) and rechecks `.finished` under the lock.
   The claimed `LockGuard` is held in the interpreter (`held_locks`) for the run and released on drop.
+  **`.finished`/`.failed` markers (replacing `FinishOkHook`/`registerFailHook`)** are done without a
+  hook system: each `lock1`/`run_for_all` claim is recorded on the interpreter (`claimed_locks`), and
+  after the script body completes `interpret()` writes a `<sane>.finished` receipt for every claim on
+  success or a `<sane>.failed` log on error (best-effort, so a marker write never masks the run
+  result). `get_lock` is a two-pass scan: it skips `.finished` entries and prefers never-attempted
+  ones, falling back to retrying `.failed` entries last (mirroring `getLock`'s failed-retry pass; the
+  contention-only `shuffleM` randomization is dropped). This is what makes the multi-run
+  `tests/parallel_2` workflow pick a different sample on each run and collect once all are done.
 - **Modules + stdlib — sample/directory loading:** `group()` is interpreted (`execute_group`,
   mirroring `executeGroup`/`groupFiles`). On top of it, `load_fastq_directory`
   (`BuiltinModules/LoadDirectory.hs`) globs `<dir>/*.{fq,fastq}{,.gz,.bz2,.xz}` (sorted), pairs files
@@ -303,11 +311,10 @@ covered by `tests/`**. They are grouped by impact.
   `to_shortest`), which never switches to scientific notation for exponents `< -6` or `>= 21`, unlike
   Haskell's double-conversion `toShortest`. Reachable via `normalization={normed}` on multi-megabase
   contigs.
-- **`.finished`-on-success markers (`FinishOkHook`).** Both `lock1` and `collect`'s "cannot collect"
-  path rely on Haskell's `FinishOkHook`, which is unported (no hook system). Without it a successful
-  parallel run leaves no `.finished` marker, so a re-run can redo an already-completed sample (duplicated
-  work, not wrong output). A lightweight end-of-run hook list on the `Interpreter` (run after the body
-  completes successfully) would close this and the `collect` guidance-timing nuance.
+- **`collect()` "cannot collect" guidance timing.** The `.finished`/`.failed` markers themselves are
+  now ported (see the parallel-module section); the one nuance left is that `collect`'s "run ngless
+  once per sample" guidance is emitted inline rather than deferred to end-of-run as Haskell's
+  `FinishOkHook` does (gated on `--quiet`, not output-affecting).
 - **`collect()` minor gaps:** the `--subsample` `.subsample` ofile suffix and `auto_comments={date}`
   remain unported.
 

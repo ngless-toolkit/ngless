@@ -143,6 +143,12 @@ pub fn warn(lno: usize, msg: &str) {
     message(OutputType::Warning, lno, msg);
 }
 
+/// Current time as `Day DD-MM-YYYY HH:MM` (UTC), matching Haskell's `%a %d-%m-%Y %R` used for the
+/// parallel-module `.finished` receipt line.
+pub(crate) fn finished_timestamp() -> String {
+    timestamp(false)
+}
+
 /// Format the current time as `Day DD-MM-YYYY HH:MM[:SS]` in UTC. With `with_seconds` (i.e. under
 /// `--trace`) the seconds field is included, mirroring Haskell's `%a %d-%m-%Y %T` vs `%R`.
 fn timestamp(with_seconds: bool) -> String {
