@@ -283,29 +283,47 @@ covered by `tests/`**. They are grouped by impact.
   and the `soap` mapper (`StandardModules/Soap.hs`; registered on `import` but `execute_map` rejects
   it). Both are referenced only for hashing in `src/transform.rs`. (`batch` is now ported — see the
   stdlib section above.)
-- **CLI sub-modes + flags — Phase 0 (parser groundwork) DONE; behaviour pending.** A phased
-  implementation plan lives in `next-steps.md` ("CLI flags & sub-modes — implementation plan").
-  `lib.rs` peels off the informational `infoOption`s (`--version*`/`--date-short`/`-h/--help`) and
-  hands the rest to `cli::run_cli`, which dispatches on a `Mode` enum mirroring `CmdArgs.NGLessMode`
-  (`Default`/`PrintPath`/`CheckInstall`/`InstallReferenceData`/`DownloadFile`/`DownloadDemo`/
-  `CreateReferencePack`). Implemented modes: `Default` (the run/validate flow) plus `--print-path`
-  and `--check-install`. The remaining sub-modes (`--install-reference-data`, `--download-file`,
-  `--download-demo`, `--create-reference-pack`) are now **recognized** — they route to their `Mode`
-  variant and exit with a clear "not yet implemented" message instead of falling through. **Unknown
-  flags now error** (`Invalid option \`...'`, mirroring optparse) instead of being silently ignored;
-  a bare `-` stays a valid STDIN positional. All `DefaultMode` flags are **parsed** into `RunOpts`,
-  including the ones not yet wired: `-e/--script` (inline), `-p/--print-last` (`wrapPrint`),
-  `--color auto|no|yes|force`, `--search-dir` (deprecated alias for `--search-path`),
-  `--experimental-features`, `--export-json`/`--export-cwl`, `--check-deprecation`,
-  `--create-report`/`--no-create-report`, `-o/--html-report-directory`; the `keep-temporary-files`/
-  `strict-threads`/`create-report` triSwitches accept their `--no-` forms (`Option<bool>`,
-  `None` ⇒ fall through to config). Still absent are the *behaviours* behind those flags (Phases
-  1–4): the run/validate flags actually used by `tests/` (`-n`, `-t`, `--keep-temporary-files`,
-  `-q`, `-v`, `--trace`, `--no-header`, `--debug`, `--search-path`, `--subsample`, `-j/--jobs`,
-  `--strict-threads`, `-c/--config-file`, `--index-path`) plus `--print-path`/`--check-install` are
-  the only ones with full effect today. The **`--experimental-features`** flag is *purely a gate on
-  the two export modes* (in `Execs/Main.hs` it only causes `--export-json`/`--export-cwl` to
-  `fatalError` when absent); it unlocks **no** script-level behavior.
+- **CLI sub-modes + flags — Phase 0 (parser groundwork) + Phase 1 (small `DefaultMode` flags)
+  DONE.** A phased implementation plan lives in `next-steps.md` ("CLI flags & sub-modes —
+  implementation plan"). `lib.rs` peels off the informational `infoOption`s (`--version*`/
+  `--date-short`/`-h/--help`) and hands the rest to `cli::run_cli`, which dispatches on a `Mode` enum
+  mirroring `CmdArgs.NGLessMode` (`Default`/`PrintPath`/`CheckInstall`/`InstallReferenceData`/
+  `DownloadFile`/`DownloadDemo`/`CreateReferencePack`). Implemented modes: `Default` (the
+  run/validate flow) plus `--print-path` and `--check-install`. The remaining sub-modes
+  (`--install-reference-data`, `--download-file`, `--download-demo`, `--create-reference-pack`) are
+  **recognized** — they route to their `Mode` variant and exit with a clear "not yet implemented"
+  message instead of falling through (Phases 2/4). **Unknown flags error** (`Invalid option \`...'`,
+  mirroring optparse) instead of being silently ignored; a bare `-` stays a valid STDIN positional.
+  **Phase 1 wired the behaviour of the small `DefaultMode` flags** (mirroring `modeExec
+  DefaultMode`):
+  - **`-e/--script` (inline script)** — `run_script` selects file-vs-inline (`loadScript` + the
+    `(fname, reqversion)` split): an inline script is named `"inline"`, carries **no** version
+    requirement (no header ⇒ default version 1.5, mirroring `parseVersion Nothing`), and is **not**
+    prepended to `ARGV` (`nConfArgv`: `ScriptFilePath f -> f:extraArgs`, else `extraArgs`). The file
+    path `-` now reads the script from STDIN (`load_script_file`).
+  - **`-p/--print-last`** — `transform::wrap_print` (porting `wrapPrint`) wraps the last statement in
+    `write(<expr>, ofile=STDOUT)` right after parsing, before type-checking, so it is type-checked,
+    validated and seen by `uses_STDOUT` (which suppresses the run header). It errors if the script
+    already terminates in a `print`/`write` call.
+  - **`--color auto|no|yes|force`** — overrides the config-file `color` key (`None` ⇒ fall through)
+    before `output::init`.
+  - **`--experimental-features`** — gates the export modes (its *only* effect): `--export-json`/
+    `--export-cwl` without it produce the exact Haskell `fatalError`; *with* it they report "not yet
+    implemented" (the export machinery itself is Phase 3).
+  - **`--index-path`** — threaded into mapper index resolution. `ensure_one_index_exists`/
+    `ensure_splits_exist` (`src/interpret.rs`) call the new `get_index_output` (porting
+    `getIndexOutput`): when the index store path is set and the FASTA is not already under it
+    (`is_sub_path`/`split_path`, faithful to `System.FilePath.splitPath`'s trailing-slash quirk), the
+    index is mirrored into `<index-dir>/<abs-fafile-without-leading-slash>` with a symlink back to the
+    original FASTA, and the bwa index is built there. A reference that already carries a valid index
+    is used in place (the original location is checked first), so `--index-path` only redirects
+    *missing* indices.
+  All remaining `DefaultMode` flags are parsed into `RunOpts`: `--search-dir` (deprecated alias for
+  `--search-path`), `--check-deprecation`, `--create-report`/`--no-create-report`,
+  `-o/--html-report-directory`; the `keep-temporary-files`/`strict-threads`/`create-report`
+  triSwitches accept their `--no-` forms (`Option<bool>`, `None` ⇒ fall through to config). Still
+  pending: the Phase 2/3/4 sub-modes, `--check-deprecation` (needs module deprecation metadata), and
+  `--create-report`/`-o` (await the HTML report).
 - **Config-file reader — DONE** (`src/configuration.rs`, mirroring `Configuration.hs`). The three
   Haskell config steps are reproduced: `guess_configuration` (environment defaults, including the
   `$XDG_DATA_HOME` user-directory resolution from `getDefaultUserNglessDirectory`),

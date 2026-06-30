@@ -407,6 +407,49 @@ fn take_directory(path: &str) -> String {
     }
 }
 
+/// Make a path absolute relative to the current working directory if it is not already (mirrors
+/// `System.Directory.makeAbsolute`, which does not require the path to exist). Used by
+/// `getIndexOutput` to mirror a reference under the `--index-path` directory.
+fn make_absolute(p: &str) -> PathBuf {
+    let path = Path::new(p);
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map(|c| c.join(path))
+            .unwrap_or_else(|_| path.to_path_buf())
+    }
+}
+
+/// Split a path into components the way `System.FilePath.splitPath` does: each component is a run
+/// of non-separator characters followed by its trailing run of separators (so concatenating the
+/// components reproduces the original path, e.g. `"/a/b/c"` → `["/", "a/", "b/", "c"]`).
+fn split_path(p: &str) -> Vec<String> {
+    let chars: Vec<char> = p.chars().collect();
+    let mut res = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        let start = i;
+        while i < chars.len() && chars[i] != '/' {
+            i += 1;
+        }
+        while i < chars.len() && chars[i] == '/' {
+            i += 1;
+        }
+        res.push(chars[start..i].iter().collect());
+    }
+    res
+}
+
+/// Whether `base`'s path components are a prefix of `path`'s (mirrors `isSubPath` in
+/// `Interpretation/Map.hs`): an empty `base` is always a sub-path; a `base` longer than `path` is
+/// never one.
+fn is_sub_path(path: &str, base: &str) -> bool {
+    let ps = split_path(path);
+    let bs = split_path(base);
+    bs.len() <= ps.len() && ps.iter().zip(bs.iter()).all(|(p, b)| p == b)
+}
+
 /// Interpret a script body (already type-checked and validated). `temp_dir` is where
 /// intermediate FASTQ files (e.g. from `preprocess`) are written.
 #[allow(clippy::too_many_arguments)]
@@ -1495,24 +1538,30 @@ impl Interpreter {
         fafile: &str,
     ) -> NgResult<Vec<String>> {
         if block_size <= 0 {
-            self.ensure_one_index_exists(mapper, fafile)?;
-            Ok(vec![fafile.to_string()])
+            Ok(vec![self.ensure_one_index_exists(mapper, fafile)?])
         } else {
             let blocks = self.ensure_splits_exist(block_size, fafile)?;
+            let mut out = Vec::with_capacity(blocks.len());
             for b in &blocks {
-                self.ensure_one_index_exists(mapper, b)?;
+                out.push(self.ensure_one_index_exists(mapper, b)?);
             }
-            Ok(blocks)
+            Ok(out)
         }
     }
 
     /// Build the index for a single FASTA under a lock if it is missing, rechecking once the lock is
     /// held (mirrors `ensureIndexExists 0`: the index may have been built by another process while
-    /// we waited for the lock).
-    fn ensure_one_index_exists(&self, mapper: MapperKind, fafile: &str) -> NgResult<()> {
+    /// we waited for the lock). Returns the FASTA path actually mapped against: if a valid index is
+    /// already present next to `fafile`, it is used in place; otherwise the index is built at the
+    /// `--index-path`-redirected location (with a symlink back to the original FASTA), and that
+    /// path is returned.
+    fn ensure_one_index_exists(&self, mapper: MapperKind, fafile: &str) -> NgResult<String> {
+        // Mirrors `ensureIndexExists 0`: check the *original* location first, so a reference that
+        // already carries its index is used in place even when `--index-path` is set.
         if mapper.has_valid_index(fafile)? {
-            return Ok(());
+            return Ok(fafile.to_string());
         }
+        let fafile = self.get_index_output(true, fafile)?;
         let params = LockParameters {
             lock_fname: PathBuf::from(format!("{fafile}.ngless-index.lock")),
             max_age: Duration::from_secs(36 * 3600),
@@ -1524,11 +1573,61 @@ impl Interpreter {
         };
         with_lock_file(params, || {
             // Recheck under the lock: the index may have been created while we slept.
-            if !mapper.has_valid_index(fafile)? {
-                mapper.create_index(fafile)?;
+            if !mapper.has_valid_index(&fafile)? {
+                mapper.create_index(&fafile)?;
             }
             Ok(())
-        })
+        })?;
+        Ok(fafile)
+    }
+
+    /// Resolve where a reference's index should be stored (mirrors `getIndexOutput`). When the
+    /// `--index-path`/`index-path` config option is set and `fafile` is not already inside that
+    /// directory, the index is mirrored into `<index-dir>/<absolute-fafile-without-leading-slash>`:
+    /// the parent directory is created and, when `create_link` is set, a symlink to the original
+    /// FASTA is placed at the mirrored path so the mapper can build its index next to it. Otherwise
+    /// `fafile` is returned unchanged.
+    fn get_index_output(&self, create_link: bool, fafile: &str) -> NgResult<String> {
+        let index_dir = match &crate::configuration::global().index_store_path {
+            Some(d) if !d.is_empty() => d.clone(),
+            _ => return Ok(fafile.to_string()),
+        };
+        // `not (fafile isSubPath index_dir)`: if the FASTA already lives under the index directory,
+        // it is used in place.
+        if is_sub_path(fafile, &index_dir) {
+            return Ok(fafile.to_string());
+        }
+        let abs = make_absolute(fafile);
+        let abs_str = abs.to_string_lossy();
+        // `dropSlash`: strip all leading slashes so the absolute path joins *under* the index dir.
+        let rel = abs_str.trim_start_matches('/');
+        let target = Path::new(&index_dir).join(rel);
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!(
+                        "Could not create index directory '{}': {e}",
+                        parent.display()
+                    ),
+                )
+            })?;
+        }
+        if create_link {
+            #[cfg(unix)]
+            match std::os::unix::fs::symlink(&abs, &target) {
+                Ok(()) => {}
+                // Mirrors `catchIOError … isAlreadyExistsError`: an existing link is fine.
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+                Err(e) => {
+                    return Err(NgError::new(
+                        NgErrorType::SystemError,
+                        format!("Could not create index symlink '{}': {e}", target.display()),
+                    ))
+                }
+            }
+        }
+        Ok(target.to_string_lossy().into_owned())
     }
 
     /// Map `rs` against one indexed reference, returning the SAM temp file (mirrors
@@ -1549,13 +1648,18 @@ impl Interpreter {
     /// (mirrors `ensureSplitsExist`). A `.done` receipt file records completion so repeated runs
     /// reuse existing splits.
     fn ensure_splits_exist(&self, block_size: i64, fafile: &str) -> NgResult<Vec<String>> {
+        // The split chunks live alongside the `--index-path`-redirected FASTA (mirrors
+        // `getIndexOutput False` in `ensureSplitsExist`), but their base name still derives from the
+        // *original* FASTA (`takeBaseName fafile`), and the split itself reads the original file.
+        let redirected = self.get_index_output(false, fafile)?;
         let p = Path::new(fafile);
+        let pr = Path::new(&redirected);
         let stem = p
             .file_stem()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_default();
         let base_name = format!("{stem}.splits_{block_size}m");
-        let ofa_base = match p.parent() {
+        let ofa_base = match pr.parent() {
             Some(dir) if !dir.as_os_str().is_empty() => {
                 dir.join(&base_name).to_string_lossy().to_string()
             }
@@ -1565,7 +1669,7 @@ impl Interpreter {
         if Path::new(&receipt).exists() {
             // Reuse: collect the existing `<base>.*.fna` chunks, sorted lexicographically (as
             // Haskell's `sort . namesMatching` does).
-            let dir = p.parent().filter(|d| !d.as_os_str().is_empty());
+            let dir = pr.parent().filter(|d| !d.as_os_str().is_empty());
             let prefix = format!("{base_name}.");
             let mut found = Vec::new();
             let read_dir = match dir {
@@ -4577,6 +4681,35 @@ mod tests {
 
     fn s(v: &[&str]) -> Vec<String> {
         v.iter().map(|x| x.to_string()).collect()
+    }
+
+    #[test]
+    fn split_path_matches_haskell() {
+        // Mirrors `System.FilePath.splitPath` examples.
+        assert_eq!(split_path("/a/b/c"), s(&["/", "a/", "b/", "c"]));
+        assert_eq!(split_path("a/b/c"), s(&["a/", "b/", "c"]));
+        assert_eq!(
+            split_path("/directory/file.ext"),
+            s(&["/", "directory/", "file.ext"])
+        );
+        assert_eq!(split_path(""), Vec::<String>::new());
+    }
+
+    #[test]
+    fn is_sub_path_prefix_semantics() {
+        // `base` components must be a prefix of `path` components. Mirrors `splitPath`, whose
+        // intermediate components keep their trailing slash: a base *without* a trailing slash
+        // (`/idx` → `["/", "idx"]`) does NOT match the slashed intermediate component (`"idx/"`),
+        // so only the trailing-slash form matches — a faithful quirk of `isSubPath`.
+        assert!(!is_sub_path("/idx/a/b", "/idx"));
+        assert!(is_sub_path("/idx/a/b", "/idx/a/"));
+        assert!(is_sub_path("/idx", "/idx"));
+        // A longer base is never a sub-path; a relative path does not match an absolute base.
+        assert!(!is_sub_path("/idx", "/idx/a"));
+        assert!(!is_sub_path("/other/a", "/idx"));
+        assert!(!is_sub_path("refdir/ref.fna", "/idx"));
+        // An empty base is always a sub-path (mirrors `isSubPath' _ [] = True`).
+        assert!(is_sub_path("/anything", ""));
     }
 
     #[test]

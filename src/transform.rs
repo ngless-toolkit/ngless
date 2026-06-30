@@ -21,6 +21,43 @@ use std::collections::HashMap;
 use crate::ast::{BOp, Block, Expression, FuncName, Index, NGLType, UOp, Variable};
 use crate::modules::{ArgCheck, Function};
 
+/// Wrap the last top-level statement in `write(<expr>, ofile=STDOUT)` (mirrors `wrapPrint` in
+/// `Execs/Main.hs`), used by `-p/--print-last`. Applied right after parsing, before type-checking,
+/// so the injected `write` participates in type checking, validation and `uses_STDOUT` detection
+/// (which suppresses the run header and switches to quiet mode). Errors if the script already
+/// terminates in a `print`/`write` call, mirroring `wrapPrint`'s `throwScriptError`.
+pub fn wrap_print(body: &mut Vec<(usize, Expression)>) -> Result<(), String> {
+    let Some((_, last)) = body.last() else {
+        // An empty script is left untouched (mirrors `wrap [] = return []`).
+        return Ok(());
+    };
+    if !wrapable(last) {
+        return Err(
+            "Cannot add write() statement at the end of script (the script cannot \
+                    terminate with a print/write call)"
+                .to_string(),
+        );
+    }
+    let (lno, e) = body.pop().expect("body is non-empty");
+    let wrapped = Expression::FunctionCall(
+        FuncName("write".to_string()),
+        Box::new(e),
+        vec![(
+            Variable("ofile".to_string()),
+            Expression::BuiltinConstant(Variable("STDOUT".to_string())),
+        )],
+        None,
+    );
+    body.push((lno, wrapped));
+    Ok(())
+}
+
+/// Whether the last statement may be wrapped in `write()` (mirrors `wrapable`): anything except a
+/// `print`/`write` call (the script must not already terminate by writing/printing).
+fn wrapable(e: &Expression) -> bool {
+    !matches!(e, Expression::FunctionCall(FuncName(f), ..) if f == "print" || f == "write")
+}
+
 /// Insert `__check_ifile`/`__check_ofile` calls that float up to right after the assignment of the
 /// variable the file path depends on (mirrors `addFileChecks` in `Transform.hs`).
 ///
@@ -1109,6 +1146,57 @@ mod tests {
             md5_hex(b"The quick brown fox jumps over the lazy dog"),
             "9e107d9d372bb6826bd81d3542a419d6"
         );
+    }
+
+    #[test]
+    fn wrap_print_wraps_last_statement() {
+        // The last statement becomes `write(<expr>, ofile=STDOUT)`.
+        let mut body = vec![
+            (
+                1,
+                Expression::Assignment(Variable("x".into()), Box::new(Expression::ConstInt(1))),
+            ),
+            (2, Expression::Lookup(None, Variable("x".into()))),
+        ];
+        wrap_print(&mut body).unwrap();
+        assert_eq!(body.len(), 2);
+        // Earlier statements are untouched.
+        assert!(matches!(body[0].1, Expression::Assignment(..)));
+        match &body[1].1 {
+            Expression::FunctionCall(FuncName(f), inner, kwargs, None) => {
+                assert_eq!(f, "write");
+                assert!(matches!(**inner, Expression::Lookup(_, _)));
+                assert_eq!(kwargs.len(), 1);
+                assert_eq!(kwargs[0].0, Variable("ofile".into()));
+                assert!(
+                    matches!(&kwargs[0].1, Expression::BuiltinConstant(Variable(v)) if v == "STDOUT")
+                );
+            }
+            other => panic!("expected a write() call, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn wrap_print_rejects_terminal_print_or_write() {
+        for f in ["print", "write"] {
+            let mut body = vec![(
+                1,
+                Expression::FunctionCall(
+                    FuncName(f.into()),
+                    Box::new(Expression::ConstStr("x".into())),
+                    vec![],
+                    None,
+                ),
+            )];
+            assert!(wrap_print(&mut body).is_err());
+        }
+    }
+
+    #[test]
+    fn wrap_print_empty_script_is_noop() {
+        let mut body: Vec<(usize, Expression)> = vec![];
+        wrap_print(&mut body).unwrap();
+        assert!(body.is_empty());
     }
 
     #[test]

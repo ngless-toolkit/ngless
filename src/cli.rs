@@ -50,13 +50,13 @@ struct RunOpts {
     /// overrides the config-file `index-path`.
     index_path: Option<String>,
     /// `-e/--script`: inline script source (mirrors `InlineScript`). When set there is no version
-    /// requirement and the script name is `"inline"`. Parsed here; wired up in Phase 1.
+    /// requirement and the script name is `"inline"` (and is not prepended to `ARGV`).
     inline_script: Option<String>,
-    /// `-p/--print-last`: wrap the last statement in `print()` (mirrors `wrapPrint`/`print_last`).
-    /// Parsed here; wired up in Phase 1.
+    /// `-p/--print-last`: wrap the last statement in `write(<expr>, ofile=STDOUT)` (mirrors
+    /// `wrapPrint`/`print_last`).
     print_last: bool,
     /// `--color auto|no|yes|force`: colour override (mirrors `parseColor`). `None` falls through to
-    /// the config value. Parsed here; applied over the config value in Phase 1.
+    /// the config value; otherwise it overrides the config-file `color` key.
     color: Option<ColorSetting>,
     /// `--experimental-features`: gate for the export modes (mirrors `experimentalFeatures`; its
     /// *only* effect in Haskell). Parsed here; consumed by Phase 3.
@@ -136,8 +136,9 @@ fn exec_default(opts: &RunOpts) -> i32 {
     // so an interrupted run (Ctrl+C / SIGTERM) does not leave stale artifacts behind.
     crate::cleanup::install();
     // No script to run: print the usage message (to stderr) rather than the generic
-    // fatal-error block, mirroring optparse-applicative's behavior on a missing argument.
-    if opts.script.is_none() {
+    // fatal-error block, mirroring optparse-applicative's behavior on a missing argument. An
+    // inline script (`-e/--script`) counts as a script source even without a positional.
+    if opts.script.is_none() && opts.inline_script.is_none() {
         eprintln!("{}", crate::help_text());
         return 1;
     }
@@ -469,6 +470,26 @@ fn parse_jobs(s: &str) -> NgResult<usize> {
     }
 }
 
+/// Read a script file as UTF-8 (mirrors the file/STDIN branches of `loadScript`). A bare `-` reads
+/// the script from standard input.
+fn load_script_file(fname: &str) -> NgResult<String> {
+    use crate::errors::NgErrorType::SystemError;
+    if fname == "-" {
+        use std::io::Read;
+        let mut s = String::new();
+        std::io::stdin().read_to_string(&mut s).map_err(|e| {
+            NgError::new(
+                SystemError,
+                format!("Could not read script from STDIN: {e}"),
+            )
+        })?;
+        Ok(s)
+    } else {
+        std::fs::read_to_string(fname)
+            .map_err(|e| NgError::new(SystemError, format!("Could not read {fname}: {e}")))
+    }
+}
+
 fn arg_value(args: &[String], idx: usize, flag: &str) -> NgResult<String> {
     args.get(idx)
         .cloned()
@@ -476,6 +497,31 @@ fn arg_value(args: &[String], idx: usize, flag: &str) -> NgResult<String> {
 }
 
 fn run_script(opts: &RunOpts) -> NgResult<i32> {
+    // The export modes are gated on `--experimental-features` (mirrors the gate at the top of
+    // `modeExec DefaultMode`: its *only* effect in Haskell).
+    if !opts.experimental_features {
+        if opts.export_json.is_some() {
+            return Err(NgError::script(
+                "The use of --export-json requires the --experimental-features flag\n\
+                 This feature may change at any time.\n",
+            ));
+        }
+        if opts.export_cwl.is_some() {
+            return Err(NgError::script(
+                "The use of --export-cwl requires the --experimental-features flag\n\
+                 This feature may change at any time.\n",
+            ));
+        }
+    }
+    // The export machinery itself (`JSONScript.hs`/`CWL.hs`) is not ported yet (Phase 3): once the
+    // gate above is satisfied, requesting an export is reported as unimplemented rather than
+    // silently ignored.
+    if opts.export_json.is_some() || opts.export_cwl.is_some() {
+        return Err(NgError::script(
+            "Script export (--export-json/--export-cwl) is not yet implemented in this build of ngless.",
+        ));
+    }
+
     // Build the configuration in the three Haskell steps (`initConfiguration`): environment
     // defaults (`guessConfiguration`), config files (`readConfigFiles`), then command-line
     // overrides (`updateConfigurationOpts`). The triSwitch flags can turn an option on *or* off; an
@@ -495,6 +541,11 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     }
     if opts.index_path.is_some() {
         config.index_store_path = opts.index_path.clone();
+    }
+    // `--color` overrides the config-file `color` key (mirrors `color <|> nConfColor`). An absent
+    // flag (`None`) falls through to the config value.
+    if let Some(c) = opts.color {
+        config.color = c;
     }
     // `--no-header` also disables the banner (mirrors `nConfPrintHeader && not no_header`).
     if opts.no_header {
@@ -520,37 +571,59 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     };
     crate::parallel::init(n_threads, config.strict_threads);
 
-    let fname = opts
-        .script
-        .as_ref()
-        .ok_or_else(|| NgError::script("No script file provided."))?;
-    let text = std::fs::read_to_string(fname).map_err(|e| {
-        NgError::new(
-            crate::errors::NgErrorType::SystemError,
-            format!("Could not read {fname}: {e}"),
-        )
-    })?;
+    // Determine the script source (mirrors `loadScript` + the `(fname, reqversion)` split in
+    // `modeExec DefaultMode`): an inline script (`-e/--script`) is named `"inline"` and carries no
+    // version requirement; a file (or `-` for STDIN) is read as UTF-8 and *does* require a version
+    // declaration.
+    let (fname, text, req_version) = match &opts.inline_script {
+        Some(src) => ("inline".to_string(), src.clone(), false),
+        None => {
+            let fname = opts
+                .script
+                .as_ref()
+                .ok_or_else(|| NgError::script("No script file provided."))?;
+            (fname.clone(), load_script_file(fname)?, true)
+        }
+    };
 
-    let script = crate::parser::parse_ngless(fname, true, &text)?;
+    let mut script = crate::parser::parse_ngless(&fname, req_version, &text)?;
 
-    // Version gate: this build supports only ngless "1.5"+.
-    let header = script
-        .header
-        .as_ref()
-        .ok_or_else(|| NgError::script("Script is missing a version declaration."))?;
-    let version = parse_version(&header.version).ok_or_else(|| {
-        NgError::script(format!(
-            "Could not parse ngless version '{}'.",
-            header.version
-        ))
-    })?;
+    // `-p/--print-last`: wrap the last statement in `write(<expr>, ofile=STDOUT)`, mirroring
+    // `wrapPrint` applied right after `parsengless`. Done before type-checking so the injected
+    // `write` is type-checked, validated and seen by `uses_STDOUT` (header suppression).
+    if opts.print_last {
+        crate::transform::wrap_print(&mut script.body).map_err(NgError::script)?;
+    }
+
+    // Version gate: this build supports only ngless "1.5"+. An inline script without a version
+    // declaration defaults to 1.5 (mirrors `parseVersion Nothing = NGLVersion 1 5`); a file always
+    // has a header (it is required when parsing).
+    let version = match &script.header {
+        Some(header) => parse_version(&header.version).ok_or_else(|| {
+            NgError::script(format!(
+                "Could not parse ngless version '{}'.",
+                header.version
+            ))
+        })?,
+        None => MIN_VERSION,
+    };
     if version < MIN_VERSION {
+        let declared = script
+            .header
+            .as_ref()
+            .map(|h| h.version.clone())
+            .unwrap_or_default();
         return Err(NgError::script(format!(
-            "Script declares ngless version \"{}\", but this build supports only ngless \"1.5\" and newer.\n\
+            "Script declares ngless version \"{declared}\", but this build supports only ngless \"1.5\" and newer.\n\
              Update the version statement, or use the Haskell build for older scripts.",
-            header.version
         )));
     }
+    // The module imports (empty for an inline script with no header).
+    let modules: Vec<crate::ast::ModInfo> = script
+        .header
+        .as_ref()
+        .map(|h| h.modules.clone())
+        .unwrap_or_default();
     let temp_dir = std::path::PathBuf::from(&config.temporary_directory);
 
     // Gather the functions contributed by imported modules. Built-in standard modules
@@ -560,7 +633,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     let mut external_modules = Vec::new();
     let mut constants: Vec<(String, NGLType)> = Vec::new();
     let mut constant_values = Vec::new();
-    for m in &header.modules {
+    for m in &modules {
         constants.extend(crate::modules::module_constants(m.name(), m.version()));
         constant_values.extend(crate::interpret::module_constant_values(
             m.name(),
@@ -631,12 +704,12 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     crate::transform::add_output_hash(
         &mut typed.body,
         (version.major, version.minor),
-        &header.modules,
+        &modules,
         &funcs,
     );
     // The parallel module contributes its own transform (`run_for_all`/`set_parallel_tag`/lock
     // hash). It runs after `add_output_hash`, mirroring Haskell's pre-transforms-then-module order.
-    if let Some(parallel) = header.modules.iter().find(|m| m.name() == "parallel") {
+    if let Some(parallel) = modules.iter().find(|m| m.name() == "parallel") {
         let include_for_all = parallel.version() == "1.1";
         crate::transform::parallel_transform(&mut typed.body, include_for_all)
             .map_err(NgError::script)?;
@@ -650,14 +723,18 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // affect the `{hash}`/`{script}` content hashes.
     typed.body = crate::transform::add_file_checks(std::mem::take(&mut typed.body), &funcs);
 
-    // ARGV = [script_path, ...extra_args] (mirrors `nConfArgv` in Configuration.hs).
-    let mut argv = vec![fname.clone()];
+    // ARGV: for a file script, `[script_path, ...extra_args]`; for an inline script, just the
+    // extra args (mirrors `nConfArgv`: `ScriptFilePath f -> f:extraArgs`, otherwise `extraArgs`).
+    let mut argv = Vec::new();
+    if opts.inline_script.is_none() {
+        argv.push(fname.clone());
+    }
     argv.extend(opts.extra_args.iter().cloned());
 
     // Active mappers (mirrors `ngleMappersActive`): bwa is always available; importing the
     // `minimap2`/`soap` modules activates those mappers.
     let mut active_mappers = vec!["bwa".to_string()];
-    for m in &header.modules {
+    for m in &modules {
         match m.name() {
             "minimap2" => active_mappers.push("minimap2".to_string()),
             "soap" => active_mappers.push("soap".to_string()),
