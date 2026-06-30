@@ -215,6 +215,18 @@
   threading **module constants** (`EXAMPLE_HELLO`, ...) through the type checker (`checktypes` takes a
   `constants` list), validation, and the interpreter; `example()` prints its diagnostics including a
   faithful Haskell-`show` of the read set (`haskell_show`).
+- **Modules + stdlib — the `batch` module:** the `batch` standard module
+  (`StandardModules/Batch.hs` + `Utils/Batch.hs`) is ported in `src/batch.rs`. It contributes no
+  functions but two constants describing the batch array-job index — `JOBINDEX_OR_0` (the index, or
+  `0` when not under a batch scheduler) and `JOBINDEX_VALID` (whether one was found) — read from
+  `LSB_JOBINDEX` (LSF) then `SGE_TASK_ID` (SGE) via `get_job_index`, wired through the same
+  module-constant path as `example` (`module_constants`/`module_constant_values`). Loading it also
+  reproduces the `setNumCapabilities` side effect: when the environment advertises a CPU allotment
+  (`OMP_NUM_THREADS`/`NSLOTS`/`LSB_DJOB_NUMPROC`/`SLURM_CPUS_PER_TASK`, in order — `get_ncpus`), the
+  worker thread count is overridden in the import loop (`cli.rs` → `parallel::override_n_threads`),
+  superseding `--jobs` exactly as the Haskell module load supersedes the command-line value. The
+  `parallel` thread config was moved from a write-once `OnceLock` to atomics so this late override is
+  possible.
 - **Modules + stdlib — the parallel module + output hashing:** the `parallel` standard module
   (`StandardModules/Parallel.hs`) is ported, along with the script transforms that feed it
   (`src/transform.rs`, mirroring `Transform.hs`). The headline piece is **output hashing**:
@@ -267,11 +279,10 @@ covered by `tests/`**. They are grouped by impact.
 
 - **HTML/JS run report.** `Output.hs::writeOutputJS` writes a report directory (`output.js` + HTML) at
   end of run; `src/output.rs` has no report writer at all (only the console output layer).
-- **Standard modules not ported:** `batch` (`StandardModules/Batch.hs` + `Utils/Batch.hs` — LSF/SGE
-  `$LSB_JOBINDEX`/`$SGE_TASK_ID` job-index detection and `setNumCapabilities`), `motus`
-  (`StandardModules/Motus.hs`, deprecated motus1 wrapper), and the `soap` mapper
-  (`StandardModules/Soap.hs`; registered on `import` but `execute_map` rejects it). All three are
-  referenced only for hashing in `src/transform.rs`.
+- **Standard modules not ported:** `motus` (`StandardModules/Motus.hs`, deprecated motus1 wrapper)
+  and the `soap` mapper (`StandardModules/Soap.hs`; registered on `import` but `execute_map` rejects
+  it). Both are referenced only for hashing in `src/transform.rs`. (`batch` is now ported — see the
+  stdlib section above.)
 - **CLI sub-modes not yet ported:** the Rust `cli.rs` handles the run/validate flags plus `--print-path`
   and `--check-install`, but several Haskell `modeExec` branches (`Execs/Main.hs` /
   `CmdArgs.hs::NGLessMode`) are absent: `--export-json` (`JSONScript.hs`), `--export-cwl` (`CWL.hs`),

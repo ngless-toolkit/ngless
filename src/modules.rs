@@ -418,6 +418,11 @@ mod builders {
             // The `minimap2` module (StandardModules/Minimap2.hs) exposes no functions; importing
             // it only activates the minimap2 mapper (see `active_mappers` in cli.rs).
             ("minimap2", _) => Some(vec![]),
+            // The `batch` module (StandardModules/Batch.hs) exposes no functions; it only
+            // contributes the `JOBINDEX_*` constants (see `module_constants`) and, at load time,
+            // overrides the worker thread count from the batch scheduler's CPU allotment (see the
+            // import loop in cli.rs).
+            ("batch", _) => Some(vec![]),
             _ => None,
         }
     }
@@ -502,15 +507,21 @@ mod builders {
         )
     }
 
-    /// Constants contributed by an imported standard module (mirrors `modConstants`). Only the
-    /// `example` module exposes any. Returns the constant names and their types for the type
-    /// checker; the runtime values live in `interpret::module_constant_values`.
+    /// Constants contributed by an imported standard module (mirrors `modConstants`). The
+    /// `example` and `batch` modules expose some. Returns the constant names and their types for
+    /// the type checker; the runtime values live in `interpret::module_constant_values`.
     pub fn module_constants(name: &str, _version: &str) -> Vec<(std::string::String, NGLType)> {
         match name {
             "example" => vec![
                 ("EXAMPLE_0".to_string(), Integer),
                 ("EXAMPLE_TRUE".to_string(), Bool),
                 ("EXAMPLE_HELLO".to_string(), String),
+            ],
+            // The `batch` module (StandardModules/Batch.hs) exposes the batch array-job index as
+            // an integer (`0` when not running under a batch scheduler) and a validity flag.
+            "batch" => vec![
+                ("JOBINDEX_OR_0".to_string(), Integer),
+                ("JOBINDEX_VALID".to_string(), Bool),
             ],
             _ => Vec::new(),
         }

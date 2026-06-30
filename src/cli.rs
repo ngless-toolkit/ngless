@@ -265,6 +265,15 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
             m.name(),
             m.version(),
         ));
+        // The `batch` module overrides the worker thread count from the batch scheduler's CPU
+        // allotment at load time, superseding `--jobs` (mirrors the `setNumCapabilities` call in
+        // StandardModules/Batch.hs, which runs while the module is loaded — after the command-line
+        // thread count has been applied).
+        if m.name() == "batch" {
+            if let Some(ncpus) = crate::batch::get_ncpus() {
+                crate::parallel::override_n_threads(ncpus);
+            }
+        }
         match crate::modules::module_functions(m.name(), m.version()) {
             Some(fs) => extra_funcs.extend(fs),
             None => {

@@ -194,7 +194,7 @@ fn sam_group_stats_stream(path: &str) -> NgResult<(i64, i64, i64)> {
 }
 
 /// Runtime values of the constants contributed by a standard module (mirrors `modConstants`).
-/// Only the `example` module exposes any; the corresponding types live in
+/// The `example` and `batch` modules expose some; the corresponding types live in
 /// `modules::module_constants`.
 pub fn module_constant_values(name: &str, _version: &str) -> Vec<(String, NGLessObject)> {
     match name {
@@ -206,6 +206,22 @@ pub fn module_constant_values(name: &str, _version: &str) -> Vec<(String, NGLess
                 NGLessObject::String("Hello".to_string()),
             ),
         ],
+        // `JOBINDEX_OR_0` is the batch array-job index or `0` when absent; `JOBINDEX_VALID`
+        // reports whether the index was actually found (mirrors `loadModule` in
+        // StandardModules/Batch.hs).
+        "batch" => {
+            let job_id = crate::batch::get_job_index();
+            vec![
+                (
+                    "JOBINDEX_OR_0".to_string(),
+                    NGLessObject::Integer(job_id.unwrap_or(0)),
+                ),
+                (
+                    "JOBINDEX_VALID".to_string(),
+                    NGLessObject::Bool(job_id.is_some()),
+                ),
+            ]
+        }
         _ => Vec::new(),
     }
 }

@@ -13,50 +13,44 @@
 //!    finishes first, so every consumer that feeds it an ordered stream keeps producing
 //!    byte-identical output at any thread count.
 
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-struct ThreadConfig {
-    /// Worker count for NGLess's own parallel work (`>= 1`).
-    n_threads: usize,
-    /// `--strict-threads`: reserve one core for NGLess/system work when handing a thread count
-    /// to external tools (mirrors `nConfStrictThreads`).
-    strict: bool,
-}
-
-static CONFIG: OnceLock<ThreadConfig> = OnceLock::new();
+/// Worker count for NGLess's own parallel work (`>= 1`). Defaults to a single thread (the Haskell
+/// default) so callers reached before [`init`] — e.g. unit tests — behave deterministically.
+static N_THREADS: AtomicUsize = AtomicUsize::new(1);
+/// `--strict-threads`: reserve one core for NGLess/system work when handing a thread count to
+/// external tools (mirrors `nConfStrictThreads`).
+static STRICT: AtomicBool = AtomicBool::new(false);
 
 /// Initialise the global thread configuration from the parsed command line. Called once at
-/// startup; later calls are ignored (mirrors the single global `nglConfiguration`).
+/// startup (mirrors building the single global `nglConfiguration`).
 pub fn init(n_threads: usize, strict: bool) {
-    let _ = CONFIG.set(ThreadConfig {
-        n_threads: n_threads.max(1),
-        strict,
-    });
-}
-
-fn config() -> &'static ThreadConfig {
-    // Default to a single thread (the Haskell default) so callers reached before `init` — e.g.
-    // unit tests — behave deterministically.
-    CONFIG.get_or_init(|| ThreadConfig {
-        n_threads: 1,
-        strict: false,
-    })
+    N_THREADS.store(n_threads.max(1), Ordering::Relaxed);
+    STRICT.store(strict, Ordering::Relaxed);
 }
 
 /// Number of worker threads to use for NGLess's own in-process parallel work.
 pub fn n_threads() -> usize {
-    config().n_threads
+    N_THREADS.load(Ordering::Relaxed)
+}
+
+/// Override the worker thread count after [`init`]. Used by the `batch` standard module, which on
+/// load supersedes the command-line `--jobs` value with the batch scheduler's CPU allotment
+/// (mirrors the `setNumCapabilities` call in `StandardModules/Batch.hs`). `strict` is left as set
+/// by [`init`]. Like `init`, this must run before any parallel work begins.
+pub fn override_n_threads(n_threads: usize) {
+    N_THREADS.store(n_threads.max(1), Ordering::Relaxed);
 }
 
 /// Thread count to pass to an external tool (`bwa`/`minimap2`/`samtools`). With `--strict-threads`
 /// and more than one core, reserve one core for NGLess/system work (mirrors `bwathreads` in
 /// `Bwa.hs` and `samtoolsthreads` in `Utils/Samtools.hs`); otherwise hand the tool the full count.
 pub fn external_tool_threads() -> usize {
-    let cfg = config();
-    if cfg.strict && cfg.n_threads > 1 {
-        cfg.n_threads - 1
+    let n = n_threads();
+    if STRICT.load(Ordering::Relaxed) && n > 1 {
+        n - 1
     } else {
-        cfg.n_threads
+        n
     }
 }
 
