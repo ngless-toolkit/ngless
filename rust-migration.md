@@ -283,17 +283,26 @@ covered by `tests/`**. They are grouped by impact.
   and the `soap` mapper (`StandardModules/Soap.hs`; registered on `import` but `execute_map` rejects
   it). Both are referenced only for hashing in `src/transform.rs`. (`batch` is now ported — see the
   stdlib section above.)
-- **CLI sub-modes + flags — Phase 0 (parser groundwork) + Phase 1 (small `DefaultMode` flags)
-  DONE.** A phased implementation plan lives in `next-steps.md` ("CLI flags & sub-modes —
-  implementation plan"). `lib.rs` peels off the informational `infoOption`s (`--version*`/
-  `--date-short`/`-h/--help`) and hands the rest to `cli::run_cli`, which dispatches on a `Mode` enum
-  mirroring `CmdArgs.NGLessMode` (`Default`/`PrintPath`/`CheckInstall`/`InstallReferenceData`/
-  `DownloadFile`/`DownloadDemo`/`CreateReferencePack`). Implemented modes: `Default` (the
-  run/validate flow) plus `--print-path` and `--check-install`. The remaining sub-modes
-  (`--install-reference-data`, `--download-file`, `--download-demo`, `--create-reference-pack`) are
-  **recognized** — they route to their `Mode` variant and exit with a clear "not yet implemented"
-  message instead of falling through (Phases 2/4). **Unknown flags error** (`Invalid option \`...'`,
-  mirroring optparse) instead of being silently ignored; a bare `-` stays a valid STDIN positional.
+- **CLI sub-modes + flags — Phase 0 (parser groundwork) + Phase 1 (small `DefaultMode` flags) +
+  Phase 2 (download sub-modes) DONE.** A phased implementation plan lives in `next-steps.md` ("CLI
+  flags & sub-modes — implementation plan"). `lib.rs` peels off the informational `infoOption`s
+  (`--version*`/`--date-short`/`-h/--help`) and hands the rest to `cli::run_cli`, which dispatches on
+  a `Mode` enum mirroring `CmdArgs.NGLessMode`
+  (`Default`/`PrintPath`/`CheckInstall`/`InstallReferenceData`/`DownloadFile`/`DownloadDemo`/
+  `CreateReferencePack`). Implemented modes: `Default` (the run/validate flow), `--print-path`,
+  `--check-install`, and the **Phase 2** download sub-modes `--install-reference-data REF`,
+  `--download-file --download-url URL --local-file PATH` and `--download-demo NAME` (the `Mode`
+  variants now carry their parsed arguments). The download modes reuse `src/reference.rs`'s now-`pub`
+  `install_data`/`download_file`/`download_expand_tar`; each first calls `init_submode_config`
+  (mirroring `initConfiguration` running before every `modeExec`) so the config-file
+  `download-url`/data directories apply. `--install-reference-data` rejects a non-builtin ref with
+  the exact Haskell text (`Reference <ref> is not a known reference.`) and installs at version
+  `(1,5)` (`parseVersion Nothing`); `--download-demo` reproduces the known-list/`suggestionMessage`
+  "Unknown demo" block and unpacks `<base>/Demos/<name>.tar.gz` into the current directory. The one
+  remaining sub-mode, `--create-reference-pack` (Phase 4), is **recognized** — it routes to its
+  `Mode` variant and exits with a clear "not yet implemented" message instead of falling through.
+  **Unknown flags error** (`Invalid option \`...'`, mirroring optparse) instead of being silently
+  ignored; a bare `-` stays a valid STDIN positional.
   **Phase 1 wired the behaviour of the small `DefaultMode` flags** (mirroring `modeExec
   DefaultMode`):
   - **`-e/--script` (inline script)** — `run_script` selects file-vs-inline (`loadScript` + the

@@ -80,9 +80,9 @@ struct RunOpts {
 
 /// Top-level execution mode, mirroring `CmdArgs.NGLessMode`. `lib::run` peels off the
 /// informational `infoOption`s (`--version*`/`--date-short`/`--help`) first; everything else is
-/// dispatched here. Only [`Mode::Default`], [`Mode::PrintPath`] and [`Mode::CheckInstall`] are
-/// implemented so far — the remaining sub-modes are *recognized* (so their flags no longer fall
-/// through to the unknown-flag error) but error out until the corresponding phase lands.
+/// dispatched here. [`Mode::Default`], [`Mode::PrintPath`], [`Mode::CheckInstall`] and the Phase 2
+/// download sub-modes are implemented; [`Mode::CreateReferencePack`] is *recognized* (so its flags
+/// no longer fall through to the unknown-flag error) but errors out until Phase 4 lands.
 enum Mode {
     /// `DefaultMode`: load → parse → type check → validate → interpret a script.
     Default(Box<RunOpts>),
@@ -90,12 +90,12 @@ enum Mode {
     PrintPath(String),
     /// `--check-install` (`CheckInstallMode`).
     CheckInstall,
-    /// `--install-reference-data REF` (`InstallReferenceMode`) — Phase 2.
-    InstallReferenceData,
-    /// `--download-file --download-url URL --local-file PATH` (`DownloadFileMode`) — Phase 2.
-    DownloadFile,
-    /// `--download-demo NAME` (`DownloadDemoMode`) — Phase 2.
-    DownloadDemo,
+    /// `--install-reference-data REF` (`InstallReferenceMode`).
+    InstallReferenceData(String),
+    /// `--download-file --download-url URL --local-file PATH` (`DownloadFileMode`).
+    DownloadFile { url: String, local: String },
+    /// `--download-demo NAME` (`DownloadDemoMode`).
+    DownloadDemo(String),
     /// `--create-reference-pack ...` (`CreateReferencePackMode`) — Phase 4.
     CreateReferencePack,
 }
@@ -115,9 +115,9 @@ pub fn run_cli(args: &[String]) -> i32 {
         Mode::Default(opts) => exec_default(&opts),
         Mode::PrintPath(exec) => crate::print_path(&exec),
         Mode::CheckInstall => crate::check_install(),
-        Mode::InstallReferenceData => not_implemented("--install-reference-data"),
-        Mode::DownloadFile => not_implemented("--download-file"),
-        Mode::DownloadDemo => not_implemented("--download-demo"),
+        Mode::InstallReferenceData(refname) => exec_install_reference(&refname),
+        Mode::DownloadFile { url, local } => exec_download_file(&url, &local),
+        Mode::DownloadDemo(name) => exec_download_demo(&name),
         Mode::CreateReferencePack => not_implemented("--create-reference-pack"),
     }
 }
@@ -128,6 +128,112 @@ pub fn run_cli(args: &[String]) -> i32 {
 fn not_implemented(mode: &str) -> i32 {
     eprintln!("The {mode} mode is not yet implemented in this build of ngless.");
     1
+}
+
+/// Read a required named option (`--name VALUE` or `--name=VALUE`) from the raw argument list. Used
+/// by the download sub-modes, whose options are plain `strOption`s (no `=`-vs-space distinction in
+/// optparse).
+fn named_option(args: &[String], name: &str) -> NgResult<String> {
+    let prefix = format!("{name}=");
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        if a == name {
+            return it
+                .next()
+                .cloned()
+                .ok_or_else(|| NgError::script(format!("Option {name} requires a value")));
+        }
+        if let Some(v) = a.strip_prefix(&prefix) {
+            return Ok(v.to_string());
+        }
+    }
+    Err(NgError::script(format!("Missing required option {name}")))
+}
+
+/// Initialise the process-global configuration for the non-`Default` sub-modes, mirroring
+/// `initConfiguration` in `main'` (which runs before every `modeExec`). The download sub-modes need
+/// the resolved `download-url`/data-directory configuration; they take no `-c/--config-file`, so
+/// only the default config-file locations are read.
+fn init_submode_config() -> NgResult<()> {
+    let config = crate::configuration::read_config_files(&[])?;
+    crate::configuration::init_global(config);
+    Ok(())
+}
+
+/// `--install-reference-data REF` (`InstallReferenceMode`): download and install a builtin
+/// reference. Mirrors `modeExec (InstallReferenceMode ref)`: a non-builtin reference is rejected,
+/// otherwise the data is installed at the version-`Nothing` default version (1.5).
+fn exec_install_reference(refname: &str) -> i32 {
+    if let Err(e) = init_submode_config() {
+        report_fatal_error(&e);
+        return 1;
+    }
+    if !crate::reference::is_builtin_reference(refname) {
+        // Mirrors the Haskell `error (concat ["Reference ", ref, " is not a known reference."])`.
+        eprintln!("Reference {refname} is not a known reference.");
+        return 1;
+    }
+    // `parseVersion Nothing` is 1.5, the version used to build the download URL.
+    match crate::reference::install_data(refname, (1, 5)) {
+        Ok(_) => 0,
+        Err(e) => {
+            report_fatal_error(&e);
+            1
+        }
+    }
+}
+
+/// `--download-file --download-url URL --local-file PATH` (`DownloadFileMode`): download a single
+/// file to a local path. Mirrors `modeExec (DownloadFileMode url local)`.
+fn exec_download_file(url: &str, local: &str) -> i32 {
+    if let Err(e) = init_submode_config() {
+        report_fatal_error(&e);
+        return 1;
+    }
+    match crate::reference::download_file(url, std::path::Path::new(local)) {
+        Ok(()) => 0,
+        Err(e) => {
+            report_fatal_error(&e);
+            1
+        }
+    }
+}
+
+/// `--download-demo NAME` (`DownloadDemoMode`): download and unpack a demo dataset into the current
+/// directory. Mirrors `modeExec (DownloadDemoMode demo)`, including the known-demo list and the
+/// "Unknown demo" suggestion message.
+fn exec_download_demo(name: &str) -> i32 {
+    const KNOWN: [&str; 2] = ["gut-short", "ocean-short"];
+    if !KNOWN.contains(&name) {
+        // Reproduce the Haskell stderr block verbatim: red "Unknown demo", the suggestion message,
+        // an "Available demos are:" header, the tab-bulleted list, then a colour reset.
+        const RED: &str = "\u{1b}[31m";
+        const RESET: &str = "\u{1b}[0m";
+        let suggestion = crate::suggestion::suggestion_message(name, &KNOWN);
+        eprintln!("{RED}Unknown demo '{name}'.\n{suggestion}Available demos are:");
+        for d in KNOWN {
+            eprintln!("\t- {d}");
+        }
+        eprintln!("{RESET}");
+        return 1;
+    }
+    if let Err(e) = init_submode_config() {
+        report_fatal_error(&e);
+        return 1;
+    }
+    let base = crate::reference::download_base_url();
+    let base = base.trim_end_matches('/');
+    let url = format!("{base}/Demos/{name}.tar.gz");
+    match crate::reference::download_expand_tar(&url, std::path::Path::new(".")) {
+        Ok(()) => {
+            println!("\nDemo downloaded to {name}");
+            0
+        }
+        Err(e) => {
+            report_fatal_error(&e);
+            1
+        }
+    }
 }
 
 /// Run `DefaultMode`: load → parse → version gate → type check → validate → interpret.
@@ -168,14 +274,27 @@ fn parse_mode(args: &[String]) -> NgResult<Mode> {
     if args.iter().any(|a| a == "--check-install") {
         return Ok(Mode::CheckInstall);
     }
-    if args.iter().any(|a| a == "--install-reference-data") {
-        return Ok(Mode::InstallReferenceData);
+    if let Some(pos) = args.iter().position(|a| a == "--install-reference-data") {
+        // The reference name is a positional argument (mirrors `installArgs`'s `strArgument REF`).
+        let refname = args.get(pos + 1).cloned().ok_or_else(|| {
+            NgError::script("--install-reference-data requires an argument (REF)")
+        })?;
+        return Ok(Mode::InstallReferenceData(refname));
     }
     if args.iter().any(|a| a == "--download-file") {
-        return Ok(Mode::DownloadFile);
+        // `--download-file` takes two named options, `--download-url` and `--local-file` (mirrors
+        // `downloadFileArgs`'s two `strOption`s).
+        let url = named_option(args, "--download-url")?;
+        let local = named_option(args, "--local-file")?;
+        return Ok(Mode::DownloadFile { url, local });
     }
-    if args.iter().any(|a| a == "--download-demo") {
-        return Ok(Mode::DownloadDemo);
+    if let Some(pos) = args.iter().position(|a| a == "--download-demo") {
+        // The demo name is a positional argument (mirrors `downloadDemoArgs`'s `strArgument`).
+        let name = args
+            .get(pos + 1)
+            .cloned()
+            .ok_or_else(|| NgError::script("--download-demo requires an argument (DEMO-NAME)"))?;
+        return Ok(Mode::DownloadDemo(name));
     }
     if args.iter().any(|a| a == "--create-reference-pack") {
         return Ok(Mode::CreateReferencePack);

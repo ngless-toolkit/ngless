@@ -58,7 +58,7 @@ const fn bref(name: &'static str, alias: &'static str) -> BuiltinReference {
 /// The download base URL (mirrors `nConfDownloadBaseURL`). It comes from the configuration file's
 /// `download-url` key (see `crate::configuration`); the `NGLESS_DOWNLOAD_BASE_URL` environment
 /// variable overrides it when set (a Rust-only convenience the Haskell build lacks).
-fn download_base_url() -> String {
+pub fn download_base_url() -> String {
     std::env::var("NGLESS_DOWNLOAD_BASE_URL")
         .unwrap_or_else(|_| crate::configuration::global().download_base_url.clone())
 }
@@ -126,7 +126,10 @@ fn find_data_files(refname: &str) -> Option<PathBuf> {
 }
 
 /// Download and install a reference, returning its directory (mirrors `installData`).
-fn install_data(refname: &str, ngl_version: (i64, i64)) -> NgResult<PathBuf> {
+///
+/// Public so the `--install-reference-data` sub-mode (`InstallReferenceMode` in `Execs/Main.hs`)
+/// can drive it directly, in addition to the on-demand `map(..., reference=...)` path.
+pub fn install_data(refname: &str, ngl_version: (i64, i64)) -> NgResult<PathBuf> {
     let bref = find_builtin(refname).ok_or_else(|| {
         // Suggest the closest builtin reference name or alias ("Did you mean ...?").
         let mut allnames: Vec<&str> = Vec::new();
@@ -218,7 +221,10 @@ fn is_writable(dir: &Path) -> bool {
 
 /// Download a `.tar.gz` from `url` and expand it into `destdir` (mirrors `downloadExpandTar`):
 /// download to `<destdir>.tar.gz`, gunzip+untar into `destdir`, then remove the tarball.
-fn download_expand_tar(url: &str, destdir: &Path) -> NgResult<()> {
+///
+/// Public so the `--download-demo` sub-mode (`DownloadDemoMode` in `Execs/Main.hs`) can expand a
+/// demo tarball into the current directory.
+pub fn download_expand_tar(url: &str, destdir: &Path) -> NgResult<()> {
     fs::create_dir_all(destdir).map_err(|e| {
         NgError::new(
             NgErrorType::SystemError,
@@ -256,7 +262,10 @@ fn download_expand_tar(url: &str, destdir: &Path) -> NgResult<()> {
 
 /// Download `url` to `dest` over HTTP(S) (mirrors `downloadFile`). Sends the same `User-Agent`
 /// header as the Haskell build (`NGLess/<version>`).
-fn download_file(url: &str, dest: &Path) -> NgResult<()> {
+///
+/// Public so the `--download-file` sub-mode (`DownloadFileMode` in `Execs/Main.hs`) can download a
+/// single file to a user-named local path.
+pub fn download_file(url: &str, dest: &Path) -> NgResult<()> {
     let user_agent = format!("NGLess/{}", crate::version::VERSION_STR);
     let resp = ureq::get(url)
         .set("User-Agent", &user_agent)
