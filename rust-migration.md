@@ -283,20 +283,20 @@ covered by `tests/`**. They are grouped by impact.
   and the `soap` mapper (`StandardModules/Soap.hs`; registered on `import` but `execute_map` rejects
   it). Both are referenced only for hashing in `src/transform.rs`. (`batch` is now ported — see the
   stdlib section above.)
-- **CLI sub-modes not yet ported:** the Rust `cli.rs` handles the run/validate flags plus `--print-path`
-  and `--check-install`, but several Haskell `modeExec` branches (`Execs/Main.hs` /
-  `CmdArgs.hs::NGLessMode`) are absent: `--export-json` (`JSONScript.hs`), `--export-cwl` (`CWL.hs`),
-  `--install-reference-data` (standalone `installData`, distinct from the on-`map()` auto-download),
-  `--create-reference-pack` (`createReferencePack`), `--download-file` (`DownloadFileMode`), and
-  `--download-demo` (`DownloadDemoMode`). The **`--experimental-features`** flag is also unported — but
-  note it is *purely a gate on the two export modes*: in `Execs/Main.hs` it only causes
-  `--export-json`/`--export-cwl` to `fatalError` when absent. It unlocks **no** script-level behavior;
-  there is nothing for the Rust port to gate behind it until an export mode is implemented.
-- **DefaultMode flags silently ignored.** Unknown flags hit a no-op arm in `src/cli.rs` rather than
-  erroring as Haskell's optparse would. Not wired: `--strict-threads`, `--print-last`,
-  `--create-report`/`--html-report-directory`, `-c/--config` (config files), `--check-deprecation`,
-  `--index-path`. (`--keep-temporary-files` and `--jobs` **are** wired — `--jobs` drives the parallel
-  preprocess/count/select + background-compression work.)
+- **CLI sub-modes + flags not yet ported.** A phased implementation plan lives in `next-steps.md`
+  ("CLI flags & sub-modes — implementation plan"). Current state: `lib.rs`/`cli.rs` handle the
+  run/validate flags (`-n`, `-t`, `--keep-temporary-files`, `-q`, `-v`, `--trace`, `--no-header`,
+  `--debug`, `--search-path`, `--subsample`, `-j/--jobs`, `--strict-threads`) plus `--print-path` and
+  `--check-install`. Absent `modeExec` branches: `--export-json` (`JSONScript.hs`), `--export-cwl`
+  (`CWL.hs`), `--install-reference-data` (standalone `installData`, distinct from the on-`map()`
+  auto-download), `--create-reference-pack` (`createReferencePack`), `--download-file`
+  (`DownloadFileMode`), `--download-demo` (`DownloadDemoMode`). Absent `DefaultMode` flags:
+  `-e/--script` (inline), `-p/--print-last` (`wrapPrint`), `--color`, `--search-dir` (deprecated
+  alias), `--experimental-features`, `--index-path`, `-c/--config-file`, `--check-deprecation`,
+  `--create-report`/`-o/--html-report-directory`. The **`--experimental-features`** flag is *purely a
+  gate on the two export modes* (in `Execs/Main.hs` it only causes `--export-json`/`--export-cwl` to
+  `fatalError` when absent); it unlocks **no** script-level behavior. Unknown flags currently hit a
+  no-op arm in `src/cli.rs` rather than erroring as Haskell's optparse would.
 - **Config-file reader.** `Configuration.hs` reads ngless config files (e.g. the `download-url` key);
   Rust is env-var-only (`NGLESS_DOWNLOAD_BASE_URL`, see `src/reference.rs`).
 - **`writeToMove`/`addMove` — DONE** (`src/transform.rs::write_to_move`, wired in `cli.rs` as the
