@@ -454,12 +454,16 @@ maintenance win aligned with the stated motivation.
 
 ## Verification
 
-- Primary: `NGLESS_BIN=<rust-binary> ./run-tests.sh` — must reach 97/97 with diffs identical to the
-  Haskell binary, run per-milestone on the gated subset.
-- Differential CI job: build both binaries, run each `tests/*` script through both, fail on any output
-  diff (the strongest possible parity check).
+Run the test suite with:
+
+```
+pixi run --environment default bash -c 'NGLESS_BIN=$PWD/target/debug/ngless ./run-tests.sh'
+```
+
+(Exit code 0 + "All done." = clean. Append a test-name prefix to run a subset, e.g.
+`./run-tests.sh map-minimap2`. Unit tests: `cargo test`.)
+
+
 - `cargo test` for ported unit tests (parse/type/count/validation), plus `proptest` for the
   tokenizer/parser round-trips.
 - Large-input soak tests (multi-GB FASTQ/BAM) to confirm bounded memory and ordering.
-- Final: run every example script in `docs/sources` end-to-end; build + smoke-test the bioconda, Docker,
-  static-musl, and macOS artifacts.
