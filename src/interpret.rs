@@ -1723,8 +1723,15 @@ impl Interpreter {
         let (name, path) = mapped_read_set(expr, "select")?;
         let paired = lookup_bool(args, "paired", true)?;
         let var = &block.variable.0;
-        let outpath = self.new_temp_path("selected_", "sam")?;
-        let mut out = sam_temp_writer(&outpath)?;
+        // `.sam.zst` => `StreamWriter` compresses with zstd on a background thread (mirroring
+        // Haskell's `block_selected_*.sam.zstd`). All consumers read it back transparently:
+        // internal readers via `group_sam_stream`/`read_sam_text` (`open_read`), samtools via the
+        // `samtools_input` decompression shim, and `write` via `copy_fastq`.
+        let outpath = self.new_temp_path("selected_", "sam.zst")?;
+        let mut out = crate::compression::StreamWriter::create_with_level(
+            &outpath.to_string_lossy(),
+            crate::compression::INTERMEDIATE_ZSTD_LEVEL,
+        )?;
         for item in group_sam_stream(&path.to_string_lossy(), paired)? {
             match item? {
                 SamItem::Header(line) => {
@@ -1757,7 +1764,7 @@ impl Interpreter {
                 }
             }
         }
-        out.flush().map_err(sam_write_err)?;
+        out.finish()?;
         Ok(NGLessObject::MappedReadSet {
             name,
             path: outpath,
@@ -2694,13 +2701,19 @@ impl Interpreter {
         // Stream through three output writers (pair.1, pair.2, singles), collecting QC stats per
         // output in one pass (mirrors executePreprocess: open all three, stream, then delete the
         // empty ones and pick the result shape from the per-output counts). Temp paths are
-        // allocated up front in slot order; `.fq` => uncompressed (StreamWriter::Plain).
-        let p1path = self.new_temp_path("preprocessed.1.", "fq")?;
-        let p2path = self.new_temp_path("preprocessed.2.", "fq")?;
-        let spath = self.new_temp_path("preprocessed.singles.", "fq")?;
-        let mut w1 = crate::compression::StreamWriter::create(&p1path.to_string_lossy())?;
-        let mut w2 = crate::compression::StreamWriter::create(&p2path.to_string_lossy())?;
-        let mut ws = crate::compression::StreamWriter::create(&spath.to_string_lossy())?;
+        // allocated up front in slot order; the `.fq.zst` extension makes `StreamWriter` compress
+        // them with zstd on a background thread (mirroring Haskell's `preprocessed.*.fq.zst`). The
+        // downstream mapper input (`write_interleaved`) decompresses transparently via `open_read`.
+        let p1path = self.new_temp_path("preprocessed.1.", "fq.zst")?;
+        let p2path = self.new_temp_path("preprocessed.2.", "fq.zst")?;
+        let spath = self.new_temp_path("preprocessed.singles.", "fq.zst")?;
+        let lvl = crate::compression::INTERMEDIATE_ZSTD_LEVEL;
+        let mut w1 =
+            crate::compression::StreamWriter::create_with_level(&p1path.to_string_lossy(), lvl)?;
+        let mut w2 =
+            crate::compression::StreamWriter::create_with_level(&p2path.to_string_lossy(), lvl)?;
+        let mut ws =
+            crate::compression::StreamWriter::create_with_level(&spath.to_string_lossy(), lvl)?;
         let (mut a1, mut a2, mut as_) = (
             fastq::FastQStatsAcc::new(),
             fastq::FastQStatsAcc::new(),

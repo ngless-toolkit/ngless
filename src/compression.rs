@@ -14,8 +14,15 @@ use flate2::Compression;
 
 use crate::errors::{NgError, NgErrorType, NgResult};
 
-/// zstd compression level used for output (NGLess commonly uses level 3).
+/// zstd compression level used for user-facing output (NGLess commonly uses level 3).
 const ZSTD_LEVEL: i32 = 3;
+
+/// zstd compression level used for NGLess's own *intermediate* temp files (preprocessed FASTQ,
+/// block-selected SAM). These are written and read back within a single run, so the goal is to
+/// shrink I/O cheaply rather than to maximise the ratio: level 1 is the fastest zstd setting and
+/// still removes most of the redundancy in FASTQ/SAM text. (The Haskell original used level 3 for
+/// these; we trade a little ratio for speed since the files never leave the run.)
+pub const INTERMEDIATE_ZSTD_LEVEL: i32 = 1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Compress {
@@ -256,6 +263,13 @@ impl StreamWriter {
     /// Create a writer for `path`, choosing the compressor by extension. Levels replicate
     /// [`write_bytes`]: gzip/bzip2 `Compression::default()`, zstd [`ZSTD_LEVEL`].
     pub fn create(path: &str) -> NgResult<StreamWriter> {
+        StreamWriter::create_with_level(path, ZSTD_LEVEL)
+    }
+
+    /// Like [`create`](StreamWriter::create) but with an explicit zstd compression level (used by
+    /// intermediate temp files via [`INTERMEDIATE_ZSTD_LEVEL`]). The level only affects the zstd
+    /// case; gzip/bzip2/uncompressed are unchanged.
+    pub fn create_with_level(path: &str, zstd_level: i32) -> NgResult<StreamWriter> {
         let f = File::create(path).map_err(|e| {
             NgError::new(
                 NgErrorType::SystemError,
@@ -285,7 +299,7 @@ impl StreamWriter {
                 bzip2::Compression::default(),
             )),
             Compress::Zstd => Encoder::Zstd(
-                zstd::stream::write::Encoder::new(BufWriter::new(f), ZSTD_LEVEL)
+                zstd::stream::write::Encoder::new(BufWriter::new(f), zstd_level)
                     .map_err(sys_err)?,
             ),
         };
