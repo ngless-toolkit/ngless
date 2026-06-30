@@ -48,10 +48,10 @@ pub fn n_threads() -> usize {
     config().n_threads
 }
 
-/// Thread count to pass to an external mapper (`bwa`/`minimap2`). With `--strict-threads` and
-/// more than one core, reserve one core for NGLess/system work (mirrors `bwathreads` in
-/// `Bwa.hs`); otherwise hand the tool the full count.
-pub fn mapper_threads() -> usize {
+/// Thread count to pass to an external tool (`bwa`/`minimap2`/`samtools`). With `--strict-threads`
+/// and more than one core, reserve one core for NGLess/system work (mirrors `bwathreads` in
+/// `Bwa.hs` and `samtoolsthreads` in `Utils/Samtools.hs`); otherwise hand the tool the full count.
+pub fn external_tool_threads() -> usize {
     let cfg = config();
     if cfg.strict && cfg.n_threads > 1 {
         cfg.n_threads - 1

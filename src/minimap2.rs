@@ -123,7 +123,7 @@ pub fn call_mapper(
     extra_args: &[String],
     out_sam: &Path,
 ) -> NgResult<()> {
-    let threads = crate::parallel::mapper_threads();
+    let threads = crate::parallel::external_tool_threads();
 
     let mut cmd = Command::new(minimap2_bin());
     cmd.arg("-t")

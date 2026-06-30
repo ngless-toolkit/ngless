@@ -15,6 +15,13 @@ pub fn samtools_bin() -> String {
     std::env::var("NGLESS_SAMTOOLS_BIN").unwrap_or_else(|_| "samtools".to_string())
 }
 
+/// Thread count to hand samtools via `-@`, as a string ready to drop into an argument list
+/// (mirrors the `-@ numCapabilities` passed throughout `Utils/Samtools.hs` and
+/// `StandardModules/Samtools.hs`).
+fn threads_arg() -> String {
+    crate::parallel::external_tool_threads().to_string()
+}
+
 fn run(args: &[&str], what: &str) -> NgResult<std::process::Output> {
     let out = Command::new(samtools_bin())
         .args(args)
@@ -39,9 +46,10 @@ fn run(args: &[&str], what: &str) -> NgResult<std::process::Output> {
 }
 
 /// Read a BAM file as SAM text including the header (mirrors `samBamConduit` for `.bam`:
-/// `samtools view -h`).
+/// `samtools view -h -@ <threads>`).
 pub fn bam_to_sam_text(bamfile: &str) -> NgResult<String> {
-    let out = run(&["view", "-h", bamfile], "view")?;
+    let threads = threads_arg();
+    let out = run(&["view", "-h", "-@", &threads, bamfile], "view")?;
     String::from_utf8(out.stdout).map_err(|e| {
         NgError::new(
             NgErrorType::DataError,
@@ -56,7 +64,7 @@ pub fn bam_to_sam_text(bamfile: &str) -> NgResult<String> {
 pub fn bam_to_sam_child(bamfile: &str) -> NgResult<std::process::Child> {
     use std::process::Stdio;
     Command::new(samtools_bin())
-        .args(["view", "-h", bamfile])
+        .args(["view", "-h", "-@", &threads_arg(), bamfile])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -69,11 +77,14 @@ pub fn bam_to_sam_child(bamfile: &str) -> NgResult<std::process::Child> {
 }
 
 /// Convert a SAM file to BAM, writing to `out` (mirrors `convertSamToBam`:
-/// `samtools view -bS -o out in`).
+/// `samtools view -@ <threads> -bS -o out in`).
 pub fn convert_sam_to_bam(samfile: &Path, out: &Path) -> NgResult<()> {
+    let threads = threads_arg();
     run(
         &[
             "view",
+            "-@",
+            &threads,
             "-bS",
             "-o",
             &out.to_string_lossy(),
@@ -85,12 +96,15 @@ pub fn convert_sam_to_bam(samfile: &Path, out: &Path) -> NgResult<()> {
 }
 
 /// Convert a BAM file to SAM, writing to `out` (mirrors `convertBamToSam`:
-/// `samtools view -h -o out in`).
+/// `samtools view -h -@ <threads> -o out in`).
 pub fn convert_bam_to_sam(bamfile: &Path, out: &Path) -> NgResult<()> {
+    let threads = threads_arg();
     run(
         &[
             "view",
             "-h",
+            "-@",
+            &threads,
             "-o",
             &out.to_string_lossy(),
             &bamfile.to_string_lossy(),
@@ -114,6 +128,8 @@ pub fn sort(
     if by_name {
         args.push("-n".to_string());
     }
+    args.push("-@".to_string());
+    args.push(threads_arg());
     args.push("-O".to_string());
     args.push(oformat.to_string());
     args.push("-T".to_string());
@@ -127,12 +143,15 @@ pub fn sort(
 }
 
 /// `samtools_view` with a BED region file: keep only records overlapping `bed_file` (mirrors
-/// `executeView`: `samtools view -h -O <fmt> -L <bed> in`), writing to `out`.
+/// `executeView`: `samtools view -h -@ <threads> -O <fmt> -L <bed> in`), writing to `out`.
 pub fn view_bed(input: &Path, bed_file: &str, out: &Path, oformat: &str) -> NgResult<()> {
+    let threads = threads_arg();
     run(
         &[
             "view",
             "-h",
+            "-@",
+            &threads,
             "-O",
             oformat,
             "-L",
