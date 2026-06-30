@@ -27,9 +27,10 @@ struct RunOpts {
     no_header: bool,
     debug: String,
     temp_dir: Option<String>,
-    /// `--keep-temporary-files`: do not delete temporary files at the end of the run
-    /// (mirrors `nConfKeepTemporaryFiles`). Defaults to deleting them.
-    keep_temporary_files: bool,
+    /// `--keep-temporary-files`/`--no-keep-temporary-files`: whether to delete temporary files at
+    /// the end of the run (mirrors the `keep_temporary_files` triSwitch → `nConfKeepTemporaryFiles`).
+    /// `None` falls through to the config value.
+    keep_temporary_files: Option<bool>,
     search_path: Vec<String>,
     /// `--subsample`: keep only a deterministic 1/10 of the reads on FASTQ load (mirrors
     /// `nConfSubsample`); also appends `.subsampled` to write outputs.
@@ -38,45 +39,147 @@ struct RunOpts {
     /// thread count handed to external tools. `0` means "unset" and resolves to 1 (the Haskell
     /// default, `NThreads 1`); `auto` resolves to the detected CPU count at parse time.
     n_threads: usize,
-    /// `--strict-threads`: strictly respect `--jobs` by reserving one core for NGLess/system
-    /// work when invoking external mappers (mirrors `nConfStrictThreads`).
-    strict_threads: bool,
+    /// `--strict-threads`/`--no-strict-threads`: strictly respect `--jobs` by reserving one core
+    /// for NGLess/system work when invoking external mappers (mirrors the `strict-threads`
+    /// triSwitch → `nConfStrictThreads`). `None` falls through to the config value.
+    strict_threads: Option<bool>,
     /// `-c/--config-file`: extra configuration files to read (required to exist), applied after the
     /// default locations so they take precedence (mirrors `config_files`).
     config_files: Vec<String>,
     /// `--index-path`: where to store mapper indices (mirrors `nConfIndexStorePath`); when set, it
     /// overrides the config-file `index-path`.
     index_path: Option<String>,
+    /// `-e/--script`: inline script source (mirrors `InlineScript`). When set there is no version
+    /// requirement and the script name is `"inline"`. Parsed here; wired up in Phase 1.
+    inline_script: Option<String>,
+    /// `-p/--print-last`: wrap the last statement in `print()` (mirrors `wrapPrint`/`print_last`).
+    /// Parsed here; wired up in Phase 1.
+    print_last: bool,
+    /// `--color auto|no|yes|force`: colour override (mirrors `parseColor`). `None` falls through to
+    /// the config value. Parsed here; applied over the config value in Phase 1.
+    color: Option<ColorSetting>,
+    /// `--experimental-features`: gate for the export modes (mirrors `experimentalFeatures`; its
+    /// *only* effect in Haskell). Parsed here; consumed by Phase 3.
+    experimental_features: bool,
+    /// `--export-json FILE`/`--export-cwl FILE`: serialise the transformed script (mirrors
+    /// `exportJSON`/`exportCWL`). Parsed here; implemented in Phase 3.
+    export_json: Option<String>,
+    export_cwl: Option<String>,
+    /// `--check-deprecation`: check whether the ngless version or any used modules are deprecated
+    /// (mirrors `deprecationCheck`). Parsed here; implemented in a later phase.
+    deprecation_check: bool,
+    /// `--create-report`/`--no-create-report`: whether to write the HTML report directory (mirrors
+    /// the `createReportDirectory` triSwitch). `None` falls through to the config value.
+    create_report: Option<bool>,
+    /// `-o/--html-report-directory DIR`: HTML report output directory (mirrors
+    /// `html_report_directory`). Parsed here; consumed once the HTML report lands.
+    html_report_directory: Option<String>,
     /// Positional arguments after the script path, exposed (with the script path) as `ARGV`.
     extra_args: Vec<String>,
 }
 
-/// Entry point for the non-informational command line (everything except `--version*` and
-/// `--check-install`, which are handled in `lib::run`). Returns the process exit code.
-pub fn run_default_mode(args: &[String]) -> i32 {
-    // Install signal-driven removal of lock/temporary files before any worker threads are spawned,
-    // so an interrupted run (Ctrl+C / SIGTERM) does not leave stale artifacts behind.
-    crate::cleanup::install();
-    let opts = match parse_args(args) {
-        Ok(o) => o,
+/// Top-level execution mode, mirroring `CmdArgs.NGLessMode`. `lib::run` peels off the
+/// informational `infoOption`s (`--version*`/`--date-short`/`--help`) first; everything else is
+/// dispatched here. Only [`Mode::Default`], [`Mode::PrintPath`] and [`Mode::CheckInstall`] are
+/// implemented so far — the remaining sub-modes are *recognized* (so their flags no longer fall
+/// through to the unknown-flag error) but error out until the corresponding phase lands.
+enum Mode {
+    /// `DefaultMode`: load → parse → type check → validate → interpret a script.
+    Default(Box<RunOpts>),
+    /// `--print-path EXEC` (`PrintPathMode`).
+    PrintPath(String),
+    /// `--check-install` (`CheckInstallMode`).
+    CheckInstall,
+    /// `--install-reference-data REF` (`InstallReferenceMode`) — Phase 2.
+    InstallReferenceData,
+    /// `--download-file --download-url URL --local-file PATH` (`DownloadFileMode`) — Phase 2.
+    DownloadFile,
+    /// `--download-demo NAME` (`DownloadDemoMode`) — Phase 2.
+    DownloadDemo,
+    /// `--create-reference-pack ...` (`CreateReferencePackMode`) — Phase 4.
+    CreateReferencePack,
+}
+
+/// Entry point for the non-informational command line (everything except the `infoOption`s
+/// `--version*`/`--date-short`/`-h/--help`, which short-circuit in `lib::run`). Dispatches on the
+/// execution mode (`CmdArgs.NGLessMode`) and returns the process exit code.
+pub fn run_cli(args: &[String]) -> i32 {
+    let mode = match parse_mode(args) {
+        Ok(m) => m,
         Err(e) => {
             eprintln!("{e}");
             return 1;
         }
     };
+    match mode {
+        Mode::Default(opts) => exec_default(&opts),
+        Mode::PrintPath(exec) => crate::print_path(&exec),
+        Mode::CheckInstall => crate::check_install(),
+        Mode::InstallReferenceData => not_implemented("--install-reference-data"),
+        Mode::DownloadFile => not_implemented("--download-file"),
+        Mode::DownloadDemo => not_implemented("--download-demo"),
+        Mode::CreateReferencePack => not_implemented("--create-reference-pack"),
+    }
+}
+
+/// Report a recognized-but-unimplemented sub-mode and exit non-zero. These branches exist so the
+/// flags are no longer silently ignored; the actual behaviour lands in later phases (see
+/// `next-steps.md`, "CLI flags & sub-modes — implementation plan").
+fn not_implemented(mode: &str) -> i32 {
+    eprintln!("The {mode} mode is not yet implemented in this build of ngless.");
+    1
+}
+
+/// Run `DefaultMode`: load → parse → version gate → type check → validate → interpret.
+fn exec_default(opts: &RunOpts) -> i32 {
+    // Install signal-driven removal of lock/temporary files before any worker threads are spawned,
+    // so an interrupted run (Ctrl+C / SIGTERM) does not leave stale artifacts behind.
+    crate::cleanup::install();
     // No script to run: print the usage message (to stderr) rather than the generic
     // fatal-error block, mirroring optparse-applicative's behavior on a missing argument.
     if opts.script.is_none() {
         eprintln!("{}", crate::help_text());
         return 1;
     }
-    match run_script(&opts) {
+    match run_script(opts) {
         Ok(code) => code,
         Err(e) => {
             report_fatal_error(&e);
             1
         }
     }
+}
+
+/// Determine the execution mode (`CmdArgs.nglessArgs`). The sub-modes are each selected by a unique
+/// long flag (`--print-path`/`--check-install`/`--install-reference-data`/`--download-file`/
+/// `--download-demo`/`--create-reference-pack`); their presence is unambiguous, so we route on it
+/// directly rather than reproducing optparse's `<|>` backtracking. Anything else is `DefaultMode`.
+fn parse_mode(args: &[String]) -> NgResult<Mode> {
+    if let Some(pos) = args.iter().position(|a| a == "--print-path") {
+        // `--print-path` is a bare flag taking the EXEC name as the following argument (mirrors
+        // `printPathArgs`'s positional `strArgument`).
+        let exec = args
+            .get(pos + 1)
+            .cloned()
+            .ok_or_else(|| NgError::script("--print-path requires an argument (EXEC)"))?;
+        return Ok(Mode::PrintPath(exec));
+    }
+    if args.iter().any(|a| a == "--check-install") {
+        return Ok(Mode::CheckInstall);
+    }
+    if args.iter().any(|a| a == "--install-reference-data") {
+        return Ok(Mode::InstallReferenceData);
+    }
+    if args.iter().any(|a| a == "--download-file") {
+        return Ok(Mode::DownloadFile);
+    }
+    if args.iter().any(|a| a == "--download-demo") {
+        return Ok(Mode::DownloadDemo);
+    }
+    if args.iter().any(|a| a == "--create-reference-pack") {
+        return Ok(Mode::CreateReferencePack);
+    }
+    Ok(Mode::Default(Box::new(parse_args(args)?)))
 }
 
 /// Print a fatal error in the same format as `runNGLessIO` in `Execs/Main.hs`: a context line, a
@@ -113,9 +216,64 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
             "-n" | "--validate-only" => opts.validate_only = true,
             "-q" | "--quiet" => opts.quiet = true,
             "--trace" => opts.trace = true,
+            "--no-trace" => opts.trace = false,
             "--subsample" => opts.subsample = true,
-            "--strict-threads" => opts.strict_threads = true,
-            "--keep-temporary-files" => opts.keep_temporary_files = true,
+            // triSwitch flags: `--flag`/`--no-flag` set `Some(true)`/`Some(false)`; absent stays
+            // `None` and falls through to the config value (mirrors `triSwitch`/`fromMaybe`).
+            "--strict-threads" => opts.strict_threads = Some(true),
+            "--no-strict-threads" => opts.strict_threads = Some(false),
+            "--keep-temporary-files" => opts.keep_temporary_files = Some(true),
+            "--no-keep-temporary-files" => opts.keep_temporary_files = Some(false),
+            "--create-report" => opts.create_report = Some(true),
+            "--no-create-report" => opts.create_report = Some(false),
+            "-p" | "--print-last" => opts.print_last = true,
+            "--experimental-features" => opts.experimental_features = true,
+            "--check-deprecation" => opts.deprecation_check = true,
+            "-e" | "--script" => {
+                i += 1;
+                opts.inline_script = Some(arg_value(args, i, a)?);
+            }
+            other if other.starts_with("--script=") => {
+                opts.inline_script = Some(other["--script=".len()..].to_string());
+            }
+            "--color" => {
+                i += 1;
+                opts.color = Some(parse_color(&arg_value(args, i, a)?)?);
+            }
+            other if other.starts_with("--color=") => {
+                opts.color = Some(parse_color(&other["--color=".len()..])?);
+            }
+            "--export-json" => {
+                i += 1;
+                opts.export_json = Some(arg_value(args, i, a)?);
+            }
+            other if other.starts_with("--export-json=") => {
+                opts.export_json = Some(other["--export-json=".len()..].to_string());
+            }
+            "--export-cwl" => {
+                i += 1;
+                opts.export_cwl = Some(arg_value(args, i, a)?);
+            }
+            other if other.starts_with("--export-cwl=") => {
+                opts.export_cwl = Some(other["--export-cwl=".len()..].to_string());
+            }
+            "-o" | "--html-report-directory" => {
+                i += 1;
+                opts.html_report_directory = Some(arg_value(args, i, a)?);
+            }
+            other if other.starts_with("--html-report-directory=") => {
+                opts.html_report_directory =
+                    Some(other["--html-report-directory=".len()..].to_string());
+            }
+            // `--search-dir` is a deprecated alias for `--search-path` (mirrors `searchDir`).
+            "--search-dir" => {
+                i += 1;
+                opts.search_path.push(arg_value(args, i, a)?);
+            }
+            other if other.starts_with("--search-dir=") => {
+                opts.search_path
+                    .push(other["--search-dir=".len()..].to_string());
+            }
             "-j" | "--jobs" | "--threads" => {
                 i += 1;
                 opts.n_threads = parse_jobs(&arg_value(args, i, a)?)?;
@@ -171,9 +329,10 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
             other if other.starts_with("--debug=") => {
                 opts.debug = other["--debug=".len()..].to_string();
             }
-            other if other.starts_with('-') => {
-                // Unknown flag: ignored for now (more flags will be wired up as the
-                // corresponding features land).
+            other if other.starts_with('-') && other != "-" => {
+                // Unknown flag: error out, mirroring optparse-applicative (`-` alone is a valid
+                // positional meaning STDIN, so it is *not* treated as a flag).
+                return Err(NgError::script(format!("Invalid option `{other}'")));
             }
             _ => {
                 if opts.script.is_none() {
@@ -186,6 +345,18 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
         i += 1;
     }
     Ok(opts)
+}
+
+/// Parse a `--color` value (mirrors `parseColor`/`readColor`): `auto`/`no`/`yes`/`force`.
+fn parse_color(s: &str) -> NgResult<ColorSetting> {
+    match s {
+        "auto" => Ok(ColorSetting::Auto),
+        "no" => Ok(ColorSetting::No),
+        "yes" | "force" => Ok(ColorSetting::Force),
+        _ => Err(NgError::script(
+            "Could not parse color option (valid options are 'auto', 'force', and 'no')",
+        )),
+    }
 }
 
 /// Parse a `-v/--verbosity` value (mirrors `readVerbosity`: `quiet`/`normal`/`full`).
@@ -307,14 +478,14 @@ fn arg_value(args: &[String], idx: usize, flag: &str) -> NgResult<String> {
 fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // Build the configuration in the three Haskell steps (`initConfiguration`): environment
     // defaults (`guessConfiguration`), config files (`readConfigFiles`), then command-line
-    // overrides (`updateConfigurationOpts`). The boolean flags can only turn an option *on*, so an
-    // absent flag falls through to the config-file value.
+    // overrides (`updateConfigurationOpts`). The triSwitch flags can turn an option on *or* off; an
+    // absent flag (`None`) falls through to the config-file value (mirrors `fromMaybe`).
     let mut config = crate::configuration::read_config_files(&opts.config_files)?;
-    if opts.keep_temporary_files {
-        config.keep_temporary_files = true;
+    if let Some(b) = opts.keep_temporary_files {
+        config.keep_temporary_files = b;
     }
-    if opts.strict_threads {
-        config.strict_threads = true;
+    if let Some(b) = opts.strict_threads {
+        config.strict_threads = b;
     }
     if let Some(t) = &opts.temp_dir {
         config.temporary_directory = t.clone();

@@ -283,21 +283,29 @@ covered by `tests/`**. They are grouped by impact.
   and the `soap` mapper (`StandardModules/Soap.hs`; registered on `import` but `execute_map` rejects
   it). Both are referenced only for hashing in `src/transform.rs`. (`batch` is now ported — see the
   stdlib section above.)
-- **CLI sub-modes + flags not yet ported.** A phased implementation plan lives in `next-steps.md`
-  ("CLI flags & sub-modes — implementation plan"). Current state: `lib.rs`/`cli.rs` handle the
-  run/validate flags (`-n`, `-t`, `--keep-temporary-files`, `-q`, `-v`, `--trace`, `--no-header`,
-  `--debug`, `--search-path`, `--subsample`, `-j/--jobs`, `--strict-threads`, `-c/--config-file`,
-  `--index-path`) plus `--print-path` and `--check-install`. Absent `modeExec` branches:
-  `--export-json` (`JSONScript.hs`), `--export-cwl` (`CWL.hs`), `--install-reference-data` (standalone
-  `installData`, distinct from the on-`map()` auto-download), `--create-reference-pack`
-  (`createReferencePack`), `--download-file` (`DownloadFileMode`), `--download-demo`
-  (`DownloadDemoMode`). Absent `DefaultMode` flags: `-e/--script` (inline), `-p/--print-last`
-  (`wrapPrint`), `--color` (the config-file `color` key is read, but the CLI flag is not yet wired),
-  `--search-dir` (deprecated alias), `--experimental-features`, `--check-deprecation`,
-  `--create-report`/`-o/--html-report-directory`. The **`--experimental-features`** flag is *purely a
-  gate on the two export modes* (in `Execs/Main.hs` it only causes `--export-json`/`--export-cwl` to
-  `fatalError` when absent); it unlocks **no** script-level behavior. Unknown flags currently hit a
-  no-op arm in `src/cli.rs` rather than erroring as Haskell's optparse would.
+- **CLI sub-modes + flags — Phase 0 (parser groundwork) DONE; behaviour pending.** A phased
+  implementation plan lives in `next-steps.md` ("CLI flags & sub-modes — implementation plan").
+  `lib.rs` peels off the informational `infoOption`s (`--version*`/`--date-short`/`-h/--help`) and
+  hands the rest to `cli::run_cli`, which dispatches on a `Mode` enum mirroring `CmdArgs.NGLessMode`
+  (`Default`/`PrintPath`/`CheckInstall`/`InstallReferenceData`/`DownloadFile`/`DownloadDemo`/
+  `CreateReferencePack`). Implemented modes: `Default` (the run/validate flow) plus `--print-path`
+  and `--check-install`. The remaining sub-modes (`--install-reference-data`, `--download-file`,
+  `--download-demo`, `--create-reference-pack`) are now **recognized** — they route to their `Mode`
+  variant and exit with a clear "not yet implemented" message instead of falling through. **Unknown
+  flags now error** (`Invalid option \`...'`, mirroring optparse) instead of being silently ignored;
+  a bare `-` stays a valid STDIN positional. All `DefaultMode` flags are **parsed** into `RunOpts`,
+  including the ones not yet wired: `-e/--script` (inline), `-p/--print-last` (`wrapPrint`),
+  `--color auto|no|yes|force`, `--search-dir` (deprecated alias for `--search-path`),
+  `--experimental-features`, `--export-json`/`--export-cwl`, `--check-deprecation`,
+  `--create-report`/`--no-create-report`, `-o/--html-report-directory`; the `keep-temporary-files`/
+  `strict-threads`/`create-report` triSwitches accept their `--no-` forms (`Option<bool>`,
+  `None` ⇒ fall through to config). Still absent are the *behaviours* behind those flags (Phases
+  1–4): the run/validate flags actually used by `tests/` (`-n`, `-t`, `--keep-temporary-files`,
+  `-q`, `-v`, `--trace`, `--no-header`, `--debug`, `--search-path`, `--subsample`, `-j/--jobs`,
+  `--strict-threads`, `-c/--config-file`, `--index-path`) plus `--print-path`/`--check-install` are
+  the only ones with full effect today. The **`--experimental-features`** flag is *purely a gate on
+  the two export modes* (in `Execs/Main.hs` it only causes `--export-json`/`--export-cwl` to
+  `fatalError` when absent); it unlocks **no** script-level behavior.
 - **Config-file reader — DONE** (`src/configuration.rs`, mirroring `Configuration.hs`). The three
   Haskell config steps are reproduced: `guess_configuration` (environment defaults, including the
   `$XDG_DATA_HOME` user-directory resolution from `getDefaultUserNglessDirectory`),

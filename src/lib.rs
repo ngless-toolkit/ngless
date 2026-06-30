@@ -67,7 +67,7 @@ pub mod version {
 
 /// Usage/help text, listing the flags this build actually supports (see `cli::parse_args`).
 /// Used by `--help`/`-h` (printed to stdout) and as the usage message when no script is given
-/// (printed to stderr by `cli::run_default_mode`).
+/// (printed to stderr by `cli::exec_default`).
 pub(crate) fn help_text() -> String {
     format!(
         "{header}\n\
@@ -118,19 +118,8 @@ where
 {
     let args: Vec<String> = args.into_iter().map(|s| s.as_ref().to_string()).collect();
 
-    // `--print-path EXEC`: print the resolved path to a bundled external tool. Takes a
-    // positional argument, so it is handled before the single-flag loop below.
-    if let Some(pos) = args.iter().position(|a| a == "--print-path") {
-        return match args.get(pos + 1) {
-            Some(exec) => print_path(exec),
-            None => {
-                eprintln!("--print-path requires an argument (EXEC)");
-                1
-            }
-        };
-    }
-
-    // Informational flags, matching the Haskell CLI (Execs/Main.hs). These short-circuit.
+    // Informational `infoOption`s, matching the Haskell CLI (Execs/Main.hs). These short-circuit at
+    // any position, regardless of mode, so they are scanned before mode dispatch.
     for a in &args {
         match a.as_str() {
             "-V" | "--version" => {
@@ -149,7 +138,6 @@ where
                 println!("{}", version::DATE_STR);
                 return 0;
             }
-            "--check-install" => return check_install(),
             "-h" | "--help" => {
                 println!("{}", help_text());
                 return 0;
@@ -179,15 +167,16 @@ where
         };
     }
 
-    // Otherwise, run the default mode: load, parse, version-gate, type check, validate and
-    // interpret a script. Only a subset of the language is implemented so far (see `interpret`).
-    cli::run_default_mode(&args)
+    // Otherwise, dispatch on the execution mode (`CmdArgs.NGLessMode`): the default
+    // load → parse → version-gate → type check → validate → interpret flow, plus the
+    // `--print-path`/`--check-install` sub-modes (and the recognized-but-unimplemented ones).
+    cli::run_cli(&args)
 }
 
 /// `--print-path EXEC`: print the path to the external tool `EXEC` (mirrors `PrintPathMode`
 /// in `Execs/Main.hs`). The Rust build bundles no binaries, so the path is resolved from the
 /// per-tool `NGLESS_*_BIN` environment variable or from `PATH`.
-fn print_path(exec: &str) -> i32 {
+pub(crate) fn print_path(exec: &str) -> i32 {
     use errors::{NgError, NgErrorType};
     let resolved = match exec {
         "samtools" => find_bin("NGLESS_SAMTOOLS_BIN", "samtools"),
@@ -278,7 +267,7 @@ fn is_executable(path: &std::path::Path) -> bool {
 /// (samtools, bwa, megahit, ...) are reachable. The Rust build does not manage external
 /// tools yet, so this reports success to let the test harness' install check pass while the
 /// scaffold is wired up.
-fn check_install() -> i32 {
+pub(crate) fn check_install() -> i32 {
     println!("Install OK");
     0
 }
