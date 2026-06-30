@@ -9,7 +9,7 @@
 use crate::ast::NGLType;
 use crate::errors::{NgError, NgResult};
 use crate::modules::{builtin_functions, NGLVersion};
-use crate::output::{self, Verbosity};
+use crate::output::{self, ColorSetting, Verbosity};
 
 /// Minimum language version this build supports (the rewrite drops pre-1.5 semantics).
 const MIN_VERSION: NGLVersion = NGLVersion { major: 1, minor: 5 };
@@ -200,6 +200,88 @@ fn parse_verbosity(s: &str) -> NgResult<Verbosity> {
     }
 }
 
+/// Emit the resolved configuration as `Debug`-level messages, mirroring `outputConfiguration`
+/// (`Output.hs`). These are visible only under `--trace`. The strings reproduce Haskell's derived
+/// `Show` for `Bool` (`True`/`False`), `ColorSetting` (`AutoColor`/`NoColor`/`ForceColor`) and
+/// `Verbosity` (`Quiet`/`Normal`/`Loud`).
+fn output_configuration(config: &crate::configuration::Configuration, opts: &RunOpts) {
+    let color = match config.color {
+        // For `AutoColor`, also report what the automatic resolution (terminal status + `NO_COLOR`)
+        // decided, since the effective behaviour is not visible from the bare setting name.
+        ColorSetting::Auto => {
+            let resolved = if config.color.resolve() {
+                "color"
+            } else {
+                "no color"
+            };
+            format!("AutoColor ({resolved})")
+        }
+        ColorSetting::No => "NoColor".to_string(),
+        ColorSetting::Force => "ForceColor".to_string(),
+    };
+    // `--quiet` forces `Quiet`, mirroring `if quiet then Quiet else verbosity`.
+    let verbosity = if opts.quiet {
+        Verbosity::Quiet
+    } else {
+        opts.verbosity
+    };
+    let verbosity = match verbosity {
+        Verbosity::Quiet => "Quiet",
+        Verbosity::Normal => "Normal",
+        Verbosity::Loud => "Loud",
+    };
+    let show_bool = |b: bool| if b { "True" } else { "False" };
+    output::debug(0, "# Configuration");
+    output::debug(
+        0,
+        &format!("\tdownload base URL: {}", config.download_base_url),
+    );
+    output::debug(
+        0,
+        &format!("\tglobal data directory: {}", config.global_data_directory),
+    );
+    output::debug(0, &format!("\tuser directory: {}", config.user_directory));
+    output::debug(
+        0,
+        &format!("\tuser data directory: {}", config.user_data_directory),
+    );
+    output::debug(
+        0,
+        &format!("\ttemporary directory: {}", config.temporary_directory),
+    );
+    output::debug(
+        0,
+        &format!(
+            "\tkeep temporary files: {}",
+            show_bool(config.keep_temporary_files)
+        ),
+    );
+    output::debug(
+        0,
+        &format!(
+            "\tcreate report: {}",
+            show_bool(config.create_report_directory)
+        ),
+    );
+    // `nConfReportDirectory` has no config-file key and defaults to the empty string (it is only
+    // ever set by `-o/--html-report-directory`, which is not yet ported).
+    output::debug(0, "\treport directory: ");
+    output::debug(0, &format!("\tcolor setting: {color}"));
+    output::debug(
+        0,
+        &format!("\tprint header: {}", show_bool(config.print_header)),
+    );
+    output::debug(0, &format!("\tsubsample: {}", show_bool(opts.subsample)));
+    output::debug(0, &format!("\tverbosity: {verbosity}"));
+    if let Some(p) = &config.index_store_path {
+        output::debug(0, &format!("\tindex storage path: {p}"));
+    }
+    output::debug(0, "\tsearch path:");
+    for p in &config.search_path {
+        output::debug(0, &format!("\t\t{p}"));
+    }
+}
+
 /// Parse a `-j/--jobs`/`--threads` value (mirrors `NThreadsOpts`): `auto` resolves to the
 /// detected CPU count; otherwise a positive integer. `0` is rejected.
 fn parse_jobs(s: &str) -> NgResult<usize> {
@@ -255,6 +337,9 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // `nglConfiguration` from the parsed args). `--quiet` overrides `-v`; `--trace` forces the
     // highest verbosity; `color` comes from the config file.
     output::init(opts.verbosity, opts.quiet, opts.trace, config.color);
+    // Dump the resolved configuration as `Debug`-level messages (shown only under `--trace`),
+    // mirroring `outputConfiguration` in `Output.hs`.
+    output_configuration(&config, &opts);
     // `n_threads == 0` means the flag was not given: default to a single thread (the Haskell
     // default), which keeps output byte-for-byte reproducible unless the user opts in.
     let n_threads = if opts.n_threads == 0 {

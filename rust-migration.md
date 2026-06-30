@@ -319,7 +319,14 @@ covered by `tests/`**. They are grouped by impact.
   (`NGLESS_DOWNLOAD_BASE_URL` still overrides the URL as a Rust-only convenience), and `--color`/the
   `color` key now flow into `output::init`. This unblocks `-c/--config-file` (also wired:
   `--index-path`). Not yet wired downstream: `index-path`/`create-report` are stored but unused until
-  the index-store and HTML-report features land.
+  the index-store and HTML-report features land. The resolved configuration is also dumped under
+  `--trace` (`cli.rs::output_configuration`, mirroring `outputConfiguration` in `Output.hs`): a
+  `# Configuration` block of `Debug`-level lines (visible only with `--trace`) listing the download
+  URL, data/temp directories, the boolean/colour/verbosity settings (rendered with Haskell's derived
+  `Show` — `True`/`False`, `AutoColor`/`NoColor`/`ForceColor`, `Quiet`/`Normal`/`Loud`), the index
+  storage path (when set) and the search path. For `AutoColor` the line additionally reports the
+  resolved decision in parentheses (`AutoColor (color)`/`AutoColor (no color)`) so the effective
+  behaviour of the terminal-status + `NO_COLOR` check is visible.
 - **`writeToMove`/`addMove` — DONE** (`src/transform.rs::write_to_move`, wired in `cli.rs` as the
   first builtin transform, before `add_file_checks`). The last-use analysis walks the body tracking a
   `blocked` set (variables bound to `fastq`/`paired`/`samfile` or aliases of such — the user's input

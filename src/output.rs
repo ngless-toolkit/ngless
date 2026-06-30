@@ -53,7 +53,7 @@ pub enum ColorSetting {
 impl ColorSetting {
     /// Resolve the setting to a concrete on/off decision (mirrors the `shouldColor`/`AutoColor`
     /// resolution in `Output.hs`): `Auto` consults `stderr`'s terminal status and `NO_COLOR`.
-    fn resolve(self) -> bool {
+    pub(crate) fn resolve(self) -> bool {
         match self {
             ColorSetting::Force => true,
             ColorSetting::No => false,
