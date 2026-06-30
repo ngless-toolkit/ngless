@@ -60,6 +60,13 @@ impl TempFiles {
         &self.dir
     }
 
+    /// Whether `path` was allocated through this registry (mirrors testing membership in
+    /// `ngleTemporaryFilesCreated`). Used by `write` to decide whether a file may be *moved*
+    /// (renamed) to the output rather than copied.
+    pub fn was_created(&self, path: &Path) -> bool {
+        self.created.lock().unwrap().iter().any(|p| p == path)
+    }
+
     /// Reserve a fresh temporary file and register it for cleanup (mirrors
     /// `openNGLTempFile'`). The file is created atomically with `O_CREAT | O_EXCL`; on a
     /// name collision the counter is bumped and the open retried. The returned file is

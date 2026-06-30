@@ -340,6 +340,10 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         crate::transform::parallel_transform(&mut typed.body, include_for_all)
             .map_err(NgError::script)?;
     }
+    // `writeToMove`: mark `write()` calls whose input variable is dead afterwards with
+    // `__can_move=True`, so the interpreter may move (rename) the backing temp file to the output
+    // instead of copying it. First of the builtin transforms, before `addFileChecks`.
+    crate::transform::write_to_move(&mut typed.body);
     // Insert the floated `__check_ofile` calls (mirrors `addFileChecks`, a builtin transform that
     // runs after the module transforms). Done after output hashing so the inserted checks do not
     // affect the `{hash}`/`{script}` content hashes.

@@ -299,14 +299,24 @@ covered by `tests/`**. They are grouped by impact.
   preprocess/count/select + background-compression work.)
 - **Config-file reader.** `Configuration.hs` reads ngless config files (e.g. the `download-url` key);
   Rust is env-var-only (`NGLESS_DOWNLOAD_BASE_URL`, see `src/reference.rs`).
+- **`writeToMove`/`addMove` — DONE** (`src/transform.rs::write_to_move`, wired in `cli.rs` as the
+  first builtin transform, before `add_file_checks`). The last-use analysis walks the body tracking a
+  `blocked` set (variables bound to `fastq`/`paired`/`samfile` or aliases of such — the user's input
+  files, never movable) and injects `__can_move=True` into every `write(v)` whose `v` is not used in
+  any later statement. At run time `execute_write` reads the flag and `move_or_copy_compress`
+  (`src/interpret.rs`) renames (with a cross-device copy fallback, mirroring `moveOrCopy`) instead of
+  copying — but only when the source shares the destination's compression format, the destination is
+  not STDOUT, and the source is a temp file this run created (`TempFiles::was_created`, mirroring the
+  `ifile elem createdFiles` guard in `moveIfAllowed`). All FASTQ/counts/sequence-set/mapped-read-set
+  write paths route through it. This is output-neutral (a move and a copy produce the same destination
+  bytes), so the `tests/` suite stays byte-identical.
 - **`Transform.hs` passes not ported** (Rust applies `add_output_hash`+`addTemporaries`,
-  `parallel_transform`, `add_file_checks`): **`writeToMove`/`addMove`** (inserts `__remove`,
-  `BuiltinModules/Remove.hs`, to free intermediate temp files after last use — disk-usage only, not
-  output-affecting; the `__remove` builtin itself is therefore also unported). **NB this also gates
-  write's move-instead-of-copy:** `__can_move` is accepted as a `write` arg (`src/modules.rs`) but never
-  set true (no pass injects it) and never read by `execute_write`, so `write` always copies. Wiring move
-  (`moveOrCopy`, `woCanMove`) safely requires this last-use analysis first. Plus the output-neutral
-  optimizations `qcInPreprocess`/`ifLenDiscardSpecial`/`substrimReassign` and the early-check injections
+  `parallel_transform`, `write_to_move`, `add_file_checks`): the mid-run temp-file GC —
+  `removeIfTemporary` (`Interpret.hs`) and the `__remove` builtin (`BuiltinModules/Remove.hs`), which
+  free intermediate temp files after last use (disk-usage only, not output-affecting) — is still
+  unported. (Note this is distinct from `writeToMove`, which is now done; the two are independent.)
+  Plus the output-neutral optimizations
+  `qcInPreprocess`/`ifLenDiscardSpecial`/`substrimReassign` and the early-check injections
   `addRSChecks`/`addIndexChecks`/`addCountsCheck` (Rust does eager IO validation differently, so these
   are partly covered). `addUseNewer` is correctly out of scope at ≥1.5.
 - **Reference-download path:** `count(reference=...)` annotation download still errors (`src/interpret.rs`:

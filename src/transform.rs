@@ -261,6 +261,151 @@ fn recursive_collect(e: &Expression, f: &mut dyn FnMut(&Expression)) {
     }
 }
 
+/// `writeToMove` (mirrors `Transform.hs`): when a variable is no longer used *after* a `write()`
+/// call that takes it, inject a hidden `__can_move=True` keyword argument into that call. This tells
+/// the interpreter it may **move** (rename) the intermediate temp file backing the variable to the
+/// output instead of copying it, since the value will never be read again.
+///
+/// Variables bound to an original input file (`fastq`/`paired`/`samfile`) — or to an alias of such a
+/// variable — are *blocked*: their backing files are the user's inputs, not movable temporaries, so
+/// they must always be copied. (The interpreter applies a second, runtime guard: it only moves a
+/// file it actually created as a temporary, so an incorrectly-injected `__can_move` can never clobber
+/// a user file.)
+pub fn write_to_move(body: &mut [(usize, Expression)]) {
+    let mut blocked: Vec<Variable> = Vec::new();
+    for i in 0..body.len() {
+        // Variables passed to a `write()` in this statement that are not used in any later statement
+        // and are not blocked (mirrors `toRemove`/`unused`).
+        let to_remove: Vec<Variable> = function_vars("write", &body[i].1)
+            .into_iter()
+            .filter(|v| !blocked.contains(v))
+            .filter(|v| !body[i + 1..].iter().any(|(_, e)| is_var_used1(v, e)))
+            .collect();
+        add_move(&to_remove, &mut body[i].1);
+
+        // Extend the blocked set from this statement (mirrors `blockhere`).
+        if let Expression::Assignment(var, rhs) = &body[i].1 {
+            let block = match rhs.as_ref() {
+                Expression::FunctionCall(FuncName(fname), _, _, _) => {
+                    matches!(fname.as_str(), "fastq" | "paired" | "samfile")
+                }
+                Expression::Lookup(_, prev) => blocked.contains(prev),
+                _ => false,
+            };
+            if block {
+                blocked.push(var.clone());
+            }
+        }
+    }
+}
+
+/// Variables used as the (single-`Lookup`) argument to a call of `fname` anywhere in `expr`
+/// (mirrors `functionVars`).
+fn function_vars(fname: &str, expr: &Expression) -> Vec<Variable> {
+    let mut out = Vec::new();
+    recursive_collect(expr, &mut |sub| {
+        if let Expression::FunctionCall(FuncName(f), arg, _, _) = sub {
+            if f == fname {
+                if let Expression::Lookup(_, v) = arg.as_ref() {
+                    out.push(v.clone());
+                }
+            }
+        }
+    });
+    out
+}
+
+/// Whether `v` is used in `expr` (mirrors `isVarUsed1`): an assignment *to* `v` counts as a use, as
+/// does any `Lookup` of `v`.
+fn is_var_used1(v: &Variable, expr: &Expression) -> bool {
+    let mut used = false;
+    recursive_collect(expr, &mut |sub| match sub {
+        Expression::Assignment(v2, _) if v2 == v => used = true,
+        Expression::Lookup(_, v2) if v2 == v => used = true,
+        _ => {}
+    });
+    used
+}
+
+/// Inject `__can_move=True` into every `write(Lookup v, ...)` in `expr` whose `v` is in `dead`
+/// (mirrors `addMove`).
+fn add_move(dead: &[Variable], expr: &mut Expression) {
+    recursive_transform_mut(expr, &mut |e| {
+        if let Expression::FunctionCall(FuncName(f), arg, args, _) = e {
+            if f == "write" {
+                if let Expression::Lookup(_, v) = arg.as_ref() {
+                    if dead.contains(v) {
+                        args.insert(
+                            0,
+                            (
+                                Variable("__can_move".to_string()),
+                                Expression::ConstBool(true),
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    });
+}
+
+/// Apply `f` to `e` and every sub-expression, children first (mirrors `recursiveTransform`). The
+/// traversal mirrors [`recursive_collect`] but over `&mut`.
+fn recursive_transform_mut(e: &mut Expression, f: &mut dyn FnMut(&mut Expression)) {
+    match e {
+        Expression::ListExpression(es) | Expression::Sequence(es) => {
+            for c in es.iter_mut() {
+                recursive_transform_mut(c, f);
+            }
+        }
+        Expression::UnaryOp(_, a) => recursive_transform_mut(a, f),
+        Expression::BinaryOp(_, a, b) => {
+            recursive_transform_mut(a, f);
+            recursive_transform_mut(b, f);
+        }
+        Expression::Condition(c, t, fe) => {
+            recursive_transform_mut(c, f);
+            recursive_transform_mut(t, f);
+            recursive_transform_mut(fe, f);
+        }
+        Expression::IndexExpression(a, ix) => {
+            recursive_transform_mut(a, f);
+            match ix {
+                Index::One(i) => recursive_transform_mut(i, f),
+                Index::Two(a, b) => {
+                    if let Some(a) = a {
+                        recursive_transform_mut(a, f);
+                    }
+                    if let Some(b) = b {
+                        recursive_transform_mut(b, f);
+                    }
+                }
+            }
+        }
+        Expression::Assignment(_, a) => recursive_transform_mut(a, f),
+        Expression::FunctionCall(_, arg, args, block) => {
+            recursive_transform_mut(arg, f);
+            for (_, v) in args.iter_mut() {
+                recursive_transform_mut(v, f);
+            }
+            if let Some(b) = block {
+                recursive_transform_mut(&mut b.body, f);
+            }
+        }
+        Expression::MethodCall(_, self_e, arg, args) => {
+            recursive_transform_mut(self_e, f);
+            if let Some(a) = arg {
+                recursive_transform_mut(a, f);
+            }
+            for (_, v) in args.iter_mut() {
+                recursive_transform_mut(v, f);
+            }
+        }
+        _ => {}
+    }
+    f(e);
+}
+
 /// Inject the hidden `__hash` keyword argument into every `write`/`collect` call (mirrors
 /// `addOutputHash`). `version` is the script's `(major, minor)` language version, `imports` the
 /// header module imports, and `funcs` the full function table (used to look up return types so
@@ -973,6 +1118,117 @@ mod tests {
             show_ngltype(&NGLType::List(Box::new(NGLType::String)), 0),
             "NGList NGLString"
         );
+    }
+
+    fn lookup(v: &str) -> Expression {
+        Expression::Lookup(None, Variable(v.to_string()))
+    }
+
+    fn call(name: &str, arg: Expression, kwargs: Vec<(&str, Expression)>) -> Expression {
+        Expression::FunctionCall(
+            FuncName(name.to_string()),
+            Box::new(arg),
+            kwargs
+                .into_iter()
+                .map(|(k, e)| (Variable(k.to_string()), e))
+                .collect(),
+            None,
+        )
+    }
+
+    fn assign(v: &str, e: Expression) -> Expression {
+        Expression::Assignment(Variable(v.to_string()), Box::new(e))
+    }
+
+    fn has_can_move(e: &Expression) -> bool {
+        if let Expression::FunctionCall(_, _, kwargs, _) = e {
+            kwargs.iter().any(|(Variable(k), v)| {
+                k == "__can_move" && matches!(v, Expression::ConstBool(true))
+            })
+        } else {
+            false
+        }
+    }
+
+    #[test]
+    fn write_to_move_marks_dead_variable() {
+        // x = preprocess(...); write(x) -> x is dead after the write, so __can_move is injected.
+        let mut body = vec![
+            (1, assign("x", call("preprocess", lookup("input"), vec![]))),
+            (
+                2,
+                call(
+                    "write",
+                    lookup("x"),
+                    vec![("ofile", Expression::ConstStr("out.fq".to_string()))],
+                ),
+            ),
+        ];
+        write_to_move(&mut body);
+        assert!(has_can_move(&body[1].1));
+    }
+
+    #[test]
+    fn write_to_move_keeps_used_variable() {
+        // x is used again after the write, so it must NOT be moved.
+        let mut body = vec![
+            (1, assign("x", call("preprocess", lookup("input"), vec![]))),
+            (
+                2,
+                call(
+                    "write",
+                    lookup("x"),
+                    vec![("ofile", Expression::ConstStr("out.fq".to_string()))],
+                ),
+            ),
+            (
+                3,
+                call(
+                    "write",
+                    lookup("x"),
+                    vec![("ofile", Expression::ConstStr("out2.fq".to_string()))],
+                ),
+            ),
+        ];
+        write_to_move(&mut body);
+        assert!(!has_can_move(&body[1].1));
+        // The last write of x: x is no longer used afterwards, so it may move.
+        assert!(has_can_move(&body[2].1));
+    }
+
+    #[test]
+    fn write_to_move_blocks_input_files() {
+        // A variable bound directly to fastq()/paired()/samfile() (or an alias) is a user input
+        // file and must never be moved.
+        let mut body = vec![
+            (
+                1,
+                assign(
+                    "x",
+                    call("fastq", Expression::ConstStr("in.fq".to_string()), vec![]),
+                ),
+            ),
+            (2, assign("y", lookup("x"))),
+            (
+                3,
+                call(
+                    "write",
+                    lookup("x"),
+                    vec![("ofile", Expression::ConstStr("o1.fq".to_string()))],
+                ),
+            ),
+            (
+                4,
+                call(
+                    "write",
+                    lookup("y"),
+                    vec![("ofile", Expression::ConstStr("o2.fq".to_string()))],
+                ),
+            ),
+        ];
+        write_to_move(&mut body);
+        assert!(!has_can_move(&body[2].1));
+        assert!(!has_can_move(&body[3].1));
     }
 
     #[test]

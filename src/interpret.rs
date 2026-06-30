@@ -1384,7 +1384,7 @@ impl Interpreter {
             }
             let out = self.new_temp_path("module_in_", "fq")?;
             let o = out.to_string_lossy().into_owned();
-            write_fq_files(&files, &o)?;
+            write_fq_files(&files, &o, false, &self.temp_files)?;
             Ok(Some(o))
         };
         let fq1 = concat(rs.pairs.iter().map(|(a, _)| a).collect())?;
@@ -1867,6 +1867,12 @@ impl Interpreter {
         expr: &NGLessObject,
         args: &[(String, NGLessObject)],
     ) -> NgResult<NGLessObject> {
+        // The `writeToMove` transform injects `__can_move=True` when the value being written is dead
+        // afterwards, allowing the backing temp file to be moved (renamed) instead of copied.
+        let can_move = matches!(
+            lookup_arg(args, "__can_move"),
+            Some(NGLessObject::Bool(true))
+        );
         if let NGLessObject::MappedReadSet { path, .. } = expr {
             let ofile = match lookup_arg(args, "ofile") {
                 Some(NGLessObject::String(s)) => s.clone(),
@@ -1876,10 +1882,17 @@ impl Interpreter {
                     ))
                 }
             };
-            self.write_mapped_read_set(path, &ofile)?;
+            self.write_mapped_read_set(path, &ofile, can_move)?;
             return Ok(NGLessObject::String(ofile));
         }
-        execute_write(expr, args, &self.script_text, self.subsample)
+        execute_write(
+            expr,
+            args,
+            &self.script_text,
+            self.subsample,
+            can_move,
+            &self.temp_files,
+        )
     }
 
     /// `lock1`/`run_for_all`/`run_for_all_samples` (mirrors `executeLock1OrForAll`): given a list
@@ -2051,7 +2064,7 @@ impl Interpreter {
             }
             let out = self.new_temp_path("ngless-megahit-input_", "fq.gz")?;
             let o = out.to_string_lossy().into_owned();
-            write_fq_files(&files, &o)?;
+            write_fq_files(&files, &o, false, &self.temp_files)?;
             Ok(Some(o))
         };
         let mut cmd_args: Vec<String> = Vec::new();
@@ -2168,7 +2181,7 @@ impl Interpreter {
 
     /// Write a mapped read set to `ofile` (mirrors `executeWrite` of an `NGOMappedReadSet`). The
     /// output format comes from the extension; SAM/BAM conversion goes through samtools.
-    fn write_mapped_read_set(&self, path: &Path, ofile: &str) -> NgResult<()> {
+    fn write_mapped_read_set(&self, path: &Path, ofile: &str, can_move: bool) -> NgResult<()> {
         let is_bam = |p: &str| p.ends_with(".bam");
         let sam_ext = [".sam", ".sam.gz", ".sam.bz2", ".sam.zst", ".sam.zstd"];
         let format = if ofile == "/dev/stdout" || sam_ext.iter().any(|e| ofile.ends_with(e)) {
@@ -2194,7 +2207,7 @@ impl Interpreter {
                 out
             }
         };
-        copy_fastq(&orig, ofile)
+        move_or_copy_compress(&orig, ofile, can_move, &self.temp_files)
     }
 
     /// Decode a FASTQ file, register its statistics under `label`, and return a reference to it
@@ -3735,6 +3748,8 @@ fn execute_write(
     args: &[(String, NGLessObject)],
     script_text: &str,
     subsample: bool,
+    can_move: bool,
+    temp_files: &crate::tempfiles::TempFiles,
 ) -> NgResult<NGLessObject> {
     let mut ofile = match lookup_arg(args, "ofile") {
         Some(NGLessObject::String(s)) => s.clone(),
@@ -3766,27 +3781,42 @@ fn execute_write(
         NGLessObject::ReadSet { readset, .. } => {
             if readset.pairs.is_empty() {
                 let files: Vec<&FastQFilePath> = readset.singletons.iter().collect();
-                write_fq_files(&files, &ofile)?;
+                write_fq_files(&files, &ofile, can_move, temp_files)?;
             } else {
                 let f1: Vec<&FastQFilePath> = readset.pairs.iter().map(|(a, _)| a).collect();
                 let f2: Vec<&FastQFilePath> = readset.pairs.iter().map(|(_, b)| b).collect();
-                write_fq_files(&f1, &format_fq_oname(&ofile, "pair.1")?)?;
-                write_fq_files(&f2, &format_fq_oname(&ofile, "pair.2")?)?;
+                write_fq_files(
+                    &f1,
+                    &format_fq_oname(&ofile, "pair.1")?,
+                    can_move,
+                    temp_files,
+                )?;
+                write_fq_files(
+                    &f2,
+                    &format_fq_oname(&ofile, "pair.2")?,
+                    can_move,
+                    temp_files,
+                )?;
                 if !readset.singletons.is_empty() {
                     let f3: Vec<&FastQFilePath> = readset.singletons.iter().collect();
-                    write_fq_files(&f3, &format_fq_oname(&ofile, "singles")?)?;
+                    write_fq_files(
+                        &f3,
+                        &format_fq_oname(&ofile, "singles")?,
+                        can_move,
+                        temp_files,
+                    )?;
                 }
             }
             Ok(NGLessObject::String(ofile))
         }
         NGLessObject::Counts(path) => {
-            write_counts(path, &ofile, args, script_text)?;
+            write_counts(path, &ofile, args, script_text, can_move, temp_files)?;
             Ok(NGLessObject::String(ofile))
         }
         // A sequence set (assemble contigs) or a plain filename (orf_find output) is copied to the
         // destination, recompressing only if the extension demands it (mirrors `moveOrCopyCompress`).
         NGLessObject::SequenceSet(path) | NGLessObject::Filename(path) => {
-            copy_fastq(Path::new(path), &ofile)?;
+            move_or_copy_compress(Path::new(path), &ofile, can_move, temp_files)?;
             Ok(NGLessObject::String(ofile))
         }
         other => Err(NgError::script(format!(
@@ -3818,13 +3848,18 @@ fn format_fq_oname(base: &str, insert: &str) -> NgResult<String> {
 /// Write a list of FASTQ files to a single output (mirrors `moveOrCopyCompressFQs`): one file
 /// is copied/recompressed, several are concatenated (decompressed) then compressed to `ofile`,
 /// and an empty list produces an empty output file.
-fn write_fq_files(files: &[&FastQFilePath], ofile: &str) -> NgResult<()> {
+fn write_fq_files(
+    files: &[&FastQFilePath],
+    ofile: &str,
+    can_move: bool,
+    temp_files: &crate::tempfiles::TempFiles,
+) -> NgResult<()> {
     use crate::compression::{open_read, write_bytes, StreamWriter};
     match files {
         [] => write_bytes(ofile, b""),
         // Single file keeps the verbatim `std::fs::copy` byte-copy fast path (load-bearing for
-        // write byte-identity of un-preprocessed sets).
-        [single] => copy_fastq(&single.path, ofile),
+        // write byte-identity of un-preprocessed sets), or moves the temp file when allowed.
+        [single] => move_or_copy_compress(&single.path, ofile, can_move, temp_files),
         // Stream each decompressed input through one compressing writer: the encoder sees the
         // identical concatenated byte stream, so the output is content-equivalent to
         // decompress-all-then-`write_bytes`, but bounded in memory.
@@ -3841,6 +3876,33 @@ fn write_fq_files(files: &[&FastQFilePath], ofile: &str) -> NgResult<()> {
             w.finish()
         }
     }
+}
+
+/// Move or copy `src` to `ofile` (mirrors `moveOrCopyCompress` + `moveIfAllowed`). When `can_move`
+/// is set, the source shares the destination's compression format, the destination is not STDOUT,
+/// and the source is a temp file this run created (`ngleTemporaryFilesCreated`), the file is renamed
+/// (with a cross-device copy fallback via [`copy_fastq`]) instead of copied. Otherwise it falls back
+/// to a verbatim copy or a recompress.
+fn move_or_copy_compress(
+    src: &Path,
+    ofile: &str,
+    can_move: bool,
+    temp_files: &crate::tempfiles::TempFiles,
+) -> NgResult<()> {
+    use crate::compression::detect;
+    let src_str = src.to_string_lossy();
+    if can_move
+        && ofile != "/dev/stdout"
+        && detect(&src_str) == detect(ofile)
+        && temp_files.was_created(src)
+    {
+        // `moveOrCopy`: rename, falling back to a copy when the rename fails (e.g. a cross-device
+        // EXDEV when the temp dir and output are on different filesystems).
+        if std::fs::rename(src, ofile).is_ok() {
+            return Ok(());
+        }
+    }
+    copy_fastq(src, ofile)
 }
 
 /// Copy a FASTQ file to `ofile` (mirrors `moveOrCopyCompress`). When the source and
@@ -3913,6 +3975,8 @@ fn write_counts(
     ofile: &str,
     args: &[(String, NGLessObject)],
     script_text: &str,
+    can_move: bool,
+    temp_files: &crate::tempfiles::TempFiles,
 ) -> NgResult<()> {
     let format = match lookup_arg(args, "format") {
         None => "tsv".to_string(),
@@ -3954,9 +4018,10 @@ fn write_counts(
         script_text,
         hash.as_deref(),
     )?;
-    // Fast path: an unmodified TSV with no comments is copied (and recompressed) verbatim.
+    // Fast path: an unmodified TSV with no comments is copied (and recompressed) verbatim, or moved
+    // when allowed.
     if format == "tsv" && comments.is_empty() {
-        return copy_fastq(path, ofile);
+        return move_or_copy_compress(path, ofile, can_move, temp_files);
     }
     let body = crate::compression::read_to_string(&path.to_string_lossy())?;
     let mut out = String::new();
