@@ -46,6 +46,40 @@ pub enum NGLessObject {
 }
 
 impl NGLessObject {
+    /// The on-disk files backing this value (mirrors `extractFiles`/`extractFilesRS` in
+    /// `Interpret.hs`). Scalars, symbols, reads and mapped-read groups carry no backing file and
+    /// contribute nothing; file-backed values contribute their path(s); a list contributes the
+    /// union of its elements'. Used by the mid-run temp-file GC to compute the set of files still
+    /// referenced by live variables.
+    pub fn backing_files(&self) -> Vec<std::path::PathBuf> {
+        use std::path::PathBuf;
+        match self {
+            NGLessObject::String(_)
+            | NGLessObject::Bool(_)
+            | NGLessObject::Integer(_)
+            | NGLessObject::Double(_)
+            | NGLessObject::Symbol(_)
+            | NGLessObject::Void
+            | NGLessObject::Read(_)
+            | NGLessObject::MappedRead(_) => Vec::new(),
+            NGLessObject::Filename(f) | NGLessObject::SequenceSet(f) => vec![PathBuf::from(f)],
+            NGLessObject::Counts(path) => vec![path.clone()],
+            NGLessObject::MappedReadSet { path, .. } => vec![path.clone()],
+            NGLessObject::ReadSet { readset, .. } => {
+                let mut out = Vec::new();
+                for (m1, m2) in &readset.pairs {
+                    out.push(m1.path.clone());
+                    out.push(m2.path.clone());
+                }
+                for s in &readset.singletons {
+                    out.push(s.path.clone());
+                }
+                out
+            }
+            NGLessObject::List(items) => items.iter().flat_map(|o| o.backing_files()).collect(),
+        }
+    }
+
     fn type_name(&self) -> &'static str {
         match self {
             NGLessObject::String(_) => "string",

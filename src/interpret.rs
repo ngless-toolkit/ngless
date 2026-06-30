@@ -446,6 +446,7 @@ pub fn interpret(
     let result: NgResult<()> = (|| {
         for (lno, e) in body {
             interp.cur_lno.store(*lno, Ordering::Relaxed);
+            interp.gc_temps();
             crate::output::trace(*lno, &format!("Interpreting [{lno}]: {e:?}"));
             interp.interpret_top(e)?;
         }
@@ -627,6 +628,28 @@ enum BlockStatus {
 }
 
 impl Interpreter {
+    /// Mid-run temp-file garbage collection (mirrors `gcTemps` in `Interpret.hs`). Run before
+    /// each top-level statement, it removes every temporary file this run created that is no
+    /// longer referenced by any live global variable — freeing intermediate disk space as soon
+    /// as a value goes out of scope (e.g. an unassigned `preprocess` result, or a variable that
+    /// has been reassigned). Removal goes through `remove_if_temporary`, so it respects
+    /// `--keep-temporary-files` and only touches files this run actually created. This is
+    /// disk-usage only: every reclaimed file is provably dead, so output is unchanged.
+    fn gc_temps(&self) {
+        crate::output::debug(0, "Running garbage collection.");
+        let active: std::collections::HashSet<std::path::PathBuf> =
+            self.env.values().flat_map(|v| v.backing_files()).collect();
+        let garbage: Vec<std::path::PathBuf> = self
+            .temp_files
+            .created_files()
+            .into_iter()
+            .filter(|f| !active.contains(f))
+            .collect();
+        for f in &garbage {
+            self.temp_files.remove_if_temporary(f);
+        }
+    }
+
     fn interpret_top(&mut self, e: &Expression) -> NgResult<()> {
         match e {
             Expression::Assignment(Variable(var), val) => {

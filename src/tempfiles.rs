@@ -67,6 +67,39 @@ impl TempFiles {
         self.created.lock().unwrap().iter().any(|p| p == path)
     }
 
+    /// Snapshot of the tracked *file* paths, excluding directories (mirrors
+    /// `ngleTemporaryFilesCreated`, which only records files opened via `openNGLTempFile'` —
+    /// `createTempDir` does not add to it). Used by the interpreter's mid-run garbage collector
+    /// to enumerate the temp files that may be reclaimed once no live variable references them.
+    pub fn created_files(&self) -> Vec<PathBuf> {
+        self.created
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|p| !p.is_dir())
+            .cloned()
+            .collect()
+    }
+
+    /// Mirrors `removeIfTemporary`: remove `path` if (and only if) it was created through this
+    /// registry and the user did not pass `--keep-temporary-files`; then stop tracking it. This
+    /// is the primitive behind both the mid-run GC (`gcTemps`) and the `__remove` builtin
+    /// (`BuiltinModules/Remove.hs`). It is a no-op for files this registry did not create, for
+    /// directories (Haskell tracks only files for reclamation), and when `keep` is set. Removing
+    /// an already-gone file (e.g. one moved to an output) is silently ignored.
+    pub fn remove_if_temporary(&self, path: &Path) {
+        if self.keep {
+            return;
+        }
+        let mut created = self.created.lock().unwrap();
+        if path.is_dir() || !created.iter().any(|p| p == path) {
+            return;
+        }
+        crate::output::debug(0, &format!("Removing temporary file: {}", path.display()));
+        remove_file_if_exists(path);
+        created.retain(|p| p != path);
+    }
+
     /// Reserve a fresh temporary file and register it for cleanup (mirrors
     /// `openNGLTempFile'`). The file is created atomically with `O_CREAT | O_EXCL`; on a
     /// name collision the counter is bumped and the open retried. The returned file is
@@ -263,6 +296,59 @@ mod tests {
         assert_ne!(p, taken, "must not reuse an existing name");
         // The pre-existing file is untouched (not clobbered).
         assert_eq!(fs::read(&taken).unwrap(), b"pre-existing");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn remove_if_temporary_removes_tracked_file_and_untracks() {
+        let dir = scratch_dir("remove_if_temp");
+        let tf = TempFiles::new(&dir, false);
+        let p = tf.new_file("g_", "fq").unwrap();
+        assert!(p.exists());
+        assert!(tf.was_created(&p));
+        tf.remove_if_temporary(&p);
+        assert!(!p.exists(), "tracked temp file should be removed");
+        assert!(
+            !tf.was_created(&p),
+            "removed file should no longer be tracked"
+        );
+        // A second call is a harmless no-op.
+        tf.remove_if_temporary(&p);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn remove_if_temporary_ignores_untracked_and_keep() {
+        let dir = scratch_dir("remove_if_temp_guards");
+        // Untracked file is never removed.
+        let tf = TempFiles::new(&dir, false);
+        let outside = dir.join("not_ours.txt");
+        fs::write(&outside, b"keep me").unwrap();
+        tf.remove_if_temporary(&outside);
+        assert!(outside.exists(), "untracked file must not be removed");
+        // With keep=true, even a tracked file survives.
+        let tf_keep = TempFiles::new(&dir, true);
+        let p = tf_keep.new_file("k_", "fq").unwrap();
+        tf_keep.remove_if_temporary(&p);
+        assert!(p.exists(), "keep=true must suppress removal");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn created_files_excludes_directories() {
+        let dir = scratch_dir("created_files");
+        let tf = TempFiles::new(&dir, false);
+        let f = tf.new_file("f_", "sam").unwrap();
+        let d = tf.new_dir("work_").unwrap();
+        let files = tf.created_files();
+        assert!(files.contains(&f), "files should be listed");
+        assert!(!files.contains(&d), "directories must be excluded");
+        // A directory is never reclaimed by remove_if_temporary either.
+        tf.remove_if_temporary(&d);
+        assert!(
+            d.exists(),
+            "directory must not be removed by remove_if_temporary"
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 

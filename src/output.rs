@@ -132,6 +132,11 @@ pub fn trace(lno: usize, msg: &str) {
     message(OutputType::Trace, lno, msg);
 }
 
+/// `Debug`-level message (shown under `--trace`, like Haskell's `DebugOutput`).
+pub fn debug(lno: usize, msg: &str) {
+    message(OutputType::Debug, lno, msg);
+}
+
 /// `Info`-level message (shown at `Normal` verbosity and above).
 pub fn info(lno: usize, msg: &str) {
     message(OutputType::Info, lno, msg);

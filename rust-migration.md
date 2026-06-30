@@ -310,12 +310,21 @@ covered by `tests/`**. They are grouped by impact.
   `ifile elem createdFiles` guard in `moveIfAllowed`). All FASTQ/counts/sequence-set/mapped-read-set
   write paths route through it. This is output-neutral (a move and a copy produce the same destination
   bytes), so the `tests/` suite stays byte-identical.
+- **Mid-run temp-file GC — DONE** (`gcTemps`/`removeIfTemporary` in `Interpret.hs`,
+  `BuiltinModules/Remove.hs`). `Interpreter::gc_temps` runs before every top-level statement: it
+  unions the backing files of all live global variables (`NGLessObject::backing_files`, mirroring
+  `extractFiles`/`extractFilesRS`) and reclaims every temp file this run created that is *not* in that
+  set, via `TempFiles::remove_if_temporary` (mirroring `removeIfTemporary` — respects
+  `--keep-temporary-files`, only touches files the run created, untracks on removal). Only files are
+  candidates (`created_files` excludes directories, matching Haskell tracking only `openNGLTempFile'`
+  files in `ngleTemporaryFilesCreated`), so a temp dir backing e.g. a `SequenceSet` is never reclaimed
+  out from under it. This frees intermediate disk space as soon as a value goes out of scope (disk-usage
+  only — every reclaimed file is provably dead — so the suite stays byte-identical). The separate
+  `__remove` builtin *function* (a manually-invokable hook, not injected by any transform pass) shares
+  the same `remove_if_temporary` primitive; it is unused by `tests/` and not wired as a callable yet.
 - **`Transform.hs` passes not ported** (Rust applies `add_output_hash`+`addTemporaries`,
-  `parallel_transform`, `write_to_move`, `add_file_checks`): the mid-run temp-file GC —
-  `removeIfTemporary` (`Interpret.hs`) and the `__remove` builtin (`BuiltinModules/Remove.hs`), which
-  free intermediate temp files after last use (disk-usage only, not output-affecting) — is still
-  unported. (Note this is distinct from `writeToMove`, which is now done; the two are independent.)
-  Plus the output-neutral optimizations
+  `parallel_transform`, `write_to_move`, `add_file_checks`):
+  the output-neutral optimizations
   `qcInPreprocess`/`ifLenDiscardSpecial`/`substrimReassign` and the early-check injections
   `addRSChecks`/`addIndexChecks`/`addCountsCheck` (Rust does eager IO validation differently, so these
   are partly covered). `addUseNewer` is correctly out of scope at ≥1.5.
