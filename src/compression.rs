@@ -195,14 +195,143 @@ fn write_all_compressed(
 pub fn open_read(path: &str) -> NgResult<Box<dyn BufRead>> {
     let f = File::open(path).map_err(io_err(path))?;
     Ok(match detect(path) {
+        // Uncompressed input has no decode cost, so there is nothing to overlap: read it inline.
         Compress::None => Box::new(BufReader::new(f)),
-        Compress::Gzip => Box::new(BufReader::new(MultiGzDecoder::new(f))),
-        Compress::Bzip2 => Box::new(BufReader::new(bzip2::read::MultiBzDecoder::new(f))),
+        // For the compressed cases, run the decoder on a background thread (see [`StreamReader`]) so
+        // the decode overlaps the downstream parse/transform/encode instead of sharing their thread.
+        // The decoder is constructed here, on the calling thread, so any setup error (notably zstd)
+        // still surfaces synchronously before the worker is spawned.
+        Compress::Gzip => Box::new(StreamReader::spawn(Box::new(MultiGzDecoder::new(f)))),
+        Compress::Bzip2 => Box::new(StreamReader::spawn(Box::new(
+            bzip2::read::MultiBzDecoder::new(f),
+        ))),
         // `read::Decoder::new` concatenates frames until EOF by default, matching `decode_all`.
-        Compress::Zstd => Box::new(BufReader::new(
+        Compress::Zstd => Box::new(StreamReader::spawn(Box::new(
             zstd::stream::read::Decoder::new(f).map_err(io_err(path))?,
-        )),
+        ))),
     })
+}
+
+/// A streaming reader that runs decompression on a **background thread**, feeding decompressed
+/// bytes to the consumer through a bounded channel. The read-side mirror of [`StreamWriter`]: it
+/// lets the (CPU-bound) gzip/bzip2/zstd decode of an input file overlap with the downstream
+/// parse/transform/encode work on the consuming thread, instead of decompressing inline on that one
+/// thread. [`open_read`] reads uncompressed input synchronously, so it never reaches here.
+///
+/// Errors: the file is opened and the decoder constructed synchronously in [`open_read`], so "no
+/// such file" and decoder setup failures surface immediately. A *mid-stream* decode error (e.g. a
+/// corrupt member) travels down the channel as an [`std::io::Error`] and is re-emitted from the
+/// next read, matching the inline decoder's behaviour for the consumers above (`fastq_records`, the
+/// SAM line reader), which already treat read errors as fatal.
+pub struct StreamReader {
+    rx: std::sync::mpsc::Receiver<std::io::Result<Vec<u8>>>,
+    /// The chunk currently being served to the consumer, and how far into it we have read.
+    current: Vec<u8>,
+    pos: usize,
+    /// Set once the worker has signalled end-of-stream (EOF or an error already surfaced); after
+    /// this the reader reports EOF without touching the channel again.
+    done: bool,
+    /// Kept so the worker is owned by the reader; it exits on its own when the input is exhausted
+    /// or when this reader is dropped (the channel closes and its next `send` fails).
+    _handle: std::thread::JoinHandle<()>,
+}
+
+impl StreamReader {
+    /// Spawn the decode worker over an already-constructed decoder (built by [`open_read`] on the
+    /// calling thread, so setup errors are synchronous, then moved onto the worker).
+    fn spawn(decoder: Box<dyn Read + Send>) -> StreamReader {
+        // ~128 KiB chunks, capacity 8 => up to ~1 MiB of decompressed bytes buffered ahead before
+        // the worker blocks: enough to keep the consumer fed without unbounded memory growth.
+        const CHUNK: usize = 128 * 1024;
+        let (tx, rx) = std::sync::mpsc::sync_channel::<std::io::Result<Vec<u8>>>(8);
+        let handle = std::thread::spawn(move || {
+            let mut decoder = decoder;
+            loop {
+                // Fill a whole chunk before handing it over, to amortise the channel hand-off over
+                // many small decoder reads.
+                let mut buf = vec![0u8; CHUNK];
+                let mut filled = 0;
+                let mut eof = false;
+                let mut err = None;
+                while filled < CHUNK {
+                    match decoder.read(&mut buf[filled..]) {
+                        Ok(0) => {
+                            eof = true;
+                            break;
+                        }
+                        Ok(n) => filled += n,
+                        Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                        Err(e) => {
+                            err = Some(e);
+                            break;
+                        }
+                    }
+                }
+                if filled > 0 {
+                    buf.truncate(filled);
+                    if tx.send(Ok(buf)).is_err() {
+                        // Consumer gone (dropped, or short-circuited an error upstream): stop.
+                        break;
+                    }
+                }
+                if let Some(e) = err {
+                    // Surface the error once; the reader then reports EOF on subsequent reads.
+                    let _ = tx.send(Err(e));
+                    break;
+                }
+                if eof {
+                    break;
+                }
+            }
+        });
+        StreamReader {
+            rx,
+            current: Vec::new(),
+            pos: 0,
+            done: false,
+            _handle: handle,
+        }
+    }
+}
+
+impl BufRead for StreamReader {
+    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+        if self.pos >= self.current.len() {
+            if self.done {
+                return Ok(&[]);
+            }
+            match self.rx.recv() {
+                Ok(Ok(buf)) => {
+                    self.current = buf;
+                    self.pos = 0;
+                }
+                Ok(Err(e)) => {
+                    self.done = true;
+                    return Err(e);
+                }
+                // Channel closed: the worker finished the stream (EOF) or exited.
+                Err(_) => {
+                    self.done = true;
+                    return Ok(&[]);
+                }
+            }
+        }
+        Ok(&self.current[self.pos..])
+    }
+
+    fn consume(&mut self, amt: usize) {
+        self.pos = (self.pos + amt).min(self.current.len());
+    }
+}
+
+impl Read for StreamReader {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        let avail = self.fill_buf()?;
+        let n = avail.len().min(out.len());
+        out[..n].copy_from_slice(&avail[..n]);
+        self.consume(n);
+        Ok(n)
+    }
 }
 
 /// One of the concrete streaming encoders. Kept as an enum (rather than `Box<dyn Write>`)
@@ -509,6 +638,68 @@ mod tests {
         stream_writer_round_trip("fq.gz");
         stream_writer_round_trip("fq.bz2");
         stream_writer_round_trip("fq.zst");
+    }
+
+    /// `open_read` (the background-thread `StreamReader` for compressed input) must deliver exactly
+    /// the decompressed bytes, for every extension. The payload spans several decode chunks so the
+    /// channel hand-off and chunk boundaries are exercised, and it is read both via `read_to_end`
+    /// and line-by-line (`BufRead`) to cover both access paths.
+    fn open_read_round_trip(ext: &str) {
+        let dir = std::env::temp_dir();
+        let p = dir.join(format!("ngless_sr_{}_{}.{ext}", std::process::id(), ext));
+        let ps = p.to_string_lossy().to_string();
+        // ~512 KiB, larger than the 128 KiB decode chunk => multiple chunks across the channel.
+        let mut payload = Vec::new();
+        for i in 0..20_000 {
+            payload.extend_from_slice(format!("@r{i}\nACGTACGTACGT\n+\nIIIIIIIIIIII\n").as_bytes());
+        }
+        write_bytes(&ps, &payload).unwrap();
+
+        let mut got = Vec::new();
+        open_read(&ps).unwrap().read_to_end(&mut got).unwrap();
+        assert_eq!(got, payload);
+
+        // Same content, line-oriented, to exercise the BufRead path used by the SAM/FASTQ readers.
+        let mut lines = Vec::new();
+        let mut r = open_read(&ps).unwrap();
+        let mut line = String::new();
+        while r.read_line(&mut line).unwrap() > 0 {
+            lines.extend_from_slice(line.as_bytes());
+            line.clear();
+        }
+        assert_eq!(lines, payload);
+
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn open_read_round_trips_all() {
+        open_read_round_trip("fq");
+        open_read_round_trip("fq.gz");
+        open_read_round_trip("fq.bz2");
+        open_read_round_trip("fq.zst");
+    }
+
+    /// Dropping a `StreamReader` after a partial read must not hang or panic: the worker observes
+    /// the closed channel on its next send and exits on its own.
+    #[test]
+    fn open_read_partial_then_drop() {
+        let dir = std::env::temp_dir();
+        let p = dir.join(format!("ngless_srp_{}.fq.gz", std::process::id()));
+        let ps = p.to_string_lossy().to_string();
+        let mut payload = Vec::new();
+        for i in 0..20_000 {
+            payload.extend_from_slice(format!("@r{i}\nACGT\n+\nIIII\n").as_bytes());
+        }
+        write_bytes(&ps, &payload).unwrap();
+
+        let mut r = open_read(&ps).unwrap();
+        let mut small = [0u8; 16];
+        let n = r.read(&mut small).unwrap();
+        assert!(n > 0);
+        drop(r); // worker should exit cleanly when its next send fails
+
+        let _ = std::fs::remove_file(&p);
     }
 
     /// Concatenating several decompressed inputs through one `StreamWriter` (via `io::copy`)
