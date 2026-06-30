@@ -55,13 +55,12 @@ const fn bref(name: &'static str, alias: &'static str) -> BuiltinReference {
     BuiltinReference { name, alias }
 }
 
-/// The default download base URL (mirrors `defaultBaseURL` in `Configuration.hs`). Overridable via
-/// the `NGLESS_DOWNLOAD_BASE_URL` environment variable (the Haskell build reads the `download-url`
-/// config key; the Rust build has no config file yet, so an env var stands in).
-const DEFAULT_BASE_URL: &str = "https://ngless-resources.big-data-biology.org/";
-
+/// The download base URL (mirrors `nConfDownloadBaseURL`). It comes from the configuration file's
+/// `download-url` key (see `crate::configuration`); the `NGLESS_DOWNLOAD_BASE_URL` environment
+/// variable overrides it when set (a Rust-only convenience the Haskell build lacks).
 fn download_base_url() -> String {
-    std::env::var("NGLESS_DOWNLOAD_BASE_URL").unwrap_or_else(|_| DEFAULT_BASE_URL.to_string())
+    std::env::var("NGLESS_DOWNLOAD_BASE_URL")
+        .unwrap_or_else(|_| crate::configuration::global().download_base_url.clone())
 }
 
 /// Is `name` a builtin reference (resolvable without importing a module)? Mirrors
@@ -306,19 +305,27 @@ fn download_file(url: &str, dest: &Path) -> NgResult<()> {
     Ok(())
 }
 
-/// The user data directory, `$HOME/.local/share/ngless/data` (mirrors `nConfUserDataDirectory`).
+/// The user data directory (mirrors `nConfUserDataDirectory`): defaults to
+/// `$XDG_DATA_HOME/ngless/data` or `$HOME/.local/share/ngless/data`, overridable via the
+/// `user-data-directory` config key.
 fn user_data_directory() -> Option<PathBuf> {
-    std::env::var("HOME")
-        .ok()
-        .map(|home| PathBuf::from(format!("{home}/.local/share/ngless/data")))
+    let dir = &crate::configuration::global().user_data_directory;
+    if dir.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(dir))
+    }
 }
 
-/// The global data directory, `<binary-dir>/../share/ngless/data` (mirrors
-/// `nConfGlobalDataDirectory`).
+/// The global data directory (mirrors `nConfGlobalDataDirectory`): defaults to
+/// `<binary-dir>/../share/ngless/data`, overridable via the `global-data-directory` config key.
 fn global_data_directory() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let bindir = exe.parent()?;
-    Some(bindir.join("../share/ngless/data"))
+    let dir = &crate::configuration::global().global_data_directory;
+    if dir.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(dir))
+    }
 }
 
 /// The NGLess data directories, in search order (user then global), mirroring `findDataFiles`'s

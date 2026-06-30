@@ -17,6 +17,7 @@ pub mod citations;
 pub mod cleanup;
 pub mod cli;
 pub mod compression;
+pub mod configuration;
 pub mod count;
 pub mod errors;
 pub mod external_modules;

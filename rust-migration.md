@@ -286,19 +286,40 @@ covered by `tests/`**. They are grouped by impact.
 - **CLI sub-modes + flags not yet ported.** A phased implementation plan lives in `next-steps.md`
   ("CLI flags & sub-modes — implementation plan"). Current state: `lib.rs`/`cli.rs` handle the
   run/validate flags (`-n`, `-t`, `--keep-temporary-files`, `-q`, `-v`, `--trace`, `--no-header`,
-  `--debug`, `--search-path`, `--subsample`, `-j/--jobs`, `--strict-threads`) plus `--print-path` and
-  `--check-install`. Absent `modeExec` branches: `--export-json` (`JSONScript.hs`), `--export-cwl`
-  (`CWL.hs`), `--install-reference-data` (standalone `installData`, distinct from the on-`map()`
-  auto-download), `--create-reference-pack` (`createReferencePack`), `--download-file`
-  (`DownloadFileMode`), `--download-demo` (`DownloadDemoMode`). Absent `DefaultMode` flags:
-  `-e/--script` (inline), `-p/--print-last` (`wrapPrint`), `--color`, `--search-dir` (deprecated
-  alias), `--experimental-features`, `--index-path`, `-c/--config-file`, `--check-deprecation`,
+  `--debug`, `--search-path`, `--subsample`, `-j/--jobs`, `--strict-threads`, `-c/--config-file`,
+  `--index-path`) plus `--print-path` and `--check-install`. Absent `modeExec` branches:
+  `--export-json` (`JSONScript.hs`), `--export-cwl` (`CWL.hs`), `--install-reference-data` (standalone
+  `installData`, distinct from the on-`map()` auto-download), `--create-reference-pack`
+  (`createReferencePack`), `--download-file` (`DownloadFileMode`), `--download-demo`
+  (`DownloadDemoMode`). Absent `DefaultMode` flags: `-e/--script` (inline), `-p/--print-last`
+  (`wrapPrint`), `--color` (the config-file `color` key is read, but the CLI flag is not yet wired),
+  `--search-dir` (deprecated alias), `--experimental-features`, `--check-deprecation`,
   `--create-report`/`-o/--html-report-directory`. The **`--experimental-features`** flag is *purely a
   gate on the two export modes* (in `Execs/Main.hs` it only causes `--export-json`/`--export-cwl` to
   `fatalError` when absent); it unlocks **no** script-level behavior. Unknown flags currently hit a
   no-op arm in `src/cli.rs` rather than erroring as Haskell's optparse would.
-- **Config-file reader.** `Configuration.hs` reads ngless config files (e.g. the `download-url` key);
-  Rust is env-var-only (`NGLESS_DOWNLOAD_BASE_URL`, see `src/reference.rs`).
+- **Config-file reader — DONE** (`src/configuration.rs`, mirroring `Configuration.hs`). The three
+  Haskell config steps are reproduced: `guess_configuration` (environment defaults, including the
+  `$XDG_DATA_HOME` user-directory resolution from `getDefaultUserNglessDirectory`),
+  `read_config_files` (the default locations `$HOME/.config/ngless.conf`, `$HOME/.ngless.conf`,
+  `/etc/ngless.conf` — all optional — plus any `-c/--config-file` files, which are required to exist;
+  later files override earlier, so the CLI files win), and the command-line override step in
+  `cli.rs::run_script` (`updateConfigurationOpts`: boolean flags can only turn an option on, so an
+  absent flag falls through to the config value). The file format is the realistic subset of
+  `Data.Configurator`: `#` line comments (quote-aware), `key = value` bindings whose value is a
+  double-quoted string, a bare word, a `true`/`false` boolean, or a `[..]` string list; interpolation,
+  `import`, numeric literals and groups are not supported (ngless reads none of those). The keys read
+  are exactly those Haskell reads — `download-url`, `global-data-directory`, `user-directory`,
+  `user-data-directory`, `temporary-directory`, `keep-temporary-files`, `strict-threads`, `color`
+  (`auto`/`force`/`none`, with `yes`/`no` synonyms), `print-header`, `create-report`, `search-path`,
+  `index-path` — note `jobs` is deliberately *not* read from the config (the Haskell binary reads
+  `nThreads` from the command line only, despite the docs). The resolved config is published
+  process-globally (`configuration::init_global`/`global`, mirroring the global `nglConfiguration`);
+  `src/reference.rs` reads `download-url`/`global-data-directory`/`user-data-directory` from it
+  (`NGLESS_DOWNLOAD_BASE_URL` still overrides the URL as a Rust-only convenience), and `--color`/the
+  `color` key now flow into `output::init`. This unblocks `-c/--config-file` (also wired:
+  `--index-path`). Not yet wired downstream: `index-path`/`create-report` are stored but unused until
+  the index-store and HTML-report features land.
 - **`writeToMove`/`addMove` — DONE** (`src/transform.rs::write_to_move`, wired in `cli.rs` as the
   first builtin transform, before `add_file_checks`). The last-use analysis walks the body tracking a
   `blocked` set (variables bound to `fastq`/`paired`/`samfile` or aliases of such — the user's input

@@ -41,6 +41,12 @@ struct RunOpts {
     /// `--strict-threads`: strictly respect `--jobs` by reserving one core for NGLess/system
     /// work when invoking external mappers (mirrors `nConfStrictThreads`).
     strict_threads: bool,
+    /// `-c/--config-file`: extra configuration files to read (required to exist), applied after the
+    /// default locations so they take precedence (mirrors `config_files`).
+    config_files: Vec<String>,
+    /// `--index-path`: where to store mapper indices (mirrors `nConfIndexStorePath`); when set, it
+    /// overrides the config-file `index-path`.
+    index_path: Option<String>,
     /// Positional arguments after the script path, exposed (with the script path) as `ARGV`.
     extra_args: Vec<String>,
 }
@@ -144,6 +150,21 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
                 opts.search_path
                     .push(other["--search-path=".len()..].to_string());
             }
+            "-c" | "--config-file" => {
+                i += 1;
+                opts.config_files.push(arg_value(args, i, a)?);
+            }
+            other if other.starts_with("--config-file=") => {
+                opts.config_files
+                    .push(other["--config-file=".len()..].to_string());
+            }
+            "--index-path" => {
+                i += 1;
+                opts.index_path = Some(arg_value(args, i, a)?);
+            }
+            other if other.starts_with("--index-path=") => {
+                opts.index_path = Some(other["--index-path=".len()..].to_string());
+            }
             other if other.starts_with("--temporary-directory=") => {
                 opts.temp_dir = Some(other["--temporary-directory=".len()..].to_string());
             }
@@ -202,10 +223,38 @@ fn arg_value(args: &[String], idx: usize, flag: &str) -> NgResult<String> {
 }
 
 fn run_script(opts: &RunOpts) -> NgResult<i32> {
+    // Build the configuration in the three Haskell steps (`initConfiguration`): environment
+    // defaults (`guessConfiguration`), config files (`readConfigFiles`), then command-line
+    // overrides (`updateConfigurationOpts`). The boolean flags can only turn an option *on*, so an
+    // absent flag falls through to the config-file value.
+    let mut config = crate::configuration::read_config_files(&opts.config_files)?;
+    if opts.keep_temporary_files {
+        config.keep_temporary_files = true;
+    }
+    if opts.strict_threads {
+        config.strict_threads = true;
+    }
+    if let Some(t) = &opts.temp_dir {
+        config.temporary_directory = t.clone();
+    }
+    if !opts.search_path.is_empty() {
+        config.search_path = opts.search_path.clone();
+    }
+    if opts.index_path.is_some() {
+        config.index_store_path = opts.index_path.clone();
+    }
+    // `--no-header` also disables the banner (mirrors `nConfPrintHeader && not no_header`).
+    if opts.no_header {
+        config.print_header = false;
+    }
+    // Publish the resolved configuration process-globally so the download/data-directory helpers
+    // (`crate::reference`) read the config-file values (mirrors the global `nglConfiguration`).
+    crate::configuration::init_global(config.clone());
+
     // Configure the global output layer before any diagnostics are emitted (mirrors building
     // `nglConfiguration` from the parsed args). `--quiet` overrides `-v`; `--trace` forces the
-    // highest verbosity.
-    output::init(opts.verbosity, opts.quiet, opts.trace);
+    // highest verbosity; `color` comes from the config file.
+    output::init(opts.verbosity, opts.quiet, opts.trace, config.color);
     // `n_threads == 0` means the flag was not given: default to a single thread (the Haskell
     // default), which keeps output byte-for-byte reproducible unless the user opts in.
     let n_threads = if opts.n_threads == 0 {
@@ -213,7 +262,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     } else {
         opts.n_threads
     };
-    crate::parallel::init(n_threads, opts.strict_threads);
+    crate::parallel::init(n_threads, config.strict_threads);
 
     let fname = opts
         .script
@@ -246,11 +295,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
             header.version
         )));
     }
-    let temp_dir = opts
-        .temp_dir
-        .clone()
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir);
+    let temp_dir = std::path::PathBuf::from(&config.temporary_directory);
 
     // Gather the functions contributed by imported modules. Built-in standard modules
     // (`samtools`/`mocat`/...) are handled by `module_functions`; everything else is loaded as an
@@ -307,7 +352,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // directories are writable, `map` references are known, and `count()` features are valid, so
     // these problems abort before any work is done. Runs before the citation header is printed,
     // matching Haskell's ordering.
-    crate::validation::validate_io(&funcs, &opts.search_path, &typed)?;
+    crate::validation::validate_io(&funcs, &config.search_path, &typed)?;
 
     if opts.validate_only {
         if !opts.quiet {
@@ -316,9 +361,9 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         return Ok(0);
     }
 
-    // The run header is suppressed by `--no-header` or when the script writes to STDOUT
-    // (mirrors `nConfPrintHeader` and `setQuiet` on `uses_STDOUT`).
-    if !opts.no_header && !crate::validation::uses_stdout(&typed) {
+    // The run header is suppressed by `--no-header`/the config `print-header` key, or when the
+    // script writes to STDOUT (mirrors `nConfPrintHeader` and `setQuiet` on `uses_STDOUT`).
+    if config.print_header && !crate::validation::uses_stdout(&typed) {
         let citations = crate::citations::collect_citations(&typed);
         crate::citations::print_header(&citations);
     }
@@ -367,9 +412,9 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     crate::interpret::interpret(
         &typed.body,
         &temp_dir,
-        opts.keep_temporary_files,
+        config.keep_temporary_files,
         &text,
-        &opts.search_path,
+        &config.search_path,
         &argv,
         opts.subsample,
         external_modules,

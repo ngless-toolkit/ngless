@@ -40,6 +40,30 @@ pub enum Verbosity {
     Loud,
 }
 
+/// Whether to colour output, mirroring Haskell's `ColorSetting` (`CmdArgs.hs`). `Auto` colours only
+/// when stderr is a terminal (and `NO_COLOR` is unset); `Force` always colours; `No` never does.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum ColorSetting {
+    #[default]
+    Auto,
+    No,
+    Force,
+}
+
+impl ColorSetting {
+    /// Resolve the setting to a concrete on/off decision (mirrors the `shouldColor`/`AutoColor`
+    /// resolution in `Output.hs`): `Auto` consults `stderr`'s terminal status and `NO_COLOR`.
+    fn resolve(self) -> bool {
+        match self {
+            ColorSetting::Force => true,
+            ColorSetting::No => false,
+            ColorSetting::Auto => {
+                std::io::stderr().is_terminal() && std::env::var_os("NO_COLOR").is_none()
+            }
+        }
+    }
+}
+
 struct OutputConfig {
     verbosity: Verbosity,
     /// `--trace`: print all levels (including [`OutputType::Trace`]) with second-resolution
@@ -54,13 +78,13 @@ static CONFIG: OnceLock<OutputConfig> = OnceLock::new();
 /// Initialise the global output configuration from the parsed command line. Called once at
 /// startup; later calls are ignored (mirrors the single global `nglConfiguration`). `--quiet`
 /// forces [`Verbosity::Quiet`] regardless of `-v` (mirrors `if quiet then Quiet else verbosity`).
-pub fn init(verbosity: Verbosity, quiet: bool, trace: bool) {
+/// The `color` setting comes from `--color`/the config file's `color` key (mirrors `nConfColor`).
+pub fn init(verbosity: Verbosity, quiet: bool, trace: bool, color: ColorSetting) {
     let verbosity = if quiet { Verbosity::Quiet } else { verbosity };
-    let color = std::io::stderr().is_terminal() && std::env::var_os("NO_COLOR").is_none();
     let _ = CONFIG.set(OutputConfig {
         verbosity,
         trace,
-        color,
+        color: color.resolve(),
     });
 }
 
