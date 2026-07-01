@@ -1,8 +1,6 @@
-Unreleased
+Version 1.6.0-beta1 2026-07-01 by luispedro
+	* Switched to rust implementation
 	* Fix bug when outputing comments to compressed files
-	* Better performance for large uses of the parallel module
-	* Faster file permission checks for readsets
-	* More output tracing
 	* Fix `load_sample_from_yaml` (it had the wrong arguments before)
 	* Added `{always_3_fq_files}` format flag to `write()`
 	* UX: Better suggestions for mistyped arguments/flags by matching prefixes

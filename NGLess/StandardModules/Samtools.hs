@@ -228,7 +228,9 @@ loadModule v
                                    "samtools_sort" -> executeSort
                                    other -> \_ _ -> throwShouldNotOccur ("samtools runction called with wrong arguments: " ++ show other)
                    }
-    | v `elem` ["1.0", "0.1"] = return def
+    -- "1.6" is the current canonical version (internal modules track the ngless version) and maps
+    -- to the latest behaviour (same as "1.0"/"0.1").
+    | v `elem` ["1.6", "1.0", "0.1"] = return def
                    { modInfo = ModInfo "stdlib.samtools" "1.0"
                    , modCitations = [citation]
                    , modFunctions = [samtools_sort_function, samtools_view_function]

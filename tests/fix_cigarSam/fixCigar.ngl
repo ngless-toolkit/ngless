@@ -1,4 +1,4 @@
-ngless "1.5"
+ngless "1.6"
 
 mapped = samfile('reinject.sam')
 mappedBlock = select(mapped) using |mr|:

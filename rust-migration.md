@@ -524,6 +524,27 @@ The non-negotiable success criterion is **reproducibility at version ≥ 1.5**: 
 produce byte-identical (or semantically identical, where tool versions differ) output to the Haskell
 one for current scripts. The existing `tests/` suite is the contract that proves this.
 
+**Version bump to 1.6 (Rust cutover release).** The Rust build is released as language version
+**1.6**, a best-effort exact mirror of 1.5. The gate lives in `cli.rs`: `1.6` is the native version,
+`1.5` still runs but emits a deprecation warning (`output::warn`), and anything `< 1.5` or `> 1.6` is
+rejected. Both `1.5` and `1.6` normalise to the same `EFFECTIVE_VERSION` `(1,5)` for feature gating
+and output hashing, so runs are byte-identical regardless of which of the two is declared. The Haskell
+build treats `1.6` identically to `1.5` (`parseVersion (Just "1.6") = NGLVersion 1 5` in
+`NGLEnvironment.hs`), so the two implementations agree on 1.6. All functional-test scripts now declare
+`ngless "1.6"` (the `{script}` auto-comment echoes in the corresponding `expected.*` files were updated
+in lockstep; the hashes are unchanged because the effective version and body AST are unchanged). User
+docs for the switch live in `docs/sources/rust.md` (+ `whatsnew.rst`/`backwards.md`).
+
+The **binary/tool version** was bumped to `1.6.0` (`src/lib.rs` `VERSION_STR`, `Cargo.toml`, and on the
+Haskell side `Version.hs`/`package.yaml`/`NGLess.cabal`; release date `1 July 2026`). The run-header
+banner (`NGLess v1.6.0 (C) NGLess authors`) is diffed by several `expected.stdout.txt` files, which
+were updated. The **built-in standard modules** now treat `"1.6"` as their canonical version
+(`modules::CURRENT_MODULE_VERSION`): `samtools "1.6"` and `parallel "1.6"` map to the latest behaviour
+(same as `1.0`/`1.1` respectively), and the `cli.rs` import loop emits a deprecation warning when an
+internal module is imported at any other version (stderr only, so no `expected.*` diffs; test scripts
+keep their historical module versions, which now warn). The Haskell modules accept `"1.6"` too
+(`Samtools.hs`/`Parallel.hs`).
+
 ## The single biggest asset: the functional test suite as a parity oracle
 
 `tests/` (97 `.ngl` scripts + `expected.*` outputs, driven by `run-tests.sh`) is **language-agnostic**

@@ -1,4 +1,4 @@
-ngless '1.5'
+ngless '1.6'
 input = fastq('sample.fq')
 
 mapped = map(input, fafile='ref.fna')

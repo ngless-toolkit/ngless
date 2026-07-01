@@ -1,4 +1,4 @@
-ngless "1.5"
+ngless "1.6"
 import "mocat" version "1.0"
 
 input = load_mocat_sample('sample')

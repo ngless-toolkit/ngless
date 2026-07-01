@@ -1,4 +1,4 @@
-ngless "1.5"
+ngless "1.6"
 
 write(countfile('counts.that.do.not.exist.gz'), ofile='recounts.txt')
 

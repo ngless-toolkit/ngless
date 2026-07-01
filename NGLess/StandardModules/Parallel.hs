@@ -715,10 +715,11 @@ processSetParallelTag = return . processSetParallelTag' False
 
 loadModule :: T.Text -> NGLessIO Module
 loadModule v
-    | v `notElem` ["1.1", "1.0", "0.6"] = throwScriptError ("The behaviour of the parallel module changed.\n"++
-                                    "Only versions 1.1/1.0/0.6 are now supported (currently attempting to import version '"++T.unpack v++"')")
+    | v `notElem` ["1.6", "1.1", "1.0", "0.6"] = throwScriptError ("The behaviour of the parallel module changed.\n"++
+                                    "Only versions 1.6/1.1/1.0/0.6 are now supported (currently attempting to import version '"++T.unpack v++"')")
     | otherwise = do
-        let includeForAll = v == "1.1"
+        -- "1.6" is the current canonical version and maps to the latest behaviour (same as "1.1").
+        let includeForAll = v == "1.1" || v == "1.6"
         return def
             { modInfo = ModInfo "stdlib.parallel" v
             , modFunctions =

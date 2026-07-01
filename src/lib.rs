@@ -47,9 +47,9 @@ pub mod values;
 /// Version strings, mirroring `NGLess/Version.hs` and `Execs/Main.hs` exactly so that
 /// `--version*` output stays byte-identical to the Haskell binary.
 pub mod version {
-    pub const VERSION_STR: &str = "1.5.0";
-    pub const VERSION_STR_LONG: &str = "1.5.0";
-    pub const DATE_STR: &str = "14 September 2022";
+    pub const VERSION_STR: &str = "1.6.0";
+    pub const VERSION_STR_LONG: &str = "1.6.0-beta1";
+    pub const DATE_STR: &str = "1 July 2026";
     // The Rust build does not yet embed external tool binaries (samtools/bwa/...).
     pub const EMBEDDED_STR: &str = "No";
 
@@ -279,14 +279,14 @@ mod tests {
 
     #[test]
     fn version_short_is_plain_string() {
-        assert_eq!(version::VERSION_STR, "1.5.0");
+        assert_eq!(version::VERSION_STR, "1.6.0");
     }
 
     #[test]
     fn version_line_matches_haskell_format() {
         assert_eq!(
             version::version_line(),
-            "ngless v1.5.0 (release date: 14 September 2022)"
+            "ngless v1.6.0-beta1 (release date: 1 July 2026)"
         );
     }
 

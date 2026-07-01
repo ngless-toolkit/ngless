@@ -1,4 +1,4 @@
-ngless '1.5'
+ngless '1.6'
 input = fastq('short.fq')
 print("Should print\n")
 dir = 'output-dir-does-not-exist'

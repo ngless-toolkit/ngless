@@ -1,4 +1,4 @@
-ngless "1.5"
+ngless "1.6"
 import "samtools" version "0.0"
 
 mapped = samfile("filter.sam")

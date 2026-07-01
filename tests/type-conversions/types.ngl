@@ -1,4 +1,4 @@
-ngless "1.5"
+ngless "1.6"
 
 val = 1
 __assert(val.to_string() == "1")

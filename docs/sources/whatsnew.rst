@@ -12,6 +12,33 @@ User-visible improvements
 * Better suggestions for mistyped arguments/flags by matching prefixes (_e.g._, using ``ref=`` instead of ``reference=``).
 
 
+Version 1.6.0
+-------------
+
+*Beta release*
+
+Starting with version 1.6, **NGLess is based on a new implementation written in
+Rust** (previous versions were written in Haskell). See `Rust implementation
+<rust.html>`__ for the full story.
+
+Version 1.6 is a **drop-in replacement for 1.5**: it aims to produce
+byte-identical output for the same scripts. There are no new language features
+and no behavioural changes. The only thing you need to do is update the version
+declaration at the top of your scripts::
+
+    ngless "1.6"
+
+If you keep ``ngless "1.5"`` (or any earlier 1.x that your script relied on),
+your script will still run, but NGLess will print a warning suggesting you
+update to ``1.6``. Scripts declaring a version **older than 1.5** are no longer
+supported by the Rust build (use an older NGLess release, or update the script).
+
+The built-in modules (``parallel``, ``samtools``, ``mocat``, …) now also track
+the ngless version: import them at version ``1.6`` going forward. Older module
+versions are still accepted (with the latest behaviour) but print a deprecation
+warning.
+
+
 Version 1.5.0
 -------------
 

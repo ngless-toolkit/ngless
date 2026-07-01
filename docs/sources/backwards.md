@@ -5,6 +5,14 @@ NGLess can change its behaviour depending on the version used in the script.
 
 This page documents the fixes that are currently implemented.
 
+## NGLess 1.6
+
+- NGLess is now based on a [Rust implementation](rust.html) (previous versions
+  were written in Haskell). Version 1.6 is a best-effort exact mirror of 1.5:
+  update your version declaration from `ngless "1.5"` to `ngless "1.6"`.
+  Declaring `1.5` still works but prints a deprecation warning; versions older
+  than 1.5 are no longer supported by the Rust build.
+
 ## NGLess 1.4
 
 - The old `motus` module (which supports only motus version 1, which is [a

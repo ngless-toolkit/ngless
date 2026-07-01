@@ -1,4 +1,4 @@
-ngless '1.5'
+ngless '1.6'
 
 counts = count(samfile('seq1_2.sam.bz2'),
                 features=['seqname'],

@@ -7,6 +7,12 @@
 
 use crate::ast::{FuncName, MethodName, NGLType};
 
+/// The current canonical version for the built-in standard modules (`samtools`/`parallel`/
+/// `mocat`/...). Going forward, internal modules track the ngless language version, so scripts
+/// should `import "<module>" version "1.6"`. Older versions still load (with the latest behaviour)
+/// but the import loop emits a deprecation warning (see `cli::run_script`).
+pub const CURRENT_MODULE_VERSION: &str = "1.6";
+
 /// A `major.minor` NGLess language version. Ordering is lexicographic (major, then minor).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NGLVersion {
@@ -414,7 +420,9 @@ mod builders {
     pub fn module_functions(name: &str, version: &str) -> Option<Vec<Function>> {
         match (name, version) {
             ("samtools", "0.0") => Some(vec![samtools_sort_function()]),
-            ("samtools", "1.0") | ("samtools", "0.1") => {
+            // "1.6" is the current canonical version and maps to the latest behaviour (same as
+            // the historical "1.0"/"0.1"); see `CURRENT_MODULE_VERSION`.
+            ("samtools", "1.0") | ("samtools", "0.1") | ("samtools", "1.6") => {
                 Some(vec![samtools_sort_function(), samtools_view_function()])
             }
             // The `mocat` module (StandardModules/Mocat.hs) exposes `load_mocat_sample`, a thin
@@ -425,8 +433,10 @@ mod builders {
             ("example", _) => Some(vec![example_function()]),
             // The `parallel` module (StandardModules/Parallel.hs). `run_for_all`/
             // `run_for_all_samples` (and the relaxed `collect` signature) are only available in
-            // version 1.1+.
-            ("parallel", v) => Some(parallel_functions(v == "1.1")),
+            // version 1.1+; "1.6" (the current canonical version) maps to that latest behaviour.
+            ("parallel", v) => Some(parallel_functions(
+                v == "1.1" || v == super::CURRENT_MODULE_VERSION,
+            )),
             // The `minimap2` module (StandardModules/Minimap2.hs) exposes no functions; importing
             // it only activates the minimap2 mapper (see `active_mappers` in cli.rs).
             ("minimap2", _) => Some(vec![]),

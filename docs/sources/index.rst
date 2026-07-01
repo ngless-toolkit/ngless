@@ -179,6 +179,7 @@ Authors
    install
    ng-meta-profiler
    whatsnew
+   rust
    backwards
    tutorial-gut-metagenomics
    tutorial-ocean-metagenomics

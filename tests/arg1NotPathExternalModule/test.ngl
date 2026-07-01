@@ -1,4 +1,4 @@
-ngless '1.5'
+ngless '1.6'
 local import "test" version "0.0"
 
 test(1)

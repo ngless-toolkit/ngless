@@ -1,2 +1,2 @@
-ngless '1.5'
+ngless '1.6'
 write(fastq('short.fq'), ofile='output.fq')

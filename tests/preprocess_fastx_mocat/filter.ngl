@@ -1,4 +1,4 @@
-ngless "1.5"
+ngless "1.6"
 
 input = paired('input.1.fq.gz', 'input.2.fq.gz')
 

@@ -15,8 +15,8 @@ versionStr :: String
 versionStr = showVersion version
 
 versionStrLong :: String
-versionStrLong = "1.5.0"
+versionStrLong = "1.6.0-beta1"
 
 dateStr :: String
-dateStr = "14 September 2022"
+dateStr = "1 July 2026"
 

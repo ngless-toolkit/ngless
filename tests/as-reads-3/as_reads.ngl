@@ -1,4 +1,4 @@
-ngless '1.5'
+ngless '1.6'
 write(as_reads(samfile('input.sam')),
         ofile='output.fq')
 

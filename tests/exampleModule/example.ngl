@@ -1,4 +1,4 @@
-ngless '1.5'
+ngless '1.6'
 import "example" version "1.0"
 
 input = fastq('sample.fq')

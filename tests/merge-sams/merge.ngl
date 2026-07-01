@@ -1,4 +1,4 @@
-ngless "1.5"
+ngless "1.6"
 
 write(__merge_samfiles(['input1.sam', 'input2.sam']),
       ofile='output.merged.sam')

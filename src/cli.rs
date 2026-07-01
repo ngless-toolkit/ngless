@@ -11,8 +11,19 @@ use crate::errors::{NgError, NgResult};
 use crate::modules::{builtin_functions, NGLVersion};
 use crate::output::{self, ColorSetting, Verbosity};
 
-/// Minimum language version this build supports (the rewrite drops pre-1.5 semantics).
+/// Oldest language version this build still accepts (with a deprecation warning). The rewrite
+/// drops pre-1.5 semantics, so anything older is a hard error.
 const MIN_VERSION: NGLVersion = NGLVersion { major: 1, minor: 5 };
+
+/// The current language version this (Rust) build implements natively. Scripts should declare
+/// this going forward.
+const CURRENT_VERSION: NGLVersion = NGLVersion { major: 1, minor: 6 };
+
+/// The effective semantics version used for feature gating and output hashing. Version 1.6 is a
+/// best-effort exact mirror of 1.5, so both 1.5 and 1.6 map to these semantics (mirroring the
+/// Haskell `parseVersion (Just "1.6") = NGLVersion 1 5`). This keeps output — including the
+/// `{hash}` auto-comment — byte-identical between a 1.5 and a 1.6 run.
+const EFFECTIVE_VERSION: NGLVersion = NGLVersion { major: 1, minor: 5 };
 
 #[derive(Default)]
 struct RunOpts {
@@ -761,29 +772,49 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         crate::transform::wrap_print(&mut script.body).map_err(NgError::script)?;
     }
 
-    // Version gate: this build supports only ngless "1.5"+. An inline script without a version
-    // declaration defaults to 1.5 (mirrors `parseVersion Nothing = NGLVersion 1 5`); a file always
-    // has a header (it is required when parsing).
+    // Version gate. This build implements ngless "1.6" natively. Version 1.6 is a best-effort
+    // exact mirror of 1.5, so both are accepted and share the same `EFFECTIVE_VERSION` semantics;
+    // declaring 1.5 additionally emits a deprecation warning (the project is now based on the Rust
+    // implementation and 1.6 is the version to declare going forward). Anything older than 1.5 is a
+    // hard error (pre-1.5 semantics are gone); anything newer than 1.6 is not known to this build.
+    // An inline script without a version declaration defaults to 1.5 (mirrors
+    // `parseVersion Nothing = NGLVersion 1 5`); a file always has a header (required when parsing).
     let version = match &script.header {
-        Some(header) => parse_version(&header.version).ok_or_else(|| {
-            NgError::script(format!(
-                "Could not parse ngless version '{}'.",
-                header.version
-            ))
-        })?,
-        None => MIN_VERSION,
+        Some(header) => {
+            let declared = parse_version(&header.version).ok_or_else(|| {
+                NgError::script(format!(
+                    "Could not parse ngless version '{}'.",
+                    header.version
+                ))
+            })?;
+            if declared < MIN_VERSION {
+                return Err(NgError::script(format!(
+                    "Script declares ngless version \"{}\", but this build supports only ngless \"1.5\" and newer.\n\
+                     Update the version statement, or use the Haskell build for older scripts.",
+                    header.version
+                )));
+            }
+            if declared > CURRENT_VERSION {
+                return Err(NgError::script(format!(
+                    "Script declares ngless version \"{}\", but this build implements only up to ngless \"1.6\".\n\
+                     Update ngless, or lower the version statement.",
+                    header.version
+                )));
+            }
+            if declared == MIN_VERSION {
+                output::warn(
+                    0,
+                    "This script declares ngless version \"1.5\". Going forward, ngless is based on the \
+                     Rust implementation and the current version is \"1.6\", which is a drop-in \
+                     replacement for \"1.5\". Please update the version statement to \"1.6\".",
+                );
+            }
+            // Normalise to the effective semantics version (1.6 mirrors 1.5 exactly), mirroring the
+            // Haskell `parseVersion (Just "1.6") = NGLVersion 1 5`.
+            EFFECTIVE_VERSION
+        }
+        None => EFFECTIVE_VERSION,
     };
-    if version < MIN_VERSION {
-        let declared = script
-            .header
-            .as_ref()
-            .map(|h| h.version.clone())
-            .unwrap_or_default();
-        return Err(NgError::script(format!(
-            "Script declares ngless version \"{declared}\", but this build supports only ngless \"1.5\" and newer.\n\
-             Update the version statement, or use the Haskell build for older scripts.",
-        )));
-    }
     // The module imports (empty for an inline script with no header).
     let modules: Vec<crate::ast::ModInfo> = script
         .header
@@ -815,7 +846,24 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
             }
         }
         match crate::modules::module_functions(m.name(), m.version()) {
-            Some(fs) => extra_funcs.extend(fs),
+            Some(fs) => {
+                // Internal/standard modules now track the ngless version: "1.6" is the canonical
+                // version. Older versions still load (with the latest behaviour) but are deprecated.
+                if m.version() != crate::modules::CURRENT_MODULE_VERSION {
+                    output::warn(
+                        0,
+                        &format!(
+                            "The built-in module \"{}\" is imported at version \"{}\". Going forward, \
+                             internal modules track the ngless version; please update the import to \
+                             version \"{}\".",
+                            m.name(),
+                            m.version(),
+                            crate::modules::CURRENT_MODULE_VERSION,
+                        ),
+                    );
+                }
+                extra_funcs.extend(fs)
+            }
             None => {
                 let em = crate::external_modules::find_load(
                     m.name(),
@@ -885,7 +933,8 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // The parallel module contributes its own transform (`run_for_all`/`set_parallel_tag`/lock
     // hash). It runs after `add_output_hash`, mirroring Haskell's pre-transforms-then-module order.
     if let Some(parallel) = modules.iter().find(|m| m.name() == "parallel") {
-        let include_for_all = parallel.version() == "1.1";
+        let include_for_all = parallel.version() == "1.1"
+            || parallel.version() == crate::modules::CURRENT_MODULE_VERSION;
         crate::transform::parallel_transform(&mut typed.body, include_for_all)
             .map_err(NgError::script)?;
     }

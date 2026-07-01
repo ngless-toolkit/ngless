@@ -1,4 +1,4 @@
-ngless "1.5"
+ngless "1.6"
 
 write(paired("pair.1.fq", "pair.2.fq", singles="singles.fq"),
         ofile=STDOUT,

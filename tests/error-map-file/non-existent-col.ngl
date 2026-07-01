@@ -1,4 +1,4 @@
-ngless '1.5'
+ngless '1.6'
 mapped = samfile('basic.sam')
 
 # The first count() function is correct, but the second one contains an error

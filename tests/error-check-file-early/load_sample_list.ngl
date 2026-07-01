@@ -1,4 +1,4 @@
-ngless "1.5"
+ngless "1.6"
 
 samples = load_sample_list('list.yaml')
 
