@@ -49,8 +49,8 @@ a YAML file and can use any command line tool.
 
 Add new model organisms can similarly be done with simple YAML file.
 
-More advanced extensions can be done in Haskell, but this is considered a
-solution for advanced users.
+More advanced extensions can be done in Rust (the language NGLess is implemented
+in), but this is considered a solution for advanced users.
 
 ## Couldn't you just use Docker/[Bioboxes](https://bioboxes.org/)?
 

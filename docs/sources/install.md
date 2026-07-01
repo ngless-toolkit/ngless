@@ -36,26 +36,33 @@ This downloaded file bundles bwa, samtools and megahit (also statically linked).
 
 ## From source
 
-[Stack](https://docs.haskellstack.org/en/stable/README.html) is the simplest way
-to install the necessary requirements.
+Since version 1.6, NGLess is written in [Rust](https://www.rust-lang.org/) and
+builds with a standard [Cargo](https://doc.rust-lang.org/cargo/) toolchain (see
+[the Rust implementation page](rust.md) for background).
 
 The following sequence of commands should download and build the software
 
     git clone https://github.com/ngless-toolkit/ngless
     cd ngless
-    make
+    cargo build --release
 
-
-The first time you run this, it will take a while as it will download all
-dependencies. After this ngless is ready to use and subsequent builds will be
+This produces the binary at `target/release/ngless`. The first build takes a
+while as Cargo downloads and compiles all dependencies; subsequent builds are
 much faster.
 
-## Make targets
+The external tools that NGLess drives (`bwa`, `samtools`, `minimap2`, `megahit`,
+`prodigal`) are **not** bundled by a source build: they must be available on your
+`$PATH` (or pointed to via the `NGLESS_<TOOL>_BIN` environment variables, e.g.
+`NGLESS_SAMTOOLS_BIN`). The versions pinned for testing are listed in `pixi.toml`.
 
-The following are targets in the Makefile.
+## Cargo commands
 
-- `make`: compiles NGLess and haskell dependencies
-- `clean`: remove local generated files by compilation
-- `check`: run tests
-- `bench`: run benchmarks
+- `cargo build --release`: compile the optimized `ngless` binary
+- `cargo test`: run the unit tests
+- `cargo fmt --all -- --check`: check formatting (enforced in CI)
+
+The functional/parity test suite is run with `run-tests.sh`, pointed at the build
+via the `NGLESS_BIN` environment variable:
+
+    NGLESS_BIN=target/release/ngless ./run-tests.sh
 

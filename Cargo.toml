@@ -2,7 +2,7 @@
 name = "ngless"
 version = "1.6.0"
 edition = "2021"
-description = "NGLess: NGS processing with Less work — Rust reimplementation (work in progress)"
+description = "NGLess: NGS processing with Less work — a domain-specific language for next-generation sequencing data"
 license = "MIT"
 repository = "https://github.com/ngless-toolkit/ngless"
 

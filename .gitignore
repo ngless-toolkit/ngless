@@ -1,15 +1,6 @@
-/.stack-work/
-/.stack-work-check/
-/.stack-work-fastcheck/
-/.stack-work-fast/
-/.stack-work-bench/
-/cabal.sandbox.config
 /dist/
-/docker/
-/build-scripts/docker_bases/*.log
 
 *.o
-*.hi
 *.pyc
 
 # Rust build artifacts
@@ -22,16 +13,3 @@ ngless-partials/
 *.output_ngless/
 /testing_tmp_dir/
 /Modules/packages/
-
-# Generated as part of build
-NGLess/Dependencies/bwa_data.c
-NGLess/Dependencies/samtools_data.c
-NGLess/Dependencies/prodigal_data.c
-NGLess/Dependencies/megahit_data.c
-NGLess/Dependencies/minimap2_data.c
-NGLess.cabal
-stack.yaml.lock
-ngless-dyn
-ngless-static
-ngless-bench
-ngless-static-embed

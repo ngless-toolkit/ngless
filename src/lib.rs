@@ -1,15 +1,17 @@
-//! NGLess — Rust reimplementation (work in progress).
+//! NGLess — NGS processing with Less work.
 //!
-//! This is an early milestone (see `rust-migration.md` at the repo root). The command-line
-//! entry point handles the informational flags (`--version`, `--version-short`,
-//! `--version-debug`, `--date-short`) and `--check-install`. The front end (tokenizer →
-//! parser → AST) is being ported under [`tokens`], [`ast`] and [`parser`]; the type checker,
-//! validation and interpreter are not implemented yet, so running an actual `.ngl` script
-//! exits non-zero with a "not yet implemented" message.
+//! This Rust crate is the implementation of NGLess. It replaced the original Haskell program,
+//! which was removed at the 1.6 release (see `rust-migration.md` at the repo root for the port
+//! history). The command-line entry point handles the informational flags (`--version`,
+//! `--version-short`, `--version-debug`, `--date-short`), `--check-install` and `--print-path`,
+//! and otherwise dispatches to [`cli`], which drives the full pipeline: load → tokenize
+//! ([`tokens`]) → parse ([`parser`] → [`ast`]) → version gate → type check ([`types`]) →
+//! validate ([`validation`]) → transform ([`transform`]) → interpret ([`interpret`]).
 //!
-//! The goal of the rewrite is *behavioral parity* with the Haskell implementation for
-//! `ngless "1.5"`+ scripts, verified against the existing functional test suite under
-//! `tests/` via `NGLESS_BIN=<this binary> ./run-tests.sh`.
+//! The design goal is *behavioral parity* with the former Haskell implementation for
+//! `ngless "1.5"`+ scripts: output must be byte-identical. This is verified against the
+//! functional test suite under `tests/` via `NGLESS_BIN=<this binary> ./run-tests.sh` (all
+//! tests pass), whose committed `expected.*` files were produced by the Haskell binary.
 
 pub mod ast;
 pub mod batch;

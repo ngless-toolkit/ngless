@@ -85,28 +85,18 @@ This downloaded file bundles bwa, samtools and megahit (also statically linked).
 Installing/compiling from source is also possible. Clone
 [https://github.com/ngless-toolkit/ngless](https://github.com/ngless-toolkit/ngless)
 
-#### Dependencies
-
-The simplest way to get an environment with all the dependencies is to use conda:
-
-    conda create -n ngless
-    conda activate ngless
-    conda config --add channels conda-forge
-    conda install stack cairo bzip2 gmp zlib perl wget xz pkg-config make
-
-You should have `gcc` installed (or another C-compiler).
-
-The following sequence of commands should download and build the software
+NGLess is written in Rust and builds with a standard `cargo` toolchain:
 
     git clone https://github.com/ngless-toolkit/ngless
     cd ngless
-    stack setup
-    make
+    cargo build --release      # produces target/release/ngless
 
-To install, you can use the following command (replace `<PREFIX>` with
-the directory where you wish to install, default is `/usr/local`):
+The external tools NGLess drives (`samtools`, `bwa`, `minimap2`, `prodigal`, `megahit`) are
+**not** bundled: they are located on your `$PATH` (or via per-tool `NGLESS_<TOOL>_BIN`
+environment variables). The pinned versions used for testing are declared in `pixi.toml`, so a
+quick way to obtain them is [pixi](https://pixi.sh):
 
-    make make
+    pixi run --environment default target/release/ngless --version
 
 ## Running Sample Test Scripts on Local Machine
 
@@ -131,31 +121,32 @@ For developers who have done this much more datasets for testing purposes can be
 **[Ocean Metagenomics Assembly and Gene Prediction](https://ngless.readthedocs.io/en/latest/tutorial-assembly-gp.html)**
 
 
-## Rust reimplementation (work in progress)
+## Implementation (Rust)
 
-NGLess is being incrementally rewritten in Rust (see
-[`rust-migration.md`](rust-migration.md) for the full plan). The current, supported
-implementation is the Haskell one described above; the Rust sources at the repository root
-(`Cargo.toml`, `src/`) are **milestone 1 — a CLI scaffold only**, with no interpreter yet.
+NGLess was originally written in Haskell and has been reimplemented in Rust; the Haskell
+implementation was removed at the 1.6 release. The Rust sources live at the repository root
+(`Cargo.toml`, `src/`). See [`rust-migration.md`](rust-migration.md) for the port history and a
+module-by-module account of what was ported.
 
-Only `ngless "1.5"`+ scripts will be supported by the Rust version. Behavioral parity with
-the Haskell implementation is verified against the existing functional test suite under
+Only `ngless "1.5"`+ scripts are supported. Behavioral parity with the former Haskell
+implementation (byte-identical output) is verified against the functional test suite under
 `tests/`.
 
 ### Build & test
 
     cargo build --release      # produces target/release/ngless
     cargo test                 # unit tests
+    cargo fmt --all -- --check  # formatting is enforced in CI
 
-### Parity check against the functional test suite
+### Functional / parity test suite
 
-The committed `expected.*` files in each `tests/` directory are the Haskell binary's output,
-so running the functional suite against the Rust binary *is* a parity check against Haskell.
-Point the harness at the Rust build via `NGLESS_BIN`:
+The committed `expected.*` files in each `tests/` directory were produced by the Haskell
+binary, so running the functional suite against the Rust binary *is* a parity check against
+Haskell. Point the harness at the build via `NGLESS_BIN` (it needs the external tools on
+`$PATH`; `pixi run --environment default` provides the pinned versions):
 
-    NGLESS_BIN=target/release/ngless ./run-tests.sh
-
-(Most tests fail today because the interpreter is a stub — that is expected at milestone 1.)
+    NGLESS_BIN=target/release/ngless ./run-tests.sh          # all tests
+    NGLESS_BIN=target/release/ngless ./run-tests.sh regression   # only tests/regression*
 
 ## More information
 

@@ -244,11 +244,12 @@ for the requirement (using the aptly-named `reason` field):
 
 ## Internal Modules
 
-This is very advanced as it requires writing Haskell code which can then
-interact very deeply with the rest of ngless.
+This is very advanced as it requires writing Rust code (the language NGLess is
+implemented in) which can then interact very deeply with the rest of ngless.
 
-For an example, you can look at the [example internal
-module](https://github.com/ngless-toolkit/ngless/blob/master/NGLess/StandardModules/Example.hs).
+For examples, you can look at the built-in modules in the NGLess source tree
+(such as [`src/parallel.rs`](https://github.com/ngless-toolkit/ngless/blob/master/src/parallel.rs)
+or [`src/batch.rs`](https://github.com/ngless-toolkit/ngless/blob/master/src/batch.rs)).
 If you want to get started, you can ask about details on the [ngless user
 mailing list](https://groups.google.com/forum/#!forum/ngless).
 

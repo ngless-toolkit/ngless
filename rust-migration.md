@@ -1,15 +1,25 @@
-# Rewriting NGLess in Rust — Scoping & Execution Plan
+# Rewriting NGLess in Rust — Port Record
 
-> **Status:** The Rust crate lives at the repository root (`Cargo.toml`, `src/`), since it is
-> intended to eventually replace the Haskell implementation in place. The functional test harness
-> (`run-tests.sh`) can be pointed at any binary via the `NGLESS_BIN` environment variable. **All 99
-> functional tests pass** against the Rust binary with output identical to Haskell (including the
-> samtools `check.sh` cases, driven via `--print-path samtools`), and the unit tests (`cargo test`)
-> pass. The minimap2 mapper is implemented in `src/minimap2.rs`.
+> **Status: DONE.** The Rust rewrite is complete and is now the sole implementation of NGLess;
+> the Haskell program was removed at the 1.6 release. The Rust crate lives at the repository root
+> (`Cargo.toml`, `src/`). **All 99 functional tests pass** against the Rust binary with output
+> byte-identical to the (now-removed) Haskell binary — including the samtools `check.sh` cases,
+> driven via `--print-path samtools` — and the unit tests (`cargo test`) pass. The functional
+> harness (`run-tests.sh`) is pointed at any binary via the `NGLESS_BIN` environment variable;
+> the committed `expected.*` files were produced by the Haskell binary and remain the parity
+> contract.
+>
+> This document began as the scoping/execution plan and is kept as the port record: the sections
+> below describe what was ported (accurate) and, further down (from "## Context" onward), preserve
+> the original planning notes — decisions, crate recommendations, risk assessment — for historical
+> reference. Where those planning notes describe intended future work or recommend a crate, they
+> may not match the final implementation (e.g. the parser is hand-written and the FASTQ/SAM code
+> does not use `noodles`).
 
 ## Implemented surface (by area)
 
-- **CLI scaffold:** CLI info flags + `--check-install`, byte-matching the Haskell CLI.
+- **CLI:** all sub-modes and flags (see the CLI sub-modes entry under "Known remaining gaps"),
+  with the info flags + `--check-install` byte-matching the Haskell CLI.
 - **Front end:** tokenizer, parser, AST, type checker, pure validation — all with ported unit
   tests (`Tests/{Parse,Types,Validation}.hs`).
 - **Core runtime:** CLI flow (load → parse → version-gate `>=1.5` → type check → validate →
@@ -511,7 +521,9 @@ Haskell/conduit already streams large files fine. The drivers are:
 - **Distribution** — simpler single static binary and image builds (today this works but goes through
   Nix/musl/embedded-C machinery).
 
-Decision taken: **full big-bang rewrite** aiming at behavioral parity, then cut over.
+Decision taken (and since carried out): **full big-bang rewrite** aiming at behavioral parity,
+then cut over. The cutover happened at the 1.6 release, at which point the Haskell sources were
+removed.
 
 **Scope decision: only `ngless "1.5"` and newer are supported.** Scripts declaring older versions
 (`0.5`–`1.4`) do not need to run on the Rust binary — they can be rejected with a clear "version no
