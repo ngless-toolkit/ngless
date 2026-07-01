@@ -240,9 +240,9 @@ impl StreamReader {
     /// Spawn the decode worker over an already-constructed decoder (built by [`open_read`] on the
     /// calling thread, so setup errors are synchronous, then moved onto the worker).
     fn spawn(decoder: Box<dyn Read + Send>) -> StreamReader {
-        // ~128 KiB chunks, capacity 8 => up to ~1 MiB of decompressed bytes buffered ahead before
+        // ~1 MiB chunks, capacity 8 => up to 8 MiB of decompressed bytes buffered ahead before
         // the worker blocks: enough to keep the consumer fed without unbounded memory growth.
-        const CHUNK: usize = 128 * 1024;
+        const CHUNK: usize = 1024 * 1024;
         let (tx, rx) = std::sync::mpsc::sync_channel::<std::io::Result<Vec<u8>>>(8);
         let handle = std::thread::spawn(move || {
             let mut decoder = decoder;
@@ -648,10 +648,13 @@ mod tests {
         let dir = std::env::temp_dir();
         let p = dir.join(format!("ngless_sr_{}_{}.{ext}", std::process::id(), ext));
         let ps = p.to_string_lossy().to_string();
-        // ~512 KiB, larger than the 128 KiB decode chunk => multiple chunks across the channel.
+        // this is larger than the 1 MiB decode chunk => multiple chunks across the channel.
         let mut payload = Vec::new();
         for i in 0..20_000 {
-            payload.extend_from_slice(format!("@r{i}\nACGTACGTACGT\n+\nIIIIIIIIIIII\n").as_bytes());
+            payload.extend_from_slice(
+                format!("@r{i}\nATTACGTACGTACATTTTTATAGTAGTTT\n+\nILILILILILILILILILILILILILILI\n")
+                    .as_bytes(),
+            );
         }
         write_bytes(&ps, &payload).unwrap();
 
