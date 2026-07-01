@@ -17,6 +17,8 @@ zstd = "0.13.3"
 # YAML parsing for sample manifests (`load_sample_list`) and, later, external modules.
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
+# JSON serialisation for `--export-json` (mirrors `JSONScript.hs`, which uses aeson).
+serde_json = "1"
 # Reference-database auto-download: HTTP(S) client + tar extraction (mirrors
 # `Utils.Network`/`ReferenceDatabases.hs`). gzip decompression reuses `flate2` above.
 ureq = "2"

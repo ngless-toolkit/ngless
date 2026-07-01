@@ -20,6 +20,7 @@ pub mod compression;
 pub mod configuration;
 pub mod count;
 pub mod errors;
+pub mod export;
 pub mod external_modules;
 pub mod fastq;
 pub mod gff;

@@ -96,8 +96,14 @@ enum Mode {
     DownloadFile { url: String, local: String },
     /// `--download-demo NAME` (`DownloadDemoMode`).
     DownloadDemo(String),
-    /// `--create-reference-pack ...` (`CreateReferencePackMode`) — Phase 4.
-    CreateReferencePack,
+    /// `--create-reference-pack --output-name NAME --genome-url URL [--gtf-url URL]
+    /// [--functional-map-url URL]` (`CreateReferencePackMode`).
+    CreateReferencePack {
+        output_name: String,
+        genome_url: String,
+        gtf_url: Option<String>,
+        functional_map_url: Option<String>,
+    },
 }
 
 /// Entry point for the non-informational command line (everything except the `infoOption`s
@@ -118,16 +124,18 @@ pub fn run_cli(args: &[String]) -> i32 {
         Mode::InstallReferenceData(refname) => exec_install_reference(&refname),
         Mode::DownloadFile { url, local } => exec_download_file(&url, &local),
         Mode::DownloadDemo(name) => exec_download_demo(&name),
-        Mode::CreateReferencePack => not_implemented("--create-reference-pack"),
+        Mode::CreateReferencePack {
+            output_name,
+            genome_url,
+            gtf_url,
+            functional_map_url,
+        } => exec_create_reference_pack(
+            &output_name,
+            &genome_url,
+            gtf_url.as_deref(),
+            functional_map_url.as_deref(),
+        ),
     }
-}
-
-/// Report a recognized-but-unimplemented sub-mode and exit non-zero. These branches exist so the
-/// flags are no longer silently ignored; the actual behaviour lands in later phases (see
-/// `next-steps.md`, "CLI flags & sub-modes — implementation plan").
-fn not_implemented(mode: &str) -> i32 {
-    eprintln!("The {mode} mode is not yet implemented in this build of ngless.");
-    1
 }
 
 /// Read a required named option (`--name VALUE` or `--name=VALUE`) from the raw argument list. Used
@@ -148,6 +156,12 @@ fn named_option(args: &[String], name: &str) -> NgResult<String> {
         }
     }
     Err(NgError::script(format!("Missing required option {name}")))
+}
+
+/// Read an optional named option (`--name VALUE` or `--name=VALUE`); returns `None` when absent
+/// (mirrors `optional (strOption ...)`).
+fn named_option_opt(args: &[String], name: &str) -> Option<String> {
+    named_option(args, name).ok()
 }
 
 /// Initialise the process-global configuration for the non-`Default` sub-modes, mirroring
@@ -236,6 +250,37 @@ fn exec_download_demo(name: &str) -> i32 {
     }
 }
 
+/// `--create-reference-pack ...` (`CreateReferencePackMode`): download/copy a genome (and optional
+/// GTF/functional-map), build a bwa index and pack everything into a gzipped tar. Mirrors
+/// `modeExec (CreateReferencePackMode ofile gen mgtf mfunc)`.
+fn exec_create_reference_pack(
+    output_name: &str,
+    genome_url: &str,
+    gtf_url: Option<&str>,
+    functional_map_url: Option<&str>,
+) -> i32 {
+    if let Err(e) = init_submode_config() {
+        report_fatal_error(&e);
+        return 1;
+    }
+    // Diagnostics from `create_reference_pack` (the "Starting packaging..."/"Created..." lines) go
+    // through the output layer, so initialise it at the default verbosity.
+    let config = crate::configuration::global();
+    output::init(Verbosity::Normal, false, false, config.color);
+    match crate::reference::create_reference_pack(
+        output_name,
+        genome_url,
+        gtf_url,
+        functional_map_url,
+    ) {
+        Ok(()) => 0,
+        Err(e) => {
+            report_fatal_error(&e);
+            1
+        }
+    }
+}
+
 /// Run `DefaultMode`: load → parse → version gate → type check → validate → interpret.
 fn exec_default(opts: &RunOpts) -> i32 {
     // Install signal-driven removal of lock/temporary files before any worker threads are spawned,
@@ -297,7 +342,18 @@ fn parse_mode(args: &[String]) -> NgResult<Mode> {
         return Ok(Mode::DownloadDemo(name));
     }
     if args.iter().any(|a| a == "--create-reference-pack") {
-        return Ok(Mode::CreateReferencePack);
+        // `--output-name`/`--genome-url` are required `strOption`s; `--gtf-url`/`--functional-map-url`
+        // are optional (mirrors `createRefArgs`).
+        let output_name = named_option(args, "--output-name")?;
+        let genome_url = named_option(args, "--genome-url")?;
+        let gtf_url = named_option_opt(args, "--gtf-url");
+        let functional_map_url = named_option_opt(args, "--functional-map-url");
+        return Ok(Mode::CreateReferencePack {
+            output_name,
+            genome_url,
+            gtf_url,
+            functional_map_url,
+        });
     }
     Ok(Mode::Default(Box::new(parse_args(args)?)))
 }
@@ -632,15 +688,6 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
             ));
         }
     }
-    // The export machinery itself (`JSONScript.hs`/`CWL.hs`) is not ported yet (Phase 3): once the
-    // gate above is satisfied, requesting an export is reported as unimplemented rather than
-    // silently ignored.
-    if opts.export_json.is_some() || opts.export_cwl.is_some() {
-        return Err(NgError::script(
-            "Script export (--export-json/--export-cwl) is not yet implemented in this build of ngless.",
-        ));
-    }
-
     // Build the configuration in the three Haskell steps (`initConfiguration`): environment
     // defaults (`guessConfiguration`), config files (`readConfigFiles`), then command-line
     // overrides (`updateConfigurationOpts`). The triSwitch flags can turn an option on *or* off; an
@@ -816,6 +863,15 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         crate::citations::print_header(&citations);
     }
 
+    // Capture the validated, pre-transform script: the export modes serialise it as the "original"
+    // script (mirrors `writeScriptJSON jsoname sc transformed`/`writeCWL sc ...`, where `sc` is the
+    // validated — not transformed — script).
+    let original_script = if opts.export_json.is_some() || opts.export_cwl.is_some() {
+        Some(typed.clone())
+    } else {
+        None
+    };
+
     // Post-validation transforms (mirrors `Transform.transform`, run after `validate`). Inject
     // the `__hash` keyword argument into `write`/`collect` calls so `auto_comments=[{hash}]` can
     // report a content hash that is byte-identical to the Haskell build.
@@ -841,6 +897,21 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // runs after the module transforms). Done after output hashing so the inserted checks do not
     // affect the `{hash}`/`{script}` content hashes.
     typed.body = crate::transform::add_file_checks(std::mem::take(&mut typed.body), &funcs);
+
+    // Export modes (gated on `--experimental-features`, checked above): serialise the script and
+    // exit before interpretation, mirroring the `whenJust (exportJSON ...) $ ... exitSuccess` /
+    // `whenJust (exportCWL ...) $ ... exitSuccess` block in `modeExec DefaultMode`. JSON gets both
+    // the original (validated) and transformed scripts; CWL uses only the original.
+    if let Some(original) = &original_script {
+        if let Some(jsoname) = &opts.export_json {
+            crate::export::write_script_json(jsoname, original, &typed)?;
+            return Ok(0);
+        }
+        if let Some(cwlname) = &opts.export_cwl {
+            crate::export::write_cwl(original, &fname, cwlname)?;
+            return Ok(0);
+        }
+    }
 
     // ARGV: for a file script, `[script_path, ...extra_args]`; for an inline script, just the
     // extra args (mirrors `nConfArgv`: `ScriptFilePath f -> f:extraArgs`, otherwise `extraArgs`).

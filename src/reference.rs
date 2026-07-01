@@ -314,6 +314,178 @@ pub fn download_file(url: &str, dest: &Path) -> NgResult<()> {
     Ok(())
 }
 
+/// Is `p` a remote URL (mirrors `isUrl`)? Used by `download_or_copy_file` to decide between an
+/// HTTP download and a local file copy.
+pub fn is_url(p: &str) -> bool {
+    p.starts_with("http://") || p.starts_with("https://") || p.starts_with("ftp://")
+}
+
+/// Download `src` (if it is a URL) or copy it from the local filesystem, into `dest` (mirrors
+/// `downloadOrCopyFile`).
+pub fn download_or_copy_file(src: &str, dest: &Path) -> NgResult<()> {
+    if is_url(src) {
+        download_file(src, dest)
+    } else {
+        fs::copy(src, dest).map(|_| ()).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not copy {src} to {}: {e}", dest.display()),
+            )
+        })
+    }
+}
+
+/// Relative paths within a reference pack (mirror `referencePath`/`gffPath`/`functionalMapPath`).
+const GFF_PATH: &str = "Annotation/annotation.gtf.gz";
+const FUNCTIONAL_MAP_PATH: &str = "Annotation/functional.map.gz";
+
+/// Build a reference package (`--create-reference-pack`), mirroring `createReferencePack`. Downloads
+/// (or copies) the genome FASTA and optional GTF/functional-map into a temporary reference layout,
+/// builds the bwa index, then writes a gzipped tar of the lot to `oname`.
+pub fn create_reference_pack(
+    oname: &str,
+    reference: &str,
+    mgtf: Option<&str>,
+    mfunc: Option<&str>,
+) -> NgResult<()> {
+    crate::output::info(0, "Starting packaging (will download and index genomes)...");
+
+    // A throwaway working directory under the configured temporary directory (mirrors
+    // `createTempDir "ngless_ref_creator_"`). Cleaned up at the end of the function.
+    let tmpdir = make_temp_dir("ngless_ref_creator_")?;
+    crate::output::debug(
+        0,
+        &format!("Working with temporary directory: {}", tmpdir.display()),
+    );
+
+    let result = (|| {
+        fs::create_dir_all(tmpdir.join("Sequence/BWAIndex"))
+            .and_then(|_| fs::create_dir_all(tmpdir.join("Annotation")))
+            .map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!(
+                        "Could not create reference layout in {}: {e}",
+                        tmpdir.display()
+                    ),
+                )
+            })?;
+
+        let fa_path = tmpdir.join(REFERENCE_PATH);
+        download_or_copy_file(reference, &fa_path)?;
+        if let Some(gtf) = mgtf {
+            download_or_copy_file(gtf, &tmpdir.join(GFF_PATH))?;
+        }
+        if let Some(func) = mfunc {
+            download_or_copy_file(func, &tmpdir.join(FUNCTIONAL_MAP_PATH))?;
+        }
+
+        let fa_path_str = fa_path.to_string_lossy().into_owned();
+        crate::mapper::create_index(&fa_path_str)?;
+
+        // The archive layout is the reference pack's relative paths: the FASTA, the five bwa index
+        // files (named `<base>-bwa-<ver>.gz.<ext>`, mirroring `indexFiles`), then the optional
+        // annotation/functional-map files.
+        let index_prefix = crate::mapper::index_prefix(&fa_path_str)?;
+        let mut entries: Vec<(PathBuf, String)> =
+            vec![(fa_path.clone(), REFERENCE_PATH.to_string())];
+        for ext in [".amb", ".ann", ".bwt", ".pac", ".sa"] {
+            let disk = PathBuf::from(format!("{index_prefix}{ext}"));
+            // Archive name is the path relative to tmpdir.
+            let rel = disk
+                .strip_prefix(&tmpdir)
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_else(|_| disk.to_string_lossy().into_owned());
+            entries.push((disk, rel));
+        }
+        if mgtf.is_some() {
+            entries.push((tmpdir.join(GFF_PATH), GFF_PATH.to_string()));
+        }
+        if mfunc.is_some() {
+            entries.push((
+                tmpdir.join(FUNCTIONAL_MAP_PATH),
+                FUNCTIONAL_MAP_PATH.to_string(),
+            ));
+        }
+
+        write_targz(oname, &entries)?;
+        crate::output::message(
+            crate::output::OutputType::Result,
+            0,
+            &format!("Created reference package in file {oname}"),
+        );
+        Ok(())
+    })();
+
+    // Best-effort cleanup of the working directory (mirrors `release rk`).
+    let _ = fs::remove_dir_all(&tmpdir);
+    result
+}
+
+/// Create a uniquely named temporary directory under the configured temporary directory.
+fn make_temp_dir(prefix: &str) -> NgResult<PathBuf> {
+    let base = {
+        let dir = &crate::configuration::global().temporary_directory;
+        if dir.is_empty() {
+            std::env::temp_dir()
+        } else {
+            PathBuf::from(dir)
+        }
+    };
+    fs::create_dir_all(&base).ok();
+    // A monotonic-enough suffix from the current time + process id avoids collisions without an
+    // extra dependency.
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let candidate = base.join(format!("{prefix}{}_{nanos}", std::process::id()));
+    fs::create_dir(&candidate).map_err(|e| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!(
+                "Could not create temporary directory {}: {e}",
+                candidate.display()
+            ),
+        )
+    })?;
+    Ok(candidate)
+}
+
+/// Write a gzip-compressed tar archive to `oname`, adding each `(disk_path, archive_name)` entry
+/// (mirrors `GZip.compress . Tar.write =<< Tar.pack tmpdir filelist`).
+fn write_targz(oname: &str, entries: &[(PathBuf, String)]) -> NgResult<()> {
+    let out = fs::File::create(oname).map_err(|e| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!("Could not create reference package {oname}: {e}"),
+        )
+    })?;
+    let gz = flate2::write::GzEncoder::new(out, flate2::Compression::default());
+    let mut builder = tar::Builder::new(gz);
+    for (disk, name) in entries {
+        builder.append_path_with_name(disk, name).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not add {} to {oname}: {e}", disk.display()),
+            )
+        })?;
+    }
+    let gz = builder.into_inner().map_err(|e| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!("Could not finalise reference package {oname}: {e}"),
+        )
+    })?;
+    gz.finish().map_err(|e| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!("Could not finalise reference package {oname}: {e}"),
+        )
+    })?;
+    Ok(())
+}
+
 /// The user data directory (mirrors `nConfUserDataDirectory`): defaults to
 /// `$XDG_DATA_HOME/ngless/data` or `$HOME/.local/share/ngless/data`, overridable via the
 /// `user-data-directory` config key.

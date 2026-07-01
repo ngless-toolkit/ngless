@@ -283,26 +283,40 @@ covered by `tests/`**. They are grouped by impact.
   and the `soap` mapper (`StandardModules/Soap.hs`; registered on `import` but `execute_map` rejects
   it). Both are referenced only for hashing in `src/transform.rs`. (`batch` is now ported — see the
   stdlib section above.)
-- **CLI sub-modes + flags — Phase 0 (parser groundwork) + Phase 1 (small `DefaultMode` flags) +
-  Phase 2 (download sub-modes) DONE.** A phased implementation plan lives in `next-steps.md` ("CLI
-  flags & sub-modes — implementation plan"). `lib.rs` peels off the informational `infoOption`s
-  (`--version*`/`--date-short`/`-h/--help`) and hands the rest to `cli::run_cli`, which dispatches on
-  a `Mode` enum mirroring `CmdArgs.NGLessMode`
+- **CLI sub-modes + flags — DONE (all phases 0–4).** A phased implementation plan lives in
+  `next-steps.md` ("CLI flags & sub-modes — implementation plan"). `lib.rs` peels off the
+  informational `infoOption`s (`--version*`/`--date-short`/`-h/--help`) and hands the rest to
+  `cli::run_cli`, which dispatches on a `Mode` enum mirroring `CmdArgs.NGLessMode`
   (`Default`/`PrintPath`/`CheckInstall`/`InstallReferenceData`/`DownloadFile`/`DownloadDemo`/
-  `CreateReferencePack`). Implemented modes: `Default` (the run/validate flow), `--print-path`,
-  `--check-install`, and the **Phase 2** download sub-modes `--install-reference-data REF`,
-  `--download-file --download-url URL --local-file PATH` and `--download-demo NAME` (the `Mode`
-  variants now carry their parsed arguments). The download modes reuse `src/reference.rs`'s now-`pub`
-  `install_data`/`download_file`/`download_expand_tar`; each first calls `init_submode_config`
-  (mirroring `initConfiguration` running before every `modeExec`) so the config-file
-  `download-url`/data directories apply. `--install-reference-data` rejects a non-builtin ref with
-  the exact Haskell text (`Reference <ref> is not a known reference.`) and installs at version
-  `(1,5)` (`parseVersion Nothing`); `--download-demo` reproduces the known-list/`suggestionMessage`
-  "Unknown demo" block and unpacks `<base>/Demos/<name>.tar.gz` into the current directory. The one
-  remaining sub-mode, `--create-reference-pack` (Phase 4), is **recognized** — it routes to its
-  `Mode` variant and exits with a clear "not yet implemented" message instead of falling through.
+  `CreateReferencePack`). Every mode is implemented: `Default` (the run/validate flow),
+  `--print-path`, `--check-install`, the **Phase 2** download sub-modes `--install-reference-data
+  REF`, `--download-file --download-url URL --local-file PATH` and `--download-demo NAME`, and the
+  **Phase 4** `--create-reference-pack --output-name NAME --genome-url URL [--gtf-url URL]
+  [--functional-map-url URL]` (the `Mode` variants carry their parsed arguments). The download modes
+  reuse `src/reference.rs`'s now-`pub` `install_data`/`download_file`/`download_expand_tar`; each
+  first calls `init_submode_config` (mirroring `initConfiguration` running before every `modeExec`)
+  so the config-file `download-url`/data directories apply. `--install-reference-data` rejects a
+  non-builtin ref with the exact Haskell text (`Reference <ref> is not a known reference.`) and
+  installs at version `(1,5)` (`parseVersion Nothing`); `--download-demo` reproduces the
+  known-list/`suggestionMessage` "Unknown demo" block and unpacks `<base>/Demos/<name>.tar.gz` into
+  the current directory. **`--create-reference-pack`** calls `reference::create_reference_pack`
+  (porting `createReferencePack`): `download_or_copy_file` (new; porting `downloadOrCopyFile`/`isUrl`)
+  fetches the genome + optional gtf/functional-map into a temp `Sequence/BWAIndex`+`Annotation`
+  layout, `mapper::create_index` bwa-indexes it, and `write_targz` packs the FASTA + the five
+  `-bwa-<ver>.gz.{amb,ann,bwt,pac,sa}` index files (+ optional annotation files) into the gzipped
+  tar — the archive layout matches Haskell byte-for-byte (verified end-to-end with a local genome).
   **Unknown flags error** (`Invalid option \`...'`, mirroring optparse) instead of being silently
   ignored; a bare `-` stays a valid STDIN positional.
+  **Phase 3 — export modes (`--export-json`/`--export-cwl`, gated on `--experimental-features`)** are
+  ported in `src/export.rs` and wired into `cli.rs::run_script` after the builtin transforms
+  (mirroring the `whenJust (exportJSON…)`/`whenJust (exportCWL…)` block, each ending in
+  `exitSuccess`). The validated (pre-transform) script is cloned as the "original"; JSON serialises
+  both it and the post-transform script (`write_script_json`, porting `JSONScript.hs` faithfully via
+  `serde_json` — the `Optimized` case is absent since the Rust AST lacks that variant), CWL uses only
+  the original (`write_cwl`, porting `CWL.hs`). NB `CWL.hs::extractARGVUsage'` matches `Lookup _
+  (Variable "ARGV")` but `ARGV` is a `BuiltinConstant` in both builds, so the pattern never fires —
+  the Haskell binary itself always emits empty CWL `inputs:` and `$(inputs.input-1)`; the Rust port
+  matches `Lookup` exactly, so its (degenerate) output is identical (documented inline).
   **Phase 1 wired the behaviour of the small `DefaultMode` flags** (mirroring `modeExec
   DefaultMode`):
   - **`-e/--script` (inline script)** — `run_script` selects file-vs-inline (`loadScript` + the
@@ -317,8 +331,8 @@ covered by `tests/`**. They are grouped by impact.
   - **`--color auto|no|yes|force`** — overrides the config-file `color` key (`None` ⇒ fall through)
     before `output::init`.
   - **`--experimental-features`** — gates the export modes (its *only* effect): `--export-json`/
-    `--export-cwl` without it produce the exact Haskell `fatalError`; *with* it they report "not yet
-    implemented" (the export machinery itself is Phase 3).
+    `--export-cwl` without it produce the exact Haskell `fatalError`; *with* it they run the export
+    (Phase 3, above).
   - **`--index-path`** — threaded into mapper index resolution. `ensure_one_index_exists`/
     `ensure_splits_exist` (`src/interpret.rs`) call the new `get_index_output` (porting
     `getIndexOutput`): when the index store path is set and the FASTA is not already under it
@@ -331,8 +345,8 @@ covered by `tests/`**. They are grouped by impact.
   `--search-path`), `--check-deprecation`, `--create-report`/`--no-create-report`,
   `-o/--html-report-directory`; the `keep-temporary-files`/`strict-threads`/`create-report`
   triSwitches accept their `--no-` forms (`Option<bool>`, `None` ⇒ fall through to config). Still
-  pending: the Phase 2/3/4 sub-modes, `--check-deprecation` (needs module deprecation metadata), and
-  `--create-report`/`-o` (await the HTML report).
+  pending: `--check-deprecation` (needs module deprecation metadata) and `--create-report`/`-o`
+  (await the HTML report).
 - **Config-file reader — DONE** (`src/configuration.rs`, mirroring `Configuration.hs`). The three
   Haskell config steps are reproduced: `guess_configuration` (environment defaults, including the
   `$XDG_DATA_HOME` user-directory resolution from `getDefaultUserNglessDirectory`),

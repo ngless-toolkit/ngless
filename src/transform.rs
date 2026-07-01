@@ -968,7 +968,7 @@ fn show_bop(op: BOp) -> &'static str {
 
 /// Derived `Show NGLType`. `prec` is the surrounding precedence (11 means "as a constructor
 /// argument", which forces parentheses around constructor applications that take arguments).
-fn show_ngltype(t: &NGLType, prec: u8) -> String {
+pub fn show_ngltype(t: &NGLType, prec: u8) -> String {
     let simple = |s: &str| s.to_string();
     let app = |head: &str, inner: String| {
         let body = format!("{head} {inner}");
