@@ -903,6 +903,7 @@ impl Interpreter {
                 self.execute_load_directory(&expr_v, &argvs)
             }
             "load_sample_list" => self.execute_load_sample_list(&expr_v),
+            "load_sample_from_yaml" => self.execute_load_sample(&expr_v, &argvs),
             "discard_singles" => execute_discard_singles(&expr_v),
             "unique" => self.execute_unique(&expr_v, &argvs),
             "example" => execute_example(&expr_v, &argvs),
@@ -2828,6 +2829,42 @@ impl Interpreter {
             });
         }
         Ok(NGLessObject::List(out))
+    }
+
+    /// `load_sample_from_yaml(yaml, sample=...)`: parse the YAML sample manifest and return the
+    /// single named read set (mirrors `executeLoadSample` in BuiltinModules/Samples.hs).
+    fn execute_load_sample(
+        &self,
+        expr: &NGLessObject,
+        args: &[(String, NGLessObject)],
+    ) -> NgResult<NGLessObject> {
+        let sample = match lookup_arg(args, "sample") {
+            Some(NGLessObject::String(s)) => s.clone(),
+            _ => {
+                return Err(NgError::script(
+                    "load_sample_from_yaml arguments: could not find string argument `sample`"
+                        .to_string(),
+                ))
+            }
+        };
+        let fname = as_string(expr, "load_sample_from_yaml")?;
+        let samples = self.execute_load_sample_list(expr)?;
+        let NGLessObject::List(l) = samples else {
+            return Err(NgError::should_not_occur(
+                "load_sample_from_yaml: sample list is not a list",
+            ));
+        };
+        for s in l {
+            if let NGLessObject::ReadSet { name, .. } = &s {
+                if *name == sample {
+                    return Ok(s);
+                }
+            }
+        }
+        Err(NgError::new(
+            NgErrorType::DataError,
+            format!("load_sample_from_yaml: sample \"{sample}\" not found in file \"{fname}\""),
+        ))
     }
 
     /// `preprocess(rs) using |read|: ...`: stream the read set through the block (mirrors

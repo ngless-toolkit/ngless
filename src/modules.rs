@@ -393,6 +393,18 @@ mod builders {
                 f.allows_auto_comprehension = true;
                 f
             },
+            {
+                let mut f = func(
+                    "load_sample_from_yaml",
+                    Some(String),
+                    vec![FileReadable],
+                    ReadSet,
+                    vec![arg("sample", true, String, vec![])],
+                    vec![MinNGLessVersion(1, 5), ReturnAssigned],
+                );
+                f.allows_auto_comprehension = true;
+                f
+            },
         ]
     }
 

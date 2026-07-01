@@ -2,7 +2,7 @@
 
 > **Status:** The Rust crate lives at the repository root (`Cargo.toml`, `src/`), since it is
 > intended to eventually replace the Haskell implementation in place. The functional test harness
-> (`run-tests.sh`) can be pointed at any binary via the `NGLESS_BIN` environment variable. **All 97
+> (`run-tests.sh`) can be pointed at any binary via the `NGLESS_BIN` environment variable. **All 99
 > functional tests pass** against the Rust binary with output identical to Haskell (including the
 > samtools `check.sh` cases, driven via `--print-path samtools`), and the unit tests (`cargo test`)
 > pass. The minimap2 mapper is implemented in `src/minimap2.rs`.
@@ -172,7 +172,9 @@
   the directory name. The `mocat` module (`StandardModules/Mocat.hs`) exposes `load_mocat_sample` as a
   thin wrapper over the same loader (versions `0.0`/`1.0`/`1.1`, with the MOCAT/MOCAT2 citations).
   `load_sample_list` (`BuiltinModules/Samples.hs`) parses a YAML sample manifest (`serde_yaml`) into a
-  list of named, Sanger-encoded read sets. The `.name()` method on a read set and `discard_singles`
+  list of named, Sanger-encoded read sets, and `load_sample_from_yaml(yaml, sample=...)` returns the
+  single read set with the requested name (`execute_load_sample`, mirroring `executeLoadSample`),
+  erroring when the sample is not found. The `.name()` method on a read set and `discard_singles`
   (`AsReads.hs`) are done, as is the `--subsample` flag (deterministic 1/10 record sample on load —
   `subsample_text` mirrors `drop90`/`performSubsample`, plus the `.subsampled` write-output marker from
   `parseWriteOptions`).
@@ -273,7 +275,7 @@
 
 ## Known remaining gaps (full Haskell↔Rust comparison)
 
-All 97 functional tests pass, so parity is complete for the script surface the suite exercises. The
+All 99 functional tests pass, so parity is complete for the script surface the suite exercises. The
 items below are features present in the Haskell binary but absent (or simplified) in Rust; **none are
 covered by `tests/`**. They are grouped by impact.
 
@@ -430,10 +432,10 @@ covered by `tests/`**. They are grouped by impact.
 ### Full module-by-module diff — behavioral discrepancies (untested)
 
 A direct Haskell↔Rust module-by-module comparison (front end, type checker, validation, counting,
-FASTQ/SAM, select/map, transforms, modules, CLI, config, output) turned up the items below. All 97
+FASTQ/SAM, select/map, transforms, modules, CLI, config, output) turned up the items below. All 99
 functional tests still pass, so each item is either outside the tested surface or output-neutral. The
 three most likely to bite real users are **D-A1** (`ARGV` idiom → hash/CWL/JSON divergence), **D-A2**
-(a genuinely missing function), and **D-A4** (silently missing citations).
+(now ported — see below), and **D-A4** (silently missing citations).
 
 - **D-A1 — `ARGV` node kind differs (output-affecting).** In Haskell `ARGV` is a module constant
   (`BuiltinModules/Argv.hs`) so it parses to `Lookup (Variable "ARGV")`; in Rust it is listed in
@@ -444,10 +446,11 @@ three most likely to bite real users are **D-A1** (`ARGV` idiom → hash/CWL/JSO
   inert since ARGV is never a `Lookup` in Rust); (b) **`--export-cwl`** fires `extractARGVUsage'` in
   Haskell (non-degenerate `inputs:`) but never in Rust (empty); (c) **`--export-json`** serialises the
   node differently (Lookup vs BuiltinConstant). No test combines ARGV with hashing/collect/export.
-- **D-A2 — missing `load_sample_from_yaml` (missing feature).** `BuiltinModules/Samples.hs` registers
-  **two** functions — `load_sample_list` and `load_sample_from_yaml` (min version 1.5, required
-  `sample` kwarg). Rust's `modules.rs` defines only `load_sample_list`, so `load_sample_from_yaml(...)`
-  type-checks in Haskell but errors `Unknown function` in Rust.
+- **D-A2 — `load_sample_from_yaml` — DONE.** `BuiltinModules/Samples.hs` registers **two**
+  functions — `load_sample_list` and `load_sample_from_yaml` (min version 1.5, required `sample`
+  kwarg). Both are now in Rust: `modules.rs` registers `load_sample_from_yaml` and `interpret.rs`
+  dispatches it to `execute_load_sample` (parse the manifest via `execute_load_sample_list`, return
+  the read set whose name matches `sample`). Covered by `tests/load_sample_from_yaml`.
 - **D-A3 — samtools `sortOFormat` transform not ported → non-byte-identical BAM.**
   `StandardModules/Samtools.hs`'s `modTransform = sortOFormat >=> checkUnique`; `sortOFormat` rewrites
   `samtools_sort` to emit BAM directly (`__output_bam=True`) when its result is only used in a BAM
