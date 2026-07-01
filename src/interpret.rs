@@ -652,9 +652,13 @@ impl MapperKind {
         rs: &ReadSet,
         extra_args: &[String],
         out_sam: &Path,
+        total_reads: Option<u64>,
     ) -> NgResult<()> {
         match self {
-            MapperKind::Bwa => crate::mapper::call_mapper(ref_index, rs, extra_args, out_sam),
+            MapperKind::Bwa => {
+                crate::mapper::call_mapper(ref_index, rs, extra_args, out_sam, total_reads)
+            }
+            // minimap2 has no progress bar in the Haskell implementation, so the count is unused.
             MapperKind::Minimap2 => {
                 crate::minimap2::call_mapper(ref_index, rs, extra_args, out_sam)
             }
@@ -1641,7 +1645,8 @@ impl Interpreter {
         extra_args: &[String],
     ) -> NgResult<PathBuf> {
         let out = self.new_temp_path("mapped_", "sam")?;
-        mapper.call_mapper(ref_index, rs, extra_args, &out)?;
+        let total_reads = self.readset_total_seqs(rs);
+        mapper.call_mapper(ref_index, rs, extra_args, &out, total_reads)?;
         Ok(out)
     }
 
@@ -2355,6 +2360,33 @@ impl Interpreter {
             encoding,
             path: PathBuf::from(path),
         })
+    }
+
+    /// Look up the cached number of sequences recorded for `fname` (mirrors `lookupNrSeqs`, which
+    /// reads the `fqOutput` accumulator keyed by file name). `fastq`/`paired` register their inputs
+    /// under the input path, so a `map` reading those directly finds a count; `None` otherwise.
+    fn lookup_nr_seqs(&self, fname: &str) -> Option<i64> {
+        self.fq_stats
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|f| f.file == fname)
+            .map(|f| f.n_seq)
+    }
+
+    /// Total number of reads across every file of `rs`, if all of them have a cached count (mirrors
+    /// `totalSize` in `interleaveFQs'`). Returns `None` as soon as one file's count is unknown, in
+    /// which case the mapping progress bar is suppressed.
+    fn readset_total_seqs(&self, rs: &ReadSet) -> Option<u64> {
+        let mut total: i64 = 0;
+        for (a, b) in &rs.pairs {
+            total += self.lookup_nr_seqs(&a.path.to_string_lossy())?;
+            total += self.lookup_nr_seqs(&b.path.to_string_lossy())?;
+        }
+        for s in &rs.singletons {
+            total += self.lookup_nr_seqs(&s.path.to_string_lossy())?;
+        }
+        u64::try_from(total).ok()
     }
 
     /// Record an already-computed [`fastq::FastQStats`] under `label`, used by the streaming
@@ -3370,6 +3402,28 @@ fn read_sam_text(path: &str) -> NgResult<String> {
 /// (decompressed). Bounded memory — at most a few lines are held at once. Both mates of a pair
 /// must have the same number of lines.
 pub(crate) fn write_interleaved<W: Write>(rs: &ReadSet, out: &mut W) -> NgResult<()> {
+    write_interleaved_inner(rs, out)
+}
+
+/// Like [`write_interleaved`], but when `total_reads` is known draws a mapping progress bar driven
+/// by the newlines streamed to the mapper (mirrors `interleaveFQs'`/`progressFQ` in `Bwa.hs`). When
+/// `total_reads` is `None` (the count was not cached) it streams without a bar, exactly as the
+/// Haskell code falls back to plain `interleaveFQs`.
+pub(crate) fn write_interleaved_progress<W: Write>(
+    rs: &ReadSet,
+    out: &mut W,
+    total_reads: Option<u64>,
+) -> NgResult<()> {
+    match total_reads {
+        Some(ts) => {
+            let mut pw = crate::progress::ProgressWriter::new(out, "Mapping FASTQ files", 80, ts);
+            write_interleaved_inner(rs, &mut pw)
+        }
+        None => write_interleaved_inner(rs, out),
+    }
+}
+
+fn write_interleaved_inner<W: Write>(rs: &ReadSet, out: &mut W) -> NgResult<()> {
     let werr = |e: std::io::Error| {
         NgError::new(
             NgErrorType::SystemError,

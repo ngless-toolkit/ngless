@@ -105,11 +105,15 @@ pub fn create_index(fafile: &str) -> NgResult<()> {
 /// Map an interleaved FASTQ stream against `ref_index` with `bwa mem`, writing the SAM output to
 /// `out_sam` (mirrors `callMapper`). `-K 100000000` fixes the chunk size so the output is
 /// independent of the thread count; `-p` reads interleaved paired reads from the input.
+///
+/// `total_reads`, when known, is the number of reads being mapped; it drives the terminal progress
+/// bar (mirrors the `interleaveFQs'` count fed to `progressFQ`). `None` suppresses the bar.
 pub fn call_mapper(
     ref_index: &str,
     rs: &crate::fastq::ReadSet,
     extra_args: &[String],
     out_sam: &Path,
+    total_reads: Option<u64>,
 ) -> NgResult<()> {
     let prefix = index_prefix(ref_index)?;
     let threads = crate::parallel::external_tool_threads();
@@ -148,7 +152,7 @@ pub fn call_mapper(
                 "bwa mem: could not open stdin".to_string(),
             )
         })?;
-        crate::interpret::write_interleaved(rs, &mut stdin)?;
+        crate::interpret::write_interleaved_progress(rs, &mut stdin, total_reads)?;
         // `stdin` is dropped here, closing the pipe.
     }
     let out = child.wait_with_output().map_err(|e| {

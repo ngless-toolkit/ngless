@@ -5,16 +5,18 @@
 //! that `--trace` modulates: with tracing on, *every* message — including the otherwise-hidden
 //! [`OutputType::Trace`] level — is printed, with second-resolution timestamps.
 //!
-//! Unlike the Haskell version this layer does not maintain a self-clearing transient status line
-//! (the single overwriting progress line shown on a terminal); messages are always printed as
-//! durable lines. It also formats timestamps in UTC rather than the local zone. Neither matters
-//! for the goal here, which is parity of *behaviour*, not byte-identical output.
+//! Like the Haskell version this layer maintains a self-clearing *transient* status line (the
+//! single overwriting progress line shown on a terminal, see [`transient_msg`]): the progress bar
+//! draws on it, and any durable message erases it first. It formats timestamps in UTC rather than
+//! the local zone, which does not matter for the goal here — parity of *behaviour*, not
+//! byte-identical output.
 //!
 //! Configuration is process-global (set once via [`init`]), mirroring Haskell's global
 //! `nglConfiguration` `IORef`: the message helpers are called from many places that do not thread
 //! an interpreter/config handle (e.g. [`crate::reference`]).
 
 use std::io::{IsTerminal, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -143,12 +145,44 @@ pub fn message(ot: OutputType, lno: usize, msg: &str) {
         String::new()
     };
     let mut out = std::io::stderr().lock();
+    // Erase any transient progress line before printing this durable one (mirrors
+    // `clearTransientIfNeeded` in Haskell's `output`).
+    clear_transient_if_needed(&mut out);
     let _ = if cfg.color {
         let (col, reset) = (color_code(ot), "\u{1b}[0m");
         writeln!(out, "{col}[{tstr}{line_str}]: {msg}{reset}")
     } else {
         writeln!(out, "[{tstr}{line_str}]: {msg}")
     };
+}
+
+/// Set when a transient progress line is currently on screen and must be erased before the next
+/// durable output line (mirrors Haskell's `lineClearNeeded` `IORef`).
+static LINE_CLEAR_NEEDED: AtomicBool = AtomicBool::new(false);
+
+/// Draw a transient status line on stderr, overwriting any previous one (mirrors
+/// `writeTransientMsg`). Does nothing when stderr is not a terminal, so redirected/piped output
+/// never receives progress noise or ANSI escapes. The cursor is returned to column 0 so the next
+/// call (or a [`clear_transient_if_needed`]) overwrites in place.
+pub fn transient_msg(m: &str) {
+    if !std::io::stderr().is_terminal() {
+        return;
+    }
+    let mut out = std::io::stderr().lock();
+    clear_transient_if_needed(&mut out);
+    // Write the message, then return the cursor to column 0 (`\r`) so it is overwritten next time.
+    let _ = write!(out, "{m}\r");
+    let _ = out.flush();
+    LINE_CLEAR_NEEDED.store(true, Ordering::Relaxed);
+}
+
+/// If a transient line is on screen, erase it (ANSI "clear entire line"; the cursor is already at
+/// column 0) and clear the flag. Mirrors `clearTransientIfNeeded` combined with the explicit flag
+/// reset Haskell performs after drawing a durable line.
+fn clear_transient_if_needed<W: Write>(out: &mut W) {
+    if LINE_CLEAR_NEEDED.swap(false, Ordering::Relaxed) {
+        let _ = write!(out, "\u{1b}[2K");
+    }
 }
 
 /// `Trace`-level message (shown only under `--trace`); the Rust analogue of `traceStatus`.

@@ -34,6 +34,7 @@ pub mod modules;
 pub mod output;
 pub mod parallel;
 pub mod parser;
+pub mod progress;
 pub mod reference;
 pub mod sam;
 pub mod samtools;

@@ -15,7 +15,7 @@
 //! `downloadExpandTar`.
 
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -281,6 +281,12 @@ pub fn download_file(url: &str, dest: &Path) -> NgResult<()> {
             ),
         })?;
 
+    // When the server reports the body size we render a progress bar while streaming (mirrors the
+    // `Content-Length` branch of `downloadFile`/`printProgress`); otherwise we stream without one.
+    let content_length = resp
+        .header("Content-Length")
+        .and_then(|s| s.trim().parse::<u64>().ok());
+
     // Stream the body to `dest`, writing to a temporary sibling first so a partial download never
     // leaves a corrupt file in place (mirrors `sinkFileCautious`).
     let tmp = {
@@ -295,7 +301,11 @@ pub fn download_file(url: &str, dest: &Path) -> NgResult<()> {
         )
     })?;
     let mut reader = resp.into_reader();
-    std::io::copy(&mut reader, &mut out).map_err(|e| {
+    let stream_result = match content_length {
+        Some(total) if total > 0 => stream_with_progress(url, &mut reader, &mut out, total),
+        _ => std::io::copy(&mut reader, &mut out).map(|_| ()),
+    };
+    stream_result.map_err(|e| {
         let _ = fs::remove_file(&tmp);
         NgError::new(
             NgErrorType::SystemError,
@@ -311,6 +321,31 @@ pub fn download_file(url: &str, dest: &Path) -> NgResult<()> {
             format!("Could not finalise download into {}: {e}", dest.display()),
         )
     })?;
+    Ok(())
+}
+
+/// Copy `reader` into `out`, updating a terminal progress bar as bytes flow (mirrors
+/// `printProgress`). `total` is the expected body size from `Content-Length`; the bar shows
+/// `bytes-so-far / total`. The bar draws only on a terminal and throttles itself (see
+/// [`crate::progress`]), so this stays cheap and silent when output is redirected.
+fn stream_with_progress<R: Read, W: Write>(
+    url: &str,
+    reader: &mut R,
+    out: &mut W,
+    total: u64,
+) -> std::io::Result<()> {
+    let mut pbar = crate::progress::ProgressBar::new(format!("Downloading {url}"), 40);
+    let mut buf = [0u8; 64 * 1024];
+    let mut done: u64 = 0;
+    loop {
+        let n = reader.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        out.write_all(&buf[..n])?;
+        done += n as u64;
+        pbar.update(done as f64 / total as f64);
+    }
     Ok(())
 }
 
