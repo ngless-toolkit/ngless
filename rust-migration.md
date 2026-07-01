@@ -313,10 +313,12 @@ covered by `tests/`**. They are grouped by impact.
   `exitSuccess`). The validated (pre-transform) script is cloned as the "original"; JSON serialises
   both it and the post-transform script (`write_script_json`, porting `JSONScript.hs` faithfully via
   `serde_json` — the `Optimized` case is absent since the Rust AST lacks that variant), CWL uses only
-  the original (`write_cwl`, porting `CWL.hs`). NB `CWL.hs::extractARGVUsage'` matches `Lookup _
-  (Variable "ARGV")` but `ARGV` is a `BuiltinConstant` in both builds, so the pattern never fires —
-  the Haskell binary itself always emits empty CWL `inputs:` and `$(inputs.input-1)`; the Rust port
-  matches `Lookup` exactly, so its (degenerate) output is identical (documented inline).
+  the original (`write_cwl`, porting `CWL.hs`). **Known divergence (D-A1 below):** `CWL.hs::
+  extractARGVUsage'` matches `IndexExpression (Lookup _ (Variable "ARGV")) …`, and in Haskell `ARGV`
+  *is* a `Lookup` (a module constant from `BuiltinModules/Argv.hs`), so the pattern **fires** and
+  emits non-degenerate CWL `inputs:`. In Rust `ARGV` is a `BuiltinConstant` (`tokens.rs` `CONSTANTS`),
+  never a `Lookup`, so `export.rs` matches nothing and emits degenerate/empty CWL — a real
+  (untested) discrepancy, not parity.
   **Phase 1 wired the behaviour of the small `DefaultMode` flags** (mirroring `modeExec
   DefaultMode`):
   - **`-e/--script` (inline script)** — `run_script` selects file-vs-inline (`loadScript` + the
@@ -424,6 +426,73 @@ covered by `tests/`**. They are grouped by impact.
   `FinishOkHook` does (gated on `--quiet`, not output-affecting).
 - **`collect()` minor gaps:** the `--subsample` `.subsample` ofile suffix and `auto_comments={date}`
   remain unported.
+
+### Full module-by-module diff — behavioral discrepancies (untested)
+
+A direct Haskell↔Rust module-by-module comparison (front end, type checker, validation, counting,
+FASTQ/SAM, select/map, transforms, modules, CLI, config, output) turned up the items below. All 97
+functional tests still pass, so each item is either outside the tested surface or output-neutral. The
+three most likely to bite real users are **D-A1** (`ARGV` idiom → hash/CWL/JSON divergence), **D-A2**
+(a genuinely missing function), and **D-A4** (silently missing citations).
+
+- **D-A1 — `ARGV` node kind differs (output-affecting).** In Haskell `ARGV` is a module constant
+  (`BuiltinModules/Argv.hs`) so it parses to `Lookup (Variable "ARGV")`; in Rust it is listed in
+  `tokens.rs` `CONSTANTS` → `BuiltinConstant(Variable("ARGV"))`. Divergences where the idiom
+  `fastq(ARGV[1])` feeds a hashed/exported value: (a) **output hash** — Haskell's `hashOf` shows the
+  use as `Lookup 'ARGV' as NGList NGLString`, Rust as `ARGV`, so `auto_comments=[{hash}]` and
+  `collect`'s `# Output hash:` differ (the `varmap.insert("ARGV","ARGV")` seed in `transform.rs` is
+  inert since ARGV is never a `Lookup` in Rust); (b) **`--export-cwl`** fires `extractARGVUsage'` in
+  Haskell (non-degenerate `inputs:`) but never in Rust (empty); (c) **`--export-json`** serialises the
+  node differently (Lookup vs BuiltinConstant). No test combines ARGV with hashing/collect/export.
+- **D-A2 — missing `load_sample_from_yaml` (missing feature).** `BuiltinModules/Samples.hs` registers
+  **two** functions — `load_sample_list` and `load_sample_from_yaml` (min version 1.5, required
+  `sample` kwarg). Rust's `modules.rs` defines only `load_sample_list`, so `load_sample_from_yaml(...)`
+  type-checks in Haskell but errors `Unknown function` in Rust.
+- **D-A3 — samtools `sortOFormat` transform not ported → non-byte-identical BAM.**
+  `StandardModules/Samtools.hs`'s `modTransform = sortOFormat >=> checkUnique`; `sortOFormat` rewrites
+  `samtools_sort` to emit BAM directly (`__output_bam=True`) when its result is only used in a BAM
+  `write`. Rust always sorts to SAM (`interpret.rs`, hard-coded `"sam"`) and converts to BAM at write
+  time, so `x = samtools_sort(...); write(x, ofile='out.bam')` carries an **extra `@PG` line** (sort +
+  view) vs Haskell's single one, plus an extra conversion pass. Tests pass only because their
+  `check.sh` strips `@PG` (`grep -v '^@PG'`). NB `checkUnique` was also moved from a *transform*
+  (Haskell) to the *validate* phase (`validation.rs::validate_select_unique_not_sorted`) — same error
+  text, earlier timing.
+- **D-A4 — run-header citations missed for nested `map`/`assemble`/`orf_find`.** `collectCitations`
+  (both builds) matches only top-level `Assignment _ (FunctionCall f)`. Haskell runs it on the
+  **transformed** script, where `addTemporaries` has lifted nested calls into `temp$N = <call>`, so
+  nested calls are found; Rust runs `collect_citations` on the **pre-transform** script (`cli.rs`), so
+  a nested `map`/`assemble`/`orf_find` is missed (e.g. `write(orf_find(contigs,…))` lists only
+  megahit, not prodigal + BWA). Fix: run `collect_citations` after transforms, or recurse into
+  sub-expressions. Untested (no `expected.stdout.txt` on the relevant test).
+- **D-A5 — `count()` with both `gff_file` and `functional_map`.** `Count.hs::parseAnnotationMode`
+  errors ("Cannot simultaneously pass a gff_file and an annotation_file"); Rust `parse_count_opts`
+  silently prefers `functional_map`. User-error edge, untested.
+- **D-A6 — `addIndexChecks` not ported → different out-of-bounds message + timing.** For
+  `array[<constInt>]` Haskell floats a `__check_index_access` up to just after the array assignment,
+  failing **early** with `Index access on line N is invalid.\n …`; Rust has no such check, so the
+  error only surfaces when the index is evaluated (later, possibly after side effects) with the
+  plainer runtime `Accessing element K in list of size M.`.
+- **D-B — error-handling / leniency on edge inputs (untested):** (B1) malformed GFF — an empty
+  attribute field or bare word crashes Haskell (`B.tail ""`), Rust skips gracefully (`gff.rs`); Haskell
+  validates the score/phase columns, Rust drops them, so Rust accepts GFF lines Haskell rejects. (B2)
+  functional-map empty data line — Haskell throws "wrong number of columns", Rust skips. (B3) encoding
+  auto-detect — empty quality line or non-multiple-of-4 file crashes/errors in Haskell, Rust
+  skips/ignores the tail; missing "Input file is empty"/"cannot be 100% confident" stderr warnings.
+  (B4) `read[<int>]` single index on a ShortRead — Haskell yields a degenerate `srSlice(a+1,-1)`, Rust
+  errors `_evalIndex: invalid operation`. (B5) SAM integer field as last token with no trailing tab —
+  Haskell crashes (`B.tail ""`), Rust returns `""` (not reachable in well-formed SAM). (B6)
+  undefined-variable wording/path differs (type-checker abort `` Could not find variable `x` `` vs
+  Haskell's validator `` `"x"` ``). (B7) integer literals — Haskell uses arbitrary-precision `Integer`,
+  Rust `i64`, so a huge literal panics in Rust (`.parse().unwrap()` in `tokens.rs`).
+- **D-C — missing stderr warnings (not output-affecting):** `count()` omits the "both `strand` and
+  `sense` … ignored" and "both `norm` and `normalization` …" warnings; assorted version-gated
+  trace/warning lines (`select`/`filter`/`allbest`/SAM-merge) are moot or emitted differently at ≥1.5.
+  All stderr, not diffed.
+- **Verified matching (no action):** version strings, citation-header 90-column wrap, `show_double`,
+  the SAM 11-column `qual→extra` quirk, all trimming (incl. round-half-to-even), the count
+  annotation/normalization/multi-mapper math, GFF intersection modes, and select/filter/allbest logic
+  were checked in detail and match. (`src/lib.rs`'s doc comment saying "type checker … not implemented
+  yet" is stale — they are fully wired.)
 
 ## Context
 
