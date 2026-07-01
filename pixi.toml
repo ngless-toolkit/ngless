@@ -4,8 +4,15 @@ channels = ["conda-forge", "https://conda.anaconda.org/bioconda"]
 name = "ngless_test"
 platforms = ["linux-64"]
 version = "0.1.0"
+preview = ["pixi-build"]
 
 [tasks]
+
+[package]
+version = "1.6.beta1"
+
+[package.build]
+backend = { name = "pixi-build-rust", version = "*" }
 
 [dependencies]
 prodigal = ">=2.6.3,<3"
