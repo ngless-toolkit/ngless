@@ -2,9 +2,9 @@ name: Build Rust
 
 on:
   push:
-    branches: [rust-migration]
+    branches: [main]
   pull_request:
-    branches: [rust-migration]
+    branches: [main]
 
 jobs:
   build:
