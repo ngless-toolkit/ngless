@@ -393,7 +393,54 @@ fn report_fatal_error(e: &crate::errors::NgError) {
     eprintln!("{RESET}");
 }
 
+/// Expand clustered / attached-value short options into canonical separate tokens, mirroring
+/// optparse-applicative: `-j4` → `-j 4`, `-nq` → `-n -q`, `-nj4` → `-n -j 4`. A short *flag*
+/// (no value) lets parsing continue with the rest of the cluster; a short *value* option
+/// consumes the rest of the cluster as its attached value (or, if the cluster ends there, the
+/// following arg, which the main loop already picks up). Long options (`--…`), a bare `-`, and
+/// non-option words pass through unchanged; an unknown short option is left as a `-<rest>` token
+/// so the main loop reports it (`Invalid option …`).
+fn expand_short_options(args: &[String]) -> Vec<String> {
+    // Short options that take a value (consume the rest of the cluster / the next arg).
+    const VALUE_OPTS: &[char] = &['e', 'j', 'o', 't', 'v', 'c'];
+    // Short boolean flags (switches).
+    const FLAG_OPTS: &[char] = &['n', 'q', 'p'];
+    let mut out = Vec::with_capacity(args.len());
+    for a in args {
+        // Only single-dash clusters (`-x…`) need expanding; `--long`, a bare `-`, and plain words
+        // are copied verbatim.
+        if a.len() < 2 || !a.starts_with('-') || a.starts_with("--") {
+            out.push(a.clone());
+            continue;
+        }
+        let chars: Vec<char> = a[1..].chars().collect();
+        let mut idx = 0;
+        while idx < chars.len() {
+            let c = chars[idx];
+            if FLAG_OPTS.contains(&c) {
+                out.push(format!("-{c}"));
+                idx += 1;
+            } else if VALUE_OPTS.contains(&c) {
+                out.push(format!("-{c}"));
+                let rest: String = chars[idx + 1..].iter().collect();
+                if !rest.is_empty() {
+                    out.push(rest);
+                }
+                break;
+            } else {
+                // Unknown short option: hand the remainder to the main loop to reject.
+                let rest: String = chars[idx..].iter().collect();
+                out.push(format!("-{rest}"));
+                break;
+            }
+        }
+    }
+    out
+}
+
 fn parse_args(args: &[String]) -> NgResult<RunOpts> {
+    let args = expand_short_options(args);
+    let args = &args[..];
     let mut opts = RunOpts::default();
     let mut i = 0;
     while i < args.len() {
@@ -1052,4 +1099,57 @@ fn parse_version(v: &str) -> Option<NGLVersion> {
 fn split_digits(s: &str) -> (&str, &str) {
     let end = s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len());
     (&s[..end], &s[end..])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn expand(argv: &[&str]) -> Vec<String> {
+        let args: Vec<String> = argv.iter().map(|s| s.to_string()).collect();
+        expand_short_options(&args)
+    }
+
+    #[test]
+    fn short_option_attached_value() {
+        assert_eq!(expand(&["-j4"]), vec!["-j", "4"]);
+        assert_eq!(expand(&["-vfull"]), vec!["-v", "full"]);
+        assert_eq!(expand(&["-eprint(1)"]), vec!["-e", "print(1)"]);
+    }
+
+    #[test]
+    fn short_option_separate_value_unchanged() {
+        assert_eq!(expand(&["-j", "4"]), vec!["-j", "4"]);
+    }
+
+    #[test]
+    fn short_flag_bundling() {
+        assert_eq!(expand(&["-nq"]), vec!["-n", "-q"]);
+        assert_eq!(expand(&["-np"]), vec!["-n", "-p"]);
+        // A value option ends the cluster and swallows the remainder as its value.
+        assert_eq!(expand(&["-nj4"]), vec!["-n", "-j", "4"]);
+        // Trailing value option with no attached value falls through to the next arg.
+        assert_eq!(expand(&["-nj", "4"]), vec!["-n", "-j", "4"]);
+    }
+
+    #[test]
+    fn passthrough_tokens() {
+        assert_eq!(expand(&["--jobs=4"]), vec!["--jobs=4"]);
+        assert_eq!(expand(&["-"]), vec!["-"]);
+        assert_eq!(expand(&["script.ngl"]), vec!["script.ngl"]);
+    }
+
+    #[test]
+    fn unknown_short_option_preserved_for_error() {
+        assert_eq!(expand(&["-x"]), vec!["-x"]);
+        // Known flag then unknown: the unknown remainder is left as one token to be rejected.
+        assert_eq!(expand(&["-nx"]), vec!["-n", "-x"]);
+    }
+
+    #[test]
+    fn parse_short_jobs_attached() {
+        let opts = parse_args(&["-j8".to_string(), "s.ngl".to_string()]).unwrap();
+        assert_eq!(opts.n_threads, 8);
+        assert_eq!(opts.script.as_deref(), Some("s.ngl"));
+    }
 }
