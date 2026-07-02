@@ -1,0 +1,2 @@
+The `motus` standard module is a mock: importing it aborts with a guidance error
+(motus1 support is long obsolete; see the downloadable motus.ngm).

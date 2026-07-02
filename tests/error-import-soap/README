@@ -1,0 +1,2 @@
+The `soap` standard module is a mock: importing it aborts with a guidance error
+(the SOAP mapper is obsolete and was never ported; use bwa/minimap2 instead).

@@ -1,3 +1,7 @@
+Unreleased
+	* Importing the legacy `motus` or `soap` modules now aborts with a clear
+	guidance error (both are obsolete and unsupported)
+
 Version 1.6.0-beta1 2026-07-01 by luispedro
 	* Switched to rust implementation
 	* Fix bug when outputing comments to compressed files

@@ -1,0 +1,2 @@
+ngless "1.6"
+import "motus" version "1.0"

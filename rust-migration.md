@@ -7,10 +7,6 @@ Haskell parity target for `ngless "1.5"`+ scripts.
   (`output.js` + HTML) at end of run; `src/output.rs` has no report writer (only the console output
   layer).
 
-- **Standard modules not ported:** `motus` (deprecated motus1 wrapper) and the `soap` mapper
-  (`soap` is registered on `import` but `execute_map` rejects it). Both are referenced only for
-  hashing in `src/transform.rs`.
-
 - **Unknown CLI flags** are silently ignored instead of producing an `Invalid option `...'` error
   (mirroring optparse). A bare `-` stays a valid STDIN positional.
 
