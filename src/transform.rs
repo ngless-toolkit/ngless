@@ -18,7 +18,9 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{BOp, Block, Expression, FuncName, Index, NGLType, UOp, Variable};
+use crate::ast::{
+    BOp, Block, Expression, FuncName, Index, NGLType, OptimizedExpression, UOp, Variable,
+};
 use crate::modules::{ArgCheck, Function};
 
 /// Wrap the last top-level statement in `write(<expr>, ofile=STDOUT)` (mirrors `wrapPrint` in
@@ -498,6 +500,62 @@ pub fn write_to_move(body: &mut [(usize, Expression)]) {
             }
         }
     }
+}
+
+/// `ifLenDiscardSpecial` (mirrors `Transform.hs`): special-cases the common preprocess idiom
+///
+/// ```text
+/// if len(read) < N:
+///     discard
+/// ```
+///
+/// rewriting the `Condition` to `Optimized(LenThresholdDiscard(read, <, N))`, which the
+/// interpreter evaluates directly on the read length without building intermediate
+/// `NGLessObject`s per read. Output-neutral; runs after `add_output_hash` (matching the Haskell
+/// transform ordering) so the rewrite does not perturb `{hash}`/`{script}` content hashes.
+pub fn if_len_discard_special(body: &mut [(usize, Expression)]) {
+    for (_, e) in body.iter_mut() {
+        recursive_transform_mut(e, &mut |sub| {
+            if let Some(opt) = as_len_threshold_discard(sub) {
+                *sub = Expression::Optimized(opt);
+            }
+        });
+    }
+}
+
+/// Match the `if len(v) <op> N: discard` (with an empty `else`) shape and extract its parts;
+/// `<op>` must be one of `<`/`<=`/`>`/`>=` (mirrors the guard in `ifLenDiscardSpecial`).
+fn as_len_threshold_discard(e: &Expression) -> Option<OptimizedExpression> {
+    let Expression::Condition(cond, then_b, else_b) = e else {
+        return None;
+    };
+    let then_is_discard = matches!(then_b.as_ref(),
+        Expression::Sequence(s) if matches!(s.as_slice(), [Expression::Discard]));
+    let else_is_empty = matches!(else_b.as_ref(),
+        Expression::Sequence(s) if s.is_empty());
+    if !then_is_discard || !else_is_empty {
+        return None;
+    }
+    let Expression::BinaryOp(b, left, right) = cond.as_ref() else {
+        return None;
+    };
+    if !matches!(b, BOp::LT | BOp::LTE | BOp::GT | BOp::GTE) {
+        return None;
+    }
+    let Expression::UnaryOp(UOp::Len, inner) = left.as_ref() else {
+        return None;
+    };
+    let Expression::Lookup(_, v) = inner.as_ref() else {
+        return None;
+    };
+    let Expression::ConstInt(thresh) = right.as_ref() else {
+        return None;
+    };
+    Some(OptimizedExpression::LenThresholdDiscard(
+        v.clone(),
+        *b,
+        *thresh,
+    ))
 }
 
 /// `sortOFormat` (samtools module transform, mirrors `StandardModules/Samtools.hs`): when a
@@ -1164,6 +1222,19 @@ pub fn show_expr(e: &Expression) -> String {
             )
         }
         Expression::Sequence(es) => format!("Sequence {}", show_list(es)),
+        Expression::Optimized(oe) => format!("Optimized ({})", show_optimized(oe)),
+    }
+}
+
+/// Derived `Show OptimizedExpression` (mirrors `Language.hs`), e.g.
+/// `LenThresholdDiscard (Variable "r") BOpLT 45`.
+fn show_optimized(oe: &OptimizedExpression) -> String {
+    match oe {
+        OptimizedExpression::LenThresholdDiscard(Variable(v), op, thresh) => format!(
+            "LenThresholdDiscard (Variable {}) {} {thresh}",
+            haskell_string(v),
+            show_bop(*op)
+        ),
     }
 }
 
@@ -1411,6 +1482,79 @@ mod tests {
             md5_hex(b"The quick brown fox jumps over the lazy dog"),
             "9e107d9d372bb6826bd81d3542a419d6"
         );
+    }
+
+    /// `if len(read) <op> N: discard` inside a block body is rewritten to the optimized node.
+    #[test]
+    fn if_len_discard_special_rewrites_pattern() {
+        let cond = Expression::Condition(
+            Box::new(Expression::BinaryOp(
+                BOp::LT,
+                Box::new(Expression::UnaryOp(
+                    UOp::Len,
+                    Box::new(Expression::Lookup(None, Variable("read".into()))),
+                )),
+                Box::new(Expression::ConstInt(10)),
+            )),
+            Box::new(Expression::Sequence(vec![Expression::Discard])),
+            Box::new(Expression::Sequence(vec![])),
+        );
+        // Wrapped in a preprocess-style call block so the rewrite is exercised recursively.
+        let mut body = vec![(
+            1,
+            Expression::FunctionCall(
+                FuncName("preprocess".into()),
+                Box::new(Expression::Lookup(None, Variable("input".into()))),
+                vec![],
+                Some(Block {
+                    variable: Variable("read".into()),
+                    body: Box::new(Expression::Sequence(vec![cond])),
+                }),
+            ),
+        )];
+        if_len_discard_special(&mut body);
+        let Expression::FunctionCall(_, _, _, Some(block)) = &body[0].1 else {
+            panic!("expected function call with block");
+        };
+        let Expression::Sequence(stmts) = block.body.as_ref() else {
+            panic!("expected sequence body");
+        };
+        assert_eq!(
+            stmts[0],
+            Expression::Optimized(OptimizedExpression::LenThresholdDiscard(
+                Variable("read".into()),
+                BOp::LT,
+                10
+            ))
+        );
+    }
+
+    /// A condition with a non-empty else branch, or `==`, must not be rewritten.
+    #[test]
+    fn if_len_discard_special_leaves_other_conditions() {
+        let make = |op: BOp, else_body: Vec<Expression>| {
+            Expression::Condition(
+                Box::new(Expression::BinaryOp(
+                    op,
+                    Box::new(Expression::UnaryOp(
+                        UOp::Len,
+                        Box::new(Expression::Lookup(None, Variable("read".into()))),
+                    )),
+                    Box::new(Expression::ConstInt(10)),
+                )),
+                Box::new(Expression::Sequence(vec![Expression::Discard])),
+                Box::new(Expression::Sequence(else_body)),
+            )
+        };
+        // `==` is not an ordering operator; a non-empty else disqualifies the rewrite.
+        for e in [
+            make(BOp::EQ, vec![]),
+            make(BOp::LT, vec![Expression::Discard]),
+        ] {
+            let mut body = vec![(1, e.clone())];
+            if_len_discard_special(&mut body);
+            assert_eq!(body[0].1, e);
+        }
     }
 
     #[test]

@@ -16,6 +16,8 @@ Unreleased
 	* A constant out-of-bounds list index (e.g. `x[5]` on a 3-element list) now
 	fails early, right after the list is assigned, with the same "Index access
 	on line N is invalid" message as earlier ngless versions
+	* The `if len(read) < N: discard` idiom inside `preprocess` blocks is now
+	optimized to a direct length test per read (faster, output-identical)
 
 Version 1.6.0-beta1 2026-07-01 by luispedro
 	* Switched to rust implementation

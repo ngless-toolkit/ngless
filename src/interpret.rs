@@ -3254,6 +3254,38 @@ impl Interpreter {
             }
             Expression::Discard => Ok((BlockStatus::Discarded, value)),
             Expression::Continue => Ok((BlockStatus::Continued, value)),
+            // The `if len(read) <op> N: discard` fast path produced by `if_len_discard_special`
+            // (mirrors the `Optimized (LenThresholdDiscard ...)` case in `interpretBlock1`): test
+            // the read length directly instead of building intermediate values per read.
+            Expression::Optimized(OptimizedExpression::LenThresholdDiscard(
+                Variable(v),
+                op,
+                thresh,
+            )) => {
+                let r = match &value {
+                    NGLessObject::Read(r) if v == name => r,
+                    _ => {
+                        return Err(NgError::should_not_occur(format!(
+                            "Variable name not found in optimized processing {v}"
+                        )))
+                    }
+                };
+                let len = r.len() as i64;
+                let discard = match op {
+                    BOp::LT => len < *thresh,
+                    BOp::GT => len > *thresh,
+                    BOp::LTE => len <= *thresh,
+                    BOp::GTE => len >= *thresh,
+                    // The transform only produces the four ordering operators above.
+                    _ => unreachable!("unexpected operator in LenThresholdDiscard"),
+                };
+                let status = if discard {
+                    BlockStatus::Discarded
+                } else {
+                    BlockStatus::Ok
+                };
+                Ok((status, value))
+            }
             Expression::Condition(c, t_branch, f_branch) => {
                 let cond = match self.eval_block_expr(c, name, &value)? {
                     NGLessObject::Bool(b) => b,

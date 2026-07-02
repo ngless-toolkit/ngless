@@ -66,8 +66,7 @@ fn enc_body(body: &[(usize, Expression)]) -> Value {
     )
 }
 
-/// `toJSONEx`: encode a single expression. The Rust AST has no `Optimized` variant (it is deferred),
-/// so that case is absent here.
+/// `toJSONEx`: encode a single expression.
 fn enc_expr(e: &Expression) -> Value {
     match e {
         Expression::Lookup(t, v) => json!({
@@ -130,6 +129,23 @@ fn enc_expr(e: &Expression) -> Value {
             "type": "control",
             "op": "sequence",
             "args": es.iter().map(enc_expr).collect::<Vec<_>>(),
+        }),
+        Expression::Optimized(oe) => json!({
+            "type": "optimized",
+            "value": enc_optimized(oe),
+        }),
+    }
+}
+
+/// `encodeOpt`: encode an internally-generated optimized expression. `--export-json` runs on the
+/// pre-transform AST, so this is not exercised in practice, but is kept faithful to Haskell.
+fn enc_optimized(oe: &crate::ast::OptimizedExpression) -> Value {
+    match oe {
+        crate::ast::OptimizedExpression::LenThresholdDiscard(v, op, thresh) => json!({
+            "type": "len-threshold",
+            "name": v.0,
+            "op": enc_bop(*op),
+            "thresh": thresh,
         }),
     }
 }

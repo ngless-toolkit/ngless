@@ -1,8 +1,9 @@
 //! Abstract syntax tree for the NGLess language.
 //!
-//! Mirrors `NGLess/Language.hs`. The runtime value type (`NGLessObject`) and the
-//! `Optimized` expression variant are intentionally deferred to later milestones; only what
-//! the front end (tokenizer → parser → type checker → validation) needs lives here.
+//! Mirrors `NGLess/Language.hs`. The runtime value type (`NGLessObject`) lives in `values.rs`; the
+//! AST here is what the front end (tokenizer → parser → type checker → validation) and the
+//! post-typecheck transforms need. `Optimized` (see [`OptimizedExpression`]) is generated only by
+//! those transforms, never parsed from user input.
 
 use std::fmt;
 
@@ -72,6 +73,16 @@ pub enum NGLType {
     List(Box<NGLType>),
 }
 
+/// An internally-generated, optimized expression (mirrors `OptimizedExpression` in
+/// `Language.hs`). These never appear in user scripts; they are produced by post-typecheck
+/// transforms (see `transform.rs`) to special-case hot patterns inside `preprocess` blocks.
+#[derive(Clone, Debug, PartialEq)]
+pub enum OptimizedExpression {
+    /// `if len(read) <op> <int>: discard` — the block variable, the comparison operator (one of
+    /// `<`/`<=`/`>`/`>=`), and the integer threshold.
+    LenThresholdDiscard(Variable, BOp, i64),
+}
+
 /// The main AST type.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
@@ -105,6 +116,9 @@ pub enum Expression {
         Vec<(Variable, Expression)>,
     ),
     Sequence(Vec<Expression>),
+    /// An internally-generated optimized expression (see [`OptimizedExpression`]). Produced by a
+    /// post-typecheck transform; never parsed from user input.
+    Optimized(OptimizedExpression),
 }
 
 /// Module import information (the header `import "name" version "v"`).

@@ -8,9 +8,12 @@ Haskell parity target for `ngless "1.5"`+ scripts.
   layer).
 
 - **`Transform.hs` passes not ported.** The output-neutral optimizations
-  `qcInPreprocess`/`ifLenDiscardSpecial`/`substrimReassign` and the early-check injections
+  `qcInPreprocess`/`substrimReassign` and the early-check injections
   `addRSChecks`/`addCountsCheck` are absent (Rust does eager IO validation differently, so these are
-  partly covered). `addFileChecks` and `addIndexChecks` *are* ported (`transform.rs`), the latter
+  partly covered). `ifLenDiscardSpecial` *is* ported (`transform.rs::if_len_discard_special` +
+  the `Optimized(LenThresholdDiscard …)` AST node, handled in `interpret.rs::interpret_block_stmt`):
+  `if len(read) <op> N: discard` inside a preprocess block is rewritten to the fast path, matching
+  Haskell byte-for-byte. `addFileChecks` and `addIndexChecks` *are* ported (`transform.rs`), the latter
   reusing a `genericCheckUpfloat` port that would also back `addRSChecks`/`addCountsCheck` if those
   are picked up later. `addTemporaries` is still not ported (see the out-of-bounds note below for the
   one edge that leaves). `addUseNewer` is out of scope at ≥1.5.

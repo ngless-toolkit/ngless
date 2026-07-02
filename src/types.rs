@@ -246,8 +246,11 @@ impl TypeChecker {
             Expression::UnaryOp(uop, expr) => self.check_uop(*uop, expr),
             Expression::BinaryOp(bop, a, b) => self.check_bop(*bop, a, b),
             Expression::IndexExpression(expr, index) => self.check_index(expr, index),
-            // These should never reach nglTypeOf.
-            Expression::Condition(..) | Expression::Sequence(_) => Ok(None),
+            // These should never reach nglTypeOf. `Optimized` is generated only by post-typecheck
+            // transforms, so it never appears during type inference.
+            Expression::Condition(..) | Expression::Sequence(_) | Expression::Optimized(_) => {
+                Ok(None)
+            }
         }
     }
 

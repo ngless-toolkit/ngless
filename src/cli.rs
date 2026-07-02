@@ -975,6 +975,10 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // `__can_move=True`, so the interpreter may move (rename) the backing temp file to the output
     // instead of copying it. First of the builtin transforms, before `addFileChecks`.
     crate::transform::write_to_move(&mut typed.body);
+    // `ifLenDiscardSpecial`: rewrite `if len(read) <op> N: discard` inside preprocess blocks to the
+    // `Optimized(LenThresholdDiscard ...)` fast path. A builtin transform, run after `writeToMove`
+    // and before `addFileChecks`, matching Haskell's order. Output-neutral.
+    crate::transform::if_len_discard_special(&mut typed.body);
     // Insert the floated `__check_ofile` calls (mirrors `addFileChecks`, a builtin transform that
     // runs after the module transforms). Done after output hashing so the inserted checks do not
     // affect the `{hash}`/`{script}` content hashes.
