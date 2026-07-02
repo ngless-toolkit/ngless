@@ -1973,10 +1973,17 @@ impl Interpreter {
                 )))
             }
         };
+        // `sortOFormat` (a transform) injects `__output_bam=True` when the result feeds only a BAM
+        // `write`; sorting straight to BAM avoids a second SAM→BAM conversion pass (extra `@PG`).
+        let out_bam = matches!(
+            lookup_arg(args, "__output_bam"),
+            Some(NGLessObject::Bool(true))
+        );
+        let oformat = if out_bam { "bam" } else { "sam" };
         let input = self.samtools_input(&path)?;
-        let out = self.new_temp_path("sorted_", "sam")?;
+        let out = self.new_temp_path("sorted_", oformat)?;
         let temp_prefix = self.new_temp_path("samtools_sort_temp", "tmp")?;
-        crate::samtools::sort(&input, &out, "sam", by_name, &temp_prefix)?;
+        crate::samtools::sort(&input, &out, oformat, by_name, &temp_prefix)?;
         Ok(NGLessObject::MappedReadSet { name, path: out })
     }
 

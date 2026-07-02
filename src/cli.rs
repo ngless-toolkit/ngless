@@ -965,6 +965,12 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         crate::transform::parallel_transform(&mut typed.body, include_for_all)
             .map_err(NgError::script)?;
     }
+    // The samtools module's `sortOFormat` transform: when a `samtools_sort` result is only used in
+    // a BAM `write`, inject `__output_bam=True` so the interpreter sorts straight to BAM (one pass,
+    // one `@PG` line). A module transform, so it runs after `addOutputHash` and before `writeToMove`.
+    if modules.iter().any(|m| m.name() == "samtools") {
+        crate::transform::sort_oformat(&mut typed.body);
+    }
     // `writeToMove`: mark `write()` calls whose input variable is dead afterwards with
     // `__can_move=True`, so the interpreter may move (rename) the backing temp file to the output
     // instead of copying it. First of the builtin transforms, before `addFileChecks`.

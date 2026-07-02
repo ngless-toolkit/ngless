@@ -336,6 +336,107 @@ pub fn write_to_move(body: &mut [(usize, Expression)]) {
     }
 }
 
+/// `sortOFormat` (samtools module transform, mirrors `StandardModules/Samtools.hs`): when a
+/// `samtools_sort(...)` result is *only* consumed by a `write()` in BAM format, inject a hidden
+/// `__output_bam=True` keyword so the interpreter sorts directly to BAM. This avoids an extra
+/// SAM→BAM conversion pass (and the extra `@PG` line it adds), matching Haskell byte-for-byte.
+///
+/// Runs after `addOutputHash` (so the injected arg does not perturb the `{hash}`) and before
+/// `writeToMove`, mirroring the Haskell transform ordering.
+pub fn sort_oformat(body: &mut [(usize, Expression)]) {
+    for i in 0..body.len() {
+        let is_sort = matches!(
+            &body[i].1,
+            Expression::Assignment(_, rhs)
+                if matches!(rhs.as_ref(),
+                    Expression::FunctionCall(FuncName(f), _, _, None) if f == "samtools_sort")
+        );
+        if !is_sort {
+            continue;
+        }
+        let Expression::Assignment(v, _) = &body[i].1 else {
+            continue;
+        };
+        let v = v.clone();
+        if output_bam(&v, &body[i + 1..]) {
+            if let Expression::Assignment(_, rhs) = &mut body[i].1 {
+                if let Expression::FunctionCall(_, _, args, _) = rhs.as_mut() {
+                    args.insert(
+                        0,
+                        (
+                            Variable("__output_bam".to_string()),
+                            Expression::ConstBool(true),
+                        ),
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// Whether variable `v` (bound to a `samtools_sort` result) is used *only* as the input to a BAM
+/// `write()` in the following statements `es` (mirrors `outputBam`). Any other use of `v` — before
+/// or after such a write — makes it unsafe, so we fall back to SAM (`false`).
+fn output_bam(v: &Variable, es: &[(usize, Expression)]) -> bool {
+    for (idx, (_, c)) in es.iter().enumerate() {
+        // A top-level `write(Lookup v, ...)` consuming exactly `v`.
+        if let Expression::FunctionCall(FuncName(f), arg, args, None) = c {
+            if f == "write" {
+                if let Expression::Lookup(_, v2) = arg.as_ref() {
+                    if v2 == v {
+                        let rest = &es[idx + 1..];
+                        return is_obam(args) && !rest.iter().any(|(_, e)| is_var_used1(v, e));
+                    }
+                }
+            }
+        }
+        // `v` used any other way (e.g. re-sorted, selected, aliased) → unsafe.
+        if is_var_used1(v, c) {
+            return false;
+        }
+    }
+    false
+}
+
+/// Whether a `write()`'s keyword arguments request BAM output (mirrors `isOBam`): an explicit
+/// `format={bam}` wins; otherwise infer from an `ofile=` string that ends in `.bam`. In doubt, SAM.
+fn is_obam(args: &[(Variable, Expression)]) -> bool {
+    match arg_format(args) {
+        Some(true) => return true,
+        Some(false) => return false,
+        None => {}
+    }
+    match args.iter().find(|(Variable(k), _)| k == "ofile") {
+        Some((_, oname)) => string_will_end_with(oname, ".bam") == Some(true),
+        None => false,
+    }
+}
+
+/// The `format=` argument as a tri-state (mirrors `oFormat`): `Some(true)` for `{bam}`, `Some(false)`
+/// for any other symbol, `None` when absent.
+fn arg_format(args: &[(Variable, Expression)]) -> Option<bool> {
+    args.iter()
+        .find(|(Variable(k), _)| k == "format")
+        .map(|(_, v)| matches!(v, Expression::ConstSymbol(s) if s == "bam"))
+}
+
+/// Whether the string-valued expression provably ends with `post` (mirrors `stringWillEndWith`).
+/// A literal is checked directly; a `+` concatenation is decided by its *right* operand (the
+/// suffix); anything else is unknown (`None`).
+fn string_will_end_with(e: &Expression, post: &str) -> Option<bool> {
+    match e {
+        Expression::ConstStr(b) => {
+            if b.len() >= post.len() {
+                Some(b.ends_with(post))
+            } else {
+                None
+            }
+        }
+        Expression::BinaryOp(BOp::Add, _, right) => string_will_end_with(right, post),
+        _ => None,
+    }
+}
+
 /// Variables used as the (single-`Lookup`) argument to a call of `fname` anywhere in `expr`
 /// (mirrors `functionVars`).
 fn function_vars(fname: &str, expr: &Expression) -> Vec<Variable> {
@@ -1317,6 +1418,120 @@ mod tests {
         write_to_move(&mut body);
         assert!(!has_can_move(&body[2].1));
         assert!(!has_can_move(&body[3].1));
+    }
+
+    fn has_output_bam(e: &Expression) -> bool {
+        if let Expression::Assignment(_, rhs) = e {
+            if let Expression::FunctionCall(_, _, kwargs, _) = rhs.as_ref() {
+                return kwargs.iter().any(|(Variable(k), v)| {
+                    k == "__output_bam" && matches!(v, Expression::ConstBool(true))
+                });
+            }
+        }
+        false
+    }
+
+    fn symbol(s: &str) -> Expression {
+        Expression::ConstSymbol(s.to_string())
+    }
+
+    #[test]
+    fn sort_oformat_injects_for_bam_write() {
+        // s = samtools_sort(x); write(s, ofile='out.bam') -> sort straight to BAM.
+        let mut body = vec![
+            (1, assign("s", call("samtools_sort", lookup("x"), vec![]))),
+            (
+                2,
+                call(
+                    "write",
+                    lookup("s"),
+                    vec![("ofile", Expression::ConstStr("out.bam".to_string()))],
+                ),
+            ),
+        ];
+        sort_oformat(&mut body);
+        assert!(has_output_bam(&body[0].1));
+    }
+
+    #[test]
+    fn sort_oformat_respects_format_symbol() {
+        // Explicit format={bam} wins even when ofile does not end in .bam.
+        let mut body = vec![
+            (1, assign("s", call("samtools_sort", lookup("x"), vec![]))),
+            (
+                2,
+                call(
+                    "write",
+                    lookup("s"),
+                    vec![
+                        ("ofile", Expression::ConstStr("out.dat".to_string())),
+                        ("format", symbol("bam")),
+                    ],
+                ),
+            ),
+        ];
+        sort_oformat(&mut body);
+        assert!(has_output_bam(&body[0].1));
+    }
+
+    #[test]
+    fn sort_oformat_skips_sam_write() {
+        // A SAM write must not trigger BAM output.
+        let mut body = vec![
+            (1, assign("s", call("samtools_sort", lookup("x"), vec![]))),
+            (
+                2,
+                call(
+                    "write",
+                    lookup("s"),
+                    vec![("ofile", Expression::ConstStr("out.sam".to_string()))],
+                ),
+            ),
+        ];
+        sort_oformat(&mut body);
+        assert!(!has_output_bam(&body[0].1));
+    }
+
+    #[test]
+    fn sort_oformat_skips_when_reused() {
+        // If the sorted set is used elsewhere (here: another write), it is unsafe to change format.
+        let mut body = vec![
+            (1, assign("s", call("samtools_sort", lookup("x"), vec![]))),
+            (
+                2,
+                call(
+                    "write",
+                    lookup("s"),
+                    vec![("ofile", Expression::ConstStr("out.bam".to_string()))],
+                ),
+            ),
+            (
+                3,
+                call(
+                    "write",
+                    lookup("s"),
+                    vec![("ofile", Expression::ConstStr("copy.bam".to_string()))],
+                ),
+            ),
+        ];
+        sort_oformat(&mut body);
+        assert!(!has_output_bam(&body[0].1));
+    }
+
+    #[test]
+    fn sort_oformat_infers_bam_from_concatenated_ofile() {
+        // ofile = base + '.bam' should still be recognised as BAM (suffix is the right operand).
+        let ofile = Expression::BinaryOp(
+            BOp::Add,
+            Box::new(lookup("base")),
+            Box::new(Expression::ConstStr(".bam".to_string())),
+        );
+        let mut body = vec![
+            (1, assign("s", call("samtools_sort", lookup("x"), vec![]))),
+            (2, call("write", lookup("s"), vec![("ofile", ofile)])),
+        ];
+        sort_oformat(&mut body);
+        assert!(has_output_bam(&body[0].1));
     }
 
     #[test]

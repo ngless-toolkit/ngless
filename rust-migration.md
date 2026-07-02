@@ -34,15 +34,12 @@ Haskell parity target for `ngless "1.5"`+ scripts.
   `inputs:`) but never in Rust (empty); (c) **`--export-json`** serialises the node differently
   (Lookup vs BuiltinConstant). No test combines ARGV with hashing/collect/export.
 
-- **samtools `sortOFormat` transform not ported → non-byte-identical BAM.**
-  `StandardModules/Samtools.hs`'s `sortOFormat` rewrites `samtools_sort` to emit BAM directly
-  (`__output_bam=True`) when its result is only used in a BAM `write`. Rust always sorts to SAM
-  (`interpret.rs`, hard-coded `"sam"`) and converts to BAM at write time, so
-  `x = samtools_sort(...); write(x, ofile='out.bam')` carries an **extra `@PG` line** (sort + view)
-  vs Haskell's single one, plus an extra conversion pass. Tests pass only because their `check.sh`
-  strips `@PG` (`grep -v '^@PG'`). Relatedly, `checkUnique` runs in the validate phase in Rust
-  (`validation.rs::validate_select_unique_not_sorted`) vs a transform in Haskell — same error text,
-  earlier timing.
+- **samtools `checkUnique` runs at a different phase (same error, earlier timing).** The samtools
+  module's `checkUnique` (rejecting `select(..., keep_if=[{unique}])` on a `samtools_sort`ed read
+  set) runs in the validate phase in Rust (`validation.rs::validate_select_unique_not_sorted`) vs a
+  module transform in Haskell — identical error text, surfaced slightly earlier. (The sibling
+  `sortOFormat` transform *is* ported: `transform.rs::sort_oformat` injects `__output_bam=True` so
+  `samtools_sort` feeding only a BAM `write` sorts straight to BAM, one `@PG` line, byte-identical.)
 
 - **Run-header citations missed for nested `map`/`assemble`/`orf_find`.** `collectCitations` matches
   only top-level `Assignment _ (FunctionCall f)`. Haskell runs it on the **transformed** script,
