@@ -405,6 +405,53 @@ fn rs_checks_of(lno: usize, e: &Expression) -> Option<(Vec<Variable>, Expression
     Some((vec![v.clone()], check))
 }
 
+/// `addCountsCheck` (mirrors `Transform.hs`): for every `count(mapped, ...)` call, inject a
+/// `__check_count(__VOID, original_lno=N, <count kwargs>)` call floated up to just after the last
+/// variable the count arguments depend on (or to the top of the script when they are all constant),
+/// so that when a `functional_map` is used, missing requested features fail *early* rather than only
+/// when `count` finally streams the SAM. The last of the three `genericCheckUpfloat` checks; a
+/// builtin transform, run after `add_index_checks`, matching the Haskell order. Runs after
+/// `add_output_hash`, so the injected checks do not affect `{hash}`/`{script}` content hashes.
+pub fn add_counts_check(body: Vec<(usize, Expression)>) -> Vec<(usize, Expression)> {
+    generic_check_upfloat(&count_check_of, body)
+}
+
+/// `countCheck`: match a `count(...)` call (with no block) and return the variables its keyword
+/// arguments depend on plus the `__check_count` call to float up.
+fn count_check_of(lno: usize, e: &Expression) -> Option<(Vec<Variable>, Expression)> {
+    let Expression::FunctionCall(FuncName(f), _, kwargs, None) = e else {
+        return None;
+    };
+    if f != "count" {
+        return None;
+    }
+    let vars = kwargs.iter().flat_map(|(_, v)| used_variables(v)).collect();
+    let check = Expression::FunctionCall(
+        FuncName("__check_count".to_string()),
+        Box::new(Expression::BuiltinConstant(Variable("__VOID".to_string()))),
+        std::iter::once((
+            Variable("original_lno".to_string()),
+            Expression::ConstInt(lno as i64),
+        ))
+        .chain(kwargs.iter().cloned())
+        .collect(),
+        None,
+    );
+    Some((vars, check))
+}
+
+/// `usedVariables` (mirrors `Language.hs`): every variable referenced by a `Lookup` anywhere in the
+/// expression.
+fn used_variables(e: &Expression) -> Vec<Variable> {
+    let mut out = Vec::new();
+    recursive_collect(e, &mut |sub| {
+        if let Expression::Lookup(_, v) = sub {
+            out.push(v.clone());
+        }
+    });
+    out
+}
+
 /// `genericCheckUpfloat` (mirrors `Transform.hs`): generalises "emit a check for a statement, then
 /// bubble it up past intervening statements to just after the variable(s) it depends on are
 /// assigned". Works on the reversed statement list so a check can be placed *before* (reversed) the
@@ -503,6 +550,120 @@ fn float_down(
     out
 }
 
+/// `qcInPreprocess` (mirrors `Transform.hs`): when a read set loaded by
+/// `fastq`/`paired`/`load_fastq_directory`/`load_mocat_sample` is *first used* by a `preprocess`,
+/// move the QC pass from load time into the preprocess (which already streams the input). The loader
+/// gets a hidden `__perform_qc=False` and the matching `preprocess` a hidden `__input_qc=True`, so
+/// the interpreter computes the per-input-file QC statistics once, inside `preprocess`, instead of
+/// separately at load time. Output-neutral: the same statistics are still produced under the same
+/// (input-file) labels. A builtin transform, run after `writeToMove` and before
+/// `ifLenDiscardSpecial`; runs after `add_output_hash`, so the injected args do not affect hashes.
+pub fn qc_in_preprocess(mut body: Vec<(usize, Expression)>) -> Vec<(usize, Expression)> {
+    let mut i = 0;
+    while i < body.len() {
+        if let Some((fname, v)) = fastq_var(&body[i].1) {
+            // The transform is only safe when the *first* use of the loaded variable is the
+            // preprocess (otherwise QC-deferral could change an intervening observation).
+            if can_qc_preprocess_transform(&v, &body[i + 1..]) {
+                let expr = std::mem::replace(&mut body[i].1, Expression::Discard);
+                body[i].1 = add_perform_qc_false(&fname, expr);
+                rewrite_preprocess_input_qc(&v, &mut body, i + 1);
+            }
+        }
+        i += 1;
+    }
+    body
+}
+
+/// `fastQVar`: a `v = <loader>(...)` assignment whose loader is one of the QC-performing read-set
+/// loaders, returning the loader name and the assigned variable.
+fn fastq_var(e: &Expression) -> Option<(String, Variable)> {
+    let Expression::Assignment(v, rhs) = e else {
+        return None;
+    };
+    let Expression::FunctionCall(FuncName(fname), _, _, _) = rhs.as_ref() else {
+        return None;
+    };
+    if matches!(
+        fname.as_str(),
+        "fastq" | "paired" | "load_fastq_directory" | "load_mocat_sample"
+    ) {
+        Some((fname.clone(), v.clone()))
+    } else {
+        None
+    }
+}
+
+/// `canQCPreprocessTransform`: true iff the first use of `v` in the following statements is a
+/// `preprocess(v, ...)`. Any earlier use of `v` makes the deferral unsafe.
+fn can_qc_preprocess_transform(v: &Variable, rest: &[(usize, Expression)]) -> bool {
+    for (_, e) in rest {
+        // Check the `_ = preprocess(v, ...)` shape first — that assignment also *uses* `v`, so the
+        // order matters (mirrors the clause order in Haskell).
+        if is_preprocess_of(v, e) {
+            return true;
+        }
+        if is_var_used1(v, e) {
+            return false;
+        }
+    }
+    false
+}
+
+/// Whether `e` is `_ = preprocess(<Lookup v>, ...)`.
+fn is_preprocess_of(v: &Variable, e: &Expression) -> bool {
+    let Expression::Assignment(_, rhs) = e else {
+        return false;
+    };
+    let Expression::FunctionCall(FuncName(f), arg, _, _) = rhs.as_ref() else {
+        return false;
+    };
+    f == "preprocess" && matches!(arg.as_ref(), Expression::Lookup(_, v2) if v2 == v)
+}
+
+/// `addArgument func (__perform_qc, False)`: prepend a hidden `__perform_qc=False` keyword to the
+/// `func` call inside an assignment RHS.
+fn add_perform_qc_false(func: &str, expr: Expression) -> Expression {
+    match expr {
+        Expression::Assignment(v, rhs) => {
+            Expression::Assignment(v, Box::new(add_perform_qc_false(func, *rhs)))
+        }
+        Expression::FunctionCall(FuncName(fname), e, mut args, b) if fname == func => {
+            args.insert(
+                0,
+                (
+                    Variable("__perform_qc".to_string()),
+                    Expression::ConstBool(false),
+                ),
+            );
+            Expression::FunctionCall(FuncName(fname), e, args, b)
+        }
+        other => other,
+    }
+}
+
+/// `rewritePreprocess`: prepend a hidden `__input_qc=True` to the *first* `preprocess(v, ...)` call
+/// in `body[start..]`.
+fn rewrite_preprocess_input_qc(v: &Variable, body: &mut [(usize, Expression)], start: usize) {
+    for stmt in &mut body[start..] {
+        if !is_preprocess_of(v, &stmt.1) {
+            continue;
+        }
+        if let Expression::Assignment(_, rhs) = &mut stmt.1 {
+            if let Expression::FunctionCall(_, _, args, _) = rhs.as_mut() {
+                args.insert(
+                    0,
+                    (
+                        Variable("__input_qc".to_string()),
+                        Expression::ConstBool(true),
+                    ),
+                );
+            }
+        }
+        return;
+    }
+}
+
 /// `writeToMove` (mirrors `Transform.hs`): when a variable is no longer used *after* a `write()`
 /// call that takes it, inject a hidden `__can_move=True` keyword argument into that call. This tells
 /// the interpreter it may **move** (rename) the intermediate temp file backing the variable to the
@@ -595,6 +756,49 @@ fn as_len_threshold_discard(e: &Expression) -> Option<OptimizedExpression> {
         *b,
         *thresh,
     ))
+}
+
+/// `substrimReassign` (mirrors `Transform.hs`): rewrite `read = substrim(read, min_quality=N)` (the
+/// same variable on both sides, with `min_quality` as the sole keyword argument and no block) to
+/// `Optimized(SubstrimReassign(read, N))`, which the interpreter applies in place on the block
+/// variable's read. Output-neutral; runs after `if_len_discard_special` and before `add_file_checks`
+/// (matching Haskell's transform ordering), so the rewrite does not perturb `{hash}`/`{script}`
+/// content hashes.
+pub fn substrim_reassign(body: &mut [(usize, Expression)]) {
+    for (_, e) in body.iter_mut() {
+        recursive_transform_mut(e, &mut |sub| {
+            if let Some(opt) = as_substrim_reassign(sub) {
+                *sub = Expression::Optimized(opt);
+            }
+        });
+    }
+}
+
+/// Match `v = substrim(v, min_quality=N)` and extract `(v, N)` (mirrors the guard in
+/// `substrimReassign`). Requires the exact shape: one `min_quality`/`ConstInt` keyword argument, no
+/// block, and the assigned variable identical to the `substrim` input.
+fn as_substrim_reassign(e: &Expression) -> Option<OptimizedExpression> {
+    let Expression::Assignment(v, rhs) = e else {
+        return None;
+    };
+    let Expression::FunctionCall(FuncName(f), arg, kwargs, None) = rhs.as_ref() else {
+        return None;
+    };
+    if f != "substrim" {
+        return None;
+    }
+    let Expression::Lookup(_, v2) = arg.as_ref() else {
+        return None;
+    };
+    if v != v2 {
+        return None;
+    }
+    match kwargs.as_slice() {
+        [(Variable(k), Expression::ConstInt(mq))] if k == "min_quality" => {
+            Some(OptimizedExpression::SubstrimReassign(v.clone(), *mq))
+        }
+        _ => None,
+    }
 }
 
 /// `sortOFormat` (samtools module transform, mirrors `StandardModules/Samtools.hs`): when a
@@ -1274,6 +1478,9 @@ fn show_optimized(oe: &OptimizedExpression) -> String {
             haskell_string(v),
             show_bop(*op)
         ),
+        OptimizedExpression::SubstrimReassign(Variable(v), mq) => {
+            format!("SubstrimReassign (Variable {}) {mq}", haskell_string(v))
+        }
     }
 }
 

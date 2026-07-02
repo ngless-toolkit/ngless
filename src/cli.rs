@@ -1022,10 +1022,19 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // `__can_move=True`, so the interpreter may move (rename) the backing temp file to the output
     // instead of copying it. First of the builtin transforms, before `addFileChecks`.
     crate::transform::write_to_move(&mut typed.body);
+    // `qcInPreprocess`: when a loaded read set is first used by a `preprocess`, defer its QC into
+    // that preprocess (`__perform_qc=False` on the loader, `__input_qc=True` on the preprocess), so
+    // the per-input-file QC statistics are computed once. A builtin transform, run after
+    // `writeToMove` and before `ifLenDiscardSpecial`, matching Haskell's order. Output-neutral.
+    typed.body = crate::transform::qc_in_preprocess(std::mem::take(&mut typed.body));
     // `ifLenDiscardSpecial`: rewrite `if len(read) <op> N: discard` inside preprocess blocks to the
     // `Optimized(LenThresholdDiscard ...)` fast path. A builtin transform, run after `writeToMove`
     // and before `addFileChecks`, matching Haskell's order. Output-neutral.
     crate::transform::if_len_discard_special(&mut typed.body);
+    // `substrimReassign`: rewrite `read = substrim(read, min_quality=N)` inside preprocess blocks to
+    // the `Optimized(SubstrimReassign ...)` fast path. A builtin transform, run after
+    // `ifLenDiscardSpecial` and before `addFileChecks`, matching Haskell's order. Output-neutral.
+    crate::transform::substrim_reassign(&mut typed.body);
     // Insert the floated `__check_ofile` calls (mirrors `addFileChecks`, a builtin transform that
     // runs after the module transforms). Done after output hashing so the inserted checks do not
     // affect the `{hash}`/`{script}` content hashes.
@@ -1039,6 +1048,11 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // that runs after `addRSChecks`). A constant out-of-bounds index now fails early, right after
     // the array is assigned. Done after output hashing so the inserted checks do not affect hashes.
     typed.body = crate::transform::add_index_checks(std::mem::take(&mut typed.body));
+    // Insert the floated `__check_count` calls (mirrors `addCountsCheck`, the last builtin transform,
+    // run after `addIndexChecks`). When a `count(functional_map=...)` requests features that are not
+    // columns of the map, this now fails early. Done after output hashing so the inserted checks do
+    // not affect hashes.
+    typed.body = crate::transform::add_counts_check(std::mem::take(&mut typed.body));
 
     // Export modes (gated on `--experimental-features`, checked above): serialise the script and
     // exit before interpretation, mirroring the `whenJust (exportJSON ...) $ ... exitSuccess` /

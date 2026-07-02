@@ -147,6 +147,11 @@ fn enc_optimized(oe: &crate::ast::OptimizedExpression) -> Value {
             "op": enc_bop(*op),
             "thresh": thresh,
         }),
+        crate::ast::OptimizedExpression::SubstrimReassign(v, mq) => json!({
+            "type": "substrim-reassign",
+            "name": v.0,
+            "minqual": mq,
+        }),
     }
 }
 

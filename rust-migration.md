@@ -7,20 +7,20 @@ Haskell parity target for `ngless "1.5"`+ scripts.
   (`output.js` + HTML) at end of run; `src/output.rs` has no report writer (only the console output
   layer).
 
-- **`Transform.hs` passes not ported.** The output-neutral optimizations
-  `qcInPreprocess`/`substrimReassign` and the early-check injection `addCountsCheck` are absent (Rust
-  does eager IO validation differently, so these are partly covered). `ifLenDiscardSpecial` *is*
-  ported (`transform.rs::if_len_discard_special` +
-  the `Optimized(LenThresholdDiscard …)` AST node, handled in `interpret.rs::interpret_block_stmt`):
-  `if len(read) <op> N: discard` inside a preprocess block is rewritten to the fast path, matching
-  Haskell byte-for-byte. `addFileChecks`, `addRSChecks`, and `addIndexChecks` *are* ported
-  (`transform.rs`), all three sharing a `genericCheckUpfloat` port that would also back
-  `addCountsCheck` if it is picked up later. `addRSChecks` (`transform.rs::add_rs_checks` +
-  the `__check_readset` builtin in `interpret.rs::execute_check_readset`) floats a `__check_readset`
-  call up to just after a `preprocess`ed read set is bound, verifying its backing FASTQ files are
-  readable early (byte-identical error text, see `tests/error-readset-check-early`). `addTemporaries`
-  is still not ported (see the out-of-bounds note below for the one edge that leaves). `addUseNewer`
-  is out of scope at ≥1.5.
+- **`Transform.hs` passes: only two edges remain.** Almost all passes are ported
+  (`transform.rs`): `writeToMove`, `qcInPreprocess`, `ifLenDiscardSpecial`, `substrimReassign`,
+  `addFileChecks`, `addRSChecks`, `addIndexChecks`, `addCountsCheck`, `addOutputHash`, and the
+  parallel/samtools module transforms. The four `genericCheckUpfloat`-based checks (`addFileChecks`,
+  `addRSChecks`, `addIndexChecks`, `addCountsCheck`) share one `generic_check_upfloat` port;
+  `addCountsCheck` injects a runtime `__check_count` (`interpret.rs::execute_count_check`) that catches
+  missing `functional_map` features for *dynamic* count arguments — the static-argument case is
+  already covered eagerly by `validation.rs::validate_count` (see `tests/error-count-check-dynamic`).
+  `qcInPreprocess` and `substrimReassign` are output-neutral optimizations, ported faithfully
+  (`transform.rs::qc_in_preprocess`/`substrim_reassign`, with interpreter support for the hidden
+  `__perform_qc`/`__input_qc` args and the `Optimized(SubstrimReassign …)` node). Two edges are left:
+  **`addTemporaries`** is not ported — the only observable gap is `<call>()[<constInt>]` (indexing a
+  call result directly, without binding it to a variable); see the out-of-bounds note below.
+  **`addUseNewer`** is out of scope at ≥1.5 (it only fires below `ngless "1.1"`).
 
 - **Reference-download path:** `count(reference=...)` annotation download errors (`src/interpret.rs`:
   "automatic annotation download is not supported"). `ensure_data_present` only surfaces the FASTA

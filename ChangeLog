@@ -1,4 +1,7 @@
 Unreleased
+	* `count(functional_map=...)` now checks that the requested features are
+	columns of the map early, aborting before any output is written, even when
+	the map or features are passed through variables (dynamic arguments)
 	* `preprocess()` now verifies its input read set's backing FASTQ files are
 	readable early (right after the read set is bound) rather than only when the
 	reads are finally streamed, so a missing/unreadable input aborts sooner

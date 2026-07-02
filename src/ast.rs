@@ -81,6 +81,10 @@ pub enum OptimizedExpression {
     /// `if len(read) <op> <int>: discard` — the block variable, the comparison operator (one of
     /// `<`/`<=`/`>`/`>=`), and the integer threshold.
     LenThresholdDiscard(Variable, BOp, i64),
+    /// `read = substrim(read, min_quality=<int>)` (the same variable on both sides) — the block
+    /// variable and the `min_quality` threshold. Applies `substrim` in place without rebuilding the
+    /// intermediate `NGLessObject`.
+    SubstrimReassign(Variable, i64),
 }
 
 /// The main AST type.

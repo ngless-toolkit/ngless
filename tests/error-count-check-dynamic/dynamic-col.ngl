@@ -1,0 +1,11 @@
+ngless '1.6'
+mapped = samfile('basic.sam')
+
+# The functional map is passed through a *variable*, so the validation-phase check
+# (validate_count) — which only handles statically-known arguments — cannot see it and skips.
+# The addCountsCheck transform injects a runtime `__check_count` that runs before count() (and
+# thus before the write below), reporting the missing feature ("kot" is not a column of the map)
+# with the plain executeCountCheck message (no "Available columns" listing).
+mapfile = 'functional.map'
+counted = count(mapped, features=['kot'], multiple={all1}, functional_map=mapfile)
+write(counted, ofile='should.not.be.created.txt')

@@ -451,6 +451,65 @@ fn execute_check_readset(
     Ok(NGLessObject::Void)
 }
 
+/// `__check_count(__VOID, original_lno=N, <count kwargs>)`: when a `count()` uses a `functional_map`,
+/// verify up front that every requested feature is a column of that map, failing early with
+/// `In call to count() [line N], missing features: ...` (mirrors `executeCountCheck`). Inserted by
+/// [`crate::transform::add_counts_check`] and floated up to just after the arguments' variables are
+/// bound. Only functional-map mode is checked; `seqname`/`gff_file`/`reference` counts are no-ops
+/// here (matching Haskell's `parseAnnotationMode` fallthrough with `mappedref = Nothing`).
+fn execute_count_check(args: &[(String, NGLessObject)]) -> NgResult<NGLessObject> {
+    let lno = match lookup_arg(args, "original_lno") {
+        Some(NGLessObject::Integer(i)) => *i,
+        _ => 0,
+    };
+    let features =
+        lookup_string_list(args, "features")?.unwrap_or_else(|| vec!["gene".to_string()]);
+    // `seqname` mode short-circuits (features == ["seqname"]); otherwise a `functional_map`
+    // triggers the check and any other mode (gff_file / reference / none) is a no-op.
+    if features == ["seqname"] {
+        return Ok(NGLessObject::Void);
+    }
+    let Some(fmap) = lookup_opt_string(args, "functional_map") else {
+        return Ok(NGLessObject::Void);
+    };
+    let columns = functional_map_header_columns(&fmap)?;
+    let missing: Vec<&String> = features.iter().filter(|f| !columns.contains(f)).collect();
+    if !missing.is_empty() {
+        let mut msg = format!("In call to count() [line {lno}], missing features:");
+        for f in missing {
+            msg.push(' ');
+            msg.push_str(f);
+        }
+        return Err(NgError::new(NgErrorType::DataError, msg));
+    }
+    Ok(NGLessObject::Void)
+}
+
+/// Read the header columns of a MOCAT-style functional map: the last of the leading comment lines,
+/// or the first line when there is none (mirrors `lastCommentOrHeader fname True`), split on tabs.
+/// Unlike [`crate::count`]'s loader, the first (gene-name) column is kept, matching Haskell's
+/// `B8.split '\t'` over the whole line.
+fn functional_map_header_columns(path: &str) -> NgResult<Vec<String>> {
+    let text = crate::compression::read_to_string(path)?;
+    let is_comment = |line: &str| line.is_empty() || line.starts_with('#');
+    let mut header: Option<&str> = None;
+    for line in text.lines() {
+        match header {
+            None => {
+                header = Some(line);
+                if !is_comment(line) {
+                    break;
+                }
+            }
+            Some(_) if is_comment(line) => header = Some(line),
+            Some(_) => break,
+        }
+    }
+    Ok(header
+        .map(|h| h.split('\t').map(str::to_string).collect())
+        .unwrap_or_default())
+}
+
 /// Check that `oname`'s directory exists and is writable (mirrors `checkOFile` in
 /// `BuiltinModules/Checks.hs`). Returns an error message, or `None` when the file can be written.
 pub(crate) fn check_ofile(oname: &str) -> Option<String> {
@@ -955,7 +1014,12 @@ impl Interpreter {
             return match block {
                 Some(b) => {
                     let readset = self.interpret_expr(expr)?;
-                    self.execute_preprocess(&readset, b)
+                    // `__input_qc=True` (set by `qcInPreprocess`) tells preprocess to compute the
+                    // per-input-file QC statistics that the loader deferred.
+                    let input_qc = args.iter().any(|(Variable(k), v)| {
+                        k == "__input_qc" && matches!(v, Expression::ConstBool(true))
+                    });
+                    self.execute_preprocess(&readset, b, input_qc)
                 }
                 None => Err(NgError::script("preprocess requires a block")),
             };
@@ -1016,6 +1080,7 @@ impl Interpreter {
             "__check_ifile" => execute_check_ifile(&expr_v, &argvs),
             "__check_index_access" => execute_check_index_access(&expr_v, &argvs),
             "__check_readset" => execute_check_readset(&expr_v, &argvs),
+            "__check_count" => execute_count_check(&argvs),
             other => {
                 if self
                     .external_modules
@@ -2444,17 +2509,35 @@ impl Interpreter {
     /// by `fqStatsC`, so memory stays bounded and the original file is referenced unchanged
     /// (a later `write` reproduces it byte-for-byte). The decode pass still runs to completion,
     /// so the `%4`/length errors fire in the same order (detect, then decode).
-    fn load_and_qc(&self, path: &str, label: &str) -> NgResult<FastQFilePath> {
+    fn load_and_qc(&self, path: &str, label: &str, perform_qc: bool) -> NgResult<FastQFilePath> {
         let encoding = fastq::detect_encoding_stream(crate::compression::open_read(path)?)?;
-        let mut acc = fastq::FastQStatsAcc::new();
-        for r in fastq::fastq_records(crate::compression::open_read(path)?, encoding) {
-            acc.update(&r?);
+        // With `__perform_qc=False` (set by `qcInPreprocess` when the read set is immediately
+        // preprocessed), the statistics fold is deferred to the preprocess's `__input_qc` pass; the
+        // encoding is still detected so the reference is complete. Mirrors `asFQFilePathMayQC`.
+        if perform_qc {
+            let mut acc = fastq::FastQStatsAcc::new();
+            for r in fastq::fastq_records(crate::compression::open_read(path)?, encoding) {
+                acc.update(&r?);
+            }
+            self.register_fq_stats_from(label, &acc.finish(), encoding);
         }
-        self.register_fq_stats_from(label, &acc.finish(), encoding);
         Ok(FastQFilePath {
             encoding,
             path: PathBuf::from(path),
         })
+    }
+
+    /// Stream a FASTQ file with a known encoding and register its statistics under `label` (mirrors
+    /// the input-QC branch of `executePreprocess` under `__input_qc`). Used to compute the
+    /// per-input-file QC that `qcInPreprocess` deferred from load time.
+    fn qc_input_file(&self, fqf: &FastQFilePath) -> NgResult<()> {
+        let path = fqf.path.to_string_lossy();
+        let mut acc = fastq::FastQStatsAcc::new();
+        for r in fastq::fastq_records(crate::compression::open_read(&path)?, fqf.encoding) {
+            acc.update(&r?);
+        }
+        self.register_fq_stats_from(&path, &acc.finish(), fqf.encoding);
+        Ok(())
     }
 
     /// Look up the cached number of sequences recorded for `fname` (mirrors `lookupNrSeqs`, which
@@ -2608,8 +2691,9 @@ impl Interpreter {
             let readset = self.uninterleave(&name)?;
             return Ok(NGLessObject::ReadSet { name, readset });
         }
+        let perform_qc = lookup_bool(args, "__perform_qc", true)?;
         let path = self.maybe_subsample(&name)?;
-        let fqf = self.load_and_qc(&path, &path)?;
+        let fqf = self.load_and_qc(&path, &path, perform_qc)?;
         Ok(NGLessObject::ReadSet {
             name,
             readset: ReadSet {
@@ -2725,10 +2809,11 @@ impl Interpreter {
             Some(NGLessObject::String(s)) => s.clone(),
             _ => String::new(),
         };
+        let perform_qc = lookup_bool(args, "__perform_qc", true)?;
         let p1 = self.maybe_subsample(&mate1)?;
         let p2 = self.maybe_subsample(&mate2)?;
-        let f1 = self.load_and_qc(&p1, &p1)?;
-        let f2 = self.load_and_qc(&p2, &p2)?;
+        let f1 = self.load_and_qc(&p1, &p1, perform_qc)?;
+        let f2 = self.load_and_qc(&p2, &p2, perform_qc)?;
         if f1.encoding != f2.encoding {
             return Err(NgError::new(
                 NgErrorType::DataError,
@@ -2742,14 +2827,18 @@ impl Interpreter {
             Vec::new()
         } else {
             let p3 = self.maybe_subsample(&mate3)?;
-            // QC stats are registered for the singles file even if it is later dropped.
+            // QC stats are registered for the singles file even if it is later dropped (unless QC
+            // is deferred to the preprocess via `__perform_qc=False`). The `n_singles3` count drives
+            // the empty-file drop below, so it is always computed.
             let enc3 = fastq::detect_encoding_stream(crate::compression::open_read(&p3)?)?;
             let mut acc3 = fastq::FastQStatsAcc::new();
             for r in fastq::fastq_records(crate::compression::open_read(&p3)?, enc3) {
                 acc3.update(&r?);
             }
             let n_singles3 = acc3.n_seq();
-            self.register_fq_stats_from(&p3, &acc3.finish(), enc3);
+            if perform_qc {
+                self.register_fq_stats_from(&p3, &acc3.finish(), enc3);
+            }
             if f1.encoding != enc3 {
                 // Special case seen in the wild: an empty singles file with a default encoding.
                 if n_singles3 == 0 {
@@ -2831,7 +2920,7 @@ impl Interpreter {
     fn execute_load_directory(
         &self,
         expr: &NGLessObject,
-        _args: &[(String, NGLessObject)],
+        args: &[(String, NGLessObject)],
     ) -> NgResult<NGLessObject> {
         let basedir = as_string(expr, "load_fastq_directory")?;
         if !Path::new(&basedir).is_dir() {
@@ -2869,13 +2958,20 @@ impl Interpreter {
         }
         fqfiles.sort();
 
+        // Forward the hidden `__perform_qc` (set by `qcInPreprocess`) to the per-file `fastq`/
+        // `paired` loads, so QC deferral propagates through directory/mocat loading.
+        let perform_qc = lookup_bool(args, "__perform_qc", true)?;
+        let qc_arg = || ("__perform_qc".to_string(), NGLessObject::Bool(perform_qc));
         let (singletons, paired) = match_up(&fqfiles)?;
         let mut members: Vec<NGLessObject> = Vec::new();
         for f in &singletons {
-            members.push(self.execute_fastq(&NGLessObject::String(f.clone()), &[])?);
+            members.push(self.execute_fastq(&NGLessObject::String(f.clone()), &[qc_arg()])?);
         }
         for p in &paired {
-            let mut pargs = vec![("second".to_string(), NGLessObject::String(p.1.clone()))];
+            let mut pargs = vec![
+                ("second".to_string(), NGLessObject::String(p.1.clone())),
+                qc_arg(),
+            ];
             if let Some(singles) = &p.2 {
                 pargs.push(("singles".to_string(), NGLessObject::String(singles.clone())));
             }
@@ -2999,7 +3095,12 @@ impl Interpreter {
     /// survive stays paired, a pair where one survives becomes a singleton (`keep_singles`,
     /// default true). Output encoding is the common input encoding, or Sanger if they disagree.
     #[allow(clippy::too_many_lines)]
-    fn execute_preprocess(&self, readset: &NGLessObject, block: &Block) -> NgResult<NGLessObject> {
+    fn execute_preprocess(
+        &self,
+        readset: &NGLessObject,
+        block: &Block,
+        input_qc: bool,
+    ) -> NgResult<NGLessObject> {
         let (name, rs) = match readset {
             NGLessObject::ReadSet { name, readset } => (name.clone(), readset.clone()),
             other => {
@@ -3014,6 +3115,14 @@ impl Interpreter {
             inputs.push(b.clone());
         }
         inputs.extend(rs.singletons.iter().cloned());
+        // `__input_qc`: compute the per-input-file QC statistics that `qcInPreprocess` deferred from
+        // load time, registered (in mate.1, mate.2, singles order) *before* the output-slot stats
+        // below, matching the order the loader would have produced.
+        if input_qc {
+            for fqf in &inputs {
+                self.qc_input_file(fqf)?;
+            }
+        }
         let outenc = output_encoding(&inputs);
         let var = &block.variable.0;
         let keep_singles = true;
@@ -3325,6 +3434,23 @@ impl Interpreter {
                     BlockStatus::Ok
                 };
                 Ok((status, value))
+            }
+            // The `read = substrim(read, min_quality=N)` fast path produced by `substrim_reassign`
+            // (mirrors the `Optimized (SubstrimReassign ...)` case in `interpretBlock1`): apply
+            // `substrim` in place on the block variable's read.
+            Expression::Optimized(OptimizedExpression::SubstrimReassign(Variable(v), mq)) => {
+                let r = match &value {
+                    NGLessObject::Read(r) if v == name => r,
+                    _ => {
+                        return Err(NgError::should_not_occur(format!(
+                            "Variable name not found in optimized processing {v}"
+                        )))
+                    }
+                };
+                Ok((
+                    BlockStatus::Ok,
+                    NGLessObject::Read(fastq::substrim(*mq as i32, r)),
+                ))
             }
             Expression::Condition(c, t_branch, f_branch) => {
                 let cond = match self.eval_block_expr(c, name, &value)? {
