@@ -28,8 +28,7 @@ Haskell parity target for `ngless "1.5"`+ scripts.
 - **Per-position quality percentiles** (`qualityPercentiles` in `Data/FastQ.hs`) are simplified out
   of the Rust QC accumulator.
 
-- **`collect()` minor gaps:** the `--subsample` `.subsample` ofile suffix and `auto_comments={date}`
-  are unported.
+- **`collect()` minor gap:** the `--subsample` `.subsample` ofile suffix is unported.
 
 - **`ARGV` node kind differs (output-affecting).** In Haskell `ARGV` is a module constant
   (`BuiltinModules/Argv.hs`) so it parses to `Lookup (Variable "ARGV")`; in Rust it is in `tokens.rs`

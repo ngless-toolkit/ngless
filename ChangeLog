@@ -1,4 +1,6 @@
 Unreleased
+	* `write()` and `collect()` now support `auto_comments=[{date}]`, which
+	prepends a `Script run on <local date/time>` comment line to the output
 	* Short command-line options again accept an attached value and clustering
 	(e.g. `-j4` for `--jobs=4` and `-nq` for `-n -q`), matching earlier ngless
 	versions
