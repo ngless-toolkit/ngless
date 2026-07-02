@@ -91,9 +91,8 @@ struct RunOpts {
 
 /// Top-level execution mode, mirroring `CmdArgs.NGLessMode`. `lib::run` peels off the
 /// informational `infoOption`s (`--version*`/`--date-short`/`--help`) first; everything else is
-/// dispatched here. [`Mode::Default`], [`Mode::PrintPath`], [`Mode::CheckInstall`] and the Phase 2
-/// download sub-modes are implemented; [`Mode::CreateReferencePack`] is *recognized* (so its flags
-/// no longer fall through to the unknown-flag error) but errors out until Phase 4 lands.
+/// dispatched here. All modes — [`Mode::Default`], [`Mode::PrintPath`], [`Mode::CheckInstall`], the
+/// download sub-modes, and [`Mode::CreateReferencePack`] — are implemented.
 enum Mode {
     /// `DefaultMode`: load → parse → type check → validate → interpret a script.
     Default(Box<RunOpts>),

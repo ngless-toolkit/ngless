@@ -7,9 +7,6 @@ Haskell parity target for `ngless "1.5"`+ scripts.
   (`output.js` + HTML) at end of run; `src/output.rs` has no report writer (only the console output
   layer).
 
-- **Unknown CLI flags** are silently ignored instead of producing an `Invalid option `...'` error
-  (mirroring optparse). A bare `-` stays a valid STDIN positional.
-
 - **`Transform.hs` passes not ported.** The output-neutral optimizations
   `qcInPreprocess`/`ifLenDiscardSpecial`/`substrimReassign` and the early-check injections
   `addRSChecks`/`addIndexChecks`/`addCountsCheck` are absent (Rust does eager IO validation

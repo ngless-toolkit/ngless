@@ -258,10 +258,14 @@ fn extract_output(sc: &Script) -> i64 {
 /// `extractARGVUsage`: the first `ARGV[<ConstInt>]` index found in a pre-order walk of `e` (mirrors
 /// `recursiveAnalyse` with a `callCC` exit on the first match).
 ///
-/// NB: the Haskell pattern is `IndexExpression (Lookup _ (Variable "ARGV")) ...`, but `ARGV` is
-/// actually a `BuiltinConstant` (in both Haskell and Rust), so this match *never fires* — the
-/// Haskell binary therefore always produces empty CWL inputs and a `$(inputs.input-1)` glob. We
-/// match `Lookup` exactly as the Haskell source does so the (degenerate) output stays identical.
+/// NB: the Haskell pattern is `IndexExpression (Lookup _ (Variable "ARGV")) ...`. In Haskell the
+/// parser has no ARGV special-case (`Parse.hs`: every bare identifier becomes a `Lookup`) and
+/// `writeCWL` runs on the pre-transform script, so `ARGV[<n>]` stays a `Lookup` and this match
+/// *does* fire, producing non-degenerate CWL `inputs:`. In Rust, `ARGV` tokenizes to a
+/// `BuiltinConstant` node (`tokens.rs` `CONSTANTS`), so the `Lookup`-matching walk below never
+/// fires and Rust emits empty inputs. This is a known divergence (see `rust-migration.md`, the
+/// ARGV entry); we keep the `Lookup` pattern here to mirror the Haskell source, but note that the
+/// two binaries do *not* produce identical CWL for a script that indexes `ARGV`.
 fn extract_argv_usage(e: &Expression) -> Option<i64> {
     let mut found = None;
     recursive_find_argv(e, &mut found);
