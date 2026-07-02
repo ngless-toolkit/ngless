@@ -11,11 +11,12 @@ aimed at metagenomics pipelines (FASTQ preprocessing → mapping → feature cou
 
 **Implementation status (important):** NGLess was rewritten from Haskell to Rust. As of the
 1.6 release the Haskell implementation was *completely removed* and the Rust code at the repo
-root (`Cargo.toml`, `src/`) is the sole, supported implementation. Many doc comments in
-`src/`, `src/lib.rs`, and `README.md` are **stale** — they still say things like "milestone 1
-scaffold", "not implemented yet", or "the supported implementation is the Haskell one". Do not
-trust those; treat the Rust code as the full implementation. `rust-migration.md` is the most
-accurate status doc (all 99 functional tests pass against the Rust binary).
+root (`Cargo.toml`, `src/`) is the sole, supported implementation. Many doc comments in `src/`
+are **stale** — they still describe features as "deferred to a later milestone" or "a scaffold"
+even where the Rust code fully implements them. Do not trust those; treat the Rust code as the
+full implementation. `rust-migration.md` is the most
+accurate status doc (all 99 functional tests pass against the Rust binary). Current crate
+version is `1.6.0-beta1` (see `Cargo.toml`).
 
 ## Build & test
 
@@ -49,8 +50,13 @@ tools; CI and local runs get them via pixi:
 pixi run --environment default bash -c 'NGLESS_BIN="$PWD/target/release/ngless" ./run-tests.sh'
 ```
 
-The top-level `Makefile` is **stale** (it drives the removed Haskell `stack` build); ignore it.
 CI is `.github/workflows/build_rust.yml`.
+
+## ChangeLog
+
+Update `ChangeLog` for any user-visible change (new/changed/removed functions, flags,
+output, bug fixes) and for large internal changes. Add a bullet under the current unreleased
+version block at the top, matching the existing tab-indented `* ...` style.
 
 ## Architecture
 
@@ -88,7 +94,11 @@ Domain subsystems (called from the interpreter):
 - `sam.rs`, `mapper.rs`, `minimap2.rs`, `samtools.rs` — mapping and SAM/BAM handling.
 - `count.rs`, `gff.rs`, `select.rs` — feature counting, GFF parsing, SAM record filtering.
 - `reference.rs` — reference-database resolution / auto-download (tar + HTTP via `ureq`).
-- `parallel.rs`, `batch.rs` — the `parallel` module (`lock1`/sample partitioning) and `--jobs`.
+- `parallel.rs` — in-process compute parallelism: the `--jobs`/`--threads` thread config and
+  `par_map_ordered` (order-preserving bounded parallel map). Note the `.ngl` `parallel` module
+  itself (`lock1`, `collect`) is implemented in `interpret.rs`/`modules.rs`/`transform.rs`.
+- `batch.rs` — the `batch` standard module: reads scheduler env vars (`LSB_JOBINDEX`,
+  `SGE_TASK_ID`, `SLURM_CPUS_PER_TASK`, …) to expose job-array constants and override the thread count.
 
 Cross-cutting:
 - `configuration.rs` — config-file + env + CLI settings (mirrors `Configuration.hs`).
@@ -96,6 +106,8 @@ Cross-cutting:
   signal-driven cleanup (removes locks/temps on Ctrl+C / SIGTERM).
 - `output.rs`, `citations.rs`, `errors.rs`, `suggestion.rs` — run header/verbosity, citation
   collection, error types, and "did you mean" suggestions.
+- `progress.rs` — single-line terminal progress bar with ETA (port of `Utils/ProgressBar.hs`);
+  drawn via `output::transient_msg` for the download and bwa-mapping paths.
 - `export.rs` — `--export-json` (mirrors `JSONScript.hs`).
 
 ## Byte-parity is the core constraint
