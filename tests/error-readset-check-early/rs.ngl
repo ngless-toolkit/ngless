@@ -1,0 +1,9 @@
+ngless "1.6"
+
+samples = load_sample_list('list.yaml')
+input = samples[0]
+println("REACHED_MARKER")
+input = preprocess(input) using |read|:
+    if len(read) < 10:
+        discard
+write(input, ofile='output.fq')

@@ -8,15 +8,19 @@ Haskell parity target for `ngless "1.5"`+ scripts.
   layer).
 
 - **`Transform.hs` passes not ported.** The output-neutral optimizations
-  `qcInPreprocess`/`substrimReassign` and the early-check injections
-  `addRSChecks`/`addCountsCheck` are absent (Rust does eager IO validation differently, so these are
-  partly covered). `ifLenDiscardSpecial` *is* ported (`transform.rs::if_len_discard_special` +
+  `qcInPreprocess`/`substrimReassign` and the early-check injection `addCountsCheck` are absent (Rust
+  does eager IO validation differently, so these are partly covered). `ifLenDiscardSpecial` *is*
+  ported (`transform.rs::if_len_discard_special` +
   the `Optimized(LenThresholdDiscard …)` AST node, handled in `interpret.rs::interpret_block_stmt`):
   `if len(read) <op> N: discard` inside a preprocess block is rewritten to the fast path, matching
-  Haskell byte-for-byte. `addFileChecks` and `addIndexChecks` *are* ported (`transform.rs`), the latter
-  reusing a `genericCheckUpfloat` port that would also back `addRSChecks`/`addCountsCheck` if those
-  are picked up later. `addTemporaries` is still not ported (see the out-of-bounds note below for the
-  one edge that leaves). `addUseNewer` is out of scope at ≥1.5.
+  Haskell byte-for-byte. `addFileChecks`, `addRSChecks`, and `addIndexChecks` *are* ported
+  (`transform.rs`), all three sharing a `genericCheckUpfloat` port that would also back
+  `addCountsCheck` if it is picked up later. `addRSChecks` (`transform.rs::add_rs_checks` +
+  the `__check_readset` builtin in `interpret.rs::execute_check_readset`) floats a `__check_readset`
+  call up to just after a `preprocess`ed read set is bound, verifying its backing FASTQ files are
+  readable early (byte-identical error text, see `tests/error-readset-check-early`). `addTemporaries`
+  is still not ported (see the out-of-bounds note below for the one edge that leaves). `addUseNewer`
+  is out of scope at ≥1.5.
 
 - **Reference-download path:** `count(reference=...)` annotation download errors (`src/interpret.rs`:
   "automatic annotation download is not supported"). `ensure_data_present` only surfaces the FASTA

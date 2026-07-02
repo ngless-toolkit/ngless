@@ -366,6 +366,45 @@ fn index_check_expr(arr: &Variable, ix1: i64, lno: usize) -> Expression {
     )
 }
 
+/// `addRSChecks` (mirrors `Transform.hs`): for every `x = preprocess(v, ...) using ...` assignment,
+/// inject a `__check_readset(v, original_lno=N)` call floated up to just after `v`'s assignment, so
+/// the readset's backing FASTQ files are verified readable *early* (right after the read set is
+/// bound) rather than only when `preprocess` finally streams them. A builtin transform, run after
+/// `add_file_checks` and before `add_index_checks`, matching the Haskell order. Runs after
+/// `add_output_hash`, so the injected checks do not affect `{hash}`/`{script}` content hashes.
+pub fn add_rs_checks(body: Vec<(usize, Expression)>) -> Vec<(usize, Expression)> {
+    generic_check_upfloat(&rs_checks_of, body)
+}
+
+/// `addRSChecks'`: match `Assignment _ (FunctionCall "preprocess" (Lookup v) _ _)` and return the
+/// preprocessed variable plus the `__check_readset` call to float up. Only a direct `Lookup`
+/// argument qualifies (matching Haskell); a nested call there would already have been lifted into a
+/// temporary by `addTemporaries`.
+fn rs_checks_of(lno: usize, e: &Expression) -> Option<(Vec<Variable>, Expression)> {
+    let Expression::Assignment(_, rhs) = e else {
+        return None;
+    };
+    let Expression::FunctionCall(FuncName(f), arg, _, _) = rhs.as_ref() else {
+        return None;
+    };
+    if f != "preprocess" {
+        return None;
+    }
+    let Expression::Lookup(t, v) = arg.as_ref() else {
+        return None;
+    };
+    let check = Expression::FunctionCall(
+        FuncName("__check_readset".to_string()),
+        Box::new(Expression::Lookup(t.clone(), v.clone())),
+        vec![(
+            Variable("original_lno".to_string()),
+            Expression::ConstInt(lno as i64),
+        )],
+        None,
+    );
+    Some((vec![v.clone()], check))
+}
+
 /// `genericCheckUpfloat` (mirrors `Transform.hs`): generalises "emit a check for a statement, then
 /// bubble it up past intervening statements to just after the variable(s) it depends on are
 /// assigned". Works on the reversed statement list so a check can be placed *before* (reversed) the
@@ -1884,6 +1923,54 @@ mod tests {
             }
         }
         None
+    }
+
+    fn is_rs_check(e: &Expression, expect_var: &str) -> bool {
+        if let Expression::FunctionCall(FuncName(f), arg, _, _) = e {
+            if f == "__check_readset" {
+                if let Expression::Lookup(_, Variable(v)) = arg.as_ref() {
+                    return v == expect_var;
+                }
+            }
+        }
+        false
+    }
+
+    #[test]
+    fn add_rs_checks_floats_to_after_assignment() {
+        // input = fastq(..); y = other; input = preprocess(input) -> a __check_readset(input) is
+        // floated up to just after input's (first) assignment, before `y = other`.
+        let body = vec![
+            (
+                1,
+                assign(
+                    "input",
+                    call("fastq", Expression::ConstStr("f.fq".to_string()), vec![]),
+                ),
+            ),
+            (2, assign("y", lookup("other"))),
+            (
+                3,
+                assign("input", call("preprocess", lookup("input"), vec![])),
+            ),
+        ];
+        let out = add_rs_checks(body);
+        assert_eq!(out.len(), 4);
+        // The check floats up to just after input's first assignment (index 1).
+        assert!(is_rs_check(&out[1].1, "input"));
+        // Original line number is preserved on the check (line 3, where the preprocess is).
+        assert_eq!(out[1].0, 3);
+    }
+
+    #[test]
+    fn add_rs_checks_ignores_non_preprocess() {
+        // A non-preprocess assignment gets no readset check.
+        let body = vec![
+            (1, assign("input", call("fastq", lookup("p"), vec![]))),
+            (2, assign("m", call("map", lookup("input"), vec![]))),
+        ];
+        let out = add_rs_checks(body);
+        assert_eq!(out.len(), 2);
     }
 
     #[test]

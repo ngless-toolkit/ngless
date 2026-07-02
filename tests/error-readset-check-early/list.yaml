@@ -1,0 +1,5 @@
+samples:
+  sample:
+    - paired:
+        - missing_one.gz
+        - missing_two.gz

@@ -412,6 +412,45 @@ fn execute_check_index_access(
     Ok(NGLessObject::Void)
 }
 
+/// `__check_readset(readset, original_lno=N)`: verify every FASTQ file backing a read set is
+/// readable (mirrors the `__check_readset` arm of `executeChecks`). Inserted by
+/// [`crate::transform::add_rs_checks`] and floated up to just after the read set's assignment, so a
+/// missing/unreadable input surfaces right when the read set is bound rather than only when
+/// `preprocess` finally streams it.
+fn execute_check_readset(
+    expr: &NGLessObject,
+    args: &[(String, NGLessObject)],
+) -> NgResult<NGLessObject> {
+    let (name, readset) = match expr {
+        NGLessObject::ReadSet { name, readset } => (name, readset),
+        _ => return Ok(NGLessObject::Void),
+    };
+    let lno = match lookup_arg(args, "original_lno") {
+        Some(NGLessObject::Integer(i)) => *i,
+        _ => 0,
+    };
+    // `catPairs pairs ++ singles`: each pair's two mates in order, then the singletons.
+    let mut files: Vec<&std::path::Path> = Vec::new();
+    for (a, b) in &readset.pairs {
+        files.push(&a.path);
+        files.push(&b.path);
+    }
+    for s in &readset.singletons {
+        files.push(&s.path);
+    }
+    for f in files {
+        let r = f.to_string_lossy();
+        crate::output::trace(lno as usize, &format!("Checking file {r}."));
+        if let Some(err) = crate::suggestion::check_file_readable(&r) {
+            return Err(NgError::new(
+                NgErrorType::SystemError,
+                format!("Cannot read file '{r}' for sample '{name}'. {err} (used in line {lno})."),
+            ));
+        }
+    }
+    Ok(NGLessObject::Void)
+}
+
 /// Check that `oname`'s directory exists and is writable (mirrors `checkOFile` in
 /// `BuiltinModules/Checks.hs`). Returns an error message, or `None` when the file can be written.
 pub(crate) fn check_ofile(oname: &str) -> Option<String> {
@@ -976,6 +1015,7 @@ impl Interpreter {
             "__check_ofile" => execute_check_ofile(&expr_v, &argvs),
             "__check_ifile" => execute_check_ifile(&expr_v, &argvs),
             "__check_index_access" => execute_check_index_access(&expr_v, &argvs),
+            "__check_readset" => execute_check_readset(&expr_v, &argvs),
             other => {
                 if self
                     .external_modules
