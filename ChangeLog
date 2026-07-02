@@ -10,6 +10,9 @@ Unreleased
 	* `samtools_sort()` whose result feeds only a BAM `write()` now sorts
 	directly to BAM (faster: one fewer conversion pass, and byte-identical
 	output)
+	* Run-header citations are now collected recursively, so nested calls such
+	as `write(orf_find(contigs))` list all relevant references (e.g. prodigal
+	and BWA) instead of only the outermost tool
 
 Version 1.6.0-beta1 2026-07-01 by luispedro
 	* Switched to rust implementation

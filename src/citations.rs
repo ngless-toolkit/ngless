@@ -46,21 +46,64 @@ pub fn collect_citations(script: &Script) -> Vec<String> {
         }
     }
 
-    // Only assignments wrapping a function call contribute a citation (mirrors the pattern
-    // match in `collectCitations`).
+    // Any function call anywhere in the script contributes its citation. Haskell's
+    // `collectCitations` only matches top-level `Assignment _ (FunctionCall ...)`, but it runs on
+    // the *transformed* script where `addTemporaries` has already lifted nested calls into
+    // `temp$N = <call>` assignments. Rust runs on the pre-transform script, so we recurse into
+    // sub-expressions to find nested `map`/`assemble`/`orf_find` calls (e.g.
+    // `write(orf_find(contigs, …))`) that would otherwise be missed.
     for (_, expr) in &script.body {
-        if let Expression::Assignment(_, inner) = expr {
-            if let Expression::FunctionCall(FuncName(f), ..) = inner.as_ref() {
-                if let Some(c) = function_citation(f) {
-                    rest.insert(c);
-                }
-            }
-        }
+        collect_from_expr(expr, &mut rest);
     }
 
     let mut out = vec![NGLESS_CITATION.to_string()];
     out.extend(rest.into_iter().map(|s| s.to_string()));
     out
+}
+
+/// Recurse through an expression tree, inserting the citation of every `FunctionCall` found.
+fn collect_from_expr(expr: &Expression, rest: &mut BTreeSet<&'static str>) {
+    match expr {
+        Expression::FunctionCall(FuncName(f), arg, kwargs, block) => {
+            if let Some(c) = function_citation(f) {
+                rest.insert(c);
+            }
+            collect_from_expr(arg, rest);
+            for (_, v) in kwargs {
+                collect_from_expr(v, rest);
+            }
+            if let Some(block) = block {
+                collect_from_expr(&block.body, rest);
+            }
+        }
+        Expression::MethodCall(_, target, arg, kwargs) => {
+            collect_from_expr(target, rest);
+            if let Some(arg) = arg {
+                collect_from_expr(arg, rest);
+            }
+            for (_, v) in kwargs {
+                collect_from_expr(v, rest);
+            }
+        }
+        Expression::Assignment(_, inner) => collect_from_expr(inner, rest),
+        Expression::UnaryOp(_, e) => collect_from_expr(e, rest),
+        Expression::BinaryOp(_, l, r) => {
+            collect_from_expr(l, rest);
+            collect_from_expr(r, rest);
+        }
+        Expression::Condition(c, t, f) => {
+            collect_from_expr(c, rest);
+            collect_from_expr(t, rest);
+            collect_from_expr(f, rest);
+        }
+        Expression::IndexExpression(e, _) => collect_from_expr(e, rest),
+        Expression::ListExpression(es) | Expression::Sequence(es) => {
+            for e in es {
+                collect_from_expr(e, rest);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// Format a single citation, wrapping at 90 columns with a leading tab (mirrors `formatCitation`).
@@ -123,5 +166,29 @@ mod tests {
                         \t NG-meta-profiler: fast processing of metagenomes using NGLess, a domain-specific language. in\n\
                         \t Microbiome 7:84 (2019). DOI: https://doi.org/10.1186/s40168-019-0684-8";
         assert_eq!(formatted, expected);
+    }
+
+    #[test]
+    fn collects_citation_from_nested_function_call() {
+        use crate::ast::{FuncName, Variable};
+        // write(orf_find(contigs)) — orf_find nested as the argument of write.
+        let orf = Expression::FunctionCall(
+            FuncName("orf_find".to_string()),
+            Box::new(Expression::Lookup(None, Variable("contigs".to_string()))),
+            vec![],
+            None,
+        );
+        let write = Expression::FunctionCall(
+            FuncName("write".to_string()),
+            Box::new(orf),
+            vec![],
+            None,
+        );
+        let script = Script {
+            header: None,
+            body: vec![(0, write)],
+        };
+        let cits = collect_citations(&script);
+        assert!(cits.iter().any(|c| c.contains("Prodigal")));
     }
 }

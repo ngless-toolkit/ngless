@@ -41,14 +41,6 @@ Haskell parity target for `ngless "1.5"`+ scripts.
   `sortOFormat` transform *is* ported: `transform.rs::sort_oformat` injects `__output_bam=True` so
   `samtools_sort` feeding only a BAM `write` sorts straight to BAM, one `@PG` line, byte-identical.)
 
-- **Run-header citations missed for nested `map`/`assemble`/`orf_find`.** `collectCitations` matches
-  only top-level `Assignment _ (FunctionCall f)`. Haskell runs it on the **transformed** script,
-  where `addTemporaries` has lifted nested calls into `temp$N = <call>`, so nested calls are found;
-  Rust runs `collect_citations` on the **pre-transform** script (`cli.rs`), so a nested
-  `map`/`assemble`/`orf_find` is missed (e.g. `write(orf_find(contigs,…))` lists only megahit, not
-  prodigal + BWA). Fix: run `collect_citations` after transforms, or recurse into sub-expressions.
-  Untested (no `expected.stdout.txt` on the relevant test).
-
 - **Out-of-bounds message + timing (`addIndexChecks` not ported).** For `array[<constInt>]` Haskell
   floats a `__check_index_access` up to just after the array assignment, failing **early** with
   `Index access on line N is invalid.\n …`; Rust has no such check, so the error only surfaces when
