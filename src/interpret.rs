@@ -485,6 +485,7 @@ pub fn interpret(
         ngl_version,
         held_locks: Vec::new(),
         claimed_locks: Vec::new(),
+        finish_ok_messages: Mutex::new(Vec::new()),
     };
     let result: NgResult<()> = (|| {
         for (lno, e) in body {
@@ -515,6 +516,11 @@ pub fn interpret(
     }
     result?;
     crate::output::info(0, "Interpretation finished.");
+    // Deferred `FinishOkHook` messages (e.g. `collect()` partial-result guidance): emitted only on
+    // success, after "Interpretation finished.", mirroring `triggerHook FinishOkHook` in Main.hs.
+    for msg in interp.finish_ok_messages.lock().unwrap().drain(..) {
+        crate::output::info(0, &msg);
+    }
     Ok(())
 }
 
@@ -609,6 +615,10 @@ struct Interpreter {
     /// the end of the run; `get_lock` uses the markers to skip completed and de-prioritize failed
     /// entries on the next run.
     claimed_locks: Vec<ClaimedLock>,
+    /// Informational messages deferred to end-of-run and emitted (at `Info` level) only if the run
+    /// succeeds — the port of Haskell's `FinishOkHook`. Used by `collect()` to report that not all
+    /// partial results were present yet. `Mutex` so `&Interpreter` stays `Sync`.
+    finish_ok_messages: Mutex<Vec<String>>,
 }
 
 /// An entry claimed by `lock1`/`run_for_all`, recorded so the run can write its end-of-run marker
@@ -2157,19 +2167,20 @@ impl Interpreter {
             crate::compression::write_bytes_atomic(&ofile, merged.as_bytes())?;
         } else {
             // Not all partials are present: this is the normal case when the parallel module is
-            // driven one sample per ngless invocation. Haskell defers this to a FinishOkHook; the
-            // Rust port has no hook system, so we emit the same guidance now (it is purely
-            // informational — `collect` still returns successfully). Emitted at `Info` level, so it
-            // is suppressed by `--quiet`, matching Haskell. Mirrors the message in `executeCollect`.
+            // driven one sample per ngless invocation. Mirrors Haskell's `executeCollect`, which
+            // registers this guidance as a `FinishOkHook` so it is printed once at end-of-run (and
+            // only if the run succeeds). We defer it the same way (see `finish_ok_messages`). It is
+            // purely informational — `collect` still returns successfully — and emitted at `Info`
+            // level, so it is suppressed by `--quiet`, matching Haskell.
             let lno = self.cur_lno.load(Ordering::Relaxed);
-            crate::output::info(
-                lno,
-                "The collect() call could not be executed as there are partial results missing.\n\
+            self.finish_ok_messages.lock().unwrap().push(format!(
+                "The collect() call at line {lno} could not be executed as there are partial \
+                 results missing.\n\
                  When you use the parallel module and the collect() function,\n\
                  you typically need to run ngless *multiple times* (once per sample)!\n\n\n\
                  For more information, see \
-                 https://ngless.readthedocs.io/en/latest/stdlib.html#parallel-module",
-            );
+                 https://ngless.readthedocs.io/en/latest/stdlib.html#parallel-module"
+            ));
         }
         Ok(NGLessObject::Void)
     }

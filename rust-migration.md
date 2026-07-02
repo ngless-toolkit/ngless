@@ -22,10 +22,6 @@ Haskell parity target for `ngless "1.5"`+ scripts.
 - **Per-position quality percentiles** (`qualityPercentiles` in `Data/FastQ.hs`) are simplified out
   of the Rust QC accumulator.
 
-- **`collect()` guidance timing.** `collect`'s "run ngless once per sample" guidance is emitted
-  inline rather than deferred to end-of-run as Haskell's `FinishOkHook` does (gated on `--quiet`, not
-  output-affecting).
-
 - **`collect()` minor gaps:** the `--subsample` `.subsample` ofile suffix and `auto_comments={date}`
   are unported.
 

@@ -4,6 +4,9 @@ Unreleased
 	* `count()` now errors early when more than one annotation source is given
 	(seqname mode, `gff_file`, `functional_map`, or `reference`) instead of
 	silently ignoring all but one
+	* `collect()`'s "run ngless once per sample" guidance is now printed once at
+	the end of a successful run (matching earlier ngless versions) instead of
+	inline
 
 Version 1.6.0-beta1 2026-07-01 by luispedro
 	* Switched to rust implementation
