@@ -298,6 +298,170 @@ fn recursive_collect(e: &Expression, f: &mut dyn FnMut(&Expression)) {
     }
 }
 
+/// `asSequence` (mirrors `Transform.hs`): a single expression stays as-is; several become a
+/// `Sequence`.
+fn as_sequence(mut es: Vec<Expression>) -> Expression {
+    if es.len() == 1 {
+        es.pop().unwrap()
+    } else {
+        Expression::Sequence(es)
+    }
+}
+
+/// A check generator: given a statement `(lno, expr)`, either `None` (no check needed) or the
+/// variables the check depends on plus the check expression to float up (mirrors the
+/// `(Int, Expression) -> Maybe ([Variable], Expression)` argument of `genericCheckUpfloat`).
+type CheckFn<'a> = dyn Fn(usize, &Expression) -> Option<(Vec<Variable>, Expression)> + 'a;
+
+/// `addIndexChecks` (mirrors `Transform.hs`): for every `array[<constInt>]` where `array` is a
+/// variable, inject a `__check_index_access(array, original_lno=N, index1=ix)` call floated up to
+/// just after `array`'s assignment, so an out-of-bounds constant index fails *early* (right after
+/// the array is bound) with `Index access on line N is invalid.` rather than only when the index is
+/// finally evaluated. A builtin transform, run after `add_output_hash`, so the injected checks do
+/// not affect `{hash}`/`{script}` content hashes.
+pub fn add_index_checks(body: Vec<(usize, Expression)>) -> Vec<(usize, Expression)> {
+    generic_check_upfloat(&index_checks_of, body)
+}
+
+/// `addIndexChecks'`: collect every `IndexExpression(Lookup v, IndexOne(ConstInt))` in the statement
+/// and, if any, return the referenced variables plus the sequence of `__check_index_access` calls.
+fn index_checks_of(lno: usize, e: &Expression) -> Option<(Vec<Variable>, Expression)> {
+    let mut found: Vec<(Variable, i64)> = Vec::new();
+    recursive_collect(e, &mut |sub| {
+        if let Expression::IndexExpression(inner, Index::One(ix)) = sub {
+            if let (Expression::Lookup(_, v), Expression::ConstInt(ix1)) =
+                (inner.as_ref(), ix.as_ref())
+            {
+                found.push((v.clone(), *ix1));
+            }
+        }
+    });
+    if found.is_empty() {
+        return None;
+    }
+    let vars = found.iter().map(|(v, _)| v.clone()).collect();
+    let checks = found
+        .into_iter()
+        .map(|(v, ix1)| index_check_expr(&v, ix1, lno))
+        .collect();
+    Some((vars, as_sequence(checks)))
+}
+
+/// Build a `__check_index_access(Lookup v, original_lno=lno, index1=ix1)` call (mirrors
+/// `indexCheckExpr`).
+fn index_check_expr(arr: &Variable, ix1: i64, lno: usize) -> Expression {
+    Expression::FunctionCall(
+        FuncName("__check_index_access".to_string()),
+        Box::new(Expression::Lookup(None, arr.clone())),
+        vec![
+            (
+                Variable("original_lno".to_string()),
+                Expression::ConstInt(lno as i64),
+            ),
+            (Variable("index1".to_string()), Expression::ConstInt(ix1)),
+        ],
+        None,
+    )
+}
+
+/// `genericCheckUpfloat` (mirrors `Transform.hs`): generalises "emit a check for a statement, then
+/// bubble it up past intervening statements to just after the variable(s) it depends on are
+/// assigned". Works on the reversed statement list so a check can be placed *before* (reversed) the
+/// assignment it needs, i.e. *after* it in source order.
+fn generic_check_upfloat(f: &CheckFn, exprs: Vec<(usize, Expression)>) -> Vec<(usize, Expression)> {
+    let rev: Vec<(usize, Expression)> = exprs.into_iter().rev().collect();
+    let mut out = generic_check_upfloat_rev(f, rev);
+    out.reverse();
+    out
+}
+
+fn generic_check_upfloat_rev(
+    f: &CheckFn,
+    mut list: Vec<(usize, Expression)>,
+) -> Vec<(usize, Expression)> {
+    if list.is_empty() {
+        return Vec::new();
+    }
+    let (lno, expr) = list.remove(0);
+    match expr {
+        // Expand sequences back into individual statements and re-process the whole list.
+        Expression::Sequence(es) => {
+            let mut new_list: Vec<(usize, Expression)> =
+                es.into_iter().rev().map(|e| (lno, e)).collect();
+            new_list.extend(list);
+            generic_check_upfloat_rev(f, new_list)
+        }
+        // Conditions are tricky: checks must only float up *within* a branch, never above the
+        // condition itself. Each branch is upfloated independently; a check for the condition
+        // expression floats into the surrounding statements. Mirrors Haskell exactly, including
+        // that processing stops here (the tail is not recursed into again).
+        Expression::Condition(ec, et, ef) => {
+            let et_p = generic_check_upfloat(f, vec![(lno, *et)]);
+            let ef_p = generic_check_upfloat(f, vec![(lno, *ef)]);
+            let rest = match f(lno, &ec) {
+                None => list,
+                Some((vars, ne)) => float_down(&vars, (lno, ne), list),
+            };
+            let untag = |tagged: Vec<(usize, Expression)>| {
+                as_sequence(tagged.into_iter().map(|(_, e)| e).collect())
+            };
+            let cond = Expression::Condition(ec, Box::new(untag(et_p)), Box::new(untag(ef_p)));
+            let mut out = vec![(lno, cond)];
+            out.extend(rest);
+            out
+        }
+        _ => {
+            let rest = match recursive_call(f, lno, &expr) {
+                None => list,
+                Some((vars, ne)) => float_down(&vars, (lno, ne), list),
+            };
+            let mut out = vec![(lno, expr)];
+            out.extend(generic_check_upfloat_rev(f, rest));
+            out
+        }
+    }
+}
+
+/// `recursiveCall` (mirrors `Transform.hs`): try `f` on `e` and every sub-expression in pre-order,
+/// returning the first `Some`.
+fn recursive_call(f: &CheckFn, lno: usize, e: &Expression) -> Option<(Vec<Variable>, Expression)> {
+    let mut result: Option<(Vec<Variable>, Expression)> = None;
+    recursive_collect(e, &mut |sub| {
+        if result.is_none() {
+            if let Some(r) = f(lno, sub) {
+                result = Some(r);
+            }
+        }
+    });
+    result
+}
+
+/// `floatDown` (mirrors `Transform.hs`): in the reversed list, place `e` just before the first
+/// statement that uses any of `vars` (i.e. just after that statement in source order); if none do,
+/// `e` goes at the end.
+fn float_down(
+    vars: &[Variable],
+    e: (usize, Expression),
+    list: Vec<(usize, Expression)>,
+) -> Vec<(usize, Expression)> {
+    let mut out: Vec<(usize, Expression)> = Vec::new();
+    let mut iter = list.into_iter();
+    let mut pending = Some(e);
+    for (lno2, e2) in iter.by_ref() {
+        if vars.iter().any(|v| is_var_used1(v, &e2)) {
+            out.push(pending.take().unwrap());
+            out.push((lno2, e2));
+            out.extend(iter);
+            break;
+        }
+        out.push((lno2, e2));
+    }
+    if let Some(e) = pending {
+        out.push(e);
+    }
+    out
+}
+
 /// `writeToMove` (mirrors `Transform.hs`): when a variable is no longer used *after* a `write()`
 /// call that takes it, inject a hidden `__can_move=True` keyword argument into that call. This tells
 /// the interpreter it may **move** (rename) the intermediate temp file backing the variable to the
@@ -1550,5 +1714,97 @@ mod tests {
         );
         let hout = md5_hex(format!("{vstr}Lookup '{h1}' as NGLCounts").as_bytes());
         assert_eq!(hout, "41496276b6b59c90f8d8b0c4c756772d");
+    }
+
+    fn index_one(v: &str, ix: i64) -> Expression {
+        Expression::IndexExpression(
+            Box::new(lookup(v)),
+            Index::One(Box::new(Expression::ConstInt(ix))),
+        )
+    }
+
+    fn is_index_check(e: &Expression) -> Option<(String, i64)> {
+        if let Expression::FunctionCall(FuncName(f), arg, kwargs, _) = e {
+            if f == "__check_index_access" {
+                let var = match arg.as_ref() {
+                    Expression::Lookup(_, Variable(v)) => v.clone(),
+                    _ => return None,
+                };
+                let ix = kwargs
+                    .iter()
+                    .find_map(|(Variable(k), v)| match (k.as_str(), v) {
+                        ("index1", Expression::ConstInt(i)) => Some(*i),
+                        _ => None,
+                    })?;
+                return Some((var, ix));
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn add_index_checks_floats_to_after_assignment() {
+        // x = [..]; y = other; print(x[5]) -> check inserted right after x's assignment.
+        let body = vec![
+            (1, assign("x", Expression::ListExpression(vec![]))),
+            (2, assign("y", lookup("other"))),
+            (3, call("print", index_one("x", 5), vec![])),
+        ];
+        let out = add_index_checks(body);
+        assert_eq!(out.len(), 4);
+        // The check floats up to just after the x assignment (index 1), before `y = other`.
+        assert_eq!(is_index_check(&out[1].1), Some(("x".to_string(), 5)));
+        // Original line number is preserved on the check (line 3, where the access is).
+        assert_eq!(out[1].0, 3);
+    }
+
+    #[test]
+    fn add_index_checks_ignores_non_constant_index() {
+        // A non-constant index (variable) gets no static check.
+        let body = vec![
+            (1, assign("x", Expression::ListExpression(vec![]))),
+            (
+                2,
+                call(
+                    "print",
+                    Expression::IndexExpression(
+                        Box::new(lookup("x")),
+                        Index::One(Box::new(lookup("i"))),
+                    ),
+                    vec![],
+                ),
+            ),
+        ];
+        let out = add_index_checks(body);
+        assert_eq!(out.len(), 2);
+    }
+
+    #[test]
+    fn add_index_checks_stays_within_condition_branch() {
+        // Checks inside an if-branch must not float above the condition.
+        let body = vec![
+            (1, assign("x", Expression::ListExpression(vec![]))),
+            (
+                2,
+                Expression::Condition(
+                    Box::new(Expression::ConstBool(true)),
+                    Box::new(call("print", index_one("x", 5), vec![])),
+                    Box::new(Expression::Discard),
+                ),
+            ),
+        ];
+        let out = add_index_checks(body);
+        // No check is inserted at top level between the assignment and the condition.
+        assert_eq!(out.len(), 2);
+        // The check lives inside the true branch (as a Sequence with the check first).
+        if let Expression::Condition(_, t, _) = &out[1].1 {
+            if let Expression::Sequence(es) = t.as_ref() {
+                assert_eq!(is_index_check(&es[0]), Some(("x".to_string(), 5)));
+            } else {
+                panic!("expected true branch to be a Sequence, got {:?}", t);
+            }
+        } else {
+            panic!("expected a Condition");
+        }
     }
 }

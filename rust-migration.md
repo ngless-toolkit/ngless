@@ -9,8 +9,11 @@ Haskell parity target for `ngless "1.5"`+ scripts.
 
 - **`Transform.hs` passes not ported.** The output-neutral optimizations
   `qcInPreprocess`/`ifLenDiscardSpecial`/`substrimReassign` and the early-check injections
-  `addRSChecks`/`addIndexChecks`/`addCountsCheck` are absent (Rust does eager IO validation
-  differently, so these are partly covered). `addUseNewer` is out of scope at ≥1.5.
+  `addRSChecks`/`addCountsCheck` are absent (Rust does eager IO validation differently, so these are
+  partly covered). `addFileChecks` and `addIndexChecks` *are* ported (`transform.rs`), the latter
+  reusing a `genericCheckUpfloat` port that would also back `addRSChecks`/`addCountsCheck` if those
+  are picked up later. `addTemporaries` is still not ported (see the out-of-bounds note below for the
+  one edge that leaves). `addUseNewer` is out of scope at ≥1.5.
 
 - **Reference-download path:** `count(reference=...)` annotation download errors (`src/interpret.rs`:
   "automatic annotation download is not supported"). `ensure_data_present` only surfaces the FASTA
@@ -41,11 +44,15 @@ Haskell parity target for `ngless "1.5"`+ scripts.
   `sortOFormat` transform *is* ported: `transform.rs::sort_oformat` injects `__output_bam=True` so
   `samtools_sort` feeding only a BAM `write` sorts straight to BAM, one `@PG` line, byte-identical.)
 
-- **Out-of-bounds message + timing (`addIndexChecks` not ported).** For `array[<constInt>]` Haskell
-  floats a `__check_index_access` up to just after the array assignment, failing **early** with
-  `Index access on line N is invalid.\n …`; Rust has no such check, so the error only surfaces when
-  the index is evaluated (later, possibly after side effects) with the plainer runtime `Accessing
-  element K in list of size M.`.
+- **Out-of-bounds check on an un-bound indexee (`addTemporaries` not ported).** `addIndexChecks`
+  *is* now ported (`transform.rs::add_index_checks` + the `__check_index_access` builtin): for
+  `array[<constInt>]` where `array` is a variable, a check floats up to just after the array
+  assignment and fails **early** with `Index access on line N is invalid.\n …`, byte-identical to
+  Haskell. The one remaining gap is `<call>()[<constInt>]` — indexing a call result *directly*
+  without binding it to a variable. Haskell catches this because `addTemporaries` runs first and
+  lifts the call into a `temp$N` variable, giving the index a `Lookup` target; Rust's
+  `extractIndexOne`-equivalent only matches `Lookup` indexees, so this sub-case still errors late.
+  Untested and rare (the array is almost always a named variable).
 
 - **Error-handling / leniency on edge inputs (untested):**
   - malformed GFF — an empty attribute field or bare word crashes Haskell (`B.tail ""`), Rust skips

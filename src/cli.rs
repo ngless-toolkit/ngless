@@ -979,6 +979,10 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // runs after the module transforms). Done after output hashing so the inserted checks do not
     // affect the `{hash}`/`{script}` content hashes.
     typed.body = crate::transform::add_file_checks(std::mem::take(&mut typed.body), &funcs);
+    // Insert the floated `__check_index_access` calls (mirrors `addIndexChecks`, a builtin transform
+    // that runs after `addFileChecks`). A constant out-of-bounds index now fails early, right after
+    // the array is assigned. Done after output hashing so the inserted checks do not affect hashes.
+    typed.body = crate::transform::add_index_checks(std::mem::take(&mut typed.body));
 
     // Export modes (gated on `--experimental-features`, checked above): serialise the script and
     // exit before interpretation, mirroring the `whenJust (exportJSON ...) $ ... exitSuccess` /

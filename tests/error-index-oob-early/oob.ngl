@@ -1,0 +1,6 @@
+ngless "1.6"
+
+x = [1, 2, 3]
+println("REACHED_MARKER")
+y = x[5]
+println(y)

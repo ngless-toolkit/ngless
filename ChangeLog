@@ -13,6 +13,9 @@ Unreleased
 	* Run-header citations are now collected recursively, so nested calls such
 	as `write(orf_find(contigs))` list all relevant references (e.g. prodigal
 	and BWA) instead of only the outermost tool
+	* A constant out-of-bounds list index (e.g. `x[5]` on a 3-element list) now
+	fails early, right after the list is assigned, with the same "Index access
+	on line N is invalid" message as earlier ngless versions
 
 Version 1.6.0-beta1 2026-07-01 by luispedro
 	* Switched to rust implementation

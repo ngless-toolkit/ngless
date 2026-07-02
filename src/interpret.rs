@@ -376,6 +376,42 @@ fn execute_check_ifile(
     Ok(NGLessObject::Void)
 }
 
+/// `__check_index_access(list, original_lno=N, index1=ix)`: verify a constant index is in bounds
+/// (mirrors the `__check_index_access` arm of `executeChecks`). Inserted by
+/// [`crate::transform::add_index_checks`] and floated up to just after the list's assignment, so an
+/// out-of-bounds constant index fails *early* rather than when the index is finally evaluated.
+fn execute_check_index_access(
+    expr: &NGLessObject,
+    args: &[(String, NGLessObject)],
+) -> NgResult<NGLessObject> {
+    // Only lists carry a bounds check; non-list targets (e.g. a read indexed by a single int) are
+    // a no-op here and surface any error at evaluation time, as before.
+    let vs = match expr {
+        NGLessObject::List(vs) => vs,
+        _ => return Ok(NGLessObject::Void),
+    };
+    let lno = match lookup_arg(args, "original_lno") {
+        Some(NGLessObject::Integer(i)) => *i,
+        _ => 0,
+    };
+    let index1 = match lookup_arg(args, "index1") {
+        Some(NGLessObject::Integer(i)) => *i,
+        _ => 0,
+    };
+    let len = vs.len() as i64;
+    if index1 >= len {
+        let hint = if index1 == len {
+            "\nPlease note that NGLess uses 0-based indexing."
+        } else {
+            ""
+        };
+        return Err(NgError::script(format!(
+            "Index access on line {lno} is invalid.\n Accessing element with index {index1} but list only has {len} elements.{hint}"
+        )));
+    }
+    Ok(NGLessObject::Void)
+}
+
 /// Check that `oname`'s directory exists and is writable (mirrors `checkOFile` in
 /// `BuiltinModules/Checks.hs`). Returns an error message, or `None` when the file can be written.
 pub(crate) fn check_ofile(oname: &str) -> Option<String> {
@@ -939,6 +975,7 @@ impl Interpreter {
             "orf_find" => self.execute_orf_find(&expr_v, &argvs),
             "__check_ofile" => execute_check_ofile(&expr_v, &argvs),
             "__check_ifile" => execute_check_ifile(&expr_v, &argvs),
+            "__check_index_access" => execute_check_index_access(&expr_v, &argvs),
             other => {
                 if self
                     .external_modules

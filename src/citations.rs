@@ -178,12 +178,8 @@ mod tests {
             vec![],
             None,
         );
-        let write = Expression::FunctionCall(
-            FuncName("write".to_string()),
-            Box::new(orf),
-            vec![],
-            None,
-        );
+        let write =
+            Expression::FunctionCall(FuncName("write".to_string()), Box::new(orf), vec![], None);
         let script = Script {
             header: None,
             body: vec![(0, write)],
