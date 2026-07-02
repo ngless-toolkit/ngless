@@ -57,6 +57,34 @@ The recommended way to install NGLess is through
 
     conda install -c bioconda ngless 
 
+### Beta releases (via pixi)
+
+Pre-release/beta builds are published as `.conda` packages on the [GitHub
+releases page](https://github.com/ngless-toolkit/ngless/releases) before they
+reach bioconda. The easiest way to install one (together with the external tools
+NGLess drives) is with [pixi](https://pixi.sh) and a manifest that pins the beta
+package by URL. The [`pixi_install_ngless.toml`](pixi_install_ngless.toml) file
+in this repository is a ready-to-use example:
+
+    [dependencies]
+    prodigal = ">=2.6.3,<3"
+    megahit = ">=1.2.9,<2"
+    samtools = ">=1.23.1,<2"
+    minimap2 = ">=2.31,<3"
+    bwa = ">=0.7.19,<0.8"
+    ngless = { url = "https://github.com/ngless-toolkit/ngless/releases/download/v1.6.0-beta1/ngless-1.6.beta1-hb0f4dca_0.conda" }
+
+pixi only reads a manifest named exactly `pixi.toml`, so copy the example into a
+fresh directory under that name:
+
+    mkdir ngless-beta && cp pixi_install_ngless.toml ngless-beta/pixi.toml
+    cd ngless-beta
+
+Then install and run it with:
+
+    pixi install
+    pixi run ngless --version
+
 ### Docker
 
 Alternatively, a docker container with NGLess is available at
