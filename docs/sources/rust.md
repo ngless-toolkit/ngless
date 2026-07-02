@@ -79,6 +79,18 @@ streamed large files efficiently. The drivers are practical:
 As a side effect, the rewrite eliminates all the bundled C/C++/FFI code that the
 Haskell build carried.
 
+## Known changes
+
+A few behaviours are *deliberately* different from the Haskell implementation.
+These are intentional improvements, not parity bugs:
+
+- **`count()` rejects ambiguous annotation sources.** The annotation to use is
+  chosen from `features=["seqname"]`, `gff_file`, `functional_map`, or
+  `reference`. Passing more than one of these is now an error, reported before
+  the pipeline runs. Previously all but one were silently ignored (the Haskell
+  implementation only errored on the `gff_file` + `functional_map` combination).
+  Pass exactly one annotation source so that no argument is silently dropped.
+
 ## Reporting problems
 
 Because 1.6 is meant to be a drop-in replacement for 1.5, any difference in

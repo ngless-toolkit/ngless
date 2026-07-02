@@ -1,6 +1,9 @@
 Unreleased
 	* Importing the legacy `motus` or `soap` modules now aborts with a clear
 	guidance error (both are obsolete and unsupported)
+	* `count()` now errors early when more than one annotation source is given
+	(seqname mode, `gff_file`, `functional_map`, or `reference`) instead of
+	silently ignoring all but one
 
 Version 1.6.0-beta1 2026-07-01 by luispedro
 	* Switched to rust implementation

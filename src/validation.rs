@@ -201,6 +201,10 @@ fn validate_count(script: &Script) -> NgResult<()> {
             }
         });
         for kwargs in &calls {
+            // Reject argument combinations where an annotation source would be silently
+            // ignored. This is presence-based (not value-based), so it fires regardless of
+            // whether the argument values are static.
+            check_count_annotation_sources(kwargs, *lno)?;
             // Only run when every keyword argument is statically known (`constantKWArgs`).
             if !kwargs.iter().all(|(_, v)| is_static(v)) {
                 continue;
@@ -217,6 +221,38 @@ fn validate_count(script: &Script) -> NgResult<()> {
                 .unwrap_or_default();
             crate::count::check_functional_features(&fmap, &features, *lno)?;
         }
+    }
+    Ok(())
+}
+
+/// Reject `count()` calls that specify more than one annotation source.
+///
+/// The annotation to use is chosen by a fixed precedence in `parse_count_opts`
+/// (seqname > functional_map > gff_file > reference), so passing several sources at once silently
+/// discards all but the winner. Haskell only errored on the `gff_file` + `functional_map` pair
+/// (`parseAnnotationMode`); this check is stricter — it fails early on *any* ambiguous combination
+/// so no argument is quietly ignored. `features=["seqname"]` counts as a source, since in that mode
+/// `gff_file`/`functional_map`/`reference` are all discarded.
+fn check_count_annotation_sources(kwargs: &[(Variable, Expression)], lno: usize) -> NgResult<()> {
+    let mut sources: Vec<&str> = Vec::new();
+    // `features=["seqname"]` selects seqname mode; only then does it act as an annotation source.
+    if let Some((_, v)) = kwargs.iter().find(|(k, _)| k.0 == "features") {
+        if static_string_list(v).as_deref() == Some(&["seqname".to_string()][..]) {
+            sources.push("features=[\"seqname\"]");
+        }
+    }
+    for name in ["functional_map", "gff_file", "reference"] {
+        if kwargs.iter().any(|(k, _)| k.0 == name) {
+            sources.push(name);
+        }
+    }
+    if sources.len() > 1 {
+        return Err(NgError::script(format!(
+            "In call to count() [line {lno}]: ambiguous annotation source. Only one of \
+             features=[\"seqname\"], functional_map, gff_file, or reference may be given, but got: \
+             {}. Remove the extra argument(s) so that none is silently ignored.",
+            sources.join(", ")
+        )));
     }
     Ok(())
 }
@@ -1016,6 +1052,67 @@ mod tests {
     #[test]
     fn assign_variable_ok() {
         is_ok("ngless '1.5'\nnotConst = 1\nnotConst = 2\n");
+    }
+
+    // --- count() annotation-source conflicts ------------------------------
+
+    fn count_sources_result(kwargs: &[(&str, Expression)]) -> NgResult<()> {
+        let kwargs: Vec<(Variable, Expression)> = kwargs
+            .iter()
+            .map(|(k, v)| (Variable(k.to_string()), v.clone()))
+            .collect();
+        check_count_annotation_sources(&kwargs, 3)
+    }
+
+    #[test]
+    fn count_single_source_ok() {
+        assert!(
+            count_sources_result(&[("gff_file", Expression::ConstStr("a.gff".into()))]).is_ok()
+        );
+        assert!(count_sources_result(&[(
+            "features",
+            Expression::ListExpression(vec![Expression::ConstStr("seqname".into())])
+        )])
+        .is_ok());
+        // `features` for a gff/functional_map run is not an annotation source on its own.
+        assert!(count_sources_result(&[
+            (
+                "features",
+                Expression::ListExpression(vec![Expression::ConstStr("gene".into())])
+            ),
+            ("gff_file", Expression::ConstStr("a.gff".into())),
+        ])
+        .is_ok());
+    }
+
+    #[test]
+    fn count_gff_and_functional_map_conflict() {
+        assert!(count_sources_result(&[
+            ("gff_file", Expression::ConstStr("a.gff".into())),
+            ("functional_map", Expression::ConstStr("b.map".into())),
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn count_seqname_with_gff_conflict() {
+        assert!(count_sources_result(&[
+            (
+                "features",
+                Expression::ListExpression(vec![Expression::ConstStr("seqname".into())])
+            ),
+            ("gff_file", Expression::ConstStr("a.gff".into())),
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn count_reference_with_gff_conflict() {
+        assert!(count_sources_result(&[
+            ("gff_file", Expression::ConstStr("a.gff".into())),
+            ("reference", Expression::ConstStr("sacCer3".into())),
+        ])
+        .is_err());
     }
 
     // --- IO validation (`validate_io`) ------------------------------------

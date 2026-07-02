@@ -59,10 +59,6 @@ Haskell parity target for `ngless "1.5"`+ scripts.
   prodigal + BWA). Fix: run `collect_citations` after transforms, or recurse into sub-expressions.
   Untested (no `expected.stdout.txt` on the relevant test).
 
-- **`count()` with both `gff_file` and `functional_map`.** `Count.hs::parseAnnotationMode` errors
-  ("Cannot simultaneously pass a gff_file and an annotation_file"); Rust `parse_count_opts` silently
-  prefers `functional_map`. User-error edge, untested.
-
 - **Out-of-bounds message + timing (`addIndexChecks` not ported).** For `array[<constInt>]` Haskell
   floats a `__check_index_access` up to just after the array assignment, failing **early** with
   `Index access on line N is invalid.\n …`; Rust has no such check, so the error only surfaces when
