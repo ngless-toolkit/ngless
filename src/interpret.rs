@@ -599,7 +599,7 @@ pub fn interpret(
     constants: Vec<(String, NGLessObject)>,
     active_mappers: Vec<String>,
     ngl_version: (i64, i64),
-) -> NgResult<()> {
+) -> NgResult<RunReportData> {
     let mut env = HashMap::new();
     for (name, value) in constants {
         env.insert(name, value);
@@ -655,32 +655,56 @@ pub fn interpret(
     for msg in interp.finish_ok_messages.lock().unwrap().drain(..) {
         crate::output::info(0, &msg);
     }
-    Ok(())
+    // Hand the collected FASTQ/mapping statistics back to the CLI so it can write the end-of-run
+    // HTML report (mirrors the report being written from Haskell's global `savedOutput` after
+    // `FinishOkHook`). Only reached on success, matching Haskell's `Right ()` guard.
+    let fq_stats = std::mem::take(&mut *interp.fq_stats.lock().unwrap());
+    let map_stats = std::mem::take(&mut *interp.map_stats.lock().unwrap());
+    Ok(RunReportData {
+        fq_stats,
+        map_stats,
+    })
 }
 
 /// Collected per-file FASTQ statistics, in registration order (mirrors the `savedOutput`
-/// accumulator). `qcstats({fastq})` serialises these to a TSV.
-struct FqInfo {
-    file: String,
-    encoding: String,
-    gc_content: f64,
-    non_atcg: f64,
-    n_seq: i64,
-    n_basepairs: i64,
-    min_len: i64,
-    max_len: i64,
+/// accumulator). `qcstats({fastq})` serialises these to a TSV; the end-of-run HTML report
+/// (`crate::report`) also consumes them, including `lno`/`qual_percentiles` (Haskell's `scriptLno`
+/// and `perBaseQ`).
+pub(crate) struct FqInfo {
+    pub(crate) file: String,
+    pub(crate) encoding: String,
+    pub(crate) gc_content: f64,
+    pub(crate) non_atcg: f64,
+    pub(crate) n_seq: i64,
+    pub(crate) n_basepairs: i64,
+    pub(crate) min_len: i64,
+    pub(crate) max_len: i64,
+    /// Script line number this stats block was registered at (mirrors `FQInfo.scriptLno`); used
+    /// by the report to annotate the corresponding script line with a `QC` link.
+    pub(crate) lno: usize,
+    /// Per-position `(mean, median, lower_quartile, upper_quartile)` quality (mirrors `perBaseQ`);
+    /// charted by the report.
+    pub(crate) qual_percentiles: Vec<(i64, i64, i64, i64)>,
 }
 
 /// Collected per-`map()`-call mapping statistics (mirrors `MappingInfo`). `qcstats({mapping})`
 /// serialises these. The `input_file`/`reference` fields hold temp/index paths exactly as the
 /// Haskell code records them, so this output is not byte-reproducible (no test diffs it).
-struct MapInfo {
-    lno: usize,
-    input_file: String,
-    reference: String,
-    total: i64,
-    aligned: i64,
-    unique: i64,
+pub(crate) struct MapInfo {
+    pub(crate) lno: usize,
+    pub(crate) input_file: String,
+    pub(crate) reference: String,
+    pub(crate) total: i64,
+    pub(crate) aligned: i64,
+    pub(crate) unique: i64,
+}
+
+/// FASTQ + mapping statistics collected over a run, returned by [`interpret`] to the CLI so it can
+/// write the end-of-run HTML report (mirrors the `fqOutput`/`mapOutput` parts of Haskell's
+/// `savedOutput`, which the report reads globally).
+pub struct RunReportData {
+    pub(crate) fq_stats: Vec<FqInfo>,
+    pub(crate) map_stats: Vec<MapInfo>,
 }
 
 /// One block's worth of preprocessed paired output: the encoded bytes destined for each of the
@@ -2611,6 +2635,8 @@ impl Interpreter {
             n_basepairs: st.num_basepairs(),
             min_len: st.min_len,
             max_len: st.max_len,
+            lno: self.cur_lno.load(Ordering::Relaxed),
+            qual_percentiles: st.qual_percentiles.clone(),
         });
     }
 
@@ -5369,6 +5395,7 @@ mod tests {
             vec!["bwa".to_string()],
             (1, 5),
         )
+        .map(|_| ())
     }
 
     #[test]

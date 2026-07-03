@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NGLess run report</title>
+<style>
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --panel-2: #f0f2f5;
+  --text: #1c2126;
+  --muted: #667085;
+  --border: #e2e6ea;
+  --accent: #d98800;
+  --accent-weak: #fbeccb;
+  --link: #1668c1;
+  --code-bg: #f4f5f7;
+  --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10);
+  --c-trace: #98a2b3;
+  --c-debug: #667085;
+  --c-info: #1668c1;
+  --c-result: #6b4f1d;
+  --c-warning: #b7791f;
+  --c-error: #c0362c;
+  --s-mean: #1668c1;
+  --s-median: #12805c;
+  --s-lower: #b7791f;
+  --s-upper: #8a5cf6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216;
+    --panel: #171b21;
+    --panel-2: #1e242c;
+    --text: #e6e9ee;
+    --muted: #93a1b1;
+    --border: #2a313a;
+    --accent: #f0a930;
+    --accent-weak: #3a2f16;
+    --link: #6db3f2;
+    --code-bg: #12161b;
+    --shadow: none;
+    --c-trace: #667085;
+    --c-debug: #93a1b1;
+    --c-info: #6db3f2;
+    --c-result: #d8b878;
+    --c-warning: #e0a94a;
+    --c-error: #ef6a5f;
+    --s-mean: #6db3f2;
+    --s-median: #3ecf9a;
+    --s-lower: #e0a94a;
+    --s-upper: #b18cff;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f6f7f9; --panel: #ffffff; --panel-2: #f0f2f5; --text: #1c2126;
+  --muted: #667085; --border: #e2e6ea; --accent: #d98800; --accent-weak: #fbeccb;
+  --link: #1668c1; --code-bg: #f4f5f7; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10);
+  --c-trace:#98a2b3;--c-debug:#667085;--c-info:#1668c1;--c-result:#6b4f1d;--c-warning:#b7791f;--c-error:#c0362c;
+  --s-mean:#1668c1;--s-median:#12805c;--s-lower:#b7791f;--s-upper:#8a5cf6;
+}
+:root[data-theme="dark"] {
+  --bg:#0f1216;--panel:#171b21;--panel-2:#1e242c;--text:#e6e9ee;--muted:#93a1b1;
+  --border:#2a313a;--accent:#f0a930;--accent-weak:#3a2f16;--link:#6db3f2;--code-bg:#12161b;--shadow:none;
+  --c-trace:#667085;--c-debug:#93a1b1;--c-info:#6db3f2;--c-result:#d8b878;--c-warning:#e0a94a;--c-error:#ef6a5f;
+  --s-mean:#6db3f2;--s-median:#3ecf9a;--s-lower:#e0a94a;--s-upper:#b18cff;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+code, pre, .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+header.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.top-inner { max-width: 1080px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.brand { font-weight: 700; font-size: 17px; letter-spacing: .2px; display: flex; align-items: center; gap: 9px; }
+.brand .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
+.brand small { color: var(--muted); font-weight: 500; font-size: 12px; }
+nav.tabs { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+nav.tabs button {
+  font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: var(--muted);
+  padding: 6px 12px; border-radius: 8px;
+}
+nav.tabs button:hover { color: var(--text); background: var(--panel-2); }
+nav.tabs button.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }
+.theme-toggle { font: inherit; cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--muted); border-radius: 8px; padding: 6px 10px; }
+.theme-toggle:hover { color: var(--text); }
+
+main { max-width: 1080px; margin: 0 auto; padding: 22px 20px 80px; }
+.meta { color: var(--muted); font-size: 13.5px; margin: 6px 0 22px; }
+.meta strong { color: var(--text); font-weight: 600; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); margin: 0 0 22px; overflow: hidden; }
+.panel > h2 { margin: 0; padding: 14px 18px; font-size: 15px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+.panel .body { padding: 16px 18px; }
+.tab-section { display: none; }
+.tab-section.active { display: block; }
+.empty { color: var(--muted); font-style: italic; padding: 6px 2px; }
+
+/* Script listing */
+.script { margin: 0; overflow-x: auto; }
+.script .ln { display: grid; grid-template-columns: 3.4em minmax(0,1fr); gap: 0; align-items: baseline; }
+.script .ln:hover { background: var(--panel-2); }
+.script .gutter { color: var(--muted); text-align: right; padding-right: 12px; user-select: none; font-size: 12.5px; border-right: 1px solid var(--border); }
+.script .src { padding-left: 12px; white-space: pre-wrap; word-break: break-word; }
+.tag { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; padding: 1px 6px; border-radius: 5px; margin-right: 7px; vertical-align: middle; }
+.tag.qc { background: color-mix(in srgb, var(--s-median) 18%, transparent); color: var(--s-median); }
+.tag.stats { background: color-mix(in srgb, var(--s-upper) 18%, transparent); color: var(--s-upper); }
+
+/* Log */
+.log-controls { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+.log-controls label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.log { margin: 0; font-size: 13px; }
+.log .row { display: grid; grid-template-columns: 4.6em auto 1fr; gap: 10px; padding: 3px 4px; border-radius: 6px; align-items: baseline; }
+.log .row:hover { background: var(--panel-2); }
+.log .lvl { font-weight: 700; text-transform: uppercase; font-size: 10.5px; letter-spacing: .3px; }
+.log .lno { color: var(--muted); font-size: 12px; }
+.log .ts { color: var(--muted); font-size: 12px; }
+.log .msg { white-space: pre-wrap; word-break: break-word; }
+.lvl-trace { color: var(--c-trace); } .lvl-debug { color: var(--c-debug); }
+.lvl-info { color: var(--c-info); } .lvl-result { color: var(--c-result); }
+.lvl-warning { color: var(--c-warning); } .lvl-error { color: var(--c-error); }
+.hide-ts .ts { display: none; }
+
+/* Tables */
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+.table-wrap { overflow-x: auto; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .3px; }
+tbody tr:hover { background: var(--panel-2); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bar { position: relative; }
+.bar .fill { position: absolute; inset: 0; background: color-mix(in srgb, var(--s-mean) 14%, transparent); border-right: 2px solid var(--s-mean); z-index: 0; }
+.bar .val { position: relative; z-index: 1; }
+
+/* QC chart */
+.qc-block { border-top: 1px solid var(--border); }
+.qc-block:first-child { border-top: 0; }
+.qc-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 4px 2px 10px; }
+.qc-head .fname { font-weight: 600; }
+.qc-head .sub { color: var(--muted); font-size: 12.5px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin: 2px 0 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 22px; height: 3px; border-radius: 2px; display: inline-block; }
+.chart-wrap { overflow-x: auto; }
+svg.qc-chart { display: block; width: 100%; min-width: 520px; height: 240px; }
+svg .grid line { stroke: var(--border); stroke-width: 1; }
+svg .axis text { fill: var(--muted); font-size: 11px; }
+svg .axis-label { fill: var(--muted); font-size: 11px; }
+svg .band { fill: color-mix(in srgb, var(--s-mean) 12%, transparent); }
+footer { max-width: 1080px; margin: 0 auto; padding: 0 20px 40px; color: var(--muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<script>
+"use strict";
+const REPORT_DATA = {{DATA}};
+</script>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand"><span class="dot"></span> NGLess <small>run report</small></div>
+    <nav class="tabs" id="tabs"></nav>
+    <button class="theme-toggle" id="themeToggle" title="Toggle light/dark">◐</button>
+  </div>
+</header>
+
+<main>
+  <div class="meta" id="meta"></div>
+  <section class="tab-section" data-tab="overview" id="tab-overview"></section>
+  <section class="tab-section" data-tab="qc" id="tab-qc"></section>
+  <section class="tab-section" data-tab="mapping" id="tab-mapping"></section>
+</main>
+
+<footer>
+  Generated by NGLess. This report is fully self-contained &mdash; it makes no network requests and
+  works offline.
+</footer>
+
+<script>
+"use strict";
+(function () {
+  const D = REPORT_DATA;
+  const el = (tag, props, children) => {
+    const n = document.createElement(tag);
+    if (props) for (const k in props) {
+      if (k === "class") n.className = props[k];
+      else if (k === "html") n.innerHTML = props[k];
+      else if (k === "text") n.textContent = props[k];
+      else n.setAttribute(k, props[k]);
+    }
+    if (children) for (const c of [].concat(children)) if (c != null) n.append(c);
+    return n;
+  };
+  const fmtInt = (n) => (n == null ? "" : Number(n).toLocaleString("en-US"));
+
+  // ---- meta line ----
+  document.getElementById("meta").append(
+    "Result of running ", el("strong", { text: D.scriptName || "script" }),
+    " at ", el("strong", { text: D.time || "" }), "."
+  );
+
+  // ---- Overview: script listing + run log ----
+  const overview = document.getElementById("tab-overview");
+
+  const scriptPanel = el("div", { class: "panel" }, el("h2", { text: "Script" }));
+  const scriptBody = el("div", { class: "body" });
+  const scriptList = el("div", { class: "script mono" });
+  for (const line of (D.script || [])) {
+    const src = el("div", { class: "src" });
+    if (line.qc) src.append(el("a", { class: "tag qc", href: "#qc-" + line.lno, text: "QC" }));
+    if (line.stats) src.append(el("a", { class: "tag stats", href: "#stats-" + line.lno, text: "Stats" }));
+    src.append(document.createTextNode(line.text || ""));
+    scriptList.append(el("div", { class: "ln", id: "line-" + line.lno },
+      [el("div", { class: "gutter", text: String(line.lno) }), src]));
+  }
+  if (!(D.script || []).length) scriptList.append(el("div", { class: "empty", text: "No script recorded." }));
+  scriptBody.append(scriptList);
+  scriptPanel.append(scriptBody);
+  overview.append(scriptPanel);
+
+  const logPanel = el("div", { class: "panel" }, el("h2", { text: "Run log" }));
+  const logBody = el("div", { class: "body" });
+  const showTs = el("input", { type: "checkbox" });
+  const minLevel = el("select");
+  for (const [v, t] of [["trace", "Trace+"], ["debug", "Debug+"], ["info", "Info+"], ["result", "Result+"], ["warning", "Warnings+"], ["error", "Errors only"]])
+    minLevel.append(el("option", { value: v, text: t }));
+  minLevel.value = "debug";
+  const order = { trace: 0, debug: 1, info: 2, result: 3, warning: 4, error: 5 };
+  const logRows = el("div", { class: "log hide-ts" });
+  logBody.append(el("div", { class: "log-controls" },
+    [el("label", null, [showTs, "Show timestamps"]),
+     el("label", null, ["Level ", minLevel])]), logRows);
+
+  function renderLog() {
+    logRows.innerHTML = "";
+    const min = order[minLevel.value];
+    let shown = 0;
+    for (const o of (D.output || [])) {
+      if ((order[o.otype] ?? 0) < min) continue;
+      shown++;
+      logRows.append(el("div", { class: "row" }, [
+        el("span", { class: "lvl lvl-" + o.otype, text: o.otype }),
+        el("span", { class: "lno", text: o.lno > 0 ? "L" + o.lno : "" }),
+        el("span", null, [
+          el("span", { class: "ts", text: "[" + (o.time || "") + "] " }),
+          el("span", { class: "msg", text: o.message || "" }),
+        ]),
+      ]));
+    }
+    if (!shown) logRows.append(el("div", { class: "empty", text: "No messages at this level." }));
+  }
+  showTs.addEventListener("change", () => logRows.classList.toggle("hide-ts", !showTs.checked));
+  minLevel.addEventListener("change", renderLog);
+  renderLog();
+  logPanel.append(logBody);
+  overview.append(logPanel);
+
+  // ---- QC tab ----
+  const qcTab = document.getElementById("tab-qc");
+  const fq = D.fqStats || [];
+  const qcPanel = el("div", { class: "panel" }, el("h2", { text: "FastQ quality control" }));
+  const qcBody = el("div", { class: "body" });
+  if (!fq.length) {
+    qcBody.append(el("div", { class: "empty", text: "No FASTQ statistics were collected in this run." }));
+  } else {
+    // summary table
+    const rows = [
+      ["File", (f) => f.file],
+      ["Encoding", (f) => f.encoding],
+      ["% GC", (f) => (f.gcContent * 100).toFixed(1) + "%"],
+      ["Sequences", (f) => fmtInt(f.numSeqs)],
+      ["Base pairs", (f) => fmtInt(f.numBasepairs)],
+      ["Length", (f) => f.minLen + "–" + f.maxLen],
+      ["Non-ATCG", (f) => (f.nonATCG * 100).toFixed(3) + "%"],
+    ];
+    const thead = el("thead", null, el("tr", null,
+      [el("th", { text: "" })].concat(fq.map((f, i) => el("th", { text: "#" + (i + 1) })))));
+    const tbody = el("tbody");
+    for (const [label, get] of rows) {
+      tbody.append(el("tr", null,
+        [el("th", { text: label })].concat(fq.map((f) => el("td", { text: get(f) })))));
+    }
+    qcBody.append(el("div", { class: "table-wrap" }, el("table", null, [thead, tbody])));
+
+    // per-file quality charts
+    for (let i = 0; i < fq.length; i++) {
+      const f = fq[i];
+      const block = el("div", { class: "qc-block", id: "qc-" + f.lno });
+      block.append(el("div", { class: "qc-head" }, [
+        el("span", { class: "fname mono", text: "#" + (i + 1) + " " + f.file }),
+        el("span", { class: "sub", text: (f.perBaseQ || []).length + " positions · " + f.encoding }),
+      ]));
+      block.append(el("div", { class: "legend" }, [
+        legendItem("var(--s-upper)", "Upper quartile"),
+        legendItem("var(--s-mean)", "Mean"),
+        legendItem("var(--s-median)", "Median"),
+        legendItem("var(--s-lower)", "Lower quartile"),
+      ]));
+      block.append(el("div", { class: "chart-wrap" }, qualityChart(f.perBaseQ || [])));
+      qcBody.append(block);
+    }
+  }
+  qcPanel.append(qcBody);
+  qcTab.append(qcPanel);
+
+  function legendItem(color, label) {
+    return el("span", null, [el("i", { style: "background:" + color }), label]);
+  }
+
+  // Hand-rendered SVG line chart of per-position quality (no external libraries).
+  function qualityChart(data) {
+    const NS = "http://www.w3.org/2000/svg";
+    const W = 900, H = 240, mL = 40, mR = 12, mT = 12, mB = 28;
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "qc-chart");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("preserveAspectRatio", "none");
+    if (!data.length) return svg;
+    const n = data.length;
+    let lo = Infinity, hi = -Infinity;
+    for (const d of data) {
+      lo = Math.min(lo, d.lowerQuartile, d.median, d.mean, d.upperQuartile);
+      hi = Math.max(hi, d.lowerQuartile, d.median, d.mean, d.upperQuartile);
+    }
+    if (lo === hi) { lo -= 1; hi += 1; }
+    lo = Math.floor(lo) - 1; hi = Math.ceil(hi) + 1;
+    const px = (i) => mL + (n === 1 ? 0.5 : i / (n - 1)) * (W - mL - mR);
+    const py = (v) => H - mB - ((v - lo) / (hi - lo)) * (H - mT - mB);
+    const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+    // y grid + labels
+    const grid = mk("g", { class: "grid" }), axis = mk("g", { class: "axis" });
+    const ticks = 4;
+    for (let t = 0; t <= ticks; t++) {
+      const v = lo + (hi - lo) * (t / ticks);
+      const y = py(v);
+      grid.append(mk("line", { x1: mL, y1: y, x2: W - mR, y2: y }));
+      const label = mk("text", { x: mL - 6, y: y + 3, "text-anchor": "end" });
+      label.textContent = v.toFixed(0);
+      axis.append(label);
+    }
+    // x labels (first / mid / last position, 1-based)
+    for (const i of (n === 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1])) {
+      const label = mk("text", { x: px(i), y: H - 8, "text-anchor": "middle" });
+      label.textContent = String(i + 1);
+      axis.append(label);
+    }
+    svg.append(grid, axis);
+
+    // shaded interquartile band
+    let up = "", down = "";
+    for (let i = 0; i < n; i++) up += (i ? " L" : "M") + px(i) + " " + py(data[i].upperQuartile);
+    for (let i = n - 1; i >= 0; i--) down += " L" + px(i) + " " + py(data[i].lowerQuartile);
+    svg.append(mk("path", { class: "band", d: up + down + " Z" }));
+
+    const line = (key, color) => {
+      let d = "";
+      for (let i = 0; i < n; i++) d += (i ? " L" : "M") + px(i) + " " + py(data[i][key]);
+      svg.append(mk("path", { d, fill: "none", stroke: color, "stroke-width": key === "mean" ? 2 : 1.5, "stroke-opacity": key === "mean" ? 1 : 0.9 }));
+    };
+    line("lowerQuartile", "var(--s-lower)");
+    line("upperQuartile", "var(--s-upper)");
+    line("median", "var(--s-median)");
+    line("mean", "var(--s-mean)");
+    return svg;
+  }
+
+  // ---- Mapping tab ----
+  const mapTab = document.getElementById("tab-mapping");
+  const ms = D.mapStats || [];
+  const mapPanel = el("div", { class: "panel" }, el("h2", { text: "Mapping statistics" }));
+  const mapBody = el("div", { class: "body" });
+  if (!ms.length) {
+    mapBody.append(el("div", { class: "empty", text: "No mapping was performed in this run." }));
+  } else {
+    const head = el("thead", null, el("tr", null,
+      ["Line", "Reference", "Input", "Total", "Aligned", "Unique"].map((h) => el("th", { text: h }))));
+    const body = el("tbody");
+    for (const m of ms) {
+      const pct = (v) => m.total ? " (" + (100 * v / m.total).toFixed(1) + "%)" : "";
+      const tr = el("tr", { id: "stats-" + m.lno }, [
+        el("td", { text: String(m.lno) }),
+        el("td", { class: "mono", text: m.reference }),
+        el("td", { class: "mono", text: m.inputFile }),
+        el("td", { class: "num", text: fmtInt(m.total) }),
+        el("td", { class: "num", text: fmtInt(m.aligned) + pct(m.aligned) }),
+        el("td", { class: "num", text: fmtInt(m.unique) + pct(m.unique) }),
+      ]);
+      body.append(tr);
+    }
+    mapBody.append(el("div", { class: "table-wrap" }, el("table", null, [head, body])));
+  }
+  mapPanel.append(mapBody);
+  mapTab.append(mapPanel);
+
+  // ---- tabs ----
+  const tabDefs = [
+    ["overview", "Overview"],
+    ["qc", "FastQ QC" + (fq.length ? " (" + fq.length + ")" : "")],
+    ["mapping", "Mapping" + (ms.length ? " (" + ms.length + ")" : "")],
+  ];
+  const tabsNav = document.getElementById("tabs");
+  const buttons = {};
+  function activate(name) {
+    for (const t of tabDefs.map((d) => d[0])) {
+      document.getElementById("tab-" + t).classList.toggle("active", t === name);
+      buttons[t].classList.toggle("active", t === name);
+    }
+    if (history.replaceState) history.replaceState(null, "", "#" + name);
+  }
+  for (const [name, label] of tabDefs) {
+    const b = el("button", { text: label });
+    b.addEventListener("click", () => activate(name));
+    buttons[name] = b;
+    tabsNav.append(b);
+  }
+  // deep-link: #qc-N / #stats-N / #line-N select the right tab, then scroll
+  function initialTab() {
+    const h = (location.hash || "").replace(/^#/, "");
+    if (h.startsWith("qc-")) return "qc";
+    if (h.startsWith("stats-")) return "mapping";
+    if (h.startsWith("line-")) return "overview";
+    if (tabDefs.some((d) => d[0] === h)) return h;
+    return "overview";
+  }
+  activate(initialTab());
+  // intra-page tag links should switch tabs before jumping
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest && e.target.closest("a[href^='#']");
+    if (!a) return;
+    const id = a.getAttribute("href").slice(1);
+    if (id.startsWith("qc-")) activate("qc");
+    else if (id.startsWith("stats-")) activate("mapping");
+    setTimeout(() => { const t = document.getElementById(id); if (t) t.scrollIntoView({ behavior: "smooth", block: "center" }); }, 0);
+  });
+
+  // ---- theme toggle ----
+  const root = document.documentElement;
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const cur = root.getAttribute("data-theme")
+      || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+  });
+})();
+</script>
+</body>
+</html>

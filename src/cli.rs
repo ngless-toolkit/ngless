@@ -667,9 +667,19 @@ fn output_configuration(config: &crate::configuration::Configuration, opts: &Run
             show_bool(config.create_report_directory)
         ),
     );
-    // `nConfReportDirectory` has no config-file key and defaults to the empty string (it is only
-    // ever set by `-o/--html-report-directory`, which is not yet ported).
-    output::debug(0, "\treport directory: ");
+    // `nConfReportDirectory` has no config-file key; it is derived from the script source (or set
+    // by `-o/--html-report-directory`). Report the value `resolve_report_directory` would produce.
+    let report_dir = if let Some(dir) = &opts.html_report_directory {
+        dir.clone()
+    } else if opts.inline_script.is_some() {
+        "INLINE_SCRIPT.output_ngless".to_string()
+    } else {
+        match opts.script.as_deref() {
+            Some("-") | None => "STDIN.output_ngless".to_string(),
+            Some(s) => format!("{s}.output_ngless"),
+        }
+    };
+    output::debug(0, &format!("\treport directory: {report_dir}"));
     output::debug(0, &format!("\tcolor setting: {color}"));
     output::debug(
         0,
@@ -752,6 +762,11 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     let mut config = crate::configuration::read_config_files(&opts.config_files)?;
     if let Some(b) = opts.keep_temporary_files {
         config.keep_temporary_files = b;
+    }
+    // `--create-report`/`--no-create-report` override the config `create-report` key (mirrors the
+    // `createReportDirectory` triSwitch); `None` falls through to the config value.
+    if let Some(b) = opts.create_report {
+        config.create_report_directory = b;
     }
     if let Some(b) = opts.strict_threads {
         config.strict_threads = b;
@@ -1087,7 +1102,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         }
     }
 
-    crate::interpret::interpret(
+    let report_data = crate::interpret::interpret(
         &typed.body,
         &temp_dir,
         config.keep_temporary_files,
@@ -1100,7 +1115,41 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         active_mappers,
         (version.major, version.minor),
     )?;
+
+    // Write the end-of-run HTML report (mirrors the `whenM (nConfCreateReportDirectory ...)` block
+    // in Haskell's `modeExec DefaultMode`, run only on a successful `Right ()`). A failure to write
+    // the report must not turn a successful run into a failure — the pipeline outputs are already
+    // produced — so it is reported as a warning and the run still exits 0.
+    if config.create_report_directory {
+        let report_dir = resolve_report_directory(opts, &fname);
+        if let Err(e) = crate::report::write_report(
+            std::path::Path::new(&report_dir),
+            &fname,
+            &text,
+            &output::recorded_output(),
+            &report_data.fq_stats,
+            &report_data.map_stats,
+        ) {
+            output::warn(0, &format!("Could not write run report: {e}"));
+        }
+    }
     Ok(0)
+}
+
+/// Resolve the report output directory (ports the `html_odir` `case` in `Configuration.hs`):
+/// `-o/--html-report-directory` wins; otherwise it is derived from the script source
+/// (`<script>.output_ngless`, or the `STDIN`/`INLINE_SCRIPT` sentinels).
+fn resolve_report_directory(opts: &RunOpts, fname: &str) -> String {
+    if let Some(dir) = &opts.html_report_directory {
+        return dir.clone();
+    }
+    if opts.inline_script.is_some() {
+        "INLINE_SCRIPT.output_ngless".to_string()
+    } else if fname == "-" {
+        "STDIN.output_ngless".to_string()
+    } else {
+        format!("{fname}.output_ngless")
+    }
 }
 
 fn parse_version(v: &str) -> Option<NGLVersion> {

@@ -1,4 +1,13 @@
 Unreleased
+	* ngless now writes an HTML run report again (the `<script>.output_ngless/`
+	directory, or the location given by `-o`/`--html-report-directory`; disable
+	with `--no-create-report`). The report is a single self-contained
+	`index.html` that embeds its data and makes no network requests, so it works
+	offline on compute clusters (the old report loaded AngularJS, jQuery,
+	Bootstrap and d3/nvd3 from CDNs). It shows the script (with links to the
+	quality-control and mapping statistics), the run log, per-file FASTQ QC with
+	per-position quality charts, and mapping statistics. The directory also
+	contains `script.ngl`, `fq.tsv` and `mappings.tsv`
 	* `count()` now supports annotating against a packaged reference: the
 	`reference` argument (and the reference a read set was `map`ped against, used
 	as the default when no `gff_file`/`functional_map`/`reference` is given) is

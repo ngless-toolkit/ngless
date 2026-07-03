@@ -17,7 +17,7 @@
 
 use std::io::{IsTerminal, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Message severity/category, mirroring Haskell's `OutputType`. The ordering is significant:
@@ -50,6 +50,22 @@ pub enum ColorSetting {
     Auto,
     No,
     Force,
+}
+
+impl OutputType {
+    /// Lowercase level name, matching Haskell's `Show OutputType` (`trace`/`debug`/`info`/
+    /// `result`/`warning`/`error`). Used as the `otype` field in the recorded run log the HTML
+    /// report renders.
+    pub fn name(self) -> &'static str {
+        match self {
+            OutputType::Trace => "trace",
+            OutputType::Debug => "debug",
+            OutputType::Info => "info",
+            OutputType::Result => "result",
+            OutputType::Warning => "warning",
+            OutputType::Error => "error",
+        }
+    }
 }
 
 impl ColorSetting {
@@ -130,10 +146,46 @@ fn color_code(ot: OutputType) -> &'static str {
     }
 }
 
+/// One recorded diagnostic line, retained for the end-of-run HTML report (mirrors Haskell's
+/// `OutputLine` accumulated in the global `savedOutput`). Every message is recorded regardless of
+/// whether the active verbosity actually prints it, so the report's run log is complete.
+#[derive(Clone, Debug)]
+pub struct OutputRecord {
+    pub lno: usize,
+    pub otype: OutputType,
+    /// Second-resolution timestamp (`Day DD-MM-YYYY HH:MM:SS`, UTC), matching the `%T` format the
+    /// Haskell `OutputLine` JSON used.
+    pub time: String,
+    pub message: String,
+}
+
+/// Process-global buffer of every emitted message, in emission order (mirrors the `outOutput`
+/// field of Haskell's `savedOutput` `IORef`). Snapshotted by [`recorded_output`] when the report
+/// is written.
+static RECORDED: OnceLock<Mutex<Vec<OutputRecord>>> = OnceLock::new();
+
+fn recorded() -> &'static Mutex<Vec<OutputRecord>> {
+    RECORDED.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+/// Snapshot of all recorded output lines, for the end-of-run report writer.
+pub fn recorded_output() -> Vec<OutputRecord> {
+    recorded().lock().unwrap().clone()
+}
+
 /// Emit a message at level `ot`, tagged with line number `lno` (0 means "no line number", as in
 /// Haskell where `lno > 0` gates the `Line N` suffix). Output goes to stderr. This is the single
 /// choke point mirroring Haskell's `output`.
 pub fn message(ot: OutputType, lno: usize, msg: &str) {
+    // Record every message before deciding whether to print it: Haskell's `output` runs
+    // `modifyIORef savedOutput` unconditionally, so the HTML report's run log includes even
+    // otherwise-hidden Trace/Debug lines. Uses a second-resolution timestamp like `OutputLine`.
+    recorded().lock().unwrap().push(OutputRecord {
+        lno,
+        otype: ot,
+        time: timestamp(true),
+        message: msg.to_string(),
+    });
     if !should_print(ot) {
         return;
     }
