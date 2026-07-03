@@ -122,7 +122,7 @@ mod unix {
 
         for &sig in &[libc::SIGINT, libc::SIGTERM] {
             let mut action: libc::sigaction = unsafe { std::mem::zeroed() };
-            action.sa_sigaction = handler as libc::sighandler_t;
+            action.sa_sigaction = handler as *const () as libc::sighandler_t;
             action.sa_flags = libc::SA_RESTART;
             unsafe {
                 libc::sigemptyset(&mut action.sa_mask);
