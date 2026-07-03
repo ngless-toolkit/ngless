@@ -4262,29 +4262,20 @@ fn execute_write(
                 let files: Vec<&FastQFilePath> = readset.singletons.iter().collect();
                 write_fq_files(&files, &ofile, can_move, temp_files)?;
             } else {
+                // Build the 2-3 independent output jobs (pair.1, pair.2, and singles when
+                // present). Each reads distinct inputs and writes a distinct output, so they
+                // carry no data dependency and can run concurrently.
                 let f1: Vec<&FastQFilePath> = readset.pairs.iter().map(|(a, _)| a).collect();
                 let f2: Vec<&FastQFilePath> = readset.pairs.iter().map(|(_, b)| b).collect();
-                write_fq_files(
-                    &f1,
-                    &format_fq_oname(&ofile, "pair.1")?,
-                    can_move,
-                    temp_files,
-                )?;
-                write_fq_files(
-                    &f2,
-                    &format_fq_oname(&ofile, "pair.2")?,
-                    can_move,
-                    temp_files,
-                )?;
+                let mut jobs: Vec<(Vec<&FastQFilePath>, String)> = vec![
+                    (f1, format_fq_oname(&ofile, "pair.1")?),
+                    (f2, format_fq_oname(&ofile, "pair.2")?),
+                ];
                 if !readset.singletons.is_empty() {
                     let f3: Vec<&FastQFilePath> = readset.singletons.iter().collect();
-                    write_fq_files(
-                        &f3,
-                        &format_fq_oname(&ofile, "singles")?,
-                        can_move,
-                        temp_files,
-                    )?;
+                    jobs.push((f3, format_fq_oname(&ofile, "singles")?));
                 }
+                write_fq_files_parallel(&jobs, can_move, temp_files)?;
             }
             Ok(NGLessObject::String(ofile))
         }
@@ -4322,6 +4313,42 @@ fn format_fq_oname(base: &str, insert: &str) -> NgResult<String> {
     Err(NgError::script(format!(
         "Cannot handle filename {base} (expected extension .fq/.fq.gz/.fq.bz2)."
     )))
+}
+
+/// Run the 2-3 independent output jobs of a paired write (`pair.1` / `pair.2` / `singles`). Each
+/// job reads distinct inputs and writes its own output atomically, so the jobs share no state and
+/// each output file is byte-identical regardless of the order they run in. Under `--jobs N`
+/// (`N > 1`) they run concurrently — one thread per job — to overlap the CPU-bound recompression;
+/// with a single thread this degrades to a serial loop, keeping the default path unchanged.
+///
+/// All handles are joined before returning; on failure the lowest-indexed job's error is returned
+/// so the reported error is deterministic regardless of completion order.
+fn write_fq_files_parallel(
+    jobs: &[(Vec<&FastQFilePath>, String)],
+    can_move: bool,
+    temp_files: &crate::tempfiles::TempFiles,
+) -> NgResult<()> {
+    if crate::parallel::n_threads() <= 1 || jobs.len() < 2 {
+        for (files, oname) in jobs {
+            write_fq_files(files, oname, can_move, temp_files)?;
+        }
+        return Ok(());
+    }
+    std::thread::scope(|s| {
+        let handles: Vec<_> = jobs
+            .iter()
+            .map(|(files, oname)| {
+                s.spawn(move || write_fq_files(files, oname, can_move, temp_files))
+            })
+            .collect();
+        let mut first_err = None;
+        for h in handles {
+            if let Err(e) = h.join().expect("write_fq_files worker panicked") {
+                first_err.get_or_insert(e);
+            }
+        }
+        first_err.map_or(Ok(()), Err)
+    })
 }
 
 /// Write a list of FASTQ files to a single output (mirrors `moveOrCopyCompressFQs`): one file

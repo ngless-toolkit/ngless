@@ -1,4 +1,8 @@
 Unreleased
+	* `write()` of a paired read set now recompresses its output files (pair.1,
+	pair.2, and singles) concurrently when more than one thread is available
+	(`--jobs`), overlapping the CPU-bound recompression; output is byte-identical
+	to the single-threaded path
 	* `write()` (and `--export-json`) now write their output files atomically
 	(to a temporary sibling that is renamed into place), so an interrupted or
 	failed run never leaves a half-written output file at the destination
