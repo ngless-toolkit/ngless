@@ -4250,9 +4250,11 @@ fn execute_write(
         // output, which may be STDOUT (`/dev/stdout`). Mirrors the `interleaveFQs` branch of
         // `executeWrite`; no per-mate filename derivation (so no extension check on STDOUT).
         NGLessObject::ReadSet { readset, .. } if format_flags.as_deref() == Some("interleaved") => {
-            let mut w = crate::compression::StreamWriter::create(&ofile)?;
-            write_interleaved(readset, &mut w)?;
-            w.finish()?;
+            crate::compression::write_atomically(&ofile, |target| {
+                let mut w = crate::compression::StreamWriter::create_at(target, &ofile)?;
+                write_interleaved(readset, &mut w)?;
+                w.finish()
+            })?;
             Ok(NGLessObject::String(ofile))
         }
         NGLessObject::ReadSet { readset, .. } => {
@@ -4339,9 +4341,10 @@ fn write_fq_files(
         [single] => move_or_copy_compress(&single.path, ofile, can_move, temp_files),
         // Stream each decompressed input through one compressing writer: the encoder sees the
         // identical concatenated byte stream, so the output is content-equivalent to
-        // decompress-all-then-`write_bytes`, but bounded in memory.
-        many => {
-            let mut w = StreamWriter::create(ofile)?;
+        // decompress-all-then-`write_bytes`, but bounded in memory. Written atomically (temp
+        // sibling + rename) so a partial concatenation is never visible at `ofile`.
+        many => crate::compression::write_atomically(ofile, |target| {
+            let mut w = StreamWriter::create_at(target, ofile)?;
             for f in many {
                 std::io::copy(&mut open_read(&f.path.to_string_lossy())?, &mut w).map_err(|e| {
                     NgError::new(
@@ -4351,7 +4354,7 @@ fn write_fq_files(
                 })?;
             }
             w.finish()
-        }
+        }),
     }
 }
 
@@ -4389,11 +4392,14 @@ fn copy_fastq(src: &Path, ofile: &str) -> NgResult<()> {
     use crate::compression::{detect, read_bytes, write_bytes};
     let src_str = src.to_string_lossy();
     if detect(&src_str) == detect(ofile) {
-        std::fs::copy(src, ofile).map_err(|e| {
-            NgError::new(
-                NgErrorType::SystemError,
-                format!("Could not write {ofile}: {e}"),
-            )
+        // Copy to a temp sibling then rename, so a partial copy is never visible at `ofile`.
+        crate::compression::write_atomically(ofile, |target| {
+            std::fs::copy(src, target).map(|_| ()).map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Could not write {ofile}: {e}"),
+                )
+            })
         })?;
     } else {
         let data = read_bytes(&src_str)?;

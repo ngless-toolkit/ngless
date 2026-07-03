@@ -363,22 +363,24 @@ fn recursive_find_argv(e: &Expression, found: &mut Option<i64>) {
     }
 }
 
-/// Write `bytes` to `fname`, mirroring `withOutputFile` (the export modes write directly to the
-/// named output path).
+/// Write `bytes` to `fname`, mirroring `withOutputFile` (the export modes write to the named output
+/// path). The write is atomic (temp sibling + rename, via [`crate::compression::write_atomically`]),
+/// so a half-written file is never visible at `fname`.
 fn write_output_file(fname: &str, bytes: &[u8]) -> NgResult<()> {
-    let mut f = fs::File::create(fname).map_err(|e| {
-        NgError::new(
-            NgErrorType::SystemError,
-            format!("Could not create output file {fname}: {e}"),
-        )
-    })?;
-    f.write_all(bytes).map_err(|e| {
-        NgError::new(
-            NgErrorType::SystemError,
-            format!("Could not write to {fname}: {e}"),
-        )
-    })?;
-    Ok(())
+    crate::compression::write_atomically(fname, |target| {
+        let mut f = fs::File::create(target).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not create output file {fname}: {e}"),
+            )
+        })?;
+        f.write_all(bytes).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write to {fname}: {e}"),
+            )
+        })
+    })
 }
 
 #[cfg(test)]

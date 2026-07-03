@@ -90,17 +90,66 @@ pub fn read_to_string(path: &str) -> NgResult<String> {
     })
 }
 
-/// Write bytes to `path`, compressing by extension.
-pub fn write_bytes(path: &str, data: &[u8]) -> NgResult<()> {
-    let f = File::create(path).map_err(|e| {
+/// True when `path` can be written via a temporary sibling and an atomic `rename`. STDOUT and
+/// other `/dev/*` device paths cannot be a rename target, so they are written in place.
+fn is_renameable_dest(path: &str) -> bool {
+    !path.starts_with("/dev/")
+}
+
+/// A temporary sibling of `path`, in the same directory (so the finalizing `rename` stays on one
+/// filesystem). The PID disambiguates concurrent processes and the process-local counter
+/// disambiguates concurrent writers within this process, so no two writers pick the same name.
+fn atomic_tmp_path(path: &str) -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    format!(
+        "{path}.tmp.{}.{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    )
+}
+
+/// Write to `ofile` atomically: `write` is handed a temporary sibling path to fill, and on success
+/// that temp is `rename`d onto `ofile` — so a reader (or a concurrent writer) never observes a
+/// half-written destination. If `write` fails the temp is removed and `ofile` is left untouched.
+/// Device destinations (STDOUT, `/dev/*`) cannot be a rename target, so `write` is pointed straight
+/// at `ofile` for those.
+pub fn write_atomically<F>(ofile: &str, write: F) -> NgResult<()>
+where
+    F: FnOnce(&str) -> NgResult<()>,
+{
+    if !is_renameable_dest(ofile) {
+        return write(ofile);
+    }
+    let tmp = atomic_tmp_path(ofile);
+    if let Err(e) = write(&tmp) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    std::fs::rename(&tmp, ofile).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
         NgError::new(
             NgErrorType::SystemError,
-            format!("Could not write {path}: {e}"),
+            format!("Could not write {ofile}: {e}"),
         )
-    })?;
-    let f = write_all_compressed(f, detect(path), path, data)?;
-    drop(f);
-    Ok(())
+    })
+}
+
+/// Write bytes to `path`, compressing by extension. The write is atomic (temp sibling + `rename`,
+/// via [`write_atomically`]), so a partially written file is never visible at `path`.
+pub fn write_bytes(path: &str, data: &[u8]) -> NgResult<()> {
+    write_atomically(path, |target| {
+        let f = File::create(target).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not write {path}: {e}"),
+            )
+        })?;
+        // Compression keys off the *final* path's extension, not the temp target's name.
+        let f = write_all_compressed(f, detect(path), path, data)?;
+        drop(f);
+        Ok(())
+    })
 }
 
 /// Write `data` to `path` **atomically and durably** (mirrors `moveOrCopyCompress` with
@@ -116,14 +165,7 @@ pub fn write_bytes_atomic(path: &str, data: &[u8]) -> NgResult<()> {
         )
     };
     // A temp sibling in the same directory, so the final rename stays on one filesystem.
-    let tmp = format!(
-        "{path}.tmp.{}.{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    );
+    let tmp = atomic_tmp_path(path);
     let f = File::create(&tmp).map_err(sys_err)?;
     // Compression keys off the *final* path's extension, not the temp name.
     let synced = (|| {
@@ -395,11 +437,26 @@ impl StreamWriter {
         StreamWriter::create_with_level(path, ZSTD_LEVEL)
     }
 
+    /// Stream to `write_path` while choosing the compressor (and error-message path) from
+    /// `ext_path`. This decoupling lets an atomic writer fill a temporary sibling (`write_path`)
+    /// that is later renamed onto the real destination (`ext_path`), while still compressing per the
+    /// destination's extension. Used by [`write_atomically`]-based streaming output.
+    pub fn create_at(write_path: &str, ext_path: &str) -> NgResult<StreamWriter> {
+        StreamWriter::create_impl(write_path, ext_path, ZSTD_LEVEL)
+    }
+
     /// Like [`create`](StreamWriter::create) but with an explicit zstd compression level (used by
     /// intermediate temp files via [`INTERMEDIATE_ZSTD_LEVEL`]). The level only affects the zstd
     /// case; gzip/bzip2/uncompressed are unchanged.
     pub fn create_with_level(path: &str, zstd_level: i32) -> NgResult<StreamWriter> {
-        let f = File::create(path).map_err(|e| {
+        StreamWriter::create_impl(path, path, zstd_level)
+    }
+
+    fn create_impl(write_path: &str, ext_path: &str, zstd_level: i32) -> NgResult<StreamWriter> {
+        // The file is created at `write_path`, but compression and error messages track `ext_path`
+        // (the eventual destination the caller cares about).
+        let path = ext_path;
+        let f = File::create(write_path).map_err(|e| {
             NgError::new(
                 NgErrorType::SystemError,
                 format!("Could not write {path}: {e}"),
