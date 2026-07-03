@@ -1,0 +1,8 @@
+ngless '1.6'
+input = paired('sample.fq', 'sample2.fq')
+trim = 3
+input = preprocess(input, keep_singles=False) using |read|:
+   read = read[trim:]
+   if len(read) < 10:
+       discard
+write(input, ofile='output.fq')

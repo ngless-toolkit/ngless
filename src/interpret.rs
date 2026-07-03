@@ -1043,7 +1043,23 @@ impl Interpreter {
                     let input_qc = args.iter().any(|(Variable(k), v)| {
                         k == "__input_qc" && matches!(v, Expression::ConstBool(true))
                     });
-                    self.execute_preprocess(&readset, b, input_qc)
+                    // `keep_singles` (default True): when a pair loses one mate, keep the
+                    // survivor as a singleton. Set `keep_singles=False` to discard it.
+                    let keep_singles = match args
+                        .iter()
+                        .find(|(Variable(k), _)| k == "keep_singles")
+                    {
+                        Some((_, e)) => match self.interpret_expr(e)? {
+                            NGLessObject::Bool(v) => v,
+                            other => {
+                                return Err(NgError::script(format!(
+                                    "preprocess argument 'keep_singles' must be a Boolean, got {other:?}"
+                                )))
+                            }
+                        },
+                        None => true,
+                    };
+                    self.execute_preprocess(&readset, b, input_qc, keep_singles)
                 }
                 None => Err(NgError::script("preprocess requires a block")),
             };
@@ -3158,6 +3174,7 @@ impl Interpreter {
         readset: &NGLessObject,
         block: &Block,
         input_qc: bool,
+        keep_singles: bool,
     ) -> NgResult<NGLessObject> {
         let (name, rs) = match readset {
             NGLessObject::ReadSet { name, readset } => (name.clone(), readset.clone()),
@@ -3183,7 +3200,6 @@ impl Interpreter {
         }
         let outenc = output_encoding(&inputs);
         let var = &block.variable.0;
-        let keep_singles = true;
 
         // Stream through three output writers (pair.1, pair.2, singles), collecting QC stats per
         // output in one pass (mirrors executePreprocess: open all three, stream, then delete the

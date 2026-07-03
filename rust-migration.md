@@ -8,10 +8,6 @@ Haskell parity target for `ngless "1.5"`+ scripts.
 - **`Transform.hs` passes:** `addTemporaries` is not ported -- the only
   observable gap is `<call>()[<constInt>]` (indexing a call result directly,
   without binding it to a variable).
-- **`preprocess(..., keep_singles=False)` is ignored.** Rust hardcodes
-  `keep_singles = true`; Haskell reads the `keep_singles` keyword with default `True`.
-  Scripts that rely on orphaned paired-end mates being discarded will keep extra singleton
-  reads in Rust.
 - **`write(mapped, format={sam|bam})` ignores explicit `format`.** Rust infers SAM/BAM
   solely from `ofile`; Haskell lets `format` override filename inference. A script writing
   `format={sam}` to a non-`.sam*` filename, or `format={bam}` to a non-`.bam` filename,
