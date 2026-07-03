@@ -2131,11 +2131,13 @@ impl Interpreter {
     }
 
     /// Give samtools a file it can read natively. samtools handles `.sam`, `.bam` and gzipped
-    /// SAM, but not zstd/bzip2; for those we decompress to a plain SAM temp first.
+    /// SAM, but not zstd/bzip2/xz; for those we decompress to a plain SAM temp first.
     fn samtools_input(&self, path: &Path) -> NgResult<PathBuf> {
         let s = path.to_string_lossy().to_string();
         match crate::compression::detect(&s) {
-            crate::compression::Compress::Zstd | crate::compression::Compress::Bzip2 => {
+            crate::compression::Compress::Zstd
+            | crate::compression::Compress::Bzip2
+            | crate::compression::Compress::Xz => {
                 let text = read_sam_text(&s)?;
                 self.write_sam_temp(&text)
             }

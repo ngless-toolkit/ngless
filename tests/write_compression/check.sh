@@ -19,5 +19,7 @@ echo "Comparing SAM.bz2"
 diff -q <(bzcat output.sam.bz2 | grep -v '^@[PG|HD]') texpected.sam
 echo "Comparing SAM.zstd"
 diff -q <(zstdcat output.sam.zstd | grep -v '^@[PG|HD]') texpected.sam
+echo "Comparing SAM.xz"
+diff -q <(xzcat output.sam.xz | grep -v '^@[PG|HD]') texpected.sam
 echo "Comparing BAM"
 diff -q <($SAMTOOLS view -h output.bam | grep -v '^@[PG|HD]') texpected.sam

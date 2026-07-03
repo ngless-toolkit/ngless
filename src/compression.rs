@@ -1,9 +1,10 @@
 //! Transparent (de)compression for FASTQ/SAM I/O, dispatched on filename extension.
 //!
 //! Mirrors the behaviour of `withPossiblyCompressedFile` (read) and `moveOrCopyCompress`
-//! (write). NGLess recognises gzip (`.gz`), bzip2 (`.bz2`) and zstd (`.zst`/`.zstd`); all four
-//! states (including uncompressed) are handled here. Output is content-equivalent to NGLess —
-//! the exact compressed bytes need not match, since the test suite compares decompressed data.
+//! (write). NGLess recognises gzip (`.gz`), bzip2 (`.bz2`), xz (`.xz`) and zstd (`.zst`/`.zstd`);
+//! all five states (including uncompressed) are handled here. Output is content-equivalent to
+//! NGLess — the exact compressed bytes need not match, since the test suite compares decompressed
+//! data.
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
@@ -17,6 +18,10 @@ use crate::errors::{NgError, NgErrorType, NgResult};
 /// zstd compression level used for user-facing output (NGLess commonly uses level 3).
 const ZSTD_LEVEL: i32 = 3;
 
+/// xz/lzma preset used for output. Matches liblzma's default preset (6), which is also what
+/// Haskell's `asyncXzTo` uses when no explicit level is given.
+const XZ_LEVEL: u32 = 6;
+
 /// zstd compression level used for NGLess's own *intermediate* temp files (preprocessed FASTQ,
 /// block-selected SAM). These are written and read back within a single run, so the goal is to
 /// shrink I/O cheaply rather than to maximise the ratio: level 1 is the fastest zstd setting and
@@ -29,6 +34,7 @@ pub enum Compress {
     None,
     Gzip,
     Bzip2,
+    Xz,
     Zstd,
 }
 
@@ -38,6 +44,8 @@ pub fn detect(path: &str) -> Compress {
         Compress::Gzip
     } else if path.ends_with(".bz2") {
         Compress::Bzip2
+    } else if path.ends_with(".xz") {
+        Compress::Xz
     } else if path.ends_with(".zst") || path.ends_with(".zstd") {
         Compress::Zstd
     } else {
@@ -69,6 +77,12 @@ pub fn read_bytes(path: &str) -> NgResult<Vec<u8>> {
         }
         Compress::Bzip2 => {
             let mut r = bzip2::read::MultiBzDecoder::new(f);
+            r.read_to_end(&mut buf).map_err(io_err(path))?;
+        }
+        // `new_multi_decoder` consumes concatenated `.xz` streams (the liblzma
+        // `LZMA_CONCATENATED` mode), matching the other multi-member decoders.
+        Compress::Xz => {
+            let mut r = xz2::read::XzDecoder::new_multi_decoder(f);
             r.read_to_end(&mut buf).map_err(io_err(path))?;
         }
         // `decode_all` consumes the whole stream, including concatenated frames.
@@ -219,6 +233,12 @@ fn write_all_compressed(
             let bw = w.finish().map_err(write_err)?;
             bw.into_inner().map_err(into_inner_err)
         }
+        Compress::Xz => {
+            let mut w = xz2::write::XzEncoder::new(BufWriter::new(f), XZ_LEVEL);
+            w.write_all(data).map_err(write_err)?;
+            let bw = w.finish().map_err(write_err)?;
+            bw.into_inner().map_err(into_inner_err)
+        }
         Compress::Zstd => {
             let compressed = zstd::stream::encode_all(data, ZSTD_LEVEL).map_err(write_err)?;
             let mut w = BufWriter::new(f);
@@ -246,6 +266,11 @@ pub fn open_read(path: &str) -> NgResult<Box<dyn BufRead>> {
         Compress::Gzip => Box::new(StreamReader::spawn(Box::new(MultiGzDecoder::new(f)))),
         Compress::Bzip2 => Box::new(StreamReader::spawn(Box::new(
             bzip2::read::MultiBzDecoder::new(f),
+        ))),
+        // `new_multi_decoder` decodes concatenated `.xz` streams (`LZMA_CONCATENATED`), matching
+        // `read_bytes`.
+        Compress::Xz => Box::new(StreamReader::spawn(Box::new(
+            xz2::read::XzDecoder::new_multi_decoder(f),
         ))),
         // `read::Decoder::new` concatenates frames until EOF by default, matching `decode_all`.
         Compress::Zstd => Box::new(StreamReader::spawn(Box::new(
@@ -382,6 +407,7 @@ impl Read for StreamReader {
 enum Encoder {
     Gzip(GzEncoder<BufWriter<File>>),
     Bzip2(bzip2::write::BzEncoder<BufWriter<File>>),
+    Xz(xz2::write::XzEncoder<BufWriter<File>>),
     Zstd(zstd::stream::write::Encoder<'static, BufWriter<File>>),
 }
 
@@ -390,6 +416,7 @@ impl Encoder {
         match self {
             Encoder::Gzip(w) => w.write_all(buf),
             Encoder::Bzip2(w) => w.write_all(buf),
+            Encoder::Xz(w) => w.write_all(buf),
             Encoder::Zstd(w) => w.write_all(buf),
         }
     }
@@ -398,6 +425,7 @@ impl Encoder {
         match self {
             Encoder::Gzip(w) => w.finish()?.flush(),
             Encoder::Bzip2(w) => w.finish()?.flush(),
+            Encoder::Xz(w) => w.finish()?.flush(),
             Encoder::Zstd(w) => w.finish()?.flush(),
         }
     }
@@ -484,6 +512,7 @@ impl StreamWriter {
                 BufWriter::new(f),
                 bzip2::Compression::default(),
             )),
+            Compress::Xz => Encoder::Xz(xz2::write::XzEncoder::new(BufWriter::new(f), XZ_LEVEL)),
             Compress::Zstd => Encoder::Zstd(
                 zstd::stream::write::Encoder::new(BufWriter::new(f), zstd_level)
                     .map_err(sys_err)?,
@@ -625,6 +654,7 @@ mod tests {
         assert_eq!(detect("a.fq"), Compress::None);
         assert_eq!(detect("a.fq.gz"), Compress::Gzip);
         assert_eq!(detect("a.fq.bz2"), Compress::Bzip2);
+        assert_eq!(detect("a.fq.xz"), Compress::Xz);
         assert_eq!(detect("a.fq.zst"), Compress::Zstd);
         assert_eq!(detect("a.fq.zstd"), Compress::Zstd);
     }
@@ -669,6 +699,11 @@ mod tests {
     }
 
     #[test]
+    fn xz_round_trip() {
+        round_trip("xz");
+    }
+
+    #[test]
     fn zstd_round_trip() {
         round_trip("zst");
     }
@@ -694,6 +729,7 @@ mod tests {
         stream_writer_round_trip("fq");
         stream_writer_round_trip("fq.gz");
         stream_writer_round_trip("fq.bz2");
+        stream_writer_round_trip("fq.xz");
         stream_writer_round_trip("fq.zst");
     }
 
@@ -737,6 +773,7 @@ mod tests {
         open_read_round_trip("fq");
         open_read_round_trip("fq.gz");
         open_read_round_trip("fq.bz2");
+        open_read_round_trip("fq.xz");
         open_read_round_trip("fq.zst");
     }
 
@@ -816,6 +853,7 @@ mod tests {
         atomic_round_trip("tsv");
         atomic_round_trip("tsv.gz");
         atomic_round_trip("tsv.bz2");
+        atomic_round_trip("tsv.xz");
         atomic_round_trip("tsv.zst");
     }
 }

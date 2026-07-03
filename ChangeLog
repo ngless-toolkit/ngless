@@ -1,4 +1,7 @@
 Unreleased
+	* Restored transparent xz/lzma (`.xz`) support for both input and output,
+	matching earlier ngless versions (uncompressed, `.gz`, `.bz2`, `.xz` and
+	`.zst`/`.zstd` are all recognized by filename extension)
 	* `write()` of a mapped read set now honors an explicit `format={sam|bam}`
 	argument, which overrides the format inferred from the output filename
 	(matching earlier ngless versions). When neither `format` nor a recognized
