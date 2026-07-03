@@ -1100,7 +1100,7 @@ impl Interpreter {
     /// pair.1/pair.2 by their flag bits and lone reads become singletons.
     fn execute_as_reads(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
         let (name, path) = match expr {
-            NGLessObject::MappedReadSet { name, path } => (name.clone(), path.clone()),
+            NGLessObject::MappedReadSet { name, path, .. } => (name.clone(), path.clone()),
             other => {
                 return Err(NgError::should_not_occur(format!(
                     "as_reads expected a mapped read set, got {other:?}"
@@ -1194,8 +1194,8 @@ impl Interpreter {
                 .collect::<NgResult<Vec<_>>>()?;
             return Ok(NGLessObject::List(counted));
         }
-        let (name, path) = mapped_read_set(expr, "count")?;
-        let opts = parse_count_opts(args)?;
+        let (name, path, mapped_ref) = mapped_read_set(expr, "count")?;
+        let opts = parse_count_opts(args, mapped_ref.as_deref(), self.ngl_version)?;
 
         // Stream the SAM in read-name groups (mirroring the conduit pipeline) to keep memory
         // bounded — no more than one read group is held at a time. All `@SQ` headers precede the
@@ -1243,7 +1243,7 @@ impl Interpreter {
     /// a group is *aligned* if any read is aligned, and *unique* if it is aligned and all its
     /// records share one reference name.
     fn execute_mapstats(&self, expr: &NGLessObject) -> NgResult<NGLessObject> {
-        let (name, path) = mapped_read_set(expr, "mapstats")?;
+        let (name, path, _) = mapped_read_set(expr, "mapstats")?;
         let (total, aligned, unique) = sam_group_stats_stream(&path.to_string_lossy())?;
 
         let tsv = format!("\t{name}\ntotal\t{total}\naligned\t{aligned}\nunique\t{unique}\n");
@@ -1314,6 +1314,7 @@ impl Interpreter {
             return Ok(NGLessObject::MappedReadSet {
                 name,
                 path: PathBuf::from(fname),
+                reference: None,
             });
         }
         // Sourcing `headers` then `fname` and re-emitting line-by-line is, for newline-terminated
@@ -1321,13 +1322,17 @@ impl Interpreter {
         let mut data = read_sam_text(&headers)?;
         data.push_str(&read_sam_text(&fname)?);
         let path = self.write_sam_temp(&data)?;
-        Ok(NGLessObject::MappedReadSet { name, path })
+        Ok(NGLessObject::MappedReadSet {
+            name,
+            path,
+            reference: None,
+        })
     }
 
     /// `map(reads, fafile=/reference=, mode_all=, mapper=, block_size_megabases=, __extra_args=)`:
     /// map a read set against a reference (mirrors `executeMap`). This build supports the `bwa`
-    /// and `minimap2` mappers; the `soap` mapper is not implemented. Packaged `reference=`
-    /// databases must already be installed locally (no download).
+    /// and `minimap2` mappers; the `soap` mapper is not implemented. A packaged `reference=`
+    /// database is resolved to its FASTA (downloading the pack if it is not already installed).
     fn execute_map(
         &self,
         expr: &NGLessObject,
@@ -1371,9 +1376,11 @@ impl Interpreter {
         };
 
         // lookupReference: exactly one of `reference`/`fafile` (mirrors `lookupReference`).
+        // A packaged `reference=` also becomes the mapped read set's `mappedRef` (used later as
+        // `count`'s default annotation source), mirroring `indexReference`'s `Just r`.
         let reference = lookup_opt_string(args, "reference");
         let fafile = lookup_opt_string(args, "fafile");
-        let fafile = match (reference, fafile) {
+        let (fafile, mapped_ref) = match (reference, fafile) {
             (None, None) => {
                 return Err(NgError::script("Either reference or fafile must be passed"))
             }
@@ -1384,8 +1391,8 @@ impl Interpreter {
             }
             // A packaged `reference=` is resolved to its FASTA in the data directories; the FASTA
             // then flows through the same indexing/mapping path as `fafile=`.
-            (Some(refname), None) => self.resolve_reference(&refname)?,
-            (None, Some(fa)) => self.expand_path(&fa)?,
+            (Some(refname), None) => (self.resolve_reference(&refname)?, Some(refname)),
+            (None, Some(fa)) => (self.expand_path(&fa)?, None),
         };
 
         let mode_all = lookup_bool(args, "mode_all", false)?;
@@ -1395,7 +1402,9 @@ impl Interpreter {
         }
         let block_size = lookup_int(args, "block_size_megabases", 0)?;
 
-        self.perform_map(mapper, &fafile, block_size, &name, &rs, &bwa_args)
+        self.perform_map(
+            mapper, &fafile, block_size, &name, &rs, &bwa_args, mapped_ref,
+        )
     }
 
     /// Resolve a packaged `reference=` database name to its FASTA file (mirrors
@@ -1405,7 +1414,10 @@ impl Interpreter {
     /// then the global one. A missing builtin reference is downloaded from the configured base URL
     /// (mirrors `installData`), using the script's language version for the URL's version directory.
     fn resolve_reference(&self, refname: &str) -> NgResult<String> {
-        crate::reference::ensure_data_present(refname, self.ngl_version)
+        let paths = crate::reference::ensure_data_present(refname, self.ngl_version)?;
+        paths
+            .fa_file
+            .ok_or_else(|| NgError::script(format!("Could not find reference '{refname}'.")))
     }
 
     /// Run an external-module command function (mirrors `executeCommand`): encode the unnamed input
@@ -1486,6 +1498,7 @@ impl Interpreter {
             (Some(p), NGLType::MappedReadSet) => Ok(NGLessObject::MappedReadSet {
                 name: group_name,
                 path: PathBuf::from(p),
+                reference: None,
             }),
             (Some(_), other) => Err(NgError::should_not_occur(format!(
                 "External module return type {other:?} is not implemented in this build yet."
@@ -1645,6 +1658,7 @@ impl Interpreter {
         name: &str,
         rs: &ReadSet,
         extra_args: &[String],
+        mapped_ref: Option<String>,
     ) -> NgResult<NGLessObject> {
         let refs = self.ensure_index_exists(mapper, block_size, fafile)?;
         let (path, reference) = match refs.as_slice() {
@@ -1665,6 +1679,7 @@ impl Interpreter {
         Ok(NGLessObject::MappedReadSet {
             name: name.to_string(),
             path,
+            reference: mapped_ref,
         })
     }
 
@@ -1939,6 +1954,7 @@ impl Interpreter {
         Ok(NGLessObject::MappedReadSet {
             name: "test".to_string(),
             path,
+            reference: None,
         })
     }
 
@@ -1964,7 +1980,7 @@ impl Interpreter {
         expr: &NGLessObject,
         args: &[(String, NGLessObject)],
     ) -> NgResult<NGLessObject> {
-        let (name, path) = mapped_read_set(expr, "select")?;
+        let (name, path, reference) = mapped_read_set(expr, "select")?;
         let paired = lookup_bool(args, "paired", true)?;
         let keep_if = lookup_symbol_list(args, "keep_if");
         let drop_if = lookup_symbol_list(args, "drop_if");
@@ -2009,6 +2025,7 @@ impl Interpreter {
         Ok(NGLessObject::MappedReadSet {
             name,
             path: outpath,
+            reference,
         })
     }
 
@@ -2021,7 +2038,7 @@ impl Interpreter {
         args: &[(String, NGLessObject)],
         block: &Block,
     ) -> NgResult<NGLessObject> {
-        let (name, path) = mapped_read_set(expr, "select")?;
+        let (name, path, reference) = mapped_read_set(expr, "select")?;
         let paired = lookup_bool(args, "paired", true)?;
         let var = &block.variable.0;
         // `.sam.zst` => `StreamWriter` compresses with zstd on a background thread (mirroring
@@ -2069,6 +2086,7 @@ impl Interpreter {
         Ok(NGLessObject::MappedReadSet {
             name,
             path: outpath,
+            reference,
         })
     }
 
@@ -2105,7 +2123,7 @@ impl Interpreter {
         expr: &NGLessObject,
         args: &[(String, NGLessObject)],
     ) -> NgResult<NGLessObject> {
-        let (name, path) = mapped_read_set(expr, "samtools_sort")?;
+        let (name, path, reference) = mapped_read_set(expr, "samtools_sort")?;
         let by_name = match lookup_symbol(args, "by", "coordinate")?.as_str() {
             "coordinate" => false,
             "name" => true,
@@ -2126,7 +2144,11 @@ impl Interpreter {
         let out = self.new_temp_path("sorted_", oformat)?;
         let temp_prefix = self.new_temp_path("samtools_sort_temp", "tmp")?;
         crate::samtools::sort(&input, &out, oformat, by_name, &temp_prefix)?;
-        Ok(NGLessObject::MappedReadSet { name, path: out })
+        Ok(NGLessObject::MappedReadSet {
+            name,
+            path: out,
+            reference,
+        })
     }
 
     /// `samtools_view(mapped, bed_file=...)` (from the `samtools` module, mirrors `executeView`):
@@ -2136,7 +2158,7 @@ impl Interpreter {
         expr: &NGLessObject,
         args: &[(String, NGLessObject)],
     ) -> NgResult<NGLessObject> {
-        let (name, path) = mapped_read_set(expr, "samtools_view")?;
+        let (name, path, reference) = mapped_read_set(expr, "samtools_view")?;
         let bed = match lookup_arg(args, "bed_file") {
             Some(NGLessObject::String(s)) => s.clone(),
             _ => {
@@ -2148,7 +2170,11 @@ impl Interpreter {
         let input = self.samtools_input(&path)?;
         let out = self.new_temp_path("subset_", "sam")?;
         crate::samtools::view_bed(&input, &bed, &out, "sam")?;
-        Ok(NGLessObject::MappedReadSet { name, path: out })
+        Ok(NGLessObject::MappedReadSet {
+            name,
+            path: out,
+            reference,
+        })
     }
 
     /// `write(...)`: dispatch on the value type (mirrors `executeWrite`). Read sets and counts are
@@ -4952,7 +4978,11 @@ fn normalize_count_file(text: &str) -> String {
 }
 
 /// Build [`count::CountOpts`] from the keyword arguments (mirrors `parseOptions`).
-fn parse_count_opts(args: &[(String, NGLessObject)]) -> NgResult<crate::count::CountOpts> {
+fn parse_count_opts(
+    args: &[(String, NGLessObject)],
+    mapped_ref: Option<&str>,
+    ngl_version: (i64, i64),
+) -> NgResult<crate::count::CountOpts> {
     use crate::count::{AnnotationMode, CountOpts, IntersectMode, MMMethod, NMode, StrandMode};
 
     let features =
@@ -5016,16 +5046,38 @@ fn parse_count_opts(args: &[(String, NGLessObject)]) -> NgResult<crate::count::C
     };
     let include_minus1 = lookup_bool(args, "include_minus1", true)?;
 
+    // Mirrors `parseAnnotationMode`: seqname wins, then an explicit `functional_map`, then an
+    // explicit `gff_file`, then a `reference` — which defaults to the mapped read set's own reference
+    // (`mappedref`) when not given. A packaged reference is resolved (downloading it if necessary) to
+    // its bundled annotation file, choosing GFF or functional-map by which one the pack ships.
     let annotation_mode = if features == ["seqname"] {
         AnnotationMode::SeqName
     } else if let Some(m) = lookup_opt_string(args, "functional_map") {
         AnnotationMode::FunctionalMap(m)
     } else if let Some(g) = lookup_opt_string(args, "gff_file") {
         AnnotationMode::Gff(g)
-    } else if lookup_opt_string(args, "reference").is_some() {
-        return Err(NgError::script(
-            "count(): the `reference` argument (automatic annotation download) is not supported in this build yet.".to_string(),
-        ));
+    } else if let Some(refname) =
+        lookup_opt_string(args, "reference").or_else(|| mapped_ref.map(str::to_string))
+    {
+        crate::output::info(0, &format!("Annotate with reference: {refname:?}"));
+        let paths = crate::reference::ensure_data_present(&refname, ngl_version)?;
+        match (paths.gff_file, paths.functional_map) {
+            (Some(g), None) => AnnotationMode::Gff(g),
+            (None, Some(f)) => AnnotationMode::FunctionalMap(f),
+            (None, None) => {
+                return Err(NgError::script(format!(
+                    "Could not find annotation file for '{refname}'"
+                )))
+            }
+            (Some(_), Some(_)) => {
+                return Err(NgError::new(
+                    NgErrorType::DataError,
+                    format!(
+                        "Reference {refname} has both a GFF and a functional map file. Cannot figure out what to do."
+                    ),
+                ))
+            }
+        }
     } else {
         return Err(NgError::script(
             "For counting, you must use seqname mode, pass a `gff_file`, or pass a `functional_map`.".to_string(),
@@ -5046,9 +5098,13 @@ fn parse_count_opts(args: &[(String, NGLessObject)]) -> NgResult<crate::count::C
 }
 
 /// Destructure a mapped read set value into its name and backing file path.
-fn mapped_read_set(v: &NGLessObject, who: &str) -> NgResult<(String, PathBuf)> {
+fn mapped_read_set(v: &NGLessObject, who: &str) -> NgResult<(String, PathBuf, Option<String>)> {
     match v {
-        NGLessObject::MappedReadSet { name, path } => Ok((name.clone(), path.clone())),
+        NGLessObject::MappedReadSet {
+            name,
+            path,
+            reference,
+        } => Ok((name.clone(), path.clone(), reference.clone())),
         other => Err(NgError::should_not_occur(format!(
             "{who} expected a mapped read set, got {other:?}"
         ))),

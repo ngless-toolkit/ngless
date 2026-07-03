@@ -91,8 +91,21 @@ fn find_builtin(name: &str) -> Option<&'static BuiltinReference> {
 /// The relative path of the reference FASTA within a reference pack (mirrors `referencePath`).
 const REFERENCE_PATH: &str = "Sequence/BWAIndex/reference.fa.gz";
 
-/// Make sure the named reference is present, downloading it if necessary, and return the path of
-/// its FASTA file (mirrors `ensureDataPresent` followed by `buildFaFilePath`).
+/// The resolved on-disk paths of a reference pack (mirrors Haskell's `ReferenceFilePaths`).
+///
+/// For a builtin/packaged reference, `fa_file` and `gff_file` are always the canonical locations
+/// within the pack — the GFF path is *constructed* unconditionally (not probed for existence),
+/// exactly as `wrapRefDir` does — and `functional_map` is always `None`. Only URL-typed
+/// external-module references (`moduleDirectReference`, unsupported in this build because external
+/// modules carry no `references:` section) would ever populate `functional_map`.
+pub struct ReferenceFilePaths {
+    pub fa_file: Option<String>,
+    pub gff_file: Option<String>,
+    pub functional_map: Option<String>,
+}
+
+/// Make sure the named reference is present, downloading it if necessary, and return the on-disk
+/// paths of its FASTA and annotation files (mirrors `ensureDataPresent`).
 ///
 /// `ngl_version` is the script's `(major, minor)` language version, used to build the
 /// version-namespaced download URL (mirrors the `versionDirectory` logic in `installData`).
@@ -101,12 +114,16 @@ const REFERENCE_PATH: &str = "Sequence/BWAIndex/reference.fa.gz";
 /// `Saccharomyces_cerevisiae_R64-1-1` resolve to (and download into) separate directories — exactly
 /// as in Haskell, where `installData`'s `destdir` uses the passed-in name while the URL uses the
 /// canonical `refName`.
-pub fn ensure_data_present(refname: &str, ngl_version: (i64, i64)) -> NgResult<String> {
-    if let Some(refdir) = find_data_files(refname) {
-        return Ok(build_fa_path(&refdir));
-    }
-    let refdir = install_data(refname, ngl_version)?;
-    Ok(build_fa_path(&refdir))
+pub fn ensure_data_present(refname: &str, ngl_version: (i64, i64)) -> NgResult<ReferenceFilePaths> {
+    let refdir = match find_data_files(refname) {
+        Some(refdir) => refdir,
+        None => install_data(refname, ngl_version)?,
+    };
+    Ok(ReferenceFilePaths {
+        fa_file: Some(build_fa_path(&refdir)),
+        gff_file: Some(refdir.join(GFF_PATH).to_string_lossy().into_owned()),
+        functional_map: None,
+    })
 }
 
 fn build_fa_path(refdir: &Path) -> String {

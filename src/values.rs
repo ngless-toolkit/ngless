@@ -35,10 +35,15 @@ pub enum NGLessObject {
     /// e.g. the result of `qcstats`. `write` copies the file to the output.
     Counts(std::path::PathBuf),
     /// A mapped read set backed by a SAM/BAM file on disk (mirrors `NGOMappedReadSet`), e.g. the
-    /// result of `samfile`. `name` is the user-facing group name.
+    /// result of `samfile`. `name` is the user-facing group name. `reference` carries the packaged
+    /// reference database name the reads were mapped against (the third field of Haskell's
+    /// `NGOMappedReadSet`), and is `None` for reads mapped against a plain `fafile=` or produced by
+    /// `samfile`/merge/external commands. `count()` uses it as the default `reference` argument when
+    /// none is given explicitly.
     MappedReadSet {
         name: String,
         path: std::path::PathBuf,
+        reference: Option<String>,
     },
     /// One group of SAM alignment records sharing a read name (mirrors `NGOMappedRead`). This is
     /// the value bound to the block variable of `select(...) using |mr|:`.

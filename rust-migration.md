@@ -11,10 +11,3 @@ Haskell parity target for `ngless "1.5"`+ scripts.
 - **`Transform.hs` passes:** `addTemporaries` is not ported — the only
   observable gap is `<call>()[<constInt>]` (indexing a call result directly,
   without binding it to a variable).
-
-- **Reference-download path:** `count(reference=...)` annotation download errors (`src/interpret.rs`:
-  "automatic annotation download is not supported"). `ensure_data_present` only surfaces the FASTA
-  path, whereas Haskell's `ensureDataPresent` also returns `rfpGffFile`; it needs to surface the GFF
-  (`Annotation/annotation.gtf.gz`) / functional-map paths. URL-typed module references are
-  unsupported (`moduleDirectReference`/`ExternalPackagedReference`; external modules carry no
-  `references:` section in their YAML).

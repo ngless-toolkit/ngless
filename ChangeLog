@@ -1,4 +1,9 @@
 Unreleased
+	* `count()` now supports annotating against a packaged reference: the
+	`reference` argument (and the reference a read set was `map`ped against, used
+	as the default when no `gff_file`/`functional_map`/`reference` is given) is
+	resolved to the pack's bundled annotation file, downloading the reference if
+	necessary
 	* `write()` of a paired read set now recompresses its output files (pair.1,
 	pair.2, and singles) concurrently when more than one thread is available
 	(`--jobs`), overlapping the CPU-bound recompression; output is byte-identical
