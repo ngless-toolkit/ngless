@@ -72,6 +72,58 @@ pub struct FastQStats {
     pub max_len: i64,
     /// Base counts: (A, C, G, T, other), each case-insensitive.
     pub bp: (i64, i64, i64, i64, i64),
+    /// Per-position quality statistics `(mean, median, lower_quartile, upper_quartile)`, one
+    /// tuple per base position (mirrors `qualityPercentiles` in `Data/FastQ.hs`).
+    pub qual_percentiles: Vec<(i64, i64, i64, i64)>,
+}
+
+/// Quality-value offset for the per-position quality histograms (mirrors Haskell's
+/// `minQualityValue`): quality `q` is counted at histogram index `q - MIN_QUALITY_VALUE`.
+const MIN_QUALITY_VALUE: i64 = -5;
+
+/// Width of each per-position quality histogram (mirrors the 256-wide `VU.Vector Int`).
+const QUAL_HIST_WIDTH: usize = 256;
+
+/// A per-position quality histogram: for each base position a 256-wide count vector indexed by
+/// `q - MIN_QUALITY_VALUE` (mirrors `qualCounts :: [VU.Vector Int]`).
+type QualCounts = Vec<[i64; QUAL_HIST_WIDTH]>;
+
+/// Fold a read's decoded qualities into the per-position histograms, growing them as needed
+/// (mirrors the `update` inner loop of `fqStatsC`).
+fn accumulate_qualities(qual_counts: &mut QualCounts, qualities: &[i8]) {
+    if qual_counts.len() < qualities.len() {
+        qual_counts.resize(qualities.len(), [0; QUAL_HIST_WIDTH]);
+    }
+    for (i, &q) in qualities.iter().enumerate() {
+        let idx = (q as i64 - MIN_QUALITY_VALUE) as usize;
+        qual_counts[i][idx] += 1;
+    }
+}
+
+/// Per-position `(mean, median, lower_quartile, upper_quartile)` quality, a faithful port of
+/// `qualityPercentiles`. Each output is offset by `MIN_QUALITY_VALUE`, matching Haskell.
+fn quality_percentiles(qual_counts: &QualCounts) -> Vec<(i64, i64, i64, i64)> {
+    qual_counts.iter().map(position_stats).collect()
+}
+
+fn position_stats(qs: &[i64; QUAL_HIST_WIDTH]) -> (i64, i64, i64, i64) {
+    let elem_total: i64 = qs.iter().sum();
+    // bpSum = Σ i * qs[i]; mean uses Haskell's integer `div` (floor, both operands ≥ 0).
+    let bp_sum: i64 = qs.iter().enumerate().map(|(i, &q)| i as i64 * q).sum();
+    let mean = bp_sum / elem_total + MIN_QUALITY_VALUE;
+    // The index of the first inclusive prefix-sum reaching `ceil(elemTotal * perc)`.
+    let percentile = |perc: f64| -> i64 {
+        let lim = (elem_total as f64 * perc).ceil() as i64;
+        let mut acc = 0i64;
+        for (i, &q) in qs.iter().enumerate() {
+            acc += q;
+            if acc >= lim {
+                return i as i64 + MIN_QUALITY_VALUE;
+            }
+        }
+        unreachable!("ERROR: Logical impossibility in calcPercentile function")
+    };
+    (mean, percentile(0.50), percentile(0.25), percentile(0.75))
 }
 
 impl FastQStats {
@@ -99,6 +151,7 @@ pub fn stats_from_reads(reads: &[ShortRead]) -> FastQStats {
     let (mut a, mut c, mut g, mut t, mut o) = (0i64, 0i64, 0i64, 0i64, 0i64);
     let mut min_len = i64::MAX;
     let mut max_len = 0i64;
+    let mut qual_counts: QualCounts = Vec::new();
     for r in reads {
         let len = r.sequence.len() as i64;
         min_len = min_len.min(len);
@@ -112,12 +165,14 @@ pub fn stats_from_reads(reads: &[ShortRead]) -> FastQStats {
                 _ => o += 1,
             }
         }
+        accumulate_qualities(&mut qual_counts, &r.qualities);
     }
     FastQStats {
         n_seq: reads.len() as i64,
         min_len,
         max_len,
         bp: (a, c, g, t, o),
+        qual_percentiles: quality_percentiles(&qual_counts),
     }
 }
 
@@ -309,9 +364,9 @@ impl<R: BufRead> Iterator for FastqReader<R> {
 }
 
 /// Incremental version of [`stats_from_reads`]: fold reads one at a time so QC statistics can
-/// be collected during a single streaming pass. Uses only the sequence (never qualities), so it
-/// is independent of the quality encoding — which is what lets the QC pass be decoupled from
-/// encoding detection. `finish` on an empty accumulator yields `(min_len, max_len) =
+/// be collected during a single streaming pass. The reads are already decoded with the file's
+/// detected encoding, so the per-position quality histograms (`qual_counts`) match Haskell's
+/// `qualCounts`. `finish` on an empty accumulator yields `(min_len, max_len) =
 /// (i64::MAX, 0)`, exactly as `stats_from_reads(&[])`.
 #[derive(Clone, Debug)]
 pub struct FastQStatsAcc {
@@ -323,6 +378,7 @@ pub struct FastQStatsAcc {
     g: i64,
     t: i64,
     o: i64,
+    qual_counts: QualCounts,
 }
 
 impl Default for FastQStatsAcc {
@@ -342,6 +398,7 @@ impl FastQStatsAcc {
             g: 0,
             t: 0,
             o: 0,
+            qual_counts: Vec::new(),
         }
     }
 
@@ -364,6 +421,7 @@ impl FastQStatsAcc {
                 _ => self.o += 1,
             }
         }
+        accumulate_qualities(&mut self.qual_counts, &sr.qualities);
     }
 
     /// Fold another accumulator into this one. Every field is a commutative/associative
@@ -379,6 +437,15 @@ impl FastQStatsAcc {
         self.g += other.g;
         self.t += other.t;
         self.o += other.o;
+        if self.qual_counts.len() < other.qual_counts.len() {
+            self.qual_counts
+                .resize(other.qual_counts.len(), [0; QUAL_HIST_WIDTH]);
+        }
+        for (dst, src) in self.qual_counts.iter_mut().zip(other.qual_counts.iter()) {
+            for i in 0..QUAL_HIST_WIDTH {
+                dst[i] += src[i];
+            }
+        }
     }
 
     pub fn finish(&self) -> FastQStats {
@@ -387,6 +454,7 @@ impl FastQStatsAcc {
             min_len: self.min_len,
             max_len: self.max_len,
             bp: (self.a, self.c, self.g, self.t, self.o),
+            qual_percentiles: quality_percentiles(&self.qual_counts),
         }
     }
 }
@@ -921,5 +989,50 @@ mod tests {
         let trimmed = substrim(20, &sr);
         assert_eq!(trimmed.sequence, "TTT");
         assert_eq!(trimmed.qualities, vec![123, 122, 111]);
+    }
+
+    #[test]
+    fn quality_percentiles_matches_haskell() {
+        // Two reads, hand-computed against `qualityPercentiles` (mean, median, lq, uq), each
+        // offset by minQualityValue = -5.
+        let reads = vec![
+            ShortRead::new("a", "AC", vec![10, 20]),
+            ShortRead::new("b", "GT", vec![30, 40]),
+        ];
+        // Position 0 qualities {10,30}: mean 20, median 10, lq 10, uq 30.
+        // Position 1 qualities {20,40}: mean 30, median 20, lq 20, uq 40.
+        let expected = vec![(20, 10, 10, 30), (30, 20, 20, 40)];
+        assert_eq!(stats_from_reads(&reads).qual_percentiles, expected);
+
+        // The streaming accumulator agrees with the batch computation, one read at a time.
+        let mut acc = FastQStatsAcc::new();
+        for r in &reads {
+            acc.update(r);
+        }
+        assert_eq!(acc.finish().qual_percentiles, expected);
+    }
+
+    #[test]
+    fn quality_percentiles_merge_and_uneven_lengths() {
+        // Reads of different lengths: only the longer read reaches position 2.
+        let left = vec![ShortRead::new("a", "ACG", vec![10, 20, 30])];
+        let right = vec![ShortRead::new("b", "AC", vec![14, 24])];
+
+        let serial = stats_from_reads(&[left[0].clone(), right[0].clone()]);
+
+        // Merging per-block accumulators in input order matches the single serial fold.
+        let mut a = FastQStatsAcc::new();
+        for r in &left {
+            a.update(r);
+        }
+        let mut b = FastQStatsAcc::new();
+        for r in &right {
+            b.update(r);
+        }
+        a.merge(&b);
+        assert_eq!(a.finish().qual_percentiles, serial.qual_percentiles);
+
+        // Empty input has no per-position statistics.
+        assert!(stats_from_reads(&[]).qual_percentiles.is_empty());
     }
 }

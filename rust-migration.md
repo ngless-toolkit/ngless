@@ -5,7 +5,8 @@ Haskell parity target for `ngless "1.5"`+ scripts.
 
 - **HTML/JS run report.** Haskell's `Output.hs::writeOutputJS` writes a report directory
   (`output.js` + HTML) at end of run; `src/output.rs` has no report writer (only the console output
-  layer).
+  layer). The per-position quality percentiles the report displays *are* now computed by the QC
+  accumulator (`fastq.rs`, see below), so the data is ready once the report writer lands.
 
 - **`Transform.hs` passes: only two edges remain.** Almost all passes are ported
   (`transform.rs`): `writeToMove`, `qcInPreprocess`, `ifLenDiscardSpecial`, `substrimReassign`,
@@ -28,9 +29,6 @@ Haskell parity target for `ngless "1.5"`+ scripts.
   (`Annotation/annotation.gtf.gz`) / functional-map paths. URL-typed module references are
   unsupported (`moduleDirectReference`/`ExternalPackagedReference`; external modules carry no
   `references:` section in their YAML).
-
-- **Per-position quality percentiles** (`qualityPercentiles` in `Data/FastQ.hs`) are simplified out
-  of the Rust QC accumulator.
 
 - **`ARGV` node kind differs (output-affecting).** In Haskell `ARGV` is a module constant
   (`BuiltinModules/Argv.hs`) so it parses to `Lookup (Variable "ARGV")`; in Rust it is in `tokens.rs`

@@ -6,6 +6,9 @@ Unreleased
 	* `write()` (and `--export-json`) now write their output files atomically
 	(to a temporary sibling that is renamed into place), so an interrupted or
 	failed run never leaves a half-written output file at the destination
+	* FASTQ QC now collects per-position quality percentiles (mean/median/lower
+	and upper quartile) during the statistics pass, matching earlier ngless
+	versions (used by the run report)
 	* `collect()` under `--subsample` now appends a `.subsample` suffix to its
 	output file, matching earlier ngless versions
 	* `count(functional_map=...)` now checks that the requested features are
