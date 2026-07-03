@@ -1540,8 +1540,9 @@ impl Interpreter {
                 path: PathBuf::from(p),
                 reference: None,
             }),
+            (Some(p), NGLType::SequenceSet) => Ok(NGLessObject::SequenceSet(p)),
             (Some(_), other) => Err(NgError::should_not_occur(format!(
-                "External module return type {other:?} is not implemented in this build yet."
+                "Not implemented (ExternalModules.hs:executeCommand commandReturnType = {other:?})"
             ))),
         }
     }
@@ -1615,7 +1616,7 @@ impl Interpreter {
                     },
                     ArgKind::MappedReadSet => match value {
                         NGLessObject::MappedReadSet { path, .. } => {
-                            path.to_string_lossy().into_owned()
+                            self.as_mapped_file_path(&path.to_string_lossy(), &arg.file_info)?
                         }
                         other => {
                             return Err(NgError::script(format!(
@@ -1624,7 +1625,8 @@ impl Interpreter {
                         }
                     },
                     ArgKind::Counts => match value {
-                        NGLessObject::Counts(p) => p.to_string_lossy().into_owned(),
+                        NGLessObject::Counts(p) => self
+                            .adjust_compression(&arg.file_info, p.to_string_lossy().into_owned())?,
                         other => {
                             return Err(NgError::script(format!(
                                 "Expected counts in external module, got {other:?}"
@@ -1674,6 +1676,110 @@ impl Interpreter {
                 "Malformed input argument to external module",
             )),
         }
+    }
+
+    /// Materialise a mapped read set as a file path for a module argument, converting between
+    /// SAM/BAM and adjusting compression as the declared `filetype` requires (mirrors the
+    /// `NGOMappedReadSet` case of `asFilePaths`).
+    fn as_mapped_file_path(
+        &self,
+        path: &str,
+        file_info: &Option<crate::external_modules::FileType>,
+    ) -> NgResult<String> {
+        use crate::external_modules::FileTypeBase;
+        let ft = match file_info {
+            None => return Ok(path.to_string()),
+            Some(ft) => ft,
+        };
+        match ft.base {
+            FileTypeBase::Sam => self.as_sam_file(path, file_info),
+            FileTypeBase::Bam => self.as_bam_file(path),
+            FileTypeBase::SamOrBam => self.adjust_compression(file_info, path.to_string()),
+            _ => Err(NgError::script("Unexpected combination of arguments")),
+        }
+    }
+
+    /// As a (possibly compressed) SAM file (mirrors `asSamFile`): a `.bam` input is converted to
+    /// SAM; otherwise its compression is adjusted for the module.
+    fn as_sam_file(
+        &self,
+        path: &str,
+        file_info: &Option<crate::external_modules::FileType>,
+    ) -> NgResult<String> {
+        if path.ends_with(".bam") {
+            let out = self.new_temp_path("external_sam_", "sam")?;
+            crate::samtools::convert_bam_to_sam(Path::new(path), &out)?;
+            Ok(out.to_string_lossy().into_owned())
+        } else {
+            self.adjust_compression(file_info, path.to_string())
+        }
+    }
+
+    /// As a BAM file (mirrors `asBamFile`): a `.bam` input passes through, a `.sam[.gz|.bz2|.zst|
+    /// .zstd|.xz]` input is converted to BAM, and anything else passes through unchanged.
+    fn as_bam_file(&self, path: &str) -> NgResult<String> {
+        let is_sam = path.ends_with(".sam")
+            || path.ends_with(".sam.gz")
+            || path.ends_with(".sam.bz2")
+            || path.ends_with(".sam.zst")
+            || path.ends_with(".sam.zstd")
+            || path.ends_with(".sam.xz");
+        if path.ends_with(".bam") || !is_sam {
+            Ok(path.to_string())
+        } else {
+            let out = self.new_temp_path("external_bam_", "bam")?;
+            crate::samtools::convert_sam_to_bam(Path::new(path), &out)?;
+            Ok(out.to_string_lossy().into_owned())
+        }
+    }
+
+    /// Adjust a file's compression for a module argument (mirrors `adjustCompression`): a file the
+    /// module cannot read in its current compression (per `can_gzip`/`can_bzip2`) is decompressed
+    /// to a temp file; an uncompressed or already-acceptable file passes through unchanged.
+    fn adjust_compression(
+        &self,
+        file_info: &Option<crate::external_modules::FileType>,
+        path: String,
+    ) -> NgResult<String> {
+        use crate::compression::{detect, Compress};
+        let ft = match file_info {
+            Some(ft) => ft,
+            None => return Ok(path),
+        };
+        Ok(match detect(&path) {
+            Compress::None => path,
+            Compress::Gzip if ft.can_gzip => path,
+            Compress::Bzip2 if ft.can_bzip2 => path,
+            _ => self.uncompress_file(&path)?,
+        })
+    }
+
+    /// Decompress a file to a temp file, preserving its logical extension (mirrors
+    /// `uncompressFile`).
+    fn uncompress_file(&self, path: &str) -> NgResult<String> {
+        let inner = ["gz", "bz2", "zst", "zstd", "xz"]
+            .iter()
+            .find_map(|s| path.strip_suffix(&format!(".{s}")))
+            .unwrap_or(path);
+        let ext = Path::new(inner)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("dat");
+        let out = self.new_temp_path("uncompress_", ext)?;
+        let mut reader = crate::compression::open_read(path)?;
+        let mut writer = std::fs::File::create(&out).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not create {}: {e}", out.display()),
+            )
+        })?;
+        std::io::copy(&mut reader, &mut writer).map_err(|e| {
+            NgError::new(
+                NgErrorType::SystemError,
+                format!("Could not decompress {path}: {e}"),
+            )
+        })?;
+        Ok(out.to_string_lossy().into_owned())
     }
 
     /// Expand `<...>` search-path placeholders, falling back to the original string when no

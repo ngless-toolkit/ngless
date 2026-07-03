@@ -1,0 +1,6 @@
+ngless '1.6'
+local import "asm" version "0.0"
+
+input = fastq('input.fq')
+contigs = fake_assemble(input)
+write(contigs, ofile='output.contigs.fna')

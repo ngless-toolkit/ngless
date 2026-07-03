@@ -1,4 +1,11 @@
 Unreleased
+	* External modules now support the full range of Haskell behavior for
+	file-backed arguments and return types: functions can return `sequenceset`
+	values, and `readset`/`mappedreadset`/`counts` arguments honor their declared
+	`filetype`/`can_gzip`/`can_bzip2` payload (converting SAM<->BAM and
+	decompressing inputs the module cannot read). Module definitions are also
+	validated on load (illegal `atype`/`filetype` combinations, a named `arg1`,
+	or an unnamed `additional` argument are now rejected)
 	* Restored transparent xz/lzma (`.xz`) support for both input and output,
 	matching earlier ngless versions (uncompressed, `.gz`, `.bz2`, `.xz` and
 	`.zst`/`.zstd` are all recognized by filename extension)

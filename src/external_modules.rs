@@ -64,6 +64,50 @@ impl ArgKind {
     }
 }
 
+/// The base file type of a file-backed argument (mirrors `FileTypeBase`). Determines how the
+/// interpreter materialises a `readset`/`mappedreadset`/`counts` value into a file for the module.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FileTypeBase {
+    FastqSingle,  // "fq1"
+    FastqPair,    // "fq2"
+    FastqTriplet, // "fq3"
+    Sam,          // "sam"
+    Bam,          // "bam"
+    SamOrBam,     // "sam_or_bam"
+    Tsv,          // "tsv"
+}
+
+impl FileTypeBase {
+    fn parse(s: &str) -> NgResult<FileTypeBase> {
+        Ok(match s {
+            "fq1" => FileTypeBase::FastqSingle,
+            "fq2" => FileTypeBase::FastqPair,
+            "fq3" => FileTypeBase::FastqTriplet,
+            "sam" => FileTypeBase::Sam,
+            "bam" => FileTypeBase::Bam,
+            "sam_or_bam" => FileTypeBase::SamOrBam,
+            "tsv" => FileTypeBase::Tsv,
+            other => {
+                return Err(NgError::new(
+                    NgErrorType::SystemError,
+                    format!("unknown file type '{other}'"),
+                ))
+            }
+        })
+    }
+}
+
+/// The `filetype`/`can_gzip`/`can_bzip2`/`can_stream` payload attached to a file-backed argument
+/// (mirrors `FileType`). `can_gzip`/`can_bzip2` control whether a compressed input file is passed
+/// through as-is or decompressed before being handed to the module command.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FileType {
+    pub base: FileTypeBase,
+    pub can_gzip: bool,
+    pub can_bzip2: bool,
+    pub can_stream: bool,
+}
+
 /// A default value for a command argument (mirrors `cargDef`).
 #[derive(Clone, Debug)]
 pub enum DefaultVal {
@@ -87,6 +131,9 @@ pub struct CommandArg {
     pub when_true: Option<Vec<String>>,
     /// For a `str` argument, whether to expand `<...>` search-path placeholders.
     pub expand_searchpath: bool,
+    /// For a `readset`/`counts`/`mappedreadset` argument, the declared file-type payload (mirrors
+    /// the `FileInfo` command extra). `None` when the argument has no `filetype` field.
+    pub file_info: Option<FileType>,
 }
 
 /// The return specification of a command (mirrors `CommandReturn`).
@@ -178,6 +225,14 @@ struct RawArg {
     when_true: Option<serde_yaml::Value>,
     #[serde(rename = "expand_searchpath", default)]
     expand_searchpath: bool,
+    #[serde(default)]
+    filetype: Option<String>,
+    #[serde(rename = "can_gzip", default)]
+    can_gzip: bool,
+    #[serde(rename = "can_bzip2", default)]
+    can_bzip2: bool,
+    #[serde(rename = "can_stream", default)]
+    can_stream: bool,
 }
 
 #[derive(Deserialize)]
@@ -194,6 +249,21 @@ impl RawArg {
         let kind = ArgKind::parse(&self.atype)?;
         let when_true = self.when_true.map(value_to_strings);
         let default = self.def.and_then(|v| default_for(&kind, v));
+        // The `FileInfo` payload only applies to file-backed arguments and only when a `filetype`
+        // is declared (mirrors `Aeson.parseJSON <|> return Nothing`, where the parse fails and
+        // falls back to `Nothing` if the `filetype` key is absent).
+        let file_info = match kind {
+            ArgKind::ReadSet | ArgKind::Counts | ArgKind::MappedReadSet => match &self.filetype {
+                Some(ft) => Some(FileType {
+                    base: FileTypeBase::parse(ft)?,
+                    can_gzip: self.can_gzip,
+                    can_bzip2: self.can_bzip2,
+                    can_stream: self.can_stream,
+                }),
+                None => None,
+            },
+            _ => None,
+        };
         Ok(CommandArg {
             name: self.name,
             required: self.required,
@@ -201,6 +271,7 @@ impl RawArg {
             expand_searchpath: self.expand_searchpath,
             when_true,
             default,
+            file_info,
             kind,
         })
     }
@@ -327,8 +398,32 @@ impl ExternalModule {
         self.functions.iter().find(|c| c.ngl_name == name)
     }
 
+    /// Attempt to find bugs in the module definition (mirrors `checkSyntax`): `arg1` may not carry
+    /// a `name`, each `additional` argument must be named, and every file-typed argument must use a
+    /// legal `atype`/`filetype` combination.
+    fn check_syntax(&self) -> NgResult<()> {
+        for f in &self.functions {
+            if !f.arg1.name.is_empty() {
+                return Err(NgError::script(
+                    "Error in module.yaml: `arg1` cannot have a 'name' attribute",
+                ));
+            }
+            check_arg_types(&f.arg1)?;
+            for a in &f.additional {
+                if a.name.is_empty() {
+                    return Err(NgError::script(
+                        "Error in module.yaml: `additional` argument is missing a name",
+                    ));
+                }
+                check_arg_types(a)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Validate the module and run its `init` command, if any (mirrors `validateModule`).
     pub fn validate(&self, ngless_version: (i64, i64), temp_dir: &Path) -> NgResult<()> {
+        self.check_syntax()?;
         if let Some(minv) = self.min_ngless_version {
             if minv > ngless_version {
                 return Err(NgError::script(format!(
@@ -367,6 +462,29 @@ impl ExternalModule {
         }
         Ok(())
     }
+}
+
+/// Check that a file-typed argument uses a legal `atype`/`filetype` combination (mirrors
+/// `checkArgsTypes` + `legalNGLTypeFileTypeCombos`). Arguments without a `filetype` payload pass.
+fn check_arg_types(a: &CommandArg) -> NgResult<()> {
+    if let Some(ft) = &a.file_info {
+        let legal = matches!(
+            (&a.kind, &ft.base),
+            (ArgKind::ReadSet, FileTypeBase::FastqSingle)
+                | (ArgKind::ReadSet, FileTypeBase::FastqPair)
+                | (ArgKind::ReadSet, FileTypeBase::FastqTriplet)
+                | (ArgKind::MappedReadSet, FileTypeBase::Sam)
+                | (ArgKind::MappedReadSet, FileTypeBase::Bam)
+                | (ArgKind::MappedReadSet, FileTypeBase::SamOrBam)
+                | (ArgKind::Counts, FileTypeBase::Tsv)
+        );
+        if !legal {
+            return Err(NgError::script(
+                "Illegal combination of options for atype/filetype",
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Build the `ArgInformation` for the type checker from a command argument.
@@ -463,4 +581,89 @@ fn check_compatible(name: &str, version: &str, module: &ExternalModule) -> NgRes
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn load(yaml: &str) -> NgResult<ExternalModule> {
+        let raw: RawModule = serde_yaml::from_str(yaml).expect("valid YAML");
+        ExternalModule::from_raw(raw, PathBuf::from("."))
+    }
+
+    #[test]
+    fn parses_file_info_payload() {
+        let m = load(
+            "name: t\nversion: '0.0'\nfunctions:\n  - nglName: f\n    arg0: ./x.sh\n    \
+             arg1: {atype: readset, filetype: fq1, can_gzip: true}\n",
+        )
+        .unwrap();
+        let ft = m.functions[0].arg1.file_info.as_ref().unwrap();
+        assert_eq!(ft.base, FileTypeBase::FastqSingle);
+        assert!(ft.can_gzip);
+        assert!(!ft.can_bzip2);
+    }
+
+    #[test]
+    fn no_file_info_without_filetype() {
+        let m = load(
+            "name: t\nversion: '0.0'\nfunctions:\n  - nglName: f\n    arg0: ./x.sh\n    \
+             arg1: {atype: readset}\n",
+        )
+        .unwrap();
+        assert!(m.functions[0].arg1.file_info.is_none());
+    }
+
+    #[test]
+    fn sequenceset_return_type() {
+        let m = load(
+            "name: t\nversion: '0.0'\nfunctions:\n  - nglName: f\n    arg0: ./x.sh\n    \
+             arg1: {atype: readset}\n    return: {rtype: sequenceset, name: contigs, extension: fna}\n",
+        )
+        .unwrap();
+        assert_eq!(m.functions[0].ret.rtype, NGLType::SequenceSet);
+    }
+
+    #[test]
+    fn check_syntax_rejects_illegal_filetype_combo() {
+        // `counts` may only pair with `tsv`, not `sam`.
+        let m = load(
+            "name: t\nversion: '0.0'\nfunctions:\n  - nglName: f\n    arg0: ./x.sh\n    \
+             arg1: {atype: counts, filetype: sam}\n",
+        )
+        .unwrap();
+        assert!(m.check_syntax().is_err());
+    }
+
+    #[test]
+    fn check_syntax_rejects_named_arg1() {
+        let m = load(
+            "name: t\nversion: '0.0'\nfunctions:\n  - nglName: f\n    arg0: ./x.sh\n    \
+             arg1: {name: input, atype: readset}\n",
+        )
+        .unwrap();
+        assert!(m.check_syntax().is_err());
+    }
+
+    #[test]
+    fn check_syntax_rejects_unnamed_additional() {
+        let m = load(
+            "name: t\nversion: '0.0'\nfunctions:\n  - nglName: f\n    arg0: ./x.sh\n    \
+             arg1: {atype: readset}\n    additional:\n      - {atype: flag}\n",
+        )
+        .unwrap();
+        assert!(m.check_syntax().is_err());
+    }
+
+    #[test]
+    fn check_syntax_accepts_legal_module() {
+        let m = load(
+            "name: t\nversion: '0.0'\nfunctions:\n  - nglName: f\n    arg0: ./x.sh\n    \
+             arg1: {atype: mappedreadset, filetype: bam}\n    additional:\n      \
+             - {name: verbose, atype: flag}\n",
+        )
+        .unwrap();
+        assert!(m.check_syntax().is_ok());
+    }
 }

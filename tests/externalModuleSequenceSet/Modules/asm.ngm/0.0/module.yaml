@@ -1,0 +1,14 @@
+version: '0.0.0'
+name: 'Test assembler'
+functions:
+    -
+        nglName: "fake_assemble"
+        arg0: './assemble.sh'
+        arg1:
+            atype: 'readset'
+            filetype: "fq1"
+            can_gzip: true
+        return:
+            rtype: 'sequenceset'
+            name: 'contigs'
+            extension: 'fna'
