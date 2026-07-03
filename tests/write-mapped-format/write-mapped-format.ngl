@@ -1,0 +1,10 @@
+ngless '1.6'
+
+# An explicit `format` argument overrides the format inferred from the filename
+# extension (parity with the Haskell implementation).
+
+# format={sam} to a .bam-named file must produce a text SAM file.
+write(samfile('input.sam'), ofile='out_as_sam.bam', format={sam})
+
+# format={bam} to a non-.bam-named file must produce a binary BAM (BGZF) file.
+write(samfile('input.sam'), ofile='out_as_bam.dat', format={bam})

@@ -2240,7 +2240,18 @@ impl Interpreter {
                     ))
                 }
             };
-            self.write_mapped_read_set(path, &ofile, can_move)?;
+            // An explicit `format={sam|bam}` symbol overrides the filename-based inference
+            // (mirrors `woFormat opts` taking precedence over `guessFormat` in Haskell).
+            let format = match lookup_arg(args, "format") {
+                None => None,
+                Some(NGLessObject::Symbol(s)) => Some(s.clone()),
+                Some(other) => {
+                    return Err(NgError::script(format!(
+                        "write: `format` should be a symbol, got {other:?}"
+                    )))
+                }
+            };
+            self.write_mapped_read_set(path, &ofile, format.as_deref(), can_move)?;
             return Ok(NGLessObject::String(ofile));
         }
         execute_write(
@@ -2544,16 +2555,38 @@ impl Interpreter {
         Ok(actiondir)
     }
 
-    /// Write a mapped read set to `ofile` (mirrors `executeWrite` of an `NGOMappedReadSet`). The
-    /// output format comes from the extension; SAM/BAM conversion goes through samtools.
-    fn write_mapped_read_set(&self, path: &Path, ofile: &str, can_move: bool) -> NgResult<()> {
+    /// Write a mapped read set to `ofile` (mirrors `executeWrite` of an `NGOMappedReadSet`). An
+    /// explicit `format={sam|bam}` symbol takes precedence; otherwise the format is inferred from
+    /// the filename extension. SAM/BAM conversion goes through samtools.
+    fn write_mapped_read_set(
+        &self,
+        path: &Path,
+        ofile: &str,
+        format: Option<&str>,
+        can_move: bool,
+    ) -> NgResult<()> {
         let is_bam = |p: &str| p.ends_with(".bam");
-        let sam_ext = [".sam", ".sam.gz", ".sam.bz2", ".sam.zst", ".sam.zstd"];
-        let format = if ofile == "/dev/stdout" || sam_ext.iter().any(|e| ofile.ends_with(e)) {
-            "sam"
-        } else {
-            // `.bam`, or (as in Haskell) anything unrecognised, defaults to BAM.
-            "bam"
+        // Infer the format from the filename (mirrors Haskell's `guessFormat`): `/dev/stdout` and
+        // `.sam*` extensions are SAM; `.bam` is BAM; anything else defaults to BAM (with a warning).
+        let guess_format = || -> &'static str {
+            let sam_ext = [".sam", ".sam.gz", ".sam.bz2", ".sam.zst", ".sam.zstd"];
+            if ofile == "/dev/stdout" || sam_ext.iter().any(|e| ofile.ends_with(e)) {
+                "sam"
+            } else {
+                if !is_bam(ofile) {
+                    crate::output::warn(
+                        self.cur_lno.load(Ordering::Relaxed),
+                        &format!(
+                            "Cannot determine format of MappedReadSet output based on filename ('{ofile}'). Defaulting to BAM."
+                        ),
+                    );
+                }
+                "bam"
+            }
+        };
+        let format = match format {
+            Some(f) => f,
+            None => guess_format(),
         };
         let src = path.to_string_lossy().to_string();
         // Produce a file in the requested format, converting via samtools when needed.
@@ -2565,11 +2598,16 @@ impl Interpreter {
                 out
             }
             ("bam", true) => path.to_path_buf(),
-            (_, _) => {
+            ("bam", false) => {
                 let input = self.samtools_input(path)?;
                 let out = self.new_temp_path("converted_", "bam")?;
                 crate::samtools::convert_sam_to_bam(&input, &out)?;
                 out
+            }
+            (other, _) => {
+                return Err(NgError::script(format!(
+                    "write does not accept format {{{other}}} with input type MappedReadSet"
+                )))
             }
         };
         move_or_copy_compress(&orig, ofile, can_move, &self.temp_files)

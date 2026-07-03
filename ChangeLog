@@ -1,4 +1,8 @@
 Unreleased
+	* `write()` of a mapped read set now honors an explicit `format={sam|bam}`
+	argument, which overrides the format inferred from the output filename
+	(matching earlier ngless versions). When neither `format` nor a recognized
+	extension determines the format, a warning is emitted and BAM is used
 	* ngless now writes an HTML run report again (the `<script>.output_ngless/`
 	directory, or the location given by `-o`/`--html-report-directory`; disable
 	with `--no-create-report`). The report is a single self-contained
