@@ -8,8 +8,10 @@
 //!
 //! This reimplementation writes a **single self-contained `index.html`**: the run data is embedded
 //! inline as a JSON literal, the styling is inline CSS, the interactivity is dependency-free
-//! vanilla JavaScript, and the per-position quality chart is hand-rendered as inline SVG. The page
-//! makes *zero* external requests, so it works fully offline. The HTML/JS/CSS shell lives in
+//! vanilla JavaScript, and the per-position quality chart is hand-rendered as inline SVG. The
+//! script listing is syntax-highlighted client-side by a small NGLess tokenizer in the template
+//! (mirroring `tokens.rs`), so the Rust side only embeds the raw script text. The page makes *zero*
+//! external requests, so it works fully offline. The HTML/JS/CSS shell lives in
 //! `report/template.html` (embedded via `include_str!`) with a single `{{DATA}}` placeholder.
 //!
 //! Alongside `index.html` the directory also gets the raw `script.ngl` and two machine-readable

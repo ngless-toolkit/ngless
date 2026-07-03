@@ -27,6 +27,13 @@
   --s-median: #12805c;
   --s-lower: #b7791f;
   --s-upper: #8a5cf6;
+  --code-kw: #8a5cf6;
+  --code-const: #1668c1;
+  --code-str: #1a8452;
+  --code-num: #b7791f;
+  --code-com: #8a94a2;
+  --code-fn: #0e7490;
+  --code-sym: #c26a00;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -51,6 +58,13 @@
     --s-median: #3ecf9a;
     --s-lower: #e0a94a;
     --s-upper: #b18cff;
+    --code-kw: #b18cff;
+    --code-const: #6db3f2;
+    --code-str: #4bd08a;
+    --code-num: #e0a94a;
+    --code-com: #6f7d8c;
+    --code-fn: #4bc6d8;
+    --code-sym: #f0a930;
   }
 }
 :root[data-theme="light"] {
@@ -59,12 +73,14 @@
   --link: #1668c1; --code-bg: #f4f5f7; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.10);
   --c-trace:#98a2b3;--c-debug:#667085;--c-info:#1668c1;--c-result:#6b4f1d;--c-warning:#b7791f;--c-error:#c0362c;
   --s-mean:#1668c1;--s-median:#12805c;--s-lower:#b7791f;--s-upper:#8a5cf6;
+  --code-kw:#8a5cf6;--code-const:#1668c1;--code-str:#1a8452;--code-num:#b7791f;--code-com:#8a94a2;--code-fn:#0e7490;--code-sym:#c26a00;
 }
 :root[data-theme="dark"] {
   --bg:#0f1216;--panel:#171b21;--panel-2:#1e242c;--text:#e6e9ee;--muted:#93a1b1;
   --border:#2a313a;--accent:#f0a930;--accent-weak:#3a2f16;--link:#6db3f2;--code-bg:#12161b;--shadow:none;
   --c-trace:#667085;--c-debug:#93a1b1;--c-info:#6db3f2;--c-result:#d8b878;--c-warning:#e0a94a;--c-error:#ef6a5f;
   --s-mean:#6db3f2;--s-median:#3ecf9a;--s-lower:#e0a94a;--s-upper:#b18cff;
+  --code-kw:#b18cff;--code-const:#6db3f2;--code-str:#4bd08a;--code-num:#e0a94a;--code-com:#6f7d8c;--code-fn:#4bc6d8;--code-sym:#f0a930;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -118,6 +134,15 @@ main { max-width: 1080px; margin: 0 auto; padding: 22px 20px 80px; }
 .tag { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; padding: 1px 6px; border-radius: 5px; margin-right: 7px; vertical-align: middle; }
 .tag.qc { background: color-mix(in srgb, var(--s-median) 18%, transparent); color: var(--s-median); }
 .tag.stats { background: color-mix(in srgb, var(--s-upper) 18%, transparent); color: var(--s-upper); }
+/* NGLess syntax highlighting */
+.tok-comment { color: var(--code-com); font-style: italic; }
+.tok-string  { color: var(--code-str); }
+.tok-number  { color: var(--code-num); }
+.tok-keyword { color: var(--code-kw); font-weight: 600; }
+.tok-const   { color: var(--code-const); }
+.tok-symbol  { color: var(--code-sym); }
+.tok-func    { color: var(--code-fn); font-weight: 600; }
+.tok-op      { color: var(--muted); }
 
 /* Log */
 .log-controls { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
@@ -206,6 +231,97 @@ const REPORT_DATA = {{DATA}};
   };
   const fmtInt = (n) => (n == null ? "" : Number(n).toLocaleString("en-US"));
 
+  // ---- NGLess syntax highlighter (dependency-free; mirrors tokens.rs) ----
+  // Reserved words and language constants/booleans, from tokens.rs.
+  const NGL_KEYWORDS = new Set(["if", "else", "ngless", "len", "discard", "continue", "not", "local", "import", "using"]);
+  const NGL_CONSTS = new Set(["STDIN", "STDOUT", "ARGV", "true", "True", "false", "False"]);
+  const isVarStart = (c) => c === "_" || (c >= "a" && c <= "z") || (c >= "A" && c <= "Z");
+  const isVarCont = (c) => isVarStart(c) || (c >= "0" && c <= "9");
+  const isDigit = (c) => c >= "0" && c <= "9";
+  const isHex = (c) => isDigit(c) || (c >= "a" && c <= "f") || (c >= "A" && c <= "F");
+  // Highlight one line of NGLess source. `inBlock` carries `/* ... */` state across lines.
+  // Returns { frag, inBlock } where frag is a DocumentFragment of coloured spans.
+  function highlightNGL(text, inBlock) {
+    const frag = document.createDocumentFragment();
+    const push = (cls, s) => {
+      if (!s) return;
+      frag.append(cls ? el("span", { class: cls, text: s }) : document.createTextNode(s));
+    };
+    const n = text.length;
+    let i = 0;
+    // Continuation of a multi-line block comment: consume until the closing `*/`.
+    if (inBlock) {
+      const end = text.indexOf("*/");
+      if (end === -1) { push("tok-comment", text); return { frag, inBlock: true }; }
+      push("tok-comment", text.slice(0, end + 2));
+      i = end + 2;
+      inBlock = false;
+    }
+    while (i < n) {
+      const c = text[i];
+      // line comments: `#...` and `//...`
+      if (c === "#" || (c === "/" && text[i + 1] === "/")) { push("tok-comment", text.slice(i)); i = n; break; }
+      // block comment `/* ... */` (may run to end of line -> continue on next line)
+      if (c === "/" && text[i + 1] === "*") {
+        const end = text.indexOf("*/", i + 2);
+        if (end === -1) { push("tok-comment", text.slice(i)); inBlock = true; i = n; break; }
+        push("tok-comment", text.slice(i, end + 2)); i = end + 2; continue;
+      }
+      // strings: single- or double-quoted, with backslash escapes
+      if (c === '"' || c === "'") {
+        let j = i + 1;
+        while (j < n) {
+          if (text[j] === "\\") { j += 2; continue; }
+          if (text[j] === c) { j++; break; }
+          j++;
+        }
+        push("tok-string", text.slice(i, j)); i = j; continue;
+      }
+      // symbol `{name}`
+      if (c === "{") {
+        let j = i + 1;
+        while (j < n && isVarCont(text[j])) j++;
+        if (j > i + 1 && text[j] === "}") { push("tok-symbol", text.slice(i, j + 1)); i = j + 1; continue; }
+      }
+      // numbers: hex `0x..`, decimal integer, or double `d.d`
+      if (isDigit(c)) {
+        let j = i;
+        if (c === "0" && text[i + 1] === "x" && isHex(text[i + 2] || "")) {
+          j = i + 2;
+          while (j < n && isHex(text[j])) j++;
+        } else {
+          while (j < n && isDigit(text[j])) j++;
+          if (text[j] === "." && isDigit(text[j + 1] || "")) { j++; while (j < n && isDigit(text[j])) j++; }
+        }
+        push("tok-number", text.slice(i, j)); i = j; continue;
+      }
+      // words: identifiers, optional `module::function`
+      if (isVarStart(c)) {
+        let j = i + 1;
+        while (j < n && isVarCont(text[j])) j++;
+        if (text[j] === ":" && text[j + 1] === ":" && isVarStart(text[j + 2] || "")) {
+          j += 2;
+          while (j < n && isVarCont(text[j])) j++;
+        }
+        const word = text.slice(i, j);
+        let cls = null;
+        if (NGL_KEYWORDS.has(word)) cls = "tok-keyword";
+        else if (NGL_CONSTS.has(word)) cls = "tok-const";
+        else {
+          let k = j;
+          while (k < n && text[k] === " ") k++;
+          if (text[k] === "(") cls = "tok-func"; // function/method call
+        }
+        push(cls, word); i = j; continue;
+      }
+      // operators
+      if ("=,+-*():[]<>.|!".indexOf(c) !== -1) { push("tok-op", c); i++; continue; }
+      // whitespace / anything else
+      push(null, c); i++;
+    }
+    return { frag, inBlock };
+  }
+
   // ---- meta line ----
   document.getElementById("meta").append(
     "Result of running ", el("strong", { text: D.scriptName || "script" }),
@@ -218,11 +334,14 @@ const REPORT_DATA = {{DATA}};
   const scriptPanel = el("div", { class: "panel" }, el("h2", { text: "Script" }));
   const scriptBody = el("div", { class: "body" });
   const scriptList = el("div", { class: "script mono" });
+  let inBlockComment = false;
   for (const line of (D.script || [])) {
     const src = el("div", { class: "src" });
     if (line.qc) src.append(el("a", { class: "tag qc", href: "#qc-" + line.lno, text: "QC" }));
     if (line.stats) src.append(el("a", { class: "tag stats", href: "#stats-" + line.lno, text: "Stats" }));
-    src.append(document.createTextNode(line.text || ""));
+    const hl = highlightNGL(line.text || "", inBlockComment);
+    src.append(hl.frag);
+    inBlockComment = hl.inBlock;
     scriptList.append(el("div", { class: "ln", id: "line-" + line.lno },
       [el("div", { class: "gutter", text: String(line.lno) }), src]));
   }
