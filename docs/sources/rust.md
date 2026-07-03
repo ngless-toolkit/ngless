@@ -81,8 +81,7 @@ Haskell build carried.
 
 ## Known changes
 
-A few behaviours are *deliberately* different from the Haskell implementation.
-These are intentional improvements, not parity bugs:
+A few behaviours are from the Haskell implementation but not considered errors:
 
 - **`count()` rejects ambiguous annotation sources.** The annotation to use is
   chosen from `features=["seqname"]`, `gff_file`, `functional_map`, or
@@ -90,6 +89,19 @@ These are intentional improvements, not parity bugs:
   the pipeline runs. Previously all but one were silently ignored (the Haskell
   implementation only errored on the `gff_file` + `functional_map` combination).
   Pass exactly one annotation source so that no argument is silently dropped.
+- **Error messages are not exactly the same.** The Rust implementation has a
+  different error reporting mechanism, so the text of error messages may
+  differ.
+- **Rounding of floating-point numbers in output files may differ very
+  slightly.** The typical difference is in the last digit of a long
+  floating-point number, and is not expected to affect downstream analysis. A
+  typical case is that rust will output `1025.6640844000465` where the Haskell
+  implementation outputs `1025.6640844000462`.
+- `ARGV` is handled slightly differently internally, which can show up in the
+  JSON output. This can also show up in the hashes, which is potentially
+  serious if you mix different versions of NGLess in a pipeline. The
+  recommendation is to use the same version of NGLess for all steps in a
+  pipeline and switch to `ngless "1.6"` as soon as possible.
 
 ## Reporting problems
 
