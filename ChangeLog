@@ -1,4 +1,6 @@
 Unreleased
+	* `collect()` under `--subsample` now appends a `.subsample` suffix to its
+	output file, matching earlier ngless versions
 	* `count(functional_map=...)` now checks that the requested features are
 	columns of the map early, aborting before any output is written, even when
 	the map or features are passed through variables (dynamic arguments)

@@ -2267,8 +2267,14 @@ impl Interpreter {
                 ))
             }
         };
-        let ofile = string_arg(args, "ofile")
+        let mut ofile = string_arg(args, "ofile")
             .ok_or_else(|| NgError::script("collect arguments: ofile is required"))?;
+        // Under `--subsample`, the merged output gains a literal `.subsample` suffix (mirrors the
+        // `isSubsample` branch of Haskell's `executeCollect`). Note this is `.subsample`, not the
+        // `.subsampled` suffix that write() appends.
+        if self.subsample {
+            ofile.push_str(".subsample");
+        }
         let hash = string_arg(args, "__hash").unwrap_or_default();
         let tag = string_arg(args, "__parallel_tag").unwrap_or_default();
         let prefix = if tag.is_empty() {
