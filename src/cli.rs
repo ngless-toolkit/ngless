@@ -860,33 +860,39 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     let mut constants: Vec<(String, NGLType)> = Vec::new();
     let mut constant_values = Vec::new();
     for m in &modules {
-        // `motus` and `soap` are legacy standard modules that are no longer supported. Importing
-        // either aborts with a guidance error rather than being loaded (mock modules). `motus`
-        // mirrors StandardModules/Motus.hs, which — at any version ≥1.4, i.e. every supported
-        // script — throws for the deprecated "1.0" wrapper and points newer versions at the
-        // downloadable `motus.ngm`. `soap` (StandardModules/Soap.hs) registered the long-obsolete
-        // SOAP mapper, which was never ported; we reject it up front instead.
-        match m.name() {
-            "motus" => {
-                return Err(NgError::script(if m.version() == "1.0" {
-                    "motus module is not supported in NGLess 1.4 (it supported motus1 only and \
+        // `motus` and `soap` are legacy standard modules that are no longer supported as *built-in*
+        // (non-local) imports. A plain `import "motus"` aborts with a guidance error rather than
+        // being loaded (mock module); `motus` mirrors StandardModules/Motus.hs, which — at any
+        // version ≥1.4, i.e. every supported script — throws for the deprecated "1.0" wrapper and
+        // points newer versions at the downloadable `motus.ngm`. `soap` (StandardModules/Soap.hs)
+        // registered the long-obsolete SOAP mapper, which was never ported; we reject it up front.
+        //
+        // A `local import "motus"` is exempt: downloading the `motus.ngm` external module and
+        // loading it with `local import` is now the recommended way to run motus, so those fall
+        // through to the normal external-module loader below.
+        if matches!(m, crate::ast::ModInfo::Import { .. }) {
+            match m.name() {
+                "motus" => {
+                    return Err(NgError::script(if m.version() == "1.0" {
+                        "motus module is not supported in NGLess 1.4 (it supported motus1 only and \
                      that is now very old; please see \
                      https://github.com/ngless-toolkit/ngless-contrib/tree/master/motus.ngm)"
-                        .to_string()
-                } else {
-                    "To use the motus module for newer versions, you need to download it and \
+                            .to_string()
+                    } else {
+                        "To use the motus module for newer versions, you need to download it and \
                      import it with 'local import'"
-                        .to_string()
-                }));
+                            .to_string()
+                    }));
+                }
+                "soap" => {
+                    return Err(NgError::script(
+                        "soap module is no longer supported (the SOAP mapper is very old and \
+                         unmaintained; please use the 'bwa' or 'minimap2' mappers instead)"
+                            .to_string(),
+                    ));
+                }
+                _ => {}
             }
-            "soap" => {
-                return Err(NgError::script(
-                    "soap module is no longer supported (the SOAP mapper is very old and \
-                     unmaintained; please use the 'bwa' or 'minimap2' mappers instead)"
-                        .to_string(),
-                ));
-            }
-            _ => {}
         }
         constants.extend(crate::modules::module_constants(m.name(), m.version()));
         constant_values.extend(crate::interpret::module_constant_values(
