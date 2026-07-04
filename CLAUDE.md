@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 NGLess is a domain-specific language for NGS (next-generation sequencing) data processing,
 aimed at metagenomics pipelines (FASTQ preprocessing → mapping → feature counting). The
-`.ngl` script language is versioned; scripts declare a version on their first line (e.g.
-`ngless "1.5"`).
+`.ngl` script language is versioned; scripts declare a version on their first line. This build
+supports exactly **one** language version, `ngless "1.6"` — declaring any other version
+(including the older `"1.5"`) is a hard error (see `LANGUAGE_VERSION` in `cli.rs`).
 
 **Implementation status (important):** NGLess was rewritten from Haskell to Rust. As of the
 1.6 release the Haskell implementation was *completely removed* and the Rust code at the repo
@@ -27,7 +28,7 @@ cargo test <name>              # run a single unit test by name
 cargo fmt --all -- --check     # formatting is enforced in CI
 ```
 
-Functional / parity test suite (the primary correctness bar):
+Functional test suite (the primary correctness bar):
 
 ```sh
 NGLESS_BIN=target/release/ngless ./run-tests.sh          # all 99 tests
@@ -38,8 +39,9 @@ NGLESS_BIN=target/release/ngless ./run-tests.sh regression   # only tests/regres
 committed `expected.*` files; the harness runs ngless and `diff`s actual output against
 `expected.*`. A dir may also have `cmdargs` (extra CLI args), `run.sh` (custom invocation),
 `check.sh` (extra assertions), and `cleanup.sh`. Dirs named `error-*` expect a non-zero exit;
-`error-validation-*` run with `-n` (validate only). The `expected.*` files were produced by the
-old Haskell binary, so passing the suite *is* a byte-for-byte parity check against Haskell.
+`error-validation-*` run with `-n` (validate only). Most `expected.*` files were originally
+produced by the old Haskell binary; the suite is the regression gate for output, but exact
+Haskell parity is **no longer a goal** (see "Output stability" below).
 
 **External tools** (samtools, bwa, minimap2, prodigal, megahit) are NOT bundled. The binary
 finds them on `$PATH` or via per-tool overrides `NGLESS_SAMTOOLS_BIN`, `NGLESS_BWA_BIN`,
@@ -62,7 +64,7 @@ version block at the top, matching the existing tab-indented `* ...` style.
 
 The execution pipeline (mirrors the Haskell `DefaultMode` flow) is, in order:
 
-**load → tokenize → parse → version gate (≥1.5) → type check → validate → transform → interpret**
+**load → tokenize → parse → version gate (== 1.6) → type check → validate → transform → interpret**
 
 Entry: `src/main.rs` → `lib.rs::run` (handles `--version*`, `--help`, `--check-install`,
 `--print-path`, `--debug-parse`) → `cli.rs::run_cli` / `run_script` drives the pipeline above.
@@ -78,15 +80,16 @@ Front end:
   `NGLVersion`. `external_modules.rs` loads user `.ngm` external modules (see `Modules/`).
 
 Transform & run:
-- `transform.rs` — post-typecheck AST transforms. Notably `addOutputHash`, which computes an
-  MD5 content hash injected as a hidden `__hash` arg (reported by `auto_comments=[{hash}]`).
-  This hash must be **byte-identical** to Haskell, so `show_expr` reproduces Haskell's derived
-  `Show`.
+- `transform.rs` — post-typecheck AST transforms. Notably `add_output_hash`, which computes an
+  MD5 content hash injected as a hidden `__hash` arg (reported by `auto_comments=[{hash}]`). The
+  hash only needs to be deterministic and content-addressed (it is an internal identifier), so it
+  is computed from the `Debug` serialization of the rewritten AST — no Haskell-`Show` reproduction.
 - `interpret.rs` — the interpreter (largest module). Evaluates the pure subset plus the
   file-backed FASTQ/SAM pipeline builtins (`fastq`, `paired`, `preprocess ... using |read|:`,
   `map`, `select`, `count`, `write`, `qcstats`, `collect`, sample loading, …).
-- `values.rs` — runtime values (`NGLessObject`) and operators; includes `show_double`, a
-  faithful port of Haskell's `show :: Double -> String` needed for byte-identical numeric output.
+- `values.rs` — runtime values (`NGLessObject`) and operators; includes `show_double`, a port of
+  Haskell's `show :: Double -> String`. It formats numeric output (count tables, QC stats) and the
+  committed `expected.*` baselines were produced with it, so changing it would churn those files.
 
 Domain subsystems (called from the interpreter):
 - `fastq.rs` / `compression.rs` — file-backed read sets, streaming FASTQ records, QC stats;
@@ -110,11 +113,18 @@ Cross-cutting:
   drawn via `output::transient_msg` for the download and bwa-mapping paths.
 - `export.rs` — `--export-json` (mirrors `JSONScript.hs`).
 
-## Byte-parity is the core constraint
+## Output stability
 
-The overriding design goal is *behavioral parity* with the removed Haskell implementation for
-`ngless "1.5"`+ scripts. Much of the code exists to reproduce Haskell output exactly (numeric
-formatting, output hashes, version/header strings, citation ordering, error exit codes). When
-changing anything that affects output, run the functional suite — a `diff` against `expected.*`
-is the regression gate. Version 1.6 deliberately maps to 1.5 semantics (see `EFFECTIVE_VERSION`
-in `cli.rs`) so `{hash}` and other output stay identical across 1.5/1.6 scripts.
+The Rust build is now the sole implementation, so **byte-for-byte parity with the removed Haskell
+binary is no longer a goal**. The `expected.*` files are still the regression gate: run the
+functional suite whenever you change anything that affects output, and keep output *stable across
+Rust releases* unless a change is intentional. Several code paths still reproduce Haskell's exact
+formatting (numeric output via `show_double`, version/header strings, citation ordering, error exit
+codes) simply because the committed baselines were produced that way and there is no reason to churn
+them — but that is a convenience, not a hard constraint.
+
+The `{hash}` auto-comment and parallel lock/stats directory names are an **internal, opaque content
+hash**: it must stay deterministic and content-addressed, but its exact value is not meaningful and
+may change (it did in the single-version cleanup). If you change how the hash is computed, regenerate
+the handful of `expected.*` files that embed it (`tests/write-hash*`, `tests/same-hash-collect*`)
+after confirming the only diff is the hash line.

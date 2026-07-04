@@ -11,19 +11,10 @@ use crate::errors::{NgError, NgResult};
 use crate::modules::{builtin_functions, NGLVersion};
 use crate::output::{self, ColorSetting, Verbosity};
 
-/// Oldest language version this build still accepts (with a deprecation warning). The rewrite
-/// drops pre-1.5 semantics, so anything older is a hard error.
-const MIN_VERSION: NGLVersion = NGLVersion { major: 1, minor: 5 };
-
-/// The current language version this (Rust) build implements natively. Scripts should declare
-/// this going forward.
-const CURRENT_VERSION: NGLVersion = NGLVersion { major: 1, minor: 6 };
-
-/// The effective semantics version used for feature gating and output hashing. Version 1.6 is a
-/// best-effort exact mirror of 1.5, so both 1.5 and 1.6 map to these semantics (mirroring the
-/// Haskell `parseVersion (Just "1.6") = NGLVersion 1 5`). This keeps output — including the
-/// `{hash}` auto-comment — byte-identical between a 1.5 and a 1.6 run.
-const EFFECTIVE_VERSION: NGLVersion = NGLVersion { major: 1, minor: 5 };
+/// The single language version this build implements. NGLess is now Rust-only and supports
+/// exactly one language version; there is no longer a range of accepted versions or a separate
+/// "effective" version. A script must declare exactly this version; anything else is a hard error.
+const LANGUAGE_VERSION: NGLVersion = NGLVersion { major: 1, minor: 6 };
 
 #[derive(Default)]
 struct RunOpts {
@@ -76,9 +67,6 @@ struct RunOpts {
     /// `exportJSON`/`exportCWL`). Parsed here; implemented in Phase 3.
     export_json: Option<String>,
     export_cwl: Option<String>,
-    /// `--check-deprecation`: check whether the ngless version or any used modules are deprecated
-    /// (mirrors `deprecationCheck`). Parsed here; implemented in a later phase.
-    deprecation_check: bool,
     /// `--create-report`/`--no-create-report`: whether to write the HTML report directory (mirrors
     /// the `createReportDirectory` triSwitch). `None` falls through to the config value.
     create_report: Option<bool>,
@@ -466,7 +454,6 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
             "--no-create-report" => opts.create_report = Some(false),
             "-p" | "--print-last" => opts.print_last = true,
             "--experimental-features" => opts.experimental_features = true,
-            "--check-deprecation" => opts.deprecation_check = true,
             "-e" | "--script" => {
                 i += 1;
                 opts.inline_script = Some(arg_value(args, i, a)?);
@@ -502,15 +489,6 @@ fn parse_args(args: &[String]) -> NgResult<RunOpts> {
             other if other.starts_with("--html-report-directory=") => {
                 opts.html_report_directory =
                     Some(other["--html-report-directory=".len()..].to_string());
-            }
-            // `--search-dir` is a deprecated alias for `--search-path` (mirrors `searchDir`).
-            "--search-dir" => {
-                i += 1;
-                opts.search_path.push(arg_value(args, i, a)?);
-            }
-            other if other.starts_with("--search-dir=") => {
-                opts.search_path
-                    .push(other["--search-dir=".len()..].to_string());
             }
             "-j" | "--jobs" | "--threads" => {
                 i += 1;
@@ -838,13 +816,10 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         crate::transform::wrap_print(&mut script.body).map_err(NgError::script)?;
     }
 
-    // Version gate. This build implements ngless "1.6" natively. Version 1.6 is a best-effort
-    // exact mirror of 1.5, so both are accepted and share the same `EFFECTIVE_VERSION` semantics;
-    // declaring 1.5 additionally emits a deprecation warning (the project is now based on the Rust
-    // implementation and 1.6 is the version to declare going forward). Anything older than 1.5 is a
-    // hard error (pre-1.5 semantics are gone); anything newer than 1.6 is not known to this build.
-    // An inline script without a version declaration defaults to 1.5 (mirrors
-    // `parseVersion Nothing = NGLVersion 1 5`); a file always has a header (required when parsing).
+    // Version gate. This build implements a single language version (`LANGUAGE_VERSION`, "1.6").
+    // A script must declare exactly that version; anything else (including the older "1.5") is a
+    // hard error. An inline script without a version declaration defaults to the current version;
+    // a file always has a header (required when parsing).
     let version = match &script.header {
         Some(header) => {
             let declared = parse_version(&header.version).ok_or_else(|| {
@@ -853,33 +828,16 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
                     header.version
                 ))
             })?;
-            if declared < MIN_VERSION {
+            if declared != LANGUAGE_VERSION {
                 return Err(NgError::script(format!(
-                    "Script declares ngless version \"{}\", but this build supports only ngless \"1.5\" and newer.\n\
-                     Update the version statement, or use the Haskell build for older scripts.",
+                    "Script declares ngless version \"{}\", but this build implements only ngless \"1.6\".\n\
+                     Update the version statement, or install a matching ngless build.",
                     header.version
                 )));
             }
-            if declared > CURRENT_VERSION {
-                return Err(NgError::script(format!(
-                    "Script declares ngless version \"{}\", but this build implements only up to ngless \"1.6\".\n\
-                     Update ngless, or lower the version statement.",
-                    header.version
-                )));
-            }
-            if declared == MIN_VERSION {
-                output::warn(
-                    0,
-                    "This script declares ngless version \"1.5\". Going forward, ngless is based on the \
-                     Rust implementation and the current version is \"1.6\", which is a drop-in \
-                     replacement for \"1.5\". Please update the version statement to \"1.6\".",
-                );
-            }
-            // Normalise to the effective semantics version (1.6 mirrors 1.5 exactly), mirroring the
-            // Haskell `parseVersion (Just "1.6") = NGLVersion 1 5`.
-            EFFECTIVE_VERSION
+            LANGUAGE_VERSION
         }
-        None => EFFECTIVE_VERSION,
+        None => LANGUAGE_VERSION,
     };
     // The module imports (empty for an inline script with no header).
     let modules: Vec<crate::ast::ModInfo> = script
@@ -979,8 +937,8 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     }
 
     // Type check, then validate.
-    let typed = crate::types::checktypes(version, &script, &extra_funcs, &constants)?;
-    let mut funcs = builtin_functions(version);
+    let typed = crate::types::checktypes(&script, &extra_funcs, &constants)?;
+    let mut funcs = builtin_functions();
     funcs.extend(extra_funcs);
     let constant_names: Vec<String> = constants.iter().map(|(n, _)| n.clone()).collect();
     crate::validation::validate(&funcs, &constant_names, &typed)?;

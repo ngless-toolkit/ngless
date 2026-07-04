@@ -1,4 +1,17 @@
 Unreleased
+	* NGLess now supports a single language version, "1.6". Scripts must declare
+	`ngless "1.6"`; declaring an older version (including "1.5") is now a hard
+	error rather than being accepted with a deprecation warning.
+	* Removed the deprecated `strand` argument to `count()`; use `sense`
+	(`{both}`/`{sense}`/`{antisense}`) instead. `strand=True` is equivalent to
+	`sense={sense}`.
+	* Removed the deprecated `--search-dir` command-line flag (use
+	`--search-path`) and the unimplemented `--check-deprecation` flag.
+	* The output content hash reported by `auto_comments=[{hash}]` (and used to
+	name parallel lock/stats directories) is now computed with a simpler internal
+	serialization. It is still deterministic and content-addressed, but the hash
+	*values* differ from previous releases (they are an internal identifier, not a
+	stable cross-version value).
 	* The parallel module (`lock1`/`run_for_all`/`collect`) now reports its
 	progress the way earlier ngless versions did: which lock file was obtained,
 	where per-sample stats are written, the number of pending/locked/failed

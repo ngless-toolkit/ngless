@@ -9,7 +9,7 @@
 #     write(counts, ofile='output.hash.txt', auto_comments=[{script}, {hash}])
 #     write(counts, ofile='output.compress.txt.gz', auto_comments=[{script}, {hash}])
 #     
-# Output hash: 41496276b6b59c90f8d8b0c4c756772d
+# Output hash: bb52066b9c95bfd32f0882d23db7946d
 	seq1_2.sam.bz2
 -1	1
 seq1	99990

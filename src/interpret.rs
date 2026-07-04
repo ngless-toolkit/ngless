@@ -5320,9 +5320,7 @@ fn parse_count_opts(
         }
     };
 
-    let strand_specific = lookup_bool(args, "strand", false)?;
-    let sense_default = if strand_specific { "sense" } else { "both" };
-    let strand_mode = match lookup_symbol(args, "sense", sense_default)?.as_str() {
+    let strand_mode = match lookup_symbol(args, "sense", "both")?.as_str() {
         "both" => StrandMode::Both,
         "sense" => StrandMode::Sense,
         "antisense" => StrandMode::Antisense,

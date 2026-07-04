@@ -33,21 +33,13 @@ pub enum ArgCheck {
     Symbol(Vec<String>),
     FileReadable,
     FileWritable,
-    /// First version where this argument may be used.
-    MinVersion(i64, i64),
-    /// Deprecated since the given version, with a reason.
-    Deprecated(i64, i64, String),
 }
 
 /// Checks for a function.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FunctionCheck {
-    /// First version where this function may be used.
-    MinNGLessVersion(i64, i64),
     /// The function is pure: its return value must be assigned.
     ReturnAssigned,
-    /// Version when behaviour changed, with a reason.
-    NGLVersionIncompatibleChange(i64, i64, String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -91,7 +83,7 @@ pub use builders::{builtin_functions, builtin_methods, module_constants, module_
 /// `Integer`, ... name `NGLType` variants) does not clash with the `std` `String` used in the
 /// struct field types above.
 mod builders {
-    use super::{ArgCheck, ArgInformation, Function, FunctionCheck, MethodInfo, NGLVersion};
+    use super::{ArgCheck, ArgInformation, Function, FunctionCheck, MethodInfo};
     use crate::ast::{FuncName, MethodName, NGLType};
     use NGLType::*;
 
@@ -135,17 +127,12 @@ mod builders {
         Union(vec![String, Integer, Double])
     }
 
-    /// The builtin functions, ported from `builtinFunctions` in BuiltinFunctions.hs. The `write`
-    /// return type depends on the language version.
-    pub fn builtin_functions(ver: NGLVersion) -> Vec<Function> {
+    /// The builtin functions, ported from `builtinFunctions` in BuiltinFunctions.hs.
+    pub fn builtin_functions() -> Vec<Function> {
         use ArgCheck::*;
         use FunctionCheck::*;
 
-        let write_ret = if ver >= NGLVersion::new(1, 4) {
-            String
-        } else {
-            Void
-        };
+        let write_ret = String;
 
         vec![
             func(
@@ -218,7 +205,7 @@ mod builders {
                 vec![],
                 Read,
                 smoothtrim_args(),
-                vec![ReturnAssigned, MinNGLessVersion(0, 11)],
+                vec![ReturnAssigned],
             ),
             func(
                 "map",
@@ -289,7 +276,7 @@ mod builders {
                     vec![],
                     ReadSet,
                     vec![],
-                    vec![MinNGLessVersion(1, 1), ReturnAssigned],
+                    vec![ReturnAssigned],
                 );
                 f.allows_auto_comprehension = true;
                 f
@@ -301,10 +288,7 @@ mod builders {
                 vec![sym(&["fastq", "mapping"])],
                 Counts,
                 vec![],
-                vec![
-                    ReturnAssigned,
-                    NGLVersionIncompatibleChange(0, 8, "".to_string()),
-                ],
+                vec![ReturnAssigned],
             ),
             func("write", Some(Any), vec![], write_ret, write_args(), vec![]),
             func("print", Some(print_type()), vec![], Void, vec![], vec![]),
@@ -350,15 +334,7 @@ mod builders {
                 vec![],
                 SequenceSet,
                 vec![arg("__extra_megahit_args", false, list(String), vec![])],
-                vec![
-                    NGLVersionIncompatibleChange(
-                        1,
-                        4,
-                        "Megahit version was updated which significantly changes results"
-                            .to_string(),
-                    ),
-                    ReturnAssigned,
-                ],
+                vec![ReturnAssigned],
             ),
             // From the always-loaded builtin "orffind" module (BuiltinModules/ORFFind.hs):
             // prodigal gene prediction. Takes a sequence set (typed as String), returns the
@@ -370,7 +346,7 @@ mod builders {
                 Filename,
                 vec![
                     arg("is_metagenome", true, Bool, vec![]),
-                    arg("include_fragments", false, Bool, vec![MinVersion(1, 1)]),
+                    arg("include_fragments", false, Bool, vec![]),
                     arg("coords_out", false, String, vec![FileWritable]),
                     arg("prots_out", false, String, vec![FileWritable]),
                 ],
@@ -394,7 +370,7 @@ mod builders {
                     vec![FileReadable],
                     list(ReadSet),
                     vec![],
-                    vec![MinNGLessVersion(1, 5), ReturnAssigned],
+                    vec![ReturnAssigned],
                 );
                 f.allows_auto_comprehension = true;
                 f
@@ -406,7 +382,7 @@ mod builders {
                     vec![FileReadable],
                     ReadSet,
                     vec![arg("sample", true, String, vec![])],
-                    vec![MinNGLessVersion(1, 5), ReturnAssigned],
+                    vec![ReturnAssigned],
                 );
                 f.allows_auto_comprehension = true;
                 f
@@ -632,10 +608,7 @@ mod builders {
                 "format_flags",
                 false,
                 Symbol,
-                vec![
-                    ArgCheck::MinVersion(0, 7),
-                    sym(&["interleaved", "always_3_fq_files"]),
-                ],
+                vec![sym(&["interleaved", "always_3_fq_files"])],
             ),
             arg("verbose", false, Bool, vec![]),
             arg("comment", false, String, vec![]),
@@ -645,12 +618,7 @@ mod builders {
                 list(Symbol),
                 vec![sym(&["date", "script", "hash"])],
             ),
-            arg(
-                "compress_level",
-                false,
-                Integer,
-                vec![ArgCheck::MinVersion(1, 5)],
-            ),
+            arg("compress_level", false, Integer, vec![]),
         ]
     }
 
@@ -686,20 +654,7 @@ mod builders {
                 "sense",
                 false,
                 Symbol,
-                vec![
-                    sym(&["both", "sense", "antisense"]),
-                    ArgCheck::MinVersion(1, 1),
-                ],
-            ),
-            arg(
-                "strand",
-                false,
-                Bool,
-                vec![ArgCheck::Deprecated(
-                    1,
-                    1,
-                    "Use `sense` argument instead".into(),
-                )],
+                vec![sym(&["both", "sense", "antisense"])],
             ),
             arg("norm", false, Bool, vec![]),
             arg("discard_zeros", false, Bool, vec![]),
@@ -710,7 +665,7 @@ mod builders {
                 Symbol,
                 vec![sym(&["raw", "normed", "scaled", "fpkm"])],
             ),
-            arg("reference", false, String, vec![ArgCheck::MinVersion(0, 8)]),
+            arg("reference", false, String, vec![]),
         ]
     }
 
@@ -747,7 +702,7 @@ mod builders {
                 Symbol,
                 vec![sym(&["auto", "33", "64", "sanger", "solexa"])],
             ),
-            arg("interleaved", false, Bool, vec![ArgCheck::MinVersion(1, 1)]),
+            arg("interleaved", false, Bool, vec![]),
             arg("__perform_qc", false, Bool, vec![]),
         ]
     }
@@ -755,12 +710,7 @@ mod builders {
     fn samfile_args() -> Vec<ArgInformation> {
         vec![
             arg("name", false, String, vec![]),
-            arg(
-                "headers",
-                false,
-                String,
-                vec![ArgCheck::MinVersion(0, 7), ArgCheck::FileReadable],
-            ),
+            arg("headers", false, String, vec![ArgCheck::FileReadable]),
         ]
     }
 
@@ -796,12 +746,7 @@ mod builders {
             arg("mode_all", false, Bool, vec![]),
             arg("mapper", false, String, vec![]),
             arg("block_size_megabases", false, Integer, vec![]),
-            arg(
-                "__extra_args",
-                false,
-                list(String),
-                vec![ArgCheck::MinVersion(1, 1)],
-            ),
+            arg("__extra_args", false, list(String), vec![]),
             arg("__oname", false, String, vec![]),
         ]
     }
@@ -845,7 +790,6 @@ mod builders {
 
     /// The builtin methods, ported from `builtinMethods` in BuiltinFunctions.hs.
     pub fn builtin_methods() -> Vec<MethodInfo> {
-        use FunctionCheck::*;
         vec![
             // NGLMappedRead
             method("flag", MappedRead, Some(Symbol), Bool, flag_args(), vec![]),
@@ -860,14 +804,7 @@ mod builders {
             method("pe_filter", MappedRead, None, MappedRead, vec![], vec![]),
             method("some_match", MappedRead, Some(String), Bool, vec![], vec![]),
             method("unique", MappedRead, None, MappedRead, vec![], vec![]),
-            method(
-                "allbest",
-                MappedRead,
-                None,
-                MappedRead,
-                vec![],
-                vec![MinNGLessVersion(0, 9)],
-            ),
+            method("allbest", MappedRead, None, MappedRead, vec![], vec![]),
             // NGLRead
             method("avg_quality", Read, None, Double, vec![], vec![]),
             method(
@@ -878,14 +815,7 @@ mod builders {
                 vec![],
                 vec![],
             ),
-            method(
-                "n_to_zero_quality",
-                Read,
-                None,
-                Read,
-                vec![],
-                vec![MinNGLessVersion(0, 8)],
-            ),
+            method("n_to_zero_quality", Read, None, Read, vec![], vec![]),
             // NGLReadSet
             method("name", ReadSet, None, String, vec![], vec![]),
             // NGLDouble / NGLInteger
@@ -898,7 +828,7 @@ mod builders {
         vec![
             arg("min_identity_pc", false, Integer, vec![]),
             arg("min_match_size", false, Integer, vec![]),
-            arg("max_trim", false, Integer, vec![ArgCheck::MinVersion(0, 7)]),
+            arg("max_trim", false, Integer, vec![]),
             arg("action", false, Symbol, vec![sym(&["drop", "unmatch"])]),
             arg("reverse", false, Bool, vec![]),
         ]

@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ast::*;
 use crate::errors::{NgError, NgResult};
-use crate::modules::{builtin_functions, builtin_methods, Function, MethodInfo, NGLVersion};
+use crate::modules::{builtin_functions, builtin_methods, Function, MethodInfo};
 
 /// Signals an immediate abort of type checking (`cannotContinue`).
 struct Abort;
@@ -33,12 +33,11 @@ struct TypeChecker {
 /// Type-check a script against the builtin module for the given language version. On success
 /// returns the script with all `Lookup` nodes annotated with their inferred types.
 pub fn checktypes(
-    ver: NGLVersion,
     script: &Script,
     extra_funcs: &[Function],
     constants: &[(String, NGLType)],
 ) -> NgResult<Script> {
-    let mut functions = builtin_functions(ver);
+    let mut functions = builtin_functions();
     functions.extend_from_slice(extra_funcs);
     let mut tc = TypeChecker {
         line: 0,
@@ -774,13 +773,9 @@ mod tests {
     use super::*;
     use crate::parser::parse_ngless;
 
-    fn mods() -> NGLVersion {
-        NGLVersion::new(1, 3)
-    }
-
     fn is_ok_text(text: &str) {
         let script = parse_ngless("test", true, text).expect("parse failed");
-        if let Err(e) = checktypes(mods(), &script, &[], &[]) {
+        if let Err(e) = checktypes(&script, &[], &[]) {
             panic!("Type error on good code: {e} for script:\n{text}");
         }
     }
@@ -788,7 +783,7 @@ mod tests {
     fn is_error_text(text: &str) {
         let script = parse_ngless("test", true, text).expect("parse failed");
         assert!(
-            checktypes(mods(), &script, &[], &[]).is_err(),
+            checktypes(&script, &[], &[]).is_err(),
             "expected type error for script:\n{text}"
         );
     }
@@ -806,7 +801,6 @@ mod tests {
     #[test]
     fn bad_type_fastq() {
         assert!(checktypes(
-            mods(),
             &func_call("fastq", Expression::ConstInt(3), vec![]),
             &[],
             &[]
@@ -817,7 +811,6 @@ mod tests {
     #[test]
     fn good_type_fastq() {
         assert!(checktypes(
-            mods(),
             &func_call("fastq", Expression::ConstStr("fastq.fq".into()), vec![]),
             &[],
             &[]
@@ -832,7 +825,7 @@ mod tests {
             Expression::ConstStr("fastq.fq".into()),
             vec![(Variable("fname".into()), Expression::ConstInt(10))],
         );
-        assert!(checktypes(mods(), &s, &[], &[]).is_err());
+        assert!(checktypes(&s, &[], &[]).is_err());
     }
 
     #[test]
@@ -954,7 +947,7 @@ mod tests {
     /// Type-check `text` and return the error message (panicking if it type-checks cleanly).
     fn type_error_message(text: &str) -> String {
         let script = parse_ngless("test", true, text).expect("parse failed");
-        match checktypes(mods(), &script, &[], &[]) {
+        match checktypes(&script, &[], &[]) {
             Ok(_) => panic!("expected a type error for script:\n{text}"),
             Err(e) => e.to_string(),
         }

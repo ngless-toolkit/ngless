@@ -1,20 +1,21 @@
 //! Script transforms that run after type-checking and validation, before interpretation.
 //!
-//! Mirrors the relevant parts of `NGLess/Transform.hs`. The only transform implemented here is
-//! `addOutputHash`, which computes a content hash for each `write`/`collect` output call and
-//! injects it as a hidden `__hash` keyword argument. The hash is what the `auto_comments=[{hash}]`
-//! feature reports as `# Output hash: <md5>`.
+//! Mirrors the relevant parts of `NGLess/Transform.hs`. A central transform is `add_output_hash`,
+//! which computes a content hash for each `write`/`collect` output call and injects it as a hidden
+//! `__hash` keyword argument. The hash is what the `auto_comments=[{hash}]` feature reports as
+//! `# Output hash: <md5>`, and what names parallel lock/stats directories.
 //!
-//! The hash must be **byte-identical** to the Haskell implementation, which computes
-//! `MD5.md5s . MD5.Str . (versionString ++) . show $ expr'` where:
-//!   * `versionString = show nv ++ show (sortOn modName modInfos)` — the language version and the
-//!     sorted list of loaded modules (see [`version_string`]);
+//! The hash is an **internal, opaque identifier**: it only needs to be deterministic and
+//! content-addressed (equal inputs → equal hash), not byte-identical to any other implementation.
+//! It is computed as `md5(version_string ++ Debug-serialization(expr'))` where:
+//!   * `version_string` encodes the language version and the sorted list of loaded modules (see
+//!     [`version_string`]) so scripts differing only in imports hash differently;
 //!   * `expr'` is the (sub)expression with every variable `Lookup` replaced by a `Lookup` whose
 //!     variable name is the hash of the expression that was assigned to it, and every *nested*
 //!     (non-top, non-void) function call replaced by such a hashed `Lookup` (this mirrors the
-//!     earlier `addTemporaries` pass, which lifts nested calls into `temp$N` bindings).
-//!
-//! Reproducing Haskell's derived `Show` for the AST (see [`show_expr`]) is therefore load-bearing.
+//!     earlier `addTemporaries` pass, which lifts nested calls into `temp$N` bindings). This
+//!     content-addressing is load-bearing — e.g. it makes `collect` and `write` of the same
+//!     pipeline hash equal (see the `same-hash-collect` functional test).
 
 use std::collections::HashMap;
 
@@ -1209,21 +1210,11 @@ fn process_set_parallel_tag(body: &mut [(usize, Expression)]) {
 }
 
 /// `addLockHash`. Inject `__hash` into `lock1`/`run_for_all`/`run_for_all_samples` calls. The hash
-/// is `md5(show (map snd body))`; it only names lock/stats directories, so it need only be
-/// deterministic, but we reproduce the Haskell formula for fidelity.
+/// only names lock/stats directories, so it need only be a deterministic function of the script
+/// body; we hash the `Debug` serialization of the statement expressions.
 fn add_lock_hash(body: &mut [(usize, Expression)]) {
-    let shown = {
-        let mut s = String::from("[");
-        for (i, (_, e)) in body.iter().enumerate() {
-            if i > 0 {
-                s.push(',');
-            }
-            s.push_str(&show_expr(e));
-        }
-        s.push(']');
-        s
-    };
-    let h = md5_hex(shown.as_bytes());
+    let exprs: Vec<&Expression> = body.iter().map(|(_, e)| e).collect();
+    let h = md5_hex(format!("{exprs:?}").as_bytes());
     for (_, e) in body.iter_mut() {
         inject_lock_hash(e, &h);
     }
@@ -1290,7 +1281,7 @@ impl HashCtx<'_> {
     /// itself) and then `md5(versionString ++ show rewritten)`.
     fn hash_of(&self, e: &Expression, varmap: &HashMap<String, String>, is_top: bool) -> String {
         let rewritten = self.rewrite(e, varmap, is_top);
-        md5_hex(format!("{}{}", self.vstr, show_expr(&rewritten)).as_bytes())
+        md5_hex(format!("{}{:?}", self.vstr, rewritten).as_bytes())
     }
 
     /// Rewrite an expression for hashing. `is_top` is true only for the outermost call of an
@@ -1335,7 +1326,7 @@ impl HashCtx<'_> {
                     // Void calls are not lifted into temporaries.
                     call
                 } else {
-                    let h = md5_hex(format!("{}{}", self.vstr, show_expr(&call)).as_bytes());
+                    let h = md5_hex(format!("{}{:?}", self.vstr, call).as_bytes());
                     Expression::Lookup(Some(ret), Variable(h))
                 }
             }
@@ -1387,49 +1378,32 @@ impl HashCtx<'_> {
     }
 }
 
-/// `versionString = show nv ++ show (sortOn modName modInfos)`.
+/// A deterministic prefix mixed into every output content hash, so that scripts differing only in
+/// their language version or module imports hash differently. The exact format is internal and
+/// opaque (it no longer needs to match any other implementation).
 fn version_string(version: (i64, i64), imports: &[crate::ast::ModInfo]) -> String {
-    let (maj, min) = version;
     let mut mods = loaded_modules(version, imports);
-    mods.sort_by(|a, b| a.0.cmp(&b.0));
-    let mut s = format!("NGLVersion {maj} {min}[");
-    for (i, (n, v)) in mods.iter().enumerate() {
-        if i > 0 {
-            s.push(',');
-        }
-        s.push_str(&format!(
-            "ModInfo {{modName = {}, modVersion = {}}}",
-            haskell_string(n),
-            haskell_string(v)
-        ));
-    }
-    s.push(']');
-    s
+    mods.sort();
+    format!("NGLVersion {} {} {:?}", version.0, version.1, mods)
 }
 
-/// Reproduce the list of loaded modules from `Execs/Main.hs::loadModules` (name, version). The
-/// order is irrelevant (the caller sorts by name) but the membership and versions must match.
+/// The list of loaded modules (name, version) that contributes to the content hash: the built-in
+/// modules (always loaded at the single supported language version) plus the header imports.
 fn loaded_modules(version: (i64, i64), imports: &[crate::ast::ModInfo]) -> Vec<(String, String)> {
-    let ge = |a: (i64, i64), b: (i64, i64)| a >= b;
-    let mut mods: Vec<(String, String)> = Vec::new();
     let m = |n: &str, v: &str| (n.to_string(), v.to_string());
-    mods.push(m("__builtin__", &format!("{}.{}", version.0, version.1)));
-    if ge(version, (0, 6)) {
-        mods.push(m("builtin.orffind", "0.6"));
-    }
-    if ge(version, (1, 2)) {
-        mods.push(m("builtin.load_directory", "1.0"));
-    }
-    if ge(version, (1, 5)) {
-        mods.push(m("builtin.samples", "1.5"));
-    }
-    mods.push(m("builtin.readlines", "0.0"));
-    mods.push(m("builtin.argv", "0.0"));
-    mods.push(m("builtin.assemble", "0.0"));
-    mods.push(m("builtin.as_reads", "0.0"));
-    mods.push(m("builtin.checks", "0.0"));
-    mods.push(m("builtin.remove", "0.0"));
-    mods.push(m("builtin.stats", "0.6"));
+    let mut mods: Vec<(String, String)> = vec![
+        m("__builtin__", &format!("{}.{}", version.0, version.1)),
+        m("builtin.orffind", "0.6"),
+        m("builtin.load_directory", "1.0"),
+        m("builtin.samples", "1.5"),
+        m("builtin.readlines", "0.0"),
+        m("builtin.argv", "0.0"),
+        m("builtin.assemble", "0.0"),
+        m("builtin.as_reads", "0.0"),
+        m("builtin.checks", "0.0"),
+        m("builtin.remove", "0.0"),
+        m("builtin.stats", "0.6"),
+    ];
     for imp in imports {
         let (name, ver) = (imp.name(), imp.version());
         let info = match name {
@@ -1449,145 +1423,8 @@ fn loaded_modules(version: (i64, i64), imports: &[crate::ast::ModInfo]) -> Vec<(
 }
 
 // ---------------------------------------------------------------------------
-// Haskell-compatible `show` for the AST (mirrors the `Show Expression` instance in Language.hs).
+// `Show` for NGLType, used by JSON export (`export.rs`).
 // ---------------------------------------------------------------------------
-
-/// Reproduce `show :: Expression -> String`.
-pub fn show_expr(e: &Expression) -> String {
-    match e {
-        Expression::Lookup(Some(t), Variable(v)) => {
-            format!("Lookup '{v}' as {}", show_ngltype(t, 0))
-        }
-        Expression::Lookup(None, Variable(v)) => format!("Lookup '{v}' (type unknown)"),
-        Expression::ConstStr(t) => haskell_string(t),
-        Expression::ConstInt(n) => n.to_string(),
-        Expression::ConstDouble(f) => show_double(*f),
-        Expression::ConstBool(b) => if *b { "True" } else { "False" }.to_string(),
-        Expression::ConstSymbol(t) => format!("{{{t}}}"),
-        Expression::BuiltinConstant(Variable(v)) => v.clone(),
-        Expression::ListExpression(es) => show_list(es),
-        Expression::Continue => "continue".to_string(),
-        Expression::Discard => "discard".to_string(),
-        Expression::UnaryOp(UOp::Len, a) => format!("len({})", show_expr(a)),
-        Expression::UnaryOp(op, a) => format!("{}({})", show_uop(*op), show_expr(a)),
-        Expression::BinaryOp(op, a, b) => {
-            format!(
-                "BinaryOp({} -{}- {})",
-                show_expr(a),
-                show_bop(*op),
-                show_expr(b)
-            )
-        }
-        Expression::Condition(c, a, b) => format!(
-            "if [{}] then {{{}}} else {{{}}}",
-            show_expr(c),
-            show_expr(a),
-            show_expr(b)
-        ),
-        Expression::IndexExpression(a, ix) => format!("{}[{}]", show_expr(a), show_index(ix)),
-        Expression::Assignment(Variable(v), a) => format!("{v} = {}", show_expr(a)),
-        Expression::FunctionCall(FuncName(fname), a, args, block) => {
-            let blk = match block {
-                None => String::new(),
-                Some(b) => format!("using {{{}}}", show_block(b)),
-            };
-            format!("{fname}({}{}){blk}", show_expr(a), show_args(args))
-        }
-        Expression::MethodCall(m, self_e, a, args) => {
-            let arg = match a {
-                None => String::new(),
-                Some(x) => show_expr(x),
-            };
-            format!(
-                "({}).{}( {arg}{} )",
-                show_expr(self_e),
-                m.0,
-                show_args(args)
-            )
-        }
-        Expression::Sequence(es) => format!("Sequence {}", show_list(es)),
-        Expression::Optimized(oe) => format!("Optimized ({})", show_optimized(oe)),
-    }
-}
-
-/// Derived `Show OptimizedExpression` (mirrors `Language.hs`), e.g.
-/// `LenThresholdDiscard (Variable "r") BOpLT 45`.
-fn show_optimized(oe: &OptimizedExpression) -> String {
-    match oe {
-        OptimizedExpression::LenThresholdDiscard(Variable(v), op, thresh) => format!(
-            "LenThresholdDiscard (Variable {}) {} {thresh}",
-            haskell_string(v),
-            show_bop(*op)
-        ),
-        OptimizedExpression::SubstrimReassign(Variable(v), mq) => {
-            format!("SubstrimReassign (Variable {}) {mq}", haskell_string(v))
-        }
-    }
-}
-
-fn show_args(args: &[(Variable, Expression)]) -> String {
-    let mut s = String::new();
-    for (Variable(v), e) in args {
-        s.push_str(&format!("; {v}={}", show_expr(e)));
-    }
-    s
-}
-
-fn show_list(es: &[Expression]) -> String {
-    let mut s = String::from("[");
-    for (i, e) in es.iter().enumerate() {
-        if i > 0 {
-            s.push(',');
-        }
-        s.push_str(&show_expr(e));
-    }
-    s.push(']');
-    s
-}
-
-fn show_block(b: &Block) -> String {
-    // `show (Block v body)` is derived: Block {blockVariable = Variable "v", blockBody = ...}.
-    format!(
-        "Block {{blockVariable = Variable {}, blockBody = {}}}",
-        haskell_string(&b.variable.0),
-        show_expr(&b.body)
-    )
-}
-
-fn show_index(ix: &Index) -> String {
-    match ix {
-        Index::One(e) => format!("IndexOne ({})", show_expr(e)),
-        Index::Two(a, b) => {
-            let f = |o: &Option<Box<Expression>>| match o {
-                None => "Nothing".to_string(),
-                Some(e) => format!("Just ({})", show_expr(e)),
-            };
-            format!("IndexTwo ({}) ({})", f(a), f(b))
-        }
-    }
-}
-
-fn show_uop(op: UOp) -> &'static str {
-    match op {
-        UOp::Len => "UOpLen",
-        UOp::Minus => "UOpMinus",
-        UOp::Not => "UOpNot",
-    }
-}
-
-fn show_bop(op: BOp) -> &'static str {
-    match op {
-        BOp::Add => "BOpAdd",
-        BOp::Mul => "BOpMul",
-        BOp::GT => "BOpGT",
-        BOp::GTE => "BOpGTE",
-        BOp::LT => "BOpLT",
-        BOp::LTE => "BOpLTE",
-        BOp::EQ => "BOpEQ",
-        BOp::NEQ => "BOpNEQ",
-        BOp::PathAppend => "BOpPathAppend",
-    }
-}
 
 /// Derived `Show NGLType`. `prec` is the surrounding precedence (11 means "as a constructor
 /// argument", which forces parentheses around constructor applications that take arguments).
@@ -1628,53 +1465,9 @@ pub fn show_ngltype(t: &NGLType, prec: u8) -> String {
     }
 }
 
-/// Haskell `show` of a `String`/`Text`: double-quoted with escaping of `"`, `\`, and control
-/// characters (as `\<decimal>`, with the `\&` separator where Haskell needs it).
-fn haskell_string(s: &str) -> String {
-    let mut out = String::from("\"");
-    let mut prev_numeric_escape = false;
-    for c in s.chars() {
-        let mut this_numeric_escape = false;
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\t' => out.push_str("\\t"),
-            '\r' => out.push_str("\\r"),
-            c if (c as u32) < 0x20 || (c as u32) == 0x7f => {
-                out.push_str(&format!("\\{}", c as u32));
-                this_numeric_escape = true;
-            }
-            c if (c as u32) > 0x7f => {
-                out.push_str(&format!("\\{}", c as u32));
-                this_numeric_escape = true;
-            }
-            c => {
-                // Haskell inserts "\&" between a numeric escape and a following digit.
-                if prev_numeric_escape && c.is_ascii_digit() {
-                    out.push_str("\\&");
-                }
-                out.push(c);
-            }
-        }
-        prev_numeric_escape = this_numeric_escape;
-    }
-    out.push('"');
-    out
-}
-
-/// Best-effort reproduction of Haskell's `show :: Double -> String` for the common cases that
-/// appear in hashed expressions. Whole numbers render as `N.0`.
-fn show_double(f: f64) -> String {
-    if f == f.trunc() && f.is_finite() {
-        format!("{f:.1}")
-    } else {
-        format!("{f}")
-    }
-}
-
 // ---------------------------------------------------------------------------
-// MD5 (RFC 1321). Implemented in-crate to avoid a dependency and to match Haskell's `Data.Hash.MD5`.
+// MD5 (RFC 1321). Implemented in-crate to avoid a dependency; used for the internal output
+// content hashes (`{hash}` auto-comment, lock/stats directory names).
 // ---------------------------------------------------------------------------
 
 /// Compute the lowercase hex MD5 digest of `input`.
@@ -2127,24 +1920,6 @@ mod tests {
         ];
         sort_oformat(&mut body);
         assert!(has_output_bam(&body[0].1));
-    }
-
-    #[test]
-    fn write_hash_matches_haskell() {
-        // Reproduce the write-hash test's output hash (count(samfile('seq1_2.sam.bz2'), ...)).
-        let version = (1, 1); // dummy; overwritten below via explicit version_string check
-        let _ = version;
-        let imports: Vec<crate::ast::ModInfo> = Vec::new();
-        let vstr = version_string((1, 5), &imports);
-        let h0 = md5_hex(format!("{vstr}samfile(\"seq1_2.sam.bz2\")").as_bytes());
-        let h1 = md5_hex(
-            format!(
-                "{vstr}count(Lookup '{h0}' as NGLMappedReadSet; features=[\"seqname\"]; multiple={{all1}}; normalization={{fpkm}})"
-            )
-            .as_bytes(),
-        );
-        let hout = md5_hex(format!("{vstr}Lookup '{h1}' as NGLCounts").as_bytes());
-        assert_eq!(hout, "41496276b6b59c90f8d8b0c4c756772d");
     }
 
     fn index_one(v: &str, ix: i64) -> Expression {

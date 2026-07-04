@@ -22,7 +22,6 @@ pub fn validate(funcs: &[Function], constants: &[String], script: &Script) -> Ng
     errs.extend(validate_stdin_used_once(script));
     errs.extend(validate_map_ref(script));
     errs.extend(validate_no_constant_assignments(constants, script));
-    errs.extend(validate_ngless_version_uses(funcs, &methods, script));
     errs.extend(validate_pure_functions(funcs, script));
     errs.extend(validate_write_oname(script));
     errs.extend(validate_block_assignments(script));
@@ -840,143 +839,14 @@ fn validate_block_assignments(script: &Script) -> Vec<String> {
     out
 }
 
-fn validate_ngless_version_uses(
-    funcs: &[Function],
-    methods: &[MethodInfo],
-    script: &Script,
-) -> Vec<String> {
-    let version = match &script.header {
-        Some(h) => h.version.clone(),
-        None => return Vec::new(),
-    };
-    let mut out = Vec::new();
-    for (lno, expr) in &script.body {
-        recursive_analyse(expr, &mut |x| match x {
-            Expression::FunctionCall(fname, _, kwargs, _) => {
-                if let Some(finfo) = find_function(funcs, fname) {
-                    if let Some(minv) = min_version_function(&finfo.checks) {
-                        check_version(
-                            &format!("Function {}", fname.0),
-                            minv,
-                            &version,
-                            *lno,
-                            &mut out,
-                        );
-                    }
-                    for (Variable(name), _) in kwargs {
-                        if let Some(minv) = check_arg(&finfo.kwargs, name) {
-                            check_version(
-                                &format!("Using argument {name} to function {}", fname.0),
-                                minv,
-                                &version,
-                                *lno,
-                                &mut out,
-                            );
-                        }
-                    }
-                }
-            }
-            Expression::MethodCall(mname, _, _, kwargs) => {
-                if let Some(minfo) = find_method(methods, mname) {
-                    if let Some(minv) = min_version_method(&minfo.checks) {
-                        check_version(
-                            &format!("Using method {}", mname.0),
-                            minv,
-                            &version,
-                            *lno,
-                            &mut out,
-                        );
-                    }
-                    for (Variable(name), _) in kwargs {
-                        if let Some(minv) = check_arg(&minfo.kwargs, name) {
-                            check_version(
-                                &format!("Using argument {name} to method {}", mname.0),
-                                minv,
-                                &version,
-                                *lno,
-                                &mut out,
-                            );
-                        }
-                    }
-                }
-            }
-            _ => {}
-        });
-    }
-    out
-}
-
-fn min_version_function(checks: &[FunctionCheck]) -> Option<(i64, i64)> {
-    checks.iter().find_map(|c| match c {
-        FunctionCheck::MinNGLessVersion(a, b) => Some((*a, *b)),
-        _ => None,
-    })
-}
-
-fn min_version_method(checks: &[FunctionCheck]) -> Option<(i64, i64)> {
-    min_version_function(checks)
-}
-
-fn check_arg(ainfos: &[ArgInformation], argname: &str) -> Option<(i64, i64)> {
-    let ai = ainfos.iter().find(|ai| ai.name == argname)?;
-    ai.checks.iter().find_map(|c| match c {
-        ArgCheck::MinVersion(a, b) => Some((*a, *b)),
-        _ => None,
-    })
-}
-
-fn check_version(prefix: &str, minv: (i64, i64), version: &str, lno: usize, out: &mut Vec<String>) {
-    if version_le(minv, version) {
-        return;
-    }
-    out.push(line_msg(
-        lno,
-        format!(
-            "{prefix} requires ngless version {}.{} (version '{version}' is active).",
-            minv.0, minv.1
-        ),
-    ));
-}
-
-fn version_le(minv: (i64, i64), actual: &str) -> bool {
-    match parse_version(actual) {
-        Some((a_maj, a_min)) => match a_maj.cmp(&minv.0) {
-            std::cmp::Ordering::Greater => true,
-            std::cmp::Ordering::Equal => a_min >= minv.1,
-            std::cmp::Ordering::Less => false,
-        },
-        None => false,
-    }
-}
-
-fn parse_version(v: &str) -> Option<(i64, i64)> {
-    let (maj_str, rest) = split_digits(v);
-    if maj_str.is_empty() || rest.is_empty() {
-        return None;
-    }
-    let maj: i64 = maj_str.parse().ok()?;
-    let after_dot = &rest[1..]; // drop the '.'
-    let (min_str, _) = split_digits(after_dot);
-    if min_str.is_empty() {
-        return None;
-    }
-    let min: i64 = min_str.parse().ok()?;
-    Some((maj, min))
-}
-
-fn split_digits(s: &str) -> (&str, &str) {
-    let end = s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len());
-    (&s[..end], &s[end..])
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::{builtin_functions, NGLVersion};
+    use crate::modules::builtin_functions;
     use crate::parser::parse_ngless;
 
     fn funcs() -> Vec<Function> {
-        builtin_functions(NGLVersion::new(1, 3))
+        builtin_functions()
     }
 
     fn is_ok(text: &str) {
