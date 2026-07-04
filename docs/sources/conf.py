@@ -129,10 +129,6 @@ if has_guzzle:
     }
 else:
     html_theme = "default"
-    html_sidebars = {
-        '*': ['searchbox.html', 'sidebar.html'],
-    }
-
     html_theme_options = {}
 
 
