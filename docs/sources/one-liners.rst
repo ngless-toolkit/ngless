@@ -8,6 +8,11 @@ the ``-e`` argument to pass an inline script on the command line.
 The ``-p`` (or ``--print-last``) argument tells ngless to output the value of
 the last expression to *stdout*.
 
+When a script is passed inline with ``-e``, ngless does **not** write an HTML
+report directory by default (unlike when running a script from a file). Pass
+``--create-report`` (or ``-o``/``--html-report-directory``) to produce one
+anyway.
+
 Converting a SAM file to a FASTQ file
 -------------------------------------
 

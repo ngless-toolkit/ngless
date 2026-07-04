@@ -747,9 +747,14 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         config.keep_temporary_files = b;
     }
     // `--create-report`/`--no-create-report` override the config `create-report` key (mirrors the
-    // `createReportDirectory` triSwitch); `None` falls through to the config value.
+    // `createReportDirectory` triSwitch); `None` falls through to the config value, except that an
+    // inline script (`-e/--script`) defaults to *no* report (writing an HTML report directory for a
+    // throwaway one-liner is rarely wanted). An explicit `--create-report` or `-o/--html-report-
+    // directory` still forces one.
     if let Some(b) = opts.create_report {
         config.create_report_directory = b;
+    } else if opts.inline_script.is_some() && opts.html_report_directory.is_none() {
+        config.create_report_directory = false;
     }
     if let Some(b) = opts.strict_threads {
         config.strict_threads = b;

@@ -70,3 +70,9 @@ A few options are useful for debugging:
    -o,--html-report-directory ARG
                             name of output directory
 
+By default, ngless writes an HTML report directory at the end of a run. The one
+exception is inline scripts (passed with `-e`/`--script`): these do **not**
+produce a report by default, as they are typically used for quick one-liners
+where a report directory is unwanted. Pass `--create-report` (or an explicit
+`-o`/`--html-report-directory`) to force a report even for an inline script.
+

@@ -38,6 +38,12 @@ deprecation warning.
 * The HTML run report is now a single self-contained ``index.html`` that embeds
   its own data and makes no network requests, so it works offline on compute
   clusters (the 1.5 report loaded AngularJS/jQuery/Bootstrap/d3 from CDNs).
+* Inline scripts (passed with ``-e``/``--script``) no longer write an HTML
+  report directory by default. Previously every run produced a report; now the
+  one-liner path skips it, since a throwaway command rarely wants a report
+  directory left behind. Running a script from a file is unchanged. Pass
+  ``--create-report`` (or an explicit ``-o``/``--html-report-directory``) to
+  force a report for an inline script.
 * ``write()`` and ``collect()`` support ``auto_comments=[{date}]``, which
   prepends a ``Script run on <date>`` line to the output.
 * Added the ``{always_3_fq_files}`` format flag to ``write()``.

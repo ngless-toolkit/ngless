@@ -30,7 +30,9 @@ Version 1.6.0-beta2 2026-07-04 by luispedro
 	quality-control and mapping statistics), the run log, per-file FASTQ QC with
 	per-position quality charts, and mapping statistics. The script listing is
 	syntax-highlighted. The directory also contains `script.ngl`, `fq.tsv` and
-	`mappings.tsv`
+	`mappings.tsv`. Inline scripts (passed with `-e`/`--script`) do *not* write a
+	report by default (they are typically quick one-liners); pass
+	`--create-report` or `-o`/`--html-report-directory` to force one.
 	* Importing the legacy `motus` or `soap` modules now aborts with a clear
 	guidance error (both are obsolete and unsupported)
 	* `count()` now errors early when more than one annotation source is given
