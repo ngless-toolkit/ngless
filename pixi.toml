@@ -9,7 +9,10 @@ preview = ["pixi-build"]
 [tasks]
 
 [package]
-version = "1.6.beta1"
+# For "normal" versions, this can come from Cargo.toml, but for pre-releases,
+# we need to specify it here because of difference conventions between Cargo
+# and conda (-beta vs .beta).
+version = "1.6.beta2"
 
 [package.build]
 backend = { name = "pixi-build-rust", version = "*" }

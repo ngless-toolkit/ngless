@@ -14,9 +14,11 @@ bzip2 = "0.6.1"
 # Transparent gzip read/write for FASTQ (`.fq.gz`). bzip2/zstd support arrives later.
 flate2 = "1"
 zstd = "0.13.3"
-# xz/lzma (`.xz`) transparent read/write, matching Haskell's XZCompression. Links against
-# the system liblzma.
-xz2 = "0.1"
+# xz/lzma (`.xz`) transparent read/write, matching Haskell's XZCompression. The `static`
+# feature vendors and compiles liblzma from source instead of linking the system copy via
+# pkg-config; the latter injects `-L /usr/lib/x86_64-linux-gnu` into the link line, which
+# pulls in the host glibc and breaks the conda/`pixi build` link against the older sysroot.
+xz2 = { version = "0.1", features = ["static"] }
 # YAML parsing for sample manifests (`load_sample_list`) and, later, external modules.
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"

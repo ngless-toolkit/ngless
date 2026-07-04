@@ -34,7 +34,7 @@ repository](https://github.com/ngless-toolkit/ngless/blob/master/pixi_install_ng
     samtools = ">=1.23.1,<2"
     minimap2 = ">=2.31,<3"
     bwa = ">=0.7.19,<0.8"
-    ngless = { url = "https://github.com/ngless-toolkit/ngless/releases/download/v1.6.0-beta1/ngless-1.6.beta1-hb0f4dca_0.conda" }
+    ngless = { url = "https://github.com/ngless-toolkit/ngless/releases/download/v1.6.0-beta2/ngless-1.6.beta2-ha35fb5c_0.conda" }
 
 Then, from that directory, install and run it with:
 
