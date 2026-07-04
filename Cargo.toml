@@ -1,6 +1,6 @@
 [package]
 name = "ngless"
-version = "1.6.0-beta1"
+version = "1.6.0-beta2"
 edition = "2021"
 description = "NGLess: NGS processing with Less work — a domain-specific language for next-generation sequencing data"
 license = "MIT"

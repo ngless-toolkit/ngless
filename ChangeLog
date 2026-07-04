@@ -1,7 +1,16 @@
-Unreleased
+Version 1.6.0-beta2 2026-07-04 by luispedro
+
+	Changes with respect to 1.5.0:
+	* NGLess is now based on a new implementation written in Rust (previous
+	versions were written in Haskell). It is intended as a compatible replacement:
+	the same scripts produce the same results.
 	* NGLess now supports a single language version, "1.6". Scripts must declare
 	`ngless "1.6"`; declaring an older version (including "1.5") is now a hard
-	error rather than being accepted with a deprecation warning.
+	error. Update the version statement at the top of your scripts to `ngless
+	"1.6"`.
+	* Built-in modules (`parallel`, `samtools`, `mocat`, ...) now track the ngless
+	version: import them at version "1.6" going forward. Older module versions are
+	still accepted (with the latest behaviour) but print a deprecation warning.
 	* Removed the deprecated `strand` argument to `count()`; use `sense`
 	(`{both}`/`{sense}`/`{antisense}`) instead. `strand=True` is equivalent to
 	`sense={sense}`.
@@ -12,30 +21,6 @@ Unreleased
 	serialization. It is still deterministic and content-addressed, but the hash
 	*values* differ from previous releases (they are an internal identifier, not a
 	stable cross-version value).
-	* The parallel module (`lock1`/`run_for_all`/`collect`) now reports its
-	progress the way earlier ngless versions did: which lock file was obtained,
-	where per-sample stats are written, the number of pending/locked/failed
-	tasks, and the collect/paste steps. When every task is already finished or
-	running, ngless now prints an informational message and exits successfully
-	(rather than reporting a fatal error). Each `lock1`/`run_for_all` claim also
-	redirects the HTML run report into a per-sample `ngless-stats/<hash>/<sample>`
-	directory again. (Relatedly, the lock hash is now computed for `lock1`/
-	`run_for_all` calls used as an assignment right-hand side, so lock/stats
-	directories are namespaced by script hash as intended.)
-	* External modules now support the full range of Haskell behavior for
-	file-backed arguments and return types: functions can return `sequenceset`
-	values, and `readset`/`mappedreadset`/`counts` arguments honor their declared
-	`filetype`/`can_gzip`/`can_bzip2` payload (converting SAM<->BAM and
-	decompressing inputs the module cannot read). Module definitions are also
-	validated on load (illegal `atype`/`filetype` combinations, a named `arg1`,
-	or an unnamed `additional` argument are now rejected)
-	* Restored transparent xz/lzma (`.xz`) support for both input and output,
-	matching earlier ngless versions (uncompressed, `.gz`, `.bz2`, `.xz` and
-	`.zst`/`.zstd` are all recognized by filename extension)
-	* `write()` of a mapped read set now honors an explicit `format={sam|bam}`
-	argument, which overrides the format inferred from the output filename
-	(matching earlier ngless versions). When neither `format` nor a recognized
-	extension determines the format, a warning is emitted and BAM is used
 	* ngless now writes an HTML run report again (the `<script>.output_ngless/`
 	directory, or the location given by `-o`/`--html-report-directory`; disable
 	with `--no-create-report`). The report is a single self-contained
@@ -46,57 +31,33 @@ Unreleased
 	per-position quality charts, and mapping statistics. The script listing is
 	syntax-highlighted. The directory also contains `script.ngl`, `fq.tsv` and
 	`mappings.tsv`
-	* `count()` now supports annotating against a packaged reference: the
-	`reference` argument (and the reference a read set was `map`ped against, used
-	as the default when no `gff_file`/`functional_map`/`reference` is given) is
-	resolved to the pack's bundled annotation file, downloading the reference if
-	necessary
-	* `write()` of a paired read set now recompresses its output files (pair.1,
-	pair.2, and singles) concurrently when more than one thread is available
-	(`--jobs`), overlapping the CPU-bound recompression; output is byte-identical
-	to the single-threaded path
-	* `write()` (and `--export-json`) now write their output files atomically
-	(to a temporary sibling that is renamed into place), so an interrupted or
-	failed run never leaves a half-written output file at the destination
-	* FASTQ QC now collects per-position quality percentiles (mean/median/lower
-	and upper quartile) during the statistics pass, matching earlier ngless
-	versions (used by the run report)
-	* `collect()` under `--subsample` now appends a `.subsample` suffix to its
-	output file, matching earlier ngless versions
-	* `count(functional_map=...)` now checks that the requested features are
-	columns of the map early, aborting before any output is written, even when
-	the map or features are passed through variables (dynamic arguments)
-	* `preprocess()` now verifies its input read set's backing FASTQ files are
-	readable early (right after the read set is bound) rather than only when the
-	reads are finally streamed, so a missing/unreadable input aborts sooner
-	* `preprocess(..., keep_singles=False)` now discards orphaned paired-end
-	mates (a pair where only one read survives) instead of keeping them as
-	singletons; previously the keyword was ignored and singletons were always
-	kept
-	* `write()` and `collect()` now support `auto_comments=[{date}]`, which
-	prepends a `Script run on <local date/time>` comment line to the output
-	* Short command-line options again accept an attached value and clustering
-	(e.g. `-j4` for `--jobs=4` and `-nq` for `-n -q`), matching earlier ngless
-	versions
 	* Importing the legacy `motus` or `soap` modules now aborts with a clear
 	guidance error (both are obsolete and unsupported)
 	* `count()` now errors early when more than one annotation source is given
 	(seqname mode, `gff_file`, `functional_map`, or `reference`) instead of
 	silently ignoring all but one
-	* `collect()`'s "run ngless once per sample" guidance is now printed once at
-	the end of a successful run (matching earlier ngless versions) instead of
-	inline
-	* `samtools_sort()` whose result feeds only a BAM `write()` now sorts
-	directly to BAM (faster: one fewer conversion pass, and byte-identical
-	output)
-	* Run-header citations are now collected recursively, so nested calls such
-	as `write(orf_find(contigs))` list all relevant references (e.g. prodigal
-	and BWA) instead of only the outermost tool
 	* A constant out-of-bounds list index (e.g. `x[5]` on a 3-element list) now
 	fails early, right after the list is assigned, with the same "Index access
 	on line N is invalid" message as earlier ngless versions
-	* The `if len(read) < N: discard` idiom inside `preprocess` blocks is now
-	optimized to a direct length test per read (faster, output-identical)
+	* Added the `{always_3_fq_files}` format flag to `write()`
+	* Better suggestions for mistyped arguments/flags (matching by prefix, e.g.
+	`ref=` for `reference=`)
+
+	Changes with respect to 1.6.0-beta1:
+	* The build now supports a single language version, "1.6": a script declaring
+	"1.5" (which beta1 still accepted with a warning) is now a hard error.
+	* Removed the deprecated `count()` `strand` argument (use `sense`), the
+	`--search-dir` command-line flag (use `--search-path`), and the unimplemented
+	`--check-deprecation` flag.
+	* The internal output content hash (`auto_comments=[{hash}]` and parallel
+	lock/stats directory names) is computed differently, so its values differ from
+	beta1. It remains deterministic and content-addressed.
+	* Otherwise beta2 restores a large set of features that beta1 had not yet
+	ported from earlier ngless versions -- transparent `.xz` support, the HTML run
+	report, parallel-module progress reporting, `format={sam|bam}` on `write()`,
+	`preprocess(keep_singles=False)`, `auto_comments=[{date}]`, reference-based
+	`count()`, enhanced FASTQ QC statistics, broader external module support,
+	and several performance and UX improvements.
 
 Version 1.6.0-beta1 2026-07-01 by luispedro
 	* Switched to rust implementation

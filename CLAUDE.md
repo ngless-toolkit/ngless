@@ -17,7 +17,7 @@ are **stale** — they still describe features as "deferred to a later milestone
 even where the Rust code fully implements them. Do not trust those; treat the Rust code as the
 full implementation. `rust-migration.md` is the most
 accurate status doc (all 99 functional tests pass against the Rust binary). Current crate
-version is `1.6.0-beta1` (see `Cargo.toml`).
+version is `1.6.0-beta2` (see `Cargo.toml`).
 
 ## Build & test
 

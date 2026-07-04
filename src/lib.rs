@@ -48,12 +48,12 @@ pub mod types;
 pub mod validation;
 pub mod values;
 
-/// Version strings, mirroring `NGLess/Version.hs` and `Execs/Main.hs` exactly so that
-/// `--version*` output stays byte-identical to the Haskell binary.
+/// Version strings and the `--version*` output format (originally modelled on `NGLess/Version.hs`
+/// and `Execs/Main.hs`).
 pub mod version {
     pub const VERSION_STR: &str = "1.6.0";
-    pub const VERSION_STR_LONG: &str = "1.6.0-beta1";
-    pub const DATE_STR: &str = "1 July 2026";
+    pub const VERSION_STR_LONG: &str = "1.6.0-beta2";
+    pub const DATE_STR: &str = "4 July 2026";
     // The Rust build does not yet embed external tool binaries (samtools/bwa/...).
     pub const EMBEDDED_STR: &str = "No";
 
@@ -290,7 +290,7 @@ mod tests {
     fn version_line_matches_haskell_format() {
         assert_eq!(
             version::version_line(),
-            "ngless v1.6.0-beta1 (release date: 1 July 2026)"
+            "ngless v1.6.0-beta2 (release date: 4 July 2026)"
         );
     }
 

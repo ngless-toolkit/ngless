@@ -2,41 +2,70 @@
 What's New (History)
 ====================
 
-Unreleased
-----------
-
-User-visible improvements
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* Added ``{always_3_fq_files}`` format flag to ``write()``
-* Better suggestions for mistyped arguments/flags by matching prefixes (_e.g._, using ``ref=`` instead of ``reference=``).
-
-
 Version 1.6.0
 -------------
 
-*Beta release*
+*Beta release (1.6.0-beta2, released on July 4 2026).*
 
 Starting with version 1.6, **NGLess is based on a new implementation written in
 Rust** (previous versions were written in Haskell). See `Rust implementation
-<rust.html>`__ for the full story.
+<rust.html>`__ for the full story. Version 1.6 is intended as a compatible
+replacement for 1.5: the same scripts should produce the same results.
 
-Version 1.6 is a **drop-in replacement for 1.5**: it aims to produce
-byte-identical output for the same scripts. There are no new language features
-and no behavioural changes. The only thing you need to do is update the version
-declaration at the top of your scripts::
+Changes with respect to 1.5.0
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Upgrading.** NGLess 1.6 supports a single language version. You must declare::
 
     ngless "1.6"
 
-If you keep ``ngless "1.5"`` (or any earlier 1.x that your script relied on),
-your script will still run, but NGLess will print a warning suggesting you
-update to ``1.6``. Scripts declaring a version **older than 1.5** are no longer
-supported by the Rust build (use an older NGLess release, or update the script).
+at the top of your scripts. Declaring ``ngless "1.5"`` (or any older version) is
+now an **error** (earlier 1.6 pre-releases accepted ``1.5`` with a warning; that
+is no longer the case). The built-in modules (``parallel``, ``samtools``,
+``mocat``, …) now also track the ngless version: import them at version ``1.6``.
+Older module versions are still accepted, with the latest behaviour, but print a
+deprecation warning.
 
-The built-in modules (``parallel``, ``samtools``, ``mocat``, …) now also track
-the ngless version: import them at version ``1.6`` going forward. Older module
-versions are still accepted (with the latest behaviour) but print a deprecation
-warning.
+**Removed (previously deprecated):**
+
+* The ``strand`` argument to ``count()`` — use ``sense`` (``{both}`` /
+  ``{sense}`` / ``{antisense}``) instead; ``strand=True`` is ``sense={sense}``.
+* The ``--search-dir`` command-line flag — use ``--search-path``.
+* The (never-implemented) ``--check-deprecation`` flag.
+
+**New and improved:**
+
+* The HTML run report is now a single self-contained ``index.html`` that embeds
+  its own data and makes no network requests, so it works offline on compute
+  clusters (the 1.5 report loaded AngularJS/jQuery/Bootstrap/d3 from CDNs).
+* ``write()`` and ``collect()`` support ``auto_comments=[{date}]``, which
+  prepends a ``Script run on <date>`` line to the output.
+* Added the ``{always_3_fq_files}`` format flag to ``write()``.
+* Better suggestions for mistyped arguments/flags (matching by prefix, e.g.
+  ``ref=`` for ``reference=``).
+* ``write()`` now writes output files atomically (a failed run never leaves a
+  half-written file), recompresses paired output concurrently under ``--jobs``,
+  and sorts directly to BAM when a ``samtools_sort`` result feeds a BAM
+  ``write()``.
+
+For the complete list, see the ``ChangeLog``.
+
+Changes with respect to 1.6.0-beta1
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you were testing the earlier ``1.6.0-beta1`` pre-release:
+
+* The build now supports only ``ngless "1.6"``; declaring ``"1.5"`` (which
+  beta1 accepted with a warning) is now an error.
+* Removed the deprecated ``count()`` ``strand`` argument, the ``--search-dir``
+  flag, and the unimplemented ``--check-deprecation`` flag.
+* The internal output hash (``auto_comments=[{hash}]`` and the parallel
+  lock/stats directory names) changed its values; it remains deterministic and
+  content-addressed.
+* beta2 also restores many features beta1 had not yet ported from earlier ngless
+  versions: transparent ``.xz`` support, the HTML run report, parallel-module
+  progress reporting, ``format={sam|bam}`` on ``write()``,
+  ``preprocess(keep_singles=False)``, reference-based ``count()``, and more.
 
 
 Version 1.5.0
