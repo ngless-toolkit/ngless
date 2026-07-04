@@ -571,11 +571,39 @@ pub fn find_load(name: &str, version: &str, data_dirs: &[String]) -> NgResult<Ex
         .map(|p| format!("\t{}", p.display()))
         .collect::<Vec<_>>()
         .join("\n");
+    // The requested version was not found; check whether other versions of the same module
+    // exist so we can point the user at them.
+    let mut available: Vec<String> = Vec::new();
+    let namedir = Path::new("Modules").join(format!("{name}.ngm"));
+    for base in &bases {
+        let dir = base.join(&namedir);
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            if entry.path().join("module.yaml").is_file() {
+                if let Some(v) = entry.file_name().to_str() {
+                    if !available.iter().any(|a| a == v) {
+                        available.push(v.to_string());
+                    }
+                }
+            }
+        }
+    }
+    let available_msg = if available.is_empty() {
+        String::new()
+    } else {
+        available.sort();
+        format!(
+            "\nOther versions of module '{name}' are available: {}.",
+            available.join(", ")
+        )
+    };
     Err(NgError::new(
         NgErrorType::SystemError,
         format!(
             "Could not find external module '{name}' version {version}.\n\
-             The following locations were searched:\n{locations}"
+             The following locations were searched:\n{locations}{available_msg}"
         ),
     ))
 }
