@@ -44,6 +44,9 @@ Version 1.6.0-beta2 2026-07-04 by luispedro
 	* Added the `{always_3_fq_files}` format flag to `write()`
 	* Better suggestions for mistyped arguments/flags (matching by prefix, e.g.
 	`ref=` for `reference=`)
+	* When an `import` of a local module cannot be found, the error now lists all
+	the locations that were searched. Under `--trace`, each candidate location is
+	printed as it is checked.
 
 	Changes with respect to 1.6.0-beta1:
 	* The build now supports a single language version, "1.6": a script declaring

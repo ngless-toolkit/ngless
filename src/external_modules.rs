@@ -533,9 +533,18 @@ pub fn find_load(name: &str, version: &str, data_dirs: &[String]) -> NgResult<Ex
         .join(version);
     let mut bases: Vec<PathBuf> = vec![PathBuf::from(".")];
     bases.extend(data_dirs.iter().map(PathBuf::from));
+    let mut searched: Vec<PathBuf> = Vec::with_capacity(bases.len());
     for base in &bases {
         let dir = base.join(&modpath);
         let yaml = dir.join("module.yaml");
+        crate::output::trace(
+            0,
+            &format!(
+                "Looking for module '{name}' version {version} at {}",
+                yaml.display()
+            ),
+        );
+        searched.push(yaml.clone());
         if yaml.is_file() {
             let text = std::fs::read_to_string(&yaml).map_err(|e| {
                 NgError::new(
@@ -557,9 +566,17 @@ pub fn find_load(name: &str, version: &str, data_dirs: &[String]) -> NgResult<Ex
             return Ok(module);
         }
     }
+    let locations = searched
+        .iter()
+        .map(|p| format!("\t{}", p.display()))
+        .collect::<Vec<_>>()
+        .join("\n");
     Err(NgError::new(
         NgErrorType::SystemError,
-        format!("Could not find external module '{name}' version {version}."),
+        format!(
+            "Could not find external module '{name}' version {version}.\n\
+             The following locations were searched:\n{locations}"
+        ),
     ))
 }
 
