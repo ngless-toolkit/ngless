@@ -92,16 +92,10 @@ A few behaviours are from the Haskell implementation but not considered errors:
 - **Error messages are not exactly the same.** The Rust implementation has a
   different error reporting mechanism, so the text of error messages may
   differ.
-- **Rounding of floating-point numbers in output files may differ very
-  slightly.** The typical difference is in the last digit of a long
-  floating-point number, and is not expected to affect downstream analysis. A
-  typical case is that rust will output `1025.6640844000465` where the Haskell
-  implementation outputs `1025.6640844000462`.
-- `ARGV` is handled slightly differently internally, which can show up in the
-  JSON output. This can also show up in the hashes, which is potentially
-  serious if you mix different versions of NGLess in a pipeline. The
-  recommendation is to use the same version of NGLess for all steps in a
-  pipeline and switch to `ngless "1.6"` as soon as possible.
+- **Direct indexing of a function-call result is not supported yet.** Write
+  the result to a variable first, then index that variable. For example, use
+  `xs = readlines("samples.txt")` followed by `sample = xs[0]` instead of
+  `sample = readlines("samples.txt")[0]`.
 
 ## Reporting problems
 

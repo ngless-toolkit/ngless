@@ -31,7 +31,7 @@ NGLess
 
 NGLess is best illustrated by an example::
 
-    ngless "1.4"
+    ngless "1.6"
     input = paired('ctrl1.fq', 'ctrl2.fq', singles='ctrl-singles.fq')
     input = preprocess(input) using |read|:
         read = read[5:]
@@ -72,10 +72,10 @@ Ngless has builtin support for model organisms:
 7. Caenorhabditis elegans (ce10)
 8. Saccharomyces cerevisiae (sacCer3)
 
-and the standard library includes support for `mOTUs <motus.html>`__,
-metagenomics profiling of `marine samples <tutorial-ocean-metagenomics.html>`__
-and `human gut microbiome samples <tutorial-gut-metagenomics.html>`__. We also
-have `standard library modules <stdlib.html>`__ for helping users upgrading
+and the standard library includes support for running many samples in parallel
+and for MOCAT-style FASTQ directory loading. External modules are available for
+additional workflows such as `mOTUs <motus3.html>`__. We also have
+`standard library modules <stdlib.html>`__ for helping users upgrading
 from MOCAT or running many samples (we have used NGLess on projects with
 >10,000 samples).
 
@@ -104,18 +104,18 @@ This is equivalent to the full script:
 
 ::
 
-    ngless "1.4" # <- version declaration, optional on the command line
+    ngless "1.6" # <- version declaration, optional on the command line
     samcontents = samfile("file.sam") # <- load a SAM/BAM file
     reads = as_reads(samcontents) # <- just get the reads (w quality scores)
-    write(reads, ofname=STDOUT) # <- write them to STDOUT (default format: FASTQ)
+    write(reads, ofile=STDOUT) # <- write them to STDOUT (default format: FASTQ)
 
 This only works if the data in the samfile is single ended as we pipe
 out a single FQ file. Otherwise, you can always do:
 
 ::
 
-    ngless "1.4"
-    write(as_read(samfile("file.sam")),
+    ngless "1.6"
+    write(as_reads(samfile("file.sam")),
             ofile="output.fq")
 
 which will write 3 files: ``output.1.fq``, ``output.2.fq``, and
@@ -136,11 +136,11 @@ This is equivalent to the full script:
 
 ::
 
-    ngless "1.4" # <- version declaration, optional on the command line
+    ngless "1.6" # <- version declaration, optional on the command line
     samcontents = samfile("file.sam") # <- load a SAM/BAM file
     samcontents = select(samcontents, keep_if=[{mapped}]) # <- select only *mapped* reads
     reads = as_reads(samcontents) # <- just get the reads (w quality scores)
-    write(reads, ofname=STDOUT) # <- write them to STDOUT (default format: FASTQ)
+    write(reads, ofile=STDOUT) # <- write them to STDOUT (default format: FASTQ)
 
 Reading from STDIN
 ~~~~~~~~~~~~~~~~~~
@@ -197,7 +197,6 @@ Authors
    count
    constants
    Organisms
-   motus
    configuration
    searchpath
    reproducible

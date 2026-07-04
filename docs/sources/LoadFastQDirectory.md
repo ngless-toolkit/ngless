@@ -19,9 +19,9 @@ This will return a sample that contains _both paired-end **and** single-end data
 2. The paired-end dataset `sample1/SRR8053355.pair.1.fq.bz2` - `sample1/SRR8053355.pair.2.fq.bz2`
 3. The single-end dataset `sample1/SRR8053346.single.fq.gz`
 
-Currently (as of version `1.4`), `NGLess` supports the following
+Currently, `NGLess` supports the following:
 
-- Extensions `.gz` and `.bz2` are handled transparently
+- Extensions `.gz`, `.bz2`, and `.xz` are handled transparently
 - The extension (prior to the compression extension) must be either `.fq` or `.fastq`
 - Before the extension, one of `.1`/`.2` or `_1`/`_2` or `_F`/`_R` denotes the paired-end matching
 

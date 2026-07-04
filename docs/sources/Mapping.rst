@@ -4,8 +4,9 @@ Mapping
 Mapping is one of the major functions of NGLess. Here we describe, in more
 detail, some of its functionality.
 
-Mapping is implemented using `bwa <https://bio-bwa.sourceforge.net/>`__. As of
-version 1.4, NGLess uses *bwa 0.7.17* by default.
+Mapping is implemented using `bwa <https://bio-bwa.sourceforge.net/>`__ by
+default. NGLess resolves the ``bwa`` executable from ``NGLESS_BWA_BIN`` or from
+``PATH`` and records the tool version in the generated index filenames.
 
 By default, bwa is called with default parameters. If the ``mode_all`` argument
 is set to true, then ``-a`` is passed to ``bwa``.
@@ -28,20 +29,16 @@ specified in the script. As low memory mode is heuristic, it can potentially
 *change* results. As NGLess aims to capture all parameters that can change the
 result **inside** the script, it must be specified as an argument to ``map()``.
 
-Using SOAPAligner
------------------
+Using minimap2
+--------------
 
-.. note:: Support for SOAPAligner is experimental (as of version 0.6)
+You can use minimap2 as an alternative mapper by importing the minimap2 module
+and passing ``mapper="minimap2"``::
 
-You can use SOAPAligner as an alternative to bwa using the following code::
-
-
-    import "soap" version "0.0"
+    ngless "1.6"
+    import "minimap2" version "1.6"
 
     input = ....
 
-    mapped = map(input, mapper="soap")
-
-Note that, unlike the case for bwa, SOAPAligner is not bundled with NGLess and
-must be in the PATH to be used.
+    mapped = map(input, fafile="reference.fa", mapper="minimap2")
 

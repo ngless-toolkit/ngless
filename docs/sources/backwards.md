@@ -20,6 +20,8 @@ This page documents the fixes that are currently implemented.
   supported any more. Upgrade to the new [external motus
   module](https://github.com/ngless-toolkit/ngless-contrib/tree/master/motus.ngm)
   if possible.
+- Starting in NGLess 1.4, `write()` returns the filename used. Before this,
+  it returned nothing.
 
 ## NGLess 1.1
 
@@ -29,6 +31,13 @@ This page documents the fixes that are currently implemented.
 - Starting in NGLess 1.1, `countfile` reorders its input if necessary.
 - The `count` function now accepts multiple lines of comments at the top of its
   `functional_map` arguments
+- Starting in NGLess 1.1, `count()` uses the `sense` argument for
+  strand-specific data. Older scripts may use the deprecated boolean `strand`
+  argument, where `strand=True` maps to `sense={sense}` and `strand=False` maps
+  to `sense={both}`.
+- Older Haskell releases of the `mocat` module exposed `coord_file_to_gtf()` to
+  convert MOCAT `.coord` files to GTF. This helper is not part of the current
+  Rust standard module surface.
 
 ## NGLess 0.8
 

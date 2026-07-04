@@ -1,7 +1,7 @@
 
-=======================================================
-Human Gut Metagenomics Functional & Taxonomic Profiling
-=======================================================
+===========================================
+Human Gut Metagenomics Functional Profiling
+===========================================
 
 .. note::
     If you are starting out with NGLess for metagenomics profiling, consider
@@ -14,7 +14,7 @@ metagenomes.
 
 
 .. note::
-    This tutorial is also available as a `slide presentation
+    An older slide presentation for the previous mOTUs-based version of this tutorial is available as a `slide presentation
     <https://ngless.readthedocs.io/en/latest/_static/gut-metagenomics-tutorial-presentation/gut_specI_tutorial.html>`__
 
 1. Download the toy dataset
@@ -62,9 +62,8 @@ The rest of this tutorial is an explanation of the steps in this script.
 
 To run ngless, we need write a script. We start with a few imports::
 
-    ngless "1.4"
-    import "parallel" version "1.0"
-    import "motus" version "0.1"
+    ngless "1.6"
+    import "parallel" version "1.6"
     import "igc" version "0.0"
 
 These will all be used in the tutorial.
@@ -163,26 +162,12 @@ use the ``collect()`` function to aggregate across all the samples processed::
             allneeded=samples,
             ofile='igc.profiles.txt')
 
-9. Taxonomic profling using mOTUS
+9. Taxonomic profiling
 
-Map the samples against the ``motus`` reference (this reference comes with the
-`motus module <motus.html>`__ we imported earlier)::
-
-    mapped = map(input, reference='motus', mode_all=True)
-
-Now call the built-in ``count`` function to summarize your reads at gene level::
-
-    counted = count(mapped, features=['gene'], multiple={dist1})
-
-To get the final taconomic profile, we call the ``motus`` function, which takes
-the gene count table and performs the motus quantification. The result of this
-call is another table, which we can concatenate with ``collect()``::
-
-    motus_table = motus(counted)
-    collect(motus_table,
-            current=sample,
-            allneeded=samples,
-            ofile='motus-counts.txt')
+The historical built-in mOTUs module used by older versions of this tutorial is
+not part of the current standard module surface. For current taxonomic
+profiling with mOTUs, use the external mOTUs module documented in
+`mOTUs profiling <motus3.html>`__.
 
 10. Run it!
 
@@ -201,10 +186,8 @@ Full script
 
 Here is the full script::
 
-    ngless "1.0"
-    import "parallel" version "0.6"
-    import "mocat" version "0.0"
-    import "motus" version "0.1"
+    ngless "1.6"
+    import "parallel" version "1.6"
     import "igc" version "0.0"
 
     samples = readlines('igc.demo.short')
@@ -237,13 +220,3 @@ Here is the full script::
             current=sample,
             allneeded=samples,
             ofile='igc.profiles.txt')
-
-    mapped = map(input, reference='motus', mode_all=True)
-
-    counted = count(mapped, features=['gene'], multiple={dist1})
-
-    motus_table = motus(counted)
-    collect(motus_table,
-            current=sample,
-            allneeded=samples,
-            ofile='motus-counts.txt')

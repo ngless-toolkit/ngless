@@ -60,8 +60,9 @@ visualised in a graphical user interface (GUI). Statistics calculated are:
 
 If not specified, the encoding is guessed from the file.
 
-Gzip and bzip2 compressed files are transparently supported (determined by file
-extension, ``.gz`` and ``.bz2`` for gzip and bzip2 respectively).
+Gzip, bzip2, xz, and zstd compressed files are transparently supported
+(determined by file extension: ``.gz``, ``.bz2``, ``.xz``, ``.zst``, and
+``.zstd``).
 
 
 
@@ -121,9 +122,11 @@ extensions are accepted:
 - ``fq``
 - ``fq.gz``
 - ``fq.bz2``
+- ``fq.xz``
 - ``fastq``
 - ``fastq.gz``
 - ``fastq.bz2``
+- ``fastq.xz``
 
 Paired-end reads are assumed to be split into two files, with matching names
 with ``.1``/``.2`` appended. ``_1``/``_2`` as is used by the European Nucleotide
@@ -144,7 +147,7 @@ Arguments by value:
 +------------+--------------+------------+----------------+
 | Name       | Type         | Required   | Default Value  |
 +============+==============+============+================+
-| name       | String       |  no        | ""             |
+| encoding   | Symbol       |  no        | {auto}         |
 +------------+--------------+------------+----------------+
 
 Argument
@@ -171,7 +174,7 @@ Arguments by value:
 +------------+--------------+------------+----------------+
 | Name       | Type         | Required   | Default Value  |
 +============+==============+============+================+
-| name       | String       |  no        | ""             |
+| name       | String       | yes        | -              |
 +------------+--------------+------------+----------------+
 
 Argument
@@ -191,8 +194,9 @@ Loads a SAM file::
 
     s = samfile('input.sam')
 
-This function takes no keyword arguments. BAM files are also supported
-(determined by the filename), as are ``sam.gz`` files.
+BAM files are also supported (determined by the filename), as are compressed
+SAM files using the standard compression extensions (for example, ``.sam.gz``,
+``.sam.bz2``, ``.sam.xz``, ``.sam.zst``, or ``.sam.zstd``).
 
 Returns
 ~~~~~~~
@@ -206,11 +210,11 @@ Arguments by value:
 +===============+======================+============+================+
 | name          | String               |  no        | -              |
 +---------------+----------------------+------------+----------------+
-| header        | String               |  no        | -              |
+| headers       | String               |  no        | -              |
 +---------------+----------------------+------------+----------------+
 
 .. versionadded:: 0.7
-    The ``header`` argument was added in version 0.7
+    The ``headers`` argument was added in version 0.7
 
 - The ``name`` argument names the group (for ``count()``, for example).
 - The ``headers`` argument can be used if the SAM headers are kept in a
@@ -597,10 +601,6 @@ The following illustration exemplifies how counting would be performed.
 
 .. image:: ../images/sense_counting.svg
 
-**Note**: before version **1.1**, there was an argument ``strand`` which was
-either ``True`` or ``False`` mapping to ``{sense}`` and ``{both}``
-respectively. ``strand`` is still supported, but deprecated.
-
 ``min`` defines the minimum amount of overlaps a given feature must have, at
 least, to be kept (default: 0, i.e., keep all counts). If you just want to
 discard features that are exactly zero, you should set the ``discard_zeros``
@@ -617,10 +617,7 @@ argument to True.
   by both the size of the feature and the number of fragments.
 
 Unmapped inserts are included in the output if ``{include_minus1}`` is true
-(default: ``False``).
-
-.. versionadded:: 0.6
-    Before version 0.6, the default was to **not** include the -1 fraction.
+(default: ``True``).
 
 substrim
 --------
@@ -765,9 +762,6 @@ Any
 Return:
 ~~~~~~~
 
-.. versionadded:: NGLess 1.4
-    Prior to version 1.4, ``write()`` returned nothing
-
 String: the file name used
 
 Arguments by value:
@@ -778,13 +772,13 @@ Arguments by value:
 +=================+=============+============+================+
 | ofile           | String      | yes        | -              |
 +-----------------+-------------+------------+----------------+
-| format          | String      | no         | -              |
+| format          | Symbol      | no         | -              |
 +-----------------+-------------+------------+----------------+
-| format\_flags   | [Symbol]    | no         | []             |
+| format\_flags   | Symbol      | no         | -              |
 +-----------------+-------------+------------+----------------+
 | comment         | String      | no         | -              |
 +-----------------+-------------+------------+----------------+
-| auto_comments   | String      | no         | -              |
+| auto_comments   | [Symbol]    | no         | -              |
 +-----------------+-------------+------------+----------------+
 | compress_level  | Integer     | no         | -              |
 +-----------------+-------------+------------+----------------+
@@ -810,6 +804,7 @@ Compression is inferred from the ``ofile`` argument:
 - ``.gz``: gzip compression
 - ``.bz2``: bzip2 compression
 - ``.xz``: xz compression
+- ``.zst``: ZStandard compression
 - ``.zstd``: ZStandard compression (since NGLess 1.1)
 
 If given, the argument ``compress_level`` can be control the compression level.

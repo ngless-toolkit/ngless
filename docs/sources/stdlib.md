@@ -8,7 +8,7 @@ This module allows you to run several parallel computations.
 command multiple times_ (one for each sample). These can be run in parallel
 (and even on different compute nodes on an HPC cluster).
 
-### `run_for_all` interface (module versions 1.1 and above, for NGLess 1.5 and above)
+### `run_for_all` interface
 
 We will use two functions: `run_for_all` and `collect`.
 
@@ -23,8 +23,8 @@ have and ngless will figure everything out.
 
 For example
 
-    ngless "1.5"
-    import "parallel" version "1.1"
+    ngless "1.6"
+    import "parallel" version "1.6"
 
     samples = ['Sample1', 'Sample2', 'Sample3']
     current = run_for_all(samples)
@@ -61,7 +61,7 @@ Now, only when all the samples have been processed, does NGLess collect all the
 results into a single table.
 
 
-### `lock1` interface (all versions, including older versions)
+### `lock1` interface
 
 Instead of `run_for_all`, you can use `lock1` which is more flexible, but also
 potentially more complex.
@@ -70,8 +70,8 @@ potentially more complex.
 element. It has the exact same locking mechanism as `run_for_all` and using it
 is very similar:
 
-    ngless "1.4"
-    import "parallel" version "1.0"
+    ngless "1.6"
+    import "parallel" version "1.6"
 
     samples = ['Sample1', 'Sample2', 'Sample3']
     current = lock1(samples)
@@ -96,8 +96,8 @@ applies to the whole script).
 
 #### Full "parallel" example
 
-    ngless "1.0"
-    import "parallel" version "1.0"
+    ngless "1.6"
+    import "parallel" version "1.6"
 
     sample = lock1(readlines('input.txt'))
     input = fastq(sample)
@@ -139,8 +139,8 @@ interfere in a way that you get erroneous results**.
 This module exposes two samtools functionalities: sorting (`samtools_sort`) and
 selecting reads in regions of interest (`samtools_view`).
 
-    ngless '1.0'
-    import "samtools" version "1.0"
+    ngless '1.6'
+    import "samtools" version "1.6"
     input = samfile('input.bam')
     sam_regions = samtools_view(input, bed_file="interesting_regions.bed")
     write(sam_regions, ofile='interesting.sam')
@@ -148,8 +148,8 @@ selecting reads in regions of interest (`samtools_view`).
 `samtools_view :: mappedreadset -> mappedreadset` returns a subset of the
 mapped reads that overlap with the regions specified in the BED file.
 
-    ngless '1.0'
-    import "samtools" version "1.0"
+    ngless '1.6'
+    import "samtools" version "1.6"
     to_sort = samfile('input.bam')
     sorted = samtools_sort(to_sort)
     name_sorted = samtools_sort(to_sort, by={name})
@@ -159,7 +159,7 @@ mapped reads that overlap with the regions specified in the BED file.
 `samtools_sort :: mappedreadset -> mappedreadset` returns a sorted version of
 the dataset.
 
-Internally, both function call ngless' version of samtools while respecting
+Internally, both functions call the samtools executable resolved by NGLess while respecting
 your settings for the use of threads and temporary disk space. When combined
 with other functionality, ngless can also often stream data into/from samtools
 instead of relying on intermediate files (these optimizations should not change
@@ -167,7 +167,7 @@ the visible behaviour, only make the computation faster).
 
 ## Mocat module
 
-    import "mocat" version "1.0"
+    import "mocat" version "1.6"
 
 This is a [MOCAT](http://vm-lux.embl.de/~kultima/MOCAT) compatibility layer to
 make it easier to adapt projects from MOCAT to ngless.
@@ -177,18 +177,14 @@ make it easier to adapt projects from MOCAT to ngless.
 `load_mocat_sample :: string -> readset` this is now available as
 `load_fastq_directory`.
 
-`coord_file_to_gtf :: string -> string` this function takes a MOCAT-style
-`.coord`, converts it internally to a GTF file and returns it.
-
 Example usage:
 
-    ngless "1.1"
-    import "mocat" version "1.1"
+    ngless "1.6"
+    import "mocat" version "1.6"
 
     sample = load_mocat_sample('Sample1')
-    mapped = map(sampled, fafile='data/catalog.padded.fna')
-    write(count(mapped, gff_file=coord_file_to_gtf('data/catalog.padded.coord')),
-        ofile='counts.txt')
+    mapped = map(sample, fafile='data/catalog.padded.fna')
+    write(count(mapped, features=['seqname']), ofile='counts.txt')
 
 This module can be combined with the parallel module (see above) to obtain a
 very smooth upgrade from MOCAT to ngless.

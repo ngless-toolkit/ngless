@@ -26,7 +26,7 @@ of that tutorial before starting this one.
 
 To run ngless, we need write a script. We start with a few imports::
 
-    ngless "1.4"
+    ngless "1.6"
 
 
 3. Preprocessing
@@ -34,7 +34,7 @@ To run ngless, we need write a script. We start with a few imports::
 First, we want to trim the reads based on quality::
 
     sample = 'SAMEA2621155.sampled'
-    input = load_mocat_sample(sample)
+    input = load_fastq_directory(sample)
 
     input = preprocess(input, keep_singles=False) using |read|:
         read = substrim(read, min_quality=25)
@@ -49,8 +49,8 @@ This is now very simply two calls to the function `assemble
     contigs = assemble(input)
     write(contigs, ofile='contigs.fna')
 
-    orfs = orf_find(contigs)
-    write(contigs, ofile='orfs.fna')
+    orfs = orf_find(contigs, is_metagenome=True)
+    write(orfs, ofile='orfs.fna')
 
 
 Full script
@@ -58,10 +58,10 @@ Full script
 
 ::
 
-    ngless "1.4"
+    ngless "1.6"
 
     sample = 'SAMEA2621155.sampled'
-    input = load_mocat_sample(sample)
+    input = load_fastq_directory(sample)
 
     input = preprocess(input, keep_singles=False) using |read|:
         read = substrim(read, min_quality=25)
@@ -71,5 +71,5 @@ Full script
     contigs = assemble(input)
     write(contigs, ofile='contigs.fna')
 
-    orfs = orf_find(contigs)
-    write(contigs, ofile='orfs.fna')
+    orfs = orf_find(contigs, is_metagenome=True)
+    write(orfs, ofile='orfs.fna')

@@ -34,7 +34,7 @@ The format is the following
 
 You can load a sample list with the `load_sample_list` function:
 
-    ngless "1.5"
+    ngless "1.6"
     samples = load_sample_list('list.yaml')
     input = samples[0]
 
@@ -48,8 +48,8 @@ You can load a sample list with the `load_sample_list` function:
 It can also be used with the [parallel module](stdlib.html) module's
 `run_for_all_samples` function. For example:
 
-    ngless "1.5"
-    import "parallel" version "1.1"
+    ngless "1.6"
+    import "parallel" version "1.6"
     input = run_for_all_samples(load_sample_list('list.yaml'))
 
     input = preprocess(input) using |read|:
@@ -69,7 +69,7 @@ The function `load_sample_from_yaml` (which takes a YAML file and a mandatory
 `sample` argument) will return a single sample (identified by the `sample`
 argument).
 
-    ngless "1.5"
+    ngless "1.6"
     input = load_sample_from_yaml('list.yaml', sample='sample-id')
     ...
 

@@ -34,7 +34,7 @@ Integers are specified as decimals ``[0-9]+`` or as hexadecimals
 The first line (ignoring comments and empty lines) of an NGLess file MUST be a
 version declaration:
 
-    ngless "1.4"
+    ngless "1.6"
 
 
 ## Module Import Statements
@@ -42,16 +42,17 @@ version declaration:
 Following the version statement, optional import statements are allowed, using
 the syntax `import "<MODULE>" version "<VERSION>"`. For example:
 
-    import "batch" version "1.0"
+    import "batch" version "1.6"
 
-This statement indicates that the ``batch`` module, version ``1.0`` should be
-used in this script. Module versions are independent of NGLess versions.
+This statement indicates that the ``batch`` module, version ``1.6`` should be
+used in this script. Built-in modules now track the NGLess version, so new
+scripts should import built-in modules at the same version as the script.
 
 Only a predefined set of modules can be imported (these are shipped with
 NGLess). To import user-written modules, the user MUST use the _local import_
 statement, e.g.:
 
-    local import "batch" version "1.0"
+    local import "batch" version "1.6"
 
 Import statements MUST immediately follow the version declaration
 

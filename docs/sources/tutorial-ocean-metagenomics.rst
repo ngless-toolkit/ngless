@@ -63,8 +63,8 @@ The rest of this tutorial is an explanation of the steps in this script.
 
 To run ngless, we need write a script. We start with a few imports::
 
-    ngless "1.4"
-    import "parallel" version "1.0"
+    ngless "1.6"
+    import "parallel" version "1.6"
     import "omrgc" version "1.0"
 
 These will all be used in the tutorial.
@@ -130,7 +130,7 @@ KEGG KOs, and eggNOG OGs::
 We have done all this computation, now we need to save it somewhere. We will
 use the ``collect()`` function to aggregate across all the samples processed::
 
-    collect(counts
+    collect(counts,
             current=sample,
             allneeded=samples,
             ofile='omgc.profiles.txt')
@@ -152,8 +152,8 @@ Full script
 
 Here is the full script::
 
-    ngless "1.4"
-    import "parallel" version "0.0"
+    ngless "1.6"
+    import "parallel" version "1.6"
     import "omrgc" version "1.0"
 
 

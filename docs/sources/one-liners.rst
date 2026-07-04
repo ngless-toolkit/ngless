@@ -17,16 +17,16 @@ Converting a SAM file to a FASTQ file
 
 This is equivalent to the full script::
 
-    ngless "1.4" # <- version declaration, optional on the command line
+    ngless "1.6" # <- version declaration, optional on the command line
     samcontents = samfile("file.sam") # <- load a SAM/BAM file
     reads = as_reads(samcontents) # <- just get the reads (w quality scores)
-    write(reads, ofname=STDOUT) # <- write them to STDOUT (default format: FASTQ)
+    write(reads, ofile=STDOUT) # <- write them to STDOUT (default format: FASTQ)
 
 This only works if the data in the samfile is single ended as we pipe out a
 single FQ file. Otherwise, you can always do::
 
-    ngless "1.4"
-    write(as_read(samfile("file.sam")),
+    ngless "1.6"
+    write(as_reads(samfile("file.sam")),
             ofile="output.fq")
 
 which will write 3 files: ``output.1.fq``, ``output.2.fq``, and
@@ -43,11 +43,11 @@ unmapped reads::
 
 This is equivalent to the full script::
 
-    ngless "1.4" # <- version declaration, optional on the command line
+    ngless "1.6" # <- version declaration, optional on the command line
     samcontents = samfile("file.sam") # <- load a SAM/BAM file
     samcontents = select(samcontents, keep_if=[{mapped}]) # <- select only *mapped* reads
     reads = as_reads(samcontents) # <- just get the reads (w quality scores)
-    write(reads, ofname=STDOUT) # <- write them to STDOUT (default format: FASTQ)
+    write(reads, ofile=STDOUT) # <- write them to STDOUT (default format: FASTQ)
 
 Reading from STDIN
 ------------------

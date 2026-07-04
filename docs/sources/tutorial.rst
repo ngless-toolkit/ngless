@@ -26,7 +26,7 @@ first step will allow you to perform quality control.
 
 ::
 
-	ngless "1.4"
+	ngless "1.6"
 
 	/* load the data set */
 	input = fastq('SRR867735.fastq.gz')
@@ -100,7 +100,7 @@ not need to specify which annotation file to use (it'll be built in)::
 
 	/* features to annotate */
 	feats = ['gene']
-	counts = count(mapped, multiple={dist1}, keep_ambiguous=false, features=feats)
+	counts = count(mapped, multiple={dist1}, features=feats)
 
 You can also see the use of some symbol arguments (symbols are the special
 strings inside braces, like `{dist1}`). Symbols are like strings, except that
