@@ -620,6 +620,7 @@ pub fn interpret(
         held_locks: Vec::new(),
         claimed_locks: Vec::new(),
         finish_ok_messages: Mutex::new(Vec::new()),
+        report_dir_override: None,
     };
     let result: NgResult<()> = (|| {
         for (lno, e) in body {
@@ -632,8 +633,17 @@ pub fn interpret(
     })();
     // End-of-run markers for `lock1`/`run_for_all` claims (mirrors the `FinishOkHook` /
     // `registerFailHook` pair): `.finished` on success, `.failed` on error. Best-effort — a
-    // marker-write failure must never mask the run's actual result.
+    // marker-write failure must never mask the run's actual result. A `NoErrorExit` (e.g. `get_lock`
+    // finding every job finished/running) is Haskell's `exitSuccess` path, which runs *neither* hook,
+    // so no marker is written for it.
+    let no_error_exit = matches!(
+        &result,
+        Err(e) if e.kind == NgErrorType::NoErrorExit
+    );
     for claim in std::mem::take(&mut interp.claimed_locks) {
+        if no_error_exit {
+            break;
+        }
         let (suffix, line) = match &result {
             Ok(()) => (
                 "finished",
@@ -660,9 +670,11 @@ pub fn interpret(
     // `FinishOkHook`). Only reached on success, matching Haskell's `Right ()` guard.
     let fq_stats = std::mem::take(&mut *interp.fq_stats.lock().unwrap());
     let map_stats = std::mem::take(&mut *interp.map_stats.lock().unwrap());
+    let report_dir_override = interp.report_dir_override.take();
     Ok(RunReportData {
         fq_stats,
         map_stats,
+        report_dir_override,
     })
 }
 
@@ -705,6 +717,9 @@ pub(crate) struct MapInfo {
 pub struct RunReportData {
     pub(crate) fq_stats: Vec<FqInfo>,
     pub(crate) map_stats: Vec<MapInfo>,
+    /// Per-sample report directory requested by `lock1`/`run_for_all` (mirrors the
+    /// `nConfReportDirectory` override in `executeLock1OrForAll`); `None` uses the default location.
+    pub(crate) report_dir_override: Option<String>,
 }
 
 /// One block's worth of preprocessed paired output: the encoded bytes destined for each of the
@@ -777,6 +792,11 @@ struct Interpreter {
     /// succeeds — the port of Haskell's `FinishOkHook`. Used by `collect()` to report that not all
     /// partial results were present yet. `Mutex` so `&Interpreter` stays `Sync`.
     finish_ok_messages: Mutex<Vec<String>>,
+    /// Per-sample report directory set by `lock1`/`run_for_all` (mirrors the `setReportDir` update
+    /// to `nConfReportDirectory` in `executeLock1OrForAll`). When set, the CLI writes the end-of-run
+    /// HTML report here (`ngless-stats/<hash>/<sample>`) instead of the default location. The last
+    /// claim wins, matching Haskell's repeated `updateNglEnvironment`.
+    report_dir_override: Option<String>,
 }
 
 /// An entry claimed by `lock1`/`run_for_all`, recorded so the run can write its end-of-run marker
@@ -1111,7 +1131,9 @@ impl Interpreter {
             "mapstats" => self.execute_mapstats(&expr_v),
             "__merge_samfiles" => self.execute_merge_sams(&expr_v),
             "write" => self.execute_write(&expr_v, &argvs),
-            "lock1" | "run_for_all" | "run_for_all_samples" => self.execute_lock1(&expr_v, &argvs),
+            name @ ("lock1" | "run_for_all" | "run_for_all_samples") => {
+                self.execute_lock1(name, &expr_v, &argvs)
+            }
             "collect" => self.execute_collect(&expr_v, &argvs),
             "__paste" => execute_paste(&expr_v, &argvs),
             "assemble" => self.execute_assemble(&expr_v, &argvs),
@@ -2377,6 +2399,7 @@ impl Interpreter {
     /// directory under `ngless-locks/`, and return the claimed entry (unsanitized).
     fn execute_lock1(
         &mut self,
+        funcname: &str,
         expr: &NGLessObject,
         args: &[(String, NGLessObject)],
     ) -> NgResult<NGLessObject> {
@@ -2384,7 +2407,7 @@ impl Interpreter {
             NGLessObject::List(items) => items,
             other => {
                 return Err(NgError::script(format!(
-                    "Wrong argument for lock1 (expected a list, got `{other:?}`)"
+                    "Wrong argument for {funcname} (expected a list, got `{other:?}`)"
                 )))
             }
         };
@@ -2409,7 +2432,24 @@ impl Interpreter {
         };
         let lockdir = self.setup_hash_directory(&prefix, "ngless-locks", &hash)?;
         let sane: Vec<String> = names.iter().map(|n| sanitize_path(n)).collect();
-        let (chosen, guard) = get_lock(&lockdir, &sane)?;
+        let lno = self.cur_lno.load(Ordering::Relaxed);
+        let (chosen, guard) = get_lock(&lockdir, &sane, lno)?;
+        // Announce the claim (mirrors the `outputListLno' InfoOutput [funcname, ": Obtained lock
+        // file: ..."]` line in `executeLock1OrForAll`). The lock file is keyed by the sanitized
+        // entry name.
+        let chosen_sane = &sane[chosen];
+        crate::output::info(
+            lno,
+            &format!("{funcname}: Obtained lock file: '{lockdir}/{chosen_sane}.lock'"),
+        );
+        // Redirect this run's stats/report into a per-sample directory under `ngless-stats/`
+        // (mirrors `setupHashDirectory prefix "ngless-stats" hash` + the `setReportDir` update to
+        // `nConfReportDirectory`). The override is handed back to the CLI, which writes the HTML
+        // report there instead of the default `<script>.output_ngless`.
+        let reportbase = self.setup_hash_directory(&prefix, "ngless-stats", &hash)?;
+        let reportdir = format!("{reportbase}/{chosen_sane}");
+        crate::output::info(lno, &format!("Writing stats to '{reportdir}'"));
+        self.report_dir_override = Some(reportdir);
         // Hold the lock for the rest of the run (mirrors keeping the `ReleaseKey`); it is released
         // when the interpreter is dropped.
         self.held_locks.push(guard);
@@ -2474,6 +2514,14 @@ impl Interpreter {
         // Write the current sample's counts as a gzipped partial. The write is atomic (temp +
         // fsync + rename, mirroring Haskell's `moveOrCopy` of a `syncFile`d temp), so a concurrent
         // run never reads a half-written partial.
+        let lno = self.cur_lno.load(Ordering::Relaxed);
+        crate::output::trace(
+            lno,
+            &format!(
+                "Collect will write partial file to {}",
+                partial_file(&current)
+            ),
+        );
         let body = crate::compression::read_bytes(&path.to_string_lossy())?;
         crate::compression::write_bytes_atomic(&partial_file(&current), &body)?;
 
@@ -2483,6 +2531,7 @@ impl Interpreter {
             .rev()
             .all(|e| Path::new(&partial_file(e)).exists());
         if can_collect {
+            crate::output::trace(lno, "Can collect");
             let comment = string_arg(args, "comment");
             let auto_comments: Vec<String> = match lookup_arg(args, "auto_comments") {
                 Some(NGLessObject::List(items)) => items
@@ -2504,6 +2553,7 @@ impl Interpreter {
             )?;
             let inputs: Vec<String> = allneeded.iter().map(|e| partial_file(e)).collect();
             let merged = paste_counts(&comments, false, &allneeded, &inputs)?;
+            crate::output::trace(lno, &format!("Pasted. Will move result to {ofile}"));
             crate::compression::write_bytes_atomic(&ofile, merged.as_bytes())?;
         } else {
             // Not all partials are present: this is the normal case when the parallel module is
@@ -2512,7 +2562,13 @@ impl Interpreter {
             // only if the run succeeds). We defer it the same way (see `finish_ok_messages`). It is
             // purely informational — `collect` still returns successfully — and emitted at `Info`
             // level, so it is suppressed by `--quiet`, matching Haskell.
-            let lno = self.cur_lno.load(Ordering::Relaxed);
+            crate::output::trace(
+                lno,
+                &format!(
+                    "Cannot collect (not all files present yet), wrote partial file to {}",
+                    partial_file(&current)
+                ),
+            );
             self.finish_ok_messages.lock().unwrap().push(format!(
                 "The collect() call at line {lno} could not be executed as there are partial \
                  results missing.\n\
@@ -4223,14 +4279,23 @@ fn sanitize_path(s: &str) -> String {
         .collect()
 }
 
-/// Claim a lock in `lockdir` for the first entry that is not finished or failed (mirrors `getLock`,
-/// collapsing its not-locked/stale-locked passes into one: each candidate is claimed through the
+/// Claim a lock in `lockdir` for the first available entry (mirrors `getLock`). Candidates are
+/// tried in three passes, matching Haskell: first entries that are neither locked nor failed, then
+/// (stale-)locked ones, and finally previously-failed ones. Each candidate is claimed through the
 /// shared `lockfile::acquire_lock`, which atomically creates `<entry>.lock` with `O_CREAT|O_EXCL`
 /// and reclaims a stale lock — one older than an hour, the `getLock'` `maxAge` — so a crashed peer
-/// does not block forever). A held, fresh lock makes `acquire_lock` return `None`, so we move on to
-/// the next entry. Returns the chosen index and its [`LockGuard`], which the caller keeps alive for
-/// the run. A non-zero exit / contention message matches the Haskell text.
-fn get_lock(lockdir: &str, sane: &[String]) -> NgResult<(usize, crate::lockfile::LockGuard)> {
+/// does not block forever; a held, fresh lock makes it return `None`, moving on to the next entry.
+/// Returns the chosen index and its [`LockGuard`], which the caller keeps alive for the run.
+///
+/// The progress/diagnostic lines mirror `getLock`'s `outputListLno'` output (`lno` is the current
+/// script line). When no lock can be obtained because every job is finished or running, the return
+/// is a [`NgErrorType::NoErrorExit`] — Haskell's `NGError NoErrorExit`, which exits *successfully*
+/// (the message is already printed) rather than as a fatal error.
+fn get_lock(
+    lockdir: &str,
+    sane: &[String],
+    lno: usize,
+) -> NgResult<(usize, crate::lockfile::LockGuard)> {
     use crate::lockfile::{acquire_lock, LockParameters, WhenExistsStrategy};
     use std::collections::HashSet;
     let existing: HashSet<String> = std::fs::read_dir(lockdir)
@@ -4241,62 +4306,128 @@ fn get_lock(lockdir: &str, sane: &[String]) -> NgResult<(usize, crate::lockfile:
         })
         .unwrap_or_default();
 
+    let has = |name: &str, ext: &str| existing.contains(&format!("{name}.{ext}"));
+
+    // Partition the entries the way `getLock` does. `notfinished` is every entry without a
+    // `.finished` marker; within it, `locked`/`failed` are those that additionally carry a `.lock`
+    // or `.failed` file, and `notfailed` is the remainder (neither locked nor failed).
+    let notfinished: Vec<usize> = (0..sane.len())
+        .filter(|&i| !has(&sane[i], "finished"))
+        .collect();
+    if notfinished.is_empty() {
+        crate::output::info(lno, "All jobs are finished");
+        return Err(NgError::new(
+            NgErrorType::NoErrorExit,
+            "All jobs are finished",
+        ));
+    }
+    let locked: Vec<usize> = notfinished
+        .iter()
+        .copied()
+        .filter(|&i| has(&sane[i], "lock"))
+        .collect();
+    let failed: Vec<usize> = notfinished
+        .iter()
+        .copied()
+        .filter(|&i| has(&sane[i], "failed"))
+        .collect();
+    let notfailed: Vec<usize> = notfinished
+        .iter()
+        .copied()
+        .filter(|&i| !has(&sane[i], "lock") && !has(&sane[i], "failed"))
+        .collect();
+
+    crate::output::trace(lno, &format!("Looking for a lock in '{lockdir}'"));
+    crate::output::trace(
+        lno,
+        &format!(
+            "Total number of tasks to run is {} (total not finished (including locked & failed): {} ; locked: {} ; failed: {}).",
+            sane.len(),
+            notfinished.len(),
+            locked.len(),
+            failed.len()
+        ),
+    );
+
     // Try to claim entry `i` (the `name` is the sanitized entry). A held, fresh lock makes
     // `acquire_lock` return `None`, so the caller moves on to the next candidate.
-    let try_claim =
-        |i: usize, name: &str| -> NgResult<Option<(usize, crate::lockfile::LockGuard)>> {
-            let params = LockParameters {
-                lock_fname: PathBuf::from(format!("{lockdir}/{name}.lock")),
-                // One hour: lock files are mtime-refreshed every ten minutes while healthy, so an older
-                // one signals a crashed process (mirrors `getLock'`).
-                max_age: Duration::from_secs(60 * 60),
-                when_exists: WhenExistsStrategy::IfLockedNothing,
-                mtime_update: true,
-            };
-            if let Some(guard) = acquire_lock(params)? {
-                // Recheck `.finished` under the lock: a peer may have finished (and released the lock)
-                // between our directory scan and the acquire (mirrors the `doesFileExist finishedName`
-                // recheck in `getLock'`).
-                if Path::new(&format!("{lockdir}/{name}.finished")).exists() {
-                    drop(guard);
-                    return Ok(None);
-                }
-                return Ok(Some((i, guard)));
-            }
-            Ok(None)
+    let try_claim = |i: usize| -> NgResult<Option<(usize, crate::lockfile::LockGuard)>> {
+        let name = &sane[i];
+        let params = LockParameters {
+            lock_fname: PathBuf::from(format!("{lockdir}/{name}.lock")),
+            // One hour: lock files are mtime-refreshed every ten minutes while healthy, so an older
+            // one signals a crashed process (mirrors `getLock'`).
+            max_age: Duration::from_secs(60 * 60),
+            when_exists: WhenExistsStrategy::IfLockedNothing,
+            mtime_update: true,
         };
-
-    // Pass 1: entries that are neither finished nor failed. The `acquire_lock` `max_age` reclaim
-    // already covers Haskell's separate stale-locked pass, so there is no third pass.
-    for (i, name) in sane.iter().enumerate() {
-        if existing.contains(&format!("{name}.finished"))
-            || existing.contains(&format!("{name}.failed"))
-        {
-            continue;
+        if let Some(guard) = acquire_lock(params)? {
+            // Recheck `.finished` under the lock: a peer may have finished (and released the lock)
+            // between our directory scan and the acquire (mirrors the `doesFileExist finishedName`
+            // recheck in `getLock'`).
+            if Path::new(&format!("{lockdir}/{name}.finished")).exists() {
+                drop(guard);
+                return Ok(None);
+            }
+            return Ok(Some((i, guard)));
         }
-        if let Some(v) = try_claim(i, name)? {
+        Ok(None)
+    };
+
+    // Pass 1: entries that are neither locked nor failed (`getLock'` over `notfailed`).
+    for &i in &notfailed {
+        if let Some(v) = try_claim(i)? {
             return Ok(v);
         }
     }
 
-    // Pass 2: retry previously-failed entries last (mirrors `getLock`'s final fallback over the
-    // failed set). A `.finished` entry is always skipped. Haskell randomizes this order only to
-    // reduce concurrent-process contention; order does not affect correctness, so we go in order.
-    for (i, name) in sane.iter().enumerate() {
-        if existing.contains(&format!("{name}.finished"))
-            || !existing.contains(&format!("{name}.failed"))
-        {
-            continue;
-        }
-        if let Some(v) = try_claim(i, name)? {
+    // Pass 2: (stale-)locked entries — `acquire_lock`'s `max_age` reclaims any whose owner crashed.
+    crate::output::info(
+        lno,
+        "All tasks locked or failed. Checking for stale locks...",
+    );
+    for &i in &locked {
+        if let Some(v) = try_claim(i)? {
             return Ok(v);
         }
     }
 
-    Err(NgError::new(
-        NgErrorType::DataError,
-        "All jobs are finished or running",
-    ))
+    if failed.is_empty() {
+        crate::output::info(lno, "All jobs appear to be finished or running");
+        return Err(NgError::new(
+            NgErrorType::NoErrorExit,
+            "All jobs are finished or running",
+        ));
+    }
+
+    // Pass 3: retry previously-failed entries (Haskell randomizes this order only to reduce
+    // concurrent-process contention; order does not affect correctness, so we go in order).
+    crate::output::info(
+        lno,
+        "All tasks locked or failed and there are no stale locks.",
+    );
+    crate::output::info(
+        lno,
+        "Will retry some failed tasks, but it is possible that this will fail again.",
+    );
+    crate::output::info(lno, &format!("Failed logs are in directory '{lockdir}'"));
+    for &i in &failed {
+        if let Some(v) = try_claim(i)? {
+            return Ok(v);
+        }
+    }
+
+    let msg = if notfailed.is_empty() {
+        "All jobs are finished".to_string()
+    } else if failed.is_empty() {
+        "Jobs appear to be running".to_string()
+    } else {
+        format!(
+            "Jobs are either locked or failed. Check directory '{lockdir}' for more information"
+        )
+    };
+    crate::output::warn(lno, &format!("Could get a lock for any file: {msg}"));
+    Err(NgError::new(NgErrorType::NoErrorExit, msg))
 }
 
 /// `__paste()` (mirrors `executePaste`): merge a set of counts files into `ofile`.

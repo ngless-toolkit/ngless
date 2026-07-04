@@ -1,4 +1,14 @@
 Unreleased
+	* The parallel module (`lock1`/`run_for_all`/`collect`) now reports its
+	progress the way earlier ngless versions did: which lock file was obtained,
+	where per-sample stats are written, the number of pending/locked/failed
+	tasks, and the collect/paste steps. When every task is already finished or
+	running, ngless now prints an informational message and exits successfully
+	(rather than reporting a fatal error). Each `lock1`/`run_for_all` claim also
+	redirects the HTML run report into a per-sample `ngless-stats/<hash>/<sample>`
+	directory again. (Relatedly, the lock hash is now computed for `lock1`/
+	`run_for_all` calls used as an assignment right-hand side, so lock/stats
+	directories are namespaced by script hash as intended.)
 	* External modules now support the full range of Haskell behavior for
 	file-backed arguments and return types: functions can return `sequenceset`
 	values, and `readset`/`mappedreadset`/`counts` arguments honor their declared

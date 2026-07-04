@@ -1225,17 +1225,58 @@ fn add_lock_hash(body: &mut [(usize, Expression)]) {
     };
     let h = md5_hex(shown.as_bytes());
     for (_, e) in body.iter_mut() {
-        if let Expression::FunctionCall(FuncName(fname), _, kwargs, _) = e {
+        inject_lock_hash(e, &h);
+    }
+}
+
+/// Inject the lock `__hash` into every `lock1`/`run_for_all`/`run_for_all_samples` call reachable
+/// from `e`, recursing into sub-expressions. This mirrors Haskell's `addLockHash'` being applied via
+/// `pureTransform` (a full recursive rewrite): the call is commonly an assignment RHS
+/// (`sample = lock1(...)`) or nested inside another call, not a bare top-level statement.
+fn inject_lock_hash(e: &mut Expression, h: &str) {
+    match e {
+        Expression::FunctionCall(FuncName(fname), arg, kwargs, _) => {
             if fname == "lock1" || is_run_for_all(fname) {
                 kwargs.insert(
                     0,
                     (
                         Variable("__hash".to_string()),
-                        Expression::ConstStr(h.clone()),
+                        Expression::ConstStr(h.to_string()),
                     ),
                 );
             }
+            inject_lock_hash(arg, h);
+            for (_, v) in kwargs.iter_mut() {
+                inject_lock_hash(v, h);
+            }
         }
+        Expression::Assignment(_, rhs) => inject_lock_hash(rhs, h),
+        Expression::UnaryOp(_, a) => inject_lock_hash(a, h),
+        Expression::BinaryOp(_, a, b) => {
+            inject_lock_hash(a, h);
+            inject_lock_hash(b, h);
+        }
+        Expression::Condition(c, t, f) => {
+            inject_lock_hash(c, h);
+            inject_lock_hash(t, h);
+            inject_lock_hash(f, h);
+        }
+        Expression::IndexExpression(a, _) => inject_lock_hash(a, h),
+        Expression::MethodCall(_, obj, arg, kwargs) => {
+            inject_lock_hash(obj, h);
+            if let Some(a) = arg {
+                inject_lock_hash(a, h);
+            }
+            for (_, v) in kwargs.iter_mut() {
+                inject_lock_hash(v, h);
+            }
+        }
+        Expression::ListExpression(items) | Expression::Sequence(items) => {
+            for it in items.iter_mut() {
+                inject_lock_hash(it, h);
+            }
+        }
+        _ => {}
     }
 }
 

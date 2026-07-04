@@ -305,6 +305,11 @@ fn exec_default(opts: &RunOpts) -> i32 {
     }
     match run_script(opts) {
         Ok(code) => code,
+        // `NoErrorExit` is the "nothing to do" signal (e.g. the parallel module's `lock1`/
+        // `run_for_all` finding every job finished or running). Its message is already printed at
+        // the point it is raised, so — like Haskell's `NGError NoErrorExit -> exitSuccess` — we exit
+        // 0 with no fatal-error banner.
+        Err(e) if e.kind == crate::errors::NgErrorType::NoErrorExit => 0,
         Err(e) => {
             report_fatal_error(&e);
             1
@@ -1121,7 +1126,13 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // the report must not turn a successful run into a failure — the pipeline outputs are already
     // produced — so it is reported as a warning and the run still exits 0.
     if config.create_report_directory {
-        let report_dir = resolve_report_directory(opts, &fname);
+        // A `lock1`/`run_for_all` claim redirects the report into a per-sample `ngless-stats/...`
+        // directory (mirrors the `nConfReportDirectory` override); otherwise use the default
+        // `<script>.output_ngless` location.
+        let report_dir = report_data
+            .report_dir_override
+            .clone()
+            .unwrap_or_else(|| resolve_report_directory(opts, &fname));
         if let Err(e) = crate::report::write_report(
             std::path::Path::new(&report_dir),
             &fname,
