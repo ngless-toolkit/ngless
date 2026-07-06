@@ -1,17 +1,18 @@
-# List of backwards compatibility fixes
+# List of language changes
 
-As NGLess uses a version declaration string at the top of script means that
-NGLess can change its behaviour depending on the version used in the script.
+Every NGLess script declares a language version on its first line. This page
+documents the changes in behaviour introduced by each version so that you can
+understand what a script written for an older version expected.
 
-This page documents the fixes that are currently implemented.
+Note that, in 1.6.0, NGLess supports exactly one language version, `1.6`. Older
+versions are documented here for reference, but scripts must be updated to
+declare `ngless "1.6"` to run.
 
 ## NGLess 1.6
 
 - NGLess is now based on a [Rust implementation](rust.html) (previous versions
-  were written in Haskell). Version 1.6 is a best-effort exact mirror of 1.5:
-  update your version declaration from `ngless "1.5"` to `ngless "1.6"`.
-  Declaring `1.5` still works but prints a deprecation warning; versions older
-  than 1.5 are no longer supported by the Rust build.
+  were written in Haskell). Update your version declaration to `ngless "1.6"`;
+  earlier versions are no longer supported.
 
 ## NGLess 1.4
 
@@ -20,21 +21,19 @@ This page documents the fixes that are currently implemented.
   supported any more. Upgrade to the new [external motus
   module](https://github.com/ngless-toolkit/ngless-contrib/tree/master/motus.ngm)
   if possible.
-- Starting in NGLess 1.4, `write()` returns the filename used. Before this,
-  it returned nothing.
+- `write()` returns the filename used. Before this, it returned nothing.
 
 ## NGLess 1.1
 
 - The way that CIGAR sequence lengths are computed has changed to match
   samtools. This implies that the computation of `min_match_size` and
   `min_identity_pc` have slightly changed.
-- Starting in NGLess 1.1, `countfile` reorders its input if necessary.
+- `countfile` reorders its input if necessary.
 - The `count` function now accepts multiple lines of comments at the top of its
-  `functional_map` arguments
-- Starting in NGLess 1.1, `count()` uses the `sense` argument for
-  strand-specific data. Older scripts may use the deprecated boolean `strand`
-  argument, where `strand=True` maps to `sense={sense}` and `strand=False` maps
-  to `sense={both}`.
+  `functional_map` arguments.
+- `count()` uses the `sense` argument for strand-specific data. Older scripts
+  may use the deprecated boolean `strand` argument, where `strand=True` maps to
+  `sense={sense}` and `strand=False` maps to `sense={both}`.
 - Older Haskell releases of the `mocat` module exposed `coord_file_to_gtf()` to
   convert MOCAT `.coord` files to GTF. This helper is not part of the current
   Rust standard module surface.
@@ -63,4 +62,3 @@ is automatically treated as:
 input = preprocess(input) using |r|:
     ...
 ```
-
