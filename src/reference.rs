@@ -154,10 +154,16 @@ fn module_direct_reference(
         {
             if name == refname {
                 let fa = download_if_url(module_dir, &format!("{refname}.fna.gz"), Some(fa_file))?;
-                let gtf =
-                    download_if_url(module_dir, &format!("{refname}.gff.gz"), gtf_file.as_deref())?;
-                let map =
-                    download_if_url(module_dir, &format!("{refname}.tsv.gz"), map_file.as_deref())?;
+                let gtf = download_if_url(
+                    module_dir,
+                    &format!("{refname}.gff.gz"),
+                    gtf_file.as_deref(),
+                )?;
+                let map = download_if_url(
+                    module_dir,
+                    &format!("{refname}.tsv.gz"),
+                    map_file.as_deref(),
+                )?;
                 return Ok(Some(ReferenceFilePaths {
                     fa_file: fa,
                     gff_file: gtf,

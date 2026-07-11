@@ -1481,8 +1481,11 @@ impl Interpreter {
     /// then the global one. A missing builtin reference is downloaded from the configured base URL
     /// (mirrors `installData`), using the script's language version for the URL's version directory.
     fn resolve_reference(&self, refname: &str) -> NgResult<String> {
-        let paths =
-            crate::reference::ensure_data_present(refname, self.ngl_version, &self.module_references())?;
+        let paths = crate::reference::ensure_data_present(
+            refname,
+            self.ngl_version,
+            &self.module_references(),
+        )?;
         paths
             .fa_file
             .ok_or_else(|| NgError::script(format!("Could not find reference '{refname}'.")))

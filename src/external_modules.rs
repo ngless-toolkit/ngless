@@ -253,7 +253,9 @@ impl RawReference {
             Some("packaged") => Ok(ExternalReference::Packaged {
                 name: self.name,
                 name_version: self.name_version.ok_or_else(|| {
-                    NgError::script("Error in module.yaml: packaged reference is missing 'name-version'")
+                    NgError::script(
+                        "Error in module.yaml: packaged reference is missing 'name-version'",
+                    )
                 })?,
                 url: self.url.ok_or_else(|| {
                     NgError::script("Error in module.yaml: packaged reference is missing 'url'")
@@ -836,7 +838,10 @@ mod tests {
                 assert_eq!(name, "igc");
                 // Relative paths are resolved against the module directory.
                 assert_eq!(fa_file, "/mods/igc.ngm/1.0/igc.fna");
-                assert_eq!(map_file.as_deref(), Some("/mods/igc.ngm/1.0/igc.functional.map"));
+                assert_eq!(
+                    map_file.as_deref(),
+                    Some("/mods/igc.ngm/1.0/igc.functional.map")
+                );
                 assert!(gtf_file.is_none());
             }
             other => panic!("expected a direct reference, got {other:?}"),
@@ -855,10 +860,7 @@ mod tests {
         assert_eq!(m.references.len(), 2);
         match &m.references[0] {
             ExternalReference::Packaged {
-                name,
-                url,
-                has_gtf,
-                ..
+                name, url, has_gtf, ..
             } => {
                 assert_eq!(name, "catalog");
                 assert_eq!(url, "https://example.org/catalog.tar.gz");

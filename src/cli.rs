@@ -964,12 +964,7 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
         .iter()
         .flat_map(|m| m.references.iter().map(|r| r.name().to_string()))
         .collect();
-    crate::validation::validate_io(
-        &funcs,
-        &config.search_path,
-        &typed,
-        &module_reference_names,
-    )?;
+    crate::validation::validate_io(&funcs, &config.search_path, &typed, &module_reference_names)?;
 
     if opts.validate_only {
         if !opts.quiet {
