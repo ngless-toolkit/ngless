@@ -2783,8 +2783,19 @@ impl Interpreter {
     /// by `fqStatsC`, so memory stays bounded and the original file is referenced unchanged
     /// (a later `write` reproduces it byte-for-byte). The decode pass still runs to completion,
     /// so the `%4`/length errors fire in the same order (detect, then decode).
-    fn load_and_qc(&self, path: &str, label: &str, perform_qc: bool) -> NgResult<FastQFilePath> {
-        let encoding = fastq::detect_encoding_stream(crate::compression::open_read(path)?)?;
+    fn load_and_qc(
+        &self,
+        path: &str,
+        label: &str,
+        perform_qc: bool,
+        forced: Option<FastQEncoding>,
+    ) -> NgResult<FastQFilePath> {
+        // A forced `encoding=` skips autodetection entirely (mirrors `asFQFilePathMayQC`, where a
+        // supplied encoding bypasses `encodingFor`).
+        let encoding = match forced {
+            Some(e) => e,
+            None => fastq::detect_encoding_stream(crate::compression::open_read(path)?)?,
+        };
         // With `__perform_qc=False` (set by `qcInPreprocess` when the read set is immediately
         // preprocessed), the statistics fold is deferred to the preprocess's `__input_qc` pass; the
         // encoding is still detected so the reference is complete. Mirrors `asFQFilePathMayQC`.
@@ -2968,8 +2979,9 @@ impl Interpreter {
             return Ok(NGLessObject::ReadSet { name, readset });
         }
         let perform_qc = lookup_bool(args, "__perform_qc", true)?;
+        let forced = lookup_encoding(args)?;
         let path = self.maybe_subsample(&name)?;
-        let fqf = self.load_and_qc(&path, &path, perform_qc)?;
+        let fqf = self.load_and_qc(&path, &path, perform_qc, forced)?;
         Ok(NGLessObject::ReadSet {
             name,
             readset: ReadSet {
@@ -3086,10 +3098,11 @@ impl Interpreter {
             _ => String::new(),
         };
         let perform_qc = lookup_bool(args, "__perform_qc", true)?;
+        let forced = lookup_encoding(args)?;
         let p1 = self.maybe_subsample(&mate1)?;
         let p2 = self.maybe_subsample(&mate2)?;
-        let f1 = self.load_and_qc(&p1, &p1, perform_qc)?;
-        let f2 = self.load_and_qc(&p2, &p2, perform_qc)?;
+        let f1 = self.load_and_qc(&p1, &p1, perform_qc, forced)?;
+        let f2 = self.load_and_qc(&p2, &p2, perform_qc, forced)?;
         if f1.encoding != f2.encoding {
             return Err(NgError::new(
                 NgErrorType::DataError,
@@ -3106,7 +3119,10 @@ impl Interpreter {
             // QC stats are registered for the singles file even if it is later dropped (unless QC
             // is deferred to the preprocess via `__perform_qc=False`). The `n_singles3` count drives
             // the empty-file drop below, so it is always computed.
-            let enc3 = fastq::detect_encoding_stream(crate::compression::open_read(&p3)?)?;
+            let enc3 = match forced {
+                Some(e) => e,
+                None => fastq::detect_encoding_stream(crate::compression::open_read(&p3)?)?,
+            };
             let mut acc3 = fastq::FastQStatsAcc::new();
             for r in fastq::fastq_records(crate::compression::open_read(&p3)?, enc3) {
                 acc3.update(&r?);
@@ -3234,20 +3250,28 @@ impl Interpreter {
         }
         fqfiles.sort();
 
-        // Forward the hidden `__perform_qc` (set by `qcInPreprocess`) to the per-file `fastq`/
-        // `paired` loads, so QC deferral propagates through directory/mocat loading.
+        // Forward the hidden `__perform_qc` (set by `qcInPreprocess`) and the `encoding` passthrough
+        // to the per-file `fastq`/`paired` loads, so QC deferral and a forced encoding both
+        // propagate through directory/mocat loading (mirrors `loadDirectoryFiles`).
         let perform_qc = lookup_bool(args, "__perform_qc", true)?;
-        let qc_arg = || ("__perform_qc".to_string(), NGLessObject::Bool(perform_qc));
+        let encoding = lookup_symbol(args, "encoding", "auto")?;
+        let passthru = || {
+            vec![
+                ("__perform_qc".to_string(), NGLessObject::Bool(perform_qc)),
+                (
+                    "encoding".to_string(),
+                    NGLessObject::Symbol(encoding.clone()),
+                ),
+            ]
+        };
         let (singletons, paired) = match_up(&fqfiles)?;
         let mut members: Vec<NGLessObject> = Vec::new();
         for f in &singletons {
-            members.push(self.execute_fastq(&NGLessObject::String(f.clone()), &[qc_arg()])?);
+            members.push(self.execute_fastq(&NGLessObject::String(f.clone()), &passthru())?);
         }
         for p in &paired {
-            let mut pargs = vec![
-                ("second".to_string(), NGLessObject::String(p.1.clone())),
-                qc_arg(),
-            ];
+            let mut pargs = vec![("second".to_string(), NGLessObject::String(p.1.clone()))];
+            pargs.extend(passthru());
             if let Some(singles) = &p.2 {
                 pargs.push(("singles".to_string(), NGLessObject::String(singles.clone())));
             }
@@ -5177,6 +5201,21 @@ fn lookup_symbol(args: &[(String, NGLessObject)], name: &str, default: &str) -> 
         Some(NGLessObject::Symbol(s)) => Ok(s.clone()),
         Some(other) => Err(NgError::script(format!(
             "Argument `{name}` should be a symbol, got {other:?}"
+        ))),
+    }
+}
+
+/// Parse the `encoding` keyword argument shared by `fastq`/`paired` (and forwarded by the
+/// directory/mocat loaders). Returns `None` for `auto` (autodetect from the data) and a forced
+/// encoding otherwise (mirrors Haskell's `getEncArgument`). The type checker already restricts the
+/// symbol to the accepted set, but the mapping is reproduced here for the runtime.
+fn lookup_encoding(args: &[(String, NGLessObject)]) -> NgResult<Option<FastQEncoding>> {
+    match lookup_symbol(args, "encoding", "auto")?.as_str() {
+        "auto" => Ok(None),
+        "33" | "sanger" => Ok(Some(FastQEncoding::Sanger)),
+        "64" | "solexa" => Ok(Some(FastQEncoding::Solexa)),
+        other => Err(NgError::script(format!(
+            "Unknown encoding for fastq {other}"
         ))),
     }
 }
