@@ -619,7 +619,13 @@ pub fn module_env(module_dir: &Path, temp_dir: &Path) -> Vec<(String, String)> {
             "NGLESS_MODULE_DIR".to_string(),
             module_dir.to_string_lossy().into_owned(),
         ),
-        ("NGLESS_NR_CORES".to_string(), "1".to_string()),
+        (
+            // Mirrors `getNumCapabilities` in Haskell's `nglessEnv`: the configured worker thread
+            // count (`--jobs`/`--threads`, possibly overridden by the `batch` module), not a
+            // hard-coded 1.
+            "NGLESS_NR_CORES".to_string(),
+            crate::parallel::n_threads().to_string(),
+        ),
         ("TMPDIR".to_string(), tmp.clone()),
         ("TMP".to_string(), tmp.clone()),
         ("TEMPDIR".to_string(), tmp.clone()),
