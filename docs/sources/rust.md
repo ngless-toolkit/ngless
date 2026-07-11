@@ -14,7 +14,7 @@ The most important point: **for users, essentially nothing changes.**
 - The NGLess language is exactly the same. Your scripts do not need to be
   rewritten.
 - Version 1.6 is a **best-effort exact mirror of 1.5**. It is designed to
-  produce byte-identical output for the same inputs, so results remain
+  produce equivalent output for the same inputs, so results remain
   reproducible across the transition.
 - The command-line interface, the standard library, the reference databases,
   and the external tools (bwa, samtools, minimap2, megahit, prodigal, …) all
@@ -36,9 +36,10 @@ to::
 
 That is the only change required.
 
-If you continue to declare `ngless "1.5"`, your script will still run, but
-NGLess will print a warning recommending that you update to `1.6`. Declaring
-version 1.6 removes the warning.
+The Rust build supports a **single** language version, `1.6`. Declaring any
+other version — including `ngless "1.5"` — is now a **hard error**, not a
+warning. Update the version statement at the top of your scripts to `ngless
+"1.6"`.
 
 ### Module imports
 
@@ -56,11 +57,11 @@ importing one prints a deprecation warning suggesting you update to `1.6`.
 | Declared version | Rust build (1.6+) behaviour                    |
 |------------------|------------------------------------------------|
 | `1.6`            | Runs (current version).                         |
-| `1.5`            | Runs, with a deprecation warning.               |
+| `1.5`            | **Rejected**: update the script to `1.6`.       |
 | `1.0`–`1.4`      | **Rejected**: use an older NGLess, or update.   |
 | `0.x`            | **Rejected**: use an older NGLess, or update.   |
 
-Pre-1.5 semantics carried a long tail of version-specific behaviours that are
+Pre-1.6 semantics carried a long tail of version-specific behaviours that are
 not reproduced by the Rust implementation. If you need to run an old script
 verbatim without updating it, use an older NGLess release (up to 1.5, which is
 the last Haskell release).
@@ -96,6 +97,13 @@ A few behaviours are from the Haskell implementation but not considered errors:
   the result to a variable first, then index that variable. For example, use
   `xs = readlines("samples.txt")` followed by `sample = xs[0]` instead of
   `sample = readlines("samples.txt")[0]`.
+- **The deprecated `strand` argument to `count()` is no longer accepted.** Use
+  `sense` (`{both}`/`{sense}`/`{antisense}`) instead; `strand=True` is
+  equivalent to `sense={sense}`. Passing `strand` is now an unknown-argument
+  error.
+- **The `soap` module has been removed.** `import "soap"` (and the SOAP mapper)
+  is no longer available and is rejected at import time. Use one of the
+  supported mappers (bwa or minimap2).
 
 ## Reporting problems
 
