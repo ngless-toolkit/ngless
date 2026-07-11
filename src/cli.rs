@@ -930,6 +930,22 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
                 extra_funcs.extend(fs)
             }
             None => {
+                // A plain (global) `import` is only allowed for known modules; local-only modules
+                // must be brought in with `local import` (mirrors `loadModule`'s `isGlobalImport`
+                // gate in `NGLess/ExternalModules.hs`).
+                if matches!(m, crate::ast::ModInfo::Import { .. })
+                    && !crate::external_modules::is_known_module(m.name())
+                {
+                    let suggestion = crate::suggestion::suggestion_message(
+                        m.name(),
+                        crate::external_modules::KNOWN_MODULES,
+                    );
+                    return Err(NgError::script(format!(
+                        "Module '{}' is not known.\n\t{suggestion}\n\tTo import local modules, use \
+                         \"local import\"",
+                        m.name(),
+                    )));
+                }
                 let em = crate::external_modules::find_load(
                     m.name(),
                     m.version(),

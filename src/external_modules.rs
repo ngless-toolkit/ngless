@@ -642,8 +642,74 @@ pub fn module_env(module_dir: &Path, temp_dir: &Path) -> Vec<(String, String)> {
     env
 }
 
+/// Modules that NGLess knows how to fetch from the download server (mirrors `knownModules` in
+/// `NGLess/Modules.hs`). A plain (global) `import` is only allowed for these; any other name must be
+/// brought in with `local import`. When one of these is requested but not present locally,
+/// `find_load` auto-downloads it.
+pub const KNOWN_MODULES: &[&str] = &[
+    "example-cmd",
+    "gmgc",
+    "igc",
+    "om-rgc",
+    "DogGutCatalog",
+    "MouseGutCatalog",
+    "PigGutCatalog",
+    "specI",
+    "motus",
+];
+
+/// Whether `name` is a known (downloadable, globally importable) module.
+pub fn is_known_module(name: &str) -> bool {
+    KNOWN_MODULES.contains(&name)
+}
+
+/// Download a known external module into the user data directory (mirrors `downloadModule`). Returns
+/// the module directory (`<user-data>/Modules/<name>.ngm/<version>`).
+fn download_module(name: &str, version: &str) -> NgResult<PathBuf> {
+    let data_dir = crate::reference::user_data_directory().ok_or_else(|| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!("Cannot download module '{name}': no user data directory is configured."),
+        )
+    })?;
+    let nameversion = Path::new(&format!("{name}.ngm")).join(version);
+    let destdir = data_dir.join("Modules").join(&nameversion);
+    let base_url = crate::reference::download_base_url();
+    let url = format!(
+        "{}/Modules/{}.tar.gz",
+        base_url.trim_end_matches('/'),
+        nameversion.to_string_lossy()
+    );
+    crate::reference::download_expand_tar(&url, &data_dir)?;
+    Ok(destdir)
+}
+
+/// Load a module from a directory containing `module.yaml`, checking the version is compatible.
+fn load_from_dir(name: &str, version: &str, dir: PathBuf) -> NgResult<ExternalModule> {
+    let yaml = dir.join("module.yaml");
+    let text = std::fs::read_to_string(&yaml).map_err(|e| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!("Could not read module file {}: {e}", yaml.display()),
+        )
+    })?;
+    let raw: RawModule = serde_yaml::from_str(&text).map_err(|e| {
+        NgError::new(
+            NgErrorType::SystemError,
+            format!(
+                "Could not load module file {}. Error was `{e}`",
+                yaml.display()
+            ),
+        )
+    })?;
+    let module = ExternalModule::from_raw(raw, dir)?;
+    check_compatible(name, version, &module)?;
+    Ok(module)
+}
+
 /// Find and load an external module (mirrors `findLoad`). Searches the current directory, then the
-/// global and user data directories, for `Modules/<name>.ngm/<version>/module.yaml`.
+/// global and user data directories, for `Modules/<name>.ngm/<version>/module.yaml`. If the module
+/// is not found locally but is a [`known module`](KNOWN_MODULES), it is downloaded first.
 pub fn find_load(name: &str, version: &str, data_dirs: &[String]) -> NgResult<ExternalModule> {
     let modpath = Path::new("Modules")
         .join(format!("{name}.ngm"))
@@ -663,25 +729,14 @@ pub fn find_load(name: &str, version: &str, data_dirs: &[String]) -> NgResult<Ex
         );
         searched.push(yaml.clone());
         if yaml.is_file() {
-            let text = std::fs::read_to_string(&yaml).map_err(|e| {
-                NgError::new(
-                    NgErrorType::SystemError,
-                    format!("Could not read module file {}: {e}", yaml.display()),
-                )
-            })?;
-            let raw: RawModule = serde_yaml::from_str(&text).map_err(|e| {
-                NgError::new(
-                    NgErrorType::SystemError,
-                    format!(
-                        "Could not load module file {}. Error was `{e}`",
-                        yaml.display()
-                    ),
-                )
-            })?;
-            let module = ExternalModule::from_raw(raw, dir)?;
-            check_compatible(name, version, &module)?;
-            return Ok(module);
+            return load_from_dir(name, version, dir);
         }
+    }
+    // Not found locally: a known module is downloaded into the user data directory and loaded from
+    // there (mirrors `findLoad`'s `downloadModule` fallback).
+    if is_known_module(name) {
+        let dir = download_module(name, version)?;
+        return load_from_dir(name, version, dir);
     }
     let locations = searched
         .iter()

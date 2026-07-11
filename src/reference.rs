@@ -649,7 +649,7 @@ fn write_targz(oname: &str, entries: &[(PathBuf, String)]) -> NgResult<()> {
 /// The user data directory (mirrors `nConfUserDataDirectory`): defaults to
 /// `$XDG_DATA_HOME/ngless/data` or `$HOME/.local/share/ngless/data`, overridable via the
 /// `user-data-directory` config key.
-fn user_data_directory() -> Option<PathBuf> {
+pub fn user_data_directory() -> Option<PathBuf> {
     let dir = &crate::configuration::global().user_data_directory;
     if dir.is_empty() {
         None

@@ -23,6 +23,11 @@ Version 1.6.0-beta2 2026-07-04 by luispedro
 	* External module commands now see `NGLESS_NR_CORES` set to the configured
 	worker thread count (`--jobs`/`--threads`, or the `batch` scheduler's
 	allotment) instead of a hard-coded 1.
+	* Restored the distinction between global and local module imports. A plain
+	`import` is again only accepted for known modules (`igc`, `om-rgc`, `motus`,
+	the gut-catalog modules, ...); importing a local-only module now requires
+	`local import`. Known modules that are not present locally are auto-downloaded
+	again.
 	* Removed the deprecated `strand` argument to `count()`; use `sense`
 	(`{both}`/`{sense}`/`{antisense}`) instead. `strand=True` is equivalent to
 	`sense={sense}`.
