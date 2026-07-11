@@ -185,8 +185,10 @@ fn exec_install_reference(refname: &str) -> i32 {
         eprintln!("Reference {refname} is not a known reference.");
         return 1;
     }
-    // `parseVersion Nothing` is 1.5, the version used to build the download URL.
-    match crate::reference::install_data(refname, (1, 5)) {
+    // `parseVersion Nothing` is 1.5, the version used to build the download URL. The
+    // `--install-reference-data` mode only handles builtin references (checked above), so no module
+    // references are in scope here.
+    match crate::reference::install_data(refname, (1, 5), &[]) {
         Ok(_) => 0,
         Err(e) => {
             report_fatal_error(&e);
@@ -958,7 +960,16 @@ fn run_script(opts: &RunOpts) -> NgResult<i32> {
     // directories are writable, `map` references are known, and `count()` features are valid, so
     // these problems abort before any work is done. Runs before the citation header is printed,
     // matching Haskell's ordering.
-    crate::validation::validate_io(&funcs, &config.search_path, &typed)?;
+    let module_reference_names: Vec<String> = external_modules
+        .iter()
+        .flat_map(|m| m.references.iter().map(|r| r.name().to_string()))
+        .collect();
+    crate::validation::validate_io(
+        &funcs,
+        &config.search_path,
+        &typed,
+        &module_reference_names,
+    )?;
 
     if opts.validate_only {
         if !opts.quiet {

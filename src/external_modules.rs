@@ -154,6 +154,45 @@ pub struct Command {
     pub ret: CommandReturn,
 }
 
+/// A reference database contributed by an external module (mirrors `ExternalReference`).
+///
+/// A `Direct` reference points at FASTA/GTF/functional-map files directly (a path relative to the
+/// module directory, an absolute path, or a URL). A `Packaged` reference names an NGLess reference
+/// pack that is downloaded and unpacked exactly like a builtin reference. These are consulted by
+/// `crate::reference::ensure_data_present` when a `map`/`count` call names `reference=<name>`.
+#[derive(Clone, Debug)]
+pub enum ExternalReference {
+    Direct {
+        name: String,
+        /// The module directory, used as the base for caching downloaded URL references.
+        module_dir: PathBuf,
+        /// FASTA file: a resolved local path or a URL.
+        fa_file: String,
+        /// Optional GTF/GFF annotation file: a resolved local path or a URL.
+        gtf_file: Option<String>,
+        /// Optional functional-map file: a resolved local path or a URL.
+        map_file: Option<String>,
+    },
+    Packaged {
+        name: String,
+        name_version: String,
+        url: String,
+        has_gtf: bool,
+        has_mapfile: bool,
+    },
+}
+
+impl ExternalReference {
+    /// The name by which this reference is requested in `reference=<name>` (mirrors `erefName` /
+    /// `refName . refData`).
+    pub fn name(&self) -> &str {
+        match self {
+            ExternalReference::Direct { name, .. } => name,
+            ExternalReference::Packaged { name, .. } => name,
+        }
+    }
+}
+
 /// A loaded external module (mirrors `ExternalModule`).
 #[derive(Clone, Debug)]
 pub struct ExternalModule {
@@ -161,6 +200,7 @@ pub struct ExternalModule {
     pub version: String,
     pub dir: PathBuf,
     pub functions: Vec<Command>,
+    pub references: Vec<ExternalReference>,
     pub min_ngless_version: Option<(i64, i64)>,
     pub min_version_reason: String,
     pub init_cmd: Option<String>,
@@ -179,9 +219,72 @@ struct RawModule {
     init: Option<RawInit>,
     #[serde(default)]
     functions: Vec<RawCommand>,
+    #[serde(default)]
+    references: Vec<RawReference>,
     citation: Option<String>,
     #[serde(default)]
     citations: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct RawReference {
+    rtype: Option<String>,
+    name: String,
+    #[serde(rename = "fasta-file")]
+    fasta_file: Option<String>,
+    #[serde(rename = "gtf-file")]
+    gtf_file: Option<String>,
+    #[serde(rename = "map-file")]
+    map_file: Option<String>,
+    #[serde(rename = "name-version")]
+    name_version: Option<String>,
+    url: Option<String>,
+    #[serde(rename = "has-gtf", default)]
+    has_gtf: bool,
+    #[serde(rename = "has-mapfile", default)]
+    has_mapfile: bool,
+}
+
+impl RawReference {
+    /// Convert a raw YAML reference, resolving relative file paths against the module directory
+    /// (mirrors `FromJSON ExternalReference` + `addPathToRef`).
+    fn convert(self, dir: &Path) -> NgResult<ExternalReference> {
+        match self.rtype.as_deref() {
+            Some("packaged") => Ok(ExternalReference::Packaged {
+                name: self.name,
+                name_version: self.name_version.ok_or_else(|| {
+                    NgError::script("Error in module.yaml: packaged reference is missing 'name-version'")
+                })?,
+                url: self.url.ok_or_else(|| {
+                    NgError::script("Error in module.yaml: packaged reference is missing 'url'")
+                })?,
+                has_gtf: self.has_gtf,
+                has_mapfile: self.has_mapfile,
+            }),
+            _ => {
+                let fa_file = self.fasta_file.ok_or_else(|| {
+                    NgError::script("Error in module.yaml: reference is missing 'fasta-file'")
+                })?;
+                Ok(ExternalReference::Direct {
+                    name: self.name,
+                    module_dir: dir.to_path_buf(),
+                    fa_file: resolve_ref_path(dir, &fa_file),
+                    gtf_file: self.gtf_file.map(|p| resolve_ref_path(dir, &p)),
+                    map_file: self.map_file.map(|p| resolve_ref_path(dir, &p)),
+                })
+            }
+        }
+    }
+}
+
+/// Resolve a reference file path against the module directory (mirrors `addPathToRef`'s `ma`): an
+/// absolute path or a URL is left as-is, otherwise it is joined onto the module directory.
+fn resolve_ref_path(dir: &Path, p: &str) -> String {
+    if Path::new(p).is_absolute() || crate::reference::is_url(p) {
+        p.to_string()
+    } else {
+        dir.join(p).to_string_lossy().into_owned()
+    }
 }
 
 #[derive(Deserialize)]
@@ -363,6 +466,11 @@ impl ExternalModule {
             Some(i) => (Some(i.init_cmd), i.init_args),
             None => (None, Vec::new()),
         };
+        let references = raw
+            .references
+            .into_iter()
+            .map(|r| r.convert(&dir))
+            .collect::<NgResult<Vec<_>>>()?;
         let mut citations = raw.citation.map(|c| vec![c]).unwrap_or_default();
         citations.extend(raw.citations);
         Ok(ExternalModule {
@@ -370,6 +478,7 @@ impl ExternalModule {
             version: raw.version,
             dir,
             functions,
+            references,
             min_ngless_version,
             min_version_reason,
             init_cmd,
@@ -699,6 +808,65 @@ mod tests {
         )
         .unwrap();
         assert!(m.check_syntax().is_err());
+    }
+
+    #[test]
+    fn parses_direct_reference_with_relative_paths() {
+        let raw: RawModule = serde_yaml::from_str(
+            "name: igc\nversion: '1.0'\nreferences:\n  - name: igc\n    fasta-file: igc.fna\n    \
+             map-file: igc.functional.map\n",
+        )
+        .expect("valid YAML");
+        let m = ExternalModule::from_raw(raw, PathBuf::from("/mods/igc.ngm/1.0")).unwrap();
+        assert_eq!(m.references.len(), 1);
+        match &m.references[0] {
+            ExternalReference::Direct {
+                name,
+                fa_file,
+                gtf_file,
+                map_file,
+                ..
+            } => {
+                assert_eq!(name, "igc");
+                // Relative paths are resolved against the module directory.
+                assert_eq!(fa_file, "/mods/igc.ngm/1.0/igc.fna");
+                assert_eq!(map_file.as_deref(), Some("/mods/igc.ngm/1.0/igc.functional.map"));
+                assert!(gtf_file.is_none());
+            }
+            other => panic!("expected a direct reference, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_packaged_reference_and_keeps_urls() {
+        let raw: RawModule = serde_yaml::from_str(
+            "name: t\nversion: '0.0'\nreferences:\n  - rtype: packaged\n    name: catalog\n    \
+             name-version: '1.2'\n    url: https://example.org/catalog.tar.gz\n    has-gtf: true\n  \
+             - name: direct\n    fasta-file: https://example.org/d.fna.gz\n",
+        )
+        .expect("valid YAML");
+        let m = ExternalModule::from_raw(raw, PathBuf::from("/mods/t.ngm/0.0")).unwrap();
+        assert_eq!(m.references.len(), 2);
+        match &m.references[0] {
+            ExternalReference::Packaged {
+                name,
+                url,
+                has_gtf,
+                ..
+            } => {
+                assert_eq!(name, "catalog");
+                assert_eq!(url, "https://example.org/catalog.tar.gz");
+                assert!(has_gtf);
+            }
+            other => panic!("expected a packaged reference, got {other:?}"),
+        }
+        // A URL fasta-file is preserved verbatim (not joined onto the module directory).
+        match &m.references[1] {
+            ExternalReference::Direct { fa_file, .. } => {
+                assert_eq!(fa_file, "https://example.org/d.fna.gz");
+            }
+            other => panic!("expected a direct reference, got {other:?}"),
+        }
     }
 
     #[test]

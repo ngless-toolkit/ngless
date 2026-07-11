@@ -46,11 +46,16 @@ pub fn validate(funcs: &[Function], constants: &[String], script: &Script) -> Ng
 ///
 /// `funcs` is the full function table (to look up the `FileReadable`/`FileWritable` argument tags);
 /// `search_path` is used to expand `<...>`-placeholder input paths exactly as interpretation will.
-pub fn validate_io(funcs: &[Function], search_path: &[String], script: &Script) -> NgResult<()> {
+pub fn validate_io(
+    funcs: &[Function],
+    search_path: &[String],
+    script: &Script,
+    module_reference_names: &[String],
+) -> NgResult<()> {
     let mut errs: Vec<String> = Vec::new();
     validate_read_inputs(funcs, search_path, script, &mut errs);
     validate_ofile(funcs, script, &mut errs);
-    check_references_exist(script, &mut errs);
+    check_references_exist(script, module_reference_names, &mut errs);
     // `validateCount` throws directly rather than accumulating (it calls `executeCountCheck`), so it
     // runs last and propagates, mirroring the Haskell ordering.
     validate_count(script)?;
@@ -151,8 +156,15 @@ fn check_ofile_io(ofile: &str, local: &mut Vec<String>) {
 
 /// `checkReferencesExist`: a `map(..., reference=...)` whose constant value is neither a builtin
 /// reference name/alias nor an existing file on disk is an error (with a "did you mean" suggestion).
-fn check_references_exist(script: &Script, errs: &mut Vec<String>) {
-    let allnames = crate::reference::builtin_reference_names();
+fn check_references_exist(
+    script: &Script,
+    module_reference_names: &[String],
+    errs: &mut Vec<String>,
+) {
+    // Module-contributed reference names precede the builtin names, mirroring the `allnames`
+    // ordering in `checkReferencesExist` (`(ename <$> refs) ++ builtin ...`).
+    let mut allnames: Vec<String> = module_reference_names.to_vec();
+    allnames.extend(crate::reference::builtin_reference_names());
     for (lno, e) in &script.body {
         let mut local: Vec<String> = Vec::new();
         recursive_analyse(e, &mut |x| {
@@ -1002,7 +1014,7 @@ mod tests {
             "ngless '1.5'\ninput = fastq('/no/such/path/xyz.fq')\n",
         )
         .unwrap();
-        let e = validate_io(&funcs(), &[], &script)
+        let e = validate_io(&funcs(), &[], &script, &[])
             .expect_err("missing input should error")
             .to_string();
         assert!(e.contains("xyz.fq"), "got: {e}");
@@ -1013,7 +1025,7 @@ mod tests {
         let p = temp_fastq("ok");
         let txt = format!("ngless '1.5'\ninput = fastq('{}')\n", p.display());
         let script = parse_ngless("test", true, &txt).unwrap();
-        let r = validate_io(&funcs(), &[], &script);
+        let r = validate_io(&funcs(), &[], &script, &[]);
         std::fs::remove_file(&p).ok();
         assert!(r.is_ok(), "got: {:?}", r.err());
     }
@@ -1027,7 +1039,7 @@ mod tests {
             "ngless '1.5'\nfname = '/no/such/path/traced.fq'\ninput = fastq(fname)\n",
         )
         .unwrap();
-        let e = validate_io(&funcs(), &[], &script)
+        let e = validate_io(&funcs(), &[], &script, &[])
             .expect_err("missing input should error")
             .to_string();
         assert!(e.contains("traced.fq"), "got: {e}");
@@ -1043,7 +1055,7 @@ mod tests {
             ofile.display(),
         );
         let script = parse_ngless("test", true, &txt).unwrap();
-        let r = validate_io(&funcs(), &[], &script);
+        let r = validate_io(&funcs(), &[], &script, &[]);
         std::fs::remove_file(&p).ok();
         let e = r.expect_err("unknown reference should error").to_string();
         assert!(
@@ -1062,7 +1074,7 @@ mod tests {
             ofile.display(),
         );
         let script = parse_ngless("test", true, &txt).unwrap();
-        let r = validate_io(&funcs(), &[], &script);
+        let r = validate_io(&funcs(), &[], &script, &[]);
         std::fs::remove_file(&p).ok();
         assert!(r.is_ok(), "got: {:?}", r.err());
     }
@@ -1072,7 +1084,7 @@ mod tests {
         let txt =
             "ngless '1.5'\ninput = fastq('whatever')\nwrite(input, ofile='/no/such/dir/out.fq')\n";
         let script = parse_ngless("test", true, txt).unwrap();
-        let e = validate_io(&funcs(), &[], &script)
+        let e = validate_io(&funcs(), &[], &script, &[])
             .expect_err("missing output dir should error")
             .to_string();
         assert!(

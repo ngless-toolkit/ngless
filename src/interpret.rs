@@ -1257,7 +1257,12 @@ impl Interpreter {
             return Ok(NGLessObject::List(counted));
         }
         let (name, path, mapped_ref) = mapped_read_set(expr, "count")?;
-        let opts = parse_count_opts(args, mapped_ref.as_deref(), self.ngl_version)?;
+        let opts = parse_count_opts(
+            args,
+            mapped_ref.as_deref(),
+            self.ngl_version,
+            &self.module_references(),
+        )?;
 
         // Stream the SAM in read-name groups (mirroring the conduit pipeline) to keep memory
         // bounded — no more than one read group is held at a time. All `@SQ` headers precede the
@@ -1476,10 +1481,20 @@ impl Interpreter {
     /// then the global one. A missing builtin reference is downloaded from the configured base URL
     /// (mirrors `installData`), using the script's language version for the URL's version directory.
     fn resolve_reference(&self, refname: &str) -> NgResult<String> {
-        let paths = crate::reference::ensure_data_present(refname, self.ngl_version)?;
+        let paths =
+            crate::reference::ensure_data_present(refname, self.ngl_version, &self.module_references())?;
         paths
             .fa_file
             .ok_or_else(|| NgError::script(format!("Could not find reference '{refname}'.")))
+    }
+
+    /// The reference databases contributed by all loaded external modules (mirrors
+    /// `concatMap modReferences . ngleLoadedModules`), consulted when resolving a `reference=<name>`.
+    fn module_references(&self) -> Vec<crate::external_modules::ExternalReference> {
+        self.external_modules
+            .iter()
+            .flat_map(|m| m.references.iter().cloned())
+            .collect()
     }
 
     /// Run an external-module command function (mirrors `executeCommand`): encode the unnamed input
@@ -5340,6 +5355,7 @@ fn parse_count_opts(
     args: &[(String, NGLessObject)],
     mapped_ref: Option<&str>,
     ngl_version: (i64, i64),
+    module_refs: &[crate::external_modules::ExternalReference],
 ) -> NgResult<crate::count::CountOpts> {
     use crate::count::{AnnotationMode, CountOpts, IntersectMode, MMMethod, NMode, StrandMode};
 
@@ -5416,7 +5432,7 @@ fn parse_count_opts(
         lookup_opt_string(args, "reference").or_else(|| mapped_ref.map(str::to_string))
     {
         crate::output::info(0, &format!("Annotate with reference: {refname:?}"));
-        let paths = crate::reference::ensure_data_present(&refname, ngl_version)?;
+        let paths = crate::reference::ensure_data_present(&refname, ngl_version, module_refs)?;
         match (paths.gff_file, paths.functional_map) {
             (Some(g), None) => AnnotationMode::Gff(g),
             (None, Some(f)) => AnnotationMode::FunctionalMap(f),

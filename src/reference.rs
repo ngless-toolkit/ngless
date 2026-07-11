@@ -95,9 +95,9 @@ const REFERENCE_PATH: &str = "Sequence/BWAIndex/reference.fa.gz";
 ///
 /// For a builtin/packaged reference, `fa_file` and `gff_file` are always the canonical locations
 /// within the pack — the GFF path is *constructed* unconditionally (not probed for existence),
-/// exactly as `wrapRefDir` does — and `functional_map` is always `None`. Only URL-typed
-/// external-module references (`moduleDirectReference`, unsupported in this build because external
-/// modules carry no `references:` section) would ever populate `functional_map`.
+/// exactly as `wrapRefDir` does — and `functional_map` is always `None`. A direct external-module
+/// reference (`module_direct_reference`) instead sets exactly the files declared in its `references:`
+/// entry, so it may populate `functional_map` (and leave `gff_file` unset).
 pub struct ReferenceFilePaths {
     pub fa_file: Option<String>,
     pub gff_file: Option<String>,
@@ -114,16 +114,99 @@ pub struct ReferenceFilePaths {
 /// `Saccharomyces_cerevisiae_R64-1-1` resolve to (and download into) separate directories — exactly
 /// as in Haskell, where `installData`'s `destdir` uses the passed-in name while the URL uses the
 /// canonical `refName`.
-pub fn ensure_data_present(refname: &str, ngl_version: (i64, i64)) -> NgResult<ReferenceFilePaths> {
+pub fn ensure_data_present(
+    refname: &str,
+    ngl_version: (i64, i64),
+    module_refs: &[crate::external_modules::ExternalReference],
+) -> NgResult<ReferenceFilePaths> {
+    // A direct module reference (`moduleDirectReference`) takes precedence over installed/builtin
+    // packs, exactly as in Haskell's `ensureDataPresent`.
+    if let Some(paths) = module_direct_reference(refname, module_refs)? {
+        return Ok(paths);
+    }
     let refdir = match find_data_files(refname) {
         Some(refdir) => refdir,
-        None => install_data(refname, ngl_version)?,
+        None => install_data(refname, ngl_version, module_refs)?,
     };
     Ok(ReferenceFilePaths {
         fa_file: Some(build_fa_path(&refdir)),
         gff_file: Some(refdir.join(GFF_PATH).to_string_lossy().into_owned()),
         functional_map: None,
     })
+}
+
+/// Resolve a direct external-module reference (mirrors `moduleDirectReference`): find the first
+/// loaded module `references:` entry whose name matches `refname`, downloading any URL-valued files
+/// into the module's `cached/` directory. Returns `None` if no direct reference matches.
+fn module_direct_reference(
+    refname: &str,
+    module_refs: &[crate::external_modules::ExternalReference],
+) -> NgResult<Option<ReferenceFilePaths>> {
+    use crate::external_modules::ExternalReference;
+    for r in module_refs {
+        if let ExternalReference::Direct {
+            name,
+            module_dir,
+            fa_file,
+            gtf_file,
+            map_file,
+        } = r
+        {
+            if name == refname {
+                let fa = download_if_url(module_dir, &format!("{refname}.fna.gz"), Some(fa_file))?;
+                let gtf =
+                    download_if_url(module_dir, &format!("{refname}.gff.gz"), gtf_file.as_deref())?;
+                let map =
+                    download_if_url(module_dir, &format!("{refname}.tsv.gz"), map_file.as_deref())?;
+                return Ok(Some(ReferenceFilePaths {
+                    fa_file: fa,
+                    gff_file: gtf,
+                    functional_map: map,
+                }));
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// If `path` is a URL, download it into `<basedir>/cached/<fname>` (once, guarded by a lock) and
+/// return the local path; a non-URL path is returned unchanged (mirrors `downloadIfUrl`).
+fn download_if_url(basedir: &Path, fname: &str, path: Option<&str>) -> NgResult<Option<String>> {
+    let path = match path {
+        None => return Ok(None),
+        Some(p) => p,
+    };
+    if !is_url(path) {
+        return Ok(Some(path.to_string()));
+    }
+    let cached_dir = basedir.join("cached");
+    fs::create_dir_all(&cached_dir).ok();
+    let local = cached_dir.join(fname);
+    if !local.is_file() {
+        let lock_fname = {
+            let mut p = local.as_os_str().to_os_string();
+            p.push(".download.lock");
+            PathBuf::from(p)
+        };
+        let params = LockParameters {
+            lock_fname,
+            max_age: Duration::from_secs(300),
+            when_exists: WhenExistsStrategy::IfLockedRetry {
+                nr_retries: 37 * 60,
+                time_between: Duration::from_secs(60),
+            },
+            mtime_update: true,
+        };
+        let local_c = local.clone();
+        let url = path.to_string();
+        with_lock_file(params, || {
+            if !local_c.is_file() {
+                download_file(&url, &local_c)?;
+            }
+            Ok(())
+        })?;
+    }
+    Ok(Some(local.to_string_lossy().into_owned()))
 }
 
 fn build_fa_path(refdir: &Path) -> String {
@@ -146,29 +229,48 @@ fn find_data_files(refname: &str) -> Option<PathBuf> {
 ///
 /// Public so the `--install-reference-data` sub-mode (`InstallReferenceMode` in `Execs/Main.hs`)
 /// can drive it directly, in addition to the on-demand `map(..., reference=...)` path.
-pub fn install_data(refname: &str, ngl_version: (i64, i64)) -> NgResult<PathBuf> {
-    let bref = find_builtin(refname).ok_or_else(|| {
-        // Suggest the closest builtin reference name or alias ("Did you mean ...?").
-        let mut allnames: Vec<&str> = Vec::new();
-        for r in BUILTIN_REFERENCES {
-            allnames.push(r.name);
-            allnames.push(r.alias);
-        }
-        let sug = crate::suggestion::suggestion_message(refname, &allnames);
-        let sep = if sug.is_empty() { "" } else { " " };
-        NgError::script(format!(
-            "Could not find reference '{refname}'. It is not builtin nor in one of the loaded \
-             modules.{sep}{sug}"
-        ))
-    })?;
+pub fn install_data(
+    refname: &str,
+    ngl_version: (i64, i64),
+    module_refs: &[crate::external_modules::ExternalReference],
+) -> NgResult<PathBuf> {
+    use crate::external_modules::ExternalReference;
+    // A packaged module reference is searched before the builtin list (mirrors `installData`'s
+    // `findReference (refs ++ builtinReferences)`, where `refs` are the modules' packaged references);
+    // its URL is used directly.
+    let packaged_url = module_refs.iter().find_map(|r| match r {
+        ExternalReference::Packaged { name, url, .. } if name == refname => Some(url.clone()),
+        _ => None,
+    });
 
-    // versionDirectory: `show majV ++ "." ++ show minV` for versions >= 0.9 (always true for the
-    // >= 1.5 scripts this build supports).
-    let (maj, min) = ngl_version;
-    let base = download_base_url();
-    let base = base.trim_end_matches('/');
-    // The URL uses the canonical reference name; the install directory uses the user-typed name.
-    let url = format!("{base}/References/{maj}.{min}/{}.tar.gz", bref.name);
+    let url = match packaged_url {
+        Some(url) => url,
+        None => {
+            let bref = find_builtin(refname).ok_or_else(|| {
+                // Suggest the closest builtin reference name or alias ("Did you mean ...?").
+                let mut allnames: Vec<&str> = Vec::new();
+                for r in BUILTIN_REFERENCES {
+                    allnames.push(r.name);
+                    allnames.push(r.alias);
+                }
+                let sug = crate::suggestion::suggestion_message(refname, &allnames);
+                let sep = if sug.is_empty() { "" } else { " " };
+                NgError::script(format!(
+                    "Could not find reference '{refname}'. It is not builtin nor in one of the \
+                     loaded modules.{sep}{sug}"
+                ))
+            })?;
+
+            // versionDirectory: `show majV ++ "." ++ show minV` for versions >= 0.9 (always true for
+            // the >= 1.5 scripts this build supports).
+            let (maj, min) = ngl_version;
+            let base = download_base_url();
+            let base = base.trim_end_matches('/');
+            // The URL uses the canonical reference name; the install directory uses the user-typed
+            // name.
+            format!("{base}/References/{maj}.{min}/{}.tar.gz", bref.name)
+        }
+    };
 
     let basedir = install_basedir()?;
     let destdir = basedir.join("References").join(refname);

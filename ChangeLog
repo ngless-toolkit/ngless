@@ -15,6 +15,11 @@ Version 1.6.0-beta2 2026-07-04 by luispedro
 	by `load_fastq_directory()`/`load_mocat_sample()`): it was accepted but
 	ignored, so loading always auto-detected the quality encoding. `encoding`
 	({auto}/{33}/{sanger}/{64}/{solexa}) is now honoured again.
+	* External modules can once again declare `references:` (both direct
+	`fasta-file`/`gtf-file`/`map-file` entries and `packaged` reference packs).
+	These are now recognised by `map(..., reference=...)` and
+	`count(..., reference=...)`, so catalog modules such as `igc`, `om-rgc`, and
+	the gut-catalog modules resolve their bundled references again.
 	* Removed the deprecated `strand` argument to `count()`; use `sense`
 	(`{both}`/`{sense}`/`{antisense}`) instead. `strand=True` is equivalent to
 	`sense={sense}`.
