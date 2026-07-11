@@ -3,6 +3,8 @@ name: Build Rust
 on: [push, pull_request]
 
 jobs:
+  # External tools (samtools/bwa/minimap2/prodigal/megahit) for the functional
+  # tests are provided by the pinned pixi environment
   build:
     runs-on: ubuntu-latest
     steps:
@@ -17,24 +19,12 @@ jobs:
         run: cargo build --workspace --all-targets --release
       - name: Unit tests
         run: cargo test --workspace
-      - uses: actions/upload-artifact@v7
-        with:
-          path: target/release/ngless
-
-  # External tools (samtools/bwa/minimap2/prodigal/megahit) are provided by the
-  # pinned pixi environment
-  functional-tests:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
       - uses: prefix-dev/setup-pixi@v0.10.0
         with:
           cache: true
           environments: default
-      - name: Build Rust ngless
-        run: cargo build --release
       - name: Run functional tests against the Rust binary
         run: pixi run --environment default bash -c 'NGLESS_BIN="$PWD/target/release/ngless" ./run-tests.sh'
+      - uses: actions/upload-artifact@v7
+        with:
+          path: target/release/ngless
