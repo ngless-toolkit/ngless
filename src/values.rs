@@ -180,7 +180,7 @@ fn as_double(v: &NGLessObject) -> NgResult<f64> {
 }
 
 /// Join two paths the way `System.FilePath.</>` does (a simplified version).
-fn path_append(a: &str, b: &str) -> String {
+pub(crate) fn path_append(a: &str, b: &str) -> String {
     if b.starts_with('/') {
         b.to_string()
     } else if a.is_empty() || a.ends_with('/') {

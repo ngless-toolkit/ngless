@@ -1,0 +1,4 @@
+ngless '1.6'
+input = fastq('short.fq')
+print("Should not print\n")
+write(input, ofile='outputs/output-dir-does-not-exist' </> input.name() + '.fq')

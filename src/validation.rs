@@ -115,21 +115,23 @@ fn check_file_readable_io(fname: &str, search_path: &[String], local: &mut Vec<S
 
 /// `validateOFile`: for every call argument tagged `FileWritable` whose value is a constant string,
 /// check that the output directory exists and is writable, and warn when an existing file would be
-/// overwritten.
+/// overwritten. Paths that are only partly constant are handled by [`check_ofile_dir_io`].
 fn validate_ofile(funcs: &[Function], script: &Script, errs: &mut Vec<String>) {
+    // A script typically writes several files to the same output directory; report each directory
+    // once rather than once per `write()`.
+    let mut seen_dirs: Vec<String> = Vec::new();
     for (lno, e) in &script.body {
         let mut local: Vec<String> = Vec::new();
         recursive_analyse(e, &mut |x| {
             if let Expression::FunctionCall(f, arg, args, _) = x {
                 if let Some(finfo) = find_function(funcs, f) {
-                    let mut check = |ofile: &str| check_ofile_io(ofile, &mut local);
                     if finfo.arg_checks.contains(&ArgCheck::FileWritable) {
-                        validate_str_val(arg, script, &mut check);
+                        check_ofile_expr(arg, script, &mut local, &mut seen_dirs);
                     }
                     for ainfo in &finfo.kwargs {
                         if ainfo.checks.contains(&ArgCheck::FileWritable) {
                             if let Some(v) = lookup_arg(args, &ainfo.name) {
-                                validate_str_val(v, script, &mut check);
+                                check_ofile_expr(v, script, &mut local, &mut seen_dirs);
                             }
                         }
                     }
@@ -137,6 +139,20 @@ fn validate_ofile(funcs: &[Function], script: &Script, errs: &mut Vec<String>) {
             }
         });
         errs.extend(add_lno(*lno, local));
+    }
+}
+
+/// Check one output-path expression: fully constant paths are checked in full, otherwise the
+/// constant leading directory (if any) is checked.
+fn check_ofile_expr(
+    e: &Expression,
+    script: &Script,
+    local: &mut Vec<String>,
+    seen_dirs: &mut Vec<String>,
+) {
+    match const_str_val(e, script) {
+        Some(ofile) => check_ofile_io(&ofile, local),
+        None => check_ofile_dir_io(e, script, local, seen_dirs),
     }
 }
 
@@ -151,6 +167,82 @@ fn check_ofile_io(ofile: &str, local: &mut Vec<String>) {
             0,
             &format!("Writing to file '{ofile}' will overwrite existing file."),
         );
+    }
+}
+
+/// A path such as `OUTPUT_DIRECTORY </> sample.name() + '.sam'` is not known until the script runs,
+/// but its leading directory *is* known statically. Check that directory up front so a missing
+/// output directory aborts before any work is done, rather than after mapping/assembly when the
+/// `write()` is finally reached.
+///
+/// Paths that are *fully* statically known are left alone: for those,
+/// [`crate::transform::add_file_checks`] floats a `__check_ofile` up to the point where the path
+/// becomes known, which reports the complete file name (see `tests/error-ofile-complex`).
+fn check_ofile_dir_io(
+    e: &Expression,
+    script: &Script,
+    local: &mut Vec<String>,
+    seen_dirs: &mut Vec<String>,
+) {
+    let Some(dir) = const_dir_prefix(e, script) else {
+        return;
+    };
+    if seen_dirs.contains(&dir) {
+        return;
+    }
+    seen_dirs.push(dir.clone());
+    if let Some(err) = crate::interpret::check_odir(&dir) {
+        local.push(err);
+    }
+}
+
+/// The directory part of the constant leading text of `e`, if that pins down a directory (i.e. the
+/// constant prefix contains a `/`). Returns `None` when nothing can be said statically, or when the
+/// whole path is static (handled elsewhere, see [`check_ofile_dir_io`]).
+fn const_dir_prefix(e: &Expression, script: &Script) -> Option<String> {
+    let (prefix, complete) = const_str_prefix(e, script);
+    if complete {
+        return None;
+    }
+    let (dir, _) = prefix.rsplit_once('/')?;
+    // An empty directory means the path is rooted at `/`, which always exists.
+    if dir.is_empty() {
+        None
+    } else {
+        Some(dir.to_string())
+    }
+}
+
+/// The constant leading text of a string-valued expression, plus whether the *whole* expression was
+/// constant. Concatenation (`+`) and path append (`</>`) are followed as long as the left operand is
+/// fully known; the first non-constant operand ends the prefix.
+///
+/// Note that `a </> b` evaluates to just `b` when `b` is absolute, so a non-constant right operand
+/// only yields a prefix under the (overwhelmingly common) assumption that it is a relative path.
+fn const_str_prefix(e: &Expression, script: &Script) -> (String, bool) {
+    match e {
+        Expression::ConstStr(s) => (s.clone(), true),
+        Expression::Lookup(_, var) => match try_const_string(var, script) {
+            Some(s) => (s, true),
+            None => (String::new(), false),
+        },
+        Expression::BinaryOp(op @ (BOp::Add | BOp::PathAppend), a, b) => {
+            let (pa, complete_a) = const_str_prefix(a, script);
+            if !complete_a {
+                return (pa, false);
+            }
+            let (pb, complete_b) = const_str_prefix(b, script);
+            match op {
+                BOp::Add => (format!("{pa}{pb}"), complete_b),
+                // `</>`: with a known right operand the join is exact; otherwise all that is known
+                // is that the result continues below `pa`.
+                _ if complete_b => (crate::values::path_append(&pa, &pb), true),
+                _ if pa.is_empty() => (String::new(), false),
+                _ if pa.ends_with('/') => (pa, false),
+                _ => (format!("{pa}/"), false),
+            }
+        }
+        _ => (String::new(), false),
     }
 }
 
@@ -271,14 +363,18 @@ fn check_count_annotation_sources(kwargs: &[(Variable, Expression)], lno: usize)
 /// `validateStrVal`: apply `f` to the string value of `e` when it is a constant — either a literal
 /// `ConstStr` or a `Lookup` of a variable that traces to a unique constant string assignment.
 fn validate_str_val(e: &Expression, script: &Script, f: &mut dyn FnMut(&str)) {
+    if let Some(v) = const_str_val(e, script) {
+        f(&v);
+    }
+}
+
+/// The constant string value of `e`, if it is a literal or a variable that traces to a unique
+/// constant assignment (the two cases `validateStrVal` handles).
+fn const_str_val(e: &Expression, script: &Script) -> Option<String> {
     match e {
-        Expression::ConstStr(v) => f(v),
-        Expression::Lookup(_, var) => {
-            if let Some(v) = try_const_string(var, script) {
-                f(&v);
-            }
-        }
-        _ => {}
+        Expression::ConstStr(v) => Some(v.clone()),
+        Expression::Lookup(_, var) => try_const_string(var, script),
+        _ => None,
     }
 }
 
@@ -1077,6 +1173,83 @@ mod tests {
         let r = validate_io(&funcs(), &[], &script, &[]);
         std::fs::remove_file(&p).ok();
         assert!(r.is_ok(), "got: {:?}", r.err());
+    }
+
+    #[test]
+    fn io_missing_output_dir_of_computed_path_errors() {
+        // The file name is only known at run time, but its directory is statically known: the
+        // check must still fire (and only once, even though two files are written there).
+        let p = temp_fastq("missingodir");
+        let txt = format!(
+            "ngless '1.6'\nOUT = '/no/such/dir'\ninput = fastq('{}')\nwrite(input, ofile=OUT </> input.name() + '.fq.gz')\nwrite(input, ofile=OUT </> input.name() + '.2.fq.gz')\n",
+            p.display(),
+        );
+        let script = parse_ngless("test", true, &txt).unwrap();
+        let r = validate_io(&funcs(), &[], &script, &[]);
+        std::fs::remove_file(&p).ok();
+        let e = r.expect_err("missing output dir should error").to_string();
+        assert!(
+            e.contains("Output directory /no/such/dir does not exist"),
+            "got: {e}"
+        );
+        assert_eq!(e.matches("Output directory").count(), 1, "got: {e}");
+    }
+
+    #[test]
+    fn io_existing_output_dir_of_computed_path_ok() {
+        let p = temp_fastq("odir");
+        let dir = std::env::temp_dir();
+        let txt = format!(
+            "ngless '1.6'\nOUT = '{}'\ninput = fastq('{}')\nwrite(input, ofile=OUT </> input.name() + '.fq.gz')\n",
+            dir.display(),
+            p.display(),
+        );
+        let script = parse_ngless("test", true, &txt).unwrap();
+        let r = validate_io(&funcs(), &[], &script, &[]);
+        std::fs::remove_file(&p).ok();
+        assert!(r.is_ok(), "got: {:?}", r.err());
+    }
+
+    #[test]
+    fn io_computed_path_without_constant_directory_ok() {
+        // Nothing is statically known about the directory here, so no check can be made.
+        let p = temp_fastq("nodir");
+        let txt = format!(
+            "ngless '1.6'\ninput = fastq('{}')\nwrite(input, ofile=input.name() + '.fq.gz')\n",
+            p.display(),
+        );
+        let script = parse_ngless("test", true, &txt).unwrap();
+        let r = validate_io(&funcs(), &[], &script, &[]);
+        std::fs::remove_file(&p).ok();
+        assert!(r.is_ok(), "got: {:?}", r.err());
+    }
+
+    #[test]
+    fn const_dir_prefix_cases() {
+        let prefix = |txt: &str| {
+            let script = parse_ngless(
+                "test",
+                true,
+                &format!("ngless '1.6'\nOUT = 'outputs'\nprint({txt})\n"),
+            )
+            .unwrap();
+            let e = match &script.body[1].1 {
+                Expression::FunctionCall(_, arg, _, _) => (**arg).clone(),
+                other => panic!("unexpected: {other:?}"),
+            };
+            const_dir_prefix(&e, &script)
+        };
+        // `ARGV[1]` stands in for any value that is only known at run time.
+        assert_eq!(prefix("OUT </> ARGV[1]"), Some("outputs".to_string()));
+        assert_eq!(
+            prefix("OUT + '/sub/' + ARGV[1]"),
+            Some("outputs/sub".to_string())
+        );
+        assert_eq!(prefix("'no_slash' + ARGV[1]"), None);
+        assert_eq!(prefix("'/' + ARGV[1]"), None);
+        assert_eq!(prefix("ARGV[1] + '/out.txt'"), None);
+        // A fully static path is left to the `__check_ofile` transform.
+        assert_eq!(prefix("OUT </> 'f.txt'"), None);
     }
 
     #[test]

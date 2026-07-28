@@ -519,17 +519,38 @@ pub(crate) fn check_ofile(oname: &str) -> Option<String> {
             "File name '{oname}' used as output, but directory {dirname} does not exist."
         ));
     }
-    // `writable <$> getPermissions dirname`. `Permissions::readonly()` is true only when *no* write
-    // bit is set, so this errs toward "writable" (never a false alarm for a user-owned directory).
-    let writable = std::fs::metadata(&dirname)
-        .map(|m| !m.permissions().readonly())
-        .unwrap_or(false);
-    if !writable {
+    if !dir_is_writable(&dirname) {
         return Some(format!(
             "write call to file {oname}, but directory {dirname} is not writable."
         ));
     }
     None
+}
+
+/// Check an output *directory* that is only known as the constant leading part of an otherwise
+/// computed output path (e.g. `OUTPUT_DIRECTORY </> sample.name() + '.sam'`). Used by
+/// [`crate::validation::validate_io`] so that a missing output directory is reported before the
+/// script runs, even when the file name itself is only known at run time.
+pub(crate) fn check_odir(dirname: &str) -> Option<String> {
+    if !std::path::Path::new(dirname).is_dir() {
+        return Some(format!(
+            "Output directory {dirname} does not exist (it is used as the directory for an output file)."
+        ));
+    }
+    if !dir_is_writable(dirname) {
+        return Some(format!(
+            "Output directory {dirname} is not writable (it is used as the directory for an output file)."
+        ));
+    }
+    None
+}
+
+/// `writable <$> getPermissions dirname`. `Permissions::readonly()` is true only when *no* write
+/// bit is set, so this errs toward "writable" (never a false alarm for a user-owned directory).
+fn dir_is_writable(dirname: &str) -> bool {
+    std::fs::metadata(dirname)
+        .map(|m| !m.permissions().readonly())
+        .unwrap_or(false)
 }
 
 /// `System.FilePath.takeDirectory`: the directory portion of a path, or "." when there is none.
