@@ -143,35 +143,51 @@ pub fn call_mapper(
             format!("Could not start bwa mem: {e}"),
         )
     })?;
+    // Drain stderr in a background thread *while* we feed stdin. bwa mem is chatty on stderr (one
+    // `[M::mem_pestat]` block per chunk), so if we only collected it after writing all of stdin
+    // (as `wait_with_output` would), a long run could fill the 64K stderr pipe buffer; bwa would
+    // then block in write(2) and stop reading stdin while we block writing to it -- a deadlock.
+    let stderr_thread = child.stderr.take().map(|mut e| {
+        std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = std::io::Read::read_to_end(&mut e, &mut buf);
+            buf
+        })
+    });
     // Stream the interleaved reads on stdin (bounded memory). stdout is redirected straight to
     // the output file, so a blocking write here cannot deadlock against the SAM output.
-    {
+    let write_result = {
         let mut stdin = child.stdin.take().ok_or_else(|| {
             NgError::new(
                 NgErrorType::SystemError,
                 "bwa mem: could not open stdin".to_string(),
             )
         })?;
-        crate::interpret::write_interleaved_progress(rs, &mut stdin, total_reads)?;
+        crate::interpret::write_interleaved_progress(rs, &mut stdin, total_reads)
         // `stdin` is dropped here, closing the pipe.
-    }
-    let out = child.wait_with_output().map_err(|e| {
+    };
+    let status = child.wait().map_err(|e| {
         NgError::new(
             NgErrorType::SystemError,
             format!("bwa mem: failed waiting for the process: {e}"),
         )
     })?;
-    if !out.status.success() {
+    let stderr = stderr_thread
+        .and_then(|t| t.join().ok())
+        .unwrap_or_default();
+    if !status.success() {
+        // A non-zero exit takes precedence over a write error: if bwa died early, our write failed
+        // with a meaningless "broken pipe" and bwa's own message is what the user needs.
         return Err(NgError::new(
             NgErrorType::SystemError,
             format!(
                 "Failed bwa mem (exit {:?}).\nError message was:\n{}",
-                out.status.code(),
-                String::from_utf8_lossy(&out.stderr)
+                status.code(),
+                String::from_utf8_lossy(&stderr)
             ),
         ));
     }
-    Ok(())
+    write_result
 }
 
 /// Run bwa with `args`, returning its captured output, or an error including stderr on failure.
@@ -198,6 +214,74 @@ fn run(args: &[&str], what: &str) -> NgResult<std::process::Output> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A mapper that writes far more than a pipe buffer's worth of stderr *before* consuming its
+    /// stdin must not deadlock against our stdin writer (bwa mem does exactly this: it emits an
+    /// `[M::mem_pestat]` block per chunk). Regression test for the hang reported with paired-end
+    /// samples on real data.
+    #[test]
+    fn call_mapper_does_not_deadlock_on_chatty_stderr() {
+        use std::io::Write as _;
+
+        let dir = std::env::temp_dir().join(format!("ngless-mapper-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // A fake bwa: prints a version banner when called with no arguments and, for `mem`, floods
+        // stderr (~190KB, well past the 64K pipe buffer) before reading a single byte of stdin.
+        let fake = dir.join("fake-bwa.sh");
+        std::fs::write(
+            &fake,
+            "#!/bin/sh\n\
+             if [ \"$1\" != mem ]; then echo 'Version: 9.9.9-r1' >&2; exit 1; fi\n\
+             i=0\n\
+             while [ $i -lt 2000 ]; do\n\
+             echo '[M::mem_pestat] skip orientation FF as there are not enough pairs.........' >&2\n\
+             i=$((i+1))\n\
+             done\n\
+             cat > /dev/null\n\
+             echo '@HD\tVN:1.0'\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(
+            &fake,
+            std::os::unix::fs::PermissionsExt::from_mode(0o755u32),
+        )
+        .unwrap();
+        std::env::set_var("NGLESS_BWA_BIN", &fake);
+
+        // More than a pipe buffer of reads, so that we too block if the child stops reading.
+        let fq = dir.join("reads.fq");
+        {
+            let mut f = std::io::BufWriter::new(std::fs::File::create(&fq).unwrap());
+            for i in 0..5000 {
+                writeln!(
+                    f,
+                    "@read{i}\nACGTACGTACGTACGTACGTACGT\n+\nIIIIIIIIIIIIIIIIIIIIIIII"
+                )
+                .unwrap();
+            }
+        }
+        let rs = crate::fastq::ReadSet {
+            pairs: vec![],
+            singletons: vec![crate::fastq::FastQFilePath {
+                encoding: crate::fastq::FastQEncoding::Sanger,
+                path: fq,
+            }],
+        };
+        let out_sam = dir.join("out.sam");
+
+        // Run in a thread so a regression fails the test instead of hanging it forever.
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let r = call_mapper("ref.fna", &rs, &[], &out_sam, None);
+            let _ = tx.send(r);
+        });
+        match rx.recv_timeout(std::time::Duration::from_secs(60)) {
+            Ok(r) => r.expect("call_mapper failed"),
+            Err(_) => panic!("call_mapper deadlocked against the mapper's stderr"),
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn split_extension_inserts_before_ext() {

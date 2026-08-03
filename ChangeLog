@@ -72,6 +72,11 @@ Version 1.6.0-beta2 2026-07-04 by luispedro
 	the locations that were searched. Under `--trace`, each candidate location is
 	printed as it is checked. If other versions of the same module are available,
 	they are listed as well.
+	* Fixed a deadlock in `map()` where ngless could hang forever (with bwa using
+	no CPU) on samples where bwa mem writes more than a pipe buffer's worth of
+	messages to stderr while ngless is still feeding it reads. ngless now drains
+	the mapper's stderr concurrently. The same fix was applied to the streaming
+	`samtools view` used to read BAM input.
 
 	Changes with respect to 1.6.0-beta1:
 	* The build now supports a single language version, "1.6": a script declaring

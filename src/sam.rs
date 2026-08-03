@@ -289,6 +289,10 @@ pub struct SamReader {
     /// The `samtools` child for BAM input; kept alive so its stdout stays open and `wait()`-ed
     /// on EOF to surface a non-zero exit.
     child: Option<std::process::Child>,
+    /// Thread draining the child's stderr. It must run concurrently with our reads of stdout:
+    /// were stderr only read at EOF, a chatty samtools could fill the stderr pipe buffer, stop
+    /// producing stdout, and deadlock against our blocking read.
+    stderr_thread: Option<std::thread::JoinHandle<String>>,
     buf: String,
 }
 
@@ -319,11 +323,11 @@ impl SamReader {
     /// Wait for the BAM `samtools` child (if any) and error on a non-zero exit.
     fn finish(&mut self) -> NgResult<()> {
         if let Some(mut child) = self.child.take() {
-            let mut stderr = String::new();
-            if let Some(mut e) = child.stderr.take() {
-                use std::io::Read;
-                let _ = e.read_to_string(&mut stderr);
-            }
+            let stderr = self
+                .stderr_thread
+                .take()
+                .and_then(|t| t.join().ok())
+                .unwrap_or_default();
             let status = child.wait().map_err(|e| {
                 NgError::new(
                     NgErrorType::SystemError,
@@ -354,15 +358,25 @@ pub fn open_sam(path: &str) -> NgResult<SamReader> {
                 "samtools view: no stdout pipe".to_string(),
             )
         })?;
+        let stderr_thread = child.stderr.take().map(|mut e| {
+            std::thread::spawn(move || {
+                use std::io::Read;
+                let mut s = String::new();
+                let _ = e.read_to_string(&mut s);
+                s
+            })
+        });
         Ok(SamReader {
             inner: Box::new(std::io::BufReader::new(stdout)),
             child: Some(child),
+            stderr_thread,
             buf: String::new(),
         })
     } else {
         Ok(SamReader {
             inner: crate::compression::open_read(path)?,
             child: None,
+            stderr_thread: None,
             buf: String::new(),
         })
     }
