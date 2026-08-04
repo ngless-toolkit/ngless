@@ -5,7 +5,7 @@ What's New (History)
 Version 1.6.0
 -------------
 
-*Beta release (1.6.0-beta2, released on July 4 2026).*
+*Released on August 4 2026*
 
 Starting with version 1.6, **NGLess is based on a new implementation written in
 Rust** (previous versions were written in Haskell). See `Rust implementation
@@ -53,25 +53,49 @@ deprecation warning.
   half-written file), recompresses paired output concurrently under ``--jobs``,
   and sorts directly to BAM when a ``samtools_sort`` result feeds a BAM
   ``write()``.
+* Functions that take an output file now check the output directory *before* the
+  script runs, even when the file name is only computed at run time (e.g.
+  ``ofile=OUTPUT_DIRECTORY </> sample.name() + '.fna.gz'``). Previously, a
+  missing output directory was only reported once the write was reached, i.e.
+  after mapping or assembly had already run.
+* When an ``import`` of a local module cannot be found, the error lists every
+  location that was searched (and, if other versions of the module are
+  available, lists those too). Under ``--trace``, each candidate is printed as
+  it is checked.
 
 For the complete list, see the ``ChangeLog``.
 
-Changes with respect to 1.6.0-beta1
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Changes with respect to the 1.6.0 pre-releases
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you were testing the earlier ``1.6.0-beta1`` pre-release:
+If you were testing the ``1.6.0-beta1`` or ``1.6.0-beta2`` pre-releases, note
+that the final release fixes several features that the pre-releases had not
+fully ported from 1.5:
 
-* The build now supports only ``ngless "1.6"``; declaring ``"1.5"`` (which
-  beta1 accepted with a warning) is now an error.
-* Removed the deprecated ``count()`` ``strand`` argument, the ``--search-dir``
-  flag, and the unimplemented ``--check-deprecation`` flag.
-* The internal output hash (``auto_comments=[{hash}]`` and the parallel
-  lock/stats directory names) changed its values; it remains deterministic and
-  content-addressed.
-* beta2 also restores many features beta1 had not yet ported from earlier ngless
-  versions: transparent ``.xz`` support, the HTML run report, parallel-module
-  progress reporting, ``format={sam|bam}`` on ``write()``,
-  ``preprocess(keep_singles=False)``, reference-based ``count()``, and more.
+* The ``encoding`` argument to ``fastq()``/``paired()`` (and, through them,
+  ``load_fastq_directory()``/``load_mocat_sample()``) is honoured again; the
+  betas accepted it but always auto-detected the quality encoding.
+* External modules can declare ``references:`` again, so catalog modules such as
+  ``igc``, ``om-rgc``, and the gut-catalog modules resolve their bundled
+  references in ``map()`` and ``count()``.
+* The distinction between global and local module imports is restored: a plain
+  ``import`` is again only accepted for known modules (which are auto-downloaded
+  if not present locally), while a local-only module requires ``local import``.
+* External module commands see ``NGLESS_NR_CORES`` set to the configured worker
+  thread count instead of a hard-coded 1.
+* Fixed a deadlock where ``map()`` could hang forever on samples where ``bwa
+  mem`` writes a large amount of output to stderr.
+
+Relative to beta1 specifically, beta2 had already made ``ngless "1.6"`` the only
+accepted language version (beta1 accepted ``"1.5"`` with a warning), removed the
+deprecated ``count()`` ``strand`` argument, the ``--search-dir`` flag and the
+unimplemented ``--check-deprecation`` flag, and restored transparent ``.xz``
+support, the HTML run report, parallel-module progress reporting,
+``format={sam|bam}`` on ``write()``, ``preprocess(keep_singles=False)`` and
+reference-based ``count()``. The internal output hash
+(``auto_comments=[{hash}]`` and the parallel lock/stats directory names) also
+changed its values between beta1 and beta2; it remains deterministic and
+content-addressed.
 
 
 Version 1.5.0

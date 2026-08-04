@@ -9,13 +9,12 @@ The recommended way to install NGLess is through
 
 This will install the most recent released version
 
-## Beta releases (via pixi)
+## Using pixi
 
-Pre-release/beta builds are published as `.conda` packages on the [GitHub
-releases page](https://github.com/ngless-toolkit/ngless/releases) before they
-reach bioconda. The easiest way to install one, together with the external tools
-that NGLess drives (`bwa`, `samtools`, `minimap2`, `megahit`, `prodigal`), is
-with [pixi](https://pixi.sh) and a manifest that pins the beta package by URL.
+[pixi](https://pixi.sh) is an alternative to conda that installs NGLess into a
+self-contained, per-project environment. The external tools that NGLess drives
+(`bwa`, `samtools`, `minimap2`, `megahit`, `prodigal`) are dependencies of the
+bioconda package, so they are pulled in automatically.
 
 pixi only reads a manifest named exactly `pixi.toml`, so create a directory for
 the install and put the manifest there as `pixi.toml` (a ready-to-use copy ships
@@ -29,44 +28,12 @@ repository](https://github.com/ngless-toolkit/ngless/blob/master/pixi_install_ng
     version = "0.1.0"
 
     [dependencies]
-    prodigal = ">=2.6.3,<3"
-    megahit = ">=1.2.9,<2"
-    samtools = ">=1.23.1,<2"
-    minimap2 = ">=2.31,<3"
-    bwa = ">=0.7.19,<0.8"
-    ngless = { url = "https://github.com/ngless-toolkit/ngless/releases/download/v1.6.0-beta2/ngless-1.6.beta2-ha35fb5c_0.conda" }
+    ngless = ">=1.6.0,<2"
 
 Then, from that directory, install and run it with:
 
     pixi install
     pixi run ngless --version
-
-Update the `url` to point at the beta release you want to install.
-
-### Docker
-
-Alternatively, a docker container with NGLess is available at
-[docker hub](https://hub.docker.com/r/nglesstoolkit/ngless):
-
-    docker run -v $PWD:/workdir -w /workdir -it nglesstoolkit/ngless:1.4.2 ngless --version
-
-Adapt the mount flags (``-v``) as needed. You can use the `latest` tag to get a
-more up to date version as well.
-
-
-## Linux (binary)
-
-You can download a [statically linked version of NGless
-1.4.2](https://github.com/ngless-toolkit/ngless/releases/download/v1.4.2/NGLess-v1.4.2-Linux-static-full).
-
-This should work across a wide range of Linux versions (please
-[report](https://github.com/ngless-toolkit/ngless/issues) any issues you encounter):
-
-    curl -L -O https://github.com/ngless-toolkit/ngless/releases/download/v1.4.2/NGLess-v1.4.2-Linux-static-full
-    chmod +x NGLess-v1.4.2-Linux-static-full
-    ./NGLess-v1.4.2-Linux-static-full
-
-This downloaded file bundles bwa, samtools and megahit (also statically linked).
 
 ## From source
 
