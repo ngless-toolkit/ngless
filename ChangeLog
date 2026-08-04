@@ -1,3 +1,42 @@
+Unreleased
+
+	Changes with respect to 1.6.0-beta2:
+	* Fixed the `encoding` argument to `fastq()` and `paired()` (and forwarded
+	by `load_fastq_directory()`/`load_mocat_sample()`): it was accepted but
+	ignored, so loading always auto-detected the quality encoding. `encoding`
+	({auto}/{33}/{sanger}/{64}/{solexa}) is now honoured again.
+	* External modules can once again declare `references:` (both direct
+	`fasta-file`/`gtf-file`/`map-file` entries and `packaged` reference packs).
+	These are now recognised by `map(..., reference=...)` and
+	`count(..., reference=...)`, so catalog modules such as `igc`, `om-rgc`, and
+	the gut-catalog modules resolve their bundled references again.
+	* Restored the distinction between global and local module imports. A plain
+	`import` is again only accepted for known modules (`igc`, `om-rgc`, `motus`,
+	the gut-catalog modules, ...); importing a local-only module now requires
+	`local import`. Known modules that are not present locally are auto-downloaded
+	again.
+	* `local import "motus"` (and `soap`) is now exempt from the guidance error
+	that a plain `import` of these legacy built-in modules raises: downloading the
+	`motus.ngm` external module and loading it with `local import` is the
+	recommended way to run motus.
+	* When an `import` of a local module cannot be found, the error now lists all
+	the locations that were searched. Under `--trace`, each candidate location is
+	printed as it is checked. If other versions of the same module are available,
+	they are listed as well.
+	* External module commands now see `NGLESS_NR_CORES` set to the configured
+	worker thread count (`--jobs`/`--threads`, or the `batch` scheduler's
+	allotment) instead of a hard-coded 1.
+	* `write()` (and other functions taking an output file) now checks the output
+	directory before the script runs even when the file *name* is only known at
+	run time. For example, `ofile=OUTPUT_DIRECTORY </> sample.name() + '.fna.gz'`
+	now aborts immediately if `OUTPUT_DIRECTORY` does not exist, instead of only
+	failing once the write is reached (i.e., after mapping/assembly)
+	* Fixed a deadlock in `map()` where ngless could hang forever (with bwa using
+	no CPU) on samples where bwa mem writes more than a pipe buffer's worth of
+	messages to stderr while ngless is still feeding it reads. ngless now drains
+	the mapper's stderr concurrently. The same fix was applied to the streaming
+	`samtools view` used to read BAM input.
+
 Version 1.6.0-beta2 2026-07-04 by luispedro
 
 	Changes with respect to 1.5.0:
@@ -11,23 +50,6 @@ Version 1.6.0-beta2 2026-07-04 by luispedro
 	* Built-in modules (`parallel`, `samtools`, `mocat`, ...) now track the ngless
 	version: import them at version "1.6" going forward. Older module versions are
 	still accepted (with the latest behaviour) but print a deprecation warning.
-	* Fixed the `encoding` argument to `fastq()` and `paired()` (and forwarded
-	by `load_fastq_directory()`/`load_mocat_sample()`): it was accepted but
-	ignored, so loading always auto-detected the quality encoding. `encoding`
-	({auto}/{33}/{sanger}/{64}/{solexa}) is now honoured again.
-	* External modules can once again declare `references:` (both direct
-	`fasta-file`/`gtf-file`/`map-file` entries and `packaged` reference packs).
-	These are now recognised by `map(..., reference=...)` and
-	`count(..., reference=...)`, so catalog modules such as `igc`, `om-rgc`, and
-	the gut-catalog modules resolve their bundled references again.
-	* External module commands now see `NGLESS_NR_CORES` set to the configured
-	worker thread count (`--jobs`/`--threads`, or the `batch` scheduler's
-	allotment) instead of a hard-coded 1.
-	* Restored the distinction between global and local module imports. A plain
-	`import` is again only accepted for known modules (`igc`, `om-rgc`, `motus`,
-	the gut-catalog modules, ...); importing a local-only module now requires
-	`local import`. Known modules that are not present locally are auto-downloaded
-	again.
 	* Removed the deprecated `strand` argument to `count()`; use `sense`
 	(`{both}`/`{sense}`/`{antisense}`) instead. `strand=True` is equivalent to
 	`sense={sense}`.
@@ -50,33 +72,17 @@ Version 1.6.0-beta2 2026-07-04 by luispedro
 	`mappings.tsv`. Inline scripts (passed with `-e`/`--script`) do *not* write a
 	report by default (they are typically quick one-liners); pass
 	`--create-report` or `-o`/`--html-report-directory` to force one.
-	* A plain `import "motus"` or `import "soap"` (the legacy built-in modules)
-	now aborts with a clear guidance error (both are obsolete and unsupported). A
-	`local import "motus"` is exempt: downloading the `motus.ngm` external module
-	and loading it with `local import` is the recommended way to run motus.
+	* Importing the legacy `motus` or `soap` modules now aborts with a clear
+	guidance error (both are obsolete and unsupported)
 	* `count()` now errors early when more than one annotation source is given
 	(seqname mode, `gff_file`, `functional_map`, or `reference`) instead of
 	silently ignoring all but one
-	* `write()` (and other functions taking an output file) now checks the output
-	directory before the script runs even when the file *name* is only known at
-	run time. For example, `ofile=OUTPUT_DIRECTORY </> sample.name() + '.fna.gz'`
-	now aborts immediately if `OUTPUT_DIRECTORY` does not exist, instead of only
-	failing once the write is reached (i.e., after mapping/assembly)
 	* A constant out-of-bounds list index (e.g. `x[5]` on a 3-element list) now
 	fails early, right after the list is assigned, with the same "Index access
 	on line N is invalid" message as earlier ngless versions
 	* Added the `{always_3_fq_files}` format flag to `write()`
 	* Better suggestions for mistyped arguments/flags (matching by prefix, e.g.
 	`ref=` for `reference=`)
-	* When an `import` of a local module cannot be found, the error now lists all
-	the locations that were searched. Under `--trace`, each candidate location is
-	printed as it is checked. If other versions of the same module are available,
-	they are listed as well.
-	* Fixed a deadlock in `map()` where ngless could hang forever (with bwa using
-	no CPU) on samples where bwa mem writes more than a pipe buffer's worth of
-	messages to stderr while ngless is still feeding it reads. ngless now drains
-	the mapper's stderr concurrently. The same fix was applied to the streaming
-	`samtools view` used to read BAM input.
 
 	Changes with respect to 1.6.0-beta1:
 	* The build now supports a single language version, "1.6": a script declaring
