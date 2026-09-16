@@ -247,9 +247,12 @@ for the requirement (using the aptly-named `reason` field):
 This is very advanced as it requires writing Rust code (the language NGLess is
 implemented in) which can then interact very deeply with the rest of ngless.
 
-For examples, you can look at the built-in modules in the NGLess source tree
-(such as [`src/parallel.rs`](https://github.com/ngless-toolkit/ngless/blob/master/src/parallel.rs)
-or [`src/batch.rs`](https://github.com/ngless-toolkit/ngless/blob/master/src/batch.rs)).
+For an example, you can look at the built-in `batch` module in the NGLess source tree
+([`src/batch.rs`](https://github.com/ngless-toolkit/ngless/blob/master/src/batch.rs)), which is
+self-contained. Note that `src/parallel.rs` is *not* an example: despite the name, it implements
+thread-level parallelism (the `--jobs` configuration and the parallel map helper), not the `.ngl`
+`parallel` module. That module (`lock1`, `run_for_all`, `collect`) is spread across
+`src/interpret.rs`, `src/modules.rs` and `src/transform.rs`.
 If you want to get started, you can ask about details on the [ngless user
 mailing list](https://groups.google.com/forum/#!forum/ngless).
 

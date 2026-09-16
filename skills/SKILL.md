@@ -19,7 +19,11 @@ NGLess is a domain-specific language (DSL) for next-generation sequencing (NGS) 
 **Implementation**: Rust (the Haskell implementation was removed in 1.6; the Rust code at the repository root is the sole, supported implementation)
 **Repository**: https://github.com/ngless-toolkit/ngless
 
-For developer/contributor information (building, source layout, adding functions), see [references/developer-guide.md](references/developer-guide.md).
+For configuration files, search path expansion and the full command-line surface, see
+[references/configuration-and-paths.md](references/configuration-and-paths.md).
+
+For developer/contributor information (building, source layout, adding functions), see
+[references/developer-guide.md](references/developer-guide.md).
 
 ---
 
@@ -52,6 +56,8 @@ write(counts, ofile='output.tsv')
 - `continue` continues to the next item
 - No user-defined functions (only builtins and module functions)
 - Strings: single or double quotes, standard backslash escapes
+- `if` / `else` work as in Python (`else` takes its own indented block)
+- A function call's result cannot be indexed directly: assign it to a variable first
 
 **Module imports:** built-in modules now track the language version, so import them at `version "1.6"`.
 Older version strings (e.g. `"1.1"` for `parallel`) still load — with the *latest* behaviour — but print a
@@ -78,7 +84,11 @@ deprecation warning.
 | List of X | Homogeneous list: `[1, 2, 3]` |
 
 **Operators:** `+`, `-`, `*`, `<`, `>`, `<=`, `>=`, `==`, `!=`, `</>` (path join), `not`, `len()`
-**Indexing:** `read[3:]`, `read[:10]`, `read[5:20]`, `read[:]`
+Mixing Integer and Double in an arithmetic expression yields a Double.
+
+**Indexing:** slicing a read — `read[3:]`, `read[:10]`, `read[5:20]`, `read[:]` — and single-element
+indexing of a list — `samples[0]`. The indexed thing must be a *variable*: write
+`xs = readlines('samples.txt')` then `xs[0]`, not `readlines('samples.txt')[0]`.
 
 ---
 
@@ -96,6 +106,53 @@ deprecation warning.
 | `group([rs1, rs2, ...])` | [ReadSet] -> ReadSet | Combine multiple ReadSets. Args: `name=` |
 | `samfile(path)` | String -> MappedReadSet | Load SAM/BAM. Args: `name=`, `headers=` |
 | `countfile(path)` | String -> CountTable | Load TSV counts |
+
+#### `load_fastq_directory` file-naming rules
+
+The directory is scanned and files are paired up automatically, so the names must follow the
+expected convention:
+
+- `.gz`, `.bz2` and `.xz` are handled transparently and stripped first
+- the remaining extension must be `.fq` or `.fastq`
+- before that extension, `.1`/`.2`, `_1`/`_2`, or `_F`/`_R` marks a paired-end pair; anything else
+  is treated as single-end
+
+A directory containing `S1.pair.1.fq.gz`, `S1.pair.2.fq.gz` and `S1.single.fq.gz` therefore loads as
+one sample with both paired-end and single-end data. If your data does not follow these rules, build
+a directory of symlinks that does.
+
+#### YAML sample lists
+
+`load_sample_list` / `load_sample_from_yaml` read this format:
+
+```yaml
+basedir: /share/data/metagenomes     # optional
+samples:
+  sample1:
+    - paired:
+        - data/Sample1a.1.fq.gz
+        - data/Sample1a.2.fq.gz
+    - paired:
+        - data/Sample1b.1.fq.gz
+        - data/Sample1b.2.fq.gz
+  sample2:
+    - paired:
+        - data/Sample2.1.fq.gz
+        - data/Sample2.2.fq.gz
+    - single:
+        - data/Sample2.A.fq.gz
+```
+
+Each sample maps to a list of entries, each being either `paired:` (two paths) or `single:` (one
+path). Relative paths resolve against `basedir` if present, otherwise **against the current working
+directory — not the location of the YAML file**.
+
+Use `.name()` to recover the sample name from a loaded ReadSet:
+
+```ngless
+input = run_for_all_samples(load_sample_list('list.yaml'))
+write(input, ofile='outputs' </> input.name() + '.fq.xz')
+```
 
 ### Preprocessing
 
@@ -130,6 +187,15 @@ mapped = map(input, fafile='ref.fa')
 Args: `reference=` (builtin or module-provided name), `fafile=` (FASTA path), `mode_all=Bool`,
 `mapper=` (`'bwa'` or `'minimap2'`), `block_size_megabases=Int`, `__extra_args=[String]`
 
+`mode_all=True` passes `-a` to bwa (report all alignments). Using minimap2 requires *both*
+`import "minimap2" version "1.6"` and `mapper="minimap2"`.
+
+**Low-memory mode**: `block_size_megabases=N` splits a large reference into blocks of roughly `N`
+megabases, maps against each in turn and combines the results, so a large catalog can be used on a
+machine that could not hold its index. This *does change results* (slightly) — which is exactly why
+it is a script argument and not a configuration option: NGLess keeps everything that can affect
+results inside the script.
+
 Built-in references (downloaded and cached on first use): `bosTau4`, `ce10`, `canFam3`, `dm5`, `dm6`,
 `gg4`, `gg5`, `hg19`, `hg38.p7`, `hg38.p10`, `mm10.p2`, `mm10.p5`, `rn5`, `rn6`, `sacCer3`, `susScr11`.
 External modules (`igc`, `om-rgc`, the gut catalogs, ...) contribute further reference names.
@@ -149,6 +215,9 @@ mapped = select(mapped, keep_if=[{mapped}, {unique}])
 Args: `keep_if=[Symbol]`, `drop_if=[Symbol]`, `paired=Bool`
 Symbols: `{mapped}`, `{unmapped}`, `{unique}`
 
+By default `select` considers the **insert as a whole** (both mates together); pass `paired=False`
+to have each mate judged independently, as if the data were single-end.
+
 ### Block-based select with methods
 
 ```ngless
@@ -163,7 +232,9 @@ filtered = select(mapped) using |mread|:
 
 MappedRead methods:
 - `.filter(min_match_size=, min_identity_pc=, max_trim=, action={drop}/{unmatch}, reverse=Bool)`
-- `.allbest()` — keep only best alignments
+- `.allbest()` — keep only the best alignments. "Best" is the *fractional* distance: the `NM` field
+  divided by the length of the match. A match with 3 errors over 100 bp therefore beats one with 0
+  errors over 90 bp
 - `.unique()` — keep the read only if it maps uniquely (otherwise drop all its alignments)
 - `.flag({mapped})` / `.flag({unmapped})` — check mapping status
 - `.some_match(reference)` — check if mapped to a specific reference
@@ -195,8 +266,59 @@ counts = count(mapped, features=['KEGG_ko'], functional_map='eggnog.tsv')
 | `discard_zeros` | Bool | False |
 
 Exactly **one** annotation source may be given (seqname mode, `gff_file`, `functional_map`, or
-`reference`); passing more than one is an error. The deprecated `strand` argument was removed in 1.6 —
-use `sense` (`strand=True` is `sense={sense}`).
+`reference`); passing more than one is an error. If the reads were mapped with `map(reference=...)`
+against a reference that carries annotations, `count()` can use them with *no* annotation argument
+at all. The deprecated `strand` argument was removed in 1.6 — use `sense` (`strand=True` is
+`sense={sense}`). `gff_file` and `functional_map` support search path expansion.
+
+#### Choosing `multiple`
+
+- `{unique_only}` — use only uniquely mapped inserts
+- `{all1}` — an insert mapping to 4 locations adds 1 to *each*
+- `{1overN}` — an insert mapping to 4 locations adds 0.25 to each
+- `{dist1}` (default) — distribute multiple mappers in proportion to how the uniquely mapped inserts
+  are distributed among those locations
+
+Rule of thumb: `{dist1}` for **gene abundances**, `{all1}` for **functional annotations**. With
+`{all1}` the functional totals will exceed the number of reads — that is intended, since one insert
+legitimately carries several annotations.
+
+#### Choosing `mode` (how partial overlaps count)
+
+- `{union}` (default) — a read counts for every feature it overlaps
+- `{intersection_non_empty}` — a read counts only for features it *exclusively* overlaps, even partially
+- `{intersection_strict}` — a read counts only if the whole read overlaps the same feature(s)
+
+#### `normalization`
+
+- `{raw}` (default) — no normalization
+- `{normed}` — `{raw}` divided by the feature size
+- `{scaled}` — `{normed}` rescaled so the total matches `{raw}` (within rounding)
+- `{fpkm}` — fragments per 1000 bp per million fragments
+
+#### GFF or TSV?
+
+Use `functional_map` (TSV) if you can; use `gff_file` only if you must. A TSV annotates each whole
+reference sequence with a set of terms — right for gene catalogs. A GFF annotates *regions*, which
+you need for mapping against reference genomes or for (meta)transcriptomes, but it is significantly
+costlier in both time and memory.
+
+#### `functional_map` TSV format
+
+First column is the sequence name, the rest are annotation columns (this is what
+[eggnog-mapper](https://eggnog-mapper.embl.de/) produces):
+
+```
+#geneID	feat1	feat2	feat3
+G1	a1,a2	b	c
+G2	a1|a3		c
+```
+
+- The header is one line, optionally starting with `#`. A multi-line header is allowed if *every*
+  line starts with `#` — the last such line is the header.
+- Multiple values in a cell are separated by `,` or `|`.
+- Cells may be empty: for `feat2`, inserts mapped to `G2` count as unmapped.
+- **Spaces are not allowed**: `a, b` is the feature `a` and the feature ` b` (with a leading space).
 
 ### Assembly & ORF Finding
 
@@ -264,6 +386,28 @@ collect(counts, ofile='all_counts.tsv.gz')
 
 Run multiple instances: each picks a different sample via filesystem locks.
 
+**`run_for_all` vs `lock1`**: the real difference is that only **one** `run_for_all` is allowed per
+script (it applies to the whole script), while `lock1` may be called multiple times. `lock1` is more
+flexible but requires passing `current=` and `allneeded=` to `collect` explicitly:
+
+```ngless
+samples = readlines('input.txt')
+sample = lock1(samples)
+...
+collect(counts, current=sample, allneeded=samples, ofile='output.tsv')
+```
+
+**Internals worth knowing** (they explain surprising behaviour):
+
+- Lock files live in a subdirectory of `ngless-locks/` named by the **hash of the script**. Any
+  change to the script — even a whitespace-only one — starts a fresh directory and forces everything
+  to be recomputed. This over-computes rather than risk serving stale results.
+- `collect()` hashes both the script and the position within it, so multiple `collect()` calls do
+  not clash.
+- Lock mtimes are refreshed every 10 minutes; a lock older than one hour is considered stale and
+  removed. Because outputs are always written atomically, the worst case from mis-detecting a stale
+  lock is wasted computation, never a corrupt or wrong result.
+
 ### samtools
 
 ```ngless
@@ -307,7 +451,27 @@ The legacy built-in `motus`/`soap` modules were removed: a plain `import "motus"
 error, but `local import "motus"` (loading the downloaded `motus.ngm` external module) is the supported
 way to run motus.
 
+**Version strings**: built-in modules track the NGLess version (`version "1.6"`), but external
+modules carry their *own* versions — e.g. `import "igc" version "0.0"`. Do not "fix" an external
+module's version to `1.6`.
+
 See `docs/sources/modules.md` for the full `module.yaml` specification.
+
+---
+
+## Installation
+
+```sh
+conda install -c bioconda ngless        # recommended; pulls in bwa/samtools/minimap2/megahit/prodigal
+```
+
+With [pixi](https://pixi.sh), create a directory containing a manifest named exactly `pixi.toml`
+with `ngless = ">=1.6.0,<2"` under `[dependencies]` (channels: `conda-forge` and bioconda), then
+`pixi install`. A ready-made copy is `pixi_install_ngless.toml` in the repository.
+
+From source: `git clone https://github.com/ngless-toolkit/ngless && cd ngless && cargo build
+--release` produces `target/release/ngless`. A source build does **not** bring the external tools;
+put them on `$PATH` and verify with `ngless --check-install`.
 
 ---
 
@@ -343,9 +507,42 @@ Key options:
 single self-contained `index.html` (no network requests, works offline), plus `script.ngl`, `fq.tsv`, and
 `mappings.tsv`. Inline scripts (`-e`) do not write a report unless `--create-report`/`-o` is given.
 
+**`--subsample` does two things** beyond throwing away >90% of the data: it rewrites every `write()`
+so the output gains a `.subsample` extension (`results.txt` → `results.txt.subsample`), so subsampled
+output can never be confused with the real thing; and it still builds every index and downloads every
+reference the script needs, which makes it the cheapest way to prepare a pipeline's data ahead of a
+real run. Never use it in production.
+
+Short options bundle and may be joined to their values: `-nq`, `-j4`, `-nj4`, `-vfull`, `-pe '...'`.
+
+**`ngless --help` currently lists only a subset of the accepted options.** There are also several
+modes that do not run a script at all — `--install-reference-data`, `--download-demo`,
+`--download-file`, `--create-reference-pack`. See
+[references/configuration-and-paths.md](references/configuration-and-paths.md) for the full list,
+plus configuration files and search path expansion.
+
 ---
 
 ## Common Workflow Patterns
+
+### Removing contaminant / host reads
+
+The blunt form is `select(mapped, drop_if=[{mapped}])`, but the idiom used throughout the NGLess
+documentation and tutorials first raises the bar for what counts as a match, so that short spurious
+hits do not cause good reads to be thrown away:
+
+```ngless
+mapped = map(input, reference='hg19')
+mapped = select(mapped) using |mr|:
+    mr = mr.filter(min_match_size=45, min_identity_pc=90, action={unmatch})
+    if mr.flag({mapped}):
+        discard
+input = as_reads(mapped)
+```
+
+`action={unmatch}` keeps the read but clears its match information, so the following
+`flag({mapped})` test only sees matches that passed the identity and length thresholds. Prefer this
+over a bare `drop_if=[{mapped}]` when filtering against a host or contaminant genome.
 
 ### Metagenomics profiling (single sample)
 
@@ -357,7 +554,10 @@ input = preprocess(input) using |read|:
     if len(read) < 45:
         discard
 mapped = map(input, reference='hg19')
-mapped = select(mapped, drop_if=[{mapped}])  # remove human reads
+mapped = select(mapped) using |mr|:         # remove human reads
+    mr = mr.filter(min_match_size=45, min_identity_pc=90, action={unmatch})
+    if mr.flag({mapped}):
+        discard
 input = as_reads(mapped)
 mapped = map(input, fafile='gene_catalog.fna')
 counts = count(mapped, features=['KEGG_ko'], functional_map='catalog.map.tsv')
@@ -397,19 +597,32 @@ write(count(mapped, features=['seqname']), ofile='contig_counts.tsv')
 
 ## Common Pitfalls
 
-1. **Wrong version declaration**: the first non-comment line must be `ngless "1.6"`. `ngless "1.5"` (and
+1. **Indexing a function call's result** is not supported: use `xs = readlines(f)` then `xs[0]`,
+   never `readlines(f)[0]`.
+2. **Wrong version declaration**: the first non-comment line must be `ngless "1.6"`. `ngless "1.5"` (and
    every other version) is a hard error in this build — there is no compatibility mode.
-2. **Old module import versions**: `import "parallel" version "1.1"` still works but warns; use `"1.6"`.
-3. **Using tabs**: only spaces allowed (4-space indent)
-4. **Forgetting `discard`**: in `preprocess` blocks, filtered reads must be explicitly discarded with `discard`
-5. **`select` symbols confusion**: `keep_if=[{mapped}]` keeps mapped reads; `drop_if=[{mapped}]` removes them
-6. **`count` annotation sources**: if features != `['seqname']`, you need exactly one of `gff_file=`,
+3. **Old module import versions**: `import "parallel" version "1.1"` still works but warns; use `"1.6"`.
+   This applies to *built-in* modules only — external modules keep their own versions
+   (`import "igc" version "0.0"`).
+4. **Using tabs**: only spaces allowed (4-space indent)
+5. **Forgetting `discard`**: in `preprocess` blocks, filtered reads must be explicitly discarded with `discard`
+6. **`select` symbols confusion**: `keep_if=[{mapped}]` keeps mapped reads; `drop_if=[{mapped}]` removes them.
+   For host/contaminant removal prefer the `filter(..., action={unmatch})` idiom (see Common Workflow
+   Patterns) over a bare `drop_if`.
+7. **`count` annotation sources**: if features != `['seqname']`, you need exactly one of `gff_file=`,
    `functional_map=`, or `reference=` — giving two or more is an error
-7. **`strand=` on `count()`**: removed; use `sense={sense}`
-8. **Parallel scripts**: must run multiple NGLess processes (one per sample) — the `parallel` module
-   coordinates via filesystem locks
-9. **`collect` waits for all samples**: output is only written when every sample in the list has been processed
-10. **Missing external tools**: bwa/samtools/minimap2/prodigal/megahit are not bundled; install them (e.g.
+8. **`strand=` on `count()`**: removed; use `sense={sense}`
+9. **Spaces in a `functional_map` TSV** are part of the feature name: `a, b` means `a` and ` b`
+10. **`load_fastq_directory` is picky about names**: `.fq`/`.fastq` (after any `.gz`/`.bz2`/`.xz`),
+    paired as `.1`/`.2`, `_1`/`_2`, or `_F`/`_R`. Non-conforming data needs a symlink directory.
+11. **Relative paths in a YAML sample list** resolve against `basedir`, or else the current working
+    directory — *not* the directory holding the YAML file
+12. **Parallel scripts**: must run multiple NGLess processes (one per sample) — the `parallel` module
+    coordinates via filesystem locks
+13. **`collect` waits for all samples**: output is only written when every sample in the list has been processed
+14. **Editing a script invalidates parallel progress**: lock directories are named by the script hash,
+    so any edit (whitespace included) forces every sample to be reprocessed
+15. **Missing external tools**: bwa/samtools/minimap2/prodigal/megahit are not bundled; install them (e.g.
     via conda/pixi) and check with `ngless --check-install`
-11. **The `{hash}` auto-comment value changed in 1.6**: it is an internal, content-addressed identifier and
+16. **The `{hash}` auto-comment value changed in 1.6**: it is an internal, content-addressed identifier and
     is not comparable across releases

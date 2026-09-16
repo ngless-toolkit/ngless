@@ -197,6 +197,18 @@ values for module constants live in `interpret::module_constant_values`.
 
 ---
 
+## Internal Builtins
+
+`src/modules.rs` registers a few functions whose names start with `__`. They are not user-facing and
+are not documented in the manual, but they are useful when working on the codebase:
+
+- `__assert(Bool)` — aborts if the argument is false. This is how pure-language behaviour is pinned
+  in the functional suite; see `tests/type-conversions/types.ngl`. Reach for it when adding a test
+  for an interpreter or `values.rs` change that has no file output to diff.
+- `__merge_samfiles`, `__paste`, `__check_count` — injected by `transform.rs`, not written by hand.
+
+---
+
 ## Functional Test Structure
 
 `run-tests.sh` iterates `tests/*/`. Each test directory contains one or more `*.ngl` scripts and
@@ -261,6 +273,40 @@ min-ngless-version:
   min-version: "1.3"
   reason: "Uses feature X"
 ```
+
+Other supported fields (all implemented in `external_modules.rs`, all optional):
+
+```yaml
+init:                              # run *before* anything else in any script importing the module
+  init_cmd: './init.sh'            # the intended use is dependency checking, so the user gets an
+  init_args: ['Hello', 'World']    # early error instead of a failure deep into the run
+functions:
+  - nglName: 'my_function'
+    arg1:
+      atype: 'mappedreadset'
+      filetype: 'sam'              # ngless converts BAM -> SAM as needed to honour this
+      can_gzip: false
+      can_bzip2: false             # accept a bzip2-compressed input file
+      can_stream: false            # accept a pipe instead of an intermediate file
+    additional:
+      - name: 'reference'
+        atype: 'str'
+        expand_searchpath: true    # required for search path expansion on a module argument
+      - name: 'complete'
+        atype: 'flag'
+        def: false
+        when-true:                 # `when-true` may be a list, not just a single string
+          - '--output=complete'
+          - '--no-filter'
+```
+
+Notes:
+
+- Paths in `module.yaml` are relative to the YAML file, but commands run with the *user's* working
+  directory. Use `NGLESS_MODULE_DIR` to locate module-internal data.
+- Arguments without a `when-true` are passed as `--name=value`; flags default to `--name`.
+- `rtype` must be `void`, `counts` or `mappedreadset`; returning a `readset` is not supported.
+- A single `citation:` string is accepted as well as a `citations:` list.
 
 References may also be declared as `packaged` reference packs (with `name-version` and `url`), which
 are downloaded on first use. Module-declared references are usable from `map(..., reference=...)` and
