@@ -1,0 +1,12 @@
+ngless "1.6"
+
+# A `;` inside a comment used to end the comment, so the rest of the line ran as
+# code. Everything after the semicolons below must stay a comment.
+# TODO; print("MARKER\n")
+// TODO; print("MARKER\n")
+
+# Semicolons still separate statements in actual code:
+x = 1; y = 2
+__assert(x + y == 3)
+
+print("done\n")

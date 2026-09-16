@@ -1,5 +1,11 @@
 Unreleased
 
+	* Fixed a tokenizer bug where a `;` inside a `#` or `//` comment ended the
+	comment, so the rest of the line was tokenized as code. This usually produced
+	a confusing error pointing at a comment line, but if the tail of the comment
+	happened to be valid NGLess (commented-out code, typically) it was silently
+	executed. Block comments (`/* ... */`) were never affected, and `;` keeps
+	working as a statement separator in code.
 	* `ngless --help` now lists all the accepted command line options. It was
 	missing about half of them, including `-j`/`--jobs`/`--threads`, `-e`/`--script`,
 	`-o`/`--html-report-directory`, `-p`/`--print-last`, `-c`/`--config-file`,

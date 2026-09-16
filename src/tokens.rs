@@ -202,7 +202,8 @@ fn comment(lex: &mut Lexer) -> NgResult<Option<Token>> {
 /// At end of input (no trailing newline) we treat it as a line end.
 fn skip_to_eol(lex: &mut Lexer) -> Token {
     loop {
-        if let Some(t) = eol(lex) {
+        // NB: only a real newline ends a comment; a `;` inside it is just text.
+        if let Some(t) = real_eol(lex) {
             return t;
         }
         if lex.at_eof() {
@@ -440,6 +441,13 @@ fn eol(lex: &mut Lexer) -> Option<Token> {
             }
             Some(Token::NewLine)
         }
+        _ => real_eol(lex),
+    }
+}
+
+/// A real newline (`\r\n` or `\n`), producing `NewLine`. Unlike `eol`, `;` is not accepted.
+fn real_eol(lex: &mut Lexer) -> Option<Token> {
+    match lex.peek() {
         Some('\r') if lex.peek_at(1) == Some('\n') => {
             lex.bump_str("\r\n");
             Some(Token::NewLine)
@@ -529,6 +537,36 @@ mod tests {
     fn single_line_comment_is_newline() {
         assert_eq!(toks("# hello\n"), vec![Token::NewLine]);
         assert_eq!(toks("// hello\n"), vec![Token::NewLine]);
+    }
+
+    // A `;` is a statement separator in code, but inside a comment it is just text: the
+    // comment runs to the end of the line.
+    #[test]
+    fn semicolon_does_not_end_a_comment() {
+        assert_eq!(toks("# a; b\n"), vec![Token::NewLine]);
+        assert_eq!(toks("// a; b\n"), vec![Token::NewLine]);
+        assert_eq!(toks("# a; b"), vec![Token::NewLine]);
+    }
+
+    #[test]
+    fn semicolon_separates_statements() {
+        let ts: Vec<Token> = toks("x = 1; y = 2\n")
+            .into_iter()
+            .filter(|t| !matches!(t, Token::Indent(_)))
+            .collect();
+        assert_eq!(
+            ts,
+            vec![
+                Token::Word("x".to_string()),
+                Token::Operator('='),
+                Token::Expr(Expression::ConstInt(1)),
+                Token::NewLine,
+                Token::Word("y".to_string()),
+                Token::Operator('='),
+                Token::Expr(Expression::ConstInt(2)),
+                Token::NewLine,
+            ]
+        );
     }
 
     #[test]

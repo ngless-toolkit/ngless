@@ -31,7 +31,7 @@ __assert(d == -3.5)
 __assert(d.to_string() == "-3.5")
 
 # Operator precedence and associativity follow the usual rules. `*` binds tighter than
-# `+`/`-`/`</>`, which bind tighter than the comparisons, and operators of equal
+# `+`/`-`/`</>`, which bind tighter than the comparisons; operators of equal
 # precedence group to the left.
 __assert(10 - 4 - 3 == 3)
 __assert(10 - (4 - 3) == 9)
