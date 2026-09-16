@@ -1,0 +1,4 @@
+`x = 5 - 3` used to parse as `x = 5` followed by a bare top-level `-3` (there was no binary
+subtraction operator). Binary `-` now works, but a bare expression in statement position is
+still possible to write, and it must be reported by validation as a script error rather than
+reaching the interpreter and surfacing as an internal error.

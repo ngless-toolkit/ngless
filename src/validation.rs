@@ -25,6 +25,7 @@ pub fn validate(funcs: &[Function], constants: &[String], script: &Script) -> Ng
     errs.extend(validate_pure_functions(funcs, script));
     errs.extend(validate_write_oname(script));
     errs.extend(validate_block_assignments(script));
+    errs.extend(validate_statements(script));
     // Samtools-module check: only active when the module's functions are in scope.
     if funcs.iter().any(|f| f.name.0 == "samtools_sort") {
         errs.extend(validate_select_unique_not_sorted(script));
@@ -947,6 +948,75 @@ fn validate_block_assignments(script: &Script) -> Vec<String> {
     out
 }
 
+/// Check that every statement position holds something the interpreter can actually execute.
+///
+/// The parser accepts a bare expression as a statement, but neither `interpret_top` nor
+/// `interpret_block_stmt` has a case for one: there is nothing to do with its value. Reaching the
+/// interpreter that way produced a `should_not_occur` error, i.e. the "please report this bug"
+/// banner, for what is really a mistake in the user's script. Catching it here reports it as an
+/// ordinary script error, and makes `ngless -n` useful for this class of typo.
+fn validate_statements(script: &Script) -> Vec<String> {
+    /// Statements allowed at the top level (mirrors the cases of `interpret_top`).
+    fn top(lno: usize, e: &Expression, out: &mut Vec<String>) {
+        match e {
+            Expression::Assignment(_, _) | Expression::FunctionCall(..) => {}
+            Expression::Condition(_, t_branch, f_branch) => {
+                top(lno, t_branch, out);
+                top(lno, f_branch, out);
+            }
+            Expression::Sequence(es) => {
+                for e in es {
+                    top(lno, e, out);
+                }
+            }
+            other => out.push(line_msg(lno, no_effect_msg(other))),
+        }
+    }
+
+    /// Statements allowed inside a `using |var|:` block (mirrors `interpret_block_stmt`).
+    fn in_block(lno: usize, e: &Expression, out: &mut Vec<String>) {
+        match e {
+            Expression::Assignment(_, _) | Expression::Discard | Expression::Continue => {}
+            Expression::Condition(_, t_branch, f_branch) => {
+                in_block(lno, t_branch, out);
+                in_block(lno, f_branch, out);
+            }
+            Expression::Sequence(es) => {
+                for e in es {
+                    in_block(lno, e, out);
+                }
+            }
+            other => out.push(line_msg(lno, no_effect_msg(other))),
+        }
+    }
+
+    fn no_effect_msg(e: &Expression) -> String {
+        let hint = match e {
+            // `x = 5 - 3` used to parse as `x = 5` followed by the statement `-3`; `-` is now a
+            // binary operator, but a stray operator can still strand an expression like this.
+            Expression::UnaryOp(..) | Expression::BinaryOp(..) => " (a stray operator, perhaps?)",
+            _ => "",
+        };
+        format!(
+            "This expression is not a statement{hint}: its value is computed and then discarded, \
+             which has no effect. Assign it to a variable or remove it. [{e:?}]"
+        )
+    }
+
+    let mut out = Vec::new();
+    for (lno, e) in &script.body {
+        top(*lno, e, &mut out);
+        // Block bodies can be nested anywhere inside the statement (`x = preprocess(y) using ...`),
+        // so they are collected separately rather than through `top`.
+        recursive_analyse(e, &mut |x| {
+            if let Expression::FunctionCall(_, _, _, Some(block)) = x {
+                in_block(*lno, &block.body, &mut out);
+            }
+        });
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -970,6 +1040,30 @@ mod tests {
             validate(&funcs(), &[], &script).is_err(),
             "Validation should have errored for:\n{text}"
         );
+    }
+
+    /// A bare expression in statement position has no effect; it used to reach the interpreter and
+    /// come back as an internal ("please report this bug") error.
+    #[test]
+    fn bare_top_level_expression() {
+        is_error("ngless '1.6'\nx = 5\n-3\n");
+        is_error("ngless '1.6'\nx = 5\nx\n");
+        is_error("ngless '1.6'\nx = 5\nx + 1\n");
+        is_error("ngless '1.6'\ndiscard\n");
+        is_error("ngless '1.6'\nif True:\n    1 + 1\n");
+    }
+
+    #[test]
+    fn statements_are_accepted() {
+        is_ok("ngless '1.6'\nx = 5 - 3\nprint(x)\n");
+        is_ok("ngless '1.6'\nif True:\n    print(1)\nelse:\n    print(2)\n");
+    }
+
+    /// Inside a block, `discard`/`continue` are statements but a bare expression still is not.
+    #[test]
+    fn bare_expression_inside_block() {
+        is_ok("ngless '1.6'\ninput = fastq('input.fq')\ninput = preprocess(input) using |read|:\n    if len(read) < 20:\n        discard\n");
+        is_error("ngless '1.6'\ninput = fastq('input.fq')\ninput = preprocess(input) using |read|:\n    len(read)\n");
     }
 
     #[test]

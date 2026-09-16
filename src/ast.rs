@@ -24,10 +24,11 @@ pub enum UOp {
     Not,
 }
 
-/// Binary operators. Note there is no subtraction operator in NGLess.
+/// Binary operators. Note there is no division operator in NGLess.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BOp {
     Add,
+    Sub,
     Mul,
     GT,
     GTE,

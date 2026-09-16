@@ -200,6 +200,7 @@ fn enc_maybe_type(t: Option<&crate::ast::NGLType>) -> Value {
 fn enc_bop(op: BOp) -> &'static str {
     match op {
         BOp::Add => "add",
+        BOp::Sub => "sub",
         BOp::Mul => "mul",
         BOp::GT => "gt",
         BOp::GTE => "gte",

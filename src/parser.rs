@@ -10,6 +10,17 @@ use crate::ast::*;
 use crate::errors::{NgError, NgResult};
 use crate::tokens::{tokenize, PosToken, Token};
 
+/// Binding strength of each binary operator; a higher number binds tighter. The levels mirror the
+/// usual ones (and Python's): multiplication binds tighter than addition/subtraction, which bind
+/// tighter than the comparisons. `</>` is a string concatenation, so it sits with `+`.
+fn precedence(op: BOp) -> u8 {
+    match op {
+        BOp::EQ | BOp::NEQ | BOp::LT | BOp::LTE | BOp::GT | BOp::GTE => 1,
+        BOp::Add | BOp::Sub | BOp::PathAppend => 2,
+        BOp::Mul => 3,
+    }
+}
+
 /// Remove spaces that do not follow newlines, and any spaces/newlines between brackets
 /// (round or square). Mirrors `_cleanupindents` in Parse.hs.
 pub fn cleanup_indents(toks: &[PosToken]) -> Vec<PosToken> {
@@ -228,15 +239,20 @@ impl Parser {
         }
     }
 
-    fn binop(&mut self) -> Option<BOp> {
+    /// The binary operator at the current position, without consuming it.
+    fn peek_binop(&self) -> Option<BOp> {
         match self.peek() {
             Some(PosToken {
                 tok: Token::Bop(b), ..
-            }) => {
-                let b = *b;
-                self.pos += 1;
-                Some(b)
-            }
+            }) => Some(*b),
+            // `-` is tokenized as a plain operator (not a `Bop`) because it is also the unary
+            // minus. It is only read as subtraction here, i.e. in operator position, after a
+            // left operand has already been parsed; `left_expression` tries `uoperator` first,
+            // so `-3`, `f(-3)` and `5 - -3` all still get the unary reading where appropriate.
+            Some(PosToken {
+                tok: Token::Operator('-'),
+                ..
+            }) => Some(BOp::Sub),
             _ => None,
         }
     }
@@ -313,17 +329,32 @@ impl Parser {
     }
 
     fn innerexpression(&mut self) -> Option<Expression> {
-        let left = self.left_expression()?;
-        if let Some(be) = self.opt(|p| {
-            let bop = p.binop()?;
-            let right = p.innerexpression()?;
-            Some((bop, right))
-        }) {
-            let (bop, right) = be;
-            Some(Expression::BinaryOp(bop, Box::new(left), Box::new(right)))
-        } else {
-            Some(left)
+        self.binary_expression(0)
+    }
+
+    /// Parse a chain of binary operators by precedence climbing: parse a left operand, then keep
+    /// absorbing operators that bind at least as tightly as `min_prec`. All the operators are
+    /// left-associative, and the precedence levels are the familiar ones (see [`precedence`]), so
+    /// `10 - 4 - 3` is `(10 - 4) - 3` and `1 + 2 * 3` is `1 + (2 * 3)`, as in Python.
+    ///
+    /// The loop never crosses a newline, because `peek_binop` only matches operator tokens.
+    fn binary_expression(&mut self, min_prec: u8) -> Option<Expression> {
+        let mut left = self.left_expression()?;
+        while let Some(bop) = self.peek_binop().filter(|b| precedence(*b) >= min_prec) {
+            let save = self.pos;
+            self.pos += 1;
+            // Left-associative: the right operand may only absorb strictly tighter operators.
+            match self.binary_expression(precedence(bop) + 1) {
+                Some(right) => {
+                    left = Expression::BinaryOp(bop, Box::new(left), Box::new(right));
+                }
+                None => {
+                    self.pos = save;
+                    break;
+                }
+            }
         }
+        Some(left)
     }
 
     fn left_expression(&mut self) -> Option<Expression> {
@@ -1037,5 +1068,153 @@ mod tests {
             Token::NewLine,
         ];
         assert_eq!(tokcleanup(toks), expected);
+    }
+
+    // --- binary minus --------------------------------------------------------
+
+    fn int(n: i64) -> Expression {
+        Expression::ConstInt(n)
+    }
+
+    fn sub(a: Expression, b: Expression) -> Expression {
+        Expression::BinaryOp(BOp::Sub, Box::new(a), Box::new(b))
+    }
+
+    fn neg(e: Expression) -> Expression {
+        Expression::UnaryOp(UOp::Minus, Box::new(e))
+    }
+
+    #[test]
+    fn parse_binary_minus() {
+        assert_eq!(parse_body("5 - 3"), vec![sub(int(5), int(3))]);
+        assert_eq!(parse_body("a - b"), vec![sub(lookup("a"), lookup("b"))]);
+    }
+
+    /// The regression this was added for: `x = 5 - 3` used to parse as `x = 5` followed by a
+    /// separate top-level `-3`.
+    #[test]
+    fn parse_assignment_with_subtraction() {
+        assert_eq!(
+            parse_body("x = 5 - 3"),
+            vec![Expression::Assignment(
+                Variable("x".into()),
+                Box::new(sub(int(5), int(3)))
+            )]
+        );
+    }
+
+    /// Unary minus still wins wherever there is no left operand to subtract from.
+    #[test]
+    fn parse_unary_minus_still_works() {
+        assert_eq!(parse_body("-3"), vec![neg(int(3))]);
+        assert_eq!(
+            parse_body("x = -3"),
+            vec![Expression::Assignment(
+                Variable("x".into()),
+                Box::new(neg(int(3)))
+            )]
+        );
+        assert_eq!(
+            parse_body("f(-3)"),
+            vec![Expression::FunctionCall(
+                FuncName("f".into()),
+                Box::new(neg(int(3))),
+                vec![],
+                None
+            )]
+        );
+        assert_eq!(parse_body("5 - -3"), vec![sub(int(5), neg(int(3)))]);
+    }
+
+    /// `binop` never crosses a newline, so consecutive statements are not glued together by a
+    /// leading unary minus on the second one.
+    #[test]
+    fn parse_minus_does_not_cross_newline() {
+        assert_eq!(
+            parse_body("x = 5\n-3"),
+            vec![
+                Expression::Assignment(Variable("x".into()), Box::new(int(5))),
+                neg(int(3)),
+            ]
+        );
+    }
+
+    fn add(a: Expression, b: Expression) -> Expression {
+        Expression::BinaryOp(BOp::Add, Box::new(a), Box::new(b))
+    }
+
+    fn mul(a: Expression, b: Expression) -> Expression {
+        Expression::BinaryOp(BOp::Mul, Box::new(a), Box::new(b))
+    }
+
+    fn bop(op: BOp, a: Expression, b: Expression) -> Expression {
+        Expression::BinaryOp(op, Box::new(a), Box::new(b))
+    }
+
+    /// Operators of equal precedence group to the left, as in Python.
+    #[test]
+    fn parse_left_associativity() {
+        assert_eq!(
+            parse_body("10 - 4 - 3"),
+            vec![sub(sub(int(10), int(4)), int(3))]
+        );
+        assert_eq!(
+            parse_body("1 - 2 + 3"),
+            vec![add(sub(int(1), int(2)), int(3))]
+        );
+        assert_eq!(
+            parse_body("2 * 3 * 4"),
+            vec![mul(mul(int(2), int(3)), int(4))]
+        );
+        // `</>` sits at the same level as `+`.
+        assert_eq!(
+            parse_body("a </> b + c"),
+            vec![add(
+                bop(BOp::PathAppend, lookup("a"), lookup("b")),
+                lookup("c")
+            )]
+        );
+    }
+
+    /// `*` binds tighter than `+`/`-`, which bind tighter than the comparisons.
+    #[test]
+    fn parse_precedence() {
+        assert_eq!(
+            parse_body("1 + 2 * 3"),
+            vec![add(int(1), mul(int(2), int(3)))]
+        );
+        assert_eq!(
+            parse_body("2 * 3 + 1"),
+            vec![add(mul(int(2), int(3)), int(1))]
+        );
+        assert_eq!(
+            parse_body("20 - 2 * 3"),
+            vec![sub(int(20), mul(int(2), int(3)))]
+        );
+        assert_eq!(
+            parse_body("5 - 3 < 3"),
+            vec![bop(BOp::LT, sub(int(5), int(3)), int(3))]
+        );
+        assert_eq!(
+            parse_body("a == b + 1"),
+            vec![bop(BOp::EQ, lookup("a"), add(lookup("b"), int(1)))]
+        );
+        // Parentheses still override precedence.
+        assert_eq!(
+            parse_body("(1 + 2) * 3"),
+            vec![mul(add(int(1), int(2)), int(3))]
+        );
+    }
+
+    /// `not` binds looser than the binary operators, as in Python.
+    #[test]
+    fn parse_not_binds_loosest() {
+        assert_eq!(
+            parse_body("not a + 1 == b"),
+            vec![Expression::UnaryOp(
+                UOp::Not,
+                Box::new(bop(BOp::EQ, add(lookup("a"), int(1)), lookup("b")))
+            )]
+        );
     }
 }

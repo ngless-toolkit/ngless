@@ -266,71 +266,52 @@ impl TypeChecker {
 
     fn check_bop(&mut self, bop: BOp, a: &Expression, b: &Expression) -> TR<Option<NGLType>> {
         use NGLType::*;
+        // Each operand's type is inferred exactly once. `ngl_type_of` walks the whole
+        // subexpression, so testing an operand against several candidate types by calling it again
+        // (as a chain of `soft_check_pair`s does) costs another full traversal each time, which is
+        // exponential in the depth of an operator chain like `a + b + c + ...`.
+        let ta = self.ngl_type_of(a)?;
+        let tb = self.ngl_type_of(b)?;
         match bop {
             BOp::Add => {
-                let t = match self.soft_check_pair(&Integer, a, b)? {
-                    Some(t) => Some(t),
-                    None => self.soft_check_pair(&String, a, b)?,
-                };
+                // `+` is both numeric addition and string concatenation.
+                if ta.as_ref() == Some(&String) && tb.as_ref() == Some(&String) {
+                    return Ok(Some(String));
+                }
+                let t = num_pair_result(ta, tb);
                 if t.is_none() {
                     self.error_in_line(
-                        "Addition operator (+) must be applied to a pair of strings or integers",
+                        "Addition operator (+) must be applied to a pair of strings or numbers",
                     );
                 }
                 Ok(t)
             }
-            BOp::Mul => {
-                self.check_num(a)?;
-                self.check_num(b)
+            BOp::Sub | BOp::Mul => {
+                let ta = self.require_num(ta, a);
+                let tb = self.require_num(tb, b);
+                Ok(num_pair_result(ta, tb))
             }
             BOp::GT | BOp::GTE | BOp::LT | BOp::LTE => {
-                self.check_num(a)?;
-                self.check_num(b)?;
+                self.require_num(ta, a);
+                self.require_num(tb, b);
                 Ok(Some(Bool))
             }
-            BOp::PathAppend => {
-                self.soft_check(&String, a)?;
-                self.soft_check(&String, b)?;
-                Ok(Some(String))
-            }
+            // As in Haskell, `</>` does not check its operands (they have already been walked, so
+            // any error inside them has been reported); the result is always a String.
+            BOp::PathAppend => Ok(Some(String)),
             BOp::EQ | BOp::NEQ => {
-                let t = match self.soft_check_pair(&Integer, a, b)? {
-                    Some(t) => Some(t),
-                    None => match self.soft_check_pair(&Double, a, b)? {
-                        Some(t) => Some(t),
-                        None => self.soft_check_pair(&String, a, b)?,
-                    },
-                };
-                if t.is_none() {
+                let comparable = matches!(
+                    (&ta, &tb),
+                    (Some(Integer), Some(Integer))
+                        | (Some(Double), Some(Double))
+                        | (Some(String), Some(String))
+                );
+                if !comparable {
                     self.error_in_line("Comparison operators (== or !=) must be applied to a pair of strings or numbers");
                 }
                 Ok(Some(Bool))
             }
         }
-    }
-
-    fn soft_check(&mut self, expected: &NGLType, expr: &Expression) -> TR<Option<NGLType>> {
-        let t = self.ngl_type_of(expr)?;
-        Ok(if t.as_ref() != Some(expected) {
-            None
-        } else {
-            t
-        })
-    }
-
-    fn soft_check_pair(
-        &mut self,
-        t: &NGLType,
-        a: &Expression,
-        b: &Expression,
-    ) -> TR<Option<NGLType>> {
-        let ta = self.soft_check(t, a)?;
-        let tb = self.soft_check(t, b)?;
-        Ok(if ta == tb && tb.as_ref() == Some(t) {
-            ta
-        } else {
-            None
-        })
     }
 
     fn check_bool(&mut self, e: &Expression) -> TR<Option<NGLType>> {
@@ -359,16 +340,22 @@ impl TypeChecker {
         Ok(Some(NGLType::Integer))
     }
 
-    fn check_num(&mut self, e: &Expression) -> TR<Option<NGLType>> {
-        let t = self.ngl_type_of(e)?;
+    /// Report an error unless `t` (the already-inferred type of `e`) is numeric or unknown.
+    /// Returns the type to carry on with.
+    fn require_num(&mut self, t: Option<NGLType>, e: &Expression) -> Option<NGLType> {
         if matches!(t, Some(NGLType::Integer) | Some(NGLType::Double) | None) {
-            Ok(t)
+            t
         } else {
             self.error_in_line(format!(
                 "Expected numeric expression, got {t:?} for expression {e:?}"
             ));
-            Ok(Some(NGLType::Double)) // a decent guess most of the time
+            Some(NGLType::Double) // a decent guess most of the time
         }
+    }
+
+    fn check_num(&mut self, e: &Expression) -> TR<Option<NGLType>> {
+        let t = self.ngl_type_of(e)?;
+        Ok(self.require_num(t, e))
     }
 
     fn check_index(&mut self, expr: &Expression, index: &Index) -> TR<Option<NGLType>> {
@@ -764,6 +751,18 @@ fn type_of_constant(v: &str) -> Option<NGLType> {
     }
 }
 
+/// The result type of an arithmetic operator applied to operands of the given types: `Integer`
+/// if both are integers, `Double` if both are numeric and at least one is a double, and unknown
+/// (`None`) if either operand's type is unknown or non-numeric.
+fn num_pair_result(ta: Option<NGLType>, tb: Option<NGLType>) -> Option<NGLType> {
+    use NGLType::{Double, Integer};
+    match (ta, tb) {
+        (Some(Integer), Some(Integer)) => Some(Integer),
+        (Some(Integer) | Some(Double), Some(Integer) | Some(Double)) => Some(Double),
+        _ => None,
+    }
+}
+
 fn trivial_convertable(a: &NGLType, b: &NGLType) -> bool {
     matches!((a, b), (NGLType::SequenceSet, NGLType::String)) || a == b
 }
@@ -795,6 +794,53 @@ mod tests {
                 0,
                 Expression::FunctionCall(FuncName(name.into()), Box::new(arg), args, None),
             )],
+        }
+    }
+
+    #[test]
+    fn arithmetic_types() {
+        is_ok_text("ngless '1.6'\nx = 5 - 3\n__assert(x == 2)\n");
+        is_ok_text("ngless '1.6'\nx = 5 - 2.5\n__assert(x == 2.5)\n");
+        is_ok_text("ngless '1.6'\nx = 1.0 + 2.0\n__assert(x == 3.0)\n");
+        is_ok_text("ngless '1.6'\nx = 1.5 * 2\n__assert(x == 3.0)\n");
+        is_error_text("ngless '1.6'\nx = 'a' - 'b'\n");
+        is_error_text("ngless '1.6'\nx = 'a' - 1\n");
+    }
+
+    /// Mixing integers and doubles yields a double, whichever side the double is on.
+    #[test]
+    fn numeric_pair_result_type() {
+        use NGLType::{Double, Integer};
+        assert_eq!(num_pair_result(Some(Integer), Some(Integer)), Some(Integer));
+        assert_eq!(num_pair_result(Some(Integer), Some(Double)), Some(Double));
+        assert_eq!(num_pair_result(Some(Double), Some(Integer)), Some(Double));
+        assert_eq!(num_pair_result(Some(Double), Some(Double)), Some(Double));
+        assert_eq!(num_pair_result(None, Some(Integer)), None);
+        assert_eq!(num_pair_result(Some(NGLType::String), Some(Integer)), None);
+    }
+
+    /// `check_bop` used to infer an operand's type once per candidate type, and each inference
+    /// walks the whole operand, so a chain of `+` cost 2^n: a 24-term string concatenation took
+    /// half a second and a 200-term one never finished. Building an output path out of several
+    /// pieces is ordinary NGLess, so this guards the linear behaviour.
+    ///
+    /// Run on a worker thread so a regression fails the test in bounded time instead of hanging.
+    #[test]
+    fn deep_operator_chain_type_checks_in_linear_time() {
+        let chain = vec!["\"s\""; 40].join(" + ");
+        let text = format!("ngless '1.6'\nx = {chain}\n__assert(x == \"s\")\n");
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let script = parse_ngless("test", true, &text).expect("parse failed");
+            let _ = tx.send(checktypes(&script, &[], &[]).is_ok());
+        });
+        match rx.recv_timeout(std::time::Duration::from_secs(10)) {
+            Ok(true) => {}
+            Ok(false) => panic!("a 40-term `+` chain should type-check"),
+            Err(_) => panic!(
+                "type-checking a 40-term `+` chain did not finish in 10s: \
+                 `check_bop` is inferring operand types more than once again"
+            ),
         }
     }
 

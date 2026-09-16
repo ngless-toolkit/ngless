@@ -1,0 +1,7 @@
+ngless "1.6"
+
+# A bare expression in statement position has no effect. It used to reach the
+# interpreter, which reported it as an internal error ("please report this bug");
+# it is now caught by validation, so `ngless -n` (which this test runs with) flags it.
+x = 5
+-3

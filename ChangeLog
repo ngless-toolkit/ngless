@@ -8,6 +8,33 @@ Unreleased
 	(`--install-reference-data`, `--download-demo`, `--download-file`,
 	`--create-reference-pack`). The options are now grouped by purpose and the
 	supported short-option bundling is documented.
+	* Added the binary subtraction operator (`-`). It was documented in
+	`Language.md` (both in the prose and in the grammar), but `-` was only ever
+	parsed as unary negation, so `x = 5 - 3` silently mis-parsed as `x = 5`
+	followed by a separate top-level `-3`.
+	* Binary operators now have the usual precedence and are left-associative,
+	matching Python: `*` binds tighter than `+`/`-`/`</>`, which bind tighter
+	than the comparisons (`< > <= >= == !=`), and `not` binds loosest.
+	Previously they had no relative precedence and were right-associative, so
+	`10 - 4 - 3` would have been `10 - (4 - 3)` and `2 * 3 + 1` was `2 * (3 + 1)`.
+	Expressions such as `x - 1 > 0` or `len(x) + 1 == n`, which used to be type
+	errors, now work. Note that, unlike Python, comparisons do not chain:
+	`1 < 2 < 3` is `(1 < 2) < 3`, a type error.
+	* A bare expression in statement position (e.g. the stray `-3` above) is now
+	rejected by validation, as a normal script error reported by `ngless -n`.
+	Previously it reached the interpreter and was reported as an internal error,
+	with the "please report this bug" banner.
+	* Fixed unary minus on doubles (`x = -3.5` failed at run time with
+	"invalid unary operation (Minus) on value of type double").
+	* Fixed the type checking of arithmetic on doubles: `+` rejected a pair of
+	doubles ("Addition operator (+) must be applied to a pair of strings or
+	integers"), and `*` inferred the type of its right operand rather than the
+	documented "mixing integers and doubles returns a double".
+	* Fixed exponential type-checking time for long operator chains. The type
+	of each operand was inferred once per candidate type, and every inference
+	walks the whole operand, so a chain such as `a + b + c + ...` cost 2^n: a
+	24-term string concatenation took half a second and a 200-term one did not
+	finish. Operand types are now inferred once.
 
 Version 1.6.0 2026-08-04 by luispedro
 

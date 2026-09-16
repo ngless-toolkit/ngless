@@ -144,13 +144,28 @@ The operator `not` negates its boolean argument
 All operators can only be applied to numeric types. Mixing integers and doubles
 returns a double. The following binary operators are used for arithmetic:
 
-    + - < > >= <= == !=
+    + - * < > >= <= == !=
 
 The `+` operator can also perform concatenation of String objects.
 
 
 The `</>` operator is used to concatenate two Strings while also adding a '/'
 character between them. This is useful for concatenating file paths.
+
+### Associativity and precedence
+
+Binary operators follow the usual precedence rules (the same ones as Python): `*` binds
+tightest, then `+`, `-` and `</>`, and the comparisons (`< > <= >= == !=`) bind loosest.
+`not` binds looser still. Operators of equal precedence group to the left:
+
+    1 + 2 * 3       # 7
+    10 - 4 - 3      # 3
+    5 - 3 == 2      # True
+
+Unlike Python, comparisons do not chain: `1 < 2 < 3` means `(1 < 2) < 3`, which is a type
+error rather than `True`.
+
+There is no division operator.
 
 ## Indexing
 
@@ -239,9 +254,11 @@ denotes _optional_, and `{x}` denotes _zero or more of `x`_.
                 | innerexpression
                 ;
     
-    innerexpression = left_expression, binop, innerexpression
-                        | left_expression
-                        ;
+    innerexpression = comparison ;
+
+    comparison = additive, { ("==" | "!=" | "<=" | "<" | ">=" | ">"), additive } ;
+    additive = multiplicative, { ('+' | '-' | "</>"), multiplicative } ;
+    multiplicative = left_expression, { '*', left_expression } ;
     
     left_expression =  uoperator
                         | method_call
@@ -275,8 +292,7 @@ denotes _optional_, and `{x}` denotes _zero or more of `x`_.
     
     
     indentation = ' ', {' '} ;
-    binop = '+' | '-' | '*' | "!=" | "==" | "</>" | "<=" | "<" | ">=" | ">" | "+" | "-" ;
-    
+
     uoperator =
             lenop
             | unary_minus

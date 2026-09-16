@@ -1,0 +1,55 @@
+ngless "1.6"
+
+# Binary subtraction. This used to mis-parse: `5 - 3` became `5` followed by a
+# separate top-level `-3`.
+__assert(5 - 3 == 2)
+__assert(3 - 5 == -2)
+
+x = 5
+y = 3
+__assert(x - y == 2)
+__assert(x - 10 == -5)
+
+# Unary minus still parses wherever there is no left operand.
+n = -3
+__assert(n == -3)
+__assert(5 - -3 == 8)
+__assert(-5 - 3 == -8)
+__assert(-5 * 3 == -15)
+
+# Mixing integers and doubles gives a double.
+__assert(5 - 2.5 == 2.5)
+__assert(2.5 - 5 == -2.5)
+__assert(1.5 - 0.5 == 1.0)
+__assert(1.0 + 2.0 == 3.0)
+__assert(1 + 2.5 == 3.5)
+__assert(1.5 * 2 == 3.0)
+
+# Unary minus on a double.
+d = -3.5
+__assert(d == -3.5)
+__assert(d.to_string() == "-3.5")
+
+# Operator precedence and associativity follow the usual rules. `*` binds tighter than
+# `+`/`-`/`</>`, which bind tighter than the comparisons, and operators of equal
+# precedence group to the left.
+__assert(10 - 4 - 3 == 3)
+__assert(10 - (4 - 3) == 9)
+__assert(1 + 2 * 3 == 7)
+__assert((1 + 2) * 3 == 9)
+__assert(2 * 3 + 1 == 7)
+__assert(20 - 2 * 3 == 14)
+__assert(1 - 2 + 3 == 2)
+__assert(2 * 3 * 4 == 24)
+
+# Comparisons bind loosest, so arithmetic on either side needs no parentheses.
+__assert(5 - 3 < 3)
+__assert(len([1, 2, 3]) - 1 == 2)
+__assert(not 5 - 3 == 4)
+
+# `+` on strings, and `</>` at the same level as `+`, grouping to the left.
+__assert("a" + "b" + "c" == "abc")
+__assert("out" </> "sub" </> "f.fq" == "out/sub/f.fq")
+__assert("out" </> "sub" + ".fq" == "out/sub.fq")
+
+__assert((5 - 3).to_string() == "2")

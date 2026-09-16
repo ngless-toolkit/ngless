@@ -199,6 +199,10 @@ pub fn eval_binary(op: BOp, a: &NGLessObject, b: &NGLessObject) -> NgResult<NGLe
             (String(x), String(y)) => Ok(String(format!("{x}{y}"))),
             _ => Ok(Double(as_double(a)? + as_double(b)?)),
         },
+        BOp::Sub => match (a, b) {
+            (Integer(x), Integer(y)) => Ok(Integer(x - y)),
+            _ => Ok(Double(as_double(a)? - as_double(b)?)),
+        },
         BOp::Mul => match (a, b) {
             (Integer(x), Integer(y)) => Ok(Integer(x * y)),
             _ => Ok(Double(as_double(a)? * as_double(b)?)),
@@ -237,6 +241,7 @@ pub fn eval_unary(op: crate::ast::UOp, v: &NGLessObject) -> NgResult<NGLessObjec
     use NGLessObject::*;
     match (op, v) {
         (UOp::Minus, Integer(n)) => Ok(Integer(-n)),
+        (UOp::Minus, Double(n)) => Ok(Double(-n)),
         (UOp::Len, List(elems)) => Ok(Integer(elems.len() as i64)),
         (UOp::Len, Read(r)) => Ok(Integer(r.len() as i64)),
         (UOp::Not, Bool(b)) => Ok(Bool(!b)),
@@ -298,6 +303,44 @@ mod tests {
             eval_binary(BOp::Add, &String("a".into()), &String("b".into())).unwrap(),
             String("ab".into())
         );
+    }
+
+    #[test]
+    fn subtract_integers_and_doubles() {
+        assert_eq!(
+            eval_binary(BOp::Sub, &Integer(40), &Integer(2)).unwrap(),
+            Integer(38)
+        );
+        assert_eq!(
+            eval_binary(BOp::Sub, &Integer(40), &Integer(-2)).unwrap(),
+            Integer(42)
+        );
+        // Mixing an integer and a double yields a double.
+        assert_eq!(
+            eval_binary(BOp::Sub, &Integer(5), &Double(2.5)).unwrap(),
+            Double(2.5)
+        );
+        assert_eq!(
+            eval_binary(BOp::Sub, &Double(2.5), &Integer(5)).unwrap(),
+            Double(-2.5)
+        );
+    }
+
+    #[test]
+    fn add_doubles() {
+        assert_eq!(
+            eval_binary(BOp::Add, &Double(1.0), &Double(2.0)).unwrap(),
+            Double(3.0)
+        );
+        assert_eq!(
+            eval_binary(BOp::Add, &Integer(1), &Double(2.0)).unwrap(),
+            Double(3.0)
+        );
+    }
+
+    #[test]
+    fn unary_minus_on_double() {
+        assert_eq!(eval_unary(UOp::Minus, &Double(3.5)).unwrap(), Double(-3.5));
     }
 
     #[test]
