@@ -81,18 +81,49 @@ pub(crate) fn help_text() -> String {
          \n\
          Run the ngless script SCRIPT. Any ARGS following it are exposed to the script as ARGV.\n\
          \n\
-         Options:\n\
+         Script:\n\
+         \x20 -e, --script SCRIPT            Run an inline script instead of a script file\n\
+         \x20 -p, --print-last               Print the value of the last expression to stdout\n\
          \x20 -n, --validate-only            Only validate the script; do not run it\n\
+         \n\
+         Resources:\n\
+         \x20 -j, --jobs, --threads N        Number of threads to use\n\
+         \x20     --strict-threads           Never use more threads than --jobs (even in bursts)\n\
+         \x20     --no-strict-threads        Opposite of --strict-threads\n\
          \x20 -t, --temporary-directory DIR  Directory for temporary files\n\
          \x20     --keep-temporary-files     Do not delete temporary files when done\n\
+         \x20     --no-keep-temporary-files  Opposite of --keep-temporary-files\n\
+         \n\
+         Paths:\n\
+         \x20 -c, --config-file PATH         Configuration file to read (repeatable)\n\
+         \x20     --search-path PATH         Add a search path for references/indices (repeatable)\n\
+         \x20     --index-path PATH          Directory where mapper indices are stored\n\
+         \n\
+         Output:\n\
+         \x20 -o, --html-report-directory D  Directory for the HTML run report\n\
+         \x20     --create-report            Write an HTML run report (default for script files)\n\
+         \x20     --no-create-report         Do not write an HTML run report\n\
          \x20 -v, --verbosity LEVEL          Set verbosity level (quiet|normal|full)\n\
          \x20 -q, --quiet                    Suppress informational output\n\
          \x20     --trace                    Highest verbosity mode (print all trace messages)\n\
-         \x20     --subsample                Subsample mode (process only a fraction of the data)\n\
+         \x20     --no-trace                 Opposite of --trace\n\
          \x20     --no-header                Do not print the run header\n\
+         \x20     --color WHEN               Colour output (auto|no|force|yes)\n\
+         \n\
+         Debugging:\n\
+         \x20     --subsample                Subsample mode (process only a fraction of the data)\n\
          \x20     --debug MODE               Enable debug output (e.g. 'ast')\n\
-         \x20     --search-path PATH         Add a search path for references/indices (repeatable)\n\
-         \x20     --print-path EXEC          Print the resolved path to a bundled tool and exit\n\
+         \n\
+         Experimental (require --experimental-features):\n\
+         \x20     --export-json FILE         Export the script as JSON\n\
+         \x20     --export-cwl FILE          Generate a CWL wrapper for the script\n\
+         \n\
+         Data management (these do not run a script):\n\
+         \x20     --install-reference-data N Download and install a builtin reference\n\
+         \x20     --download-demo NAME       Download a demo dataset (gut-short, ocean-short)\n\
+         \x20     --download-file            With --download-url URL --local-file PATH\n\
+         \x20     --create-reference-pack    With --output-name, --genome-url and optionally\n\
+         \x20                                --gtf-url and --functional-map-url\n\
          \n\
          Informational:\n\
          \x20 -V, --version                  Print version and exit\n\
@@ -100,7 +131,11 @@ pub(crate) fn help_text() -> String {
          \x20     --version-debug            Print detailed version information and exit\n\
          \x20     --date-short               Print the release date and exit\n\
          \x20     --check-install            Verify the installation and exit\n\
+         \x20     --print-path EXEC          Print the resolved path to an external tool and exit\n\
          \x20 -h, --help                     Print this help message and exit\n\
+         \n\
+         Long options also accept --option=value. Short options may be bundled and joined to\n\
+         their value (-nq, -j4, -nj4, -vfull, -pe 'ngless \"1.6\"; print(1)').\n\
          \n\
          ngless v{ver}(C) NGLess Authors 2013-2023\n\
          For more information:\n\

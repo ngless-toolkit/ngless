@@ -1,3 +1,14 @@
+Unreleased
+
+	* `ngless --help` now lists all the accepted command line options. It was
+	missing about half of them, including `-j`/`--jobs`/`--threads`, `-e`/`--script`,
+	`-o`/`--html-report-directory`, `-p`/`--print-last`, `-c`/`--config-file`,
+	`--create-report`, `--index-path`, `--color`, `--strict-threads`, the
+	`--export-json`/`--export-cwl` pair, and the data-management modes
+	(`--install-reference-data`, `--download-demo`, `--download-file`,
+	`--create-reference-pack`). The options are now grouped by purpose and the
+	supported short-option bundling is documented.
+
 Version 1.6.0 2026-08-04 by luispedro
 
 	This is the first stable release of the 1.6 series. See the 1.6.0-beta2 and
