@@ -4768,29 +4768,37 @@ fn write_fq_files(
     can_move: bool,
     temp_files: &crate::tempfiles::TempFiles,
 ) -> NgResult<()> {
-    use crate::compression::{open_read, write_bytes, StreamWriter};
+    use crate::compression::write_bytes;
     match files {
         [] => write_bytes(ofile, b""),
         // Single file keeps the verbatim `std::fs::copy` byte-copy fast path (load-bearing for
         // write byte-identity of un-preprocessed sets), or moves the temp file when allowed.
         [single] => move_or_copy_compress(&single.path, ofile, can_move, temp_files),
-        // Stream each decompressed input through one compressing writer: the encoder sees the
-        // identical concatenated byte stream, so the output is content-equivalent to
-        // decompress-all-then-`write_bytes`, but bounded in memory. Written atomically (temp
-        // sibling + rename) so a partial concatenation is never visible at `ofile`.
-        many => crate::compression::write_atomically(ofile, |target| {
-            let mut w = StreamWriter::create_at(target, ofile)?;
-            for f in many {
-                std::io::copy(&mut open_read(&f.path.to_string_lossy())?, &mut w).map_err(|e| {
-                    NgError::new(
-                        NgErrorType::SystemError,
-                        format!("Could not write {ofile}: {e}"),
-                    )
-                })?;
-            }
-            w.finish()
-        }),
+        // Stream each decompressed input through one compressing writer (bounded memory).
+        many => {
+            let paths: Vec<&Path> = many.iter().map(|f| f.path.as_path()).collect();
+            stream_recompress(&paths, ofile)
+        }
     }
+}
+
+/// Decompress each of `srcs` in turn and stream the concatenation through a single writer that
+/// compresses per `ofile`'s extension. Memory use is bounded regardless of input size. Written
+/// atomically (temp sibling + rename) so a partial output is never visible at `ofile`.
+fn stream_recompress(srcs: &[&Path], ofile: &str) -> NgResult<()> {
+    use crate::compression::{open_read, StreamWriter};
+    crate::compression::write_atomically(ofile, |target| {
+        let mut w = StreamWriter::create_at(target, ofile)?;
+        for src in srcs {
+            std::io::copy(&mut open_read(&src.to_string_lossy())?, &mut w).map_err(|e| {
+                NgError::new(
+                    NgErrorType::SystemError,
+                    format!("Could not write {ofile}: {e}"),
+                )
+            })?;
+        }
+        w.finish()
+    })
 }
 
 /// Move or copy `src` to `ofile` (mirrors `moveOrCopyCompress` + `moveIfAllowed`). When `can_move`
@@ -4824,7 +4832,7 @@ fn move_or_copy_compress(
 /// destination share a compression format the bytes are copied verbatim; otherwise the source
 /// is decompressed and re-compressed to the destination format.
 fn copy_fastq(src: &Path, ofile: &str) -> NgResult<()> {
-    use crate::compression::{detect, read_bytes, write_bytes};
+    use crate::compression::detect;
     let src_str = src.to_string_lossy();
     if detect(&src_str) == detect(ofile) {
         // Copy to a temp sibling then rename, so a partial copy is never visible at `ofile`.
@@ -4837,8 +4845,7 @@ fn copy_fastq(src: &Path, ofile: &str) -> NgResult<()> {
             })
         })?;
     } else {
-        let data = read_bytes(&src_str)?;
-        write_bytes(ofile, &data)?;
+        stream_recompress(&[src], ofile)?;
     }
     Ok(())
 }

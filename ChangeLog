@@ -1,5 +1,9 @@
 Unreleased
 
+	* `write` now uses constant memory when it has to recompress FASTQ output
+	(e.g., writing the result of `preprocess` to a `.fq.gz` file). Previously,
+	the whole decompressed file was held in memory, so memory usage grew with
+	the input size.
 	* Fixed a tokenizer bug where a `;` inside a `#` or `//` comment ended the
 	comment, so the rest of the line was tokenized as code. This usually produced
 	a confusing error pointing at a comment line, but if the tail of the comment
