@@ -51,9 +51,9 @@ pub mod values;
 /// Version strings and the `--version*` output format (originally modelled on `NGLess/Version.hs`
 /// and `Execs/Main.hs`).
 pub mod version {
-    pub const VERSION_STR: &str = "1.6.0";
-    pub const VERSION_STR_LONG: &str = "1.6.0";
-    pub const DATE_STR: &str = "4 August 2026";
+    pub const VERSION_STR: &str = "1.6.1";
+    pub const VERSION_STR_LONG: &str = "1.6.1";
+    pub const DATE_STR: &str = "18 September 2026";
 
     /// `--version` / `-V` output.
     pub fn version_line() -> String {
@@ -358,14 +358,14 @@ mod tests {
 
     #[test]
     fn version_short_is_plain_string() {
-        assert_eq!(version::VERSION_STR, "1.6.0");
+        assert_eq!(version::VERSION_STR, "1.6.1");
     }
 
     #[test]
     fn version_line_matches_haskell_format() {
         assert_eq!(
             version::version_line(),
-            "ngless v1.6.0 (release date: 4 August 2026)"
+            "ngless v1.6.1 (release date: 18 September 2026)"
         );
     }
 
@@ -373,7 +373,7 @@ mod tests {
     fn version_debug_line_format() {
         assert_eq!(
             version::version_debug_line(),
-            "ngless v1.6.0 (full version: 1.6.0; release date: 4 August 2026)"
+            "ngless v1.6.1 (full version: 1.6.1; release date: 18 September 2026)"
         );
     }
 

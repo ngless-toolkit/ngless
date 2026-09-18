@@ -2,6 +2,42 @@
 What's New (History)
 ====================
 
+Version 1.6.1
+-------------
+
+*Released on September 18 2026*
+
+Bug-fix release.
+
+**Behaviour change:** binary operators now have the usual precedence and are
+left-associative, as in Python: ``*`` binds tighter than ``+``/``-``/``</>``,
+which bind tighter than the comparisons (``< > <= >= == !=``), and ``not``
+binds loosest. Previously, operators had no relative precedence and grouped to
+the right, so ``2 * 3 + 1`` evaluated to 8 (it is now 7). Expressions such as
+``x - 1 > 0`` or ``len(x) + 1 == n``, which used to be type errors, now work.
+
+**Fixes and improvements:**
+
+* Added the binary subtraction operator (``-``). It was documented, but
+  ``x = 5 - 3`` silently parsed as ``x = 5`` followed by a stray ``-3``.
+* A bare expression used as a statement (such as that stray ``-3``) is now
+  reported as a script error by validation (including ``ngless -n``) instead of
+  as an internal error.
+* Arithmetic on doubles: unary minus (``-3.5``) and adding two doubles now work,
+  and mixing integers and doubles consistently yields a double.
+* Fixed exponential type-checking time for long operator chains (e.g., building
+  a path from many ``+``-joined pieces).
+* A ``;`` inside a ``#`` or ``//`` comment no longer ends the comment (the rest
+  of the line was being treated as code).
+* ``write()`` uses constant memory when recompressing FASTQ output (e.g.,
+  writing the result of ``preprocess`` to a ``.fq.gz`` file).
+* ``ngless --check-install`` now checks that the external tools (samtools, bwa,
+  prodigal, megahit; minimap2 is optional) can be found and fails if they
+  cannot. ``--check-install --verbose`` prints where each tool was found.
+* ``ngless --help`` now lists all supported command-line options.
+
+For the complete list, see the ``ChangeLog``.
+
 Version 1.6.0
 -------------
 

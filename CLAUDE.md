@@ -16,9 +16,9 @@ root (`Cargo.toml`, `src/`) is the sole, supported implementation. Many doc comm
 are **stale** — they still describe features as "deferred to a later milestone" or "a scaffold"
 even where the Rust code fully implements them. Do not trust those; treat the Rust code as the
 full implementation. `rust-migration.md` is the most
-accurate status doc (all 108 functional tests pass against the Rust binary). Current crate
-version is `1.6.0` (see `Cargo.toml`), released 4 August 2026 — the first stable release of
-the 1.6 series.
+accurate status doc (all 111 functional tests pass against the Rust binary). Current crate
+version is `1.6.1` (see `Cargo.toml`), released 18 September 2026 (1.6.0, released 4 August
+2026, was the first stable release of the 1.6 series).
 
 ## Build & test
 
@@ -32,7 +32,7 @@ cargo fmt --all -- --check     # formatting is enforced in CI
 Functional test suite (the primary correctness bar):
 
 ```sh
-NGLESS_BIN=target/release/ngless ./run-tests.sh          # all 108 tests
+NGLESS_BIN=target/release/ngless ./run-tests.sh          # all 111 tests
 NGLESS_BIN=target/release/ngless ./run-tests.sh regression   # only tests/regression*
 ```
 

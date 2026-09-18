@@ -1,4 +1,8 @@
-Unreleased
+Version 1.6.1 2026-09-18 by luispedro
+
+	Bug-fix release. Note that binary operators now have the usual precedence
+	(see below), which changes the result of expressions such as `2 * 3 + 1`
+	(now 7; it was 8 in 1.6.0).
 
 	* `ngless --check-install` now checks that the external tools can be found
 	(on the PATH or via the `NGLESS_*_BIN` variables) and exits with an error

@@ -14,7 +14,7 @@ version: 1.0.0
 
 NGLess is a domain-specific language (DSL) for next-generation sequencing (NGS) data processing, with a focus on metagenomics. It has a Pythonesque syntax with Ruby-like blocks, is statically typed with type inference, and emphasizes reproducibility and error checking.
 
-**Current version**: 1.6.0 (released 4 August 2026)
+**Current version**: 1.6.1 (released 18 September 2026)
 **Language version**: `1.6` — the *only* version this build accepts. Declaring anything else (including the older `"1.5"`) is a hard error.
 **Implementation**: Rust (the Haskell implementation was removed in 1.6; the Rust code at the repository root is the sole, supported implementation)
 **Repository**: https://github.com/ngless-toolkit/ngless

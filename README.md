@@ -154,7 +154,7 @@ Haskell. Point the harness at the build via `NGLESS_BIN` (it needs the external 
 - [Frequently Asked Questions (FAQ)](https://ngless.readthedocs.io/en/latest/faq.html)
 - [ngless mailing list](https://groups.google.com/forum/#!forum/ngless)
 - [What's new log](https://ngless.readthedocs.io/en/latest/whatsnew.html)
-- [NGless 1.6.0 Release Documentation](https://ngless.readthedocs.io/en/latest/whatsnew.html#version-1-6-0)
+- [NGless 1.6.1 Release Documentation](https://ngless.readthedocs.io/en/latest/whatsnew.html#version-1-6-1)
 
 ## Authors
 
