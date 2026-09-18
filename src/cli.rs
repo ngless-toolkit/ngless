@@ -86,8 +86,8 @@ enum Mode {
     Default(Box<RunOpts>),
     /// `--print-path EXEC` (`PrintPathMode`).
     PrintPath(String),
-    /// `--check-install` (`CheckInstallMode`).
-    CheckInstall,
+    /// `--check-install [--verbose]` (`CheckInstallMode`).
+    CheckInstall { verbose: bool },
     /// `--install-reference-data REF` (`InstallReferenceMode`).
     InstallReferenceData(String),
     /// `--download-file --download-url URL --local-file PATH` (`DownloadFileMode`).
@@ -118,7 +118,7 @@ pub fn run_cli(args: &[String]) -> i32 {
     match mode {
         Mode::Default(opts) => exec_default(&opts),
         Mode::PrintPath(exec) => crate::print_path(&exec),
-        Mode::CheckInstall => crate::check_install(),
+        Mode::CheckInstall { verbose } => crate::check_install(verbose),
         Mode::InstallReferenceData(refname) => exec_install_reference(&refname),
         Mode::DownloadFile { url, local } => exec_download_file(&url, &local),
         Mode::DownloadDemo(name) => exec_download_demo(&name),
@@ -322,7 +322,8 @@ fn parse_mode(args: &[String]) -> NgResult<Mode> {
         return Ok(Mode::PrintPath(exec));
     }
     if args.iter().any(|a| a == "--check-install") {
-        return Ok(Mode::CheckInstall);
+        let verbose = args.iter().any(|a| a == "--verbose");
+        return Ok(Mode::CheckInstall { verbose });
     }
     if let Some(pos) = args.iter().position(|a| a == "--install-reference-data") {
         // The reference name is a positional argument (mirrors `installArgs`'s `strArgument REF`).

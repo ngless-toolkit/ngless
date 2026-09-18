@@ -130,7 +130,8 @@ pub(crate) fn help_text() -> String {
          \x20     --version-short            Print short version string and exit\n\
          \x20     --version-debug            Print detailed version information and exit\n\
          \x20     --date-short               Print the release date and exit\n\
-         \x20     --check-install            Verify the installation and exit\n\
+         \x20     --check-install            Verify the installation and exit (add --verbose\n\
+         \x20                                to print the paths of the external tools)\n\
          \x20     --print-path EXEC          Print the resolved path to an external tool and exit\n\
          \x20 -h, --help                     Print this help message and exit\n\
          \n\
@@ -218,15 +219,11 @@ where
 /// per-tool `NGLESS_*_BIN` environment variable or from `PATH`.
 pub(crate) fn print_path(exec: &str) -> i32 {
     use errors::{NgError, NgErrorType};
-    let resolved = match exec {
-        "samtools" => find_bin("NGLESS_SAMTOOLS_BIN", "samtools"),
-        "prodigal" => find_bin("NGLESS_PRODIGAL_BIN", "prodigal"),
-        "megahit" => find_bin("NGLESS_MEGAHIT_BIN", "megahit"),
-        "bwa" => find_bin("NGLESS_BWA_BIN", "bwa"),
-        "minimap2" => find_bin("NGLESS_MINIMAP2_BIN", "minimap2"),
-        other => Err(NgError::new(
+    let resolved = match EXTERNAL_TOOLS.iter().find(|(name, _, _)| *name == exec) {
+        Some((name, envvar, _)) => find_bin(envvar, name),
+        None => Err(NgError::new(
             NgErrorType::SystemError,
-            format!("Unknown binary {other}."),
+            format!("Unknown binary {exec}."),
         )),
     };
     match resolved {
@@ -242,7 +239,7 @@ pub(crate) fn print_path(exec: &str) -> i32 {
 }
 
 /// Resolve the path to an external tool, mirroring `findNGLessBin`/`checkExecutable` in
-/// `NGLess/FileManagement.hs` for a build without embedded dependencies: honour the
+/// `NGLess/FileManagement.hs`: honour the
 /// `NGLESS_*_BIN` override (which must point at an executable file), otherwise look the tool
 /// up on `PATH`.
 fn find_bin(envvar: &str, fname: &str) -> errors::NgResult<String> {
@@ -267,9 +264,7 @@ fn find_bin(envvar: &str, fname: &str) -> errors::NgResult<String> {
         Some(p) => Ok(p),
         None => Err(NgError::new(
             NgErrorType::SystemError,
-            format!(
-                "Cannot find {fname} on the system and this is a build without embedded dependencies."
-            ),
+            format!("Cannot find {fname} on the PATH (set {envvar} to point to its location)."),
         )),
     }
 }
@@ -303,13 +298,60 @@ fn is_executable(path: &std::path::Path) -> bool {
     }
 }
 
-/// `--check-install`: the Haskell version verifies that bundled external tools
-/// (samtools, bwa, megahit, ...) are reachable. The Rust build does not manage external
-/// tools yet, so this reports success to let the test harness' install check pass while the
-/// scaffold is wired up.
-pub(crate) fn check_install() -> i32 {
-    println!("Install OK");
-    0
+/// External tools NGLess may invoke, with the environment variable that overrides each one's
+/// location and whether `--check-install` requires it (minimap2 is optional: it is only needed for
+/// `map(..., mapper='minimap2')`).
+const EXTERNAL_TOOLS: [(&str, &str, bool); 5] = [
+    ("samtools", "NGLESS_SAMTOOLS_BIN", true),
+    ("bwa", "NGLESS_BWA_BIN", true),
+    ("minimap2", "NGLESS_MINIMAP2_BIN", false),
+    ("prodigal", "NGLESS_PRODIGAL_BIN", true),
+    ("megahit", "NGLESS_MEGAHIT_BIN", true),
+];
+
+/// `--check-install [--verbose]`: check that the external tools can be found. A missing required
+/// tool is an error (exit code 1); a missing optional one only triggers a warning. With
+/// `--verbose`, the resolved path of each tool that is found is printed.
+pub(crate) fn check_install(verbose: bool) -> i32 {
+    check_tools(
+        EXTERNAL_TOOLS
+            .iter()
+            .map(|&(name, envvar, required)| (name, required, find_bin(envvar, name))),
+        verbose,
+    )
+}
+
+/// Report on the lookup result for each `(tool, required, result)` and return the exit code.
+fn check_tools<'a>(
+    tools: impl Iterator<Item = (&'a str, bool, errors::NgResult<String>)>,
+    verbose: bool,
+) -> i32 {
+    let mut ok = true;
+    for (name, required, resolved) in tools {
+        match resolved {
+            Ok(path) => {
+                if verbose {
+                    println!("{name}: {path}");
+                }
+            }
+            Err(e) => {
+                let msg = e.message.replace('\n', " ");
+                if required {
+                    eprintln!("Error: {msg}");
+                    ok = false;
+                } else {
+                    eprintln!("Warning: {msg} {name} is optional, so the check still passes.");
+                }
+            }
+        }
+    }
+    if ok {
+        println!("Install OK");
+        0
+    } else {
+        eprintln!("Install check FAILED: required external tools are missing.");
+        1
+    }
 }
 
 #[cfg(test)]
@@ -342,8 +384,27 @@ mod tests {
     }
 
     #[test]
-    fn check_install_exits_zero() {
-        assert_eq!(run(["--check-install"]), 0);
+    fn check_install_requires_tools() {
+        let found = |name: &'static str, required| (name, required, Ok(format!("/bin/{name}")));
+        let missing = |name: &'static str, required| {
+            (name, required, Err(errors::NgError::script("missing")))
+        };
+        assert_eq!(check_tools([found("bwa", true)].into_iter(), true), 0);
+        // A missing optional tool (minimap2) is only a warning.
+        assert_eq!(
+            check_tools(
+                [found("bwa", true), missing("minimap2", false)].into_iter(),
+                false
+            ),
+            0
+        );
+        assert_eq!(
+            check_tools(
+                [missing("bwa", true), found("minimap2", false)].into_iter(),
+                true
+            ),
+            1
+        );
     }
 
     #[test]

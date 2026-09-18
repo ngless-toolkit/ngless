@@ -1,5 +1,14 @@
 Unreleased
 
+	* `ngless --check-install` now checks that the external tools can be found
+	(on the PATH or via the `NGLESS_*_BIN` variables) and exits with an error
+	if samtools, bwa, prodigal, or megahit are missing. A missing minimap2 only
+	prints a warning. Previously, it always reported success. With `--verbose`
+	(a flag that had been dropped in the Rust rewrite), it also prints the path
+	to each tool it finds.
+	* The error for a missing external tool no longer refers to builds with
+	embedded dependencies, which no longer exist, and names the variable that
+	can be set to point to the tool.
 	* `write` now uses constant memory when it has to recompress FASTQ output
 	(e.g., writing the result of `preprocess` to a `.fq.gz` file). Previously,
 	the whole decompressed file was held in memory, so memory usage grew with
