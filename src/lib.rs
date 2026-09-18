@@ -54,8 +54,6 @@ pub mod version {
     pub const VERSION_STR: &str = "1.6.0";
     pub const VERSION_STR_LONG: &str = "1.6.0";
     pub const DATE_STR: &str = "4 August 2026";
-    // The Rust build does not yet embed external tool binaries (samtools/bwa/...).
-    pub const EMBEDDED_STR: &str = "No";
 
     /// `--version` / `-V` output.
     pub fn version_line() -> String {
@@ -65,7 +63,7 @@ pub mod version {
     /// `--version-debug` output.
     pub fn version_debug_line() -> String {
         format!(
-            "ngless v{VERSION_STR} (full version: {VERSION_STR_LONG}; release date: {DATE_STR}; embedded binaries: {EMBEDDED_STR})"
+            "ngless v{VERSION_STR} (full version: {VERSION_STR_LONG}; release date: {DATE_STR})"
         )
     }
 }
@@ -372,8 +370,11 @@ mod tests {
     }
 
     #[test]
-    fn version_debug_mentions_embedded() {
-        assert!(version::version_debug_line().contains("embedded binaries: No"));
+    fn version_debug_line_format() {
+        assert_eq!(
+            version::version_debug_line(),
+            "ngless v1.6.0 (full version: 1.6.0; release date: 4 August 2026)"
+        );
     }
 
     #[test]

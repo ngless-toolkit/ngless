@@ -6,6 +6,7 @@ Unreleased
 	prints a warning. Previously, it always reported success. With `--verbose`
 	(a flag that had been dropped in the Rust rewrite), it also prints the path
 	to each tool it finds.
+	* `ngless --version-debug` no longer prints "embedded binaries: No".
 	* The error for a missing external tool no longer refers to builds with
 	embedded dependencies, which no longer exist, and names the variable that
 	can be set to point to the tool.
