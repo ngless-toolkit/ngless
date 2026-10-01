@@ -5788,10 +5788,19 @@ mod tests {
     }
 
     fn run(text: &str) -> NgResult<()> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static N: AtomicU64 = AtomicU64::new(0);
         let script = parse_ngless("test", true, text).expect("parse failed");
-        interpret(
+        // A private temp directory per run, so concurrently running tests cannot interfere
+        // with each other's temporary files.
+        let tmpdir = std::env::temp_dir().join(format!(
+            "ngless_rust_run_{}_{}",
+            std::process::id(),
+            N.fetch_add(1, Ordering::Relaxed)
+        ));
+        let r = interpret(
             &script.body,
-            &std::env::temp_dir(),
+            &tmpdir,
             false,
             text,
             &[],
@@ -5802,7 +5811,9 @@ mod tests {
             vec!["bwa".to_string()],
             (1, 5),
         )
-        .map(|_| ())
+        .map(|_| ());
+        let _ = std::fs::remove_dir_all(&tmpdir);
+        r
     }
 
     #[test]
