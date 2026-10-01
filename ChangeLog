@@ -1,3 +1,26 @@
+Unreleased
+
+	* Fixed SAM lines without optional fields (only the 11 mandatory columns):
+	their quality string was parsed as an optional field, so `as_reads()`
+	produced FASTQ records with empty qualities and writing them back as SAM
+	produced an empty QUAL column followed by the qualities. SAM output from
+	mappers (which always include optional tags) was not affected.
+	* `ngless -p` (`--print-last`) now works when the last statement evaluates to
+	a plain value (string, integer, double, boolean, or a list of these), which
+	is printed one value per line: e.g., `ngless -pe '1 + 2'` prints `3`. More
+	generally, `write()` accepts these values when `ofile=STDOUT`. Previously,
+	this failed with an error. If the last statement is an assignment, the
+	assigned value is printed (previously an internal error).
+	* User configuration files (`$HOME/.ngless.conf` and
+	`$HOME/.config/ngless.conf`) now take precedence over the global
+	`/etc/ngless.conf`, as documented. Previously, `/etc/ngless.conf` was read
+	last and overrode them. When both user files exist,
+	`$HOME/.config/ngless.conf` takes precedence.
+	* Fixed `--export-cwl`: the generated CWL tool had no `inputs` for scripts
+	using `ARGV[n]` (and its output referred to a nonexistent input).
+	* Updated the documentation to match the current version (configuration,
+	reference installation, tutorials, function reference, and others).
+
 Version 1.6.1 2026-09-18 by luispedro
 
 	Bug-fix release. Note that binary operators now have the usual precedence

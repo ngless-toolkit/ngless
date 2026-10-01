@@ -136,7 +136,7 @@ pub(crate) fn help_text() -> String {
          Long options also accept --option=value. Short options may be bundled and joined to\n\
          their value (-nq, -j4, -nj4, -vfull, -pe 'ngless \"1.6\"; print(1)').\n\
          \n\
-         ngless v{ver}(C) NGLess Authors 2013-2023\n\
+         ngless v{ver} (C) NGLess Authors 2013-2026\n\
          For more information:\n\
          \thttps://ngless.readthedocs.io\n\
          For comments/discussion:\n\

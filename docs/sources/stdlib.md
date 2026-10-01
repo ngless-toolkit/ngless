@@ -60,6 +60,27 @@ counts together into a single table, for convenience:
 Now, only when all the samples have been processed, does NGLess collect all the
 results into a single table.
 
+`run_for_all` accepts an optional `tag` argument (a string), which is prepended to the names of the directories used for the lock
+files and partial results. Use it when the same script runs over different
+inputs that should not share locks (for example, when the sample list is
+given through `ARGV`):
+
+    current = run_for_all(readlines(ARGV[1]), tag=ARGV[1])
+
+Alternatively, `set_parallel_tag(tag)` sets the tag for all the subsequent
+`lock1()` and `collect()` calls in the script.
+
+#### Running for all samples in a YAML file
+
+`run_for_all_samples :: [readset] -> readset` works like `run_for_all`, but
+takes a list of samples (such as the result of `load_sample_list`; see [YAML
+sample lists](yaml-list.md)) and returns one of them:
+
+    ngless "1.6"
+    import "parallel" version "1.6"
+    input = run_for_all_samples(load_sample_list('samples.yaml'))
+
+The sample name (`input.name()`) is used for the lock files.
 
 ### `lock1` interface
 
@@ -133,6 +154,35 @@ mis-identifying a stale lock (for example, you had a compute node which lost
 network connectivity, but it comes back online after an hour and resumes
 processing) is that extra computation is wasted, **the processes will never
 interfere in a way that you get erroneous results**.
+
+## Batch module
+
+    import "batch" version "1.6"
+
+This module helps with running NGLess as part of an array job on an HPC
+cluster. Importing it has two effects:
+
+1. It defines two constants describing the index of the current job in the
+   array (taken from `LSB_JOBINDEX` on LSF or `SGE_TASK_ID` on SGE/UGE):
+
+   - `JOBINDEX_OR_0` (integer): the job index, or 0 when not running as an
+     array job;
+   - `JOBINDEX_VALID` (boolean): whether a job index was found.
+
+2. If the scheduler advertises how many CPUs the job was allocated (through
+   `OMP_NUM_THREADS`, `NSLOTS`, `LSB_DJOB_NUMPROC`, or `SLURM_CPUS_PER_TASK`,
+   checked in this order), NGLess uses that many threads, overriding the `-j`
+   command line option.
+
+For example:
+
+    ngless "1.6"
+    import "batch" version "1.6"
+
+    samples = readlines('samples.txt')
+    if not JOBINDEX_VALID:
+        println('This script must be run as an array job')
+    ...
 
 ## Samtools module
 

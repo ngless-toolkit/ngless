@@ -59,26 +59,32 @@ These archives are all created using versions 75, 85 and 90 of `Ensembl
 Automatic installation
 ----------------------
 
-The builtin datasets are downloaded the first time they are used. They are
-downloaded to the user home directory and stored in **home**/.ngless/genomes.
+The builtin datasets are downloaded the first time they are used and stored in
+a ``References`` subdirectory of the NGLess data directory:
+
+- the global data directory (``<prefix>/share/ngless/data``, where ``<prefix>``
+  is the directory containing ``bin/ngless``; this is normally the case for a
+  conda or pixi install) if it is writable, so that the data is shared by
+  everyone using that installation;
+- otherwise, the user data directory (by default,
+  ``$HOME/.local/share/ngless/data``).
+
+Both locations can be changed in the `configuration <configuration.html>`__
+(``global-data-directory`` and ``user-data-directory``).
 
 Manual installation
 --------------------
 
-Is possible to install data sets locally, before running any script. They can
-be installed in **User** mode or in **Root** mode.
-
-To install locally (organism bos taurus), use the following command::
+It is possible to install data sets before running any script (e.g., on a
+machine with network access, before running on compute nodes that do not have
+it). For example, to install the bos taurus reference, use the following
+command::
 
   $ ngless --install-reference-data bosTau4
 
-If you install as a super-user, then the dataset will be available for all
-users::
+This uses the same location rules as above: if the global data directory is
+writable (e.g., when running as the user who owns the installation, or with
+``sudo``), the dataset will be available for all users of that installation.
 
-  $ sudo ngless --install-reference-data bosTau4
-
-When attempting to install an organism if is returned **True** it means that
-the organism is already installed, and there is no reason to install again.
-Otherwise, a progress bar is displayed to provide information on the download.
-
-
+If the reference is already installed, nothing is downloaded. Otherwise, a
+progress bar is displayed while downloading.

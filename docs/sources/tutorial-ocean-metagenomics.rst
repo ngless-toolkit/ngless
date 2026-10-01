@@ -28,7 +28,7 @@ First download all the tutorial data::
    ngless --download-demo ocean-short
 
 This will `download
-<http://vm-lux.embl.de/~coelho/ngless-data/Demos/ocean-short.tar.gz>`__ and
+<https://ngless-resources.big-data-biology.org/Demos/ocean-short.tar.gz>`__ and
 expand the data to a directory called ``ocean-short``.
 
 This is a toy dataset. It is based on real data, but the samples were trimmed
@@ -38,24 +38,25 @@ The dataset is organized in so that each directory contains a sample with
 multiple fastq files). NGLess does not require this structure, but it is
 convenient::
 
+    $ cd ocean-short
     $ find
     ./SAMEA2621229.sampled
-    ./SAMEA2621229.sampled/ERR594355_2.short.fq.gz
-    ./SAMEA2621229.sampled/ERR594355_1.short.fq.gz
+    ./SAMEA2621229.sampled/ERR594355_2.fastq.gz.short.fq.gz
+    ./SAMEA2621229.sampled/ERR594355_1.fastq.gz.short.fq.gz
     ./SAMEA2621155.sampled
-    ./SAMEA2621155.sampled/ERR599133_1.short.fq.gz
-    ./SAMEA2621155.sampled/ERR599133_2.short.fq.gz
+    ./SAMEA2621155.sampled/ERR599133_1.fastq.gz.short.fq.gz
+    ./SAMEA2621155.sampled/ERR599133_2.fastq.gz.short.fq.gz
     ./SAMEA2621033.sampled
-    ./SAMEA2621033.sampled/ERR594391_2.short.fq.gz
-    ./SAMEA2621033.sampled/ERR594391_1.short.fq.gz
-    ./tara.demo.short
-    ./process.ngl
+    ./SAMEA2621033.sampled/ERR594391_2.fastq.gz.short.fq.gz
+    ./SAMEA2621033.sampled/ERR594391_1.fastq.gz.short.fq.gz
+    ./tara.demo.sampled
+    ./ocean-demo.ngl
 
-
-The whole script we will be using is there as well (``process.ngl``), so you
-can immediately run it with::
-
-    ngless process.ngl
+.. note::
+    The demo data also includes a script (``ocean-demo.ngl``), but it was
+    written for an older version of NGLess and does not run with the current
+    version. Use the script in this tutorial instead (the `full script`_ is at
+    the end).
 
 The rest of this tutorial is an explanation of the steps in this script.
 
@@ -65,7 +66,7 @@ To run ngless, we need write a script. We start with a few imports::
 
     ngless "1.6"
     import "parallel" version "1.6"
-    import "omrgc" version "1.0"
+    import "om-rgc" version "1.0"
 
 These will all be used in the tutorial.
 
@@ -75,11 +76,11 @@ We are going to process each sample separately. For this, we use the ``lock1``
 function from the `parallel <stdlib.html#parallel-module>`__ module (which we
 imported before)::
 
-    samples = readlines('tara.demo.short')
+    samples = readlines('tara.demo.sampled')
     sample = lock1(samples)
 
 The ``readlines`` function reads a file and returns all lines. In this case, we
-are reading the ``tara.demo.short`` file, which contains the three samples
+are reading the ``tara.demo.sampled`` file, which contains the three samples
 (``SAMEA2621229.sampled``, ``SAMEA2621155.sampled``, and
 ``SAMEA2621033.sampled``).
 
@@ -108,10 +109,10 @@ And, now, we preprocess the data::
 After preprocessing, we map the reads to the ocean microbial reference gene
 catalog::
 
-    mapped = map(input, reference='omrgc', mode_all=True)
+    mapped = map(input, reference='om-rgc', mode_all=True)
 
-The line above is the reason we needed to import the ``omrgc`` module: it made
-the ``omrgc`` reference available.
+The line above is the reason we needed to import the ``om-rgc`` module: it made
+the ``om-rgc`` reference available.
 
 ::
 
@@ -125,7 +126,7 @@ KEGG KOs, and eggNOG OGs::
                 features=['KEGG_ko', 'eggNOG_OG'],
                 normalization={scaled})
 
-7. Aggregate the results
+6. Aggregate the results
 
 We have done all this computation, now we need to save it somewhere. We will
 use the ``collect()`` function to aggregate across all the samples processed::
@@ -135,7 +136,7 @@ use the ``collect()`` function to aggregate across all the samples processed::
             allneeded=samples,
             ofile='omgc.profiles.txt')
 
-8. Run it!
+7. Run it!
 
 This is our script. We save it to a file (``process.ngl`` in this example) and
 run it from the command line::
@@ -154,10 +155,10 @@ Here is the full script::
 
     ngless "1.6"
     import "parallel" version "1.6"
-    import "omrgc" version "1.0"
+    import "om-rgc" version "1.0"
 
 
-    samples = readlines('tara.demo.short')
+    samples = readlines('tara.demo.sampled')
     sample = lock1(samples)
     input = load_fastq_directory(sample)
 
@@ -166,7 +167,7 @@ Here is the full script::
         if len(read) < 45:
             discard
 
-    mapped = map(input, reference='omrgc', mode_all=True)
+    mapped = map(input, reference='om-rgc', mode_all=True)
     mapped = select(mapped, keep_if=[{mapped}, {unique}])
     collect(
             count(mapped,

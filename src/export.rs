@@ -280,14 +280,8 @@ fn extract_output(sc: &Script) -> i64 {
 /// `extractARGVUsage`: the first `ARGV[<ConstInt>]` index found in a pre-order walk of `e` (mirrors
 /// `recursiveAnalyse` with a `callCC` exit on the first match).
 ///
-/// NB: the Haskell pattern is `IndexExpression (Lookup _ (Variable "ARGV")) ...`. In Haskell the
-/// parser has no ARGV special-case (`Parse.hs`: every bare identifier becomes a `Lookup`) and
-/// `writeCWL` runs on the pre-transform script, so `ARGV[<n>]` stays a `Lookup` and this match
-/// *does* fire, producing non-degenerate CWL `inputs:`. In Rust, `ARGV` tokenizes to a
-/// `BuiltinConstant` node (`tokens.rs` `CONSTANTS`), so the `Lookup`-matching walk below never
-/// fires and Rust emits empty inputs. This is a known divergence (see `rust-migration.md`, the
-/// ARGV entry); we keep the `Lookup` pattern here to mirror the Haskell source, but note that the
-/// two binaries do *not* produce identical CWL for a script that indexes `ARGV`.
+/// In Rust, `ARGV` tokenizes to a `BuiltinConstant` node (`tokens.rs` `CONSTANTS`), whereas the
+/// Haskell parser produced a `Lookup`; both forms are matched.
 fn extract_argv_usage(e: &Expression) -> Option<i64> {
     let mut found = None;
     recursive_find_argv(e, &mut found);
@@ -301,7 +295,7 @@ fn recursive_find_argv(e: &Expression, found: &mut Option<i64>) {
         return;
     }
     if let Expression::IndexExpression(inner, Index::One(ix)) = e {
-        if let Expression::Lookup(_, v) = inner.as_ref() {
+        if let Expression::Lookup(_, v) | Expression::BuiltinConstant(v) = inner.as_ref() {
             if v.0 == "ARGV" {
                 if let Expression::ConstInt(i) = ix.as_ref() {
                     *found = Some(*i);
@@ -424,6 +418,19 @@ mod tests {
         };
         assert_eq!(extract_output(&sc), 1);
         assert_eq!(extract_all_argv_usage(&sc), vec![1]);
+    }
+
+    #[test]
+    fn cwl_from_parsed_script_uses_argv() {
+        // As parsed, `ARGV` is a `BuiltinConstant`: both inputs and the output must be found.
+        let text = "ngless \"1.6\"\nmapped = samfile(ARGV[1])\nwrite(mapped, ofile=ARGV[2])\n";
+        let sc = crate::parser::parse_ngless("s.ngl", true, text).unwrap();
+        assert_eq!(extract_all_argv_usage(&sc), vec![1, 2]);
+        assert_eq!(extract_output(&sc), 2);
+        let cwl = build_cwl("s.ngl", &sc);
+        assert!(cwl.contains("- id: input1\n"));
+        assert!(cwl.contains("- id: input2\n"));
+        assert!(cwl.contains("glob: $(inputs.input2)\n"));
     }
 
     #[test]

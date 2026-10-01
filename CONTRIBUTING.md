@@ -9,4 +9,4 @@ NGLess has a strong culture of strict backwards compatibility, so changing behav
 requires (at the very least) discussion.
 
 For all but the smallest changes, please list them on the `ChangeLog` and the
-`docs/source/whatsnew.rst` files.
+`docs/sources/whatsnew.rst` files.

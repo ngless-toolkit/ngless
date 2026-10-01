@@ -130,7 +130,7 @@ extensions are accepted:
 
 Paired-end reads are assumed to be split into two files, with matching names
 with ``.1``/``.2`` appended. ``_1``/``_2`` as is used by the European Nucleotide
-Archive (ENA) is also accepted.
+Archive (ENA) is also accepted, as is ``_F``/``_R``.
 
 If paired-end reads have been pre-filtered, an unpaired/single file is often available.
 ``load_fastq_directory`` recognizes the suffix ``single``. In the following example,
@@ -154,6 +154,49 @@ Argument
 ~~~~~~~~
 
 String (directory path)
+
+Returns
+~~~~~~~
+
+ReadSet
+
+load_sample_list
+----------------
+
+.. versionadded:: NGLess 1.5
+
+Loads a list of samples from a YAML file (see `YAML sample lists
+<yaml-list.html>`__)::
+
+    samples = load_sample_list('samples.yaml')
+
+Argument
+~~~~~~~~
+
+String (path to the YAML file)
+
+Returns
+~~~~~~~
+
+List of ReadSet
+
+load_sample_from_yaml
+---------------------
+
+.. versionadded:: NGLess 1.5
+
+Loads a single sample from a YAML file (see `YAML sample lists
+<yaml-list.html>`__)::
+
+    input = load_sample_from_yaml('samples.yaml', sample='sample1')
+
+Arguments by value:
+~~~~~~~~~~~~~~~~~~~
++------------+--------------+------------+----------------+
+| Name       | Type         | Required   | Default Value  |
++============+==============+============+================+
+| sample     | String       | yes        | -              |
++------------+--------------+------------+----------------+
 
 Returns
 ~~~~~~~
@@ -394,6 +437,8 @@ Arguments by value:
 +------------------------+-------------+------------+----------------+
 | mode_all               | Bool        | no         | -              |
 +------------------------+-------------+------------+----------------+
+| mapper                 | String      | no         | "bwa"          |
++------------------------+-------------+------------+----------------+
 | __extra_args           | [String]    | no         | []             |
 +------------------------+-------------+------------+----------------+
 
@@ -416,6 +461,10 @@ corresponding section in the `mapping documentation <Mapping.html>`__)
 
 The option ``mode_all=True`` can be passed to include all alignments of both
 single and paired-end reads in the output SAM/BAM.
+
+The ``mapper`` argument selects the mapper: ``"bwa"`` (the default) or
+``"minimap2"`` (which requires importing the ``minimap2`` module; see the
+`mapping documentation <Mapping.html>`__).
 
 Strings passed as ``__extra_args`` will be passed verbatim to the mapper.
 
@@ -791,10 +840,16 @@ The output format is typically determined from the ``ofile`` extension, but the
 - CountsTable: ``{tsv}`` (default) or ``{csv}``: use TAB or COMMA as a delimiter
 - MappedReadSet: ``{sam}`` (default) or ``{bam}``
 - ReadSet: FastQ format, optionally compressed (depending on the extension).
+- SequenceSet (e.g., the output of ``assemble``): FASTA format.
+- Plain values (strings, integers, doubles, booleans, and lists of these) can
+  only be written to ``STDOUT``, one value per line. This is what
+  ``ngless -p`` uses to print the value of a script's last expression.
 
 By default, ReadSets are written a set of one to three FastQ files (2 files for
 the paired-end reads, and one file for the single-end ones, with empty files
-omitted). ``format\_flags`` currently supports ``{interleaved}`` to output an
+omitted). For example, ``ofile='output.fq.gz'`` produces
+``output.pair.1.fq.gz``, ``output.pair.2.fq.gz``, and
+``output.singles.fq.gz``. ``format\_flags`` currently supports ``{interleaved}`` to output an
 interleaved FastQ file instead and (since NGLess version 1.6)
 ``{always_3_fq_files}`` to **always** output three files (two for the
 paired-end reads, and one for single reads) even if some of these may be empty.
@@ -822,11 +877,14 @@ list of ``auto\_comments``:
 print
 -----
 
-Print function allows to print a NGLessObject to IO.
+Prints a value (a string, an integer, or a double) to standard output.
+
+.. versionadded:: NGLess 1.5
+    ``print`` accepts integers and doubles (before, only strings).
 
 Argument:
 ~~~~~~~~~
-NGLessObject
+String, Integer, or Double
 
 Return:
 ~~~~~~~
@@ -835,6 +893,43 @@ Void
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
 none
+
+println
+-------
+
+.. versionadded:: NGLess 1.5
+
+Same as ``print``, but followed by a newline.
+
+read_int
+--------
+
+.. versionadded:: NGLess 1.3
+
+Parses a string as an integer (leading and trailing whitespace are ignored)::
+
+    n = read_int('42')
+
+Arguments by value:
+~~~~~~~~~~~~~~~~~~~
+
++-------------------+-------------+------------+----------------+
+| Name              | Type        | Required   | Default Value  |
++===================+=============+============+================+
+| on_empty_return   | Integer     | no         | -              |
++-------------------+-------------+------------+----------------+
+
+If the input string is empty, ``on_empty_return`` is returned (and it is an
+error if it was not given). A string that cannot be parsed as an integer is an
+error.
+
+read_double
+-----------
+
+.. versionadded:: NGLess 1.3
+
+Same as ``read_int``, but parses a double (and ``on_empty_return`` must be a
+double).
 
 readlines
 ---------
@@ -859,7 +954,10 @@ function to process a large set of inputs::
 assemble
 --------
 
-`assemble`
+Assembles a ReadSet into contigs::
+
+    contigs = assemble(input)
+    write(contigs, ofile='contigs.fna')
 
 Implementation
 ~~~~~~~~~~~~~~
@@ -876,7 +974,8 @@ ReadSet
 Returns
 ~~~~~~~
 
-string : generated file
+SequenceSet (the assembled contigs, which can be written to a FASTA file with
+``write()`` or passed to ``orf_find()``)
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
@@ -884,10 +983,10 @@ Arguments by value:
 +-----------------------+-------------+------------+----------------+
 | Name                  | Type        | Required   | Default Value  |
 +=======================+=============+============+================+
-| __extra_megahit_arg   | List of str | no         | []             |
+| __extra_megahit_args  | List of str | no         | []             |
 +-----------------------+-------------+------------+----------------+
 
-``__extra_megahit_arg`` is passed directly to megahit with no checking.
+``__extra_megahit_args`` is passed directly to megahit with no checking.
 
 
 orf_find
@@ -896,7 +995,8 @@ orf_find
 `orf_find` finds open reading frames (ORFs) in a sequence set::
 
     contigs = assemble(input)
-    orfs = select(contigs, is_metagenome=True)
+    orfs = orf_find(contigs, is_metagenome=True)
+    write(orfs, ofile='orfs.fna')
 
 Argument:
 ~~~~~~~~~
@@ -906,7 +1006,8 @@ SequenceSet
 Return:
 ~~~~~~~
 
-SequenceSet
+The predicted genes (nucleotide sequences) as a FASTA file, which can be
+written with ``write()``.
 
 Arguments by value:
 ~~~~~~~~~~~~~~~~~~~
@@ -925,6 +1026,9 @@ Arguments by value:
 
 - ``is_metagenome``: whether input should be treated as a metagenome
 - ``include_fragments``: whether to include partial genes in the output
+- ``coords_out``: if given, the gene coordinates are written to this file
+- ``prots_out``: if given, the predicted protein sequences are written to this
+  file
 
 Implementation
 ~~~~~~~~~~~~~~

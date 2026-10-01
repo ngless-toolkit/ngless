@@ -264,7 +264,7 @@ functions:
         def: 'fast'
         allowed: ['fast', 'careful', 'thorough']
     return:
-      rtype: 'counts'              # void/counts/mappedreadset
+      rtype: 'counts'              # void/counts/mappedreadset/sequenceset
       name: 'ofile'
       extension: 'tsv'
 citations:
@@ -305,7 +305,9 @@ Notes:
 - Paths in `module.yaml` are relative to the YAML file, but commands run with the *user's* working
   directory. Use `NGLESS_MODULE_DIR` to locate module-internal data.
 - Arguments without a `when-true` are passed as `--name=value`; flags default to `--name`.
-- `rtype` must be `void`, `counts` or `mappedreadset`; returning a `readset` is not supported.
+- `rtype` must be `void`, `counts`, `mappedreadset` or `sequenceset`. `readset` is accepted by the
+  YAML parser but not implemented in the interpreter (it fails with an internal error after the
+  command has run), so do not use it.
 - A single `citation:` string is accepted as well as a `citations:` list.
 
 References may also be declared as `packaged` reference packs (with `name-version` and `url`), which

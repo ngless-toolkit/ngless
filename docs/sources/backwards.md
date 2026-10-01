@@ -4,15 +4,26 @@ Every NGLess script declares a language version on its first line. This page
 documents the changes in behaviour introduced by each version so that you can
 understand what a script written for an older version expected.
 
-Note that, in 1.6.0, NGLess supports exactly one language version, `1.6`. Older
+Note that, since 1.6.0, NGLess supports exactly one language version, `1.6`. Older
 versions are documented here for reference, but scripts must be updated to
 declare `ngless "1.6"` to run.
 
 ## NGLess 1.6
 
-- NGLess is now based on a [Rust implementation](rust.html) (previous versions
+- NGLess is now based on a [Rust implementation](rust.md) (previous versions
   were written in Haskell). Update your version declaration to `ngless "1.6"`;
   earlier versions are no longer supported.
+- Binary operators follow the usual precedence rules and group to the left
+  (since NGLess 1.6.1; see [the language description](Language.md)). Before,
+  they had no relative precedence and grouped to the right, so `2 * 3 + 1` was
+  8 (it is now 7). The binary subtraction operator (`-`) was also added in
+  1.6.1.
+- The deprecated `strand` argument to `count()` was removed (use `sense`).
+- `import "motus"` and `import "soap"` are rejected (use the [external mOTUs
+  module](motus3.md) with `local import`).
+- The values of the `{hash}` auto-comment (and of the `parallel` module's lock
+  directory names) changed. They remain deterministic, but are not meant to be
+  stable across versions.
 
 ## NGLess 1.4
 

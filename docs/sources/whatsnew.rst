@@ -2,6 +2,19 @@
 What's New (History)
 ====================
 
+Unreleased
+----------
+
+* SAM files whose lines have no optional fields (only the 11 mandatory columns)
+  are now handled correctly: their qualities were lost (``as_reads()`` produced
+  empty quality lines). Output from mappers was not affected.
+* ``ngless -p`` now prints plain values (e.g., ``ngless -pe '1 + 2'`` prints
+  ``3``), and ``write()`` accepts plain values when writing to ``STDOUT``.
+* User configuration files now take precedence over ``/etc/ngless.conf`` (see
+  `configuration <configuration.html>`__).
+* ``--export-cwl`` once again generates the inputs of the CWL tool from the
+  script's use of ``ARGV``.
+
 Version 1.6.1
 -------------
 
@@ -61,6 +74,20 @@ is no longer the case). The built-in modules (``parallel``, ``samtools``,
 ``mocat``, …) now also track the ngless version: import them at version ``1.6``.
 Older module versions are still accepted, with the latest behaviour, but print a
 deprecation warning.
+
+**Changed:**
+
+* ``count()`` now reports an error when more than one annotation source is given
+  (``features=['seqname']``, ``gff_file``, ``functional_map``, or
+  ``reference``). Before, all but one were silently ignored.
+* ``import "motus"`` and ``import "soap"`` (the obsolete built-in modules) are
+  rejected with an error explaining what to use instead (for mOTUs, the
+  `external module <motus3.html>`__ with ``local import``).
+* A constant out-of-bounds index into a list (e.g., ``x[5]`` when ``x`` has 3
+  elements) is now reported as soon as the list is assigned, rather than when
+  the indexing is reached.
+* The values of the ``{hash}`` auto-comment (also used for the ``parallel``
+  module's lock directories) are different (they remain deterministic).
 
 **Removed (previously deprecated):**
 

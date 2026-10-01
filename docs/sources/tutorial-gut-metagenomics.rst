@@ -24,7 +24,7 @@ First download all the tutorial data::
    ngless --download-demo gut-short
 
 This will `download
-<https://ngless.readthedocs.io/en/latest/ressources/Demos/gut-short.tar.gz>`__ and
+<https://ngless-resources.big-data-biology.org/Demos/gut-short.tar.gz>`__ and
 expand the data to a directory called ``gut-short``.
 
 This is a toy dataset. It is based on `real data
@@ -35,6 +35,7 @@ The dataset is organized in classical MOCAT style, with one sample per
 directory. NGLess does not require this structure, but this tutorial also
 demonstrates how to upgrade from your existing MOCAT-based projects.::
 
+    $ cd gut-short
     $ find
     ./igc.demo.short
     ./SAMN05615097.short
@@ -49,12 +50,12 @@ demonstrates how to upgrade from your existing MOCAT-based projects.::
     ./SAMN05615098.short/SRR4052033.pair.2.fq.gz
     ./SAMN05615098.short/SRR4052033.pair.1.fq.gz
     ./SAMN05615098.short/SRR4052033.single.fq.gz
-    ./process.ngl
+    ./gut-demo.ngl
 
-The whole script we will be using is there as well (``process.ngl``), so you
-can immediately run it with::
-
-    ngless process.ngl
+.. note::
+    The demo data also includes a script (``gut-demo.ngl``), but it was written
+    for an older version of NGLess and does not run with the current version.
+    Use the script in this tutorial instead (the `full script`_ is at the end).
 
 The rest of this tutorial is an explanation of the steps in this script.
 
@@ -79,9 +80,8 @@ imported before)::
     sample = lock1(samples)
 
 The ``readlines`` function reads a file and returns all lines. In this case, we
-are reading the ``tara.demo.short`` file, which contains the three samples
-(``SAMEA2621229.sampled``, ``SAMEA2621155.sampled``, and
-``SAMEA2621033.sampled``).
+are reading the ``igc.demo.short`` file, which contains the three samples
+(``SAMN05615096.short``, ``SAMN05615097.short``, and ``SAMN05615098.short``).
 
 ``lock1()`` is a slightly more complex function. It takes a list and *locks one
 of the elements* and returns it. It always chooses an element which has not
@@ -92,7 +92,7 @@ different sample.
    When you are using ``lock1()`` you will need to run ``NGLess`` multiple
    times. But you can run multiple instances in parallel.
 
-3. Preprocessing
+4. Preprocessing
 
 First, we load the data (the FastQ files)::
 
@@ -106,7 +106,7 @@ And, now, we preprocess the data::
             discard
 
 
-4. Filter against the human genome
+5. Filter against the human genome
 
 We want to remove reads which map to the human genome, so we first map the
 reads to the human genome::
@@ -129,12 +129,12 @@ to reads::
 
 Now, we will use the ``input`` object which has been filtered of human reads.
 
-5. Profiling using the IGC
+6. Profiling using the IGC
 
 .. note::
     This section of the tutorial uses the `Integrated Gene Catalogue
     <https://www.nature.com/nbt/journal/v32/n8/full/nbt.2942.html>`__ and
-    requires ca. **15GiB** of RAM. Skip to step 9 if your machine does not have
+    requires ca. **15GiB** of RAM. Skip to step 8 if your machine does not have
     this much memory.
 
 After preprocessing, we map the reads to the integrated gene catalog::
@@ -162,14 +162,14 @@ use the ``collect()`` function to aggregate across all the samples processed::
             allneeded=samples,
             ofile='igc.profiles.txt')
 
-9. Taxonomic profiling
+8. Taxonomic profiling
 
 The historical built-in mOTUs module used by older versions of this tutorial is
 not part of the current standard module surface. For current taxonomic
 profiling with mOTUs, use the external mOTUs module documented in
 `mOTUs profiling <motus3.html>`__.
 
-10. Run it!
+9. Run it!
 
 This is our script. We save it to a file (``process.ngl`` in this example) and
 run it from the command line::

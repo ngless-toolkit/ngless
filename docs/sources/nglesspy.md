@@ -1,8 +1,11 @@
 # NGLessPy: NGLess in Python
 
-**Note** As of Oct 2017, NGLess is considered beta software (we believe it
-works, but there may still be a few rough edges), while NGLessPy is alpha
-software (very experimental).
+**Note** NGLessPy is experimental software. It generates an NGLess script
+and runs it with the `ngless` binary, so the version passed to it must be one
+that your NGLess supports (`1.6` for the current version). Its automatic
+installation of NGLess (`auto_install=True`, the default in `run()`) downloads
+a very old NGLess release from a server that no longer exists, so install
+NGLess separately (see [install](install.md)) before using NGLessPy.
 
 ## Install
 
@@ -28,7 +31,7 @@ We now build an `NGLess.NGLess` object, giving it the version of ngless we wish
 
 
 ```python
-    sc = NGLess.NGLess('0.8')
+    sc = NGLess.NGLess('1.6')
 ```
 
 To simplify the rest of the script, we are going to use the short name `e` to
@@ -43,7 +46,7 @@ We can import ngless modules using the `import_` function (using `name` and
 `version`):
 
 ```python
-    sc.import_('mocat', '0.0')
+    sc.import_('mocat', '1.6')
 ```
 
 Now, we can use all NGLesss functionality. Functions get an underscore at the
@@ -88,10 +91,10 @@ This will even install NGLess if it is not available in the PATH.
 ```python
     from ngless import NGLess
 
-    sc = NGLess.NGLess('0.8')
+    sc = NGLess.NGLess('1.6')
     e = sc.env
 
-    sc.import_('mocat', '0.0')
+    sc.import_('mocat', '1.6')
 
     e.sample = sc.load_mocat_sample_('testing')
     @sc.preprocess_(e.sample, using='r')

@@ -19,7 +19,7 @@ bioconda package, so they are pulled in automatically.
 pixi only reads a manifest named exactly `pixi.toml`, so create a directory for
 the install and put the manifest there as `pixi.toml` (a ready-to-use copy ships
 in the [NGLess
-repository](https://github.com/ngless-toolkit/ngless/blob/master/pixi_install_ngless.toml)):
+repository](https://github.com/ngless-toolkit/ngless/blob/main/pixi_install_ngless.toml)):
 
     [workspace]
     channels = ["conda-forge", "https://conda.anaconda.org/bioconda"]

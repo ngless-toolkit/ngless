@@ -341,9 +341,10 @@ write(counts, ofile='output.tsv', auto_comments=[{date}, {script}, {hash}], comm
 ```
 
 - `format`: `{tsv}`, `{csv}`, `{sam}`, `{bam}`
-- Compression auto-detected from extension: `.gz`, `.bz2`, `.xz`, `.zstd`
-- `format_flags`: `[{interleaved}]`, `[{always_3_fq_files}]`
-- `compress_level=Int`, `verbose=Bool`
+- Compression auto-detected from extension: `.gz`, `.bz2`, `.xz`, `.zst`/`.zstd`
+- `format_flags`: `{interleaved}` or `{always_3_fq_files}` (a single symbol, not a list)
+- `compress_level=Int` (`verbose=Bool` is accepted but ignored)
+- Plain values (str/int/double/bool, or lists of these) can be written only to `ofile=STDOUT`
 - `write()` returns the filename used. The output *directory* is checked before the script runs, even
   when the file name is only computed at run time.
 
@@ -481,15 +482,16 @@ put them on `$PATH` and verify with `ngless --check-install`.
 ngless script.ngl                     # run a script
 ngless -j 8 script.ngl                # use 8 threads
 ngless -n script.ngl                  # validate only (no execution)
-ngless --subsample script.ngl         # quick test (discard 99% of data)
-ngless -e 'ngless "1.6"; print(ARGV)' # inline script
+ngless --subsample script.ngl         # quick test (keep 1 read in 10, max 25k per file)
+ngless -e 'println("hello")'          # inline script (version line optional)
+ngless -pe '2 * 3 + 1'                # -p prints the last value (here: 7)
 ngless --trace script.ngl             # maximum verbosity
 ngless --create-report script.ngl     # force an HTML QC report
 ngless --check-install                # verify external tools are available
 ```
 
 Key options:
-- `-j`, `--jobs`, `--threads N` — thread count
+- `-j`, `--jobs`, `--threads N` — thread count (`-j auto` = all available CPUs; not settable in config files)
 - `-t`, `--temporary-directory PATH` — temp file location
 - `--keep-temporary-files` / `--no-keep-temporary-files`
 - `-o`, `--html-report-directory PATH` — report output directory
@@ -508,7 +510,8 @@ single self-contained `index.html` (no network requests, works offline), plus `s
 `mappings.tsv`. Inline scripts (`-e`) do not write a report unless `--create-report`/`-o` is given.
 
 **`--subsample` does two things** beyond throwing away >90% of the data: it rewrites every `write()`
-so the output gains a `.subsample` extension (`results.txt` → `results.txt.subsample`), so subsampled
+so the output gains a `.subsampled` extension (`results.txt` → `results.txt.subsampled`; `collect()`
+output gets `.subsample` instead), so subsampled
 output can never be confused with the real thing; and it still builds every index and downloads every
 reference the script needs, which makes it the cheapest way to prepare a pipeline's data ahead of a
 real run. Never use it in production.

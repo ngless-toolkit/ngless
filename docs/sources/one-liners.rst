@@ -34,7 +34,7 @@ single FQ file. Otherwise, you can always do::
     write(as_reads(samfile("file.sam")),
             ofile="output.fq")
 
-which will write 3 files: ``output.1.fq``, ``output.2.fq``, and
+which will write 3 files: ``output.pair.1.fq``, ``output.pair.2.fq``, and
 ``output.singles.fq`` (the first two for the paired-end reads and the last one
 for reads without a mate).
 
@@ -42,7 +42,7 @@ Getting aligned reads from a SAM file as FASTQ file
 ---------------------------------------------------
 
 Building on the previous example. We can add a ``select()`` call to only output
-unmapped reads::
+mapped reads::
 
     $ ngless -pe 'as_reads(select(samfile("file.sam"), keep_if=[{mapped}]))' > file.fq
 

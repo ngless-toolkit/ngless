@@ -13,8 +13,8 @@
 //! directives, numeric literals and nested groups are not supported (ngless reads none of those
 //! keys). Unsupported value forms are read leniently as bare strings rather than rejected.
 //!
-//! Only the keys ngless actually reads are honoured (the `jobs` key, despite the docs, is *not*
-//! read from the config file by the Haskell binary — `nThreads` comes from the command line only).
+//! Only the keys ngless actually reads are honoured. There is no `jobs` key: the thread count comes
+//! from the command line only (`-j`/`--jobs`/`--threads`), or from the `batch` module.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -117,17 +117,18 @@ fn join(a: &str, b: &str) -> String {
 /// Build the configuration from defaults plus config files, mirroring `readConfigFiles`.
 ///
 /// The default search locations (all optional, parsed in order so a later file overrides an
-/// earlier one) are `$HOME/.config/ngless.conf`, `$HOME/.ngless.conf` and `/etc/ngless.conf`; the
-/// `cli_files` (from `-c/--config-file`, required to exist) are applied last and so take precedence.
+/// earlier one) are `/etc/ngless.conf`, `$HOME/.ngless.conf` and `$HOME/.config/ngless.conf`, so
+/// user settings override system-wide ones (Haskell read `/etc/ngless.conf` last, letting it
+/// override the user's files). The `cli_files` (from `-c/--config-file`, required to exist) are
+/// applied last and so take precedence.
 pub fn read_config_files(cli_files: &[String]) -> NgResult<Configuration> {
     let mut config = guess_configuration();
     let home = std::env::var("HOME").unwrap_or_default();
-    let mut files: Vec<(String, bool)> = Vec::new();
+    let mut files: Vec<(String, bool)> = vec![("/etc/ngless.conf".to_string(), false)];
     if !home.is_empty() {
-        files.push((join(&home, ".config/ngless.conf"), false));
         files.push((join(&home, ".ngless.conf"), false));
+        files.push((join(&home, ".config/ngless.conf"), false));
     }
-    files.push(("/etc/ngless.conf".to_string(), false));
     for f in cli_files {
         files.push((f.clone(), true));
     }

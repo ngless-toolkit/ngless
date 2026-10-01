@@ -4,7 +4,7 @@ This document describes how to integrate mOTUs3 with NGLess. You will need to re
 
 ## Step 0. Install NGLess
 
-Install NGLess following the instructions at [https://ngless.readthedocs.io/en/latest/install/](https://ngless.readthedocs.io/en/latest/install/) into a conda environment called `ngless`.
+Install NGLess following the instructions at [https://ngless.readthedocs.io/en/latest/install.html](https://ngless.readthedocs.io/en/latest/install.html) into a conda environment called `ngless`.
 
 ## Step 1. Install NGLess-contrib
 
@@ -29,7 +29,7 @@ cd /your/folder/Modules/motus.ngm/3.1
 
 Run
 
-```bash`
+```bash
 python -m venv mOTUs-3.1.0-venv && \
     source mOTUs-3.1.0-venv/bin/activate && \
     wget https://github.com/motu-tool/mOTUs/archive/3.1.0.tar.gz && \
@@ -50,7 +50,22 @@ user-data-directory = "/your/folder/"
 temporary-directory= "/scratch/your_folder/temp/"
 ```
 
-## Step 4. Run NGLess
+## Step 4. Import the module in your script
+
+The mOTUs module is not one of the modules that ship with NGLess, so it must be
+imported with `local import` (a plain `import "motus"` is an error, as it refers
+to the obsolete mOTUs v1 module that is no longer supported):
+
+```
+ngless "1.6"
+local import "motus" version "3.1"
+```
+
+NGLess looks for local modules in a `Modules` directory in the current
+directory and in the `user-data-directory` (which is why it was set to
+`/your/folder/` above).
+
+## Step 5. Run NGLess
 
 Run `ngless` with the option `--config-file /your/folder/ngless.conf` (for debugging, run `ngless` with the option `--trace`).
 

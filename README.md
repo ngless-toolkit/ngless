@@ -24,8 +24,8 @@ If you are using NGLess, please cite:
 
 ## Example
 
-    ngless "1.5"
-    input = fastq(['ctrl1.fq','ctrl2.fq','stim1.fq','stim2.fq'])
+    ngless "1.6"
+    input = paired('ctrl1.fq', 'ctrl2.fq', singles='ctrl-singles.fq')
     input = preprocess(input) using |read|:
         read = read[5:]
         read = substrim(read, min_quality=26)
@@ -125,12 +125,11 @@ For developers who have done this much more datasets for testing purposes can be
 
 NGLess was originally written in Haskell and has been reimplemented in Rust; the Haskell
 implementation was removed at the 1.6 release. The Rust sources live at the repository root
-(`Cargo.toml`, `src/`). See [`rust-migration.md`](rust-migration.md) for the port history and a
-module-by-module account of what was ported.
+(`Cargo.toml`, `src/`). See [`rust-migration.md`](rust-migration.md) for the current status and
+known gaps.
 
-Only `ngless "1.5"`+ scripts are supported. Behavioral parity with the former Haskell
-implementation (byte-identical output) is verified against the functional test suite under
-`tests/`.
+This build supports a single language version: scripts must declare `ngless "1.6"` (any other
+version, including `"1.5"`, is an error).
 
 ### Build & test
 
@@ -138,12 +137,13 @@ implementation (byte-identical output) is verified against the functional test s
     cargo test                 # unit tests
     cargo fmt --all -- --check  # formatting is enforced in CI
 
-### Functional / parity test suite
+### Functional test suite
 
-The committed `expected.*` files in each `tests/` directory were produced by the Haskell
-binary, so running the functional suite against the Rust binary *is* a parity check against
-Haskell. Point the harness at the build via `NGLESS_BIN` (it needs the external tools on
-`$PATH`; `pixi run --environment default` provides the pinned versions):
+Each `tests/` directory contains one or more scripts and committed `expected.*` files; the harness
+runs ngless and compares the actual output against them. Most baselines were originally produced
+by the Haskell binary, and the suite keeps output stable across releases (byte-for-byte parity
+with Haskell is no longer a goal). Point the harness at the build via `NGLESS_BIN` (it needs the
+external tools on `$PATH`; `pixi run --environment default` provides the pinned versions):
 
     NGLESS_BIN=target/release/ngless ./run-tests.sh          # all tests
     NGLESS_BIN=target/release/ngless ./run-tests.sh regression   # only tests/regression*

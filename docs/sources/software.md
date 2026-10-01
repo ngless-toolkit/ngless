@@ -9,8 +9,8 @@ NGLess 1.6 resolves external tools from environment variables such as
 `PATH`. The exact tool version is therefore the one installed in your
 environment. Commonly used tools are:
 
-- Samtools (used for SAM/BAM handling as well as in the [samtools module](stdlib.html#samtools-module))
-- BWA (used by [map](Functions.html#map) by default)
-- Minimap2 (used by [map](Functions.html#map) when selected as an alternative mapper)
-- Prodigal (used by [orf_find](Functions.html#orf-find))
-- Megahit (used by [assemble](Functions.html#assemble))
+- Samtools (used for SAM/BAM handling as well as in the [samtools module](stdlib.md#samtools-module))
+- BWA (used by [map](Functions.rst#map) by default)
+- Minimap2 (used by [map](Functions.rst#map) when selected as an alternative mapper)
+- Prodigal (used by [orf_find](Functions.rst#orf-find))
+- Megahit (used by [assemble](Functions.rst#assemble))

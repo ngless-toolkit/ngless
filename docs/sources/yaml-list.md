@@ -45,7 +45,7 @@ You can load a sample list with the `load_sample_list` function:
     ...
 
 
-It can also be used with the [parallel module](stdlib.html) module's
+It can also be used with the [parallel module](stdlib.md) module's
 `run_for_all_samples` function. For example:
 
     ngless "1.6"

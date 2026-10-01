@@ -29,7 +29,8 @@ using the ``|r|`` syntax.
 
 Within the preprocess block, you can modify the read in several ways:
 
-- you can trim it with the indexing operator: ``r[trim5:]`` or ``r[:-trim3]``
+- you can trim it with the indexing operator: ``r[trim5:]`` or
+  ``r[:len(r) - trim3]`` (negative indices are not supported)
 
 - you can call ``substrim``, ``endstrim`` or ``smoothtrim`` to trim the read
   based on quality scores. ``substrim`` finds the longest substring such that

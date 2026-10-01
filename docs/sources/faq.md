@@ -31,7 +31,9 @@ langugage).  There are several advantages to this approach:
    library (or any other language), we can also get some reproducibility
    guarantees. Note too that we declare the version of every script so that we
    can update the interpreter in the future without silently changing the
-   behaviour of older ones.
+   behaviour of older ones (a script declaring a version that the
+   interpreter does not support is rejected rather than run with different
+   semantics).
 
 3. Using a domain specific language makes the resulting scripts very readable
    even for non-experts as there is little boilerplate.
@@ -81,18 +83,19 @@ Like for the question above, we consider ngless to be related to but not
 overlapping with the CWL (Common Workflow Language).
 
 In particular, much of functionality of ngless can also be accessed in CWL
-workflow, using [our command line wrappers](command-line-wrappers.html) all of
+workflow, using [our command line wrappers](command-line-wrappers.md) all of
 which have CWL wrappers.
 
 Additionally, (with some limitations), you can embedded a generic NGLess script
-within a larger CWL workflow by using the `--export-cwl` functionality. For
-example, to automatically generate a wrapper for a script called
+within a larger CWL workflow by using the `--export-cwl` functionality (an
+experimental feature, which must be enabled with `--experimental-features`).
+For example, to automatically generate a wrapper for a script called
 `my-script.ngl`, call:
 
-    ngless --export-cwl=wrapper.cwl my-script.ngl
+    ngless --experimental-features --export-cwl=wrapper.cwl my-script.ngl
 
 The automatically generated `wrapper.cwl` file can now be used as a CWL tool
-within a larger pipeline. See more in the [CWL page](cwl.html).
+within a larger pipeline. See more in the [CWL page](cwl.md).
 
 ## How does ngless interact with job schedulers and HPC clusters?
 

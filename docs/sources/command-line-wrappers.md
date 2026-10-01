@@ -6,7 +6,15 @@ Python package management tools:
 
     pip install NGLessPy
 
-All of the wrappers can install NGLess if passed the `--auto-install` flag.
+```{warning}
+The wrappers in the current release of NGLessPy (0.2.2) generate scripts
+declaring `ngless "0.8"`, which NGLess 1.6 rejects, so they only work with
+NGLess 1.5 or older. Their `--auto-install` flag (and `ngless-install.py`)
+download NGLess 0.8.1 from a server that no longer exists.
+```
+
+All of the wrappers can install NGLess if passed the `--auto-install` flag
+(but see the warning above).
 
 All of these wrappers also have [Common Workflow
 Language](https://www.commonwl.org/) so that they can be used in larger
@@ -34,7 +42,7 @@ install NGLess automatically.
 
 ## ngless-count.py
 
-This is the equivalent of calling the [count function](Functions.html#count)
+This is the equivalent of calling the [count function](Functions.rst#count)
 from within NGLess:
 
     usage: ngless-count.py [-h] -i INPUT -o OUTPUT [-f FEATURES]
@@ -57,7 +65,7 @@ from within NGLess:
 
 ## ngless-map.py
 
-This is the equivalent of calling the [map function](Functions.html#map)
+This is the equivalent of calling the [map function](Functions.rst#map)
 from within NGLess.
 
     usage: ngless-map.py [-h] -i INPUT [-i2 INPUT_REVERSE] [-s INPUT_SINGLES] -o
@@ -86,7 +94,7 @@ from within NGLess.
 ## ngless-mapstats.py
 
 This is the equivalent of calling the [mapstats
-function](Functions.html#mapstats) from within NGLess. This will take a SAM/BAM
+function](Functions.rst#mapstats) from within NGLess. This will take a SAM/BAM
 file as input and produce some simple statistics.
 
     usage: ngless-mapstats.py [-h] -i INPUT -o OUTPUT [--auto-install] [--debug]
@@ -103,7 +111,7 @@ file as input and produce some simple statistics.
 
 ## ngless-select.py
 
-This is the equivalent of calling the [select function](Functions.html#select)
+This is the equivalent of calling the [select function](Functions.rst#select)
 from within NGLess:
 
     usage: ngless-select.py [-h] -i INPUT -o OUTPUT -a {keep_if,drop_if} -c
@@ -128,8 +136,8 @@ from within NGLess:
 ## ngless-trim.py
 
 This is equivalent of calling the [preprocess
-function](Functions.html#preprocess)  trimming the reads (with either
-[substrim](Functions.html#substrim) or [endstrim](Functions.html#endstrim)
+function](Functions.rst#preprocess)  trimming the reads (with either
+[substrim](Functions.rst#substrim) or [endstrim](Functions.rst#endstrim)
 depending on the arguments passed. Finally, any (trimmed) reads which are not
 of a minimum length are discard.
 
@@ -155,7 +163,7 @@ of a minimum length are discard.
 
 ## ngless-unique.py
 
-This is the equivalent of calling the [count function](Functions.html#count)
+This is the equivalent of calling the [count function](Functions.rst#count)
 from within NGLess:
 
     usage: ngless-unique.py [-h] -i INPUT -o OUTPUT [-c MAX_COPIES]

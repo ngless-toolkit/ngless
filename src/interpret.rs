@@ -4697,10 +4697,40 @@ fn execute_write(
             move_or_copy_compress(Path::new(path), &ofile, can_move, temp_files)?;
             Ok(NGLessObject::String(ofile))
         }
+        // Plain values (e.g., from `ngless -pe '1 + 2'`) can only be written to STDOUT: one value
+        // per line, formatted as `println` would.
+        other if ofile == "/dev/stdout" => {
+            let text = plain_value_lines(other).ok_or_else(|| {
+                NgError::script(format!("Cannot write {} to STDOUT.", type_label(other)))
+            })?;
+            std::io::stdout()
+                .lock()
+                .write_all(text.as_bytes())
+                .map_err(|e| NgError::new(NgErrorType::SystemError, e.to_string()))?;
+            Ok(NGLessObject::String(ofile))
+        }
         other => Err(NgError::script(format!(
             "write of {} is not implemented in this build yet.",
             type_label(other)
         ))),
+    }
+}
+
+/// Text for writing a plain value (string, number, boolean, or a list of these) to STDOUT, one
+/// value per line. `None` for any other value.
+fn plain_value_lines(v: &NGLessObject) -> Option<String> {
+    let one = |v: &NGLessObject| -> Option<String> {
+        match v {
+            NGLessObject::String(s) => Some(s.clone()),
+            NGLessObject::Integer(i) => Some(i.to_string()),
+            NGLessObject::Double(d) => Some(show_double(*d)),
+            NGLessObject::Bool(b) => Some(if *b { "True" } else { "False" }.to_string()),
+            _ => None,
+        }
+    };
+    match v {
+        NGLessObject::List(xs) => xs.iter().map(|x| one(x).map(|s| s + "\n")).collect(),
+        other => one(other).map(|s| s + "\n"),
     }
 }
 

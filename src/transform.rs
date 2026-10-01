@@ -42,16 +42,26 @@ pub fn wrap_print(body: &mut Vec<(usize, Expression)>) -> Result<(), String> {
         );
     }
     let (lno, e) = body.pop().expect("body is non-empty");
-    let wrapped = Expression::FunctionCall(
-        FuncName("write".to_string()),
-        Box::new(e),
-        vec![(
-            Variable("ofile".to_string()),
-            Expression::BuiltinConstant(Variable("STDOUT".to_string())),
-        )],
-        None,
-    );
-    body.push((lno, wrapped));
+    let write_stdout = |e: Expression| {
+        Expression::FunctionCall(
+            FuncName("write".to_string()),
+            Box::new(e),
+            vec![(
+                Variable("ofile".to_string()),
+                Expression::BuiltinConstant(Variable("STDOUT".to_string())),
+            )],
+            None,
+        )
+    };
+    // A final assignment (`x = <expr>`) is kept and the assigned variable is written (wrapping the
+    // assignment itself would write its value, which is not an expression).
+    if let Expression::Assignment(v, _) = &e {
+        let lookup = Expression::Lookup(None, v.clone());
+        body.push((lno, e));
+        body.push((lno, write_stdout(lookup)));
+    } else {
+        body.push((lno, write_stdout(e)));
+    }
     Ok(())
 }
 
@@ -1660,6 +1670,25 @@ mod tests {
                 assert!(
                     matches!(&kwargs[0].1, Expression::BuiltinConstant(Variable(v)) if v == "STDOUT")
                 );
+            }
+            other => panic!("expected a write() call, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn wrap_print_final_assignment_writes_variable() {
+        // `x = 1` as the last statement is kept, and `write(x, ofile=STDOUT)` is appended.
+        let mut body = vec![(
+            1,
+            Expression::Assignment(Variable("x".into()), Box::new(Expression::ConstInt(1))),
+        )];
+        wrap_print(&mut body).unwrap();
+        assert_eq!(body.len(), 2);
+        assert!(matches!(body[0].1, Expression::Assignment(..)));
+        match &body[1].1 {
+            Expression::FunctionCall(FuncName(f), arg, _, None) => {
+                assert_eq!(f, "write");
+                assert!(matches!(**arg, Expression::Lookup(None, Variable(ref v)) if v == "x"));
             }
             other => panic!("expected a write() call, got {other:?}"),
         }

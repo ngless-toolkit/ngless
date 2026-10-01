@@ -33,6 +33,9 @@ result to the same variable as before (see examples above).
   one of the mates mapped).
 - `some_match`: Takes a reference name and returns True if the read mapped to
   that reference name.
+- `unique`: keeps the read only if it maps to a single location (for
+  paired-end reads, both mates must map to the same reference); otherwise, all
+  its matches are removed.
 - `allbest`: eliminates matches that are not as good as the best. For NGLess,
   the number of errors (given by the `NM` field) divided by the length of the
   longest match is the fractional distance of a match. Thus, a match with 3
@@ -61,3 +64,13 @@ that it no longer reports matching).
 You can pass the flag `reverse` (i.e., `reverse=True`) to reverse the sign of
 the test.
 
+## Read sets
+
+- `name()`: the name of the sample (for example, the directory name passed to
+  `load_fastq_directory`, the sample name in a [YAML sample list](yaml-list.md),
+  or the `name` given to `group`).
+
+## Numbers
+
+- `to_string()`: converts an integer or a double to a string (e.g.,
+  `'sample' + i.to_string()`).

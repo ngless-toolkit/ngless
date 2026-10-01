@@ -14,7 +14,7 @@ needs.
 
 ## INSTALL
 
-1. install [ngless](install.html)
+1. install [ngless](install.md)
 2. install ng-meta-profiler by downloading the appropriate pipeline from github:
    [https://github.com/ngless-toolkit/ng-meta-profiler](https://github.com/ngless-toolkit/ng-meta-profiler)
 

@@ -125,8 +125,10 @@ Assignment is performed with `=` operator:
 
     variable = value
 
-A variable that is all uppercase is a constant and can only be assigned to
-once.
+A variable whose name consists only of uppercase letters (e.g., `OUTPUT`) is a
+constant and can only be assigned to once. A name containing any other
+character, such as an underscore or a digit (e.g., `OUTPUT_DIR`), is a normal
+variable.
 
 
 ## Operators

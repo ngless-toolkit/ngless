@@ -33,7 +33,7 @@ the number of reads. This may seem strange at first, but it is the intended
 behaviour.
 
 See also the [full description of all count arguments in the API
-docs](Functions.html#count).
+docs](Functions.rst#count).
 
 ## A TSV (tab-separated values) file for use in the `functional_map` argument
 

@@ -158,21 +158,16 @@ pub fn fix_cigar(prev: &str, n: i64) -> NgResult<String> {
 
 /// Re-encode an alignment record exactly as `encodeSamLine`: the twelve fields joined by tabs.
 pub fn encode_sam_line(l: &SamLine) -> String {
-    format!(
-        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-        l.qname,
-        l.flag,
-        l.rname,
-        l.pos,
-        l.mapq,
-        l.cigar,
-        l.rnext,
-        l.pnext,
-        l.tlen,
-        l.seq,
-        l.qual,
-        l.extra
-    )
+    let mandatory = format!(
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+        l.qname, l.flag, l.rname, l.pos, l.mapq, l.cigar, l.rnext, l.pnext, l.tlen, l.seq, l.qual
+    );
+    // An 11-column line (no optional fields) is written back without a trailing tab.
+    if l.extra.is_empty() {
+        mandatory
+    } else {
+        format!("{mandatory}\t{}", l.extra)
+    }
 }
 
 /// Whether a raw line is a SAM header line (mirrors `isSamHeaderString`).
@@ -180,9 +175,9 @@ pub fn is_header_line(line: &str) -> bool {
     line.starts_with('@')
 }
 
-/// Parse one alignment line, mirroring the `samP` `SimpleParser` exactly — including its quirk
-/// that the qualities use the "optional tab" parser, so an 11-column line (no extra fields)
-/// leaves `qual` empty and stores the quality string in `extra`.
+/// Parse one alignment line, mirroring the `samP` `SimpleParser`. Unlike the Haskell parser, an
+/// 11-column line (no optional fields) keeps its qualities in `qual` (Haskell left `qual` empty and
+/// stored the quality string in `extra`, which lost the qualities in `as_reads`).
 pub fn parse_sam_line(line: &str) -> NgResult<SamLine> {
     fn err(line: &str) -> NgError {
         NgError::new(
@@ -239,11 +234,11 @@ fn take_tab(input: &str) -> Option<(&str, &str)> {
     input.find('\t').map(|ix| (&input[..ix], &input[ix + 1..]))
 }
 
-/// `tabDelimOpts`: split at the first tab if present, else `("", input)`.
+/// Split at the first tab if present; otherwise the whole input is the field and nothing remains.
 fn take_tab_opt(input: &str) -> (&str, &str) {
     match input.find('\t') {
         Some(ix) => (&input[..ix], &input[ix + 1..]),
-        None => ("", input),
+        None => (input, ""),
     }
 }
 
@@ -514,12 +509,13 @@ mod tests {
     }
 
     #[test]
-    fn eleven_field_line_quirk() {
-        // No extra fields: the qualities land in `extra`, matching the Haskell parser.
+    fn eleven_field_line() {
+        // No optional fields: the qualities stay in `qual`, and the line round-trips.
         let line = "r\t0\t*\t0\t0\t*\t*\t0\t0\tACGT\tIIII";
         let l = parse_sam_line(line).unwrap();
-        assert_eq!(l.qual, "");
-        assert_eq!(l.extra, "IIII");
+        assert_eq!(l.qual, "IIII");
+        assert_eq!(l.extra, "");
+        assert_eq!(encode_sam_line(&l), line);
     }
 
     #[test]

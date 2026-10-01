@@ -23,7 +23,7 @@ provide.
 ## How to define an external module
 
 You can use the [example
-module](https://github.com/ngless-toolkit/ngless/blob/master/Modules/example-cmd.ngm/0.0/module.yaml)
+module](https://github.com/ngless-toolkit/ngless/blob/main/Modules/example-cmd.ngm/0.0/module.yaml)
 in the ngless source for inspiration. That is a complete, functional module.
 
 A module is defined by an ``YaML`` file.
@@ -38,8 +38,9 @@ Everything else is optional.
 ### References
 
 References are added with a *references* section, which is a list of
-references. A reference contains a ``fasta-file`` and (optionally) a
-``gtf-file``. For example:
+references. A reference contains a ``fasta-file`` and, optionally, either a
+``gtf-file`` (for GFF/GTF-based counting) or a ``map-file`` (a functional map,
+as used in the ``functional_map`` argument to ``count()``). For example:
 
     references:
         -
@@ -47,8 +48,22 @@ references. A reference contains a ``fasta-file`` and (optionally) a
             fasta-file: 'data/reference.fna'
             gtf-file: 'data/reference.gtf.gz'
 
-Note that the paths are relative to the module directory. The GTF file may be
+Note that the paths are relative to the module directory (absolute paths and
+URLs are also accepted; URLs are downloaded on first use). The GTF file may be
 gzipped.
+
+Alternatively, a reference can be a *packaged* reference: an archive in the
+same format as the builtin references (as produced by ``ngless
+--create-reference-pack``), which is downloaded and unpacked on first use:
+
+    references:
+        -
+            rtype: 'packaged'
+            name: 'catalog'
+            name-version: '1.0'
+            url: 'https://example.org/catalog-1.0.tar.gz'
+            has-gtf: false
+            has-mapfile: true
 
 ### Initialization
 
@@ -72,7 +87,10 @@ the module directory. However, the scripts are run with the current working
 directory of wherever the user is running the ngless protocol (so that any
 relative paths that the user specifies work as expected). To find your data
 files inside your module, ngless sets the environmental variable
-``NGLESS_MODULE_DIR`` as the path to the module directory.
+``NGLESS_MODULE_DIR`` as the path to the module directory. It also sets
+``NGLESS_NR_CORES`` to the number of threads NGLess is using (from the ``-j``
+option or the ``batch`` module), which your scripts can use to decide how many
+threads to use.
 
 
 ### Functions
@@ -105,10 +123,11 @@ To specify the unnamed argument add a ``arg1`` section, with the key ``atype``
 (argument type):
 
             arg1:
-                atype: <one of 'readset'/'mappedreadset'/'counts'/'str'/'flag'/'int'/'option'>
+                atype: <one of 'readset'/'mappedreadset'/'counts'/'sequenceset'/'str'/'flag'/'int'/'option'>
 
-The arguments of type *readset*, *mappedreadset*, and *counts* are passed as
-paths to a file on disk. **Your command is assumed to not change these, but
+The arguments of type *readset*, *mappedreadset*, *counts*, and *sequenceset*
+(a FASTA file, such as the output of ``assemble()``) are passed as paths to a
+file on disk. **Your command is assumed to not change these, but
 make a copy if necessary. Bad things will happen if you change the files.**
 You can specify more details on which kind of file you expect with the
 following optional arguments:
@@ -201,10 +220,10 @@ of the output type.
             name: "ofile"
             extension: "sam"
 
-``rtype`` must be one of ``"void"``, ``"counts"`` or ``"mappedreadset"``.
-Returning ``readset`` isn't currently supported.
+``rtype`` must be one of ``"void"``, ``"counts"``, ``"mappedreadset"``, or
+``"sequenceset"``. Returning ``readset`` isn't currently supported.
 
-If you plan to make use of [search path expansion](searchpath.html), in order
+If you plan to make use of [search path expansion](searchpath.rst), in order
 for NGLess to expand the argument prior to passing it to the external module
 you need to set ``atype: "str"`` and ``expand_searchpath: true``.
 
@@ -248,7 +267,7 @@ This is very advanced as it requires writing Rust code (the language NGLess is
 implemented in) which can then interact very deeply with the rest of ngless.
 
 For an example, you can look at the built-in `batch` module in the NGLess source tree
-([`src/batch.rs`](https://github.com/ngless-toolkit/ngless/blob/master/src/batch.rs)), which is
+([`src/batch.rs`](https://github.com/ngless-toolkit/ngless/blob/main/src/batch.rs)), which is
 self-contained. Note that `src/parallel.rs` is *not* an example: despite the name, it implements
 thread-level parallelism (the `--jobs` configuration and the parallel map helper), not the `.ngl`
 `parallel` module. That module (`lock1`, `run_for_all`, `collect`) is spread across

@@ -11,47 +11,52 @@ Configuration
 Ngless gets its configuration options from the following sources:
 
 1. Defaults/auto-configuration
-2. A global configuration file
-3. A user configuration file (typically ``$HOME/.config/ngless.conf``)
-4. A configuration file present in the current directory`
-5. A configuration file specified on the command line
-6. Command line options
+2. The global configuration file, ``/etc/ngless.conf``
+3. The user configuration files, ``$HOME/.ngless.conf`` and then
+   ``$HOME/.config/ngless.conf``
+4. Configuration files specified on the command line (with ``-c`` or
+   ``--config-file``, which can be repeated)
+5. Command line options
 
+All configuration files are optional, except those given on the command line.
 In case an option is specified more than once, the order above determines
 priority: later options take precedence.
+
+.. versionchanged:: 1.6.2
+    Previously, ``/etc/ngless.conf`` was read last and so overrode the user
+    configuration files.
 
 Configuration file format
 -------------------------
 
 NGLess configuration files are text files using assignment syntax. Here is a
-simple example, setting the temporary directory and enabling auto-detection of
-the number of threads::
+simple example, setting the temporary directory and the search path::
 
     temporary-directory = "/local/ngless-temp/"
-    jobs = "auto"
+    search-path = ["references=/share/ngless-references"]
 
 
 Options
 -------
 
-``jobs``: number of CPUs to use. You can use the keyword ``auto`` to attempt
-auto-detection (see below).
+The number of threads cannot be set in the configuration file. Use the ``-j``
+(or ``--jobs``/``--threads``) command line option (see below).
 
 ``strict-threads``: by default, NGLess will, in certain conditions, use more
-CPUs than specified by the ``jobs`` argument (in bursts of activity). This
+CPUs than specified with ``-j`` (in bursts of activity). This
 happens, for example, when it calls an external short-read-mapper (such as `bwa
 <https://bio-bwa.sourceforge.net/bwa.shtml>`__). By default, it will pass the
 threads argument through to ``bwa``. However, it will still be processing
 ``bwa``'s output using its own threads. This will results in small bursts of
-activity where the CPU usage is above ``jobs``. If you specify
+activity where the CPU usage is above the requested number of threads. If you specify
 ``--strict-threads``, however, then this behavior is curtailed and it will
 never use more threads than specified (in particular, it will call ``bwa``
 using one thread fewer than specified, while restricting itself to a single
 thread, thus even peak usage is at most the number of specified threads).
 
 ``temporary-directory``: where to keep temporary files. By default, this is the
-system defined temporary directory (either ``/tmp`` or the value of the
-``$TEMPDIR`` environment variable on Unix).
+system defined temporary directory (the value of the ``$TMPDIR`` environment
+variable or, if it is not set, ``/tmp``).
 
 ``color``: whether to use color output. Defaults to ``auto`` (i.e., print color
 if the output is a terminal), ``no`` (never use color), ``force`` (use color even
@@ -67,7 +72,18 @@ system dependent, on Linux, typically it is ``$HOME/.local/share/ngless/``).
 
 ``index-path``: user writable directory to store indices and similar data.
 
-``global-data-directory``: global data directory.
+``global-data-directory``: global data directory (default:
+``<prefix>/share/ngless/data``, where ``<prefix>`` is the directory containing
+``bin/ngless``). Reference data is installed here if it is writable (see
+`Organisms <Organisms.html>`__).
+
+``search-path``: the `search path <searchpath.html>`__ (a list of strings).
+
+``create-report``: whether to write the HTML report directory (default: true).
+
+``download-url``: base URL from which reference data, modules, and demos are
+downloaded (default: ``https://ngless-resources.big-data-biology.org/``). The
+``NGLESS_DOWNLOAD_BASE_URL`` environment variable overrides it.
 
 Debug options
 ~~~~~~~~~~~~~
@@ -76,18 +92,18 @@ Debug options
 
 ``trace`` (only command line): print a lot of internal information.
 
-Auto-detection of the number of CPUs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Number of CPUs
+~~~~~~~~~~~~~~
 
-If the option ``auto`` is passed as the number of jobs (either on the command
-line or in the configuration file), ngless will inspect the environment looking
-for a small set of clues as to how many CPUs to use. In particular, it will
-make use of these variables:
+The number of threads is set on the command line with ``-j`` (or ``--jobs`` or
+``--threads``). Passing ``auto`` (``-j auto``) uses the number of CPUs available
+to the process.
+
+When the `batch module <stdlib.html#batch-module>`__ is imported, the number of
+threads is instead taken from the CPU allocation advertised by the job
+scheduler, using the first of these variables that is set to a number:
 
 - ``OMP_NUM_THREADS``
 - ``NSLOTS``
 - ``LSB_DJOB_NUMPROC``
 - ``SLURM_CPUS_PER_TASK``
-
-If none are found (or they do not contain a single number), an error is produced.
-

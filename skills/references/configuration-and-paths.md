@@ -65,17 +65,18 @@ search-path = ["references=/opt/ngless"]
 Options are read from the following sources, **later ones overriding earlier ones**:
 
 1. Defaults / auto-configuration
-2. A global configuration file
-3. A user configuration file (typically `$HOME/.config/ngless.conf`)
-4. A configuration file in the current directory
-5. Configuration files given with `-c`/`--config-file` (repeatable)
-6. Command-line options
+2. The global configuration file, `/etc/ngless.conf`
+3. The user configuration files, `$HOME/.ngless.conf` then `$HOME/.config/ngless.conf`
+4. Configuration files given with `-c`/`--config-file` (repeatable; these must exist)
+5. Command-line options
+
+(Before this order was fixed, `/etc/ngless.conf` was read last and overrode the user files.)
+No configuration file is read from the current directory.
 
 The format is simple assignment:
 
 ```
 temporary-directory = "/local/ngless-temp/"
-jobs = "auto"
 search-path = ["references=/opt/ngless"]
 ```
 
@@ -83,18 +84,22 @@ search-path = ["references=/opt/ngless"]
 
 | Option | Meaning |
 |---|---|
-| `jobs` | Number of CPUs to use, or `"auto"` (see below) |
-| `strict-threads` | If true, never exceed `jobs` threads, even in bursts (see below) |
-| `temporary-directory` | Where to keep temporary files (default: system temp / `$TEMPDIR`) |
+| `strict-threads` | If true, never exceed the `-j` thread count, even in bursts (see below) |
+| `temporary-directory` | Where to keep temporary files (default: `$TMPDIR`, else `/tmp`) |
 | `color` | `auto` (default), `no`, `force`, `yes` (synonym of `force`) |
 | `print-header` | Whether to print the NGLess banner |
 | `user-directory` | User-writable cache for downloads (Linux default: `$HOME/.local/share/ngless/`) |
 | `user-data-directory` | User-writable data cache (default: a `data` directory inside `user-directory`) |
 | `index-path` | Where mapper indices are stored |
-| `global-data-directory` | Global data directory |
+| `global-data-directory` | Global data directory (default `<prefix>/share/ngless/data`, next to `bin/ngless`); references are installed here when it is writable, else in `user-data-directory` |
 | `keep-temporary-files` | Keep temporary files after the run (debugging) |
+| `search-path` | List of search-path entries (see Search Path Expansion) |
+| `create-report` | Whether to write the HTML run report (default true) |
+| `download-url` | Base URL for reference/module/demo downloads (`NGLESS_DOWNLOAD_BASE_URL` overrides it) |
 
-`trace` is command-line only.
+`trace` is command-line only. **There is no `jobs` key**: the thread count is set only with
+`-j`/`--jobs`/`--threads` (or by the `batch` module); a `jobs` line in a config file is silently
+ignored.
 
 Several of these have no command-line equivalent (`user-directory`, `user-data-directory`,
 `global-data-directory`, `print-header`), so a config file is the only way to set them. This is
@@ -106,22 +111,17 @@ user-data-directory = "/your/folder/"
 temporary-directory = "/scratch/your_folder/temp/"
 ```
 
-### `jobs = "auto"`
+### `-j auto` and the `batch` module
 
-With `auto`, NGLess inspects the environment for a CPU count, in particular:
-
-- `OMP_NUM_THREADS`
-- `NSLOTS`
-- `LSB_DJOB_NUMPROC`
-- `SLURM_CPUS_PER_TASK`
-
-If none is found (or none holds a single number), an error is produced. Note these are *not* the
-same variables as the `batch` module's (`LSB_JOBINDEX`, `SGE_TASK_ID`, …), though
-`SLURM_CPUS_PER_TASK` is used by both.
+`-j auto` uses the number of CPUs available to the process (it never fails). The scheduler
+variables `OMP_NUM_THREADS`, `NSLOTS`, `LSB_DJOB_NUMPROC`, `SLURM_CPUS_PER_TASK` (first one set to a
+number wins) are consulted **only** when the script imports the `batch` module, in which case they
+override `-j`. The `batch` module also reads `LSB_JOBINDEX`/`SGE_TASK_ID` for its
+`JOBINDEX_OR_0`/`JOBINDEX_VALID` constants.
 
 ### `strict-threads`
 
-By default NGLess may briefly exceed `jobs`: it passes the thread count through to an external
+By default NGLess may briefly exceed the `-j` thread count: it passes the thread count through to an external
 mapper such as `bwa` while still using its own threads to process that mapper's output. With
 `--strict-threads`, it calls `bwa` with one thread fewer and restricts itself to a single thread,
 so even peak usage stays within the limit.
@@ -193,7 +193,8 @@ ngless --create-reference-pack \
     [--functional-map-url URL]
 ```
 
-Builtin references are otherwise downloaded on first use and cached in the user directory.
+Builtin references are otherwise downloaded on first use, into `<global-data-directory>/References/`
+if that is writable (typical for a conda/pixi install) or `<user-data-directory>/References/` otherwise.
 `--subsample` is a convenient way to force all indices and downloads for a pipeline to be
 prepared without processing the real data.
 
@@ -205,5 +206,6 @@ prepared without processing the real data.
 | `NGLESS_DOWNLOAD_BASE_URL` | Override the reference/demo download server |
 | `NGLESS_MODULE_DIR` | Set by NGLess for external module commands: the module's directory |
 | `NGLESS_NR_CORES` | Set by NGLess for external module commands: the worker thread count |
-| `OMP_NUM_THREADS`, `NSLOTS`, `LSB_DJOB_NUMPROC`, `SLURM_CPUS_PER_TASK` | Consulted by `jobs = "auto"` |
+| `OMP_NUM_THREADS`, `NSLOTS`, `LSB_DJOB_NUMPROC`, `SLURM_CPUS_PER_TASK` | Thread count, when the `batch` module is imported |
+| `TMPDIR` | Default temporary directory |
 | `LSB_JOBINDEX`, `SGE_TASK_ID`, … | Consulted by the `batch` module |

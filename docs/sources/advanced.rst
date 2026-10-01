@@ -5,7 +5,8 @@ Advanced options
 Subsample mode
 ~~~~~~~~~~~~~~
 
-Subsample mode simply *throws away >90% of the data*. This allows you
+Subsample mode simply *throws away >90% of the data*: it keeps one in ten
+input reads, up to a maximum of 25,000 reads per input file. This allows you
 to quickly check whether your pipeline works as expected and the output files
 have the expected format. Subsample mode should never be used in production.
 To use it, pass the option ``--subsample`` on the command line::
@@ -24,13 +25,18 @@ run in subsample mode.
     downloaded if they have not previously been obtained.
 
 Subsample mode also changes all your ``write()`` so that the output
-files include the ``subsample`` extension. That is, a call such as::
+files include the ``subsampled`` extension. That is, a call such as::
 
     write(output, ofile='results.txt')
 
 will automatically get rewritten to::
 
-    write(output, ofile='results.txt.subsample')
+    write(output, ofile='results.txt.subsampled')
+
+When a paired-end ReadSet is written, the marker goes before the extension of
+each file (e.g., ``output.pair.1.subsampled.fq.gz``). The output of
+``collect()`` (from the `parallel module <stdlib.html#parallel-module>`__) gets
+a ``.subsample`` suffix instead.
 
 This ensures that you do not confuse subsampled results with the
 real thing.

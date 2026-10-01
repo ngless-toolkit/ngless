@@ -3,12 +3,12 @@
 Running `ngless --help` will show you all the command line options. Here we
 describe the most important ones.
 
-Most of the command line options can be set in a configuration file, which
-defaults to `~/.config/ngless.conf`, but you can set this explicitly:
+Many of the command line options can also be set in a configuration file
+(`~/.config/ngless.conf` by default), but you can pass one explicitly:
 
    --config-file ARG        Configuration files to parse
 
-The [configuraton](configuration.html) section of the manual has more
+The [configuraton](configuration.rst) section of the manual has more
 information on which options can be set in the configuration file. Whenever an
 option is set both in the config file and on the command line, then the command
 line will take priority.
@@ -23,6 +23,9 @@ should be.
 The main option is called `-j` and sets the number of threads.
 
    -j,--jobs,--threads ARG  Nr of threads to use
+
+Use `-j auto` to use all the CPUs available to the process. The number of
+threads cannot be set in the configuration file.
 
 Using `--strict-threads/--no-strict-threads` controls whether this is a strict
 or soft upper limit.
@@ -54,7 +57,7 @@ A few options are useful for debugging:
 
     -n,--validate-only       Only validate input, do not run script
     --subsample              Subsample mode: quickly test a pipeline by discarding
-                             99% of the input
+                             90% of the input (see Advanced options)
     --trace                  Set highest verbosity mode
     --no-trace               opposite of --trace
     --keep-temporary-files   Whether to keep temporary files (default is delete

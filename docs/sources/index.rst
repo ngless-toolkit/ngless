@@ -63,14 +63,18 @@ Basic functionality
 
 Ngless has builtin support for model organisms:
 
-1. Homo sapiens (hg19)
-2. Mus Muscullus (mm10)
-3. Rattus norvegicus (rn4)
+1. Homo sapiens (hg19, hg38.p7, hg38.p10)
+2. Mus musculus (mm10.p2, mm10.p5)
+3. Rattus norvegicus (rn5, rn6)
 4. Bos taurus (bosTau4)
-5. Canis familiaris (canFam2)
-6. Drosophila melanogaster (dm3)
+5. Canis familiaris (canFam3)
+6. Drosophila melanogaster (dm5, dm6)
 7. Caenorhabditis elegans (ce10)
 8. Saccharomyces cerevisiae (sacCer3)
+9. Gallus gallus (gg4, gg5)
+10. Sus scrofa (susScr11)
+
+(see `the full list <Organisms.html>`__ for details)
 
 and the standard library includes support for running many samples in parallel
 and for MOCAT-style FASTQ directory loading. External modules are available for
@@ -118,7 +122,7 @@ out a single FQ file. Otherwise, you can always do:
     write(as_reads(samfile("file.sam")),
             ofile="output.fq")
 
-which will write 3 files: ``output.1.fq``, ``output.2.fq``, and
+which will write 3 files: ``output.pair.1.fq``, ``output.pair.2.fq``, and
 ``output.singles.fq`` (the first two for the paired-end reads and the
 last one for reads without a mate).
 
@@ -126,7 +130,7 @@ Getting aligned reads from a SAM file as FASTQ file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Building on the previous example. We can add a ``select()`` call to only
-output unmapped reads:
+output mapped reads:
 
 ::
 
